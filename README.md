@@ -5,7 +5,7 @@ a GitHub CLI extension.
 
 > [!NOTE]
 > SkillView is under active development. The `main` branch is through
-> Phase 3 of the plan in [`implementation-plan.md`](./implementation-plan.md):
+> Phase 4 of the plan in [`implementation-plan.md`](./implementation-plan.md):
 > TG2 + .NET 10 Native AOT feasibility (Phase 0), environment probe +
 > capability layer + file logging + Doctor (Phase 1), local inventory
 > discovery with scan-root resolution, SKILL.md front-matter parsing,
@@ -14,7 +14,11 @@ a GitHub CLI extension.
 > (Phase 2), plus capability-gated `gh skill search` with owner/limit/page
 > controls, versioned `gh skill preview` with associated-files extraction,
 > a dedicated `SearchScreen` TUI with install-from-search staging, and
-> `search` / `preview` CLI subcommands (Phase 3).
+> `search` / `preview` CLI subcommands (Phase 3), plus the capability-gated
+> `gh skill install` adapter, `InstallScreen` TUI dialog (agent multi-select
+> checkboxes, scope `OptionSelector`, pin / force / upstream / repo-path /
+> allow-hidden-dirs / from-local controls), search→install handoff, and the
+> `install` CLI subcommand with pre/post inventory-diff rescan (Phase 4).
 
 ## Installation
 
@@ -54,6 +58,8 @@ skillview search <query>       # gh skill search adapter
 skillview search <q> --owner o --limit 50 --json
 skillview preview OWNER/REPO [SKILL] [--version <ref>] [--json]
 skillview preview OWNER/REPO@v2.0.0 SKILL  # versioned preview shorthand
+skillview install OWNER/REPO [SKILL] [--agent claude] [--scope user]
+skillview install OWNER/REPO@v1.0.0 --agent claude --agent cursor --pin --json
 skillview --debug              # Debug-level logging (flag beats SKILLVIEW_LOG env)
 skillview --scan-root <path>   # add a custom scan root (repeatable)
 ```

@@ -18,6 +18,7 @@ public sealed class TuiServices
     public required EnvironmentProbe EnvironmentProbe { get; init; }
     public required GhSkillSearchService SearchService { get; init; }
     public required GhSkillPreviewService PreviewService { get; init; }
+    public required GhSkillInstallService InstallService { get; init; }
     public required GhSkillListAdapter ListAdapter { get; init; }
     public required ScanRootResolver ScanRootResolver { get; init; }
     public required LocalSkillScanner Scanner { get; init; }
@@ -47,6 +48,7 @@ public sealed class TuiServices
             EnvironmentProbe = env,
             SearchService = new GhSkillSearchService(runner, logger),
             PreviewService = new GhSkillPreviewService(runner, logger),
+            InstallService = new GhSkillInstallService(runner, logger),
             ListAdapter = list,
             ScanRootResolver = resolver,
             Scanner = scanner,

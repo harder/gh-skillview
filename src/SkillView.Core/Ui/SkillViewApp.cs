@@ -421,7 +421,42 @@ public sealed class SkillViewApp
         screen.Show();
         if (screen.LastInstallRequest is { } req)
         {
-            SetStatus($"install staged: {req.Repo}{(req.SkillName is null ? "" : "/" + req.SkillName)} (Phase 4)");
+            OpenInstallDialog(req);
+        }
+    }
+
+    private void OpenInstallDialog(InstallRequest request)
+    {
+        if (_app is null || _ghPath is null || _lastReport is null) return;
+        var installScreen = new InstallScreen(
+            _app,
+            _services.InstallService,
+            _services.Logger,
+            _ghPath,
+            _lastReport.Capabilities,
+            request);
+        installScreen.Show();
+        if (installScreen.LastResult is { Succeeded: true } result)
+        {
+            SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…");
+            _ = Task.Run(async () =>
+            {
+                var report = _lastReport;
+                if (report is null) return;
+                var snapshot = await _services.InventoryService.CaptureAsync(
+                    report.GhPath,
+                    report.Capabilities,
+                    new LocalInventoryService.Options(
+                        ScanRoots: _options.ScanRoots,
+                        AllowHiddenDirs: false)
+                ).ConfigureAwait(false);
+                Invoke(() =>
+                    SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)"));
+            });
+        }
+        else if (installScreen.LastResult is { } failed)
+        {
+            SetStatus($"install failed (exit {failed.ExitCode}) — see logs (l)");
         }
     }
 
