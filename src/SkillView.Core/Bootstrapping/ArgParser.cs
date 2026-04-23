@@ -19,15 +19,19 @@ public static class ArgParser
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
-            if (subcommand is not null)
-            {
-                subcommandArgs.Add(arg);
-                continue;
-            }
 
+            // `--debug` is global: recognised anywhere (before or after the
+            // subcommand) per §7.1.K. Strip it from the subcommand payload so
+            // downstream parsers don't have to know about it.
             if (arg == "--debug")
             {
                 debug = true;
+                continue;
+            }
+
+            if (subcommand is not null)
+            {
+                subcommandArgs.Add(arg);
                 continue;
             }
 

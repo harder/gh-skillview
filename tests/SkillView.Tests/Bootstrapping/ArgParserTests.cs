@@ -63,4 +63,31 @@ public class ArgParserTests
         Assert.Equal("list", opts.SubcommandName);
         Assert.Equal(new[] { "--json" }, opts.SubcommandArgs);
     }
+
+    [Fact]
+    public void DebugFlagRecognisedAfterSubcommand()
+    {
+        // §7.1.K: --debug is a global flag that works on any subcommand.
+        // It's stripped from the subcommand payload so downstream parsers
+        // don't have to know about it.
+        var opts = ArgParser.Parse(
+            "skillview",
+            new[] { "list", "--json", "--debug" });
+        Assert.True(opts.Debug);
+        Assert.Equal("list", opts.SubcommandName);
+        Assert.Equal(new[] { "--json" }, opts.SubcommandArgs);
+    }
+
+    [Fact]
+    public void ScanRootAfterSubcommandIsNotConsumedAsGlobal()
+    {
+        // Only `--debug` is recognised post-subcommand. `--scan-root` is a
+        // global that must precede the subcommand; if it appears later it
+        // stays in the payload (and the subcommand parser may reject it).
+        var opts = ArgParser.Parse(
+            "skillview",
+            new[] { "list", "--scan-root", "/x" });
+        Assert.Empty(opts.ScanRoots);
+        Assert.Equal(new[] { "--scan-root", "/x" }, opts.SubcommandArgs);
+    }
 }

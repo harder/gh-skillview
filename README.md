@@ -5,7 +5,7 @@ a GitHub CLI extension.
 
 > [!NOTE]
 > SkillView is under active development. The `main` branch is through
-> Phase 6 of the plan in [`implementation-plan.md`](./implementation-plan.md):
+> Phase 7 of the plan in [`implementation-plan.md`](./implementation-plan.md):
 > TG2 + .NET 10 Native AOT feasibility (Phase 0), environment probe +
 > capability layer + file logging + Doctor (Phase 1), local inventory
 > discovery with scan-root resolution, SKILL.md front-matter parsing,
@@ -32,7 +32,12 @@ a GitHub CLI extension.
 > TUIs (`x` from Installed, `c` from the shell), `.skillview-ignore`
 > marker read/write, and the `remove` / `cleanup` CLI subcommands
 > (dry-run-by-default remove, `cleanup --apply --yes`, exportable
-> `--output` report, JSON output) (Phase 6).
+> `--output` report, JSON output) (Phase 6), plus argv parser polish
+> (`--debug` accepted anywhere, even after the subcommand), the
+> documented exit-code contract in `skillview --help`, snapshot tests
+> over every JSON-emitting subcommand (doctor / list / search /
+> preview / install / update / remove / cleanup), and dispatcher-level
+> argv-parser coverage for each subcommand (Phase 7).
 
 ## Installation
 
@@ -84,7 +89,22 @@ skillview cleanup --apply --yes            # apply: removes qualifying candidate
 skillview cleanup --output report.txt      # write exportable cleanup report
 skillview --debug              # Debug-level logging (flag beats SKILLVIEW_LOG env)
 skillview --scan-root <path>   # add a custom scan root (repeatable)
+skillview list --json --debug  # --debug is accepted anywhere on the command line
 ```
+
+### Exit codes
+
+Aligned with [cli/cli#13215](https://github.com/cli/cli/issues/13215) and
+stable across releases — scripts and agent session hooks can depend on
+these values:
+
+| Code | Meaning |
+|------|---------|
+|  0   | Success / nothing to do |
+|  1   | User-level error (input, conflict, refused destructive op) |
+|  2   | Invalid usage (bad flags, missing args) |
+| 10   | Environment error (gh missing, too old, no capability) |
+| 20   | No matches |
 
 Logs are written daily-rotated under the platform cache directory
 (`~/.cache/SkillView/logs` on Linux, `~/Library/Caches/SkillView/logs` on

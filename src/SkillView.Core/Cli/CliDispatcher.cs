@@ -12,8 +12,10 @@ using SkillView.Ui;
 
 namespace SkillView.Cli;
 
-/// Non-interactive subcommand router. Phase 1 implements `doctor`; Phase 2
-/// adds `list` and `rescan`. Phases 3–7 fill in `remove`, `cleanup`, etc.
+/// Non-interactive subcommand router. Feature-complete through Phase 7:
+/// `doctor`, `list`, `rescan`, `search`, `preview`, `install`, `update`,
+/// `remove`, `cleanup`. JSON rendering and argv parsing are factored into
+/// `internal` helpers for snapshot testing per §19.
 public static class CliDispatcher
 {
     public static async Task<int> RunAsync(AppOptions options, TuiServices services)
@@ -111,6 +113,9 @@ public static class CliDispatcher
     }
 
     private static void WriteDoctorJson(EnvironmentReport r, AppOptions options)
+        => Console.Out.WriteLine(RenderDoctorJson(r, options));
+
+    internal static string RenderDoctorJson(EnvironmentReport r, AppOptions options)
     {
         using var ms = new MemoryStream();
         using (var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -157,7 +162,7 @@ public static class CliDispatcher
 
             writer.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static void WriteFlagArray(Utf8JsonWriter writer, string name, IEnumerable<string> flags)
@@ -208,7 +213,7 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private static (string? scope, string? agent, string? path, List<string> scanRoots) ParseListArgs(
+    internal static (string? scope, string? agent, string? path, List<string> scanRoots) ParseListArgs(
         IReadOnlyList<string> args, out bool json)
     {
         json = false;
@@ -292,6 +297,11 @@ public static class CliDispatcher
     private static void WriteListJson(
         Inventory.Models.InventorySnapshot snapshot,
         CapabilityProfile capabilities)
+        => Console.Out.WriteLine(RenderListJson(snapshot, capabilities));
+
+    internal static string RenderListJson(
+        Inventory.Models.InventorySnapshot snapshot,
+        CapabilityProfile capabilities)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -344,7 +354,7 @@ public static class CliDispatcher
 
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static async Task<int> SearchAsync(AppOptions options, TuiServices services)
@@ -386,9 +396,9 @@ public static class CliDispatcher
         return response.Results.Count == 0 ? ExitCodes.NoMatches : ExitCodes.Success;
     }
 
-    private record ParsedSearchArgs(string? Query, string? Owner, int? Limit, int? Page, bool Json);
+    internal record ParsedSearchArgs(string? Query, string? Owner, int? Limit, int? Page, bool Json);
 
-    private static ParsedSearchArgs ParseSearchArgs(IReadOnlyList<string> args)
+    internal static ParsedSearchArgs ParseSearchArgs(IReadOnlyList<string> args)
     {
         string? query = null, owner = null;
         int? limit = null, page = null;
@@ -428,6 +438,9 @@ public static class CliDispatcher
     }
 
     private static void WriteSearchJson(IReadOnlyList<SearchResultSkill> rows, ParsedSearchArgs parsed)
+        => Console.Out.WriteLine(RenderSearchJson(rows, parsed));
+
+    internal static string RenderSearchJson(IReadOnlyList<SearchResultSkill> rows, ParsedSearchArgs parsed)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -452,7 +465,7 @@ public static class CliDispatcher
             w.WriteEndArray();
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static async Task<int> PreviewAsync(AppOptions options, TuiServices services)
@@ -491,9 +504,9 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool Json);
+    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool Json);
 
-    private static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
+    internal static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
     {
         string? repo = null, skill = null, version = null;
         var json = false;
@@ -523,6 +536,9 @@ public static class CliDispatcher
     }
 
     private static void WritePreviewJson(PreviewResult p)
+        => Console.Out.WriteLine(RenderPreviewJson(p));
+
+    internal static string RenderPreviewJson(PreviewResult p)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -537,7 +553,7 @@ public static class CliDispatcher
             w.WriteEndArray();
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static async Task<int> InstallAsync(AppOptions options, TuiServices services)
@@ -616,7 +632,7 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private record ParsedInstallArgs(
+    internal record ParsedInstallArgs(
         string? Repo,
         string? SkillName,
         string? Version,
@@ -631,7 +647,7 @@ public static class CliDispatcher
         bool AllowHiddenDirs,
         bool Json);
 
-    private static ParsedInstallArgs ParseInstallArgs(IReadOnlyList<string> args)
+    internal static ParsedInstallArgs ParseInstallArgs(IReadOnlyList<string> args)
     {
         string? version = null, scope = null, path = null, upstream = null, repoPath = null;
         var agents = new List<string>();
@@ -773,7 +789,7 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private record ParsedUpdateArgs(
+    internal record ParsedUpdateArgs(
         List<string> Skills,
         bool All,
         bool DryRun,
@@ -782,7 +798,7 @@ public static class CliDispatcher
         bool Yes,
         bool Json);
 
-    private static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
+    internal static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
     {
         var skills = new List<string>();
         bool all = false, dryRun = false, force = false, unpin = false, yes = false, json = false;
@@ -887,6 +903,12 @@ public static class CliDispatcher
         UpdateResult r, ParsedUpdateArgs p,
         IReadOnlyList<InstalledSkill> added,
         IReadOnlyList<UpdateDiffEntry> changed)
+        => Console.Out.WriteLine(RenderUpdateJson(r, p, added, changed));
+
+    internal static string RenderUpdateJson(
+        UpdateResult r, ParsedUpdateArgs p,
+        IReadOnlyList<InstalledSkill> added,
+        IReadOnlyList<UpdateDiffEntry> changed)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -948,7 +970,7 @@ public static class CliDispatcher
 
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     internal static IReadOnlyList<InstalledSkill> InventoryDiff(
@@ -986,6 +1008,9 @@ public static class CliDispatcher
     }
 
     private static void WriteInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
+        => Console.Out.WriteLine(RenderInstallJson(r, p, added));
+
+    internal static string RenderInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -1027,7 +1052,7 @@ public static class CliDispatcher
 
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static async Task<int> RemoveAsync(AppOptions options, TuiServices services)
@@ -1109,9 +1134,9 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private record ParsedRemoveArgs(string? Name, string? Agent, bool Yes, bool Json);
+    internal record ParsedRemoveArgs(string? Name, string? Agent, bool Yes, bool Json);
 
-    private static ParsedRemoveArgs ParseRemoveArgs(IReadOnlyList<string> args)
+    internal static ParsedRemoveArgs ParseRemoveArgs(IReadOnlyList<string> args)
     {
         string? name = null, agent = null;
         bool yes = false, json = false;
@@ -1175,6 +1200,13 @@ public static class CliDispatcher
         InstalledSkill target,
         ParsedRemoveArgs p,
         RemoveValidator.RemoveValidation validation)
+        => Console.Out.WriteLine(RenderRemoveJson(r, target, p, validation));
+
+    internal static string RenderRemoveJson(
+        RemoveService.RemoveReport r,
+        InstalledSkill target,
+        ParsedRemoveArgs p,
+        RemoveValidator.RemoveValidation validation)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -1211,7 +1243,7 @@ public static class CliDispatcher
             w.WriteEndArray();
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
     private static async Task<int> CleanupAsync(AppOptions options, TuiServices services)
@@ -1283,14 +1315,14 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private record ParsedCleanupArgs(
+    internal record ParsedCleanupArgs(
         IReadOnlyList<string>? KindFilter,
         bool Apply,
         bool Yes,
         bool Json,
         string? Output);
 
-    private static ParsedCleanupArgs ParseCleanupArgs(IReadOnlyList<string> args)
+    internal static ParsedCleanupArgs ParseCleanupArgs(IReadOnlyList<string> args)
     {
         List<string>? kinds = null;
         bool apply = false, yes = false, json = false;
@@ -1373,6 +1405,12 @@ public static class CliDispatcher
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
         ParsedCleanupArgs p)
+        => Console.Out.WriteLine(RenderCleanupJson(candidates, applied, p));
+
+    internal static string RenderCleanupJson(
+        IReadOnlyList<CleanupClassifier.Candidate> candidates,
+        IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        ParsedCleanupArgs p)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -1410,10 +1448,10 @@ public static class CliDispatcher
             }
             w.WriteEndObject();
         }
-        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
-    private static string RenderCleanupReport(IReadOnlyList<CleanupClassifier.Candidate> candidates)
+    internal static string RenderCleanupReport(IReadOnlyList<CleanupClassifier.Candidate> candidates)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"# SkillView cleanup report — {DateTimeOffset.UtcNow:O}");
@@ -1426,13 +1464,6 @@ public static class CliDispatcher
             sb.AppendLine($"  why  : {c.Reason}");
         }
         return sb.ToString();
-    }
-
-    private static int NotYetImplemented(string name, Logger logger)
-    {
-        logger.Warn("cli", $"subcommand '{name}' is not yet implemented (scheduled for Phase 2-7)");
-        Console.Error.WriteLine($"skillview: '{name}' is not yet implemented");
-        return ExitCodes.EnvironmentError;
     }
 
     private static int UnknownSubcommand(string name, Logger logger)
@@ -1492,13 +1523,22 @@ public static class CliDispatcher
                                   --apply requires --yes.
 
             Global flags:
-              --debug             Enable Debug-level logging (streams to stderr in CLI mode)
+              --debug             Enable Debug-level logging; accepted anywhere
+                                  on the command line (before or after the
+                                  subcommand). Streams to stderr in CLI mode.
               --scan-root <path>  Add a custom scan root (repeatable)
               --help | -h         Show this help
               --version | -V      Show version
 
             Environment:
               SKILLVIEW_LOG=debug  Alternative to --debug (flag takes precedence)
+
+            Exit codes (aligned with cli/cli#13215 §7.1.K):
+               0  Success / nothing to do
+               1  User-level error (input, conflict, refused destructive op)
+               2  Invalid usage (bad flags, missing args)
+              10  Environment error (gh missing / too old / no capability)
+              20  No matches
 
             With no subcommand, the TUI launches.
             """);
