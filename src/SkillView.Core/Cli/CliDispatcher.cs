@@ -2,6 +2,7 @@ using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Gh;
+using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
@@ -19,6 +20,8 @@ public static class CliDispatcher
             "doctor" => await DoctorAsync(options, services).ConfigureAwait(false),
             "list" => await ListAsync(options, services).ConfigureAwait(false),
             "rescan" => await RescanAsync(options, services).ConfigureAwait(false),
+            "search" => await SearchAsync(options, services).ConfigureAwait(false),
+            "preview" => await PreviewAsync(options, services).ConfigureAwait(false),
             "remove" or "cleanup" => NotYetImplemented(options.SubcommandName!, services.Logger),
             "--help" or "-h" or "help" => PrintHelp(),
             "--version" or "-V" => PrintVersion(),
@@ -338,6 +341,199 @@ public static class CliDispatcher
         Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
     }
 
+    private static async Task<int> SearchAsync(AppOptions options, TuiServices services)
+    {
+        var parsed = ParseSearchArgs(options.SubcommandArgs);
+        if (parsed.Query is null)
+        {
+            Console.Error.WriteLine("skillview: search requires a query");
+            Console.Error.WriteLine("usage: skillview search <query> [--owner <o>] [--limit <n>] [--json]");
+            return ExitCodes.InvalidUsage;
+        }
+
+        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        {
+            Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
+            return ExitCodes.EnvironmentError;
+        }
+
+        var response = await services.SearchService.SearchAsync(
+            report.GhPath!,
+            parsed.Query,
+            report.Capabilities,
+            new GhSkillSearchService.Options(
+                Owner: parsed.Owner,
+                Limit: parsed.Limit ?? GhSkillSearchService.DefaultLimit,
+                Page: parsed.Page ?? 1)
+        ).ConfigureAwait(false);
+
+        if (!response.Succeeded)
+        {
+            Console.Error.WriteLine($"skillview: search failed (exit {response.ExitCode}): {response.ErrorMessage}");
+            return ExitCodes.EnvironmentError;
+        }
+
+        if (parsed.Json) WriteSearchJson(response.Results, parsed);
+        else WriteSearchText(response.Results);
+
+        return response.Results.Count == 0 ? ExitCodes.NoMatches : ExitCodes.Success;
+    }
+
+    private record ParsedSearchArgs(string? Query, string? Owner, int? Limit, int? Page, bool Json);
+
+    private static ParsedSearchArgs ParseSearchArgs(IReadOnlyList<string> args)
+    {
+        string? query = null, owner = null;
+        int? limit = null, page = null;
+        var json = false;
+        for (var i = 0; i < args.Count; i++)
+        {
+            var a = args[i];
+            if (a == "--json") { json = true; continue; }
+            if (a.StartsWith("--owner=", StringComparison.Ordinal)) { owner = a["--owner=".Length..]; continue; }
+            if (a == "--owner" && i + 1 < args.Count) { owner = args[++i]; continue; }
+            if (a.StartsWith("--limit=", StringComparison.Ordinal) && int.TryParse(a["--limit=".Length..], out var l1)) { limit = l1; continue; }
+            if (a == "--limit" && i + 1 < args.Count && int.TryParse(args[i + 1], out var l2)) { limit = l2; i++; continue; }
+            if (a.StartsWith("--page=", StringComparison.Ordinal) && int.TryParse(a["--page=".Length..], out var p1)) { page = p1; continue; }
+            if (a == "--page" && i + 1 < args.Count && int.TryParse(args[i + 1], out var p2)) { page = p2; i++; continue; }
+            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            if (query is null) query = a;
+        }
+        return new ParsedSearchArgs(query, owner, limit, page, json);
+    }
+
+    private static void WriteSearchText(IReadOnlyList<SearchResultSkill> rows)
+    {
+        if (rows.Count == 0)
+        {
+            Console.Out.WriteLine("no matches");
+            return;
+        }
+        var nameWidth = Math.Max(5, rows.Max(r => (r.SkillName ?? "").Length));
+        var repoWidth = Math.Max(4, rows.Max(r => (r.Repo ?? "").Length));
+        Console.Out.WriteLine($"{"SKILL".PadRight(nameWidth)}  {"REPO".PadRight(repoWidth)}  ★       DESCRIPTION");
+        foreach (var r in rows)
+        {
+            var stars = r.Stars?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            Console.Out.WriteLine(
+                $"{(r.SkillName ?? "").PadRight(nameWidth)}  {(r.Repo ?? "").PadRight(repoWidth)}  {stars,-6}  {r.Description ?? ""}");
+        }
+    }
+
+    private static void WriteSearchJson(IReadOnlyList<SearchResultSkill> rows, ParsedSearchArgs parsed)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteString("query", parsed.Query);
+            w.WriteString("owner", parsed.Owner);
+            w.WriteNumber("limit", parsed.Limit ?? GhSkillSearchService.DefaultLimit);
+            if (parsed.Page is int pg) w.WriteNumber("page", pg);
+            w.WriteStartArray("results");
+            foreach (var r in rows)
+            {
+                w.WriteStartObject();
+                w.WriteString("skillName", r.SkillName);
+                w.WriteString("repo", r.Repo);
+                w.WriteString("namespace", r.Namespace);
+                w.WriteString("path", r.Path);
+                w.WriteString("description", r.Description);
+                if (r.Stars is int s) w.WriteNumber("stars", s);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+    }
+
+    private static async Task<int> PreviewAsync(AppOptions options, TuiServices services)
+    {
+        var parsed = ParsePreviewArgs(options.SubcommandArgs);
+        if (parsed.Repo is null)
+        {
+            Console.Error.WriteLine("skillview: preview requires a repo (OWNER/REPO)");
+            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--json]");
+            return ExitCodes.InvalidUsage;
+        }
+
+        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        {
+            Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
+            return ExitCodes.EnvironmentError;
+        }
+
+        var preview = await services.PreviewService.PreviewAsync(
+            report.GhPath!,
+            parsed.Repo,
+            parsed.SkillName,
+            parsed.Version
+        ).ConfigureAwait(false);
+
+        if (!preview.Succeeded)
+        {
+            Console.Error.WriteLine($"skillview: preview failed (exit {preview.ExitCode}): {preview.ErrorMessage}");
+            return ExitCodes.EnvironmentError;
+        }
+
+        if (parsed.Json) WritePreviewJson(preview);
+        else Console.Out.WriteLine(preview.Body);
+
+        return ExitCodes.Success;
+    }
+
+    private record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool Json);
+
+    private static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
+    {
+        string? repo = null, skill = null, version = null;
+        var json = false;
+        var positional = new List<string>();
+        for (var i = 0; i < args.Count; i++)
+        {
+            var a = args[i];
+            if (a == "--json") { json = true; continue; }
+            if (a.StartsWith("--version=", StringComparison.Ordinal)) { version = a["--version=".Length..]; continue; }
+            if (a == "--version" && i + 1 < args.Count) { version = args[++i]; continue; }
+            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            positional.Add(a);
+        }
+        if (positional.Count > 0) repo = positional[0];
+        if (positional.Count > 1) skill = positional[1];
+        // Allow `owner/repo@ref` shorthand in the first positional.
+        if (repo is not null && version is null)
+        {
+            var at = repo.LastIndexOf('@');
+            if (at > 0 && at < repo.Length - 1)
+            {
+                version = repo[(at + 1)..];
+                repo = repo[..at];
+            }
+        }
+        return new ParsedPreviewArgs(repo, skill, version, json);
+    }
+
+    private static void WritePreviewJson(PreviewResult p)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteString("repo", p.Repo);
+            w.WriteString("skillName", p.SkillName);
+            w.WriteString("version", p.Version);
+            w.WriteString("markdown", p.MarkdownBody);
+            w.WriteStartArray("associatedFiles");
+            foreach (var f in p.AssociatedFiles) w.WriteStringValue(f);
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+    }
+
     private static int NotYetImplemented(string name, Logger logger)
     {
         logger.Warn("cli", $"subcommand '{name}' is not yet implemented (scheduled for Phase 2-7)");
@@ -371,6 +567,10 @@ public static class CliDispatcher
                                   when the capability probe detects it,
                                   filesystem scan otherwise)
               rescan              Capture a fresh inventory snapshot
+              search <query> [--owner <o>] [--limit <n>] [--page <n>] [--json]
+                                  gh skill search adapter
+              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--json]
+                                  gh skill preview adapter
               remove <name>       (Phase 6) safe skill removal
               cleanup             (Phase 6) cleanup candidate review
 

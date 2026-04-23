@@ -5,13 +5,16 @@ a GitHub CLI extension.
 
 > [!NOTE]
 > SkillView is under active development. The `main` branch is through
-> Phase 2 of the plan in [`implementation-plan.md`](./implementation-plan.md):
+> Phase 3 of the plan in [`implementation-plan.md`](./implementation-plan.md):
 > TG2 + .NET 10 Native AOT feasibility (Phase 0), environment probe +
-> capability layer + file logging + Doctor (Phase 1), and local inventory
+> capability layer + file logging + Doctor (Phase 1), local inventory
 > discovery with scan-root resolution, SKILL.md front-matter parsing,
 > symlink / canonical-copy awareness, `.skillview-ignore` markers, the
 > gated `gh skill list` adapter, and `LocalInventoryService` reconciliation
-> (Phase 2).
+> (Phase 2), plus capability-gated `gh skill search` with owner/limit/page
+> controls, versioned `gh skill preview` with associated-files extraction,
+> a dedicated `SearchScreen` TUI with install-from-search staging, and
+> `search` / `preview` CLI subcommands (Phase 3).
 
 ## Installation
 
@@ -47,6 +50,10 @@ skillview list --json          # machine-readable inventory snapshot
 skillview list --scope=user    # filter by scope (project|user|custom)
 skillview list --agent=claude  # filter by agent id
 skillview rescan               # capture a fresh inventory snapshot
+skillview search <query>       # gh skill search adapter
+skillview search <q> --owner o --limit 50 --json
+skillview preview OWNER/REPO [SKILL] [--version <ref>] [--json]
+skillview preview OWNER/REPO@v2.0.0 SKILL  # versioned preview shorthand
 skillview --debug              # Debug-level logging (flag beats SKILLVIEW_LOG env)
 skillview --scan-root <path>   # add a custom scan root (repeatable)
 ```

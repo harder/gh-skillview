@@ -200,6 +200,11 @@ public sealed class SkillViewApp
             ShowInstalled();
             key.Handled = true;
         }
+        else if (rune.Value == 's' || rune.Value == 'S')
+        {
+            ShowSearchScreen();
+            key.Handled = true;
+        }
         else if (key.KeyCode == KeyCode.F1)
         {
             ShowHelp();
@@ -310,21 +315,27 @@ public sealed class SkillViewApp
         SetBusy($"preview {repo}/{pick.SkillName}…");
         try
         {
-            var text = await _services.PreviewService
+            var preview = await _services.PreviewService
                 .PreviewAsync(_ghPath, repo, pick.SkillName)
                 .ConfigureAwait(false);
             Invoke(() =>
             {
                 if (_rightPane is not null)
                 {
-                    _rightPane.Text = text;
+                    _rightPane.Text = preview.Succeeded
+                        ? preview.Body
+                        : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}";
                 }
                 if (_rightFrame is not null)
                 {
                     _rightFrame.Title = $"Preview — {repo}/{pick.SkillName}";
                 }
                 _showingLogs = false;
-                SetStatus("preview loaded");
+                SetStatus(preview.Succeeded
+                    ? (preview.AssociatedFiles.Length == 0
+                        ? "preview loaded"
+                        : $"preview loaded · {preview.AssociatedFiles.Length} file(s)")
+                    : "preview failed — see logs (l)");
             });
         }
         finally
@@ -386,9 +397,32 @@ public sealed class SkillViewApp
             "r  toggle logs pane\n" +
             "d  doctor (environment + gh capabilities)\n" +
             "I  installed skills inventory\n" +
+            "s  full search screen (owner/limit controls, install staging)\n" +
             "F1 this help\n" +
             "q  quit",
             "OK");
+    }
+
+    private void ShowSearchScreen()
+    {
+        if (_app is null) return;
+        if (_ghPath is null || _lastReport is null)
+        {
+            SetStatus("gh not ready — press 'd' for Doctor");
+            return;
+        }
+        var screen = new SearchScreen(
+            _app,
+            _services.SearchService,
+            _services.PreviewService,
+            _services.Logger,
+            _ghPath,
+            _lastReport.Capabilities);
+        screen.Show();
+        if (screen.LastInstallRequest is { } req)
+        {
+            SetStatus($"install staged: {req.Repo}{(req.SkillName is null ? "" : "/" + req.SkillName)} (Phase 4)");
+        }
     }
 
     private void ShowInstalled()
