@@ -198,7 +198,7 @@ public sealed class SearchScreen
         var limit = GhSkillSearchService.DefaultLimit;
         if (int.TryParse(_limitField?.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
         {
-            limit = n;
+            limit = Math.Clamp(n, 1, 200);
         }
 
         SetBusy($"searching '{query}'…");

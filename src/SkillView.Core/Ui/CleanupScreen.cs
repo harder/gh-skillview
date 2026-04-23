@@ -158,8 +158,16 @@ public sealed class CleanupScreen
                 _logger.Warn("cleanup", $"skipped {c.Path}: {(validation.Allowed ? "needs second confirm" : "validation refused")}");
                 continue;
             }
-            var report = _remove.Remove(validation);
-            if (report.Succeeded) removed++; else failed++;
+            try
+            {
+                var report = _remove.Remove(validation);
+                if (report.Succeeded) removed++; else failed++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                _logger.Error("cleanup.remove", $"{c.Path}: {ex.Message}");
+            }
         }
         RemovedCount += removed;
         status.Text = $" removed {removed}, skipped/failed {failed}";
