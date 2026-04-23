@@ -19,7 +19,7 @@ Phases 0–8 are complete. Current phase roadmap:
 | 6 | §12.1 safe-remove validator, `RemoveService`, cleanup classifier, `RemoveScreen` + `CleanupScreen` TUIs, CLI subcommands | ✅ Done |
 | 7 | Argv parser polish, exit-code contract, snapshot tests, dispatcher coverage | ✅ Done |
 | 8 | Release engineering — six-RID AOT matrix, SLSA attestations, end-to-end install verification | ✅ Done |
-| 9 | Hardening — UI tests, error classification, TG2 upstream contributions, contract tests | Pending |
+| 9 | Hardening — contract tests, error classification, TG2 upstream review, scan diagnostics | ✅ Done |
 
 Consult `implementation-plan.md` (§22) for detailed phase specs. Each completed
 phase has a `PHASE<N>_NOTES.md` with findings, test counts, and carry-forwards.

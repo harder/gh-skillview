@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using SkillView.Gh;
 using SkillView.Gh.Models;
@@ -49,11 +50,14 @@ public sealed class LocalInventoryService
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
 
+        var fsSw = Stopwatch.StartNew();
         var scanned = _scanner.Scan(roots, new LocalSkillScanner.Options(options.AllowHiddenDirs));
-        _logger.Info("inventory", $"filesystem scan found {scanned.Length} skill(s)");
+        fsSw.Stop();
+        _logger.Info("inventory", $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
 
         var usedGhList = false;
         ImmutableArray<GhSkillListRecord> ghRecords = ImmutableArray<GhSkillListRecord>.Empty;
+        var ghSw = Stopwatch.StartNew();
         if (ghPath is not null && capabilities.HasSkillList)
         {
             ghRecords = await _listAdapter
@@ -62,6 +66,7 @@ public sealed class LocalInventoryService
             usedGhList = true;
             _logger.Info("inventory", $"gh skill list returned {ghRecords.Length} record(s)");
         }
+        ghSw.Stop();
 
         var merged = Merge(scanned, ghRecords);
 
@@ -80,12 +85,22 @@ public sealed class LocalInventoryService
                 .ToImmutableArray();
         }
 
+        // Collect diagnostics from the scan pass.
+        var brokenCount = merged.Count(s => s.Validity == ValidityState.BrokenSymlink);
+        var diagnostics = new ScanDiagnostics
+        {
+            FsScanDuration = fsSw.Elapsed,
+            GhListDuration = usedGhList ? ghSw.Elapsed : TimeSpan.Zero,
+            BrokenSymlinksFound = brokenCount,
+        };
+
         return new InventorySnapshot
         {
             Skills = merged,
             ScannedRoots = roots,
             UsedGhSkillList = usedGhList,
             CapturedAt = DateTimeOffset.UtcNow,
+            Diagnostics = diagnostics,
         };
     }
 

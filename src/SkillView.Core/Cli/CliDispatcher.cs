@@ -190,8 +190,12 @@ public static class CliDispatcher
     private static async Task<int> RescanAsync(AppOptions options, TuiServices services)
     {
         var (snapshot, _) = await CaptureInventoryAsync(options, services).ConfigureAwait(false);
+        var d = snapshot.Diagnostics;
         Console.Out.WriteLine($"rescan: {snapshot.Skills.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
                               (snapshot.UsedGhSkillList ? " (gh skill list used)" : " (filesystem only)"));
+        Console.Out.WriteLine($"  scan: {d.FsScanDuration.TotalMilliseconds:F0}ms" +
+            (snapshot.UsedGhSkillList ? $", gh list: {d.GhListDuration.TotalMilliseconds:F0}ms" : "") +
+            (d.BrokenSymlinksFound > 0 ? $", {d.BrokenSymlinksFound} broken symlink(s)" : ""));
         return ExitCodes.Success;
     }
 

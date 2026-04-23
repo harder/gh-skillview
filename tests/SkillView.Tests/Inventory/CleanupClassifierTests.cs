@@ -124,4 +124,104 @@ public class CleanupClassifierTests : IDisposable
         var result = CleanupClassifier.Classify(snap, roots);
         Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
     }
+
+    // --- Phase 9 edge cases ---------------------------------------------
+
+    [Fact]
+    public void Classify_HiddenNestedResidue_InsideDotDir()
+    {
+        var hidden = Path.Combine(_tempRoot, ".hidden-agent", "residue");
+        Directory.CreateDirectory(hidden);
+        File.WriteAllText(Path.Combine(hidden, "SKILL.md"), "---\nname: residue\n---\nbody");
+        var skill = Skill("residue", path: hidden) with
+        {
+            Validity = ValidityState.Valid,
+        };
+        var snap = Snapshot(false, skill);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.HiddenNestedResidue);
+    }
+
+    [Fact]
+    public void Classify_HiddenNestedResidue_NotTriggeredForTopLevel()
+    {
+        var normal = Skill("normal") with { Validity = ValidityState.Valid };
+        var snap = Snapshot(false, normal);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.HiddenNestedResidue);
+    }
+
+    [Fact]
+    public void Classify_BrokenSharedMapping_ConflictingNames()
+    {
+        var sharedPath = Path.Combine(_tempRoot, "shared");
+        Directory.CreateDirectory(sharedPath);
+        File.WriteAllText(Path.Combine(sharedPath, "SKILL.md"), "---\nname: shared\n---\nbody");
+        var skill1 = Skill("name-a", path: sharedPath) with
+        {
+            Agents = ImmutableArray.Create(new AgentMembership("claude", sharedPath, false)),
+        };
+        var skill2 = Skill("name-b", path: sharedPath) with
+        {
+            Agents = ImmutableArray.Create(new AgentMembership("copilot", sharedPath, false)),
+        };
+        var snap = Snapshot(false, skill1, skill2);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.BrokenSharedMapping);
+    }
+
+    [Fact]
+    public void Classify_BrokenSharedMapping_NotTriggeredWhenNamesMatch()
+    {
+        var sharedPath = Path.Combine(_tempRoot, "shared2");
+        Directory.CreateDirectory(sharedPath);
+        var skill1 = Skill("same-name", path: sharedPath);
+        var skill2 = Skill("same-name", path: sharedPath);
+        var snap = Snapshot(false, skill1, skill2);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.BrokenSharedMapping);
+    }
+
+    [Fact]
+    public void Classify_DuplicateWithSameTreeSha_StillDetected()
+    {
+        var a = Skill("dup-sha", path: Path.Combine(_tempRoot, "a"), prov: Provenance.Both, treeSha: "abc123");
+        var b = Skill("dup-sha", path: Path.Combine(_tempRoot, "b"), prov: Provenance.FsScan, treeSha: "abc123");
+        var snap = Snapshot(false, a, b);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Duplicate);
+    }
+
+    [Fact]
+    public void Classify_MultipleEmptyDirectories()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempRoot, "empty-a"));
+        Directory.CreateDirectory(Path.Combine(_tempRoot, "empty-b"));
+        var snap = Snapshot(false);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        var emptyDirs = result.Where(c => c.Kind == CleanupClassifier.CandidateKind.EmptyDirectory).ToList();
+        Assert.Equal(2, emptyDirs.Count);
+    }
+
+    [Fact]
+    public void Classify_MalformedTakesPrecedenceOverOtherClassifications()
+    {
+        // A malformed skill that also happens to be in a hidden dir — Malformed
+        // should be emitted, not HiddenNestedResidue (malformed triggers first
+        // due to the early `continue` in the classifier loop).
+        var hidden = Path.Combine(_tempRoot, ".dotdir", "bad");
+        Directory.CreateDirectory(hidden);
+        var skill = Skill("bad", path: hidden, validity: ValidityState.MissingSkillMd);
+        var snap = Snapshot(false, skill);
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var result = CleanupClassifier.Classify(snap, roots);
+        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Malformed);
+        Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.HiddenNestedResidue);
+    }
 }

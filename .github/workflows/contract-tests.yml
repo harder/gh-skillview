@@ -1,0 +1,79 @@
+name: contract-tests
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      gh_version:
+        description: 'Override gh version (e.g., 2.91.0 or latest)'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: gh ${{ matrix.gh-version }} contract tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gh-version: '2.91.0'
+            required: true
+          - gh-version: 'latest'
+            required: false
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ !matrix.required }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install gh ${{ matrix.gh-version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ inputs.gh_version || matrix.gh-version }}"
+          if [ "$VERSION" = "latest" ]; then
+            # Install latest from GitHub's own apt repo
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+              && sudo mkdir -p -m 755 /etc/apt/keyrings \
+              && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+              && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+              && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+              && sudo apt update \
+              && sudo apt install gh -y
+          else
+            # Install pinned version from GitHub release tarball
+            ARCH="amd64"
+            URL="https://github.com/cli/cli/releases/download/v${VERSION}/gh_${VERSION}_linux_${ARCH}.tar.gz"
+            curl -fsSL "$URL" -o /tmp/gh.tar.gz
+            tar -xzf /tmp/gh.tar.gz -C /tmp
+            sudo cp "/tmp/gh_${VERSION}_linux_${ARCH}/bin/gh" /usr/local/bin/gh
+            sudo chmod +x /usr/local/bin/gh
+          fi
+          gh --version
+
+      - name: Verify gh auth
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh auth status
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run contract tests
+        env:
+          SKILLVIEW_CONTRACT_TESTS: 'true'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dotnet test --configuration Release --no-build \
+            --filter "Category=Contract" \
+            --verbosity normal
