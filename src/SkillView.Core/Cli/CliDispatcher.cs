@@ -23,6 +23,7 @@ public static class CliDispatcher
             "search" => await SearchAsync(options, services).ConfigureAwait(false),
             "preview" => await PreviewAsync(options, services).ConfigureAwait(false),
             "install" => await InstallAsync(options, services).ConfigureAwait(false),
+            "update" => await UpdateAsync(options, services).ConfigureAwait(false),
             "remove" or "cleanup" => NotYetImplemented(options.SubcommandName!, services.Logger),
             "--help" or "-h" or "help" => PrintHelp(),
             "--version" or "-V" => PrintVersion(),
@@ -676,6 +677,276 @@ public static class CliDispatcher
             upstream, repoPath, fromLocal, allowHidden, json);
     }
 
+    private static async Task<int> UpdateAsync(AppOptions options, TuiServices services)
+    {
+        var parsed = ParseUpdateArgs(options.SubcommandArgs);
+        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        {
+            Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
+            return ExitCodes.EnvironmentError;
+        }
+
+        if (!parsed.All && parsed.Skills.Count == 0 && !parsed.DryRun)
+        {
+            Console.Error.WriteLine("skillview: update requires at least one skill, --all, or --dry-run");
+            Console.Error.WriteLine(
+                "usage: skillview update [<skill>]... [--all] [--dry-run] [--force] [--unpin]" +
+                " [--yes] [--json]");
+            return ExitCodes.InvalidUsage;
+        }
+
+        // §7.1.E / §5.4: refuse `--all` without `--yes` unless the probe has
+        // confirmed `--yes`/`--non-interactive`, or the user has explicitly
+        // asked for a dry-run. This is the v2.91.0 hang-on-prompt guard.
+        if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
+        {
+            Console.Error.WriteLine(
+                "skillview: refusing `--all` without `--yes` because this `gh` build lacks --yes/--non-interactive");
+            Console.Error.WriteLine("hint: rerun with --dry-run, or name specific skills");
+            return ExitCodes.UserError;
+        }
+
+        // Pre-snapshot for diffing: additions + version changes.
+        var preSnapshot = await services.InventoryService.CaptureAsync(
+            report.GhPath,
+            report.Capabilities,
+            new Inventory.LocalInventoryService.Options(
+                ScanRoots: options.ScanRoots,
+                AllowHiddenDirs: false)
+        ).ConfigureAwait(false);
+
+        var updateOptions = new GhSkillUpdateService.Options(
+            Skills: parsed.Skills,
+            All: parsed.All,
+            DryRun: parsed.DryRun,
+            Force: parsed.Force,
+            Unpin: parsed.Unpin,
+            Yes: parsed.Yes,
+            Json: parsed.Json && report.Capabilities.SupportsUpdateJson);
+
+        var result = await services.UpdateService.UpdateAsync(
+            report.GhPath!,
+            report.Capabilities,
+            updateOptions
+        ).ConfigureAwait(false);
+
+        if (!result.Succeeded)
+        {
+            if (parsed.Json) WriteUpdateJson(result, parsed, Array.Empty<InstalledSkill>(), Array.Empty<UpdateDiffEntry>());
+            else
+            {
+                Console.Error.WriteLine($"skillview: update failed (exit {result.ExitCode}): {result.ErrorMessage}");
+                if (!string.IsNullOrWhiteSpace(result.StdErr)) Console.Error.WriteLine(result.StdErr.TrimEnd());
+            }
+            return result.ExitCode == 0 ? ExitCodes.UserError : ExitCodes.EnvironmentError;
+        }
+
+        // For dry-run we don't re-scan (no mutation); skip the diff.
+        IReadOnlyList<InstalledSkill> added;
+        IReadOnlyList<UpdateDiffEntry> changed;
+        if (parsed.DryRun)
+        {
+            added = Array.Empty<InstalledSkill>();
+            changed = Array.Empty<UpdateDiffEntry>();
+        }
+        else
+        {
+            var postSnapshot = await services.InventoryService.CaptureAsync(
+                report.GhPath,
+                report.Capabilities,
+                new Inventory.LocalInventoryService.Options(
+                    ScanRoots: options.ScanRoots,
+                    AllowHiddenDirs: false)
+            ).ConfigureAwait(false);
+            added = InventoryDiff(preSnapshot, postSnapshot);
+            changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
+        }
+
+        if (parsed.Json) WriteUpdateJson(result, parsed, added, changed);
+        else WriteUpdateText(result, parsed, added, changed);
+
+        return ExitCodes.Success;
+    }
+
+    private record ParsedUpdateArgs(
+        List<string> Skills,
+        bool All,
+        bool DryRun,
+        bool Force,
+        bool Unpin,
+        bool Yes,
+        bool Json);
+
+    private static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
+    {
+        var skills = new List<string>();
+        bool all = false, dryRun = false, force = false, unpin = false, yes = false, json = false;
+        for (var i = 0; i < args.Count; i++)
+        {
+            var a = args[i];
+            if (a == "--json") { json = true; continue; }
+            if (a == "--all") { all = true; continue; }
+            if (a == "--dry-run") { dryRun = true; continue; }
+            if (a == "--force") { force = true; continue; }
+            if (a == "--unpin") { unpin = true; continue; }
+            if (a == "--yes" || a == "--non-interactive") { yes = true; continue; }
+            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            skills.Add(a);
+        }
+        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, yes, json);
+    }
+
+    /// Per-skill TreeSha delta: skills present at the same ResolvedPath in
+    /// both snapshots where `TreeSha` changed. Captures the "updated" axis
+    /// the install diff (additions only) doesn't — Phase 4 carry-forward.
+    internal static IReadOnlyList<UpdateDiffEntry> InventoryUpdateDiff(
+        Inventory.Models.InventorySnapshot before,
+        Inventory.Models.InventorySnapshot after)
+    {
+        var beforeIndex = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
+        foreach (var s in before.Skills) beforeIndex[s.ResolvedPath] = s;
+
+        var changed = new List<UpdateDiffEntry>();
+        foreach (var a in after.Skills)
+        {
+            if (!beforeIndex.TryGetValue(a.ResolvedPath, out var b)) continue;
+            var fromSha = b.TreeSha;
+            var toSha = a.TreeSha;
+            var fromVer = b.FrontMatter.Version;
+            var toVer = a.FrontMatter.Version;
+            if (!string.Equals(fromSha, toSha, StringComparison.Ordinal) ||
+                !string.Equals(fromVer, toVer, StringComparison.Ordinal))
+            {
+                changed.Add(new UpdateDiffEntry(a.Name, a.ResolvedPath, fromVer, toVer, fromSha, toSha));
+            }
+        }
+        return changed;
+    }
+
+    internal sealed record UpdateDiffEntry(
+        string Name,
+        string ResolvedPath,
+        string? FromVersion,
+        string? ToVersion,
+        string? FromSha,
+        string? ToSha);
+
+    private static void WriteUpdateText(
+        UpdateResult r, ParsedUpdateArgs p,
+        IReadOnlyList<InstalledSkill> added,
+        IReadOnlyList<UpdateDiffEntry> changed)
+    {
+        var header = p.DryRun ? "dry-run" : "update";
+        Console.Out.WriteLine($"{header}: exit {r.ExitCode}");
+        if (!string.IsNullOrWhiteSpace(r.StdOut)) Console.Out.WriteLine(r.StdOut.TrimEnd());
+
+        if (r.Entries.Length > 0)
+        {
+            Console.Out.WriteLine();
+            Console.Out.WriteLine("parsed entries:");
+            foreach (var e in r.Entries)
+            {
+                var from = e.FromVersion ?? "?";
+                var to = e.ToVersion ?? "?";
+                Console.Out.WriteLine($"  {e.Name,-30}  {e.Status,-11}  {from} → {to}");
+            }
+        }
+
+        if (p.DryRun) return;
+
+        if (added.Count > 0)
+        {
+            Console.Out.WriteLine();
+            Console.Out.WriteLine($"rescan: +{added.Count} new skill(s)");
+            foreach (var s in added)
+                Console.Out.WriteLine($"  +  {s.Name,-24}  {s.Scope,-7}  {s.ResolvedPath}");
+        }
+        if (changed.Count > 0)
+        {
+            Console.Out.WriteLine();
+            Console.Out.WriteLine($"rescan: Δ{changed.Count} changed skill(s)");
+            foreach (var c in changed)
+            {
+                var from = c.FromVersion ?? c.FromSha ?? "?";
+                var to = c.ToVersion ?? c.ToSha ?? "?";
+                Console.Out.WriteLine($"  Δ  {c.Name,-24}  {from} → {to}  {c.ResolvedPath}");
+            }
+        }
+        if (added.Count == 0 && changed.Count == 0)
+        {
+            Console.Out.WriteLine("rescan: no inventory changes detected");
+        }
+    }
+
+    private static void WriteUpdateJson(
+        UpdateResult r, ParsedUpdateArgs p,
+        IReadOnlyList<InstalledSkill> added,
+        IReadOnlyList<UpdateDiffEntry> changed)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteBoolean("dryRun", r.DryRun);
+            w.WriteBoolean("succeeded", r.Succeeded);
+            w.WriteNumber("exitCode", r.ExitCode);
+            if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
+            w.WriteBoolean("all", p.All);
+            w.WriteBoolean("force", p.Force);
+            w.WriteBoolean("unpin", p.Unpin);
+            w.WriteBoolean("yes", p.Yes);
+
+            w.WriteStartArray("skills");
+            foreach (var s in p.Skills) w.WriteStringValue(s);
+            w.WriteEndArray();
+
+            w.WriteStartArray("commandLine");
+            foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
+            w.WriteEndArray();
+
+            w.WriteStartArray("entries");
+            foreach (var e in r.Entries)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", e.Name);
+                w.WriteString("status", e.Status);
+                w.WriteString("fromVersion", e.FromVersion);
+                w.WriteString("toVersion", e.ToVersion);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+
+            w.WriteStartArray("added");
+            foreach (var s in added)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", s.Name);
+                w.WriteString("resolvedPath", s.ResolvedPath);
+                w.WriteString("scope", s.Scope.ToString());
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+
+            w.WriteStartArray("changed");
+            foreach (var c in changed)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", c.Name);
+                w.WriteString("resolvedPath", c.ResolvedPath);
+                w.WriteString("fromVersion", c.FromVersion);
+                w.WriteString("toVersion", c.ToVersion);
+                w.WriteString("fromSha", c.FromSha);
+                w.WriteString("toSha", c.ToSha);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+
+            w.WriteEndObject();
+        }
+        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+    }
+
     internal static IReadOnlyList<InstalledSkill> InventoryDiff(
         Inventory.Models.InventorySnapshot before,
         Inventory.Models.InventorySnapshot after)
@@ -797,6 +1068,12 @@ public static class CliDispatcher
                       [--version <ref>] [--pin] [--force] [--upstream <url>]
                       [--repo-path <p>] [--from-local] [--allow-hidden-dirs] [--json]
                                   gh skill install adapter with post-install rescan
+              update [<skill>]... [--all] [--dry-run] [--force] [--unpin]
+                     [--yes] [--json]
+                                  gh skill update adapter; captures a TreeSha
+                                  inventory diff after non-dry-run updates.
+                                  Refuses --all without --yes on gh builds
+                                  lacking --yes to avoid interactive hang.
               remove <name>       (Phase 6) safe skill removal
               cleanup             (Phase 6) cleanup candidate review
 

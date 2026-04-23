@@ -205,6 +205,11 @@ public sealed class SkillViewApp
             ShowSearchScreen();
             key.Handled = true;
         }
+        else if (rune.Value == 'u' || rune.Value == 'U')
+        {
+            ShowUpdateScreen();
+            key.Handled = true;
+        }
         else if (key.KeyCode == KeyCode.F1)
         {
             ShowHelp();
@@ -398,6 +403,7 @@ public sealed class SkillViewApp
             "d  doctor (environment + gh capabilities)\n" +
             "I  installed skills inventory\n" +
             "s  full search screen (owner/limit controls, install staging)\n" +
+            "u  update installed skills (dry-run + execute)\n" +
             "F1 this help\n" +
             "q  quit",
             "OK");
@@ -458,6 +464,61 @@ public sealed class SkillViewApp
         {
             SetStatus($"install failed (exit {failed.ExitCode}) — see logs (l)");
         }
+    }
+
+    private void ShowUpdateScreen()
+    {
+        if (_app is null) return;
+        if (_ghPath is null || _lastReport is null)
+        {
+            SetStatus("gh not ready — press 'd' for Doctor");
+            return;
+        }
+        SetBusy("scanning inventory for update picker…");
+        _ = Task.Run(async () =>
+        {
+            var report = _lastReport;
+            if (report is null) return;
+            var snapshot = await _services.InventoryService.CaptureAsync(
+                report.GhPath,
+                report.Capabilities,
+                new LocalInventoryService.Options(
+                    ScanRoots: _options.ScanRoots,
+                    AllowHiddenDirs: false)
+            ).ConfigureAwait(false);
+            Invoke(() =>
+            {
+                ClearBusy();
+                var screen = new UpdateScreen(
+                    _app!,
+                    _services.UpdateService,
+                    _services.Logger,
+                    _ghPath!,
+                    report.Capabilities,
+                    snapshot.Skills);
+                screen.Show();
+                if (screen.LastResult is { DryRun: false, Succeeded: true })
+                {
+                    SetStatus("update succeeded — rescanning…");
+                    _ = Task.Run(async () =>
+                    {
+                        var post = await _services.InventoryService.CaptureAsync(
+                            report.GhPath,
+                            report.Capabilities,
+                            new LocalInventoryService.Options(
+                                ScanRoots: _options.ScanRoots,
+                                AllowHiddenDirs: false)
+                        ).ConfigureAwait(false);
+                        Invoke(() =>
+                            SetStatus($"updated — inventory now {post.Skills.Length} skill(s)"));
+                    });
+                }
+                else if (screen.LastResult is { Succeeded: false } failed)
+                {
+                    SetStatus($"update failed (exit {failed.ExitCode}) — see logs (l)");
+                }
+            });
+        });
     }
 
     private void ShowInstalled()
