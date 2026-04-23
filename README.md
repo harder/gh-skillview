@@ -50,9 +50,18 @@ gh skillview
 
 ### As a standalone binary
 
-Download the appropriate `skillview-<RID>[.exe]` asset from the
+Download the asset for your platform from the
 [latest release](https://github.com/harder/gh-skillview/releases) and place
-it on your `PATH`.
+it on your `PATH`:
+
+| Platform | Asset |
+|----------|-------|
+| Windows x64 | `skillview-win-x64.exe` |
+| Windows ARM64 | `skillview-win-arm64.exe` |
+| Linux x64 | `skillview-linux-x64` |
+| Linux ARM64 | `skillview-linux-arm64` |
+| macOS x64 (Intel) | `skillview-osx-x64` |
+| macOS ARM64 (Apple Silicon) | `skillview-osx-arm64` |
 
 ## Requirements
 

@@ -1,0 +1,10 @@
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement, feature]
+    - title: Bug Fixes
+      labels: [bug, fix]
+    - title: Maintenance
+      labels: [chore, maintenance, dependencies, ci]
+  exclude:
+    labels: [skip-changelog]

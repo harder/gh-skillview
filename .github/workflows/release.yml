@@ -82,11 +82,9 @@ jobs:
           mv "dist/app/skillview${{ matrix.ext }}" \
              "dist/out/skillview-${{ matrix.rid }}${{ matrix.ext }}"
 
-      - name: Record binary size
+      - name: Record binary sizes
         shell: bash
-        run: |
-          ls -la dist/out > dist/out/_sizes-${{ matrix.rid }}.txt
-          cat dist/out/_sizes-${{ matrix.rid }}.txt
+        run: ls -lh dist/out
 
       - uses: actions/upload-artifact@v4
         with:
@@ -103,10 +101,6 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: 'dist/gh-skillview-*,dist/skillview-*'
 
       - uses: cli/gh-extension-precompile@v2
         with:
