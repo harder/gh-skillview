@@ -242,7 +242,7 @@ public sealed class SkillViewApp
 
     private void ProbeGhAsync()
     {
-        _ = Task.Run(async () =>
+        RunBackground(async () =>
         {
             var report = await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
             _lastReport = report;
@@ -264,7 +264,7 @@ public sealed class SkillViewApp
                 return;
             }
             SetStatus($"gh {report.GhVersion} — press '/' to search, 'd' for Doctor");
-        });
+        }, "probe");
     }
 
     private async Task RunSearchAsync(string query)
@@ -444,7 +444,7 @@ public sealed class SkillViewApp
         if (installScreen.LastResult is { Succeeded: true } result)
         {
             SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…");
-            _ = Task.Run(async () =>
+            RunBackground(async () =>
             {
                 var report = _lastReport;
                 if (report is null) return;
@@ -457,7 +457,7 @@ public sealed class SkillViewApp
                 ).ConfigureAwait(false);
                 Invoke(() =>
                     SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)"));
-            });
+            }, "rescan");
         }
         else if (installScreen.LastResult is { } failed)
         {
@@ -474,7 +474,7 @@ public sealed class SkillViewApp
             return;
         }
         SetBusy("scanning inventory for update picker…");
-        _ = Task.Run(async () =>
+        RunBackground(async () =>
         {
             var report = _lastReport;
             if (report is null) return;
@@ -499,7 +499,7 @@ public sealed class SkillViewApp
                 if (screen.LastResult is { DryRun: false, Succeeded: true })
                 {
                     SetStatus("update succeeded — rescanning…");
-                    _ = Task.Run(async () =>
+                    RunBackground(async () =>
                     {
                         var post = await _services.InventoryService.CaptureAsync(
                             report.GhPath,
@@ -510,21 +510,21 @@ public sealed class SkillViewApp
                         ).ConfigureAwait(false);
                         Invoke(() =>
                             SetStatus($"updated — inventory now {post.Skills.Length} skill(s)"));
-                    });
+                    }, "rescan");
                 }
                 else if (screen.LastResult is { Succeeded: false } failed)
                 {
                     SetStatus($"update failed (exit {failed.ExitCode}) — see logs (l)");
                 }
             });
-        });
+        }, "update");
     }
 
     private void ShowInstalled()
     {
         if (_app is null) return;
         SetBusy("scanning inventory…");
-        _ = Task.Run(async () =>
+        RunBackground(async () =>
         {
             var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
             _lastReport = report;
@@ -541,7 +541,7 @@ public sealed class SkillViewApp
                 SetStatus($"{snapshot.Skills.Length} installed skill(s)");
                 InstalledScreen.Show(_app!, snapshot, target => OpenRemoveDialog(target, snapshot));
             });
-        });
+        }, "installed");
     }
 
     private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
@@ -553,7 +553,7 @@ public sealed class SkillViewApp
         if (screen.LastReport is { Succeeded: true } report)
         {
             SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…");
-            _ = Task.Run(async () =>
+            RunBackground(async () =>
             {
                 var report2 = _lastReport;
                 if (report2 is null) return;
@@ -566,7 +566,7 @@ public sealed class SkillViewApp
                 ).ConfigureAwait(false);
                 Invoke(() =>
                     SetStatus($"removed — inventory now {post.Skills.Length} skill(s)"));
-            });
+            }, "rescan");
         }
     }
 
@@ -574,7 +574,7 @@ public sealed class SkillViewApp
     {
         if (_app is null) return;
         SetBusy("scanning for cleanup candidates…");
-        _ = Task.Run(async () =>
+        RunBackground(async () =>
         {
             var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
             _lastReport = report;
@@ -595,7 +595,7 @@ public sealed class SkillViewApp
                 screen.Show();
                 SetStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
             });
-        });
+        }, "cleanup");
     }
 
     private void ShowDoctor()
@@ -608,7 +608,7 @@ public sealed class SkillViewApp
             return;
         }
         SetBusy("probing environment…");
-        _ = Task.Run(async () =>
+        RunBackground(async () =>
         {
             var report = await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
             _lastReport = report;
@@ -617,7 +617,7 @@ public sealed class SkillViewApp
                 ClearBusy();
                 DoctorScreen.Show(_app!, report);
             });
-        });
+        }, "doctor");
     }
 
     private void OnLogEntry(LogEntry _)
@@ -670,5 +670,31 @@ public sealed class SkillViewApp
             return;
         }
         _app.Invoke(action);
+    }
+
+    /// Fire-and-forget background work with exception guard. Catches any
+    /// unhandled exception, logs it, and shows a status bar message so
+    /// failures are never silently swallowed.
+    private void RunBackground(Func<Task> work, string operation)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await work().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _services.Logger.Error(operation, ex.Message);
+                Invoke(() =>
+                {
+                    ClearBusy();
+                    var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+                    SetStatus(snippet.Length > 0
+                        ? $"{operation} failed: {snippet}"
+                        : $"{operation} failed — see logs (l)");
+                });
+            }
+        });
     }
 }

@@ -191,37 +191,37 @@ public sealed class InstallScreen
         installButton.Accepting += async (_, ev) =>
         {
             ev.Handled = true;
-            if (spinner.Visible) return;
-            spinner.Visible = true;
-            spinner.AutoSpin = true;
-            status.Text = $" installing {_request.Repo}…";
-
-            var agents = new List<string>();
-            for (var i = 0; i < agentBoxes.Length; i++)
-            {
-                if (agentBoxes[i].Value == CheckState.Checked)
-                {
-                    agents.Add(KnownAgents[i]);
-                }
-            }
-            var scopeIdx = scopeSelector.Value ?? 0;
-            var scopeValue = ScopeChoices[Math.Clamp(scopeIdx, 0, ScopeChoices.Length - 1)].Value;
-
-            var options = new GhSkillInstallService.Options(
-                Agents: agents,
-                Scope: scopeValue,
-                Path: scopeValue == "custom" ? NullIfEmpty(pathField.Text) : null,
-                Version: NullIfEmpty(versionField.Text),
-                Pin: pinBox.Value == CheckState.Checked,
-                Overwrite: forceBox.Value == CheckState.Checked,
-                Upstream: _capabilities.SupportsUpstream ? NullIfEmpty(upstreamField.Text) : null,
-                AllowHiddenDirs: allowHiddenBox.Value == CheckState.Checked,
-                RepoPath: _capabilities.SupportsRepoPath ? NullIfEmpty(repoPathField.Text) : null,
-                FromLocal: fromLocalBox.Value == CheckState.Checked);
-
-            var skillName = NullIfEmpty(skillField.Text);
             try
             {
+                if (spinner.Visible) return;
+                spinner.Visible = true;
+                spinner.AutoSpin = true;
+                status.Text = $" installing {_request.Repo}…";
+
+                var agents = new List<string>();
+                for (var i = 0; i < agentBoxes.Length; i++)
+                {
+                    if (agentBoxes[i].Value == CheckState.Checked)
+                    {
+                        agents.Add(KnownAgents[i]);
+                    }
+                }
+                var scopeIdx = scopeSelector.Value ?? 0;
+                var scopeValue = ScopeChoices[Math.Clamp(scopeIdx, 0, ScopeChoices.Length - 1)].Value;
+
+                var options = new GhSkillInstallService.Options(
+                    Agents: agents,
+                    Scope: scopeValue,
+                    Path: scopeValue == "custom" ? NullIfEmpty(pathField.Text) : null,
+                    Version: NullIfEmpty(versionField.Text),
+                    Pin: pinBox.Value == CheckState.Checked,
+                    Overwrite: forceBox.Value == CheckState.Checked,
+                    Upstream: _capabilities.SupportsUpstream ? NullIfEmpty(upstreamField.Text) : null,
+                    AllowHiddenDirs: allowHiddenBox.Value == CheckState.Checked,
+                    RepoPath: _capabilities.SupportsRepoPath ? NullIfEmpty(repoPathField.Text) : null,
+                    FromLocal: fromLocalBox.Value == CheckState.Checked);
+
+                var skillName = NullIfEmpty(skillField.Text);
                 var result = await _install.InstallAsync(
                     _ghPath,
                     _request.Repo,
