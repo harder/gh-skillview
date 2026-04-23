@@ -1,0 +1,114 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write        # SLSA attestations
+  attestations: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            go_name: windows-amd64
+            ext: .exe
+          - rid: win-arm64
+            os: windows-11-arm
+            go_name: windows-arm64
+            ext: .exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            go_name: linux-amd64
+            ext: ''
+          - rid: linux-arm64
+            os: ubuntu-24.04-arm
+            go_name: linux-arm64
+            ext: ''
+          - rid: osx-x64
+            os: macos-13
+            go_name: darwin-amd64
+            ext: ''
+          - rid: osx-arm64
+            os: macos-14
+            go_name: darwin-arm64
+            ext: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux AOT toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish AOT (extension binary)
+        shell: bash
+        run: |
+          dotnet publish src/SkillView.GhExtension/SkillView.GhExtension.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true \
+            -o dist/ext
+
+      - name: Publish AOT (standalone binary)
+        shell: bash
+        run: |
+          dotnet publish src/SkillView.App/SkillView.App.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true \
+            -o dist/app
+
+      - name: Stage release assets
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/out
+          # Extension asset: Go-style naming per cli/gh-extension-precompile
+          mv "dist/ext/gh-skillview${{ matrix.ext }}" \
+             "dist/out/gh-skillview-${{ matrix.go_name }}${{ matrix.ext }}"
+          # Standalone asset: .NET RID naming
+          mv "dist/app/skillview${{ matrix.ext }}" \
+             "dist/out/skillview-${{ matrix.rid }}${{ matrix.ext }}"
+
+      - name: Record binary size
+        shell: bash
+        run: |
+          ls -la dist/out > dist/out/_sizes-${{ matrix.rid }}.txt
+          cat dist/out/_sizes-${{ matrix.rid }}.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.rid }}
+          path: dist/out/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'dist/gh-skillview-*,dist/skillview-*'
+
+      - uses: cli/gh-extension-precompile@v2
+        with:
+          build_script_override: script/build-noop.sh
+          generate_attestations: true

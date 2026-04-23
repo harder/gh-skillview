@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>skillview</AssemblyName>
+    <RootNamespace>SkillView.App</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <StripSymbols>true</StripSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SelfContained>true</SelfContained>
+    <!-- TG2 rc.4 emits IL2026/IL3050/IL3053 through its ConfigurationManager
+         reflection path. Suppressed until the upstream fix lands (§14 mandate). -->
+    <NoWarn>$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkillView.Core\SkillView.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TODO(tg2): upstream — Terminal.Gui rc.4's ConfigurationManager relies on
+         reflecting over properties tagged with ConfigProperty at module init.
+         Without rooting the assembly, AOT trimming strips those properties and
+         Scope.GetUninitializedProperty("Theme") throws at startup. -->
+    <TrimmerRootAssembly Include="Terminal.Gui" />
+  </ItemGroup>
+
+</Project>

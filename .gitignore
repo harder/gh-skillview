@@ -52,3 +52,8 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# SkillView — internal planning / phase notes kept out of public git
+implementation-plan.md
+PHASE*_NOTES.md
+dist/

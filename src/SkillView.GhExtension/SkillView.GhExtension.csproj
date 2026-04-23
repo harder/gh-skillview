@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>gh-skillview</AssemblyName>
+    <RootNamespace>SkillView.GhExtension</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <StripSymbols>true</StripSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SelfContained>true</SelfContained>
+    <!-- TG2 rc.4 emits IL2026/IL3050/IL3053 through its ConfigurationManager
+         reflection path. Suppressed until the upstream fix lands (§14 mandate). -->
+    <NoWarn>$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkillView.Core\SkillView.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TODO(tg2): upstream — mirrors SkillView.App; see that project for detail. -->
+    <TrimmerRootAssembly Include="Terminal.Gui" />
+  </ItemGroup>
+
+</Project>

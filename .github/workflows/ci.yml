@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+  aot-smoke:
+    name: AOT publish smoke (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: osx-arm64
+            os: macos-14
+          - rid: win-x64
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux AOT toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: AOT publish (standalone)
+        shell: bash
+        run: |
+          dotnet publish src/SkillView.App/SkillView.App.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true \
+            -o dist/app
+      - name: AOT publish (extension)
+        shell: bash
+        run: |
+          dotnet publish src/SkillView.GhExtension/SkillView.GhExtension.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true \
+            -o dist/ext
+      - name: Record sizes
+        shell: bash
+        run: ls -la dist/app dist/ext
