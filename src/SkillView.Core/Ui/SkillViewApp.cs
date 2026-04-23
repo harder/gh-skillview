@@ -210,6 +210,11 @@ public sealed class SkillViewApp
             ShowUpdateScreen();
             key.Handled = true;
         }
+        else if (rune.Value == 'c' || rune.Value == 'C')
+        {
+            ShowCleanupScreen();
+            key.Handled = true;
+        }
         else if (key.KeyCode == KeyCode.F1)
         {
             ShowHelp();
@@ -404,6 +409,8 @@ public sealed class SkillViewApp
             "I  installed skills inventory\n" +
             "s  full search screen (owner/limit controls, install staging)\n" +
             "u  update installed skills (dry-run + execute)\n" +
+            "c  cleanup screen (malformed, orphan, duplicate)\n" +
+            "   in Installed: x removes selected skill\n" +
             "F1 this help\n" +
             "q  quit",
             "OK");
@@ -540,7 +547,61 @@ public sealed class SkillViewApp
             {
                 ClearBusy();
                 SetStatus($"{snapshot.Skills.Length} installed skill(s)");
-                InstalledScreen.Show(_app!, snapshot);
+                InstalledScreen.Show(_app!, snapshot, target => OpenRemoveDialog(target, snapshot));
+            });
+        });
+    }
+
+    private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
+    {
+        if (_app is null) return;
+        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
+        var screen = new RemoveScreen(_app, _services.RemoveService, _services.Logger, target, validation);
+        screen.Show();
+        if (screen.LastReport is { Succeeded: true } report)
+        {
+            SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…");
+            _ = Task.Run(async () =>
+            {
+                var report2 = _lastReport;
+                if (report2 is null) return;
+                var post = await _services.InventoryService.CaptureAsync(
+                    report2.GhPath,
+                    report2.Capabilities,
+                    new LocalInventoryService.Options(
+                        ScanRoots: _options.ScanRoots,
+                        AllowHiddenDirs: false)
+                ).ConfigureAwait(false);
+                Invoke(() =>
+                    SetStatus($"removed — inventory now {post.Skills.Length} skill(s)"));
+            });
+        }
+    }
+
+    private void ShowCleanupScreen()
+    {
+        if (_app is null) return;
+        SetBusy("scanning for cleanup candidates…");
+        _ = Task.Run(async () =>
+        {
+            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            _lastReport = report;
+            var snapshot = await _services.InventoryService.CaptureAsync(
+                report.GhPath,
+                report.Capabilities,
+                new LocalInventoryService.Options(
+                    ScanRoots: _options.ScanRoots,
+                    AllowHiddenDirs: false)
+            ).ConfigureAwait(false);
+            var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
+            Invoke(() =>
+            {
+                ClearBusy();
+                var screen = new CleanupScreen(
+                    _app!, _services.RemoveService, _services.Logger,
+                    candidates, snapshot.ScannedRoots, snapshot.Skills);
+                screen.Show();
+                SetStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
             });
         });
     }

@@ -5,7 +5,7 @@ a GitHub CLI extension.
 
 > [!NOTE]
 > SkillView is under active development. The `main` branch is through
-> Phase 5 of the plan in [`implementation-plan.md`](./implementation-plan.md):
+> Phase 6 of the plan in [`implementation-plan.md`](./implementation-plan.md):
 > TG2 + .NET 10 Native AOT feasibility (Phase 0), environment probe +
 > capability layer + file logging + Doctor (Phase 1), local inventory
 > discovery with scan-root resolution, SKILL.md front-matter parsing,
@@ -23,7 +23,16 @@ a GitHub CLI extension.
 > parsing, an `UpdateScreen` TUI (skill multi-select, pinned-skill flags,
 > `--all` + `--yes` guardrails for the v2.91.0 interactive-prompt quirk),
 > and the `update` CLI subcommand with a TreeSha-axis post-update inventory
-> diff (Phase 5).
+> diff (Phase 5), plus the §12.1 safe-remove validator
+> (realpath-resolved scan-root containment, ancestor-symlink-escape
+> detection, `.git`-in-target guard, canonical-copy-with-incoming-symlinks
+> second-confirm), per-file `RemoveService`, §12.2 cleanup classifier
+> (malformed / orphan / duplicate / broken-symlink / hidden-nested /
+> broken-shared-mapping / empty-directory), `RemoveScreen` + `CleanupScreen`
+> TUIs (`x` from Installed, `c` from the shell), `.skillview-ignore`
+> marker read/write, and the `remove` / `cleanup` CLI subcommands
+> (dry-run-by-default remove, `cleanup --apply --yes`, exportable
+> `--output` report, JSON output) (Phase 6).
 
 ## Installation
 
@@ -68,6 +77,11 @@ skillview install OWNER/REPO@v1.0.0 --agent claude --agent cursor --pin --json
 skillview update [SKILL]... [--all] [--dry-run] [--force] [--unpin] [--yes] [--json]
 skillview update --dry-run                 # preview updates without mutating state
 skillview update render-md fetch-url       # update named skills only
+skillview remove render-md                 # dry-run safe removal (prints what would go)
+skillview remove render-md --yes           # execute the removal after §12.1 checks
+skillview cleanup                          # classify cleanup candidates
+skillview cleanup --apply --yes            # apply: removes qualifying candidates
+skillview cleanup --output report.txt      # write exportable cleanup report
 skillview --debug              # Debug-level logging (flag beats SKILLVIEW_LOG env)
 skillview --scan-root <path>   # add a custom scan root (repeatable)
 ```

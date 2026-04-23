@@ -24,6 +24,7 @@ public sealed class TuiServices
     public required ScanRootResolver ScanRootResolver { get; init; }
     public required LocalSkillScanner Scanner { get; init; }
     public required LocalInventoryService InventoryService { get; init; }
+    public required RemoveService RemoveService { get; init; }
     public required FileLogSink? FileLogSink { get; init; }
     public required string LogDirectory { get; init; }
 
@@ -55,6 +56,7 @@ public sealed class TuiServices
             ScanRootResolver = resolver,
             Scanner = scanner,
             InventoryService = inventory,
+            RemoveService = new RemoveService(logger),
             FileLogSink = fileLogSink,
             LogDirectory = dir,
         };

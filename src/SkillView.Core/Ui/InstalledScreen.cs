@@ -14,7 +14,7 @@ namespace SkillView.Ui;
 /// the TG2 deep-dive pass surfaces better building blocks.
 public static class InstalledScreen
 {
-    public static void Show(IApplication app, InventorySnapshot snapshot)
+    public static void Show(IApplication app, InventorySnapshot snapshot, Action<InstalledSkill>? onRemove = null)
     {
         using var dialog = new Dialog
         {
@@ -73,7 +73,7 @@ public static class InstalledScreen
             Width = Dim.Fill(),
             Text = $" {rows.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
                    (snapshot.UsedGhSkillList ? " · gh skill list ✓" : " · fs-scan only") +
-                   "   Esc/q to close",
+                   (onRemove is null ? "   Esc/q to close" : "   x=remove · Esc/q to close"),
         };
 
         dialog.Add(table, detail, footer);
@@ -82,6 +82,13 @@ public static class InstalledScreen
             if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
             {
                 app.RequestStop();
+                key.Handled = true;
+                return;
+            }
+            if ((key.AsRune.Value == 'x' || key.AsRune.Value == 'X') && onRemove is not null)
+            {
+                var i = table.SelectedRow;
+                if (i >= 0 && i < rows.Length) onRemove(rows[i]);
                 key.Handled = true;
             }
         };

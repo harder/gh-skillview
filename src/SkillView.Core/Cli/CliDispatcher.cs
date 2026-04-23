@@ -1,8 +1,11 @@
+using System.Collections.Immutable;
+using System.IO;
 using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
+using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
@@ -24,7 +27,8 @@ public static class CliDispatcher
             "preview" => await PreviewAsync(options, services).ConfigureAwait(false),
             "install" => await InstallAsync(options, services).ConfigureAwait(false),
             "update" => await UpdateAsync(options, services).ConfigureAwait(false),
-            "remove" or "cleanup" => NotYetImplemented(options.SubcommandName!, services.Logger),
+            "remove" => await RemoveAsync(options, services).ConfigureAwait(false),
+            "cleanup" => await CleanupAsync(options, services).ConfigureAwait(false),
             "--help" or "-h" or "help" => PrintHelp(),
             "--version" or "-V" => PrintVersion(),
             _ => UnknownSubcommand(options.SubcommandName ?? "<null>", services.Logger),
@@ -1026,6 +1030,404 @@ public static class CliDispatcher
         Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
     }
 
+    private static async Task<int> RemoveAsync(AppOptions options, TuiServices services)
+    {
+        var parsed = ParseRemoveArgs(options.SubcommandArgs);
+        if (parsed.Name is null)
+        {
+            Console.Error.WriteLine("skillview: remove requires a skill name");
+            Console.Error.WriteLine("usage: skillview remove <name> [--agent <id>] [--yes] [--json]");
+            return ExitCodes.InvalidUsage;
+        }
+
+        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var snapshot = await services.InventoryService.CaptureAsync(
+            report.GhPath,
+            report.Capabilities,
+            new Inventory.LocalInventoryService.Options(
+                ScanRoots: options.ScanRoots,
+                AllowHiddenDirs: false)
+        ).ConfigureAwait(false);
+
+        var matches = snapshot.Skills
+            .Where(s => string.Equals(s.Name, parsed.Name, StringComparison.OrdinalIgnoreCase))
+            .Where(s => parsed.Agent is null || s.Agents.Any(a => string.Equals(a.AgentId, parsed.Agent, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            Console.Error.WriteLine($"skillview: no installed skill named '{parsed.Name}'" +
+                (parsed.Agent is null ? "" : $" for agent '{parsed.Agent}'"));
+            return ExitCodes.NoMatches;
+        }
+        if (matches.Count > 1)
+        {
+            Console.Error.WriteLine($"skillview: {matches.Count} skills match '{parsed.Name}' — narrow with --agent");
+            foreach (var m in matches) Console.Error.WriteLine($"  · {m.ResolvedPath} ({string.Join(",", m.Agents.Select(a => a.AgentId))})");
+            return ExitCodes.UserError;
+        }
+
+        var target = matches[0];
+        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
+
+        RemoveService.RemoveReport result;
+        if (!validation.Allowed)
+        {
+            result = new RemoveService.RemoveReport(
+                Succeeded: false,
+                ResolvedPath: validation.ResolvedPath,
+                FilesDeleted: 0,
+                DirectoriesDeleted: 0,
+                Errors: validation.Errors.Select(e => $"{e.Kind}: {e.Detail}").ToImmutableArray(),
+                DryRun: false);
+        }
+        else if (validation.RequiresSecondConfirm && !parsed.Yes)
+        {
+            result = new RemoveService.RemoveReport(
+                Succeeded: false,
+                ResolvedPath: validation.ResolvedPath,
+                FilesDeleted: 0,
+                DirectoriesDeleted: 0,
+                Errors: validation.Warnings.Select(w => $"warning {w.Kind}: {w.Detail} (pass --yes to accept)").ToImmutableArray(),
+                DryRun: false);
+        }
+        else if (!parsed.Yes)
+        {
+            result = services.RemoveService.Remove(validation, new RemoveService.Options(DryRun: true));
+        }
+        else
+        {
+            result = services.RemoveService.Remove(validation);
+        }
+
+        if (parsed.Json) WriteRemoveJson(result, target, parsed, validation);
+        else WriteRemoveText(result, target, parsed, validation);
+
+        if (!validation.Allowed) return ExitCodes.UserError;
+        if (validation.RequiresSecondConfirm && !parsed.Yes) return ExitCodes.UserError;
+        if (!result.Succeeded) return ExitCodes.EnvironmentError;
+        return ExitCodes.Success;
+    }
+
+    private record ParsedRemoveArgs(string? Name, string? Agent, bool Yes, bool Json);
+
+    private static ParsedRemoveArgs ParseRemoveArgs(IReadOnlyList<string> args)
+    {
+        string? name = null, agent = null;
+        bool yes = false, json = false;
+        for (var i = 0; i < args.Count; i++)
+        {
+            var a = args[i];
+            if (a == "--json") { json = true; continue; }
+            if (a == "--yes" || a == "-y") { yes = true; continue; }
+            if (a.StartsWith("--agent=", StringComparison.Ordinal)) { agent = a["--agent=".Length..]; continue; }
+            if (a == "--agent" && i + 1 < args.Count) { agent = args[++i]; continue; }
+            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            if (name is null) name = a;
+        }
+        return new ParsedRemoveArgs(name, agent, yes, json);
+    }
+
+    private static void WriteRemoveText(
+        RemoveService.RemoveReport r,
+        InstalledSkill target,
+        ParsedRemoveArgs p,
+        RemoveValidator.RemoveValidation validation)
+    {
+        Console.Out.WriteLine($"{(r.DryRun ? "remove (dry-run)" : "remove")}: {target.Name}");
+        Console.Out.WriteLine($"  path     : {target.ResolvedPath}");
+        Console.Out.WriteLine($"  resolved : {validation.ResolvedPath}");
+        Console.Out.WriteLine($"  scope    : {target.Scope}");
+        if (validation.Errors.Length > 0)
+        {
+            Console.Error.WriteLine("REFUSED:");
+            foreach (var e in validation.Errors) Console.Error.WriteLine($"  ✗ {e.Kind}: {e.Detail}");
+            return;
+        }
+        if (validation.Warnings.Length > 0)
+        {
+            Console.Error.WriteLine("WARNINGS:");
+            foreach (var w in validation.Warnings) Console.Error.WriteLine($"  ! {w.Kind}: {w.Detail}");
+            if (!p.Yes)
+            {
+                Console.Error.WriteLine("hint: rerun with --yes to accept the warnings");
+                return;
+            }
+        }
+        if (r.DryRun)
+        {
+            Console.Out.WriteLine($"  would remove: {r.FilesDeleted} file(s), {r.DirectoriesDeleted} dir(s)");
+            Console.Out.WriteLine("  (dry-run; rerun with --yes to execute)");
+        }
+        else if (r.Succeeded)
+        {
+            Console.Out.WriteLine($"  removed: {r.FilesDeleted} file(s), {r.DirectoriesDeleted} dir(s)");
+        }
+        else
+        {
+            Console.Error.WriteLine($"  remove failed with {r.Errors.Length} error(s)");
+            foreach (var e in r.Errors) Console.Error.WriteLine($"  · {e}");
+        }
+    }
+
+    private static void WriteRemoveJson(
+        RemoveService.RemoveReport r,
+        InstalledSkill target,
+        ParsedRemoveArgs p,
+        RemoveValidator.RemoveValidation validation)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteBoolean("dryRun", r.DryRun);
+            w.WriteBoolean("succeeded", r.Succeeded);
+            w.WriteBoolean("allowed", validation.Allowed);
+            w.WriteString("name", target.Name);
+            w.WriteString("resolvedPath", validation.ResolvedPath);
+            w.WriteString("scope", target.Scope.ToString());
+            w.WriteNumber("filesDeleted", r.FilesDeleted);
+            w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
+            w.WriteStartArray("errors");
+            foreach (var e in validation.Errors)
+            {
+                w.WriteStartObject();
+                w.WriteString("kind", e.Kind.ToString());
+                w.WriteString("detail", e.Detail);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteStartArray("warnings");
+            foreach (var warn in validation.Warnings)
+            {
+                w.WriteStartObject();
+                w.WriteString("kind", warn.Kind.ToString());
+                w.WriteString("detail", warn.Detail);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteStartArray("runtimeErrors");
+            foreach (var e in r.Errors) w.WriteStringValue(e);
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+    }
+
+    private static async Task<int> CleanupAsync(AppOptions options, TuiServices services)
+    {
+        var parsed = ParseCleanupArgs(options.SubcommandArgs);
+        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var snapshot = await services.InventoryService.CaptureAsync(
+            report.GhPath,
+            report.Capabilities,
+            new Inventory.LocalInventoryService.Options(
+                ScanRoots: options.ScanRoots,
+                AllowHiddenDirs: false)
+        ).ConfigureAwait(false);
+
+        var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
+        if (parsed.KindFilter is { Count: > 0 })
+        {
+            candidates = candidates.Where(c => parsed.KindFilter.Contains(c.Kind.ToString(), StringComparer.OrdinalIgnoreCase)).ToImmutableArray();
+        }
+
+        var applied = new List<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)>();
+        if (parsed.Apply)
+        {
+            if (!parsed.Yes)
+            {
+                Console.Error.WriteLine("skillview: cleanup --apply requires --yes");
+                return ExitCodes.UserError;
+            }
+            foreach (var c in candidates)
+            {
+                RemoveValidator.RemoveValidation validation;
+                if (c.Skill is not null)
+                {
+                    validation = RemoveValidator.Validate(c.Skill, snapshot.ScannedRoots, snapshot.Skills);
+                }
+                else
+                {
+                    validation = SyntheticEmptyDirValidation(c.Path, snapshot.ScannedRoots);
+                }
+                if (!validation.Allowed || validation.RequiresSecondConfirm)
+                {
+                    applied.Add((c, RemoveService.RemoveReport.Refused(validation.ResolvedPath,
+                        validation.Allowed ? "requires second-confirm" : "validation refused")));
+                    continue;
+                }
+                applied.Add((c, services.RemoveService.Remove(validation)));
+            }
+        }
+
+        if (parsed.Json) WriteCleanupJson(candidates, applied, parsed);
+        else WriteCleanupText(candidates, applied, parsed);
+
+        if (parsed.Output is not null)
+        {
+            try
+            {
+                File.WriteAllText(parsed.Output, RenderCleanupReport(candidates));
+                Console.Error.WriteLine($"wrote report to {parsed.Output}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"skillview: failed to write {parsed.Output}: {ex.Message}");
+                return ExitCodes.EnvironmentError;
+            }
+        }
+
+        if (candidates.Length == 0) return ExitCodes.Success;
+        if (parsed.Apply && applied.Any(a => !a.R.Succeeded)) return ExitCodes.UserError;
+        return ExitCodes.Success;
+    }
+
+    private record ParsedCleanupArgs(
+        IReadOnlyList<string>? KindFilter,
+        bool Apply,
+        bool Yes,
+        bool Json,
+        string? Output);
+
+    private static ParsedCleanupArgs ParseCleanupArgs(IReadOnlyList<string> args)
+    {
+        List<string>? kinds = null;
+        bool apply = false, yes = false, json = false;
+        string? output = null;
+        for (var i = 0; i < args.Count; i++)
+        {
+            var a = args[i];
+            if (a == "--apply") { apply = true; continue; }
+            if (a == "--yes" || a == "-y") { yes = true; continue; }
+            if (a == "--json") { json = true; continue; }
+            if (a.StartsWith("--candidates=", StringComparison.Ordinal))
+            {
+                kinds = a["--candidates=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+                continue;
+            }
+            if (a == "--candidates" && i + 1 < args.Count)
+            {
+                kinds = args[++i].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+                continue;
+            }
+            if (a.StartsWith("--output=", StringComparison.Ordinal)) { output = a["--output=".Length..]; continue; }
+            if (a == "--output" && i + 1 < args.Count) { output = args[++i]; continue; }
+        }
+        return new ParsedCleanupArgs(kinds, apply, yes, json, output);
+    }
+
+    private static RemoveValidator.RemoveValidation SyntheticEmptyDirValidation(
+        string path,
+        IReadOnlyList<ScanRoot> scanRoots)
+    {
+        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
+        var inside = false;
+        foreach (var root in scanRoots)
+        {
+            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
+        }
+        if (!inside)
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.OutsideKnownRoots,
+                $"'{path}' not inside any scan root"));
+        }
+        if (Directory.Exists(Path.Combine(path, ".git")))
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.ContainsGitDirectory,
+                $"'{path}' contains .git"));
+        }
+        return new RemoveValidator.RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            path,
+            ImmutableArray<string>.Empty);
+    }
+
+    private static void WriteCleanupText(
+        IReadOnlyList<CleanupClassifier.Candidate> candidates,
+        IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        ParsedCleanupArgs p)
+    {
+        Console.Out.WriteLine($"cleanup: {candidates.Count} candidate(s){(p.Apply ? " (--apply)" : "")}");
+        foreach (var c in candidates)
+        {
+            Console.Out.WriteLine($"  {c.Kind,-22}  {c.Path}");
+            Console.Out.WriteLine($"    why: {c.Reason}");
+        }
+        if (applied.Count > 0)
+        {
+            var ok = applied.Count(a => a.R.Succeeded);
+            Console.Out.WriteLine();
+            Console.Out.WriteLine($"applied: {ok}/{applied.Count} succeeded");
+            foreach (var (c, r) in applied.Where(a => !a.R.Succeeded))
+            {
+                Console.Out.WriteLine($"  ✗ {c.Path}: {string.Join("; ", r.Errors)}");
+            }
+        }
+    }
+
+    private static void WriteCleanupJson(
+        IReadOnlyList<CleanupClassifier.Candidate> candidates,
+        IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        ParsedCleanupArgs p)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        {
+            w.WriteStartObject();
+            w.WriteBoolean("apply", p.Apply);
+            w.WriteNumber("candidates", candidates.Count);
+            w.WriteStartArray("entries");
+            foreach (var c in candidates)
+            {
+                w.WriteStartObject();
+                w.WriteString("kind", c.Kind.ToString());
+                w.WriteString("path", c.Path);
+                w.WriteString("reason", c.Reason);
+                w.WriteString("name", c.Skill?.Name);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            if (p.Apply)
+            {
+                w.WriteStartArray("applied");
+                foreach (var (c, r) in applied)
+                {
+                    w.WriteStartObject();
+                    w.WriteString("path", c.Path);
+                    w.WriteBoolean("succeeded", r.Succeeded);
+                    w.WriteNumber("filesDeleted", r.FilesDeleted);
+                    w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
+                    w.WriteStartArray("errors");
+                    foreach (var e in r.Errors) w.WriteStringValue(e);
+                    w.WriteEndArray();
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+            }
+            w.WriteEndObject();
+        }
+        Console.Out.WriteLine(System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+    }
+
+    private static string RenderCleanupReport(IReadOnlyList<CleanupClassifier.Candidate> candidates)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# SkillView cleanup report — {DateTimeOffset.UtcNow:O}");
+        sb.AppendLine($"candidates: {candidates.Count}");
+        foreach (var c in candidates)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"- kind : {c.Kind}");
+            sb.AppendLine($"  path : {c.Path}");
+            sb.AppendLine($"  why  : {c.Reason}");
+        }
+        return sb.ToString();
+    }
+
     private static int NotYetImplemented(string name, Logger logger)
     {
         logger.Warn("cli", $"subcommand '{name}' is not yet implemented (scheduled for Phase 2-7)");
@@ -1074,8 +1476,20 @@ public static class CliDispatcher
                                   inventory diff after non-dry-run updates.
                                   Refuses --all without --yes on gh builds
                                   lacking --yes to avoid interactive hang.
-              remove <name>       (Phase 6) safe skill removal
-              cleanup             (Phase 6) cleanup candidate review
+              remove <name> [--agent <id>] [--yes] [--json]
+                                  Safe filesystem removal of an installed
+                                  skill. Runs §12.1 safety checks; dry-run
+                                  by default (re-run with --yes to execute).
+                                  Requires --yes to accept warnings
+                                  (git-tracked, incoming symlinks).
+              cleanup [--candidates=kind,...] [--apply] [--yes]
+                      [--json] [--output <path>]
+                                  Classify and optionally remove cleanup
+                                  candidates per §12.2: malformed, orphan,
+                                  duplicate, broken-symlink, hidden-nested,
+                                  broken-shared-mapping, empty-directory.
+                                  Respects .skillview-ignore markers.
+                                  --apply requires --yes.
 
             Global flags:
               --debug             Enable Debug-level logging (streams to stderr in CLI mode)
