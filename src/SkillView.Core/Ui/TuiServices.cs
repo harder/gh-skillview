@@ -1,5 +1,6 @@
 using SkillView.Diagnostics;
 using SkillView.Gh;
+using SkillView.Inventory;
 using SkillView.Logging;
 using SkillView.Subprocess;
 
@@ -17,6 +18,10 @@ public sealed class TuiServices
     public required EnvironmentProbe EnvironmentProbe { get; init; }
     public required GhSkillSearchService SearchService { get; init; }
     public required GhSkillPreviewService PreviewService { get; init; }
+    public required GhSkillListAdapter ListAdapter { get; init; }
+    public required ScanRootResolver ScanRootResolver { get; init; }
+    public required LocalSkillScanner Scanner { get; init; }
+    public required LocalInventoryService InventoryService { get; init; }
     public required FileLogSink? FileLogSink { get; init; }
     public required string LogDirectory { get; init; }
 
@@ -28,6 +33,10 @@ public sealed class TuiServices
         var caps = new GhSkillCapabilityProbe(runner, logger);
         var dir = logDirectory ?? LogPaths.Resolve();
         var env = new EnvironmentProbe(locator, auth, caps, logger, dir);
+        var list = new GhSkillListAdapter(runner, logger);
+        var resolver = new ScanRootResolver();
+        var scanner = new LocalSkillScanner(logger);
+        var inventory = new LocalInventoryService(resolver, scanner, list, logger);
         return new TuiServices
         {
             Logger = logger,
@@ -38,6 +47,10 @@ public sealed class TuiServices
             EnvironmentProbe = env,
             SearchService = new GhSkillSearchService(runner, logger),
             PreviewService = new GhSkillPreviewService(runner, logger),
+            ListAdapter = list,
+            ScanRootResolver = resolver,
+            Scanner = scanner,
+            InventoryService = inventory,
             FileLogSink = fileLogSink,
             LogDirectory = dir,
         };

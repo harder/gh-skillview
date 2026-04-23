@@ -5,11 +5,13 @@ a GitHub CLI extension.
 
 > [!NOTE]
 > SkillView is under active development. The `main` branch is through
-> Phase 1 of the plan in [`implementation-plan.md`](./implementation-plan.md):
-> the TG2 + .NET 10 Native AOT feasibility spike (Phase 0), plus the
-> environment probe, capability layer, file logging with redaction, and
-> Doctor surface (Phase 1). See [`PHASE0_NOTES.md`](./PHASE0_NOTES.md) and
-> [`PHASE1_NOTES.md`](./PHASE1_NOTES.md) for per-phase detail.
+> Phase 2 of the plan in [`implementation-plan.md`](./implementation-plan.md):
+> TG2 + .NET 10 Native AOT feasibility (Phase 0), environment probe +
+> capability layer + file logging + Doctor (Phase 1), and local inventory
+> discovery with scan-root resolution, SKILL.md front-matter parsing,
+> symlink / canonical-copy awareness, `.skillview-ignore` markers, the
+> gated `gh skill list` adapter, and `LocalInventoryService` reconciliation
+> (Phase 2).
 
 ## Installation
 
@@ -40,7 +42,13 @@ skillview                      # launch the TUI
 skillview doctor               # environment + gh capability report
 skillview doctor --json        # machine-readable doctor output
 skillview doctor --clear-logs  # wipe rotated log files
+skillview list                 # installed-skill inventory (table)
+skillview list --json          # machine-readable inventory snapshot
+skillview list --scope=user    # filter by scope (project|user|custom)
+skillview list --agent=claude  # filter by agent id
+skillview rescan               # capture a fresh inventory snapshot
 skillview --debug              # Debug-level logging (flag beats SKILLVIEW_LOG env)
+skillview --scan-root <path>   # add a custom scan root (repeatable)
 ```
 
 Logs are written daily-rotated under the platform cache directory

@@ -4,6 +4,8 @@ using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
+using SkillView.Inventory;
+using SkillView.Inventory.Models;
 using SkillView.Logging;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
@@ -193,6 +195,11 @@ public sealed class SkillViewApp
             ShowDoctor();
             key.Handled = true;
         }
+        else if (rune.Value == 'I')
+        {
+            ShowInstalled();
+            key.Handled = true;
+        }
         else if (key.KeyCode == KeyCode.F1)
         {
             ShowHelp();
@@ -378,9 +385,34 @@ public sealed class SkillViewApp
             "l  toggle logs pane\n" +
             "r  toggle logs pane\n" +
             "d  doctor (environment + gh capabilities)\n" +
+            "I  installed skills inventory\n" +
             "F1 this help\n" +
             "q  quit",
             "OK");
+    }
+
+    private void ShowInstalled()
+    {
+        if (_app is null) return;
+        SetBusy("scanning inventory…");
+        _ = Task.Run(async () =>
+        {
+            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            _lastReport = report;
+            var snapshot = await _services.InventoryService.CaptureAsync(
+                report.GhPath,
+                report.Capabilities,
+                new LocalInventoryService.Options(
+                    ScanRoots: _options.ScanRoots,
+                    AllowHiddenDirs: false)
+            ).ConfigureAwait(false);
+            Invoke(() =>
+            {
+                ClearBusy();
+                SetStatus($"{snapshot.Skills.Length} installed skill(s)");
+                InstalledScreen.Show(_app!, snapshot);
+            });
+        });
     }
 
     private void ShowDoctor()
