@@ -40,10 +40,12 @@ public static class InstalledScreen
             {
                 ["Name"] = s => s.Name,
                 ["Scope"] = s => s.Scope.ToString(),
-                ["Prov"] = s => s.Provenance.ToString(),
+                ["Source"] = s => s.Provenance.ToString(),
                 ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
-                ["Sym"] = s => s.IsSymlinked ? "↩" : "",
-                ["Agents"] = s => string.Join(",", s.Agents.Select(a => a.AgentId).Distinct(StringComparer.OrdinalIgnoreCase)),
+                ["Lnk"] = s => s.IsSymlinked ? "↩" : "",
+                ["Agents"] = s => TuiHelpers.Truncate(
+                    string.Join(",", s.Agents.Select(a => a.AgentId).Distinct(StringComparer.OrdinalIgnoreCase)),
+                    30),
             });
 
         var detail = new TextView

@@ -212,7 +212,7 @@ public sealed class UpdateScreen
                     {
                         status.Text = result.Succeeded
                             ? $" dry-run complete · {result.Entries.Length} entries parsed"
-                            : $" dry-run failed (exit {result.ExitCode})";
+                            : $" dry-run failed (exit {result.ExitCode}): {TuiHelpers.ErrorSnippet(result.ErrorMessage)}";
                     }
                     else if (result.Succeeded)
                     {
@@ -221,7 +221,10 @@ public sealed class UpdateScreen
                     }
                     else
                     {
-                        status.Text = $" update failed (exit {result.ExitCode}) — see logs";
+                        var snippet = TuiHelpers.ErrorSnippet(result.ErrorMessage);
+                        status.Text = snippet.Length > 0
+                            ? $" update failed (exit {result.ExitCode}): {snippet}"
+                            : $" update failed (exit {result.ExitCode}) — see logs";
                     }
                 });
             }
@@ -232,7 +235,10 @@ public sealed class UpdateScreen
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    status.Text = " update failed — see logs";
+                    var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+                    status.Text = snippet.Length > 0
+                        ? $" update failed: {snippet}"
+                        : " update failed — see logs";
                 });
             }
         }

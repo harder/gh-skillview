@@ -128,7 +128,7 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
             ReadOnly = true,
             WordWrap = true,
-            Text = "Press '/' to focus search. 'v' previews selection. 'l' toggles logs. 'q' quits.",
+            Text = TuiHelpers.WelcomeHint,
         };
         _rightFrame.Add(_rightPane);
 
@@ -293,7 +293,10 @@ public sealed class SkillViewApp
         catch (Exception ex)
         {
             _services.Logger.Error("search", ex.Message);
-            SetStatus("search failed — see logs (l)");
+            var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+            SetStatus(snippet.Length > 0
+                ? $"search failed: {snippet}"
+                : "search failed — see logs (l)");
         }
         finally
         {
@@ -367,7 +370,7 @@ public sealed class SkillViewApp
                 ["Skill"] = s => s.SkillName ?? string.Empty,
                 ["Repo"] = s => s.Repo ?? string.Empty,
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => s.Description ?? string.Empty,
+                ["Description"] = s => TuiHelpers.Truncate(s.Description, 50),
             });
         _resultsTable.Table = source;
         _resultsTable.Update();
@@ -401,18 +404,7 @@ public sealed class SkillViewApp
         MessageBox.Query(
             _app,
             "SkillView — keys",
-            "/  focus search\n" +
-            "v  preview selected\n" +
-            "l  toggle logs pane\n" +
-            "r  toggle logs pane\n" +
-            "d  doctor (environment + gh capabilities)\n" +
-            "I  installed skills inventory\n" +
-            "s  full search screen (owner/limit controls, install staging)\n" +
-            "u  update installed skills (dry-run + execute)\n" +
-            "c  cleanup screen (malformed, orphan, duplicate)\n" +
-            "   in Installed: x removes selected skill\n" +
-            "F1 this help\n" +
-            "q  quit",
+            TuiHelpers.HelpText,
             "OK");
     }
 

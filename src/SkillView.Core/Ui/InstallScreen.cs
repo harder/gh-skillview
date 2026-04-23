@@ -19,6 +19,10 @@ namespace SkillView.Ui;
 /// accept.
 public sealed class InstallScreen
 {
+    // Known agent IDs for the multi-select checkboxes. This list is static
+    // because AOT forbids reflection-based discovery, and `gh skill install
+    // --help` doesn't enumerate valid agent names. Update this array when new
+    // agents are added to the gh skill ecosystem.
     public static readonly string[] KnownAgents =
     {
         "claude", "copilot", "cursor", "codex", "gemini", "antigravity",
@@ -236,7 +240,10 @@ public sealed class InstallScreen
                     }
                     else
                     {
-                        status.Text = $" install failed (exit {result.ExitCode}) — see logs";
+                        var snippet = TuiHelpers.ErrorSnippet(result.ErrorMessage);
+                        status.Text = snippet.Length > 0
+                            ? $" install failed (exit {result.ExitCode}): {snippet}"
+                            : $" install failed (exit {result.ExitCode}) — see logs";
                     }
                 });
             }
@@ -247,7 +254,10 @@ public sealed class InstallScreen
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    status.Text = " install failed — see logs";
+                    var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+                    status.Text = snippet.Length > 0
+                        ? $" install failed: {snippet}"
+                        : " install failed — see logs";
                 });
             }
         };

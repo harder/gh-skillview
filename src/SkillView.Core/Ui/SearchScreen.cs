@@ -218,7 +218,10 @@ public sealed class SearchScreen
                 RefreshResultsTable();
                 if (!response.Succeeded)
                 {
-                    SetStatus($"search failed (exit {response.ExitCode}) — see logs");
+                    var snippet = TuiHelpers.ErrorSnippet(response.ErrorMessage);
+                    SetStatus(snippet.Length > 0
+                        ? $"search failed (exit {response.ExitCode}): {snippet}"
+                        : $"search failed (exit {response.ExitCode}) — see logs");
                 }
                 else
                 {
@@ -231,7 +234,10 @@ public sealed class SearchScreen
         catch (Exception ex)
         {
             _logger.Error("search", ex.Message);
-            Invoke(() => SetStatus("search failed — see logs"));
+            var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+            Invoke(() => SetStatus(snippet.Length > 0
+                ? $"search failed: {snippet}"
+                : "search failed — see logs"));
         }
         finally
         {
@@ -308,7 +314,7 @@ public sealed class SearchScreen
                 ["Skill"] = s => s.SkillName ?? string.Empty,
                 ["Repo"] = s => s.Repo ?? string.Empty,
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => s.Description ?? string.Empty,
+                ["Description"] = s => TuiHelpers.Truncate(s.Description, 40),
             });
         _resultsTable.Update();
     }

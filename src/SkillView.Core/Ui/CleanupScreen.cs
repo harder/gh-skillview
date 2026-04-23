@@ -70,9 +70,9 @@ public sealed class CleanupScreen
             new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
             {
                 [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                ["Kind"] = row => row.C.Kind.ToString(),
+                ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
                 ["Name"] = row => row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
-                ["Path"] = row => row.C.Path,
+                ["Path"] = row => TuiHelpers.ShortenPath(row.C.Path),
             });
 
         var detail = new TextView
