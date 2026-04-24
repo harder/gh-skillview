@@ -106,6 +106,13 @@ public sealed class SkillViewApp
                         }
                     }
                 }
+
+                // Right arrow on table → preview (intuitive: points at preview pane)
+                if (!key.Handled && bareKey == KeyCode.CursorRight && _resultsTable?.HasFocus == true)
+                {
+                    key.Handled = true;
+                    _ = PreviewSelectedAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -188,10 +195,10 @@ public sealed class SkillViewApp
         // TODO(tg2): remove once upstream Enter→CellActivated is reliable
         _resultsTable.KeyDown += (_, key) =>
         {
-            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            if ((key.KeyCode == KeyCode.Enter || key.KeyCode == KeyCode.CursorRight) && !key.Handled)
             {
                 key.Handled = true;
-                _services.Logger.Info("preview", "Enter KeyDown → calling PreviewSelectedAsync");
+                _services.Logger.Info("preview", $"{key.KeyCode} KeyDown → calling PreviewSelectedAsync");
                 _ = PreviewSelectedAsync();
             }
         };

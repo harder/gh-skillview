@@ -291,7 +291,7 @@ internal static class TuiHelpers
     /// welcome message and the F1 help dialog.
     internal const string HelpText =
         "/  focus the search box\n" +
-        "Enter, p, v  preview when results are focused\n" +
+        "Enter, →, p, v  preview when results are focused\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
         "I  show installed skills\n" +
@@ -304,10 +304,10 @@ internal static class TuiHelpers
 
     /// Compact single-line hint shown in the welcome/preview pane.
     internal const string WelcomeHint =
-        "/ search · p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
+        "/ search · →/p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
 
     internal const string PreviewHint =
-        "Select a result and press Enter, p, or v to preview.\n\nTip: In Warp terminal, use Tab or Ctrl+J instead of Enter.";
+        "Select a result and press Enter, →, p, or v to preview.\n\nTip: In Warp terminal, use Ctrl+J instead of Enter.";
 
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
@@ -440,11 +440,13 @@ internal static class TuiHelpers
     {
         DisableTypeToSearch(table);
 
-        // Route p/v through CellActivated (same path as Enter).
+        // Route p/v/→ through CellActivated (same path as Enter).
+        // Right arrow is intuitive: it "points toward" the preview pane.
         table.KeyBindings.Add(KeyCode.P, Command.Accept);
         table.KeyBindings.Add(KeyCode.P | KeyCode.ShiftMask, Command.Accept);
         table.KeyBindings.Add(KeyCode.V, Command.Accept);
         table.KeyBindings.Add(KeyCode.V | KeyCode.ShiftMask, Command.Accept);
+        table.KeyBindings.Add(KeyCode.CursorRight, Command.Accept);
     }
 }
 

@@ -198,6 +198,14 @@ public sealed class SearchScreen
                 }
             }
 
+            // Right arrow on table → preview
+            if (key.KeyCode == KeyCode.CursorRight && !key.Handled && _resultsTable.HasFocus)
+            {
+                key.Handled = true;
+                _ = PreviewSelectedAsync();
+                return;
+            }
+
             if (_queryField.HasFocus || _ownerField.HasFocus || _limitField.HasFocus) return;
             var rune = key.AsRune.Value;
             if (key.KeyCode == KeyCode.Esc || rune == 'q' || rune == 'Q')
