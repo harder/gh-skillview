@@ -109,6 +109,41 @@ public sealed class SkillViewApp
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
+
+        // --- DIAG: dump key bindings after config ---
+        {
+            var enterBound = _resultsTable.KeyBindings.TryGet(new Terminal.Gui.Input.Key(KeyCode.Enter), out _);
+            var pBound = _resultsTable.KeyBindings.TryGet(new Terminal.Gui.Input.Key(KeyCode.P), out _);
+            _services.Logger.Debug("DIAG.bindings", $"Enter bound={enterBound} P bound={pBound} CellActivationKey={_resultsTable.CellActivationKey}");
+        }
+        // --- end DIAG ---
+
+        // Handle Enter explicitly via KeyDown as a belt-and-suspenders
+        // workaround. TG2 v2 RC4's Command.Accept pipeline for Enter
+        // (which fires CellActivated for p/v) does not reliably reach
+        // CellActivated for Enter — likely due to DefaultAcceptHandler
+        // bubbling/dispatch interference. This handler fires BEFORE the
+        // Command pipeline and short-circuits it for Enter.
+        // TODO(tg2): remove once upstream Enter→CellActivated is reliable
+        _resultsTable.KeyDown += (_, key) =>
+        {
+            // --- DIAG: trace every key the table sees ---
+            _services.Logger.Debug("DIAG.table.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} HasFocus={_resultsTable.HasFocus}");
+            // --- end DIAG ---
+            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            {
+                key.Handled = true;
+                _services.Logger.Info("preview", "Enter KeyDown → calling PreviewSelectedAsync");
+                _ = PreviewSelectedAsync();
+            }
+        };
+        // --- DIAG: trace Accepting/Accepted events ---
+        _resultsTable.Accepting += (_, args) =>
+            _services.Logger.Debug("DIAG.table.Accepting", $"Handled={args.Handled}");
+        _resultsTable.Accepted += (_, _) =>
+            _services.Logger.Debug("DIAG.table.Accepted", "fired");
+        // --- end DIAG ---
+
         _resultsTable.CellActivated += (_, _) =>
         {
             _services.Logger.Info("preview", "CellActivated fired → calling PreviewSelectedAsync");
@@ -168,6 +203,10 @@ public sealed class SkillViewApp
 
     private void OnWindowKeyDown(object? sender, Key key)
     {
+        // --- DIAG: trace every key at window level ---
+        _services.Logger.Debug("DIAG.window.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} queryFocus={_queryField?.HasFocus} tableFocus={_resultsTable?.HasFocus}");
+        // --- end DIAG ---
+
         if (key.Handled)
         {
             return;
@@ -182,6 +221,11 @@ public sealed class SkillViewApp
         if (rune.Value == '/')
         {
             _queryField?.SetFocus();
+            // Select all text so the user can immediately type a new query
+            if (_queryField is not null)
+            {
+                _queryField.SelectAll();
+            }
             key.Handled = true;
         }
         else if (rune.Value == 'q' || rune.Value == 'Q')
@@ -228,6 +272,10 @@ public sealed class SkillViewApp
 
     private void OnQueryFieldKey(object? sender, Key key)
     {
+        // --- DIAG: trace query field key events ---
+        _services.Logger.Debug("DIAG.query.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} HasFocus={_queryField?.HasFocus} Text='{_queryField?.Text}'");
+        // --- end DIAG ---
+
         if (key.KeyCode == KeyCode.Enter)
         {
             key.Handled = true;
@@ -359,7 +407,7 @@ public sealed class SkillViewApp
                 if (_rightPane is not null)
                 {
                     _rightPane.Text = preview.Succeeded
-                        ? (preview.Body ?? "(empty preview)")
+                        ? TuiHelpers.FormatPreviewText(preview.MarkdownBody ?? preview.Body ?? "(empty preview)")
                         : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}";
                 }
                 if (_rightFrame is not null)
@@ -423,7 +471,7 @@ public sealed class SkillViewApp
                 ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 24),
                 ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 30),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => TuiHelpers.Truncate(s.Description, 50),
+                ["Description"] = s => s.Description ?? string.Empty,
             });
         _resultsTable.Table = source;
         _resultsTable.Update();

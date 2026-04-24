@@ -96,6 +96,16 @@ public sealed class SearchScreen
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
+        // Enter via KeyDown workaround — same as SkillViewApp
+        // TODO(tg2): remove once upstream Enter→CellActivated is reliable
+        _resultsTable.KeyDown += (_, key) =>
+        {
+            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            {
+                key.Handled = true;
+                _ = PreviewSelectedAsync();
+            }
+        };
         _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
         _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
 
@@ -176,6 +186,7 @@ public sealed class SearchScreen
             else if (rune == '/' )
             {
                 _queryField.SetFocus();
+                _queryField.SelectAll();
                 key.Handled = true;
             }
         };
@@ -289,7 +300,7 @@ public sealed class SearchScreen
                 if (_previewPane is not null)
                 {
                     _previewPane.Text = result.Succeeded
-                        ? result.Body
+                        ? TuiHelpers.FormatPreviewText(result.MarkdownBody ?? result.Body)
                         : $"(preview failed: exit {result.ExitCode})\n\n{result.ErrorMessage}";
                 }
                 if (_previewFrame is not null)
@@ -365,7 +376,7 @@ public sealed class SearchScreen
                 ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 22),
                 ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 28),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => TuiHelpers.Truncate(s.Description, 40),
+                ["Description"] = s => s.Description ?? string.Empty,
             });
         _resultsTable.Update();
     }

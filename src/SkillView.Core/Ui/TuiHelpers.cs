@@ -86,6 +86,141 @@ internal static class TuiHelpers
     internal static bool IsPreviewKey(Key key) =>
         key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'v' or 'V' or 'p' or 'P';
 
+    /// Lightweight markdown-to-plaintext formatter for the preview pane.
+    /// Strips common markdown syntax (bold, italic, headings, horizontal
+    /// rules) and collapses excessive blank lines to improve readability
+    /// in a plain-text TextView. Code fences are preserved verbatim.
+    internal static string FormatPreviewText(string markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown)) return "(empty preview)";
+
+        var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        var output = new StringBuilder(markdown.Length);
+        var consecutiveBlanks = 0;
+        var inCodeBlock = false;
+
+        foreach (var rawLine in lines)
+        {
+            // Track code fences — preserve content verbatim
+            if (rawLine.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                inCodeBlock = !inCodeBlock;
+                consecutiveBlanks = 0;
+                output.AppendLine(rawLine);
+                continue;
+            }
+
+            if (inCodeBlock)
+            {
+                consecutiveBlanks = 0;
+                output.AppendLine(rawLine);
+                continue;
+            }
+
+            var trimmed = rawLine.TrimEnd();
+
+            // Skip horizontal rules
+            if (IsHorizontalRule(trimmed))
+            {
+                continue;
+            }
+
+            // Collapse excessive blank lines (max 1 consecutive)
+            if (trimmed.Length == 0)
+            {
+                consecutiveBlanks++;
+                if (consecutiveBlanks <= 1)
+                {
+                    output.AppendLine();
+                }
+                continue;
+            }
+
+            consecutiveBlanks = 0;
+
+            // Strip heading markers — keep text, add blank line before for spacing
+            if (trimmed.StartsWith('#'))
+            {
+                var headingText = trimmed.TrimStart('#', ' ');
+                if (output.Length > 0)
+                {
+                    output.AppendLine();
+                }
+                output.AppendLine(headingText.ToUpperInvariant());
+                continue;
+            }
+
+            // Strip inline markdown: **bold**, *italic*, __bold__, _italic_, `code`
+            var formatted = StripInlineMarkdown(trimmed);
+            output.AppendLine(formatted);
+        }
+
+        return output.ToString().TrimEnd();
+    }
+
+    private static bool IsHorizontalRule(string line)
+    {
+        var stripped = line.Replace(" ", "");
+        return stripped.Length >= 3
+               && (stripped.All(c => c == '-') || stripped.All(c => c == '*') || stripped.All(c => c == '_'));
+    }
+
+    private static string StripInlineMarkdown(string text)
+    {
+        // Strip bold: **text** or __text__
+        // Strip italic: *text* or _text_ (single)
+        // Strip code: `text`
+        // Process in order: bold first (longer markers), then italic
+        var result = new StringBuilder(text.Length);
+        var i = 0;
+
+        while (i < text.Length)
+        {
+            // Bold: ** or __
+            if (i + 1 < text.Length && ((text[i] == '*' && text[i + 1] == '*') || (text[i] == '_' && text[i + 1] == '_')))
+            {
+                var marker = text[i];
+                var end = text.IndexOf(new string(marker, 2), i + 2, StringComparison.Ordinal);
+                if (end > i + 2)
+                {
+                    result.Append(text, i + 2, end - i - 2);
+                    i = end + 2;
+                    continue;
+                }
+            }
+
+            // Inline code: `text`
+            if (text[i] == '`')
+            {
+                var end = text.IndexOf('`', i + 1);
+                if (end > i + 1)
+                {
+                    result.Append(text, i + 1, end - i - 1);
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            // Italic: * or _ (single, only if not preceded by another marker)
+            if ((text[i] == '*' || text[i] == '_') && i + 1 < text.Length && text[i + 1] != text[i])
+            {
+                var marker = text[i];
+                var end = text.IndexOf(marker, i + 1);
+                if (end > i + 1 && (end + 1 >= text.Length || text[end + 1] != marker))
+                {
+                    result.Append(text, i + 1, end - i - 1);
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            result.Append(text[i]);
+            i++;
+        }
+
+        return result.ToString();
+    }
+
     internal static void ApplyScheme(string schemeName, params View?[] views)
     {
         foreach (var view in views)

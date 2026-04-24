@@ -163,4 +163,73 @@ public sealed class TuiHelpersTests
         Assert.False(matcher.IsMatch("test", "test"));
         Assert.False(matcher.IsMatch("a", "abc"));
     }
+
+    #region FormatPreviewText
+
+    [Fact]
+    public void FormatPreviewText_ReturnsPlaceholder_WhenEmpty()
+    {
+        Assert.Equal("(empty preview)", TuiHelpers.FormatPreviewText(""));
+        Assert.Equal("(empty preview)", TuiHelpers.FormatPreviewText("   "));
+    }
+
+    [Fact]
+    public void FormatPreviewText_StripsBoldMarkers()
+    {
+        Assert.Contains("hello world", TuiHelpers.FormatPreviewText("**hello world**"));
+        Assert.Contains("hello world", TuiHelpers.FormatPreviewText("__hello world__"));
+        Assert.DoesNotContain("**", TuiHelpers.FormatPreviewText("**hello world**"));
+    }
+
+    [Fact]
+    public void FormatPreviewText_StripsItalicMarkers()
+    {
+        Assert.Contains("emphasis", TuiHelpers.FormatPreviewText("*emphasis*"));
+        Assert.DoesNotContain("*emphasis*", TuiHelpers.FormatPreviewText("*emphasis*"));
+    }
+
+    [Fact]
+    public void FormatPreviewText_StripsHeadingMarkers()
+    {
+        var result = TuiHelpers.FormatPreviewText("# My Heading");
+        Assert.Contains("MY HEADING", result);
+        Assert.DoesNotContain("#", result);
+    }
+
+    [Fact]
+    public void FormatPreviewText_CollapsesExcessiveBlanks()
+    {
+        var input = "line 1\n\n\n\n\nline 2";
+        var result = TuiHelpers.FormatPreviewText(input);
+        Assert.DoesNotContain("\n\n\n", result);
+        Assert.Contains("line 1", result);
+        Assert.Contains("line 2", result);
+    }
+
+    [Fact]
+    public void FormatPreviewText_SkipsHorizontalRules()
+    {
+        var result = TuiHelpers.FormatPreviewText("above\n---\nbelow");
+        Assert.DoesNotContain("---", result);
+        Assert.Contains("above", result);
+        Assert.Contains("below", result);
+    }
+
+    [Fact]
+    public void FormatPreviewText_PreservesCodeBlocks()
+    {
+        var input = "```\n**bold inside code**\n```";
+        var result = TuiHelpers.FormatPreviewText(input);
+        Assert.Contains("**bold inside code**", result);
+    }
+
+    [Fact]
+    public void FormatPreviewText_StripsInlineCode()
+    {
+        var result = TuiHelpers.FormatPreviewText("use `my_func()` here");
+        Assert.Contains("my_func()", result);
+        Assert.DoesNotContain("`", result);
+    }
+
+    #endregion
 }
