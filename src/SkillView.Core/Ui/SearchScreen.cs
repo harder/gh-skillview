@@ -171,6 +171,27 @@ public sealed class SearchScreen
 
         dialog.KeyDown += (_, key) =>
         {
+            // Handle Enter at dialog level BEFORE the view hierarchy.
+            // Same TG2 v2 RC4 issue as SkillViewApp — internal focused subviews
+            // (e.g. ScrollBar) have Enter→Command.Accept and steal Enter before
+            // the TableView sees it. P/V bypass because they're not base View bindings.
+            // TODO(tg2): remove once upstream Enter dispatch to TableView is fixed
+            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            {
+                if (_resultsTable.HasFocus)
+                {
+                    key.Handled = true;
+                    _ = PreviewSelectedAsync();
+                    return;
+                }
+                else if (_queryField.HasFocus || _ownerField.HasFocus || _limitField.HasFocus)
+                {
+                    key.Handled = true;
+                    _ = RunSearchAsync();
+                    return;
+                }
+            }
+
             if (_queryField.HasFocus || _ownerField.HasFocus || _limitField.HasFocus) return;
             var rune = key.AsRune.Value;
             if (key.KeyCode == KeyCode.Esc || rune == 'q' || rune == 'Q')
