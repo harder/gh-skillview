@@ -101,18 +101,29 @@ internal static class TuiHelpers
 
         foreach (var rawLine in lines)
         {
-            // Track code fences — preserve content verbatim
+            // Track code fences — indent content, show language hint
             if (rawLine.TrimStart().StartsWith("```", StringComparison.Ordinal))
             {
                 inCodeBlock = !inCodeBlock;
                 consecutiveBlanks = 0;
-                output.AppendLine(rawLine);
+                if (inCodeBlock)
+                {
+                    var lang = rawLine.TrimStart().Length > 3
+                        ? rawLine.TrimStart()[3..].Trim()
+                        : "";
+                    output.AppendLine(lang.Length > 0 ? $"  ┌─ {lang} ─" : "  ┌─");
+                }
+                else
+                {
+                    output.AppendLine("  └─");
+                }
                 continue;
             }
 
             if (inCodeBlock)
             {
                 consecutiveBlanks = 0;
+                output.Append("  │ ");
                 output.AppendLine(rawLine);
                 continue;
             }
@@ -138,7 +149,7 @@ internal static class TuiHelpers
 
             consecutiveBlanks = 0;
 
-            // Strip heading markers — keep text, add blank line before for spacing
+            // Strip heading markers — uppercase + underline for visual separation
             if (trimmed.StartsWith('#'))
             {
                 var headingText = trimmed.TrimStart('#', ' ');
@@ -146,8 +157,33 @@ internal static class TuiHelpers
                 {
                     output.AppendLine();
                 }
-                output.AppendLine(headingText.ToUpperInvariant());
+                var upper = headingText.ToUpperInvariant();
+                output.AppendLine(upper);
+                output.AppendLine(new string('─', Math.Min(upper.Length, 60)));
                 continue;
+            }
+
+            // Convert markdown list markers to bullet characters
+            var stripped = trimmed.TrimStart();
+            if (stripped.StartsWith("- ", StringComparison.Ordinal) || stripped.StartsWith("* ", StringComparison.Ordinal))
+            {
+                var indent = trimmed.Length - stripped.Length;
+                var bullet = new string(' ', indent) + "• " + StripInlineMarkdown(stripped[2..]);
+                output.AppendLine(bullet);
+                continue;
+            }
+
+            // Numbered lists: keep number, clean up inline markdown
+            if (stripped.Length > 1 && char.IsDigit(stripped[0]))
+            {
+                var dotIdx = stripped.IndexOf(". ", StringComparison.Ordinal);
+                if (dotIdx > 0 && dotIdx <= 3)
+                {
+                    var indent = trimmed.Length - stripped.Length;
+                    var numbered = new string(' ', indent) + stripped[..(dotIdx + 2)] + StripInlineMarkdown(stripped[(dotIdx + 2)..]);
+                    output.AppendLine(numbered);
+                    continue;
+                }
             }
 
             // Strip inline markdown: **bold**, *italic*, __bold__, _italic_, `code`
@@ -315,6 +351,65 @@ internal static class TuiHelpers
             Disabled = disabled,
             Code = normal,
         };
+    }
+
+    /// Apply consistent column widths to a results TableView. Column order
+    /// must match the EnumerableTableSource definition: Skill, Repo, ★, Description.
+    /// Looks up columns by header name so order changes don't break styling.
+    internal static void ApplyColumnStyles(TableView table)
+    {
+        if (table.Table is null) return;
+
+        var style = table.Style;
+        style.ExpandLastColumn = true;
+
+        for (var i = 0; i < table.Table.Columns; i++)
+        {
+            var header = table.Table.ColumnNames[i];
+            var cs = style.GetOrCreateColumnStyle(i);
+            switch (header)
+            {
+                case "Skill":
+                    cs.MinWidth = 10;
+                    cs.MaxWidth = 24;
+                    break;
+                case "Repo":
+                    cs.MinWidth = 12;
+                    cs.MaxWidth = 30;
+                    break;
+                case "★":
+                    cs.MinWidth = 1;
+                    cs.MaxWidth = 5;
+                    break;
+                case "Description":
+                    cs.MinWidth = 15;
+                    break;
+            }
+        }
+    }
+
+    /// Apply a high-contrast color scheme to a TableView so the selected
+    /// row is clearly visible (inverted colors for Focus state).
+    internal static void ConfigureTableScheme(TableView table)
+    {
+        var normal = new Attribute(StandardColor.White, StandardColor.Black);
+        var selected = new Attribute(StandardColor.Black, StandardColor.Cyan);
+        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+
+        table.SetScheme(new Scheme
+        {
+            Normal = normal,
+            HotNormal = normal,
+            Focus = selected,
+            HotFocus = selected,
+            Active = selected,
+            HotActive = selected,
+            Highlight = selected,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = normal,
+        });
     }
 
     /// Disable type-to-search on a TableView. Terminal.Gui v2 RC4's

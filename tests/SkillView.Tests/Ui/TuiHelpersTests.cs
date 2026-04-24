@@ -193,6 +193,7 @@ public sealed class TuiHelpersTests
     {
         var result = TuiHelpers.FormatPreviewText("# My Heading");
         Assert.Contains("MY HEADING", result);
+        Assert.Contains("─", result); // underline separator
         Assert.DoesNotContain("#", result);
     }
 
@@ -221,6 +222,16 @@ public sealed class TuiHelpersTests
         var input = "```\n**bold inside code**\n```";
         var result = TuiHelpers.FormatPreviewText(input);
         Assert.Contains("**bold inside code**", result);
+        Assert.Contains("│", result); // code block visual frame
+    }
+
+    [Fact]
+    public void FormatPreviewText_ConvertsBulletsToUnicode()
+    {
+        var result = TuiHelpers.FormatPreviewText("- first item\n- second item");
+        Assert.Contains("• first item", result);
+        Assert.Contains("• second item", result);
+        Assert.DoesNotContain("- first", result);
     }
 
     [Fact]

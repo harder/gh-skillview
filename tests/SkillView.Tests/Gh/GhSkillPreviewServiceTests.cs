@@ -39,7 +39,41 @@ public class GhSkillPreviewServiceTests
             """;
         var (md, files) = GhSkillPreviewService.Split(body);
         Assert.Empty(files);
+        // Body has no tree preamble or separator, so markdown = body unchanged
         Assert.Equal(body, md);
+    }
+
+    [Fact]
+    public void Split_StripsFileTreePreamble()
+    {
+        var body = "my-skill/\n├── agents/\n│   └── openai.yaml\n└── SKILL.md\n\n── SKILL.md ──\n\n# My Skill\n\nSome content here.";
+        var (md, files) = GhSkillPreviewService.Split(body);
+        Assert.Empty(files);
+        Assert.StartsWith("# My Skill", md);
+        Assert.DoesNotContain("├──", md);
+        Assert.DoesNotContain("── SKILL.md ──", md);
+    }
+
+    [Fact]
+    public void Split_StripsTreePreamble_WithAssociatedFiles()
+    {
+        var body = "repo/\n└── SKILL.md\n\n── SKILL.md ──\n\n# Skill\n\nBody.\n\n## Associated files\n- foo.md\n";
+        var (md, files) = GhSkillPreviewService.Split(body);
+        Assert.Contains("foo.md", files);
+        Assert.StartsWith("# Skill", md);
+        Assert.DoesNotContain("├", md);
+        Assert.DoesNotContain("── SKILL.md ──", md);
+    }
+
+    [Fact]
+    public void Split_NoSeparator_PreservesContent()
+    {
+        // Content that has no tree separator should be returned as-is
+        var body = "# Regular Markdown\n\nNo tree here.\n";
+        var (md, files) = GhSkillPreviewService.Split(body);
+        Assert.Empty(files);
+        Assert.Contains("Regular Markdown", md);
+        Assert.Contains("No tree here.", md);
     }
 
     [Fact]

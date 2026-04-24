@@ -96,6 +96,7 @@ public sealed class SearchScreen
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
+        TuiHelpers.ConfigureTableScheme(_resultsTable);
         // Enter via KeyDown workaround — same as SkillViewApp
         // TODO(tg2): remove once upstream Enter→CellActivated is reliable
         _resultsTable.KeyDown += (_, key) =>
@@ -398,8 +399,9 @@ public sealed class SearchScreen
                 ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 22),
                 ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 28),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => s.Description ?? string.Empty,
+                ["Description"] = s => TuiHelpers.Truncate(s.Description, 60),
             });
+        TuiHelpers.ApplyColumnStyles(_resultsTable);
         _resultsTable.Update();
     }
 

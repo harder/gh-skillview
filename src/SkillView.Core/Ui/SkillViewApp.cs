@@ -80,21 +80,12 @@ public sealed class SkillViewApp
         {
             try
             {
-                // --- DIAG: log Enter AND any Enter-like keys unconditionally ---
                 var bareKey = key.KeyCode & ~KeyCode.CtrlMask & ~KeyCode.ShiftMask & ~KeyCode.AltMask;
                 var isEnterLike = bareKey == KeyCode.Enter
                     || (int)bareKey == 0x0D   // raw CR
                     || (int)bareKey == 0x0A;  // raw LF
                 if (isEnterLike)
                 {
-                    var focusChain = BuildFocusChain(window);
-                    _services.Logger.Debug("DIAG.app.KeyDown",
-                        $"ENTER KeyCode=0x{(int)key.KeyCode:X} bare=0x{(int)bareKey:X} " +
-                        $"Handled={key.Handled} " +
-                        $"tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus} " +
-                        $"tableFocused={_resultsTable?.Focused?.GetType().Name ?? "null"} " +
-                        $"focusChain=[{focusChain}]");
-
                     if (!key.Handled && _resultsTable?.HasFocus == true)
                     {
                         key.Handled = true;
@@ -112,7 +103,6 @@ public sealed class SkillViewApp
                         }
                     }
                 }
-                // --- end DIAG ---
             }
             catch (Exception ex)
             {
@@ -173,14 +163,7 @@ public sealed class SkillViewApp
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
-
-        // --- DIAG: dump key bindings after config ---
-        {
-            var enterBound = _resultsTable.KeyBindings.TryGet(new Terminal.Gui.Input.Key(KeyCode.Enter), out _);
-            var pBound = _resultsTable.KeyBindings.TryGet(new Terminal.Gui.Input.Key(KeyCode.P), out _);
-            _services.Logger.Debug("DIAG.bindings", $"Enter bound={enterBound} P bound={pBound} CellActivationKey={_resultsTable.CellActivationKey}");
-        }
-        // --- end DIAG ---
+        TuiHelpers.ConfigureTableScheme(_resultsTable);
 
         // Handle Enter explicitly via KeyDown as a belt-and-suspenders
         // workaround. TG2 v2 RC4's Command.Accept pipeline for Enter
@@ -191,9 +174,6 @@ public sealed class SkillViewApp
         // TODO(tg2): remove once upstream Enter→CellActivated is reliable
         _resultsTable.KeyDown += (_, key) =>
         {
-            // --- DIAG: trace every key the table sees ---
-            _services.Logger.Debug("DIAG.table.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} HasFocus={_resultsTable.HasFocus}");
-            // --- end DIAG ---
             if (key.KeyCode == KeyCode.Enter && !key.Handled)
             {
                 key.Handled = true;
@@ -201,12 +181,6 @@ public sealed class SkillViewApp
                 _ = PreviewSelectedAsync();
             }
         };
-        // --- DIAG: trace Accepting/Accepted events ---
-        _resultsTable.Accepting += (_, args) =>
-            _services.Logger.Debug("DIAG.table.Accepting", $"Handled={args.Handled}");
-        _resultsTable.Accepted += (_, _) =>
-            _services.Logger.Debug("DIAG.table.Accepted", "fired");
-        // --- end DIAG ---
 
         _resultsTable.CellActivated += (_, _) =>
         {
@@ -260,13 +234,6 @@ public sealed class SkillViewApp
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner);
         window.KeyDown += OnWindowKeyDown;
 
-        // --- DIAG: trace Accepting on parent views to detect Enter interception ---
-        _leftFrame.Accepting += (_, args) =>
-            _services.Logger.Debug("DIAG.leftFrame.Accepting", $"Handled={args.Handled}");
-        window.Accepting += (_, args) =>
-            _services.Logger.Debug("DIAG.window.Accepting", $"Handled={args.Handled}");
-        // --- end DIAG ---
-
         RefreshResultsTable();
         _services.Logger.Subscribe(OnLogEntry);
         return window;
@@ -274,10 +241,6 @@ public sealed class SkillViewApp
 
     private void OnWindowKeyDown(object? sender, Key key)
     {
-        // --- DIAG: trace every key at window level ---
-        _services.Logger.Debug("DIAG.window.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} queryFocus={_queryField?.HasFocus} tableFocus={_resultsTable?.HasFocus}");
-        // --- end DIAG ---
-
         if (key.Handled)
         {
             return;
@@ -343,10 +306,6 @@ public sealed class SkillViewApp
 
     private void OnQueryFieldKey(object? sender, Key key)
     {
-        // --- DIAG: trace query field key events ---
-        _services.Logger.Debug("DIAG.query.KeyDown", $"KeyCode={key.KeyCode} Handled={key.Handled} HasFocus={_queryField?.HasFocus} Text='{_queryField?.Text}'");
-        // --- end DIAG ---
-
         if (key.KeyCode == KeyCode.Enter)
         {
             key.Handled = true;
@@ -564,9 +523,10 @@ public sealed class SkillViewApp
                 ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 24),
                 ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 30),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => s.Description ?? string.Empty,
+                ["Description"] = s => TuiHelpers.Truncate(s.Description, 60),
             });
         _resultsTable.Table = source;
+        TuiHelpers.ApplyColumnStyles(_resultsTable);
         _resultsTable.Update();
     }
 
@@ -918,20 +878,4 @@ public sealed class SkillViewApp
             }
         });
     }
-
-    // --- DIAG: trace the focus chain from window to deepest focused view ---
-    private static string BuildFocusChain(View? root)
-    {
-        var parts = new List<string>();
-        var v = root;
-        var depth = 0;
-        while (v is not null && depth < 20) // guard against cycles
-        {
-            parts.Add(v.GetType().Name);
-            v = v.Focused;
-            depth++;
-        }
-        return string.Join(" → ", parts);
-    }
-    // --- end DIAG ---
 }

@@ -73,10 +73,10 @@ public sealed class GhSkillPreviewService
         return args;
     }
 
-    /// Tolerant split: if stdout contains a heading like "Associated files",
-    /// "Bundled files", or "Files:", capture filenames below it. The heading
-    /// wording isn't frozen upstream, so we accept a small set of synonyms
-    /// and treat any non-matching body as "markdown only, no files listed".
+    /// Tolerant split: strips the file-tree preamble that `gh skill preview`
+    /// emits before the actual skill content, and captures any "Associated
+    /// files" section at the end. The preamble is a directory tree followed
+    /// by a `── filename ──` separator line.
     internal static (string Markdown, ImmutableArray<string> Files) Split(string body)
     {
         if (string.IsNullOrWhiteSpace(body))
@@ -85,8 +85,28 @@ public sealed class GhSkillPreviewService
         }
 
         var lines = body.Replace("\r\n", "\n").Split('\n');
-        int headingIndex = -1;
+
+        // Strip leading file-tree preamble: look for a `── filename ──`
+        // separator line and skip everything up to and including it.
+        int contentStart = 0;
         for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+            if (IsFileContentSeparator(trimmed))
+            {
+                contentStart = i + 1;
+                break;
+            }
+        }
+
+        // Skip blank lines after the separator
+        while (contentStart < lines.Length && lines[contentStart].Trim().Length == 0)
+        {
+            contentStart++;
+        }
+
+        int headingIndex = -1;
+        for (var i = contentStart; i < lines.Length; i++)
         {
             var trimmed = lines[i].TrimStart('#', ' ', '\t').TrimEnd(':', ' ', '\t');
             if (IsFileSectionHeading(trimmed))
@@ -98,10 +118,11 @@ public sealed class GhSkillPreviewService
 
         if (headingIndex < 0)
         {
-            return (body, ImmutableArray<string>.Empty);
+            var markdown = string.Join('\n', lines.Skip(contentStart)).TrimEnd();
+            return (markdown, ImmutableArray<string>.Empty);
         }
 
-        var markdown = string.Join('\n', lines.Take(headingIndex)).TrimEnd();
+        var markdownContent = string.Join('\n', lines.Skip(contentStart).Take(headingIndex - contentStart)).TrimEnd();
         var files = ImmutableArray.CreateBuilder<string>();
         for (var i = headingIndex + 1; i < lines.Length; i++)
         {
@@ -130,7 +151,23 @@ public sealed class GhSkillPreviewService
             }
         }
 
-        return (markdown, files.ToImmutable());
+        return (markdownContent, files.ToImmutable());
+    }
+
+    /// Detects `── filename.ext ──` separator lines emitted by `gh skill preview`.
+    /// These use em-dashes (U+2500 BOX DRAWINGS LIGHT HORIZONTAL or U+2014 EM DASH)
+    /// or regular dashes around a filename.
+    private static bool IsFileContentSeparator(string trimmed)
+    {
+        // Pattern: starts and ends with dash-like characters, has a filename in the middle
+        // Examples: "── SKILL.md ──", "--- SKILL.md ---"
+        if (trimmed.Length < 5) return false;
+        var hasLeadingDashes = trimmed[0] == '─' || trimmed[0] == '—' || trimmed[0] == '-';
+        var hasTrailingDashes = trimmed[^1] == '─' || trimmed[^1] == '—' || trimmed[^1] == '-';
+        if (!hasLeadingDashes || !hasTrailingDashes) return false;
+        // Extract middle part — should contain a filename-like string
+        var inner = trimmed.Trim('─', '—', '-', ' ', '\t');
+        return inner.Length > 0 && !inner.Contains('\n') && LooksLikeFilename(inner);
     }
 
     private static bool IsFileSectionHeading(string trimmed)
