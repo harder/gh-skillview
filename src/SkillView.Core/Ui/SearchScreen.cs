@@ -78,7 +78,7 @@ public sealed class SearchScreen
 
         var hint = new Label
         {
-            Text = "Enter search  ·  v preview  ·  i install selected  ·  Esc/q close",
+            Text = "Enter search  ·  p/v preview  ·  i install selected  ·  Esc/q close",
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
@@ -93,6 +93,14 @@ public sealed class SearchScreen
             FullRowSelect = true,
         };
         _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
+        _resultsTable.KeyDown += (_, key) =>
+        {
+            if (TuiHelpers.IsPreviewKey(key))
+            {
+                _ = PreviewSelectedAsync();
+                key.Handled = true;
+            }
+        };
         _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
 
         _previewFrame = new FrameView
@@ -109,10 +117,9 @@ public sealed class SearchScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            ReadOnly = true,
-            WordWrap = true,
             Text = "(no selection)",
         };
+        TuiHelpers.ConfigureReadOnlyPane(_previewPane, "Dialog");
         _previewFrame.Add(_previewPane);
 
         _statusLabel = new Label
@@ -131,6 +138,13 @@ public sealed class SearchScreen
             Visible = false,
             AutoSpin = false,
         };
+
+        TuiHelpers.ApplyScheme("Dialog",
+            dialog,
+            queryLabel, _queryField,
+            ownerLabel, _ownerField,
+            limitLabel, _limitField,
+            hint, _resultsTable, _previewFrame, _previewPane, _statusLabel, _spinner);
 
         dialog.Add(
             queryLabel, _queryField,
@@ -158,7 +172,7 @@ public sealed class SearchScreen
                 _app.RequestStop();
                 key.Handled = true;
             }
-            else if (rune == 'v' || rune == 'V')
+            else if (TuiHelpers.IsPreviewKey(key))
             {
                 _ = PreviewSelectedAsync();
                 key.Handled = true;
@@ -216,6 +230,15 @@ public sealed class SearchScreen
             {
                 _results = response.Results.ToList();
                 RefreshResultsTable();
+                _resultsTable?.SetFocus();
+                if (_previewPane is not null)
+                {
+                    _previewPane.Text = _results.Count == 0 ? "(no selection)" : TuiHelpers.PreviewHint;
+                }
+                if (_previewFrame is not null)
+                {
+                    _previewFrame.Title = "Preview";
+                }
                 if (!response.Succeeded)
                 {
                     var snippet = TuiHelpers.ErrorSnippet(response.ErrorMessage);
@@ -227,7 +250,7 @@ public sealed class SearchScreen
                 {
                     SetStatus(_results.Count == 0
                         ? "no matches"
-                        : $"{_results.Count} result(s) — Enter to preview, i to stage install");
+                        : $"{_results.Count} result(s) — Enter, p, or v to preview; i to install");
                 }
             });
         }
@@ -301,7 +324,7 @@ public sealed class SearchScreen
             Repo: pick.Repo,
             SkillName: pick.SkillName,
             RepoPath: pick.Path);
-        SetStatus($"install staged: {pick.Repo}{(pick.SkillName is null ? "" : "/" + pick.SkillName)} — Phase 4 executes");
+        SetStatus($"install staged: {pick.Repo}{(pick.SkillName is null ? "" : "/" + pick.SkillName)}");
     }
 
     private void RefreshResultsTable()
@@ -311,8 +334,8 @@ public sealed class SearchScreen
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                ["Skill"] = s => s.SkillName ?? string.Empty,
-                ["Repo"] = s => s.Repo ?? string.Empty,
+                ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 22),
+                ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 28),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 ["Description"] = s => TuiHelpers.Truncate(s.Description, 40),
             });
@@ -329,7 +352,7 @@ public sealed class SearchScreen
         {
             return;
         }
-        _previewPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\nPress v to load preview.";
+        _previewPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\nPress Enter, p, or v to load the preview.";
     }
 
     private void SetStatus(string text) => Invoke(() =>

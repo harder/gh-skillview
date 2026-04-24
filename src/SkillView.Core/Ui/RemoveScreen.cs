@@ -51,10 +51,9 @@ public sealed class RemoveScreen
         {
             X = 0, Y = 0,
             Width = Dim.Fill(), Height = Dim.Fill(3),
-            ReadOnly = true,
-            WordWrap = false,
             Text = BuildSummary(),
         };
+        TuiHelpers.ConfigureReadOnlyPane(summary, "Dialog");
 
         var secondConfirm = new CheckBox
         {
@@ -84,6 +83,8 @@ public sealed class RemoveScreen
             Y = Pos.AnchorEnd(1),
             IsDefault = true,
         };
+
+        TuiHelpers.ApplyScheme("Dialog", dialog, summary, secondConfirm, status, removeButton, cancelButton);
 
         removeButton.Accepting += (_, ev) =>
         {

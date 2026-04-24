@@ -38,7 +38,7 @@ public static class InstalledScreen
             rows,
             new Dictionary<string, Func<InstalledSkill, object>>
             {
-                ["Name"] = s => s.Name,
+                ["Name"] = s => TuiHelpers.Truncate(s.Name, 28),
                 ["Scope"] = s => s.Scope.ToString(),
                 ["Source"] = s => s.Provenance.ToString(),
                 ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
@@ -54,10 +54,9 @@ public static class InstalledScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
-            ReadOnly = true,
-            WordWrap = false,
             Text = rows.Length == 0 ? "(no skills found)" : RenderDetail(rows[0]),
         };
+        TuiHelpers.ConfigureReadOnlyPane(detail, "Dialog");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -77,6 +76,8 @@ public static class InstalledScreen
                    (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only") +
                    (onRemove is null ? "   Esc/q close" : "   x remove · Esc/q close"),
         };
+
+        TuiHelpers.ApplyScheme("Dialog", dialog, table, detail, footer);
 
         dialog.Add(table, detail, footer);
         dialog.KeyDown += (_, key) =>

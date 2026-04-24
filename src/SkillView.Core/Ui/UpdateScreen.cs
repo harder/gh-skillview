@@ -70,7 +70,7 @@ public sealed class UpdateScreen
             new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
             {
                 [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                ["Name"] = row => row.S.Name,
+                ["Name"] = row => TuiHelpers.Truncate(row.S.Name, 28),
                 ["Scope"] = row => row.S.Scope.ToString(),
                 ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
             });
@@ -79,9 +79,9 @@ public sealed class UpdateScreen
         {
             X = Pos.Right(table) + 1, Y = 1,
             Width = Dim.Fill(), Height = Dim.Fill(4),
-            ReadOnly = true, WordWrap = false,
             Text = "(dry-run results appear here)",
         };
+        TuiHelpers.ConfigureReadOnlyPane(preview, "Dialog");
 
         var allBox = new CheckBox
         {
@@ -142,6 +142,11 @@ public sealed class UpdateScreen
             X = Pos.Right(updateButton) + 2,
             Y = Pos.AnchorEnd(1),
         };
+
+        TuiHelpers.ApplyScheme("Dialog",
+            dialog, tableLabel, table, preview,
+            allBox, forceBox, unpinBox, yesBox,
+            status, spinner, dryRunButton, updateButton, cancelButton);
 
         // Space on a row toggles its staged state.
         table.KeyDown += (_, key) =>

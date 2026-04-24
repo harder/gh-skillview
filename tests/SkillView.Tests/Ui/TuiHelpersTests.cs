@@ -1,5 +1,8 @@
 using SkillView.Inventory;
 using SkillView.Ui;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
+using Terminal.Gui.Views;
 using Xunit;
 
 namespace SkillView.Tests.Ui;
@@ -71,9 +74,65 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void HelpText_ClarifiesEnterPreviewRequiresResultsFocus()
+    {
+        Assert.Contains("when results are focused", TuiHelpers.HelpText);
+    }
+
+    [Fact]
     public void WelcomeHint_IsNotEmpty()
     {
         Assert.True(TuiHelpers.WelcomeHint.Length > 0);
         Assert.Contains("help", TuiHelpers.WelcomeHint);
+    }
+
+    [Theory]
+    [InlineData('v')]
+    [InlineData('V')]
+    [InlineData('p')]
+    [InlineData('P')]
+    public void IsPreviewKey_AcceptsPreviewRunes(char key)
+    {
+        Assert.True(TuiHelpers.IsPreviewKey(new Key(key)));
+    }
+
+    [Fact]
+    public void IsPreviewKey_AcceptsEnter()
+    {
+        Assert.True(TuiHelpers.IsPreviewKey(new Key(KeyCode.Enter)));
+    }
+
+    [Fact]
+    public void IsPreviewKey_RejectsOtherKeys()
+    {
+        Assert.False(TuiHelpers.IsPreviewKey(new Key('x')));
+    }
+
+    [Fact]
+    public void ApplyScheme_SetsSchemeName_OnProvidedViews()
+    {
+        var label = new Label();
+        var field = new TextField();
+
+        TuiHelpers.ApplyScheme("Base", label, field, null);
+
+        Assert.Equal("Base", label.SchemeName);
+        Assert.Equal("Base", field.SchemeName);
+    }
+
+    [Fact]
+    public void ConfigureReadOnlyPane_SetsReadableDefaults()
+    {
+        var view = new TextView
+        {
+            ReadOnly = false,
+            WordWrap = false,
+        };
+
+        TuiHelpers.ConfigureReadOnlyPane(view, "Dialog");
+
+        Assert.True(view.ReadOnly);
+        Assert.True(view.WordWrap);
+        Assert.Equal("Dialog", view.SchemeName);
     }
 }

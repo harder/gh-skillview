@@ -31,10 +31,9 @@ public static class DoctorScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
-            ReadOnly = true,
-            WordWrap = false,
             Text = body,
         };
+        TuiHelpers.ConfigureReadOnlyPane(text, "Dialog");
 
         var close = new Button
         {
@@ -43,6 +42,7 @@ public static class DoctorScreen
             X = Pos.Center(),
             Y = Pos.AnchorEnd(1),
         };
+        TuiHelpers.ApplyScheme("Dialog", dialog, text, close);
         close.Accepting += (_, e) =>
         {
             app.RequestStop();

@@ -108,6 +108,14 @@ public sealed class SkillViewApp
             FullRowSelect = true,
         };
         _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
+        _resultsTable.KeyDown += (_, key) =>
+        {
+            if (TuiHelpers.IsPreviewKey(key))
+            {
+                _ = PreviewSelectedAsync();
+                key.Handled = true;
+            }
+        };
 
         _leftFrame.Add(queryLabel, _queryField, _resultsTable);
 
@@ -125,10 +133,9 @@ public sealed class SkillViewApp
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            ReadOnly = true,
-            WordWrap = true,
             Text = TuiHelpers.WelcomeHint,
         };
+        TuiHelpers.ConfigureReadOnlyPane(_rightPane, "Base");
         _rightFrame.Add(_rightPane);
 
         _statusLabel = new Label
@@ -147,6 +154,10 @@ public sealed class SkillViewApp
             Visible = false,
             AutoSpin = false,
         };
+
+        TuiHelpers.ApplyScheme("Base",
+            window, _leftFrame, _rightFrame,
+            queryLabel, _queryField, _resultsTable, _rightPane, _statusLabel, _spinner);
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner);
         window.KeyDown += OnWindowKeyDown;
@@ -179,7 +190,7 @@ public sealed class SkillViewApp
             _app?.RequestStop();
             key.Handled = true;
         }
-        else if (rune.Value == 'v' || rune.Value == 'V')
+        else if (TuiHelpers.IsPreviewKey(key))
         {
             _ = PreviewSelectedAsync();
             key.Handled = true;
@@ -284,9 +295,18 @@ public sealed class SkillViewApp
             {
                 _results = results.ToList();
                 RefreshResultsTable();
+                _resultsTable?.SetFocus();
+                if (_rightPane is not null && !_showingLogs)
+                {
+                    _rightPane.Text = results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint;
+                }
+                if (_rightFrame is not null)
+                {
+                    _rightFrame.Title = "Preview";
+                }
                 SetStatus(results.Count == 0
                     ? "no matches"
-                    : $"{results.Count} result(s) — Enter to preview");
+                    : $"{results.Count} result(s) — Enter, p, or v to preview");
             });
         }
         catch (Exception ex)
@@ -366,8 +386,8 @@ public sealed class SkillViewApp
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                ["Skill"] = s => s.SkillName ?? string.Empty,
-                ["Repo"] = s => s.Repo ?? string.Empty,
+                ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 24),
+                ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 30),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 ["Description"] = s => TuiHelpers.Truncate(s.Description, 50),
             });
@@ -384,7 +404,7 @@ public sealed class SkillViewApp
 
         if (_showingLogs)
         {
-            _rightPane.Text = "Press Enter on a result to preview.";
+            _rightPane.Text = TuiHelpers.PreviewHint;
             _rightFrame.Title = "Preview";
             _showingLogs = false;
         }

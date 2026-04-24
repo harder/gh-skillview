@@ -71,7 +71,9 @@ public sealed class CleanupScreen
             {
                 [" "] = row => checkStates[row.Idx] ? "✓" : " ",
                 ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
-                ["Name"] = row => row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
+                ["Name"] = row => TuiHelpers.Truncate(
+                    row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
+                    24),
                 ["Path"] = row => TuiHelpers.ShortenPath(row.C.Path),
             });
 
@@ -79,9 +81,9 @@ public sealed class CleanupScreen
         {
             X = Pos.Right(table) + 1, Y = 1,
             Width = Dim.Fill(), Height = Dim.Fill(2),
-            ReadOnly = true, WordWrap = true,
             Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
         };
+        TuiHelpers.ConfigureReadOnlyPane(detail, "Dialog");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -97,6 +99,8 @@ public sealed class CleanupScreen
                 ? " no cleanup candidates"
                 : $" {_candidates.Length} candidate(s) — R remove selected, I ignore selected, X export report",
         };
+
+        TuiHelpers.ApplyScheme("Dialog", dialog, header, table, detail, status);
 
         // Space-to-toggle.
         table.KeyDown += (_, key) =>

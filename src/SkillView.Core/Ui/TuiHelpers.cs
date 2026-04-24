@@ -1,4 +1,8 @@
 using SkillView.Inventory;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
@@ -51,11 +55,32 @@ internal static class TuiHelpers
         return string.Empty;
     }
 
+    internal static bool IsPreviewKey(Key key) =>
+        key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'v' or 'V' or 'p' or 'P';
+
+    internal static void ApplyScheme(string schemeName, params View?[] views)
+    {
+        foreach (var view in views)
+        {
+            if (view is not null)
+            {
+                view.SchemeName = schemeName;
+            }
+        }
+    }
+
+    internal static void ConfigureReadOnlyPane(TextView view, string schemeName, bool wordWrap = true)
+    {
+        view.ReadOnly = true;
+        view.WordWrap = wordWrap;
+        view.SchemeName = schemeName;
+    }
+
     /// Key bindings help text for the main window, shared between the
     /// welcome message and the F1 help dialog.
     internal const string HelpText =
         "/  focus the search box\n" +
-        "v  preview the selected result\n" +
+        "Enter, p, v  preview when results are focused\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
         "I  show installed skills\n" +
@@ -68,5 +93,8 @@ internal static class TuiHelpers
 
     /// Compact single-line hint shown in the welcome/preview pane.
     internal const string WelcomeHint =
-        "/ search · v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
+        "/ search · p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
+
+    internal const string PreviewHint =
+        "Select a result and press Enter, p, or v to preview.";
 }

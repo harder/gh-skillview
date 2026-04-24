@@ -174,6 +174,18 @@ public sealed class InstallScreen
             AutoSpin = false,
         };
 
+        TuiHelpers.ApplyScheme("Dialog",
+            dialog,
+            skillLabel, skillField,
+            versionLabel, versionField, pinBox,
+            repoPathLabel, repoPathField,
+            upstreamLabel, upstreamField,
+            agentsLabel,
+            scopeLabel, scopeSelector,
+            pathLabel, pathField, pathHint,
+            forceBox, allowHiddenBox, fromLocalBox,
+            status, spinner);
+
         var installButton = new Button
         {
             Text = "_Install",
