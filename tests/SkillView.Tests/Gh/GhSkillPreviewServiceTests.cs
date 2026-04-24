@@ -40,7 +40,8 @@ public class GhSkillPreviewServiceTests
         var (md, files) = GhSkillPreviewService.Split(body);
         Assert.Empty(files);
         // Body has no tree preamble or separator, so markdown = body unchanged
-        Assert.Equal(body, md);
+        // Normalize line endings for cross-platform (Windows checks out \r\n)
+        Assert.Equal(body.ReplaceLineEndings("\n"), md);
     }
 
     [Fact]
