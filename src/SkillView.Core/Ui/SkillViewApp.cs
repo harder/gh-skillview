@@ -80,20 +80,39 @@ public sealed class SkillViewApp
         {
             try
             {
-                if (key.KeyCode == KeyCode.Enter && !key.Handled && _resultsTable?.HasFocus == true)
+                // --- DIAG: log Enter AND any Enter-like keys unconditionally ---
+                var bareKey = key.KeyCode & ~KeyCode.CtrlMask & ~KeyCode.ShiftMask & ~KeyCode.AltMask;
+                var isEnterLike = bareKey == KeyCode.Enter
+                    || (int)bareKey == 0x0D   // raw CR
+                    || (int)bareKey == 0x0A;  // raw LF
+                if (isEnterLike)
                 {
-                    // --- DIAG: log Enter interception with focus chain ---
                     var focusChain = BuildFocusChain(window);
                     _services.Logger.Debug("DIAG.app.KeyDown",
-                        $"ENTER intercepted KeyCode=0x{(int)key.KeyCode:X} " +
+                        $"ENTER KeyCode=0x{(int)key.KeyCode:X} bare=0x{(int)bareKey:X} " +
+                        $"Handled={key.Handled} " +
+                        $"tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus} " +
                         $"tableFocused={_resultsTable?.Focused?.GetType().Name ?? "null"} " +
                         $"focusChain=[{focusChain}]");
-                    // --- end DIAG ---
 
-                    key.Handled = true;
-                    _services.Logger.Info("preview", "App.KeyDown Enter → calling PreviewSelectedAsync");
-                    _ = PreviewSelectedAsync();
+                    if (!key.Handled && _resultsTable?.HasFocus == true)
+                    {
+                        key.Handled = true;
+                        _services.Logger.Info("preview", "App.KeyDown Enter → calling PreviewSelectedAsync");
+                        _ = PreviewSelectedAsync();
+                    }
+                    else if (!key.Handled && _queryField?.HasFocus == true)
+                    {
+                        key.Handled = true;
+                        var query = _queryField.Text.Trim();
+                        if (!string.IsNullOrEmpty(query))
+                        {
+                            _services.Logger.Info("search", $"App.KeyDown Enter → RunSearchAsync({query})");
+                            _ = RunSearchAsync(query);
+                        }
+                    }
                 }
+                // --- end DIAG ---
             }
             catch (Exception ex)
             {
@@ -335,6 +354,21 @@ public sealed class SkillViewApp
             if (!string.IsNullOrEmpty(query))
             {
                 _ = RunSearchAsync(query);
+            }
+        }
+        // Tab from query field submits the search (workaround for terminals
+        // like Warp that swallow Enter after certain input sequences)
+        else if (key.KeyCode == KeyCode.Tab)
+        {
+            key.Handled = true;
+            var query = _queryField?.Text.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(query))
+            {
+                _ = RunSearchAsync(query);
+            }
+            else
+            {
+                _resultsTable?.SetFocus();
             }
         }
         else if (key.KeyCode == KeyCode.Esc)

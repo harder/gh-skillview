@@ -162,7 +162,7 @@ public sealed class SearchScreen
 
         _queryField.KeyDown += (_, key) =>
         {
-            if (key.KeyCode == KeyCode.Enter)
+            if (key.KeyCode == KeyCode.Enter || key.KeyCode == KeyCode.Tab)
             {
                 key.Handled = true;
                 _ = RunSearchAsync();
@@ -175,8 +175,9 @@ public sealed class SearchScreen
             // Same TG2 v2 RC4 issue as SkillViewApp — internal focused subviews
             // (e.g. ScrollBar) have Enter→Command.Accept and steal Enter before
             // the TableView sees it. P/V bypass because they're not base View bindings.
+            // Also handle Tab as Enter alternative for Warp terminal compatibility.
             // TODO(tg2): remove once upstream Enter dispatch to TableView is fixed
-            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            if ((key.KeyCode == KeyCode.Enter || key.KeyCode == KeyCode.Tab) && !key.Handled)
             {
                 if (_resultsTable.HasFocus)
                 {

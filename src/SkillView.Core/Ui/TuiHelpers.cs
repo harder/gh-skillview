@@ -266,7 +266,7 @@ internal static class TuiHelpers
         "/ search · p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
 
     internal const string PreviewHint =
-        "Select a result and press Enter, p, or v to preview.";
+        "Select a result and press Enter, p, or v to preview.\n\nTip: In Warp terminal, use Tab instead of Enter to submit searches.";
 
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
