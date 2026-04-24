@@ -197,10 +197,41 @@ internal static class TuiHelpers
         };
     }
 
-    /// Apply consistent column widths to a results TableView. Column order
-    /// must match the EnumerableTableSource definition: Skill, Repo, ★, Description.
-    /// Looks up columns by header name so order changes don't break styling.
-    internal static void ApplyColumnStyles(TableView table)
+    /// Distribute a budget of `available` cells across columns according to
+    /// per-column min widths and weights. Columns with weight 0 stay at min.
+    /// The remaining width (after minimums are paid) is split by weight and
+    /// added to each non-zero-weight column. Useful for proportional, terminal-
+    /// width-aware truncation in TableView row producers.
+    internal static int[] DistributeWidths(int available, IReadOnlyList<(int Min, double Weight)> specs)
+    {
+        var n = specs.Count;
+        var widths = new int[n];
+        if (n == 0) return widths;
+        var totalMin = 0;
+        var totalWeight = 0d;
+        for (var i = 0; i < n; i++)
+        {
+            widths[i] = specs[i].Min;
+            totalMin += specs[i].Min;
+            totalWeight += specs[i].Weight;
+        }
+        var leftover = available - totalMin;
+        if (leftover <= 0 || totalWeight <= 0) return widths;
+        for (var i = 0; i < n; i++)
+        {
+            if (specs[i].Weight > 0)
+            {
+                widths[i] += (int)Math.Round(leftover * specs[i].Weight / totalWeight);
+            }
+        }
+        return widths;
+    }
+
+    /// Apply per-column widths to a results TableView. The Skill / Repo / ★ /
+    /// Description headers are matched by name so the row producer's order
+    /// can change without breaking styling. The last column expands to fill
+    /// any rounding leftover.
+    internal static void ApplyColumnStyles(TableView table, int skillWidth, int repoWidth, int starsWidth, int descWidth)
     {
         if (table.Table is null) return;
 
@@ -214,19 +245,19 @@ internal static class TuiHelpers
             switch (header)
             {
                 case "Skill":
-                    cs.MinWidth = 10;
-                    cs.MaxWidth = 24;
+                    cs.MinWidth = Math.Min(8, skillWidth);
+                    cs.MaxWidth = Math.Max(8, skillWidth);
                     break;
                 case "Repo":
-                    cs.MinWidth = 12;
-                    cs.MaxWidth = 30;
+                    cs.MinWidth = Math.Min(8, repoWidth);
+                    cs.MaxWidth = Math.Max(8, repoWidth);
                     break;
                 case "★":
                     cs.MinWidth = 1;
-                    cs.MaxWidth = 5;
+                    cs.MaxWidth = Math.Max(3, starsWidth);
                     break;
                 case "Description":
-                    cs.MinWidth = 15;
+                    cs.MinWidth = Math.Min(15, descWidth);
                     break;
             }
         }

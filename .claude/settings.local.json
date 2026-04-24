@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 dotnet new sln -n SkillView)",
+      "Bash(dotnet new *)",
+      "Bash(DOTNET_CLI_HOME=\"$TMPDIR/dotnet-home\" DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 dotnet *)",
+      "Bash(dotnet package *)"
+    ]
+  }
+}

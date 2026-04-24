@@ -37,19 +37,59 @@ public static class InstalledScreen
         };
         TuiHelpers.DisableTypeToSearch(table);
         var rows = snapshot.Skills;
-        table.Table = new EnumerableTableSource<InstalledSkill>(
-            rows,
-            new Dictionary<string, Func<InstalledSkill, object>>
+
+        void RebuildSource()
+        {
+            var prevRow = table.SelectedRow;
+            var viewportWidth = table.Viewport.Width;
+            var available = viewportWidth > 0
+                ? Math.Max(40, viewportWidth - 6 /* col separators */)
+                : 70;
+            // Scope/Source/!/Lnk are short enums/flags; budget them as fixed.
+            // Name and Agents share the proportional remainder.
+            var fixedCols = 6 /*Scope*/ + 8 /*Source*/ + 1 /*!*/ + 3 /*Lnk*/;
+            var remaining = Math.Max(20, available - fixedCols);
+            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.45));
+            var agentsW = Math.Max(10, remaining - nameW);
+            table.Table = new EnumerableTableSource<InstalledSkill>(
+                rows,
+                new Dictionary<string, Func<InstalledSkill, object>>
+                {
+                    ["Name"] = s => TuiHelpers.Truncate(s.Name, nameW),
+                    ["Scope"] = s => s.Scope.ToString(),
+                    ["Source"] = s => s.Provenance.ToString(),
+                    ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
+                    ["Lnk"] = s => s.IsSymlinked ? "↩" : "",
+                    ["Agents"] = s => TuiHelpers.Truncate(
+                        string.Join(",", s.Agents.Select(a => a.AgentId).Distinct(StringComparer.OrdinalIgnoreCase)),
+                        agentsW),
+                });
+            var style = table.Style;
+            style.ExpandLastColumn = true;
+            for (var i = 0; i < table.Table.Columns; i++)
             {
-                ["Name"] = s => TuiHelpers.Truncate(s.Name, 28),
-                ["Scope"] = s => s.Scope.ToString(),
-                ["Source"] = s => s.Provenance.ToString(),
-                ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
-                ["Lnk"] = s => s.IsSymlinked ? "↩" : "",
-                ["Agents"] = s => TuiHelpers.Truncate(
-                    string.Join(",", s.Agents.Select(a => a.AgentId).Distinct(StringComparer.OrdinalIgnoreCase)),
-                    30),
-            });
+                var cs = style.GetOrCreateColumnStyle(i);
+                switch (table.Table.ColumnNames[i])
+                {
+                    case "Name": cs.MinWidth = 8; cs.MaxWidth = nameW; break;
+                    case "Agents": cs.MinWidth = 6; break;
+                }
+            }
+            if (prevRow >= 0 && prevRow < rows.Length) table.SelectedRow = prevRow;
+            table.Update();
+        }
+
+        RebuildSource();
+        var lastWidth = -1;
+        table.FrameChanged += (_, _) =>
+        {
+            var w = table.Viewport.Width;
+            if (w > 0 && w != lastWidth)
+            {
+                lastWidth = w;
+                RebuildSource();
+            }
+        };
 
         var detail = new Markdown
         {

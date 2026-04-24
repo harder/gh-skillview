@@ -67,15 +67,49 @@ public sealed class UpdateScreen
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
-        table.Table = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
-            _skills.Select((s, i) => (i, s)).ToList(),
-            new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
+
+        var rowsList = _skills.Select((s, i) => (i, s)).ToList();
+        void RebuildUpdateSource()
+        {
+            var prevRow = table.SelectedRow;
+            var viewportWidth = table.Viewport.Width;
+            var available = viewportWidth > 0 ? Math.Max(30, viewportWidth - 4) : 50;
+            // Fixed: checkbox(1) + Scope(6) + Flags(5). Remainder → Name.
+            var nameW = Math.Max(12, available - 1 - 6 - 5);
+            table.Table = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
+                rowsList,
+                new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
+                {
+                    [" "] = row => checkStates[row.Idx] ? "✓" : " ",
+                    ["Name"] = row => TuiHelpers.Truncate(row.S.Name, nameW),
+                    ["Scope"] = row => row.S.Scope.ToString(),
+                    ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
+                });
+            var style = table.Style;
+            style.ExpandLastColumn = true;
+            for (var i = 0; i < table.Table.Columns; i++)
             {
-                [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                ["Name"] = row => TuiHelpers.Truncate(row.S.Name, 28),
-                ["Scope"] = row => row.S.Scope.ToString(),
-                ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
-            });
+                var cs = style.GetOrCreateColumnStyle(i);
+                if (table.Table.ColumnNames[i] == "Name")
+                {
+                    cs.MinWidth = 8;
+                    cs.MaxWidth = nameW;
+                }
+            }
+            if (prevRow >= 0 && prevRow < rowsList.Count) table.SelectedRow = prevRow;
+            table.Update();
+        }
+        RebuildUpdateSource();
+        var lastUpdateWidth = -1;
+        table.FrameChanged += (_, _) =>
+        {
+            var w = table.Viewport.Width;
+            if (w > 0 && w != lastUpdateWidth)
+            {
+                lastUpdateWidth = w;
+                RebuildUpdateSource();
+            }
+        };
 
         var preview = new Markdown
         {

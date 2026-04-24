@@ -114,6 +114,17 @@ public sealed class SearchScreen
         _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
         _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
 
+        var lastSearchWidth = -1;
+        _resultsTable.FrameChanged += (_, _) =>
+        {
+            var w = _resultsTable?.Viewport.Width ?? 0;
+            if (w > 0 && w != lastSearchWidth)
+            {
+                lastSearchWidth = w;
+                RefreshResultsTable();
+            }
+        };
+
         _previewFrame = new FrameView
         {
             Title = "Preview",
@@ -413,16 +424,26 @@ public sealed class SearchScreen
     private void RefreshResultsTable()
     {
         if (_resultsTable is null) return;
+        var viewportWidth = _resultsTable.Viewport.Width;
+        var available = viewportWidth > 0 ? Math.Max(40, viewportWidth - 4) : 80;
+        var widths = TuiHelpers.DistributeWidths(available, new (int, double)[]
+        {
+            (12, 1.0), // Skill
+            (16, 1.2), // Repo
+            (3,  0.0), // ★
+            (20, 2.0), // Description
+        });
+        int skillW = widths[0], repoW = widths[1], starsW = widths[2], descW = widths[3];
         _resultsTable.Table = new EnumerableTableSource<SearchResultSkill>(
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, 22),
-                ["Repo"] = s => TuiHelpers.Truncate(s.Repo, 28),
+                ["Skill"] = s => TuiHelpers.Truncate(s.SkillName, skillW),
+                ["Repo"] = s => TuiHelpers.Truncate(s.Repo, repoW),
                 ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Description"] = s => TuiHelpers.Truncate(s.Description, 60),
+                ["Description"] = s => TuiHelpers.Truncate(s.Description, descW),
             });
-        TuiHelpers.ApplyColumnStyles(_resultsTable);
+        TuiHelpers.ApplyColumnStyles(_resultsTable, skillW, repoW, starsW, descW);
         _resultsTable.Update();
     }
 

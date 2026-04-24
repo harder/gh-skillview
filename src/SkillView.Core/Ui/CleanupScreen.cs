@@ -67,17 +67,53 @@ public sealed class CleanupScreen
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
-        table.Table = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
-            _candidates.Select((c, i) => (i, c)).ToList(),
-            new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
+
+        var rowsList = _candidates.Select((c, i) => (i, c)).ToList();
+        void RebuildCleanupSource()
+        {
+            var prevRow = table.SelectedRow;
+            var viewportWidth = table.Viewport.Width;
+            var available = viewportWidth > 0 ? Math.Max(40, viewportWidth - 4) : 70;
+            // Fixed: checkbox(1) + Kind(11). Remainder split Name (35%) / Path (65%).
+            var remaining = Math.Max(20, available - 1 - 11);
+            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.35));
+            var pathW = Math.Max(15, remaining - nameW);
+            table.Table = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
+                rowsList,
+                new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
+                {
+                    [" "] = row => checkStates[row.Idx] ? "✓" : " ",
+                    ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
+                    ["Name"] = row => TuiHelpers.Truncate(
+                        row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
+                        nameW),
+                    ["Path"] = row => TuiHelpers.Truncate(TuiHelpers.ShortenPath(row.C.Path), pathW),
+                });
+            var style = table.Style;
+            style.ExpandLastColumn = true;
+            for (var i = 0; i < table.Table.Columns; i++)
             {
-                [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
-                ["Name"] = row => TuiHelpers.Truncate(
-                    row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
-                    24),
-                ["Path"] = row => TuiHelpers.ShortenPath(row.C.Path),
-            });
+                var cs = style.GetOrCreateColumnStyle(i);
+                switch (table.Table.ColumnNames[i])
+                {
+                    case "Name": cs.MinWidth = 8; cs.MaxWidth = nameW; break;
+                    case "Path": cs.MinWidth = 10; break;
+                }
+            }
+            if (prevRow >= 0 && prevRow < rowsList.Count) table.SelectedRow = prevRow;
+            table.Update();
+        }
+        RebuildCleanupSource();
+        var lastCleanupWidth = -1;
+        table.FrameChanged += (_, _) =>
+        {
+            var w = table.Viewport.Width;
+            if (w > 0 && w != lastCleanupWidth)
+            {
+                lastCleanupWidth = w;
+                RebuildCleanupSource();
+            }
+        };
 
         var detail = new Markdown
         {
