@@ -30,6 +30,7 @@ public sealed class SkillViewApp
     private TextView? _logPane;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
+    private StatusBar? _statusBar;
     private FrameView? _leftFrame;
     private FrameView? _rightFrame;
 
@@ -157,7 +158,7 @@ public sealed class SkillViewApp
             X = 0,
             Y = 0,
             Width = Dim.Percent(50),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(2),
         };
 
         var queryLabel = new Label
@@ -219,7 +220,7 @@ public sealed class SkillViewApp
             X = Pos.Right(_leftFrame),
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(2),
         };
         _previewPane = new Markdown
         {
@@ -246,25 +247,39 @@ public sealed class SkillViewApp
         _statusLabel = new Label
         {
             X = 0,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(10),
             Text = " ready — press / to search or F1 for help",
         };
         _spinner = new SpinnerView
         {
             X = Pos.AnchorEnd(10),
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = 1,
             Height = 1,
             Visible = false,
             AutoSpin = false,
         };
 
+        _statusBar = new StatusBar(
+        [
+            new Shortcut { Title = "/", HelpText = "Search" },
+            new Shortcut { Title = "d", HelpText = "Doctor" },
+            new Shortcut { Title = "I", HelpText = "Installed" },
+            new Shortcut { Title = "s", HelpText = "Search+" },
+            new Shortcut { Title = "u", HelpText = "Update" },
+            new Shortcut { Title = "c", HelpText = "Cleanup" },
+            new Shortcut { Title = "l", HelpText = "Logs" },
+            new Shortcut { Key = Key.F1, Title = "Help" },
+            new Shortcut { Title = "q", HelpText = "Quit" },
+        ]);
+
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, _resultsTable, _previewPane, _logPane, _statusLabel, _spinner);
+            queryLabel, _queryField, _resultsTable, _previewPane, _logPane,
+            _statusLabel, _spinner, _statusBar);
 
-        window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner);
+        window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBar);
         window.KeyDown += OnWindowKeyDown;
 
         RefreshResultsTable();

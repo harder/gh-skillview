@@ -25,7 +25,7 @@ public sealed class SearchScreen
 
     private TextField? _queryField;
     private TextField? _ownerField;
-    private TextField? _limitField;
+    private NumericUpDown<int>? _limitUpDown;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
     private FrameView? _previewFrame;
@@ -70,14 +70,17 @@ public sealed class SearchScreen
         TuiHelpers.ConfigureTextInput(_ownerField, "Dialog");
 
         var limitLabel = new Label { Text = "Limit :", X = Pos.Right(_ownerField) + 2, Y = 0 };
-        _limitField = new TextField
+        _limitUpDown = new NumericUpDown<int>
         {
             X = Pos.Right(limitLabel) + 1,
             Y = 0,
-            Width = 6,
-            Text = GhSkillSearchService.DefaultLimit.ToString(CultureInfo.InvariantCulture),
+            Value = GhSkillSearchService.DefaultLimit,
+            Increment = 10,
         };
-        TuiHelpers.ConfigureTextInput(_limitField, "Dialog");
+        _limitUpDown.ValueChanging += (_, e) =>
+        {
+            if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
+        };
 
         var hint = new Label
         {
@@ -150,13 +153,13 @@ public sealed class SearchScreen
             dialog,
             queryLabel, _queryField,
             ownerLabel, _ownerField,
-            limitLabel, _limitField,
+            limitLabel, _limitUpDown,
             hint, _resultsTable, _previewFrame, _previewPane, _statusLabel, _spinner);
 
         dialog.Add(
             queryLabel, _queryField,
             ownerLabel, _ownerField,
-            limitLabel, _limitField,
+            limitLabel, _limitUpDown,
             hint,
             _resultsTable, _previewFrame,
             _statusLabel, _spinner);
@@ -190,7 +193,7 @@ public sealed class SearchScreen
                     _ = PreviewSelectedAsync();
                     return;
                 }
-                else if (_queryField.HasFocus || _ownerField.HasFocus || _limitField.HasFocus)
+                else if (_queryField.HasFocus || _ownerField.HasFocus || _limitUpDown.HasFocus)
                 {
                     key.Handled = true;
                     _ = RunSearchAsync();
@@ -206,7 +209,7 @@ public sealed class SearchScreen
                 return;
             }
 
-            if (_queryField.HasFocus || _ownerField.HasFocus || _limitField.HasFocus) return;
+            if (_queryField.HasFocus || _ownerField.HasFocus || _limitUpDown.HasFocus) return;
             var rune = key.AsRune.Value;
             if (key.KeyCode == KeyCode.Esc || rune == 'q' || rune == 'Q')
             {
@@ -246,11 +249,7 @@ public sealed class SearchScreen
         }
 
         var owner = _ownerField?.Text.Trim();
-        var limit = GhSkillSearchService.DefaultLimit;
-        if (int.TryParse(_limitField?.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
-        {
-            limit = Math.Clamp(n, 1, 200);
-        }
+        var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
 
         SetBusy($"searching '{query}'…");
         try
