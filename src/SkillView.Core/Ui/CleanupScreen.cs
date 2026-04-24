@@ -44,17 +44,18 @@ public sealed class CleanupScreen
 
     public void Show()
     {
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = $"Cleanup — {_candidates.Length} candidate(s)",
-            Width = Dim.Percent(90),
-            Height = Dim.Percent(90),
+            X = 0, Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var header = new Label
         {
             X = 0, Y = 0,
-            Text = "Space toggles row. R remove, I ignore, X export report, Esc close",
+            Text = "Space toggles row.",
         };
 
         var checkStates = new bool[_candidates.Length];
@@ -62,7 +63,7 @@ public sealed class CleanupScreen
         {
             X = 0, Y = 1,
             Width = Dim.Percent(55),
-            Height = Dim.Fill(2),
+            Height = Dim.Fill(3),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
@@ -81,10 +82,10 @@ public sealed class CleanupScreen
         var detail = new Markdown
         {
             X = Pos.Right(table) + 1, Y = 1,
-            Width = Dim.Fill(), Height = Dim.Fill(2),
+            Width = Dim.Fill(), Height = Dim.Fill(3),
             Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
         };
-        TuiHelpers.ConfigureMarkdownPane(detail, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(detail, "Base");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -94,14 +95,23 @@ public sealed class CleanupScreen
 
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(1),
+            X = 0, Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
             Text = _candidates.Length == 0
                 ? " no cleanup candidates"
-                : $" {_candidates.Length} candidate(s) — R remove selected, I ignore selected, X export report",
+                : $" {_candidates.Length} candidate(s)",
         };
 
-        TuiHelpers.ApplyScheme("Dialog", dialog, header, table, detail, status);
+        var statusBar = new StatusBar(
+        [
+            new Shortcut { Title = "Space", HelpText = "Toggle" },
+            new Shortcut { Title = "r", HelpText = "Remove" },
+            new Shortcut { Title = "i", HelpText = "Ignore" },
+            new Shortcut { Title = "x", HelpText = "Export" },
+            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+        ]);
+
+        TuiHelpers.ApplyScheme("Base", window, header, table, detail, status, statusBar);
 
         // Space-to-toggle.
         table.KeyDown += (_, key) =>
@@ -118,7 +128,7 @@ public sealed class CleanupScreen
             }
         };
 
-        dialog.KeyDown += (_, key) =>
+        window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc)
             {
@@ -132,9 +142,9 @@ public sealed class CleanupScreen
             else if (r == 'x' || r == 'X') { DoExport(status); key.Handled = true; }
         };
 
-        dialog.Add(header, table, detail, status);
+        window.Add(header, table, detail, status, statusBar);
         table.SetFocus();
-        _app.Run(dialog);
+        _app.Run(window);
     }
 
     private void DoRemove(bool[] checkStates, Label status)

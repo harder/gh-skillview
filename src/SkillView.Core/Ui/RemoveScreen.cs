@@ -40,31 +40,32 @@ public sealed class RemoveScreen
 
     public void Show()
     {
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = $"Remove — {_target.Name}",
-            Width = Dim.Percent(80),
-            Height = Dim.Percent(70),
+            X = 0, Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var summary = new Markdown
         {
             X = 0, Y = 0,
-            Width = Dim.Fill(), Height = Dim.Fill(3),
+            Width = Dim.Fill(), Height = Dim.Fill(4),
             Text = BuildSummary(),
         };
-        TuiHelpers.ConfigureMarkdownPane(summary, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(summary, "Base");
 
         var secondConfirm = new CheckBox
         {
-            X = 0, Y = Pos.AnchorEnd(2),
+            X = 0, Y = Pos.AnchorEnd(3),
             Text = "_I understand the warnings and want to proceed",
             Visible = _validation.RequiresSecondConfirm,
         };
 
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(1),
+            X = 0, Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(36),
             Text = BuildStatusLine(),
         };
@@ -73,18 +74,23 @@ public sealed class RemoveScreen
         {
             Text = "_Remove",
             X = Pos.AnchorEnd(30),
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Enabled = _validation.Allowed,
         };
         var cancelButton = new Button
         {
             Text = "_Cancel",
             X = Pos.AnchorEnd(12),
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             IsDefault = true,
         };
 
-        TuiHelpers.ApplyScheme("Dialog", dialog, summary, secondConfirm, status, removeButton, cancelButton);
+        var statusBar = new StatusBar(
+        [
+            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
+        ]);
+
+        TuiHelpers.ApplyScheme("Base", window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
 
         removeButton.Accepting += (_, ev) =>
         {
@@ -123,8 +129,8 @@ public sealed class RemoveScreen
             _app.RequestStop();
         };
 
-        dialog.Add(summary, secondConfirm, status, removeButton, cancelButton);
-        dialog.KeyDown += (_, key) =>
+        window.Add(summary, secondConfirm, status, removeButton, cancelButton, statusBar);
+        window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc)
             {
@@ -133,7 +139,7 @@ public sealed class RemoveScreen
             }
         };
         cancelButton.SetFocus();
-        _app.Run(dialog);
+        _app.Run(window);
     }
 
     private string BuildSummary()

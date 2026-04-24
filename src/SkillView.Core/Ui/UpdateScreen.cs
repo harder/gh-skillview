@@ -49,11 +49,12 @@ public sealed class UpdateScreen
 
     public void Show()
     {
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = "Update skills",
-            Width = Dim.Percent(90),
-            Height = Dim.Percent(90),
+            X = 0, Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var tableLabel = new Label { Text = "Select skills to update. Press Space to toggle.", X = 0, Y = 0 };
@@ -62,7 +63,7 @@ public sealed class UpdateScreen
         {
             X = 0, Y = 1,
             Width = Dim.Percent(45),
-            Height = Dim.Fill(4),
+            Height = Dim.Fill(5),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
@@ -79,32 +80,32 @@ public sealed class UpdateScreen
         var preview = new TextView
         {
             X = Pos.Right(table) + 1, Y = 1,
-            Width = Dim.Fill(), Height = Dim.Fill(4),
+            Width = Dim.Fill(), Height = Dim.Fill(5),
             Text = "(dry-run results appear here)",
         };
-        TuiHelpers.ConfigureReadOnlyPane(preview, "Dialog");
+        TuiHelpers.ConfigureReadOnlyPane(preview, "Base");
 
         var allBox = new CheckBox
         {
-            X = 0, Y = Pos.AnchorEnd(3),
+            X = 0, Y = Pos.AnchorEnd(4),
             Text = _capabilities.SupportsUpdateAll ? "_all" : "_all (not supported)",
             Enabled = _capabilities.SupportsUpdateAll,
         };
         var forceBox = new CheckBox
         {
-            X = 10, Y = Pos.AnchorEnd(3),
+            X = 10, Y = Pos.AnchorEnd(4),
             Text = "_force",
             Enabled = _capabilities.SupportsUpdateForce,
         };
         var unpinBox = new CheckBox
         {
-            X = 22, Y = Pos.AnchorEnd(3),
+            X = 22, Y = Pos.AnchorEnd(4),
             Text = "_unpin",
             Enabled = _capabilities.SupportsUpdateUnpin,
         };
         var yesBox = new CheckBox
         {
-            X = 34, Y = Pos.AnchorEnd(3),
+            X = 34, Y = Pos.AnchorEnd(4),
             Text = _capabilities.SupportsUpdateYes ? "_yes" : "yes (needs gh --yes)",
             Enabled = _capabilities.SupportsUpdateYes,
             Value = _capabilities.SupportsUpdateYes ? CheckState.Checked : CheckState.UnChecked,
@@ -112,13 +113,13 @@ public sealed class UpdateScreen
 
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(2),
+            X = 0, Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(10),
             Text = " ready — select skills or enable --all, then choose Dry-run or Update",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(2),
+            X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(3),
             Width = 1, Height = 1,
             Visible = false, AutoSpin = false,
         };
@@ -127,27 +128,35 @@ public sealed class UpdateScreen
         {
             Text = "_Dry-run",
             X = Pos.Center() - 22,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Enabled = _capabilities.SupportsUpdateDryRun,
         };
         var updateButton = new Button
         {
             Text = "_Update",
             X = Pos.Right(dryRunButton) + 2,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             IsDefault = true,
         };
         var cancelButton = new Button
         {
             Text = "_Cancel",
             X = Pos.Right(updateButton) + 2,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
         };
 
-        TuiHelpers.ApplyScheme("Dialog",
-            dialog, tableLabel, table, preview,
+        var statusBar = new StatusBar(
+        [
+            new Shortcut { Title = "Space", HelpText = "Toggle" },
+            new Shortcut { Title = "d", HelpText = "Dry-run" },
+            new Shortcut { Title = "u", HelpText = "Update" },
+            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+        ]);
+
+        TuiHelpers.ApplyScheme("Base",
+            window, tableLabel, table, preview,
             allBox, forceBox, unpinBox, yesBox,
-            status, spinner, dryRunButton, updateButton, cancelButton);
+            status, spinner, dryRunButton, updateButton, cancelButton, statusBar);
 
         // Space on a row toggles its staged state.
         table.KeyDown += (_, key) =>
@@ -265,13 +274,14 @@ public sealed class UpdateScreen
             _app.RequestStop();
         };
 
-        dialog.Add(
+        window.Add(
             tableLabel, table, preview,
             allBox, forceBox, unpinBox, yesBox,
             status, spinner,
-            dryRunButton, updateButton, cancelButton);
+            dryRunButton, updateButton, cancelButton,
+            statusBar);
 
-        dialog.KeyDown += (_, key) =>
+        window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc)
             {
@@ -281,6 +291,6 @@ public sealed class UpdateScreen
         };
 
         updateButton.SetFocus();
-        _app.Run(dialog);
+        _app.Run(window);
     }
 }

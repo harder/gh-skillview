@@ -9,20 +9,23 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Modal Doctor dialog shown inside the TUI (bound to `d`). Renders
-/// the same `EnvironmentReport` as the CLI `doctor` subcommand but framed in
-/// a dialog with a scrollable Markdown view.
+/// Full-screen Doctor view shown inside the TUI (bound to `d`). Renders
+/// the same `EnvironmentReport` as the CLI `doctor` subcommand in a
+/// Markdown view that fills the terminal so the main view doesn't bleed
+/// through. Esc/q returns to the main view.
 public static class DoctorScreen
 {
     public static void Show(IApplication app, EnvironmentReport report)
     {
         var body = Render(report);
 
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = "Doctor",
-            Width = Dim.Percent(80),
-            Height = Dim.Percent(80),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var text = new Markdown
@@ -33,24 +36,18 @@ public static class DoctorScreen
             Height = Dim.Fill(1),
             Text = body,
         };
-        TuiHelpers.ConfigureMarkdownPane(text, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(text, "Base");
 
-        var close = new Button
-        {
-            Text = "Close",
-            IsDefault = true,
-            X = Pos.Center(),
-            Y = Pos.AnchorEnd(1),
-        };
-        TuiHelpers.ApplyScheme("Dialog", dialog, text, close);
-        close.Accepting += (_, e) =>
-        {
-            app.RequestStop();
-            e.Handled = true;
-        };
+        var statusBar = new StatusBar(
+        [
+            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+            new Shortcut { Title = "q", HelpText = "Quit" },
+        ]);
 
-        dialog.Add(text, close);
-        dialog.KeyDown += (_, key) =>
+        TuiHelpers.ApplyScheme("Base", window, text, statusBar);
+
+        window.Add(text, statusBar);
+        window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
             {
@@ -59,7 +56,7 @@ public static class DoctorScreen
             }
         };
 
-        app.Run(dialog);
+        app.Run(window);
     }
 
     public static string Render(EnvironmentReport r)

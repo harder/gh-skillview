@@ -8,21 +8,23 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Phase 2 Installed collection. A modal dialog listing the `InstalledSkill`
-/// records in a `TableView` with a right-side detail pane. Deliberately
-/// modest: Phase 6 adds remove/cleanup actions; Phase 9 refines layout once
-/// the TG2 deep-dive pass surfaces better building blocks.
+/// Phase 2 Installed collection. A full-screen view listing the
+/// `InstalledSkill` records in a `TableView` with a right-side detail pane.
+/// Replaces the main view entirely so the search results / preview don't
+/// bleed through. Esc/q returns to the main view.
 public static class InstalledScreen
 {
     public static void Show(IApplication app, InventorySnapshot snapshot, Action<InstalledSkill>? onRemove = null)
     {
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = snapshot.UsedGhSkillList
                 ? "Installed — gh skill list + filesystem"
                 : "Installed — filesystem scan",
-            Width = Dim.Percent(90),
-            Height = Dim.Percent(90),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var table = new TableView
@@ -30,7 +32,7 @@ public static class InstalledScreen
             X = 0,
             Y = 0,
             Width = Dim.Percent(60),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(2),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
@@ -54,10 +56,10 @@ public static class InstalledScreen
             X = Pos.Right(table),
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(2),
             Text = rows.Length == 0 ? "(no skills found)" : RenderDetail(rows[0]),
         };
-        TuiHelpers.ConfigureMarkdownPane(detail, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(detail, "Base");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -71,17 +73,29 @@ public static class InstalledScreen
         var footer = new Label
         {
             X = 0,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
             Text = $" {rows.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
-                   (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only") +
-                   (onRemove is null ? "   Esc/q close" : "   x remove · Esc/q close"),
+                   (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only"),
         };
 
-        TuiHelpers.ApplyScheme("Dialog", dialog, table, detail, footer);
+        var statusBar = new StatusBar(onRemove is null
+            ? new[]
+            {
+                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+                new Shortcut { Title = "q", HelpText = "Quit" },
+            }
+            : new[]
+            {
+                new Shortcut { Title = "x", HelpText = "Remove" },
+                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+                new Shortcut { Title = "q", HelpText = "Quit" },
+            });
 
-        dialog.Add(table, detail, footer);
-        dialog.KeyDown += (_, key) =>
+        TuiHelpers.ApplyScheme("Base", window, table, detail, footer, statusBar);
+
+        window.Add(table, detail, footer, statusBar);
+        window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
             {
@@ -97,7 +111,7 @@ public static class InstalledScreen
             }
         };
 
-        app.Run(dialog);
+        app.Run(window);
     }
 
     internal static string RenderDetail(InstalledSkill s)

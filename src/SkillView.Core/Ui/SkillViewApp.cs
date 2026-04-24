@@ -76,6 +76,13 @@ public sealed class SkillViewApp
         // TODO(tg2): remove once upstream Enter dispatch to TableView is fixed
         _app.Keyboard.KeyDown += (_, key) =>
         {
+            // Only fire when our main window is the active runnable. Otherwise
+            // a sub-view (Doctor, Installed, Update, Cleanup, Search…) would
+            // see its keys leak into main-window actions like PreviewSelectedAsync.
+            if (_app.TopRunnableView != window)
+            {
+                return;
+            }
             try
             {
                 var bareKey = key.KeyCode & ~KeyCode.CtrlMask & ~KeyCode.ShiftMask & ~KeyCode.AltMask;

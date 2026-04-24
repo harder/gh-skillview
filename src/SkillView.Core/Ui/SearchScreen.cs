@@ -54,20 +54,21 @@ public sealed class SearchScreen
 
     public void Show()
     {
-        using var dialog = new Dialog
+        using var window = new Window
         {
             Title = "Search — gh skill search",
-            Width = Dim.Percent(90),
-            Height = Dim.Percent(90),
+            X = 0, Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
         };
 
         var queryLabel = new Label { Text = "Query :", X = 0, Y = 0 };
         _queryField = new TextField { X = 8, Y = 0, Width = Dim.Percent(40), Text = string.Empty };
-        TuiHelpers.ConfigureTextInput(_queryField, "Dialog");
+        TuiHelpers.ConfigureTextInput(_queryField, "Base");
 
         var ownerLabel = new Label { Text = "Owner :", X = Pos.Right(_queryField) + 2, Y = 0 };
         _ownerField = new TextField { X = Pos.Right(ownerLabel) + 1, Y = 0, Width = Dim.Percent(20), Text = string.Empty };
-        TuiHelpers.ConfigureTextInput(_ownerField, "Dialog");
+        TuiHelpers.ConfigureTextInput(_ownerField, "Base");
 
         var limitLabel = new Label { Text = "Limit :", X = Pos.Right(_ownerField) + 2, Y = 0 };
         _limitUpDown = new NumericUpDown<int>
@@ -95,7 +96,7 @@ public sealed class SearchScreen
             X = 0,
             Y = 3,
             Width = Dim.Percent(55),
-            Height = Dim.Fill(2),
+            Height = Dim.Fill(3),
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
@@ -119,7 +120,7 @@ public sealed class SearchScreen
             X = Pos.Right(_resultsTable),
             Y = 3,
             Width = Dim.Fill(),
-            Height = Dim.Fill(2),
+            Height = Dim.Fill(3),
         };
         _previewPane = new Markdown
         {
@@ -129,40 +130,49 @@ public sealed class SearchScreen
             Height = Dim.Fill(),
             Text = "(no selection)",
         };
-        TuiHelpers.ConfigureMarkdownPane(_previewPane, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
         _previewFrame.Add(_previewPane);
 
         _statusLabel = new Label
         {
             X = 0,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(10),
             Text = " ready — type a query and press Enter",
         };
         _spinner = new SpinnerView
         {
             X = Pos.AnchorEnd(10),
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = 1,
             Height = 1,
             Visible = false,
             AutoSpin = false,
         };
 
-        TuiHelpers.ApplyScheme("Dialog",
-            dialog,
+        var statusBar = new StatusBar(
+        [
+            new Shortcut { Title = "/", HelpText = "Query" },
+            new Shortcut { Title = "Enter", HelpText = "Preview" },
+            new Shortcut { Title = "i", HelpText = "Install" },
+            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+            new Shortcut { Title = "q", HelpText = "Quit" },
+        ]);
+
+        TuiHelpers.ApplyScheme("Base",
+            window,
             queryLabel, _queryField,
             ownerLabel, _ownerField,
             limitLabel, _limitUpDown,
-            hint, _resultsTable, _previewFrame, _previewPane, _statusLabel, _spinner);
+            hint, _resultsTable, _previewFrame, _previewPane, _statusLabel, _spinner, statusBar);
 
-        dialog.Add(
+        window.Add(
             queryLabel, _queryField,
             ownerLabel, _ownerField,
             limitLabel, _limitUpDown,
             hint,
             _resultsTable, _previewFrame,
-            _statusLabel, _spinner);
+            _statusLabel, _spinner, statusBar);
 
         _queryField.KeyDown += (_, key) =>
         {
@@ -175,7 +185,7 @@ public sealed class SearchScreen
             }
         };
 
-        dialog.KeyDown += (_, key) =>
+        window.KeyDown += (_, key) =>
         {
             // Handle Enter at dialog level BEFORE the view hierarchy.
             // Same TG2 v2 RC4 issue as SkillViewApp — internal focused subviews
@@ -231,7 +241,7 @@ public sealed class SearchScreen
 
         RefreshResultsTable();
         _queryField.SetFocus();
-        _app.Run(dialog);
+        _app.Run(window);
     }
 
     private async Task RunSearchAsync()
