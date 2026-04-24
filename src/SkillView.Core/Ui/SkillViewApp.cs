@@ -30,7 +30,8 @@ public sealed class SkillViewApp
     private TextView? _logPane;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
-    private StatusBar? _statusBar;
+    private StatusBar? _statusBarPreview;
+    private StatusBar? _statusBarLogs;
     private FrameView? _leftFrame;
     private FrameView? _rightFrame;
 
@@ -268,7 +269,7 @@ public sealed class SkillViewApp
             AutoSpin = false,
         };
 
-        _statusBar = new StatusBar(
+        _statusBarPreview = new StatusBar(
         [
             new Shortcut { Title = "/", HelpText = "Search" },
             new Shortcut { Title = "d", HelpText = "Doctor" },
@@ -280,13 +281,22 @@ public sealed class SkillViewApp
             new Shortcut { Key = Key.F1, Title = "Help" },
             new Shortcut { Title = "q", HelpText = "Quit" },
         ]);
+        _statusBarLogs = new StatusBar(
+        [
+            new Shortcut { Title = "l", HelpText = "Preview" },
+            new Shortcut { Key = Key.F1, Title = "Help" },
+            new Shortcut { Title = "q", HelpText = "Quit" },
+        ])
+        {
+            Visible = false,
+        };
 
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
             queryLabel, _queryField, _resultsTable, _previewPane, _logPane,
-            _statusLabel, _spinner, _statusBar);
+            _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
 
-        window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBar);
+        window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
 
         RefreshResultsTable();
@@ -639,6 +649,8 @@ public sealed class SkillViewApp
         _showingLogs = false;
         if (_previewPane is not null) _previewPane.Visible = true;
         if (_logPane is not null) _logPane.Visible = false;
+        if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
+        if (_statusBarLogs is not null) _statusBarLogs.Visible = false;
     }
 
     private void ShowLogPane()
@@ -646,6 +658,8 @@ public sealed class SkillViewApp
         _showingLogs = true;
         if (_previewPane is not null) _previewPane.Visible = false;
         if (_logPane is not null) _logPane.Visible = true;
+        if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
+        if (_statusBarLogs is not null) _statusBarLogs.Visible = true;
     }
 
     private void ShowHelp()
