@@ -442,11 +442,12 @@ internal static class TuiHelpers
 
         // Route p/v/→ through CellActivated (same path as Enter).
         // Right arrow is intuitive: it "points toward" the preview pane.
+        // CursorRight already has a default binding in TableView, so replace it.
         table.KeyBindings.Add(KeyCode.P, Command.Accept);
         table.KeyBindings.Add(KeyCode.P | KeyCode.ShiftMask, Command.Accept);
         table.KeyBindings.Add(KeyCode.V, Command.Accept);
         table.KeyBindings.Add(KeyCode.V | KeyCode.ShiftMask, Command.Accept);
-        table.KeyBindings.Add(KeyCode.CursorRight, Command.Accept);
+        table.KeyBindings.ReplaceCommands(KeyCode.CursorRight, Command.Accept);
     }
 }
 
