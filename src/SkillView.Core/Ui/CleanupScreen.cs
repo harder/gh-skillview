@@ -78,13 +78,13 @@ public sealed class CleanupScreen
                 ["Path"] = row => TuiHelpers.ShortenPath(row.C.Path),
             });
 
-        var detail = new TextView
+        var detail = new Markdown
         {
             X = Pos.Right(table) + 1, Y = 1,
             Width = Dim.Fill(), Height = Dim.Fill(2),
             Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
         };
-        TuiHelpers.ConfigureReadOnlyPane(detail, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(detail, "Dialog");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -236,11 +236,17 @@ public sealed class CleanupScreen
     private static string RenderDetail(CleanupClassifier.Candidate c)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"kind   : {c.Kind}");
-        sb.AppendLine($"path   : {c.Path}");
-        sb.AppendLine($"reason : {c.Reason}");
+        sb.AppendLine("## Candidate");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("|-------|-------|");
+        sb.AppendLine($"| kind | **{c.Kind}** |");
+        sb.AppendLine($"| path | `{c.Path}` |");
+        sb.AppendLine($"| reason | {c.Reason} |");
         if (c.Skill is { } s)
         {
+            sb.AppendLine();
+            sb.AppendLine("---");
             sb.AppendLine();
             sb.AppendLine(InstalledScreen.RenderDetail(s));
         }

@@ -47,13 +47,13 @@ public sealed class RemoveScreen
             Height = Dim.Percent(70),
         };
 
-        var summary = new TextView
+        var summary = new Markdown
         {
             X = 0, Y = 0,
             Width = Dim.Fill(), Height = Dim.Fill(3),
             Text = BuildSummary(),
         };
-        TuiHelpers.ConfigureReadOnlyPane(summary, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(summary, "Dialog");
 
         var secondConfirm = new CheckBox
         {
@@ -139,36 +139,45 @@ public sealed class RemoveScreen
     private string BuildSummary()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"target   : {_target.Name}");
-        sb.AppendLine($"path     : {_target.ResolvedPath}");
-        sb.AppendLine($"resolved : {_validation.ResolvedPath}");
-        sb.AppendLine($"scope    : {_target.Scope}");
-        sb.AppendLine($"symlink  : {_target.IsSymlinked}");
-        sb.AppendLine($"pinned   : {_target.Pinned}");
+        sb.AppendLine($"## Remove — {_target.Name}");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("|-------|-------|");
+        sb.AppendLine($"| path | `{_target.ResolvedPath}` |");
+        sb.AppendLine($"| resolved | `{_validation.ResolvedPath}` |");
+        sb.AppendLine($"| scope | {_target.Scope} |");
+        sb.AppendLine($"| symlink | {_target.IsSymlinked} |");
+        sb.AppendLine($"| pinned | {_target.Pinned} |");
         if (_target.Agents.Length > 0)
         {
-            sb.AppendLine("agents   :");
+            sb.AppendLine();
+            sb.AppendLine("### Agents");
+            sb.AppendLine();
             foreach (var a in _target.Agents)
-                sb.AppendLine($"  - {a.AgentId}  ({(a.IsSymlink ? "symlink" : "direct")})  {a.Path}");
+                sb.AppendLine($"- **{a.AgentId}** ({(a.IsSymlink ? "symlink" : "direct")}) `{a.Path}`");
         }
         if (_validation.Errors.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("REFUSED — safety rules triggered:");
+            sb.AppendLine("### ⛔ REFUSED — safety rules triggered");
+            sb.AppendLine();
             foreach (var e in _validation.Errors)
-                sb.AppendLine($"  ✗ {e.Kind}: {e.Detail}");
+                sb.AppendLine($"- ✗ **{e.Kind}:** {e.Detail}");
         }
         if (_validation.Warnings.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("WARNINGS — second confirmation required:");
+            sb.AppendLine("### ⚠️ WARNINGS — second confirmation required");
+            sb.AppendLine();
             foreach (var w in _validation.Warnings)
-                sb.AppendLine($"  ! {w.Kind}: {w.Detail}");
+                sb.AppendLine($"- ! **{w.Kind}:** {w.Detail}");
             if (_validation.IncomingSymlinkPaths.Length > 0)
             {
-                sb.AppendLine("  incoming symlinks:");
+                sb.AppendLine();
+                sb.AppendLine("**Incoming symlinks:**");
+                sb.AppendLine();
                 foreach (var link in _validation.IncomingSymlinkPaths)
-                    sb.AppendLine($"    · {link}");
+                    sb.AppendLine($"- `{link}`");
             }
         }
         return sb.ToString();

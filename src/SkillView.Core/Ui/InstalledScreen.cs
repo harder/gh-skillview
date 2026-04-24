@@ -49,7 +49,7 @@ public static class InstalledScreen
                     30),
             });
 
-        var detail = new TextView
+        var detail = new Markdown
         {
             X = Pos.Right(table),
             Y = 0,
@@ -57,7 +57,7 @@ public static class InstalledScreen
             Height = Dim.Fill(1),
             Text = rows.Length == 0 ? "(no skills found)" : RenderDetail(rows[0]),
         };
-        TuiHelpers.ConfigureReadOnlyPane(detail, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(detail, "Dialog");
 
         table.SelectedCellChanged += (_, _) =>
         {
@@ -103,34 +103,39 @@ public static class InstalledScreen
     internal static string RenderDetail(InstalledSkill s)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"name      : {s.Name}");
-        sb.AppendLine($"path      : {s.ResolvedPath}");
-        sb.AppendLine($"scope     : {s.Scope}");
-        sb.AppendLine($"provenance: {s.Provenance}");
-        sb.AppendLine($"validity  : {s.Validity}");
-        sb.AppendLine($"symlinked : {s.IsSymlinked}");
-        sb.AppendLine($"pinned    : {s.Pinned}");
-        sb.AppendLine($"ignored   : {s.Ignored}");
-        sb.AppendLine($"tree-sha  : {s.TreeSha ?? "(unset)"}");
-        sb.AppendLine($"version   : {s.FrontMatter.Version ?? "(unset)"}");
+        sb.AppendLine($"## {s.Name}");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("|-------|-------|");
+        sb.AppendLine($"| path | `{s.ResolvedPath}` |");
+        sb.AppendLine($"| scope | {s.Scope} |");
+        sb.AppendLine($"| provenance | {s.Provenance} |");
+        sb.AppendLine($"| validity | {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
+        sb.AppendLine($"| symlinked | {s.IsSymlinked} |");
+        sb.AppendLine($"| pinned | {s.Pinned} |");
+        sb.AppendLine($"| ignored | {s.Ignored} |");
+        sb.AppendLine($"| tree-sha | `{s.TreeSha ?? "(unset)"}` |");
+        sb.AppendLine($"| version | {s.FrontMatter.Version ?? "(unset)"} |");
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"installed : {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}");
+            sb.AppendLine($"| installed | {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
         {
             sb.AppendLine();
-            sb.AppendLine("description:");
+            sb.AppendLine("### Description");
+            sb.AppendLine();
             sb.AppendLine(desc);
         }
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("agents:");
+            sb.AppendLine("### Agents");
+            sb.AppendLine();
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"  - {a.AgentId} ({kind}) {a.Path}");
+                sb.AppendLine($"- **{a.AgentId}** ({kind}) `{a.Path}`");
             }
         }
         return sb.ToString();
