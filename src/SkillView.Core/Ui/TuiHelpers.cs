@@ -16,6 +16,11 @@ namespace SkillView.Ui;
 /// consistent and avoids duplicating truncation / label logic.
 internal static class TuiHelpers
 {
+    /// Detect whether we're running inside Warp terminal, which has known
+    /// issues with Enter key delivery to TUI apps on macOS.
+    internal static bool IsWarpTerminal { get; } =
+        Environment.GetEnvironmentVariable("TERM_PROGRAM")
+            ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
     /// Truncate text to `maxLen` characters, appending "…" if it was clipped.
     internal static string Truncate(string? text, int maxLen)
     {
@@ -302,7 +307,7 @@ internal static class TuiHelpers
         "/ search · p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
 
     internal const string PreviewHint =
-        "Select a result and press Enter, p, or v to preview.\n\nTip: In Warp terminal, use Tab instead of Enter to submit searches.";
+        "Select a result and press Enter, p, or v to preview.\n\nTip: In Warp terminal, use Tab or Ctrl+J instead of Enter.";
 
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.

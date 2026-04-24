@@ -82,8 +82,15 @@ public sealed class SkillViewApp
             {
                 var bareKey = key.KeyCode & ~KeyCode.CtrlMask & ~KeyCode.ShiftMask & ~KeyCode.AltMask;
                 var isEnterLike = bareKey == KeyCode.Enter
-                    || (int)bareKey == 0x0D   // raw CR
-                    || (int)bareKey == 0x0A;  // raw LF
+                    || (int)bareKey == 0x0D   // raw CR  (Ctrl+M)
+                    || (int)bareKey == 0x0A;  // raw LF  (Ctrl+J)
+
+                // Warp workaround: Ctrl+J arrives as KeyCode.J | CtrlMask
+                if (!isEnterLike && (key.KeyCode == (KeyCode.J | KeyCode.CtrlMask)))
+                {
+                    isEnterLike = true;
+                }
+
                 if (isEnterLike)
                 {
                     if (!key.Handled && _resultsTable?.HasFocus == true)
@@ -236,6 +243,12 @@ public sealed class SkillViewApp
 
         RefreshResultsTable();
         _services.Logger.Subscribe(OnLogEntry);
+
+        if (TuiHelpers.IsWarpTerminal)
+        {
+            SetStatus("Warp terminal detected — use Tab or Ctrl+J instead of Enter");
+        }
+
         return window;
     }
 
@@ -306,7 +319,14 @@ public sealed class SkillViewApp
 
     private void OnQueryFieldKey(object? sender, Key key)
     {
-        if (key.KeyCode == KeyCode.Enter)
+        // Accept Enter, Tab, and Ctrl+J as search submit triggers.
+        // Tab and Ctrl+J are workarounds for Warp terminal which swallows
+        // Enter after certain input sequences.
+        var isSubmit = key.KeyCode == KeyCode.Enter
+            || key.KeyCode == KeyCode.Tab
+            || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask);
+
+        if (isSubmit)
         {
             key.Handled = true;
             var query = _queryField?.Text.Trim() ?? string.Empty;
@@ -314,18 +334,7 @@ public sealed class SkillViewApp
             {
                 _ = RunSearchAsync(query);
             }
-        }
-        // Tab from query field submits the search (workaround for terminals
-        // like Warp that swallow Enter after certain input sequences)
-        else if (key.KeyCode == KeyCode.Tab)
-        {
-            key.Handled = true;
-            var query = _queryField?.Text.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(query))
-            {
-                _ = RunSearchAsync(query);
-            }
-            else
+            else if (key.KeyCode == KeyCode.Tab)
             {
                 _resultsTable?.SetFocus();
             }
