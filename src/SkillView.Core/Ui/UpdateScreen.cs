@@ -77,13 +77,13 @@ public sealed class UpdateScreen
                 ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
             });
 
-        var preview = new TextView
+        var preview = new Markdown
         {
             X = Pos.Right(table) + 1, Y = 1,
             Width = Dim.Fill(), Height = Dim.Fill(5),
-            Text = "(dry-run results appear here)",
+            Text = "## Dry-run results\n\n_Press **Dry-run** to preview pending updates._",
         };
-        TuiHelpers.ConfigureReadOnlyPane(preview, "Base");
+        TuiHelpers.ConfigureMarkdownPane(preview, "Base");
 
         var allBox = new CheckBox
         {
@@ -185,9 +185,11 @@ public sealed class UpdateScreen
                 if (checkStates[i]) skills.Add(_skills[i].Name);
             }
 
-            if (!allChecked && skills.Count == 0 && !dryRun)
+            if (!allChecked && skills.Count == 0)
             {
-                status.Text = " pick at least one skill or enable --all";
+                status.Text = dryRun
+                    ? " pick at least one skill or enable --all to dry-run"
+                    : " pick at least one skill or enable --all";
                 return;
             }
             if (allChecked && !dryRun && !yesChecked && !_capabilities.SupportsUpdateYes)
@@ -218,16 +220,21 @@ public sealed class UpdateScreen
                     LastResult = result;
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    preview.Text = result.Succeeded
-                        ? (string.IsNullOrWhiteSpace(result.StdOut)
-                            ? "(no output)"
-                            : result.StdOut)
-                        : $"(update failed: exit {result.ExitCode})\n\n{result.ErrorMessage}";
+                    preview.Text = RenderResult(result, dryRun, allChecked, skills);
                     if (dryRun)
                     {
-                        status.Text = result.Succeeded
-                            ? $" dry-run complete · {result.Entries.Length} entries parsed"
-                            : $" dry-run failed (exit {result.ExitCode}): {TuiHelpers.ErrorSnippet(result.ErrorMessage)}";
+                        if (!result.Succeeded)
+                        {
+                            status.Text = $" dry-run failed (exit {result.ExitCode}): {TuiHelpers.ErrorSnippet(result.ErrorMessage)}";
+                        }
+                        else if (string.IsNullOrWhiteSpace(result.StdOut))
+                        {
+                            status.Text = " dry-run complete · no updates available";
+                        }
+                        else
+                        {
+                            status.Text = $" dry-run complete · {result.Entries.Length} entries parsed";
+                        }
                     }
                     else if (result.Succeeded)
                     {
@@ -292,5 +299,43 @@ public sealed class UpdateScreen
 
         updateButton.SetFocus();
         _app.Run(window);
+    }
+
+    private static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills)
+    {
+        var sb = new System.Text.StringBuilder();
+        var heading = dryRun ? "Dry-run results" : "Update results";
+        sb.AppendLine($"## {heading}");
+        sb.AppendLine();
+        var scope = allChecked
+            ? "_all skills_"
+            : skills.Count == 1
+                ? $"`{skills[0]}`"
+                : $"{skills.Count} skills";
+        sb.AppendLine($"**Scope:** {scope}  ·  **Exit:** {result.ExitCode}  ·  **Entries:** {result.Entries.Length}");
+        sb.AppendLine();
+        if (!result.Succeeded)
+        {
+            sb.AppendLine($"### ⛔ Failed");
+            sb.AppendLine();
+            if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                sb.AppendLine("```");
+                sb.AppendLine(result.ErrorMessage.TrimEnd());
+                sb.AppendLine("```");
+            }
+            return sb.ToString();
+        }
+        if (string.IsNullOrWhiteSpace(result.StdOut))
+        {
+            sb.AppendLine(dryRun
+                ? "_No updates available for the selected skill(s)._"
+                : "_Completed with no output._");
+            return sb.ToString();
+        }
+        sb.AppendLine("```");
+        sb.AppendLine(result.StdOut.TrimEnd());
+        sb.AppendLine("```");
+        return sb.ToString();
     }
 }
