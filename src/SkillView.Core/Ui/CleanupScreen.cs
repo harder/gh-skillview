@@ -284,11 +284,9 @@ public sealed class CleanupScreen
         var sb = new StringBuilder();
         sb.AppendLine("## Candidate");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("|-------|-------|");
-        sb.AppendLine($"| kind | **{c.Kind}** |");
-        sb.AppendLine($"| path | `{c.Path}` |");
-        sb.AppendLine($"| reason | {c.Reason} |");
+        sb.AppendLine($"**kind**: **{c.Kind}**  ");
+        sb.AppendLine($"**path**: `{c.Path}`  ");
+        sb.AppendLine($"**reason**: {c.Reason}  ");
         if (c.Skill is { } s)
         {
             sb.AppendLine();

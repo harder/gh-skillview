@@ -147,13 +147,11 @@ public sealed class RemoveScreen
         var sb = new StringBuilder();
         sb.AppendLine($"## Remove — {_target.Name}");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("|-------|-------|");
-        sb.AppendLine($"| path | `{_target.ResolvedPath}` |");
-        sb.AppendLine($"| resolved | `{_validation.ResolvedPath}` |");
-        sb.AppendLine($"| scope | {_target.Scope} |");
-        sb.AppendLine($"| symlink | {_target.IsSymlinked} |");
-        sb.AppendLine($"| pinned | {_target.Pinned} |");
+        sb.AppendLine($"**path**: `{_target.ResolvedPath}`  ");
+        sb.AppendLine($"**resolved**: `{_validation.ResolvedPath}`  ");
+        sb.AppendLine($"**scope**: {_target.Scope}  ");
+        sb.AppendLine($"**symlink**: {_target.IsSymlinked}  ");
+        sb.AppendLine($"**pinned**: {_target.Pinned}  ");
         if (_target.Agents.Length > 0)
         {
             sb.AppendLine();

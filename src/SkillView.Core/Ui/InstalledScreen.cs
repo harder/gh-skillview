@@ -159,20 +159,18 @@ public static class InstalledScreen
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("|-------|-------|");
-        sb.AppendLine($"| path | `{s.ResolvedPath}` |");
-        sb.AppendLine($"| scope | {s.Scope} |");
-        sb.AppendLine($"| provenance | {s.Provenance} |");
-        sb.AppendLine($"| validity | {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
-        sb.AppendLine($"| symlinked | {s.IsSymlinked} |");
-        sb.AppendLine($"| pinned | {s.Pinned} |");
-        sb.AppendLine($"| ignored | {s.Ignored} |");
-        sb.AppendLine($"| tree-sha | `{s.TreeSha ?? "(unset)"}` |");
-        sb.AppendLine($"| version | {s.FrontMatter.Version ?? "(unset)"} |");
+        sb.AppendLine($"**path**: `{s.ResolvedPath}`  ");
+        sb.AppendLine($"**scope**: {s.Scope}  ");
+        sb.AppendLine($"**provenance**: {s.Provenance}  ");
+        sb.AppendLine($"**validity**: {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")}  ");
+        sb.AppendLine($"**symlinked**: {s.IsSymlinked}  ");
+        sb.AppendLine($"**pinned**: {s.Pinned}  ");
+        sb.AppendLine($"**ignored**: {s.Ignored}  ");
+        sb.AppendLine($"**tree-sha**: `{s.TreeSha ?? "(unset)"}`  ");
+        sb.AppendLine($"**version**: {s.FrontMatter.Version ?? "(unset)"}  ");
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"| installed | {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
+            sb.AppendLine($"**installed**: {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
         {

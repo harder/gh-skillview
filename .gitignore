@@ -56,5 +56,9 @@ nunit-*.xml
 # SkillView — internal planning / phase notes kept out of public git
 implementation-plan.md
 PHASE*_NOTES.md
+PHASE*_UX_ISSUES.md
 dist/
 .DS_Store
+
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
