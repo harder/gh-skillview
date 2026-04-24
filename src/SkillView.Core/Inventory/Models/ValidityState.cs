@@ -1,8 +1,7 @@
 namespace SkillView.Inventory.Models;
 
-/// Per-install validation state. `Malformed` surfaces instead of hiding,
-/// per §10.3 ("malformed items surface with a warning rather than silent
-/// hiding").
+/// Per-install validation state. `Malformed` surfaces instead of hiding so
+/// broken entries stay visible to the user.
 public enum ValidityState
 {
     Valid,

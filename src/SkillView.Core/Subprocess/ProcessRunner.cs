@@ -4,7 +4,7 @@ using SkillView.Logging;
 
 namespace SkillView.Subprocess;
 
-/// argv-array subprocess invoker — never shell composition (§20.1, §24.12).
+/// argv-array subprocess invoker — never shell composition.
 public sealed class ProcessRunner
 {
     private readonly Logger _logger;

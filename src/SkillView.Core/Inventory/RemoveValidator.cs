@@ -4,7 +4,7 @@ using SkillView.Inventory.Models;
 
 namespace SkillView.Inventory;
 
-/// §12.1 safety validator for remove operations. This is policy, not
+/// Safety validator for remove operations. This is policy, not
 /// execution — it reports whether a removal is `Allowed` and emits any
 /// warnings that must be re-confirmed before proceeding. Execution lives in
 /// `RemoveService`.

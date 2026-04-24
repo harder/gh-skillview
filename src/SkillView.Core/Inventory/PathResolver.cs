@@ -64,7 +64,7 @@ public static class PathResolver
     }
 
     /// True if `candidate`, after resolution, is the same file system object
-    /// as `root` or lies inside it. Used by §12.1 removal guards but also for
+    /// as `root` or lies inside it. Used by removal guards, but also for
     /// inventory scope classification.
     public static bool IsInside(string candidate, string root)
     {

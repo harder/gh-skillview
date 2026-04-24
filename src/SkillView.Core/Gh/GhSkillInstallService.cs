@@ -4,7 +4,7 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill install` (§7.1.D). Capability-gated flags (§11.3)
+/// Wraps `gh skill install`. Capability-gated flags
 /// (`--allow-hidden-dirs`, `--upstream`, `--agent` repeatable, `--repo-path`,
 /// `--from-local`) attach only when the probe confirms them. Scope / path /
 /// version / pin / force are emitted as baseline v2.91.0 flags.

@@ -5,11 +5,11 @@ using System.Text;
 namespace SkillView.Logging;
 
 /// Appends already-redacted log entries to a daily-rotated file under the
-/// SkillView cache log directory. Implements §18.3: daily rotation, 14-day
+/// SkillView cache log directory. Implements daily rotation, 14-day
 /// retention, 50 MB bound, POSIX mode 0600.
 ///
 /// Redaction is applied upstream by `Logger`; this sink trusts `LogEntry.Message`
-/// to already be safe (§13, §24.13).
+/// to already be safe.
 public sealed class FileLogSink : IDisposable
 {
     public const int RetentionDays = 14;
@@ -76,7 +76,7 @@ public sealed class FileLogSink : IDisposable
             .ToArray();
     }
 
-    /// Delete every rotated log file. Used by `doctor --clear-logs` (§18.3).
+    /// Delete every rotated log file. Used by `doctor --clear-logs`.
     public int ClearAll()
     {
         lock (_gate)

@@ -78,7 +78,7 @@ public sealed class SearchScreen
 
         var hint = new Label
         {
-            Text = "Enter: search  ·  v: preview  ·  i: stage install  ·  Esc/q: close",
+            Text = "Enter search  ·  v preview  ·  i install selected  ·  Esc/q close",
             X = 0,
             Y = 1,
             Width = Dim.Fill(),

@@ -6,7 +6,7 @@ using SkillView.Ui;
 namespace SkillView.Bootstrapping;
 
 /// Shared Main entry for both `skillview` and `gh-skillview` binaries.
-/// Entrypoint projects wrap this with a two-line Program.cs (§13.2, §13.3).
+/// Entrypoint projects wrap this with a two-line Program.cs.
 public static class EntryPoint
 {
     public static async Task<int> RunAsync(string[] args)
@@ -49,8 +49,8 @@ public static class EntryPoint
             logger.Warn("startup", $"file log sink disabled: {ex.Message}");
         }
 
-        // §18.4: `--debug` in CLI mode streams structured log lines to stderr
-        // for immediate visibility.
+        // In CLI mode, `--debug` streams structured log lines to stderr for
+        // immediate visibility.
         if (options.Debug && options.DispatchMode == DispatchMode.Cli)
         {
             logger.Subscribe(entry => Console.Error.WriteLine(Logger.Format(entry)));

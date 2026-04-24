@@ -67,7 +67,7 @@ public class ArgParserTests
     [Fact]
     public void DebugFlagRecognisedAfterSubcommand()
     {
-        // §7.1.K: --debug is a global flag that works on any subcommand.
+        // `--debug` is a global flag that works on any subcommand.
         // It's stripped from the subcommand payload so downstream parsers
         // don't have to know about it.
         var opts = ArgParser.Parse(

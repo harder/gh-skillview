@@ -20,9 +20,9 @@ public static class ArgParser
         {
             var arg = args[i];
 
-            // `--debug` is global: recognised anywhere (before or after the
-            // subcommand) per §7.1.K. Strip it from the subcommand payload so
-            // downstream parsers don't have to know about it.
+            // `--debug` is global: recognized anywhere before or after the
+            // subcommand. Strip it from the subcommand payload so downstream
+            // parsers don't have to know about it.
             if (arg == "--debug")
             {
                 debug = true;

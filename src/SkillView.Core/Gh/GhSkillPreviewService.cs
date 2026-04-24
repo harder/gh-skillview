@@ -9,7 +9,7 @@ namespace SkillView.Gh;
 /// files). The adapter keeps the raw body for direct display and also runs
 /// a tolerant section-split so UI panes and the CLI `--json` output can
 /// distinguish the markdown body from the associated-files listing
-/// (§7.1.C).
+/// for preview operations.
 public sealed class GhSkillPreviewService
 {
     private readonly ProcessRunner _runner;

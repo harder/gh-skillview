@@ -4,7 +4,7 @@ using SkillView.Inventory.Models;
 
 namespace SkillView.Inventory;
 
-/// Resolves the set of directories the scanner will walk per §10.1. Project
+/// Resolves the set of directories the scanner will walk. Project
 /// scope is active only inside a git working tree. Unknown / non-existent
 /// paths are filtered — missing `.claude/skills` is normal when the user
 /// doesn't run that agent, it is not an error.

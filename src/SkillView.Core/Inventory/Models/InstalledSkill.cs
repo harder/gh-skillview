@@ -2,9 +2,9 @@ using System.Collections.Immutable;
 
 namespace SkillView.Inventory.Models;
 
-/// A physical skill install. One record per resolved-path — shared installs
+/// A physical skill install. One record per resolved path — shared installs
 /// and symlinks collapse into the same `InstalledSkill` with multiple
-/// `AgentMembership` entries (§10.4).
+/// `AgentMembership` entries.
 public sealed record InstalledSkill
 {
     /// Front-matter `name` when present, otherwise the directory name.
@@ -14,9 +14,9 @@ public sealed record InstalledSkill
     /// between `gh skill list` records and filesystem scan.
     public required string ResolvedPath { get; init; }
 
-    /// The scan root that contained the canonical path (or the first root that
-    /// discovered it). Drives scope classification and the remove-safety
-    /// containment check (§12.1.1).
+    /// The scan root that contained the canonical path, or the first root that
+    /// discovered it. Drives scope classification and the remove-safety
+    /// containment check.
     public required string ScanRoot { get; init; }
 
     public required Scope Scope { get; init; }
@@ -31,7 +31,7 @@ public sealed record InstalledSkill
 
     public required Provenance Provenance { get; init; }
 
-    /// True if this install carries a `.skillview-ignore` marker (§10.5).
+    /// True if this install carries a `.skillview-ignore` marker.
     public required bool Ignored { get; init; }
 
     /// True if the canonical path was reached via any symlink.

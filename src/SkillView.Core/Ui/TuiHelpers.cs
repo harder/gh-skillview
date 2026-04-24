@@ -54,19 +54,19 @@ internal static class TuiHelpers
     /// Key bindings help text for the main window, shared between the
     /// welcome message and the F1 help dialog.
     internal const string HelpText =
-        "/  focus search\n" +
-        "v  preview selected\n" +
-        "l  toggle logs pane\n" +
-        "d  doctor (environment + gh capabilities)\n" +
-        "I  installed skills inventory\n" +
-        "s  full search screen (owner/limit, install staging)\n" +
-        "u  update installed skills (dry-run + execute)\n" +
-        "c  cleanup screen (malformed, orphan, duplicate)\n" +
-        "   in Installed: x removes selected skill\n" +
-        "F1 this help\n" +
+        "/  focus the search box\n" +
+        "v  preview the selected result\n" +
+        "l  show or hide logs\n" +
+        "d  open Doctor\n" +
+        "I  show installed skills\n" +
+        "s  open advanced search\n" +
+        "u  update installed skills\n" +
+        "c  review cleanup candidates\n" +
+        "   in Installed: x removes the selected skill\n" +
+        "F1 show this help\n" +
         "q  quit";
 
     /// Compact single-line hint shown in the welcome/preview pane.
     internal const string WelcomeHint =
-        "/ search · v preview · l logs · d doctor · I installed · s search+ · u update · c cleanup · F1 help · q quit";
+        "/ search · v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
 }

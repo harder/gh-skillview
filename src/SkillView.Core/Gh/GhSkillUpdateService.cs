@@ -5,13 +5,13 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill update` (§7.1.E). Capability-gated flags (§11.3)
+/// Wraps `gh skill update`. Capability-gated flags
 /// (`--dry-run`, `--all`, `--force`, `--unpin`, `--yes`/`--non-interactive`,
 /// `--json`) attach only when the probe confirms them. Positional skill
 /// names are passed through unconditionally; v2.91.0 accepts them.
 ///
 /// `update --all` on v2.91.0 blocks on an interactive confirmation prompt
-/// when `--yes` is absent upstream (§7.1.E, §5.4). When the probe reports
+/// when `--yes` is absent upstream. When the probe reports
 /// `SupportsUpdateYes`, the adapter appends the available flag so scripted
 /// callers don't hang. Until it lands, the caller can still pass specific
 /// skill names or `--dry-run`.
@@ -87,11 +87,11 @@ public sealed class GhSkillUpdateService
             args.Add("--unpin");
         }
 
-        // §7.1.E / §5.4: when `--all` is requested but `--yes` hasn't landed
-        // upstream, `gh skill update --all` hangs on an interactive prompt.
-        // We attach `--yes` (or `--non-interactive`, whichever the probe
-        // reports) only when available. The CLI path refuses `--all`
-        // without `--yes` OR `--dry-run` — see `CliDispatcher.UpdateAsync`.
+        // When `--all` is requested but `--yes` has not landed upstream,
+        // `gh skill update --all` hangs on an interactive prompt. Attach
+        // `--yes` or `--non-interactive`, whichever the probe reports, only
+        // when available. The CLI path refuses `--all` without `--yes` or
+        // `--dry-run`; see `CliDispatcher.UpdateAsync`.
         if (options.Yes && capabilities.SupportsUpdateYes)
         {
             // Prefer `--yes` when present, fall back to `--non-interactive`.

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace SkillView.Logging;
 
 /// Redacts GitHub tokens, Authorization header values, and URL userinfo from any
-/// arbitrary text fragment. Applied once at the log-writer layer (§18.2).
+/// arbitrary text fragment. Applied once at the log-writer layer.
 public static partial class Redactor
 {
     [GeneratedRegex(@"(?:ghp|gho|ghu|ghs)_[A-Za-z0-9]{20,}", RegexOptions.Compiled)]

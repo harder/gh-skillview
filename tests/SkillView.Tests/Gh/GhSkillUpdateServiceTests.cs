@@ -105,7 +105,7 @@ public class GhSkillUpdateServiceTests
     public void BuildArgs_YesDroppedWhenNoCapability()
     {
         // Without the probe confirming --yes/--non-interactive, the adapter
-        // must not append either token — PRD §7.1.E hang-on-prompt guard.
+        // Must not append either token or `gh skill update --all` can hang.
         var args = GhSkillUpdateService.BuildArgs(
             CapsWith(), new GhSkillUpdateService.Options(Yes: true));
         Assert.DoesNotContain("--yes", args);

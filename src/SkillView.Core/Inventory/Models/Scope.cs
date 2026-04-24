@@ -1,6 +1,6 @@
 namespace SkillView.Inventory.Models;
 
-/// Classifies a scan root per §10.1. `Custom` covers `--scan-root` overrides.
+/// Classifies a scan root. `Custom` covers `--scan-root` overrides.
 public enum Scope
 {
     Project,

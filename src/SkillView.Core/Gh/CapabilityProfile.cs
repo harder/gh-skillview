@@ -4,7 +4,7 @@ namespace SkillView.Gh;
 
 /// Snapshot of which `gh skill` subcommands and flag tokens are available on
 /// the `gh` binary SkillView is talking to. Built by scanning help-output
-/// token membership (§5.4, §11.3) — we never parse help-text structure.
+/// token membership — we never parse help-text structure.
 public sealed record CapabilityProfile
 {
     public required bool SkillSubcommandPresent { get; init; }
@@ -16,7 +16,7 @@ public sealed record CapabilityProfile
     public required bool ListSubcommandPresent { get; init; }
 
     // Capability flags consumed by higher-level services. Each one tracks a
-    // specific ask in the PRD (§11.3, §5.2, §5.3).
+    // specific flags SkillView cares about.
     public bool SupportsAllowHiddenDirs => InstallFlags.Contains("--allow-hidden-dirs");
     public bool SupportsUpstream => InstallFlags.Contains("--upstream");
     public bool SupportsRepoPath => InstallFlags.Contains("--repo-path");

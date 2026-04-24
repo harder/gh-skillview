@@ -15,7 +15,7 @@ namespace SkillView.Cli;
 /// Non-interactive subcommand router. Feature-complete through Phase 7:
 /// `doctor`, `list`, `rescan`, `search`, `preview`, `install`, `update`,
 /// `remove`, `cleanup`. JSON rendering and argv parsing are factored into
-/// `internal` helpers for snapshot testing per §19.
+/// `internal` helpers for snapshot testing.
 public static class CliDispatcher
 {
     public static async Task<int> RunAsync(AppOptions options, TuiServices services)
@@ -720,7 +720,7 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        // §7.1.E / §5.4: refuse `--all` without `--yes` unless the probe has
+        // Refuse `--all` without `--yes` unless the probe has
         // confirmed `--yes`/`--non-interactive`, or the user has explicitly
         // asked for a dry-run. This is the v2.91.0 hang-on-prompt guard.
         if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
@@ -1489,41 +1489,40 @@ public static class CliDispatcher
 
             Subcommands:
               doctor [--json] [--clear-logs]
-                                  Environment, auth, and gh capability report
+                                  Show environment, auth, and gh support details
               list   [--json] [--scope=project|user|custom]
                      [--agent=<id>] [--path=<dir>] [--allow-hidden-dirs]
-                                  Installed-skill inventory (gh skill list
-                                  when the capability probe detects it,
-                                  filesystem scan otherwise)
+                                  List installed skills. Uses `gh skill list`
+                                  when available; otherwise scans the filesystem.
               rescan              Capture a fresh inventory snapshot
               search <query> [--owner <o>] [--limit <n>] [--page <n>] [--json]
-                                  gh skill search adapter
+                                  Search available skills
               preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--json]
-                                  gh skill preview adapter
+                                  Show a skill preview
               install <owner/repo>[@<ref>] [<skill>] [--agent <id>]...
                       [--scope project|user|custom] [--path <dir>]
                       [--version <ref>] [--pin] [--force] [--upstream <url>]
                       [--repo-path <p>] [--from-local] [--allow-hidden-dirs] [--json]
-                                  gh skill install adapter with post-install rescan
+                                  Install a skill and refresh the inventory
               update [<skill>]... [--all] [--dry-run] [--force] [--unpin]
                      [--yes] [--json]
-                                  gh skill update adapter; captures a TreeSha
-                                  inventory diff after non-dry-run updates.
+                                  Update installed skills. After a real update,
+                                  SkillView refreshes the inventory.
                                   Refuses --all without --yes on gh builds
-                                  lacking --yes to avoid interactive hang.
+                                  that would otherwise stop for confirmation.
               remove <name> [--agent <id>] [--yes] [--json]
-                                  Safe filesystem removal of an installed
-                                  skill. Runs §12.1 safety checks; dry-run
-                                  by default (re-run with --yes to execute).
-                                  Requires --yes to accept warnings
-                                  (git-tracked, incoming symlinks).
+                                  Safely remove an installed skill.
+                                  Dry-run by default; re-run with --yes
+                                  to make changes.
+                                  Requires --yes to accept warnings such as
+                                  git-tracked files or incoming symlinks.
               cleanup [--candidates=kind,...] [--apply] [--yes]
                       [--json] [--output <path>]
-                                  Classify and optionally remove cleanup
-                                  candidates per §12.2: malformed, orphan,
-                                  duplicate, broken-symlink, hidden-nested,
-                                  broken-shared-mapping, empty-directory.
-                                  Respects .skillview-ignore markers.
+                                  Find and optionally remove cleanup candidates:
+                                  malformed, orphan, duplicate,
+                                  broken-symlink, hidden-nested,
+                                  broken-shared-mapping, and empty-directory.
+                                  Respects `.skillview-ignore` markers.
                                   --apply requires --yes.
 
             Global flags:
@@ -1537,7 +1536,7 @@ public static class CliDispatcher
             Environment:
               SKILLVIEW_LOG=debug  Alternative to --debug (flag takes precedence)
 
-            Exit codes (aligned with cli/cli#13215 §7.1.K):
+            Exit codes (aligned with cli/cli#13215):
                0  Success / nothing to do
                1  User-level error (input, conflict, refused destructive op)
                2  Invalid usage (bad flags, missing args)

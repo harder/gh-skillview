@@ -1,7 +1,7 @@
 namespace SkillView.Inventory.Models;
 
 /// Where an `InstalledSkill` record was observed. Reconciliation in
-/// `LocalInventoryService` sets this. §7.1.A, §10.4.
+/// `LocalInventoryService` sets this.
 public enum Provenance
 {
     /// Only the filesystem scan knows about this install.

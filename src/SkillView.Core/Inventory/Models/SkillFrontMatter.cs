@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 namespace SkillView.Inventory.Models;
 
 /// Parsed SKILL.md front-matter. Only the fields SkillView actually uses are
-/// modeled — unknown keys are ignored. §9, §7.1.A.
+/// modeled — unknown keys are ignored.
 public sealed record SkillFrontMatter
 {
     public string? Name { get; init; }

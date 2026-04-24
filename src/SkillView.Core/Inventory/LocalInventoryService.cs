@@ -8,10 +8,10 @@ using SkillView.Logging;
 
 namespace SkillView.Inventory;
 
-/// Merges `gh skill list` records (when available) with the filesystem scan
-/// by resolved path. Preferred inventory source wins (§6.2); filesystem scan
-/// is always consulted so the reconciliation surfaces `FsScan`-only orphans
-/// and anomalies (§5.2, §10.4).
+/// Merges `gh skill list` records, when available, with the filesystem scan
+/// by resolved path. The preferred inventory source wins, but the filesystem
+/// scan is always consulted so reconciliation still surfaces `FsScan`-only
+/// orphans and anomalies.
 public sealed class LocalInventoryService
 {
     private readonly ScanRootResolver _resolver;

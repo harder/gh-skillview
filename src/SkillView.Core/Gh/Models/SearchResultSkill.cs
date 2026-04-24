@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace SkillView.Gh.Models;
 
-/// `gh skill search --json` fields (§7.1.B).
+/// `gh skill search --json` fields.
 public sealed record SearchResultSkill(
     [property: JsonPropertyName("description")] string? Description,
     [property: JsonPropertyName("namespace")] string? Namespace,

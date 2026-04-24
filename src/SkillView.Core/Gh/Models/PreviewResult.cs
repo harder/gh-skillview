@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace SkillView.Gh.Models;
 
-/// Structured output of `gh skill preview` (§7.1.C). `gh skill preview`
+/// Structured output of `gh skill preview`. `gh skill preview`
 /// currently emits plain text — SKILL.md body followed by an associated-files
 /// listing when present. We keep the raw text verbatim for display, and
 /// opportunistically extract the list of associated file names so UI can show

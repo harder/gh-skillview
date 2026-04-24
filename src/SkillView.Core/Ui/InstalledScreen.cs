@@ -74,8 +74,8 @@ public static class InstalledScreen
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Text = $" {rows.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
-                   (snapshot.UsedGhSkillList ? " · gh skill list ✓" : " · fs-scan only") +
-                   (onRemove is null ? "   Esc/q to close" : "   x=remove · Esc/q to close"),
+                   (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only") +
+                   (onRemove is null ? "   Esc/q close" : "   x remove · Esc/q close"),
         };
 
         dialog.Add(table, detail, footer);

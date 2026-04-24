@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace SkillView.Gh;
 
-/// Parsed snapshot of `gh auth status`. See §11.1.
+/// Parsed snapshot of `gh auth status`.
 public sealed record GhAuthStatus
 {
     public required bool LoggedIn { get; init; }

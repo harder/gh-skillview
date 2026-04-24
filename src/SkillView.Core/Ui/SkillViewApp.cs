@@ -15,10 +15,9 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Phase 0 feasibility shell. Implements the end-to-end slice mandated by §22
-/// Phase 0 exit criteria: boot → search subprocess → JSON parse → TableView →
-/// preview subprocess → TextView → quit. Future phases extend this (Installed
-/// collection, inventory, updates, cleanup, etc.).
+/// Initial shell for the end-to-end TUI slice: boot → search subprocess →
+/// JSON parse → TableView → preview subprocess → TextView → quit. Future
+/// phases extend this with inventory, updates, cleanup, and other workflows.
 public sealed class SkillViewApp
 {
     private readonly TuiServices _services;
@@ -137,7 +136,7 @@ public sealed class SkillViewApp
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(10),
-            Text = " ready",
+            Text = " ready — press / to search or F1 for help",
         };
         _spinner = new SpinnerView
         {

@@ -11,11 +11,10 @@ using Xunit;
 
 namespace SkillView.Tests.Cli;
 
-/// Phase 7 — shape-level snapshot tests for each JSON-emitting subcommand
-/// (§22 "snapshot tests on JSON output"). These tests assert the stable
-/// top-level keys downstream scripts depend on. They don't compare full
-/// document bytes — that would couple the tests to formatting — but they
-/// do parse the rendered JSON and check the contract.
+/// Shape-level snapshot tests for each JSON-emitting subcommand. These tests
+/// assert the stable top-level keys downstream scripts depend on. They don't
+/// compare full document bytes — that would couple the tests to formatting —
+/// but they do parse the rendered JSON and check the contract.
 public class CliDispatcherJsonSnapshotTests
 {
     private static AppOptions DefaultOptions() => new(

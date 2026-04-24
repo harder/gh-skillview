@@ -6,7 +6,7 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill search --json` (§7.1.B, §11.2). Owner/limit are applied
+/// Wraps `gh skill search --json`. Owner and limit are applied
 /// only when the capability probe confirms the flags exist — older `gh`
 /// builds silently reject unknown flags.
 public sealed class GhSkillSearchService

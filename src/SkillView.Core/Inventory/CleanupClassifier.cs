@@ -4,7 +4,7 @@ using SkillView.Inventory.Models;
 
 namespace SkillView.Inventory;
 
-/// Classifies `InstalledSkill` records into the §12.2 candidate types.
+/// Classifies `InstalledSkill` records into cleanup candidate types.
 /// Runs purely over an already-captured `InventorySnapshot` plus the list of
 /// scan roots that produced it; does not hit the filesystem for anything the
 /// scanner already observed, with the single exception of the "empty-dir"

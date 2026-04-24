@@ -95,7 +95,7 @@ public sealed class InstallScreen
         };
         if (!_capabilities.SupportsRepoPath)
         {
-            repoPathField.Text = "(not supported by this gh build)";
+            repoPathField.Text = "(requires a newer gh build)";
         }
 
         var upstreamLabel = new Label { Text = "Upstream:", X = 0, Y = 3 };
@@ -107,7 +107,7 @@ public sealed class InstallScreen
         };
 
         var agentsLabel = new Label { Text = "Agents  :", X = 0, Y = 5 };
-        // TODO(tg2): upstream — we'd prefer FlagSelector here per §14.2, but
+        // TODO(tg2): upstream — we'd prefer FlagSelector here, but
         // the rc.4 dictionary API is in flux; a checkbox row is the safer
         // portable choice until the API stabilizes.
         var agentBoxes = new CheckBox[KnownAgents.Length];
@@ -164,7 +164,7 @@ public sealed class InstallScreen
         {
             X = 0, Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(10),
-            Text = " ready — review fields, press Install",
+            Text = " ready — review the options, then press Install",
         };
         var spinner = new SpinnerView
         {

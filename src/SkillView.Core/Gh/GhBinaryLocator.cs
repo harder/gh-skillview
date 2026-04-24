@@ -6,11 +6,11 @@ using SkillView.Subprocess;
 namespace SkillView.Gh;
 
 /// Locates the `gh` binary on PATH, records its version, and reports whether
-/// the version meets SkillView's hard minimum (§11.1, §5.3).
+/// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
     /// Minimum supported `gh` — the first release that shipped the `gh skill`
-    /// subcommand set SkillView depends on (§5.3).
+    /// subcommand set SkillView depends on.
     public static readonly SemVer MinimumVersion = new(2, 91, 0);
 
     private readonly ProcessRunner _runner;

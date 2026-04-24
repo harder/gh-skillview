@@ -18,8 +18,8 @@ namespace SkillView.Ui;
 /// Pinned-skill handling: pinned rows are rendered with a `p` flag and
 /// are skipped unless the user flips the `--force` or `--unpin` toggles.
 /// The "--all" toggle hands off to `gh skill update --all`; when the probe
-/// hasn't reported `--yes`/`--non-interactive`, the UI refuses the combo
-/// (to avoid hanging on v2.91.0's interactive prompt — §7.1.E).
+/// hasn't reported `--yes` or `--non-interactive`, the UI refuses the combo
+/// to avoid hanging on v2.91.0's interactive prompt.
 public sealed class UpdateScreen
 {
     private readonly IApplication _app;
@@ -56,7 +56,7 @@ public sealed class UpdateScreen
             Height = Dim.Percent(90),
         };
 
-        var tableLabel = new Label { Text = "Select skills to update (Space toggles)", X = 0, Y = 0 };
+        var tableLabel = new Label { Text = "Select skills to update. Press Space to toggle.", X = 0, Y = 0 };
         var checkStates = new bool[_skills.Count];
         var table = new TableView
         {
@@ -80,7 +80,7 @@ public sealed class UpdateScreen
             X = Pos.Right(table) + 1, Y = 1,
             Width = Dim.Fill(), Height = Dim.Fill(4),
             ReadOnly = true, WordWrap = false,
-            Text = "(dry-run preview appears here)",
+            Text = "(dry-run results appear here)",
         };
 
         var allBox = new CheckBox
@@ -113,7 +113,7 @@ public sealed class UpdateScreen
         {
             X = 0, Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(10),
-            Text = " ready — pick skills or check --all, then Dry-run / Update",
+            Text = " ready — select skills or enable --all, then choose Dry-run or Update",
         };
         var spinner = new SpinnerView
         {

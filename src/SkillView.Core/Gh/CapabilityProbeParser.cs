@@ -3,12 +3,12 @@ using System.Collections.Immutable;
 namespace SkillView.Gh;
 
 /// Pure flag-token scanner split out from the subprocess orchestrator so unit
-/// tests can feed in fixed help-text fixtures. §11.3 mandates "flag-token
-/// membership scans, not structural parsing of help text".
+/// tests can feed in fixed help-text fixtures. It uses flag-token membership
+/// scans, not structural parsing of help text.
 public static class CapabilityProbeParser
 {
-    /// Known flag tokens to probe per subcommand. Exactly the tokens listed in
-    /// §11.3 — extend only when the PRD does.
+    /// Known flag tokens to probe per subcommand. Extend this list only when
+    /// SkillView intentionally supports additional `gh` flags.
     public static readonly ImmutableDictionary<string, ImmutableArray<string>> ProbedTokens =
         ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("install", ImmutableArray.Create(

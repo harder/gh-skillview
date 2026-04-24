@@ -12,7 +12,7 @@ using Terminal.Gui.Views;
 namespace SkillView.Ui;
 
 /// Phase 6 cleanup screen. Lists cleanup candidates with a Space-to-toggle
-/// checkbox column (same pattern as `UpdateScreen`), and surfaces the §12.3
+/// checkbox column (same pattern as `UpdateScreen`), and surfaces the cleanup
 /// actions: remove, mark ignored, rescan, export.
 public sealed class CleanupScreen
 {
@@ -54,7 +54,7 @@ public sealed class CleanupScreen
         var header = new Label
         {
             X = 0, Y = 0,
-            Text = "Space toggles row. R=remove, I=ignore, O=open, X=export-report, Esc=close",
+            Text = "Space toggles row. R remove, I ignore, X export report, Esc close",
         };
 
         var checkStates = new bool[_candidates.Length];
@@ -94,8 +94,8 @@ public sealed class CleanupScreen
             X = 0, Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Text = _candidates.Length == 0
-                ? " no cleanup candidates — all clear"
-                : $" {_candidates.Length} candidate(s) — press R to remove checked, I to mark ignored",
+                ? " no cleanup candidates"
+                : $" {_candidates.Length} candidate(s) — R remove selected, I ignore selected, X export report",
         };
 
         // Space-to-toggle.

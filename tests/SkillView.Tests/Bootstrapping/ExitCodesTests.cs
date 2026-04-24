@@ -3,10 +3,10 @@ using Xunit;
 
 namespace SkillView.Tests.Bootstrapping;
 
-/// Phase 7 — lock the §7.1.K exit-code contract. Scripts and agent session
-/// hooks rely on these numbers; they must not drift. If any value here
-/// changes, downstream consumers break silently. Update the contract
-/// intentionally and document it in the release notes.
+/// Lock the exit-code contract. Scripts and agent session hooks rely on these
+/// numbers, so they must not drift. If any value here changes, downstream
+/// consumers break silently. Update the contract intentionally and document it
+/// in the release notes.
 public class ExitCodesTests
 {
     [Fact]

@@ -6,7 +6,7 @@ namespace SkillView.Gh;
 
 /// Builds a `CapabilityProfile` by invoking `gh skill <sub> --help` for every
 /// subcommand SkillView cares about and scanning the output for flag tokens.
-/// Follows §11.3: flag-token membership, never structural help parsing.
+/// Uses flag-token membership, never structural help parsing.
 public sealed class GhSkillCapabilityProbe
 {
     private readonly ProcessRunner _runner;

@@ -9,7 +9,7 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Modal Doctor dialog shown inside the TUI (bound to `d` per §8.3). Renders
+/// Modal Doctor dialog shown inside the TUI (bound to `d`). Renders
 /// the same `EnvironmentReport` as the CLI `doctor` subcommand but framed in
 /// a dialog with a scrollable `TextView`.
 public static class DoctorScreen

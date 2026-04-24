@@ -3,8 +3,8 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Runs `gh auth status` and parses the result (§11.1). Never stores tokens —
-/// auth state lives inside `gh` (§20.6).
+/// Runs `gh auth status` and parses the result. Never stores tokens — auth
+/// state lives inside `gh`.
 public sealed class GhAuthService
 {
     private readonly ProcessRunner _runner;

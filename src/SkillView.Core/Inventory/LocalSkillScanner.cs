@@ -5,10 +5,9 @@ using SkillView.Logging;
 
 namespace SkillView.Inventory;
 
-/// Walks `ScanRoot`s per §10.2 and produces a deduplicated list of
-/// `InstalledSkill` records. Symlinks resolve via `PathResolver`; shared
-/// canonical targets collapse into a single record with multiple
-/// `AgentMembership` entries.
+/// Walks `ScanRoot`s and produces a deduplicated list of `InstalledSkill`
+/// records. Symlinks resolve via `PathResolver`; shared canonical targets
+/// collapse into a single record with multiple `AgentMembership` entries.
 public sealed class LocalSkillScanner
 {
     public const string IgnoreMarkerName = ".skillview-ignore";
@@ -49,8 +48,8 @@ public sealed class LocalSkillScanner
     private void ScanRoot(ScanRoot root, Options opts, Dictionary<string, Builder> acc)
     {
         // `EnumerateFileSystemEntries` includes broken symlinks, which
-        // `EnumerateDirectories` silently skips on POSIX (stat fails). §10.2
-        // requires broken symlinks to surface, not disappear.
+        // `EnumerateDirectories` silently skips on POSIX when stat fails.
+        // Broken symlinks should surface, not disappear.
         IEnumerable<string> children;
         try
         {
@@ -114,7 +113,7 @@ public sealed class LocalSkillScanner
                 fm = parsed;
                 if (fm.Name is not null && !string.Equals(fm.Name, Path.GetFileName(resolved), StringComparison.Ordinal))
                 {
-                    // §10.3 "skill name in front-matter matches directory where applicable".
+                    // Treat a front-matter name mismatch as invalid so it stays visible.
                     validity = ValidityState.NameMismatch;
                 }
             }

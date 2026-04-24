@@ -5,7 +5,7 @@ using SkillView.Logging;
 
 namespace SkillView.Inventory;
 
-/// Executes a validated removal with per-file .NET APIs (§12.1 "never compose
+/// Executes a validated removal with per-file .NET APIs ("never compose
 /// file ops via shell"). Partial failures are logged and survivable: the
 /// method walks every file and collects errors rather than aborting at the
 /// first one.

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace SkillView.Logging;
 
 /// Resolves the platform-appropriate cache directory for SkillView logs
-/// (§18.3). Logs are cache, not config — they live under the cache root on
+/// Logs are cache, not config — they live under the cache root on
 /// each platform.
 public static class LogPaths
 {
