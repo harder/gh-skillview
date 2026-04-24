@@ -61,10 +61,6 @@ public sealed class SkillViewApp
         };
 
         _app = Application.Create().Init();
-        // TODO(tg2): upstream — IApplication in rc.4 exposes neither a public
-        // `Dispose` nor accessible `ResetState`, and static `Application.Shutdown`
-        // is marked `[Obsolete]`. For Phase 0 we let process exit handle cleanup;
-        // revisit once TG2 exposes a stable teardown API.
         using var window = BuildUi();
 
         // Application.Keyboard.KeyDown fires BEFORE the view hierarchy processes keys.
@@ -118,7 +114,18 @@ public sealed class SkillViewApp
         };
 
         ProbeGhAsync();
-        _app.Run(window);
+        try
+        {
+            _app.Run(window);
+        }
+        finally
+        {
+            // Dispose the application to ensure the console driver sends
+            // terminal reset sequences (disable SGR mouse tracking, restore
+            // cursor, etc.). Without this, mouse escape sequences leak into
+            // the shell prompt — especially visible in Warp.
+            (_app as IDisposable)?.Dispose();
+        }
         return ExitCodes.Success;
     }
 
@@ -246,7 +253,7 @@ public sealed class SkillViewApp
 
         if (TuiHelpers.IsWarpTerminal)
         {
-            SetStatus("Warp terminal detected — use Tab or Ctrl+J instead of Enter");
+            SetStatus("Warp detected — use Ctrl+J instead of Enter (p/v also work for preview)");
         }
 
         return window;
@@ -319,11 +326,10 @@ public sealed class SkillViewApp
 
     private void OnQueryFieldKey(object? sender, Key key)
     {
-        // Accept Enter, Tab, and Ctrl+J as search submit triggers.
-        // Tab and Ctrl+J are workarounds for Warp terminal which swallows
-        // Enter after certain input sequences.
+        // Accept Enter and Ctrl+J as search submit triggers.
+        // Ctrl+J is a workaround for Warp terminal which intercepts Enter
+        // for its own block processing after the TUI enables mouse tracking.
         var isSubmit = key.KeyCode == KeyCode.Enter
-            || key.KeyCode == KeyCode.Tab
             || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask);
 
         if (isSubmit)
@@ -333,10 +339,6 @@ public sealed class SkillViewApp
             if (!string.IsNullOrEmpty(query))
             {
                 _ = RunSearchAsync(query);
-            }
-            else if (key.KeyCode == KeyCode.Tab)
-            {
-                _resultsTable?.SetFocus();
             }
         }
         else if (key.KeyCode == KeyCode.Esc)
