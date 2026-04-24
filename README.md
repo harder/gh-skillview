@@ -410,7 +410,7 @@ SkillView is built with:
 
 - The [GitHub CLI](https://cli.github.com/) team for the CLI, the extension framework, and the `gh skill` commands that make this project possible.
 - The [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) maintainers ([@tig](https://github.com/tig), [@tznind](https://github.com/tznind), and contributors) for building a serious cross-platform TUI framework for .NET. The v2 rewrite is ambitious and impressive.
-- The [GitHub Copilot](https://github.com/features/copilot) team — this project was built almost entirely with AI-assisted development using Copilot CLI.
+- The [GitHub Copilot](https://github.com/features/copilot) and [Claude Code](https://claude.com/product/claude-code) teams — this project uses AI-assisted development.
 
 ## License
 
