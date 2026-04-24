@@ -41,6 +41,10 @@ public sealed class SkillViewApp
     private EnvironmentReport? _lastReport;
     private volatile bool _searching;
 
+    private string _defaultStatus = " ready — press / to search or F1 for help";
+    private object? _statusToken;
+    private static readonly TimeSpan StatusAutoClear = TimeSpan.FromSeconds(6);
+
     public SkillViewApp(TuiServices services, AppOptions options)
     {
         _services = services;
@@ -304,7 +308,7 @@ public sealed class SkillViewApp
 
         if (TuiHelpers.IsWarpTerminal)
         {
-            SetStatus("Warp detected — use Ctrl+J instead of Enter (p/v also work for preview)");
+            SetDefaultStatus("Warp detected — use Ctrl+J instead of Enter (p/v also work for preview)");
         }
 
         return window;
@@ -409,20 +413,20 @@ public sealed class SkillViewApp
 
             if (!report.GhFound)
             {
-                SetStatus("gh not found — search and preview disabled; press 'd' for Doctor");
+                SetDefaultStatus("gh not found — search and preview disabled; press 'd' for Doctor");
                 return;
             }
             if (!report.GhMeetsMinimum)
             {
-                SetStatus($"gh {report.GhVersionRaw ?? "?"} below minimum {GhBinaryLocator.MinimumVersion} — press 'd' for Doctor");
+                SetDefaultStatus($"gh {report.GhVersionRaw ?? "?"} below minimum {GhBinaryLocator.MinimumVersion} — press 'd' for Doctor");
                 return;
             }
             if (!report.Capabilities.SkillSubcommandPresent)
             {
-                SetStatus("`gh skill` not detected — press 'd' for Doctor");
+                SetDefaultStatus("`gh skill` not detected — press 'd' for Doctor");
                 return;
             }
-            SetStatus($"gh {report.GhVersion} — press '/' to search, 'd' for Doctor");
+            SetDefaultStatus($"gh {report.GhVersion} — press '/' to search, 'd' for Doctor");
         }, "probe");
     }
 
@@ -914,7 +918,43 @@ public sealed class SkillViewApp
         {
             _statusLabel.Text = $" {text}";
         }
+        ScheduleStatusAutoClear();
     });
+
+    /// Persistent contextual status (gh version, "gh not found", etc.).
+    /// Replaces the auto-clear default and is what transient `SetStatus`
+    /// messages fall back to after `StatusAutoClear`.
+    private void SetDefaultStatus(string text) => Invoke(() =>
+    {
+        _defaultStatus = $" {text}";
+        if (_statusLabel is not null)
+        {
+            _statusLabel.Text = _defaultStatus;
+        }
+        CancelStatusAutoClear();
+    });
+
+    private void ScheduleStatusAutoClear()
+    {
+        if (_app is null) return;
+        CancelStatusAutoClear();
+        _statusToken = _app.AddTimeout(StatusAutoClear, () =>
+        {
+            _statusToken = null;
+            if (_statusLabel is not null)
+            {
+                _statusLabel.Text = _defaultStatus;
+            }
+            return false;
+        });
+    }
+
+    private void CancelStatusAutoClear()
+    {
+        if (_app is null || _statusToken is null) return;
+        _app.RemoveTimeout(_statusToken);
+        _statusToken = null;
+    }
 
     private void SetBusy(string text) => Invoke(() =>
     {
