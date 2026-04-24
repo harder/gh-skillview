@@ -27,7 +27,7 @@ public sealed class SearchScreen
     private TextField? _ownerField;
     private TextField? _limitField;
     private TableView? _resultsTable;
-    private TextView? _previewPane;
+    private Markdown? _previewPane;
     private FrameView? _previewFrame;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
@@ -118,7 +118,7 @@ public sealed class SearchScreen
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
-        _previewPane = new TextView
+        _previewPane = new Markdown
         {
             X = 0,
             Y = 0,
@@ -126,7 +126,7 @@ public sealed class SearchScreen
             Height = Dim.Fill(),
             Text = "(no selection)",
         };
-        TuiHelpers.ConfigureReadOnlyPane(_previewPane, "Dialog");
+        TuiHelpers.ConfigureMarkdownPane(_previewPane, "Dialog");
         _previewFrame.Add(_previewPane);
 
         _statusLabel = new Label
@@ -335,7 +335,7 @@ public sealed class SearchScreen
                 if (_previewPane is not null)
                 {
                     _previewPane.Text = result.Succeeded
-                        ? TuiHelpers.FormatPreviewText(result.MarkdownBody ?? result.Body)
+                        ? result.MarkdownBody ?? result.Body
                         : $"(preview failed: exit {result.ExitCode})\n\n{result.ErrorMessage}";
                 }
                 if (_previewFrame is not null)

@@ -91,177 +91,6 @@ internal static class TuiHelpers
     internal static bool IsPreviewKey(Key key) =>
         key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'v' or 'V' or 'p' or 'P';
 
-    /// Lightweight markdown-to-plaintext formatter for the preview pane.
-    /// Strips common markdown syntax (bold, italic, headings, horizontal
-    /// rules) and collapses excessive blank lines to improve readability
-    /// in a plain-text TextView. Code fences are preserved verbatim.
-    internal static string FormatPreviewText(string markdown)
-    {
-        if (string.IsNullOrWhiteSpace(markdown)) return "(empty preview)";
-
-        var lines = markdown.Replace("\r\n", "\n").Split('\n');
-        var output = new StringBuilder(markdown.Length);
-        var consecutiveBlanks = 0;
-        var inCodeBlock = false;
-
-        foreach (var rawLine in lines)
-        {
-            // Track code fences — indent content, show language hint
-            if (rawLine.TrimStart().StartsWith("```", StringComparison.Ordinal))
-            {
-                inCodeBlock = !inCodeBlock;
-                consecutiveBlanks = 0;
-                if (inCodeBlock)
-                {
-                    var lang = rawLine.TrimStart().Length > 3
-                        ? rawLine.TrimStart()[3..].Trim()
-                        : "";
-                    output.AppendLine(lang.Length > 0 ? $"  ┌─ {lang} ─" : "  ┌─");
-                }
-                else
-                {
-                    output.AppendLine("  └─");
-                }
-                continue;
-            }
-
-            if (inCodeBlock)
-            {
-                consecutiveBlanks = 0;
-                output.Append("  │ ");
-                output.AppendLine(rawLine);
-                continue;
-            }
-
-            var trimmed = rawLine.TrimEnd();
-
-            // Skip horizontal rules
-            if (IsHorizontalRule(trimmed))
-            {
-                continue;
-            }
-
-            // Collapse excessive blank lines (max 1 consecutive)
-            if (trimmed.Length == 0)
-            {
-                consecutiveBlanks++;
-                if (consecutiveBlanks <= 1)
-                {
-                    output.AppendLine();
-                }
-                continue;
-            }
-
-            consecutiveBlanks = 0;
-
-            // Strip heading markers — uppercase + underline for visual separation
-            if (trimmed.StartsWith('#'))
-            {
-                var headingText = trimmed.TrimStart('#', ' ');
-                if (output.Length > 0)
-                {
-                    output.AppendLine();
-                }
-                var upper = headingText.ToUpperInvariant();
-                output.AppendLine(upper);
-                output.AppendLine(new string('─', Math.Min(upper.Length, 60)));
-                continue;
-            }
-
-            // Convert markdown list markers to bullet characters
-            var stripped = trimmed.TrimStart();
-            if (stripped.StartsWith("- ", StringComparison.Ordinal) || stripped.StartsWith("* ", StringComparison.Ordinal))
-            {
-                var indent = trimmed.Length - stripped.Length;
-                var bullet = new string(' ', indent) + "• " + StripInlineMarkdown(stripped[2..]);
-                output.AppendLine(bullet);
-                continue;
-            }
-
-            // Numbered lists: keep number, clean up inline markdown
-            if (stripped.Length > 1 && char.IsDigit(stripped[0]))
-            {
-                var dotIdx = stripped.IndexOf(". ", StringComparison.Ordinal);
-                if (dotIdx > 0 && dotIdx <= 3)
-                {
-                    var indent = trimmed.Length - stripped.Length;
-                    var numbered = new string(' ', indent) + stripped[..(dotIdx + 2)] + StripInlineMarkdown(stripped[(dotIdx + 2)..]);
-                    output.AppendLine(numbered);
-                    continue;
-                }
-            }
-
-            // Strip inline markdown: **bold**, *italic*, __bold__, _italic_, `code`
-            var formatted = StripInlineMarkdown(trimmed);
-            output.AppendLine(formatted);
-        }
-
-        return output.ToString().TrimEnd();
-    }
-
-    private static bool IsHorizontalRule(string line)
-    {
-        var stripped = line.Replace(" ", "");
-        return stripped.Length >= 3
-               && (stripped.All(c => c == '-') || stripped.All(c => c == '*') || stripped.All(c => c == '_'));
-    }
-
-    private static string StripInlineMarkdown(string text)
-    {
-        // Strip bold: **text** or __text__
-        // Strip italic: *text* or _text_ (single)
-        // Strip code: `text`
-        // Process in order: bold first (longer markers), then italic
-        var result = new StringBuilder(text.Length);
-        var i = 0;
-
-        while (i < text.Length)
-        {
-            // Bold: ** or __
-            if (i + 1 < text.Length && ((text[i] == '*' && text[i + 1] == '*') || (text[i] == '_' && text[i + 1] == '_')))
-            {
-                var marker = text[i];
-                var end = text.IndexOf(new string(marker, 2), i + 2, StringComparison.Ordinal);
-                if (end > i + 2)
-                {
-                    result.Append(text, i + 2, end - i - 2);
-                    i = end + 2;
-                    continue;
-                }
-            }
-
-            // Inline code: `text`
-            if (text[i] == '`')
-            {
-                var end = text.IndexOf('`', i + 1);
-                if (end > i + 1)
-                {
-                    result.Append(text, i + 1, end - i - 1);
-                    i = end + 1;
-                    continue;
-                }
-            }
-
-            // Italic: * or _ (single, only if not preceded by another marker)
-            if ((text[i] == '*' || text[i] == '_') && i + 1 < text.Length && text[i + 1] != text[i])
-            {
-                var marker = text[i];
-                var end = text.IndexOf(marker, i + 1);
-                if (end > i + 1 && (end + 1 >= text.Length || text[end + 1] != marker))
-                {
-                    result.Append(text, i + 1, end - i - 1);
-                    i = end + 1;
-                    continue;
-                }
-            }
-
-            result.Append(text[i]);
-            i++;
-        }
-
-        return result.ToString();
-    }
-
     internal static void ApplyScheme(string schemeName, params View?[] views)
     {
         foreach (var view in views)
@@ -277,6 +106,16 @@ internal static class TuiHelpers
     {
         view.ReadOnly = true;
         view.WordWrap = wordWrap;
+        view.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
+        view.SchemeName = schemeName;
+        view.SetScheme(CreateReadOnlyPaneScheme());
+    }
+
+    /// Configure a Terminal.Gui Markdown view for the preview pane. The
+    /// built-in Markdown view uses Markdig to render styled headings, code
+    /// blocks, tables, links, and lists with a built-in vertical scrollbar.
+    internal static void ConfigureMarkdownPane(Markdown view, string schemeName)
+    {
         view.SchemeName = schemeName;
         view.SetScheme(CreateReadOnlyPaneScheme());
     }

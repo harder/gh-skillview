@@ -16,7 +16,7 @@ using Terminal.Gui.Views;
 namespace SkillView.Ui;
 
 /// Initial shell for the end-to-end TUI slice: boot → search subprocess →
-/// JSON parse → TableView → preview subprocess → TextView → quit. Future
+/// JSON parse → TableView → preview subprocess → Markdown view → quit. Future
 /// phases extend this with inventory, updates, cleanup, and other workflows.
 public sealed class SkillViewApp
 {
@@ -26,7 +26,8 @@ public sealed class SkillViewApp
     private IApplication? _app;
     private TextField? _queryField;
     private TableView? _resultsTable;
-    private TextView? _rightPane;
+    private Markdown? _previewPane;
+    private TextView? _logPane;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
     private FrameView? _leftFrame;
@@ -220,7 +221,7 @@ public sealed class SkillViewApp
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
         };
-        _rightPane = new TextView
+        _previewPane = new Markdown
         {
             X = 0,
             Y = 0,
@@ -228,8 +229,19 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
             Text = TuiHelpers.WelcomeHint,
         };
-        TuiHelpers.ConfigureReadOnlyPane(_rightPane, "Base");
-        _rightFrame.Add(_rightPane);
+        TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
+
+        _logPane = new TextView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            Visible = false,
+        };
+        TuiHelpers.ConfigureReadOnlyPane(_logPane, "Base");
+
+        _rightFrame.Add(_previewPane, _logPane);
 
         _statusLabel = new Label
         {
@@ -250,7 +262,7 @@ public sealed class SkillViewApp
 
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, _resultsTable, _rightPane, _statusLabel, _spinner);
+            queryLabel, _queryField, _resultsTable, _previewPane, _logPane, _statusLabel, _spinner);
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner);
         window.KeyDown += OnWindowKeyDown;
@@ -408,9 +420,9 @@ public sealed class SkillViewApp
                 RefreshResultsTable();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
-                if (_rightPane is not null && !_showingLogs)
+                if (_previewPane is not null && !_showingLogs)
                 {
-                    _rightPane.Text = results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint;
+                    _previewPane.Text = results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint;
                 }
                 if (_rightFrame is not null)
                 {
@@ -474,17 +486,17 @@ public sealed class SkillViewApp
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
-                if (_rightPane is not null)
+                if (_previewPane is not null)
                 {
-                    _rightPane.Text = preview.Succeeded
-                        ? TuiHelpers.FormatPreviewText(preview.MarkdownBody ?? preview.Body ?? "(empty preview)")
+                    _previewPane.Text = preview.Succeeded
+                        ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
                         : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}";
                 }
                 if (_rightFrame is not null)
                 {
                     _rightFrame.Title = $"Preview — {repo}/{pick.SkillName}";
                 }
-                _showingLogs = false;
+                ShowPreviewPane();
                 SetStatus(preview.Succeeded
                     ? (preview.AssociatedFiles.Length == 0
                         ? "preview loaded"
@@ -497,9 +509,9 @@ public sealed class SkillViewApp
             _services.Logger.Warn("preview", "preview timed out");
             Invoke(() =>
             {
-                if (_rightPane is not null)
+                if (_previewPane is not null)
                 {
-                    _rightPane.Text = "(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.";
+                    _previewPane.Text = "(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.";
                 }
                 SetStatus("preview timed out");
             });
@@ -510,9 +522,9 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             Invoke(() =>
             {
-                if (_rightPane is not null)
+                if (_previewPane is not null)
                 {
-                    _rightPane.Text = snippet.Length > 0
+                    _previewPane.Text = snippet.Length > 0
                         ? $"(preview failed)\n\n{snippet}"
                         : "(preview failed)\n\nSee logs for details.";
                 }
@@ -550,12 +562,12 @@ public sealed class SkillViewApp
 
     private void UpdatePreviewPlaceholder()
     {
-        if (_rightPane is null || _showingLogs || _results.Count == 0)
+        if (_previewPane is null || _showingLogs || _results.Count == 0)
         {
             return;
         }
 
-        var current = _rightPane.Text.ToString() ?? string.Empty;
+        var current = _previewPane.Text.ToString() ?? string.Empty;
         if (current.Length > 0
             && current != TuiHelpers.PreviewHint
             && current != TuiHelpers.WelcomeHint
@@ -572,29 +584,46 @@ public sealed class SkillViewApp
         }
 
         var pick = _results[row];
-        _rightPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}";
+        _previewPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}";
     }
 
     private void ToggleRightPane()
     {
-        if (_rightPane is null || _rightFrame is null)
+        if (_previewPane is null || _rightFrame is null)
         {
             return;
         }
 
         if (_showingLogs)
         {
-            _rightPane.Text = TuiHelpers.PreviewHint;
+            ShowPreviewPane();
+            _previewPane.Text = TuiHelpers.PreviewHint;
             _rightFrame.Title = "Preview";
-            _showingLogs = false;
         }
         else
         {
+            ShowLogPane();
             var log = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
-            _rightPane.Text = log.Length > 0 ? log : "(no log entries yet)";
+            if (_logPane is not null)
+            {
+                _logPane.Text = log.Length > 0 ? log : "(no log entries yet)";
+            }
             _rightFrame.Title = "Logs";
-            _showingLogs = true;
         }
+    }
+
+    private void ShowPreviewPane()
+    {
+        _showingLogs = false;
+        if (_previewPane is not null) _previewPane.Visible = true;
+        if (_logPane is not null) _logPane.Visible = false;
+    }
+
+    private void ShowLogPane()
+    {
+        _showingLogs = true;
+        if (_previewPane is not null) _previewPane.Visible = false;
+        if (_logPane is not null) _logPane.Visible = true;
     }
 
     private void ShowHelp()
@@ -824,9 +853,9 @@ public sealed class SkillViewApp
         if (!_showingLogs) return;
         Invoke(() =>
         {
-            if (_rightPane is not null)
+            if (_logPane is not null)
             {
-                _rightPane.Text = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
+                _logPane.Text = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
             }
         });
     }
