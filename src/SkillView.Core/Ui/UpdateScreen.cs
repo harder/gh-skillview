@@ -65,6 +65,7 @@ public sealed class UpdateScreen
             Height = Dim.Fill(4),
             FullRowSelect = true,
         };
+        TuiHelpers.DisableTypeToSearch(table);
         table.Table = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
             _skills.Select((s, i) => (i, s)).ToList(),
             new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>

@@ -23,6 +23,7 @@ public sealed class ProcessRunner
         var psi = new ProcessStartInfo
         {
             FileName = executable,
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -56,6 +57,7 @@ public sealed class ProcessRunner
 
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+        process.StandardInput.Close();
 
         try
         {

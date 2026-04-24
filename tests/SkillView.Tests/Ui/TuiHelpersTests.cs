@@ -2,6 +2,7 @@ using SkillView.Inventory;
 using SkillView.Ui;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text;
 using Terminal.Gui.Views;
 using Xunit;
 
@@ -20,6 +21,15 @@ public sealed class TuiHelpersTests
     public void Truncate_ClipsWithEllipsis(string? input, int max, string expected)
     {
         Assert.Equal(expected, TuiHelpers.Truncate(input, max));
+    }
+
+    [Fact]
+    public void Truncate_RespectsDisplayWidth_ForWideGlyphs()
+    {
+        var result = TuiHelpers.Truncate("当用户明确要求使用", 8);
+
+        Assert.EndsWith("…", result);
+        Assert.True(result.GetColumns() <= 8);
     }
 
     [Theory]
@@ -134,5 +144,23 @@ public sealed class TuiHelpersTests
         Assert.True(view.ReadOnly);
         Assert.True(view.WordWrap);
         Assert.Equal("Dialog", view.SchemeName);
+    }
+
+    [Fact]
+    public void NoSearchMatcher_RejectsAllKeys()
+    {
+        var matcher = NoSearchMatcher.Instance;
+        Assert.False(matcher.IsCompatibleKey(new Key('a')));
+        Assert.False(matcher.IsCompatibleKey(new Key('z')));
+        Assert.False(matcher.IsCompatibleKey(new Key('1')));
+        Assert.False(matcher.IsCompatibleKey(new Key(KeyCode.Enter)));
+    }
+
+    [Fact]
+    public void NoSearchMatcher_NeverMatches()
+    {
+        var matcher = NoSearchMatcher.Instance;
+        Assert.False(matcher.IsMatch("test", "test"));
+        Assert.False(matcher.IsMatch("a", "abc"));
     }
 }

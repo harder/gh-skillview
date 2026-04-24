@@ -98,6 +98,7 @@ public sealed class SkillViewApp
             Text = string.Empty,
         };
         _queryField.KeyDown += OnQueryFieldKey;
+        TuiHelpers.ConfigureTextInput(_queryField, "Base");
 
         _resultsTable = new TableView
         {
@@ -107,15 +108,13 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
             FullRowSelect = true,
         };
-        _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
-        _resultsTable.KeyDown += (_, key) =>
+        TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
+        _resultsTable.CellActivated += (_, _) =>
         {
-            if (TuiHelpers.IsPreviewKey(key))
-            {
-                _ = PreviewSelectedAsync();
-                key.Handled = true;
-            }
+            _services.Logger.Info("preview", "CellActivated fired → calling PreviewSelectedAsync");
+            _ = PreviewSelectedAsync();
         };
+        _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
 
         _leftFrame.Add(queryLabel, _queryField, _resultsTable);
 
@@ -188,11 +187,6 @@ public sealed class SkillViewApp
         else if (rune.Value == 'q' || rune.Value == 'Q')
         {
             _app?.RequestStop();
-            key.Handled = true;
-        }
-        else if (TuiHelpers.IsPreviewKey(key))
-        {
-            _ = PreviewSelectedAsync();
             key.Handled = true;
         }
         else if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R')
@@ -296,6 +290,7 @@ public sealed class SkillViewApp
                 _results = results.ToList();
                 RefreshResultsTable();
                 _resultsTable?.SetFocus();
+                _services.Logger.Info("search", $"results loaded: count={_results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
                 if (_rightPane is not null && !_showingLogs)
                 {
                     _rightPane.Text = results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint;
@@ -323,21 +318,27 @@ public sealed class SkillViewApp
         }
     }
 
+    private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(30);
+
     private async Task PreviewSelectedAsync()
     {
+        _services.Logger.Debug("preview", $"PreviewSelectedAsync entered: table={_resultsTable is not null} results={_results.Count} ghPath={_ghPath is not null}");
         if (_resultsTable is null || _results.Count == 0 || _ghPath is null)
         {
+            _services.Logger.Warn("preview", $"guard failed: table={_resultsTable is not null} results={_results.Count} ghPath={_ghPath ?? "(null)"}");
             return;
         }
 
         var row = _resultsTable.SelectedRow;
         if (row < 0 || row >= _results.Count)
         {
+            _services.Logger.Warn("preview", $"SelectedRow={row} out of range (count={_results.Count})");
             return;
         }
 
         var pick = _results[row];
         var repo = pick.Repo ?? string.Empty;
+        _services.Logger.Debug("preview", $"picked: repo={repo} skill={pick.SkillName}");
         if (string.IsNullOrEmpty(repo))
         {
             SetStatus("no repo on selected row");
@@ -347,15 +348,18 @@ public sealed class SkillViewApp
         SetBusy($"preview {repo}/{pick.SkillName}…");
         try
         {
+            using var cts = new CancellationTokenSource(PreviewTimeout);
+            _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
             var preview = await _services.PreviewService
-                .PreviewAsync(_ghPath, repo, pick.SkillName)
+                .PreviewAsync(_ghPath, repo, pick.SkillName, cancellationToken: cts.Token)
                 .ConfigureAwait(false);
+            _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
                 if (_rightPane is not null)
                 {
                     _rightPane.Text = preview.Succeeded
-                        ? preview.Body
+                        ? (preview.Body ?? "(empty preview)")
                         : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}";
                 }
                 if (_rightFrame is not null)
@@ -367,6 +371,36 @@ public sealed class SkillViewApp
                     ? (preview.AssociatedFiles.Length == 0
                         ? "preview loaded"
                         : $"preview loaded · {preview.AssociatedFiles.Length} file(s)")
+                    : "preview failed — see logs (l)");
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _services.Logger.Warn("preview", "preview timed out");
+            Invoke(() =>
+            {
+                if (_rightPane is not null)
+                {
+                    _rightPane.Text = "(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.";
+                }
+                SetStatus("preview timed out");
+            });
+        }
+        catch (Exception ex)
+        {
+            _services.Logger.Error("preview", ex.Message);
+            var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+            Invoke(() =>
+            {
+                if (_rightPane is not null)
+                {
+                    _rightPane.Text = snippet.Length > 0
+                        ? $"(preview failed)\n\n{snippet}"
+                        : "(preview failed)\n\nSee logs for details.";
+                }
+
+                SetStatus(snippet.Length > 0
+                    ? $"preview failed: {snippet}"
                     : "preview failed — see logs (l)");
             });
         }
@@ -393,6 +427,33 @@ public sealed class SkillViewApp
             });
         _resultsTable.Table = source;
         _resultsTable.Update();
+    }
+
+    private void UpdatePreviewPlaceholder()
+    {
+        if (_rightPane is null || _showingLogs || _results.Count == 0)
+        {
+            return;
+        }
+
+        var current = _rightPane.Text.ToString() ?? string.Empty;
+        if (current.Length > 0
+            && current != TuiHelpers.PreviewHint
+            && current != TuiHelpers.WelcomeHint
+            && !current.StartsWith("Selected: ", StringComparison.Ordinal)
+            && !current.StartsWith("(no selection)", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var row = _resultsTable?.SelectedRow ?? -1;
+        if (row < 0 || row >= _results.Count)
+        {
+            return;
+        }
+
+        var pick = _results[row];
+        _rightPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}";
     }
 
     private void ToggleRightPane()

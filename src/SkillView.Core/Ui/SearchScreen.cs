@@ -63,9 +63,11 @@ public sealed class SearchScreen
 
         var queryLabel = new Label { Text = "Query :", X = 0, Y = 0 };
         _queryField = new TextField { X = 8, Y = 0, Width = Dim.Percent(40), Text = string.Empty };
+        TuiHelpers.ConfigureTextInput(_queryField, "Dialog");
 
         var ownerLabel = new Label { Text = "Owner :", X = Pos.Right(_queryField) + 2, Y = 0 };
         _ownerField = new TextField { X = Pos.Right(ownerLabel) + 1, Y = 0, Width = Dim.Percent(20), Text = string.Empty };
+        TuiHelpers.ConfigureTextInput(_ownerField, "Dialog");
 
         var limitLabel = new Label { Text = "Limit :", X = Pos.Right(_ownerField) + 2, Y = 0 };
         _limitField = new TextField
@@ -75,6 +77,7 @@ public sealed class SearchScreen
             Width = 6,
             Text = GhSkillSearchService.DefaultLimit.ToString(CultureInfo.InvariantCulture),
         };
+        TuiHelpers.ConfigureTextInput(_limitField, "Dialog");
 
         var hint = new Label
         {
@@ -92,15 +95,8 @@ public sealed class SearchScreen
             Height = Dim.Fill(2),
             FullRowSelect = true,
         };
+        TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
         _resultsTable.CellActivated += (_, _) => _ = PreviewSelectedAsync();
-        _resultsTable.KeyDown += (_, key) =>
-        {
-            if (TuiHelpers.IsPreviewKey(key))
-            {
-                _ = PreviewSelectedAsync();
-                key.Handled = true;
-            }
-        };
         _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
 
         _previewFrame = new FrameView
@@ -170,11 +166,6 @@ public sealed class SearchScreen
             if (key.KeyCode == KeyCode.Esc || rune == 'q' || rune == 'Q')
             {
                 _app.RequestStop();
-                key.Handled = true;
-            }
-            else if (TuiHelpers.IsPreviewKey(key))
-            {
-                _ = PreviewSelectedAsync();
                 key.Handled = true;
             }
             else if (rune == 'i' || rune == 'I')
@@ -268,11 +259,17 @@ public sealed class SearchScreen
         }
     }
 
+    private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(30);
+
     private async Task PreviewSelectedAsync()
     {
         if (_resultsTable is null || _results.Count == 0) return;
         var row = _resultsTable.SelectedRow;
-        if (row < 0 || row >= _results.Count) return;
+        if (row < 0 || row >= _results.Count)
+        {
+            _logger.Debug("preview", $"SelectedRow={row} out of range (count={_results.Count})");
+            return;
+        }
 
         var pick = _results[row];
         var repo = pick.Repo ?? string.Empty;
@@ -285,7 +282,8 @@ public sealed class SearchScreen
         SetBusy($"preview {repo}/{pick.SkillName}…");
         try
         {
-            var result = await _preview.PreviewAsync(_ghPath, repo, pick.SkillName).ConfigureAwait(false);
+            using var cts = new CancellationTokenSource(PreviewTimeout);
+            var result = await _preview.PreviewAsync(_ghPath, repo, pick.SkillName, cancellationToken: cts.Token).ConfigureAwait(false);
             Invoke(() =>
             {
                 if (_previewPane is not null)
@@ -301,6 +299,36 @@ public sealed class SearchScreen
                         : $"Preview — {repo}/{pick.SkillName} · {result.AssociatedFiles.Length} file(s)";
                 }
                 SetStatus(result.Succeeded ? "preview loaded" : "preview failed");
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.Warn("preview", "preview timed out");
+            Invoke(() =>
+            {
+                if (_previewPane is not null)
+                {
+                    _previewPane.Text = "(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.";
+                }
+                SetStatus("preview timed out");
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.Error("preview", ex.Message);
+            var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+            Invoke(() =>
+            {
+                if (_previewPane is not null)
+                {
+                    _previewPane.Text = snippet.Length > 0
+                        ? $"(preview failed)\n\n{snippet}"
+                        : "(preview failed)\n\nSee logs for details.";
+                }
+
+                SetStatus(snippet.Length > 0
+                    ? $"preview failed: {snippet}"
+                    : "preview failed — see logs");
             });
         }
         finally

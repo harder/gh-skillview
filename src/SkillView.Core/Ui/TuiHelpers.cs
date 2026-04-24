@@ -1,8 +1,14 @@
+using System.Text;
 using SkillView.Inventory;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using Attribute = Terminal.Gui.Drawing.Attribute;
+
+// ReSharper disable once CheckNamespace — keep flat SkillView.Ui namespace
 
 namespace SkillView.Ui;
 
@@ -13,8 +19,30 @@ internal static class TuiHelpers
     /// Truncate text to `maxLen` characters, appending "…" if it was clipped.
     internal static string Truncate(string? text, int maxLen)
     {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        return text.Length <= maxLen ? text : string.Concat(text.AsSpan(0, maxLen - 1), "…");
+        if (string.IsNullOrEmpty(text) || maxLen <= 0) return string.Empty;
+
+        const string ellipsis = "…";
+        if (text.GetColumns() <= maxLen) return text;
+        if (maxLen <= ellipsis.GetColumns()) return ellipsis;
+
+        var budget = maxLen - ellipsis.GetColumns();
+        var width = 0;
+        var builder = new StringBuilder(text.Length);
+        foreach (var rune in text.EnumerateRunes())
+        {
+            var runeWidth = rune.GetColumns();
+            if (width + runeWidth > budget)
+            {
+                break;
+            }
+
+            builder.Append(rune.ToString());
+            width += runeWidth;
+        }
+
+        if (builder.Length == 0) return ellipsis;
+        builder.Append(ellipsis);
+        return builder.ToString();
     }
 
     /// Shorten a filesystem path for table display. Keeps the last `segments`
@@ -74,6 +102,13 @@ internal static class TuiHelpers
         view.ReadOnly = true;
         view.WordWrap = wordWrap;
         view.SchemeName = schemeName;
+        view.SetScheme(CreateReadOnlyPaneScheme());
+    }
+
+    internal static void ConfigureTextInput(TextField view, string schemeName)
+    {
+        view.SchemeName = schemeName;
+        view.SetScheme(CreateEditableInputScheme());
     }
 
     /// Key bindings help text for the main window, shared between the
@@ -97,4 +132,95 @@ internal static class TuiHelpers
 
     internal const string PreviewHint =
         "Select a result and press Enter, p, or v to preview.";
+
+    /// Create an explicit scheme for editable text inputs using only basic
+    /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
+    private static Scheme CreateEditableInputScheme()
+    {
+        // Black background avoids the teal/green hue that DarkSlateGray
+        // produces on 16-color terminals.
+        var normal = new Attribute(StandardColor.White, StandardColor.Black);
+        var focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
+        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+
+        return new Scheme
+        {
+            Normal = normal,
+            HotNormal = normal,
+            Focus = focus,
+            HotFocus = focus,
+            Active = focus,
+            HotActive = focus,
+            Highlight = focus,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = normal,
+        };
+    }
+
+    /// Create an explicit scheme for read-only panes (preview, logs).
+    private static Scheme CreateReadOnlyPaneScheme()
+    {
+        var normal = new Attribute(StandardColor.White, StandardColor.Black);
+        var focus = new Attribute(StandardColor.White, StandardColor.Blue);
+        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+
+        return new Scheme
+        {
+            Normal = normal,
+            HotNormal = normal,
+            Focus = focus,
+            HotFocus = focus,
+            Active = normal,
+            HotActive = focus,
+            Highlight = focus,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = normal,
+        };
+    }
+
+    /// Disable type-to-search on a TableView. Terminal.Gui v2 RC4's
+    /// OnKeyDown intercepts ALL unbound letter keys for type-to-search
+    /// before the KeyDown event fires, preventing single-letter shortcuts
+    /// from reaching event handlers. Replacing the Matcher disables that.
+    /// TODO(tg2): remove once upstream supports CollectionNavigator = null
+    /// without NRE.
+    internal static void DisableTypeToSearch(TableView table)
+    {
+        table.CollectionNavigator.Matcher = NoSearchMatcher.Instance;
+    }
+
+    /// Disable type-to-search on a TableView and register preview shortcut
+    /// key bindings (p, v → Command.Accept → CellActivated).
+    ///
+    /// Terminal.Gui v2 RC4 has a known issue where TableView.OnKeyDown
+    /// intercepts ALL unbound letter keys for type-to-search *before* the
+    /// KeyDown event fires. This prevents single-letter shortcuts from
+    /// reaching event handlers. Replacing the Matcher disables that feature
+    /// while adding explicit bindings routes p/v through CellActivated.
+    internal static void ConfigureTableKeyBindings(TableView table)
+    {
+        DisableTypeToSearch(table);
+
+        // Route p/v through CellActivated (same path as Enter).
+        table.KeyBindings.Add(KeyCode.P, Command.Accept);
+        table.KeyBindings.Add(KeyCode.P | KeyCode.ShiftMask, Command.Accept);
+        table.KeyBindings.Add(KeyCode.V, Command.Accept);
+        table.KeyBindings.Add(KeyCode.V | KeyCode.ShiftMask, Command.Accept);
+    }
+}
+
+/// Matcher that rejects all keys, effectively disabling TableView's
+/// built-in type-to-search (CollectionNavigator) feature. Setting
+/// CollectionNavigator to null is documented as supported but causes
+/// a NullReferenceException in TG2 v2 RC4; this workaround avoids
+/// the NRE while achieving the same effect.
+internal sealed class NoSearchMatcher : ICollectionNavigatorMatcher
+{
+    internal static readonly NoSearchMatcher Instance = new();
+    public bool IsCompatibleKey(Key key) => false;
+    public bool IsMatch(string search, object value) => false;
 }

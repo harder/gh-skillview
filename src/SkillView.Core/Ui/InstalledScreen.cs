@@ -33,6 +33,7 @@ public static class InstalledScreen
             Height = Dim.Fill(1),
             FullRowSelect = true,
         };
+        TuiHelpers.DisableTypeToSearch(table);
         var rows = snapshot.Skills;
         table.Table = new EnumerableTableSource<InstalledSkill>(
             rows,

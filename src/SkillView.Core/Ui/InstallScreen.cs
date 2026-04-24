@@ -75,12 +75,14 @@ public sealed class InstallScreen
             X = 10, Y = 0, Width = Dim.Fill(2),
             Text = _request.SkillName ?? string.Empty,
         };
+        TuiHelpers.ConfigureTextInput(skillField, "Dialog");
 
         var versionLabel = new Label { Text = "Version :", X = 0, Y = 1 };
         var versionField = new TextField
         {
             X = 10, Y = 1, Width = 24, Text = string.Empty,
         };
+        TuiHelpers.ConfigureTextInput(versionField, "Dialog");
         var pinBox = new CheckBox
         {
             X = 36, Y = 1, Text = "_pin",
@@ -93,6 +95,7 @@ public sealed class InstallScreen
             Text = _request.RepoPath ?? string.Empty,
             Enabled = _capabilities.SupportsRepoPath,
         };
+        TuiHelpers.ConfigureTextInput(repoPathField, "Dialog");
         if (!_capabilities.SupportsRepoPath)
         {
             repoPathField.Text = "(requires a newer gh build)";
@@ -105,6 +108,7 @@ public sealed class InstallScreen
             Text = string.Empty,
             Enabled = _capabilities.SupportsUpstream,
         };
+        TuiHelpers.ConfigureTextInput(upstreamField, "Dialog");
 
         var agentsLabel = new Label { Text = "Agents  :", X = 0, Y = 5 };
         // TODO(tg2): upstream — we'd prefer FlagSelector here, but
@@ -137,6 +141,7 @@ public sealed class InstallScreen
             X = 10, Y = 9, Width = Dim.Fill(2),
             Text = string.Empty,
         };
+        TuiHelpers.ConfigureTextInput(pathField, "Dialog");
         var pathHint = new Label
         {
             Text = "(only applied when scope=custom)",

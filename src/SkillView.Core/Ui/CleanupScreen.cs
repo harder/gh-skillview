@@ -65,6 +65,7 @@ public sealed class CleanupScreen
             Height = Dim.Fill(2),
             FullRowSelect = true,
         };
+        TuiHelpers.DisableTypeToSearch(table);
         table.Table = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
             _candidates.Select((c, i) => (i, c)).ToList(),
             new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
