@@ -36,6 +36,7 @@ public sealed class SkillViewApp
     private string? _ghPath;
     private bool _showingLogs;
     private EnvironmentReport? _lastReport;
+    private volatile bool _searching;
 
     public SkillViewApp(TuiServices services, AppOptions options)
     {
@@ -50,6 +51,15 @@ public sealed class SkillViewApp
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
     public int Run()
     {
+        // Catch any unhandled exceptions so they get logged instead of silently crashing
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+            {
+                _services.Logger.Error("CRASH", $"Unhandled: {ex}");
+            }
+        };
+
         _app = Application.Create().Init();
         // TODO(tg2): upstream — IApplication in rc.4 exposes neither a public
         // `Dispose` nor accessible `ResetState`, and static `Application.Shutdown`
@@ -58,42 +68,36 @@ public sealed class SkillViewApp
         using var window = BuildUi();
 
         // Application.Keyboard.KeyDown fires BEFORE the view hierarchy processes keys.
-        // We intercept Enter here because TG2 v2 RC4's internal view hierarchy
-        // steals Enter from the TableView: every View has Enter→Command.Accept
-        // bound (View.Keyboard.cs line 16), so if the table has an internal
-        // focused subview (e.g. ScrollBar), that subview handles Enter before
-        // the table ever sees it. P/V bypass this because they're not standard
-        // View bindings.
+        // We intercept Enter here ONLY when the TableView has focus, because TG2 v2
+        // RC4's internal view hierarchy steals Enter from TableView: every View has
+        // Enter→Command.Accept bound (View.Keyboard.cs line 16), so if the table has
+        // an internal focused subview (e.g. ScrollBar), that subview handles Enter
+        // before the table ever sees it. P/V bypass because they're not base View
+        // bindings. Query field Enter works fine via OnQueryFieldKey — do NOT
+        // intercept it here to avoid double-dispatch.
         // TODO(tg2): remove once upstream Enter dispatch to TableView is fixed
         _app.Keyboard.KeyDown += (_, key) =>
         {
-            if (key.KeyCode == KeyCode.Enter && !key.Handled)
+            try
             {
-                // --- DIAG: log ALL Enter presses at the application level ---
-                var focusChain = BuildFocusChain(window);
-                _services.Logger.Debug("DIAG.app.KeyDown",
-                    $"ENTER KeyCode=0x{(int)key.KeyCode:X} ({key.KeyCode}) Handled={key.Handled} " +
-                    $"tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus} " +
-                    $"tableFocused={_resultsTable?.Focused?.GetType().Name ?? "null"} " +
-                    $"focusChain=[{focusChain}]");
-                // --- end DIAG ---
-
-                if (_resultsTable?.HasFocus == true)
+                if (key.KeyCode == KeyCode.Enter && !key.Handled && _resultsTable?.HasFocus == true)
                 {
+                    // --- DIAG: log Enter interception with focus chain ---
+                    var focusChain = BuildFocusChain(window);
+                    _services.Logger.Debug("DIAG.app.KeyDown",
+                        $"ENTER intercepted KeyCode=0x{(int)key.KeyCode:X} " +
+                        $"tableFocused={_resultsTable?.Focused?.GetType().Name ?? "null"} " +
+                        $"focusChain=[{focusChain}]");
+                    // --- end DIAG ---
+
                     key.Handled = true;
                     _services.Logger.Info("preview", "App.KeyDown Enter → calling PreviewSelectedAsync");
                     _ = PreviewSelectedAsync();
                 }
-                else if (_queryField?.HasFocus == true)
-                {
-                    key.Handled = true;
-                    var query = _queryField.Text.Trim();
-                    if (!string.IsNullOrEmpty(query))
-                    {
-                        _services.Logger.Info("search", $"App.KeyDown Enter → RunSearchAsync({query})");
-                        _ = RunSearchAsync(query);
-                    }
-                }
+            }
+            catch (Exception ex)
+            {
+                _services.Logger.Error("app.KeyDown", $"Enter handler failed: {ex.Message}");
             }
         };
 
@@ -374,7 +378,13 @@ public sealed class SkillViewApp
             SetStatus("cannot search — gh not found");
             return;
         }
+        if (_searching)
+        {
+            _services.Logger.Debug("search", "skipping — search already in progress");
+            return;
+        }
 
+        _searching = true;
         SetBusy($"searching {query}…");
         try
         {
@@ -410,6 +420,7 @@ public sealed class SkillViewApp
         }
         finally
         {
+            _searching = false;
             Invoke(ClearBusy);
         }
     }
@@ -879,10 +890,12 @@ public sealed class SkillViewApp
     {
         var parts = new List<string>();
         var v = root;
-        while (v is not null)
+        var depth = 0;
+        while (v is not null && depth < 20) // guard against cycles
         {
             parts.Add(v.GetType().Name);
             v = v.Focused;
+            depth++;
         }
         return string.Join(" → ", parts);
     }
