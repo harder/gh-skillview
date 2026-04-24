@@ -172,9 +172,10 @@ These are stable and safe to depend on in scripts.
 | Key | Action |
 |---|---|
 | `/` | Focus the search box |
-| `Enter` | Run search from the query box |
+| `Enter` | Run search (query box) or preview (results) |
+| `→` | Preview the selected result |
+| `p` or `v` | Preview the selected result |
 | `Esc` | Leave the query box and return focus to results |
-| `v` | Preview the selected result |
 | `l` or `r` | Toggle the right pane between preview and logs |
 | `d` | Open Doctor |
 | `I` | Open installed skills inventory |
@@ -189,7 +190,7 @@ These are stable and safe to depend on in scripts.
 | Key | Action |
 |---|---|
 | `Enter` | Search |
-| `v` | Preview selected result |
+| `→`, `p`, or `v` | Preview selected result |
 | `i` | Stage install for the selected result |
 | `/` | Focus the query field |
 | `Esc` or `q` | Close dialog |
@@ -379,6 +380,37 @@ When changing behavior:
 3. Use `ProcessRunner` for subprocess work instead of shell composition
 4. Preserve exit-code behavior for CLI consumers
 5. Add or update tests with code changes
+
+## Terminal compatibility
+
+SkillView works best in terminals with full ANSI and xterm key support.
+
+| Terminal | Status |
+|---|---|
+| Terminal.app (macOS) | ✅ Full support |
+| iTerm2 | ✅ Full support |
+| Kitty | ✅ Full support |
+| Alacritty | ✅ Full support |
+| Ghostty | ✅ Full support |
+| Windows Terminal | ✅ Full support |
+| Warp (macOS) | ⚠️ Partial — Enter key unreliable after first interaction; use `Ctrl+J` or `→` instead |
+
+If you encounter issues in your terminal, try `--debug` and check the log output. See the [Logging](#logging) section for log file locations.
+
+## Under the hood
+
+SkillView is built with:
+
+- [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) (v2) — the cross-platform .NET TUI framework that powers the full-screen interface
+- [GitHub CLI](https://cli.github.com/) (`gh`) — all GitHub interaction flows through `gh skill` commands
+- [.NET 10](https://dotnet.microsoft.com/) with Native AOT — single-binary, no runtime required
+- [xUnit](https://xunit.net/) — test framework
+
+## Acknowledgements
+
+- The [GitHub CLI](https://cli.github.com/) team for the CLI, the extension framework, and the `gh skill` commands that make this project possible.
+- The [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) maintainers ([@tig](https://github.com/tig), [@tznind](https://github.com/tznind), and contributors) for building a serious cross-platform TUI framework for .NET. The v2 rewrite is ambitious and impressive.
+- The [GitHub Copilot](https://github.com/features/copilot) team — this project was built almost entirely with AI-assisted development using Copilot CLI.
 
 ## License
 
