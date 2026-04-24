@@ -651,6 +651,12 @@ public sealed class SkillViewApp
         if (_logPane is not null) _logPane.Visible = false;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = false;
+        if (_leftFrame is not null) _leftFrame.Visible = true;
+        if (_rightFrame is not null)
+        {
+            _rightFrame.X = _leftFrame is not null ? Pos.Right(_leftFrame) : 0;
+            _rightFrame.Width = Dim.Fill();
+        }
     }
 
     private void ShowLogPane()
@@ -660,6 +666,12 @@ public sealed class SkillViewApp
         if (_logPane is not null) _logPane.Visible = true;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = true;
+        if (_leftFrame is not null) _leftFrame.Visible = false;
+        if (_rightFrame is not null)
+        {
+            _rightFrame.X = 0;
+            _rightFrame.Width = Dim.Fill();
+        }
     }
 
     private void ShowHelp()
