@@ -22,6 +22,40 @@ internal static class TuiHelpers
         Environment.GetEnvironmentVariable("TERM_PROGRAM")
             ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
 
+    /// Compact Unicode badge for a known agent. Falls back to the first
+    /// letter (uppercased) for unknown agents so unfamiliar IDs still
+    /// render as a one-cell glyph in the Agents column.
+    internal static string AgentIcon(string? agentId)
+    {
+        if (string.IsNullOrWhiteSpace(agentId)) return "?";
+        var key = agentId.Trim().ToLowerInvariant();
+        return key switch
+        {
+            "claude" or "claude-code" or "claude_code" or "claudecode" => "⟁",
+            "cursor" => "◫",
+            "codex" or "openai-codex" => "◎",
+            "gemini" or "gemini-cli" => "✦",
+            "opencode" or "open-code" => "⬡",
+            _ => char.ToUpperInvariant(key[0]).ToString(),
+        };
+    }
+
+    /// Concatenate one icon per distinct agent ID, preserving discovery
+    /// order. Returns "—" when the list is empty.
+    internal static string AgentBadges(IEnumerable<string> agentIds)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sb = new StringBuilder();
+        foreach (var id in agentIds)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            if (!seen.Add(id)) continue;
+            if (sb.Length > 0) sb.Append(' ');
+            sb.Append(AgentIcon(id));
+        }
+        return sb.Length == 0 ? "—" : sb.ToString();
+    }
+
     /// Severity of a transient status message. Drives the color of the
     /// notification bar and is the only thing the caller has to decide.
     internal enum NotificationLevel

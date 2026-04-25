@@ -49,8 +49,8 @@ public static class InstalledScreen
             // Name and Agents share the proportional remainder.
             var fixedCols = 6 /*Scope*/ + 8 /*Source*/ + 1 /*!*/ + 3 /*Lnk*/;
             var remaining = Math.Max(20, available - fixedCols);
-            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.45));
-            var agentsW = Math.Max(10, remaining - nameW);
+            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.55));
+            var agentsW = Math.Max(8, remaining - nameW);
             table.Table = new EnumerableTableSource<InstalledSkill>(
                 rows,
                 new Dictionary<string, Func<InstalledSkill, object>>
@@ -61,7 +61,7 @@ public static class InstalledScreen
                     ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
                     ["Lnk"] = s => s.IsSymlinked ? "↩" : "",
                     ["Agents"] = s => TuiHelpers.Truncate(
-                        string.Join(",", s.Agents.Select(a => a.AgentId).Distinct(StringComparer.OrdinalIgnoreCase)),
+                        TuiHelpers.AgentBadges(s.Agents.Select(a => a.AgentId)),
                         agentsW),
                 });
             var style = table.Style;
@@ -198,7 +198,7 @@ public static class InstalledScreen
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"- **{a.AgentId}** ({kind}) `{a.Path}`");
+                sb.AppendLine($"- {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** ({kind}) `{a.Path}`");
             }
         }
         return sb.ToString();
