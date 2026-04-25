@@ -29,6 +29,7 @@ public sealed class SkillViewApp
     private NumericUpDown<int>? _limitUpDown;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
+    private Markdown? _metadataPane;
     private TextView? _logPane;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
@@ -240,7 +241,11 @@ public sealed class SkillViewApp
             _services.Logger.Info("preview", "CellActivated fired → calling PreviewSelectedAsync");
             _ = PreviewSelectedAsync();
         };
-        _resultsTable.SelectedCellChanged += (_, _) => UpdatePreviewPlaceholder();
+        _resultsTable.SelectedCellChanged += (_, _) =>
+        {
+            UpdatePreviewPlaceholder();
+            UpdateMetadataPane();
+        };
 
         // Re-distribute column widths whenever the table is resized.
         var lastResultsWidth = -1;
@@ -268,11 +273,21 @@ public sealed class SkillViewApp
         {
             X = 0,
             Y = 0,
-            Width = Dim.Fill(),
+            Width = Dim.Percent(70),
             Height = Dim.Fill(),
             Text = TuiHelpers.WelcomeHint,
         };
         TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
+
+        _metadataPane = new Markdown
+        {
+            X = Pos.Right(_previewPane),
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            Text = "_(no selection)_",
+        };
+        TuiHelpers.ConfigureMarkdownPane(_metadataPane, "Base");
 
         _logPane = new TextView
         {
@@ -284,7 +299,7 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureReadOnlyPane(_logPane, "Base");
 
-        _rightFrame.Add(_previewPane, _logPane);
+        _rightFrame.Add(_previewPane, _metadataPane, _logPane);
 
         _statusLabel = new Label
         {
@@ -328,7 +343,7 @@ public sealed class SkillViewApp
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
             queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown,
-            _resultsTable, _previewPane, _logPane,
+            _resultsTable, _previewPane, _metadataPane, _logPane,
             _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
@@ -507,6 +522,7 @@ public sealed class SkillViewApp
             {
                 _results = results.ToList();
                 RefreshResultsTable();
+                UpdateMetadataPane();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
                 if (_previewPane is not null && !_showingLogs)
@@ -693,6 +709,51 @@ public sealed class SkillViewApp
         _previewPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}";
     }
 
+    /// Render the metadata sidebar for the currently-selected search result.
+    /// Mirrors SkillsGate's metadata panel: name, description, source, URL,
+    /// path, namespace, stars. The sidebar always reflects the selected row,
+    /// independent of whether the SKILL.md preview has been loaded yet.
+    private void UpdateMetadataPane()
+    {
+        if (_metadataPane is null) return;
+        var row = _resultsTable?.SelectedRow ?? -1;
+        if (row < 0 || row >= _results.Count)
+        {
+            _metadataPane.Text = "_(no selection)_";
+            return;
+        }
+        _metadataPane.Text = RenderSearchMetadata(_results[row]);
+    }
+
+    private static string RenderSearchMetadata(SearchResultSkill s)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"## {s.SkillName ?? "(unnamed)"}");
+        sb.AppendLine();
+        sb.AppendLine($"**repo**: `{s.Repo ?? "—"}`  ");
+        if (s.Stars is { } stars) sb.AppendLine($"**stars**: ★ {stars.ToString(CultureInfo.InvariantCulture)}  ");
+        if (!string.IsNullOrWhiteSpace(s.Repo))
+        {
+            sb.AppendLine($"**url**: https://github.com/{s.Repo}  ");
+        }
+        if (!string.IsNullOrWhiteSpace(s.Namespace))
+            sb.AppendLine($"**namespace**: `{s.Namespace}`  ");
+        if (!string.IsNullOrWhiteSpace(s.Path))
+            sb.AppendLine($"**path**: `{s.Path}`  ");
+        if (!string.IsNullOrWhiteSpace(s.Description))
+        {
+            sb.AppendLine();
+            sb.AppendLine("### Description");
+            sb.AppendLine();
+            sb.AppendLine(s.Description);
+        }
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine("_Press **i** to install._");
+        return sb.ToString();
+    }
+
     private void ToggleRightPane()
     {
         if (_previewPane is null || _rightFrame is null)
@@ -722,6 +783,7 @@ public sealed class SkillViewApp
     {
         _showingLogs = false;
         if (_previewPane is not null) _previewPane.Visible = true;
+        if (_metadataPane is not null) _metadataPane.Visible = true;
         if (_logPane is not null) _logPane.Visible = false;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = false;
@@ -737,6 +799,7 @@ public sealed class SkillViewApp
     {
         _showingLogs = true;
         if (_previewPane is not null) _previewPane.Visible = false;
+        if (_metadataPane is not null) _metadataPane.Visible = false;
         if (_logPane is not null) _logPane.Visible = true;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = true;
