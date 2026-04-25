@@ -29,6 +29,7 @@ public sealed class SkillViewApp
     private NumericUpDown<int>? _limitUpDown;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
+    private TextView? _previewRawPane;
     private Markdown? _metadataPane;
     private TextView? _logPane;
     private Label? _statusLabel;
@@ -41,6 +42,7 @@ public sealed class SkillViewApp
     private List<SearchResultSkill> _results = new();
     private string? _ghPath;
     private bool _showingLogs;
+    private bool _showingRawPreview;
     private EnvironmentReport? _lastReport;
     private volatile bool _searching;
 
@@ -279,6 +281,17 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
 
+        _previewRawPane = new TextView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Percent(70),
+            Height = Dim.Fill(),
+            Text = TuiHelpers.WelcomeHint,
+            Visible = false,
+        };
+        TuiHelpers.ConfigureReadOnlyPane(_previewRawPane, "Base");
+
         _metadataPane = new Markdown
         {
             X = Pos.Right(_previewPane),
@@ -299,7 +312,7 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureReadOnlyPane(_logPane, "Base");
 
-        _rightFrame.Add(_previewPane, _metadataPane, _logPane);
+        _rightFrame.Add(_previewPane, _previewRawPane, _metadataPane, _logPane);
 
         _statusLabel = new Label
         {
@@ -322,6 +335,7 @@ public sealed class SkillViewApp
         [
             new Shortcut { Title = "/", HelpText = "Search" },
             new Shortcut { Title = "i", HelpText = "Install" },
+            new Shortcut { Title = "e", HelpText = "Raw/Render" },
             new Shortcut { Title = "I", HelpText = "Installed" },
             new Shortcut { Title = "u", HelpText = "Update" },
             new Shortcut { Title = "c", HelpText = "Cleanup" },
@@ -343,7 +357,7 @@ public sealed class SkillViewApp
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
             queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown,
-            _resultsTable, _previewPane, _metadataPane, _logPane,
+            _resultsTable, _previewPane, _previewRawPane, _metadataPane, _logPane,
             _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
@@ -391,6 +405,11 @@ public sealed class SkillViewApp
         else if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R')
         {
             ToggleRightPane();
+            key.Handled = true;
+        }
+        else if (rune.Value == 'e' || rune.Value == 'E')
+        {
+            TogglePreviewMode();
             key.Handled = true;
         }
         else if (rune.Value == 'd' || rune.Value == 'D')
@@ -525,9 +544,9 @@ public sealed class SkillViewApp
                 UpdateMetadataPane();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
-                if (_previewPane is not null && !_showingLogs)
+                if (!_showingLogs)
                 {
-                    _previewPane.Text = results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint;
+                    SetPreviewText(results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint);
                 }
                 if (_rightFrame is not null)
                 {
@@ -591,12 +610,9 @@ public sealed class SkillViewApp
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
-                if (_previewPane is not null)
-                {
-                    _previewPane.Text = preview.Succeeded
-                        ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
-                        : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}";
-                }
+                SetPreviewText(preview.Succeeded
+                    ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
+                    : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}");
                 if (_rightFrame is not null)
                 {
                     _rightFrame.Title = $"Preview — {repo}/{pick.SkillName}";
@@ -614,10 +630,7 @@ public sealed class SkillViewApp
             _services.Logger.Warn("preview", "preview timed out");
             Invoke(() =>
             {
-                if (_previewPane is not null)
-                {
-                    _previewPane.Text = "(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.";
-                }
+                SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out");
             });
         }
@@ -627,12 +640,9 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             Invoke(() =>
             {
-                if (_previewPane is not null)
-                {
-                    _previewPane.Text = snippet.Length > 0
-                        ? $"(preview failed)\n\n{snippet}"
-                        : "(preview failed)\n\nSee logs for details.";
-                }
+                SetPreviewText(snippet.Length > 0
+                    ? $"(preview failed)\n\n{snippet}"
+                    : "(preview failed)\n\nSee logs for details.");
 
                 SetStatus(snippet.Length > 0
                     ? $"preview failed: {snippet}"
@@ -706,7 +716,7 @@ public sealed class SkillViewApp
         }
 
         var pick = _results[row];
-        _previewPane.Text = $"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}";
+        SetPreviewText($"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}");
     }
 
     /// Render the metadata sidebar for the currently-selected search result.
@@ -764,7 +774,7 @@ public sealed class SkillViewApp
         if (_showingLogs)
         {
             ShowPreviewPane();
-            _previewPane.Text = TuiHelpers.PreviewHint;
+            SetPreviewText(TuiHelpers.PreviewHint);
             _rightFrame.Title = "Preview";
         }
         else
@@ -779,10 +789,28 @@ public sealed class SkillViewApp
         }
     }
 
+    /// Mirror text into both the rendered Markdown pane and the raw
+    /// TextView pane so toggling between them via `e` keeps the same content.
+    private void SetPreviewText(string text)
+    {
+        if (_previewPane is not null) _previewPane.Text = text;
+        if (_previewRawPane is not null) _previewRawPane.Text = text;
+    }
+
+    private void TogglePreviewMode()
+    {
+        if (_previewPane is null || _previewRawPane is null || _showingLogs) return;
+        _showingRawPreview = !_showingRawPreview;
+        _previewPane.Visible = !_showingRawPreview;
+        _previewRawPane.Visible = _showingRawPreview;
+        SetStatus(_showingRawPreview ? "preview: raw SKILL.md" : "preview: rendered");
+    }
+
     private void ShowPreviewPane()
     {
         _showingLogs = false;
-        if (_previewPane is not null) _previewPane.Visible = true;
+        if (_previewPane is not null) _previewPane.Visible = !_showingRawPreview;
+        if (_previewRawPane is not null) _previewRawPane.Visible = _showingRawPreview;
         if (_metadataPane is not null) _metadataPane.Visible = true;
         if (_logPane is not null) _logPane.Visible = false;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
@@ -799,6 +827,7 @@ public sealed class SkillViewApp
     {
         _showingLogs = true;
         if (_previewPane is not null) _previewPane.Visible = false;
+        if (_previewRawPane is not null) _previewRawPane.Visible = false;
         if (_metadataPane is not null) _metadataPane.Visible = false;
         if (_logPane is not null) _logPane.Visible = true;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
