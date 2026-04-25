@@ -22,6 +22,44 @@ internal static class TuiHelpers
         Environment.GetEnvironmentVariable("TERM_PROGRAM")
             ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
 
+    /// Severity of a transient status message. Drives the color of the
+    /// notification bar and is the only thing the caller has to decide.
+    internal enum NotificationLevel
+    {
+        Info,
+        Success,
+        Warn,
+        Error,
+    }
+
+    /// Build a Scheme whose Normal attribute matches the requested
+    /// notification level. Intended for the bottom status bar Label.
+    internal static Scheme CreateStatusScheme(NotificationLevel level)
+    {
+        var (fg, bg) = level switch
+        {
+            NotificationLevel.Success => (StandardColor.Black, StandardColor.Green),
+            NotificationLevel.Warn => (StandardColor.Black, StandardColor.Yellow),
+            NotificationLevel.Error => (StandardColor.White, StandardColor.Red),
+            _ => (StandardColor.White, StandardColor.Black),
+        };
+        var normal = new Attribute(fg, bg);
+        return new Scheme
+        {
+            Normal = normal,
+            HotNormal = normal,
+            Focus = normal,
+            HotFocus = normal,
+            Active = normal,
+            HotActive = normal,
+            Highlight = normal,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = normal,
+            Code = normal,
+        };
+    }
+
     /// Open a URL or local path in the platform's default handler — browser
     /// for http(s) URLs, Explorer/Finder/file-manager for directories.
     /// Returns true on success. Uses ProcessStartInfo with UseShellExecute on

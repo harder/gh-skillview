@@ -522,7 +522,7 @@ public sealed class SkillViewApp
     {
         if (_ghPath is null)
         {
-            SetStatus("cannot search — gh not found");
+            SetStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
             return;
         }
         if (_searching)
@@ -569,7 +569,8 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             SetStatus(snippet.Length > 0
                 ? $"search failed: {snippet}"
-                : "search failed — see logs (l)");
+                : "search failed — see logs (l)",
+                TuiHelpers.NotificationLevel.Error);
         }
         finally
         {
@@ -624,11 +625,17 @@ public sealed class SkillViewApp
                     _rightFrame.Title = $"Preview — {repo}/{pick.SkillName}";
                 }
                 ShowPreviewPane();
-                SetStatus(preview.Succeeded
-                    ? (preview.AssociatedFiles.Length == 0
+                if (preview.Succeeded)
+                {
+                    SetStatus(preview.AssociatedFiles.Length == 0
                         ? "preview loaded"
-                        : $"preview loaded · {preview.AssociatedFiles.Length} file(s)")
-                    : "preview failed — see logs (l)");
+                        : $"preview loaded · {preview.AssociatedFiles.Length} file(s)",
+                        TuiHelpers.NotificationLevel.Success);
+                }
+                else
+                {
+                    SetStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
+                }
             });
         }
         catch (OperationCanceledException)
@@ -637,7 +644,7 @@ public sealed class SkillViewApp
             Invoke(() =>
             {
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
-                SetStatus("preview timed out");
+                SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
             });
         }
         catch (Exception ex)
@@ -652,7 +659,8 @@ public sealed class SkillViewApp
 
                 SetStatus(snippet.Length > 0
                     ? $"preview failed: {snippet}"
-                    : "preview failed — see logs (l)");
+                    : "preview failed — see logs (l)",
+                    TuiHelpers.NotificationLevel.Error);
             });
         }
         finally
@@ -880,11 +888,11 @@ public sealed class SkillViewApp
         var url = $"https://github.com/{pick.Repo}";
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
-            SetStatus($"opened {url}");
+            SetStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
         }
         else
         {
-            SetStatus("open failed — see logs (l)");
+            SetStatus("open failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
             _services.Logger.Warn("open", $"failed to open {url}");
         }
     }
@@ -930,7 +938,7 @@ public sealed class SkillViewApp
         installScreen.Show();
         if (installScreen.LastResult is { Succeeded: true } result)
         {
-            SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…");
+            SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…", TuiHelpers.NotificationLevel.Success);
             RunBackground(async () =>
             {
                 var report = _lastReport;
@@ -943,12 +951,12 @@ public sealed class SkillViewApp
                         AllowHiddenDirs: false)
                 ).ConfigureAwait(false);
                 Invoke(() =>
-                    SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)"));
+                    SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
             }, "rescan");
         }
         else if (installScreen.LastResult is { } failed)
         {
-            SetStatus($"install failed (exit {failed.ExitCode}) — see logs (l)");
+            SetStatus($"install failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
         }
     }
 
@@ -985,7 +993,7 @@ public sealed class SkillViewApp
                 screen.Show();
                 if (screen.LastResult is { DryRun: false, Succeeded: true })
                 {
-                    SetStatus("update succeeded — rescanning…");
+                    SetStatus("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
                     RunBackground(async () =>
                     {
                         var post = await _services.InventoryService.CaptureAsync(
@@ -996,12 +1004,12 @@ public sealed class SkillViewApp
                                 AllowHiddenDirs: false)
                         ).ConfigureAwait(false);
                         Invoke(() =>
-                            SetStatus($"updated — inventory now {post.Skills.Length} skill(s)"));
+                            SetStatus($"updated — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
                     }, "rescan");
                 }
                 else if (screen.LastResult is { Succeeded: false } failed)
                 {
-                    SetStatus($"update failed (exit {failed.ExitCode}) — see logs (l)");
+                    SetStatus($"update failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
                 }
             });
         }, "update");
@@ -1039,7 +1047,7 @@ public sealed class SkillViewApp
         screen.Show();
         if (screen.LastReport is { Succeeded: true } report)
         {
-            SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…");
+            SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…", TuiHelpers.NotificationLevel.Success);
             RunBackground(async () =>
             {
                 var report2 = _lastReport;
@@ -1052,7 +1060,7 @@ public sealed class SkillViewApp
                         AllowHiddenDirs: false)
                 ).ConfigureAwait(false);
                 Invoke(() =>
-                    SetStatus($"removed — inventory now {post.Skills.Length} skill(s)"));
+                    SetStatus($"removed — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
             }, "rescan");
         }
     }
@@ -1119,11 +1127,15 @@ public sealed class SkillViewApp
         });
     }
 
-    private void SetStatus(string text) => Invoke(() =>
+    private void SetStatus(string text) => SetStatus(text, TuiHelpers.NotificationLevel.Info);
+
+    private void SetStatus(string text, TuiHelpers.NotificationLevel level) => Invoke(() =>
     {
         if (_statusLabel is not null)
         {
             _statusLabel.Text = $" {text}";
+            _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(level));
+            _statusLabel.SetNeedsDraw();
         }
         ScheduleStatusAutoClear();
     });
@@ -1137,6 +1149,8 @@ public sealed class SkillViewApp
         if (_statusLabel is not null)
         {
             _statusLabel.Text = _defaultStatus;
+            _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+            _statusLabel.SetNeedsDraw();
         }
         CancelStatusAutoClear();
     });
@@ -1151,6 +1165,8 @@ public sealed class SkillViewApp
             if (_statusLabel is not null)
             {
                 _statusLabel.Text = _defaultStatus;
+                _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+                _statusLabel.SetNeedsDraw();
             }
             return false;
         });
@@ -1215,7 +1231,8 @@ public sealed class SkillViewApp
                     var snippet = TuiHelpers.ErrorSnippet(ex.Message);
                     SetStatus(snippet.Length > 0
                         ? $"{operation} failed: {snippet}"
-                        : $"{operation} failed — see logs (l)");
+                        : $"{operation} failed — see logs (l)",
+                        TuiHelpers.NotificationLevel.Error);
                 });
             }
         });
