@@ -48,13 +48,49 @@ public sealed class RemoveScreen
             Height = Dim.Fill(),
         };
 
+        // Picker: "All agents" + one row per AgentMembership. With 0 agents
+        // the picker degenerates to just "All", so skip the radio entirely.
+        var pickerLabels = new List<string> { "_All agents (full skill removal)" };
+        foreach (var a in _target.Agents)
+        {
+            var kind = a.IsSymlink ? "symlink" : "direct ⚠ canonical";
+            pickerLabels.Add($"{a.AgentId} — {kind}: {TuiHelpers.Truncate(a.Path, 48)}");
+        }
+        var hasAgentChoice = _target.Agents.Length > 0;
+        var pickerRows = hasAgentChoice ? pickerLabels.Count + 1 /* label */ : 0;
+        var bottomReserve = 4 + pickerRows;
+
         var summary = new Markdown
         {
             X = 0, Y = 0,
-            Width = Dim.Fill(), Height = Dim.Fill(4),
+            Width = Dim.Fill(), Height = Dim.Fill(bottomReserve),
             Text = BuildSummary(),
         };
         TuiHelpers.ConfigureMarkdownPane(summary, "Base");
+
+        Label? pickerLabel = null;
+        OptionSelector? agentPicker = null;
+        // Track the picker's selected index ourselves; OptionSelector exposes
+        // `Value` as the label string, and 1–9/a keys need to drive selection.
+        var selectedAgent = 0;
+        if (hasAgentChoice)
+        {
+            pickerLabel = new Label
+            {
+                X = 0, Y = Pos.AnchorEnd(pickerRows + 3),
+                Text = "Remove from (1-9 / a):",
+            };
+            agentPicker = new OptionSelector
+            {
+                X = 0, Y = Pos.AnchorEnd(pickerRows + 2),
+                Labels = pickerLabels,
+                Value = 0,
+            };
+            agentPicker.ValueChanged += (_, _) =>
+            {
+                if (agentPicker.Value is int idx) selectedAgent = idx;
+            };
+        }
 
         var secondConfirm = new CheckBox
         {
@@ -85,18 +121,36 @@ public sealed class RemoveScreen
             IsDefault = true,
         };
 
-        var statusBar = new StatusBar(
-        [
-            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
-        ]);
+        var statusBar = hasAgentChoice
+            ? new StatusBar(
+            [
+                new Shortcut { Title = "a", HelpText = "All" },
+                new Shortcut { Title = "1-9", HelpText = "Pick agent" },
+                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
+            ])
+            : new StatusBar(
+            [
+                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
+            ]);
 
         TuiHelpers.ApplyScheme("Base", window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
+        if (pickerLabel is not null) TuiHelpers.ApplyScheme("Base", pickerLabel);
+        if (agentPicker is not null) TuiHelpers.ApplyScheme("Base", agentPicker);
 
         removeButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            if (!_validation.Allowed) return;
-            if (_validation.RequiresSecondConfirm && secondConfirm.Value != CheckState.Checked)
+            var pick = selectedAgent;
+            // Per-agent symlink removal doesn't trigger the canonical
+            // validator's safety rules (those guard the canonical path).
+            // Direct memberships fall back to the canonical removal flow,
+            // which means they DO need _validation.Allowed.
+            var perAgent = pick > 0 && pick - 1 < _target.Agents.Length
+                ? _target.Agents[pick - 1]
+                : (AgentMembership?)null;
+            var canonicalPath = perAgent is null || !perAgent.IsSymlink;
+            if (canonicalPath && !_validation.Allowed) return;
+            if (canonicalPath && _validation.RequiresSecondConfirm && secondConfirm.Value != CheckState.Checked)
             {
                 status.Text = " second-confirm required (check the box)";
                 return;
@@ -105,6 +159,21 @@ public sealed class RemoveScreen
             status.Text = " removing…";
             try
             {
+                if (perAgent is { IsSymlink: true } symlinkAgent)
+                {
+                    System.IO.File.Delete(symlinkAgent.Path);
+                    _logger.Info("remove.agent", $"unlinked {symlinkAgent.AgentId}: {symlinkAgent.Path}");
+                    status.Text = $" unlinked {symlinkAgent.AgentId} ({symlinkAgent.Path})";
+                    LastReport = new RemoveService.RemoveReport(
+                        Succeeded: true,
+                        ResolvedPath: symlinkAgent.Path,
+                        FilesDeleted: 1,
+                        DirectoriesDeleted: 0,
+                        Errors: System.Collections.Immutable.ImmutableArray<string>.Empty,
+                        DryRun: false);
+                    _app.RequestStop();
+                    return;
+                }
                 var report = _remove.Remove(_validation);
                 LastReport = report;
                 if (report.Succeeded)
@@ -130,12 +199,33 @@ public sealed class RemoveScreen
         };
 
         window.Add(summary, secondConfirm, status, removeButton, cancelButton, statusBar);
+        if (pickerLabel is not null) window.Add(pickerLabel);
+        if (agentPicker is not null) window.Add(agentPicker);
         window.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Esc)
             {
                 _app.RequestStop();
                 key.Handled = true;
+                return;
+            }
+            if (agentPicker is null) return;
+            var rune = key.AsRune.Value;
+            if (rune == 'a' || rune == 'A')
+            {
+                selectedAgent = 0;
+                agentPicker.Value = 0;
+                key.Handled = true;
+            }
+            else if (rune >= '1' && rune <= '9')
+            {
+                var idx = rune - '0'; // 1-based agent index
+                if (idx <= _target.Agents.Length)
+                {
+                    selectedAgent = idx;
+                    agentPicker.Value = idx;
+                    key.Handled = true;
+                }
             }
         };
         cancelButton.SetFocus();
