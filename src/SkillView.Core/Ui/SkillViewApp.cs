@@ -271,12 +271,17 @@ public sealed class SkillViewApp
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
+        // Right pane stacks vertically: preview on top, a 6-line metadata
+        // strip pinned to the bottom. Stacking keeps the metadata readable
+        // at any terminal width — the prior 70/30 horizontal split rendered
+        // the sidebar at ~15% of the screen and wrapped URLs mid-token.
+        const int MetadataHeight = 6;
         _previewPane = new Markdown
         {
             X = 0,
             Y = 0,
-            Width = Dim.Percent(70),
-            Height = Dim.Fill(),
+            Width = Dim.Fill(),
+            Height = Dim.Fill(MetadataHeight),
             Text = TuiHelpers.WelcomeHint,
         };
         TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
@@ -285,8 +290,8 @@ public sealed class SkillViewApp
         {
             X = 0,
             Y = 0,
-            Width = Dim.Percent(70),
-            Height = Dim.Fill(),
+            Width = Dim.Fill(),
+            Height = Dim.Fill(MetadataHeight),
             Text = TuiHelpers.WelcomeHint,
             Visible = false,
         };
@@ -294,10 +299,10 @@ public sealed class SkillViewApp
 
         _metadataPane = new Markdown
         {
-            X = Pos.Right(_previewPane),
-            Y = 0,
+            X = 0,
+            Y = Pos.AnchorEnd(MetadataHeight),
             Width = Dim.Fill(),
-            Height = Dim.Fill(),
+            Height = MetadataHeight,
             Text = "_(no selection)_",
         };
         TuiHelpers.ConfigureMarkdownPane(_metadataPane, "Base");
@@ -751,30 +756,22 @@ public sealed class SkillViewApp
 
     private static string RenderSearchMetadata(SearchResultSkill s)
     {
+        // Bottom strip is 6 lines tall; pack key fields onto one line each
+        // and avoid Markdown headings (the TG2 renderer expands `# X` to
+        // two lines, blowing the budget).
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"## {s.SkillName ?? "(unnamed)"}");
-        sb.AppendLine();
-        sb.AppendLine($"**repo**: `{s.Repo ?? "—"}`  ");
-        if (s.Stars is { } stars) sb.AppendLine($"**stars**: ★ {stars.ToString(CultureInfo.InvariantCulture)}  ");
+        var stars = s.Stars is { } st ? $"  ★ {st.ToString(CultureInfo.InvariantCulture)}" : string.Empty;
+        sb.AppendLine($"**{s.SkillName ?? "(unnamed)"}**  ·  `{s.Repo ?? "—"}`{stars}");
         if (!string.IsNullOrWhiteSpace(s.Repo))
-        {
-            sb.AppendLine($"**url**: https://github.com/{s.Repo}  ");
-        }
-        if (!string.IsNullOrWhiteSpace(s.Namespace))
-            sb.AppendLine($"**namespace**: `{s.Namespace}`  ");
-        if (!string.IsNullOrWhiteSpace(s.Path))
-            sb.AppendLine($"**path**: `{s.Path}`  ");
+            sb.AppendLine($"https://github.com/{s.Repo}");
+        var locParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(s.Namespace)) locParts.Add($"ns `{s.Namespace}`");
+        if (!string.IsNullOrWhiteSpace(s.Path)) locParts.Add($"path `{s.Path}`");
+        if (locParts.Count > 0) sb.AppendLine(string.Join("  ·  ", locParts));
         if (!string.IsNullOrWhiteSpace(s.Description))
-        {
-            sb.AppendLine();
-            sb.AppendLine("### Description");
-            sb.AppendLine();
             sb.AppendLine(s.Description);
-        }
         sb.AppendLine();
-        sb.AppendLine("---");
-        sb.AppendLine();
-        sb.AppendLine("_Press **i** to install._");
+        sb.AppendLine("_press **i** to install · **o** to open · **e** raw/render_");
         return sb.ToString();
     }
 
