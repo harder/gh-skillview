@@ -164,7 +164,9 @@ public sealed class SearchScreen
         var statusBar = new StatusBar(
         [
             new Shortcut { Title = "/", HelpText = "Query" },
-            new Shortcut { Title = "Enter", HelpText = "Preview" },
+            TuiHelpers.IsWarpTerminal
+                ? new Shortcut { Title = "Ctrl+J", HelpText = "Preview" }
+                : new Shortcut { Title = "Enter", HelpText = "Preview" },
             new Shortcut { Title = "i", HelpText = "Install" },
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
             new Shortcut { Title = "q", HelpText = "Quit" },

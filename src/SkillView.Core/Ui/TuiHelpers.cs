@@ -127,10 +127,13 @@ internal static class TuiHelpers
     }
 
     /// Key bindings help text for the main window, shared between the
-    /// welcome message and the F1 help dialog.
-    internal const string HelpText =
+    /// welcome message and the F1 help dialog. The preview-key list adapts
+    /// to Warp (which intercepts Enter) by promoting Ctrl+J + p/v.
+    internal static string HelpText { get; } =
         "/  focus the search box\n" +
-        "Enter, →, p, v  preview when results are focused\n" +
+        (IsWarpTerminal
+            ? "Ctrl+J, →, p, v  preview when results are focused\n"
+            : "Enter, →, p, v  preview when results are focused\n") +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
         "I  show installed skills\n" +
@@ -141,12 +144,15 @@ internal static class TuiHelpers
         "F1 show this help\n" +
         "q  quit";
 
-    /// Compact single-line hint shown in the welcome/preview pane.
-    internal const string WelcomeHint =
-        "/ search · →/p/v preview · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
+    /// Compact single-line hint shown in the welcome/preview pane. Same
+    /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
+    internal static string WelcomeHint { get; } =
+        (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
+        + " · l logs · d doctor · I installed · s advanced search · u update · c cleanup · F1 help · q quit";
 
-    internal const string PreviewHint =
-        "Select a result and press Enter, →, p, or v to preview.\n\nTip: In Warp terminal, use Ctrl+J instead of Enter.";
+    internal static string PreviewHint { get; } = IsWarpTerminal
+        ? "Select a result and press Ctrl+J, p, or v to preview."
+        : "Select a result and press Enter, →, p, or v to preview.";
 
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
