@@ -9,9 +9,16 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Phase 4 install dialog. Picks up where `SearchScreen` left off: consumes
-/// an `InstallRequest` (repo + skill + repo-path) and runs `gh skill install`
-/// with the flags the user has chosen.
+/// Request to install a skill from a search result. Carries the
+/// minimum a user has selected in the results table: repo, optional
+/// skill name within the repo, and an optional repo-relative path
+/// (when the search produced a directory hit rather than a top-level
+/// repo). `InstallScreen` picks the rest of the flags interactively.
+public sealed record InstallRequest(string Repo, string? SkillName, string? RepoPath);
+
+/// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill +
+/// repo-path) and runs `gh skill install` with the flags the user has
+/// chosen.
 ///
 /// Capability-gated fields (`--repo-path`, `--upstream`, `--allow-hidden-dirs`,
 /// `--from-local`) are hidden or disabled when the probe hasn't confirmed

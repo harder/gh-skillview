@@ -25,6 +25,8 @@ public sealed class SkillViewApp
 
     private IApplication? _app;
     private TextField? _queryField;
+    private TextField? _ownerField;
+    private NumericUpDown<int>? _limitUpDown;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
     private TextView? _logPane;
@@ -109,15 +111,11 @@ public sealed class SkillViewApp
                         _services.Logger.Info("preview", "App.KeyDown Enter → calling PreviewSelectedAsync");
                         _ = PreviewSelectedAsync();
                     }
-                    else if (!key.Handled && _queryField?.HasFocus == true)
+                    else if (!key.Handled && (_queryField?.HasFocus == true || _ownerField?.HasFocus == true || _limitUpDown?.HasFocus == true))
                     {
                         key.Handled = true;
-                        var query = _queryField.Text.Trim();
-                        if (!string.IsNullOrEmpty(query))
-                        {
-                            _services.Logger.Info("search", $"App.KeyDown Enter → RunSearchAsync({query})");
-                            _ = RunSearchAsync(query);
-                        }
+                        _services.Logger.Info("search", "App.KeyDown Enter → SubmitSearch");
+                        SubmitSearch();
                     }
                 }
 
@@ -189,10 +187,30 @@ public sealed class SkillViewApp
         _queryField.KeyDown += OnQueryFieldKey;
         TuiHelpers.ConfigureTextInput(_queryField, "Base");
 
+        var ownerLabel = new Label { Text = "Owner:", X = 0, Y = 1 };
+        _ownerField = new TextField
+        {
+            X = 8, Y = 1, Width = 22, Text = string.Empty,
+        };
+        TuiHelpers.ConfigureTextInput(_ownerField, "Base");
+        _ownerField.KeyDown += OnFilterFieldKey;
+
+        var limitLabel = new Label { Text = "Limit:", X = 32, Y = 1 };
+        _limitUpDown = new NumericUpDown<int>
+        {
+            X = 39, Y = 1,
+            Value = GhSkillSearchService.DefaultLimit,
+            Increment = 10,
+        };
+        _limitUpDown.ValueChanging += (_, e) =>
+        {
+            if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
+        };
+
         _resultsTable = new TableView
         {
             X = 0,
-            Y = 2,
+            Y = 3,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             FullRowSelect = true,
@@ -236,7 +254,7 @@ public sealed class SkillViewApp
             }
         };
 
-        _leftFrame.Add(queryLabel, _queryField, _resultsTable);
+        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _resultsTable);
 
         _rightFrame = new FrameView
         {
@@ -288,11 +306,11 @@ public sealed class SkillViewApp
         _statusBarPreview = new StatusBar(
         [
             new Shortcut { Title = "/", HelpText = "Search" },
-            new Shortcut { Title = "d", HelpText = "Doctor" },
+            new Shortcut { Title = "i", HelpText = "Install" },
             new Shortcut { Title = "I", HelpText = "Installed" },
-            new Shortcut { Title = "s", HelpText = "Search+" },
             new Shortcut { Title = "u", HelpText = "Update" },
             new Shortcut { Title = "c", HelpText = "Cleanup" },
+            new Shortcut { Title = "d", HelpText = "Doctor" },
             new Shortcut { Title = "l", HelpText = "Logs" },
             new Shortcut { Key = Key.F1, Title = "Help" },
             new Shortcut { Title = "q", HelpText = "Quit" },
@@ -309,7 +327,8 @@ public sealed class SkillViewApp
 
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, _resultsTable, _previewPane, _logPane,
+            queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown,
+            _resultsTable, _previewPane, _logPane,
             _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
@@ -332,8 +351,8 @@ public sealed class SkillViewApp
         {
             return;
         }
-        // Don't intercept plain-letter typing while the query field is focused.
-        if (_queryField is not null && _queryField.HasFocus)
+        // Don't intercept plain-letter typing while a text input is focused.
+        if (_queryField?.HasFocus == true || _ownerField?.HasFocus == true || _limitUpDown?.HasFocus == true)
         {
             return;
         }
@@ -369,9 +388,9 @@ public sealed class SkillViewApp
             ShowInstalled();
             key.Handled = true;
         }
-        else if (rune.Value == 's' || rune.Value == 'S')
+        else if (rune.Value == 'i')
         {
-            ShowSearchScreen();
+            StageInstall();
             key.Handled = true;
         }
         else if (rune.Value == 'u' || rune.Value == 'U')
@@ -402,17 +421,34 @@ public sealed class SkillViewApp
         if (isSubmit)
         {
             key.Handled = true;
-            var query = _queryField?.Text.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(query))
-            {
-                _ = RunSearchAsync(query);
-            }
+            SubmitSearch();
         }
         else if (key.KeyCode == KeyCode.Esc)
         {
             key.Handled = true;
             _resultsTable?.SetFocus();
         }
+    }
+
+    /// Submit a search using the current Query/Owner/Limit fields.
+    private void OnFilterFieldKey(object? sender, Key key)
+    {
+        var isSubmit = key.KeyCode == KeyCode.Enter
+            || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask);
+        if (isSubmit)
+        {
+            key.Handled = true;
+            SubmitSearch();
+        }
+    }
+
+    private void SubmitSearch()
+    {
+        var query = _queryField?.Text.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(query)) return;
+        var owner = _ownerField?.Text.Trim();
+        var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
+        _ = RunSearchAsync(query, string.IsNullOrEmpty(owner) ? null : owner, limit);
     }
 
     private void ProbeGhAsync()
@@ -442,7 +478,7 @@ public sealed class SkillViewApp
         }, "probe");
     }
 
-    private async Task RunSearchAsync(string query)
+    private async Task RunSearchAsync(string query, string? owner = null, int? limit = null)
     {
         if (_ghPath is null)
         {
@@ -459,9 +495,14 @@ public sealed class SkillViewApp
         SetBusy($"searching {query}…");
         try
         {
-            var results = await _services.SearchService
-                .SearchAsync(_ghPath, query)
+            var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
+            var options = new GhSkillSearchService.Options(
+                Owner: owner,
+                Limit: limit ?? GhSkillSearchService.DefaultLimit);
+            var response = await _services.SearchService
+                .SearchAsync(_ghPath, query, capabilities, options)
                 .ConfigureAwait(false);
+            var results = response.Results;
             Invoke(() =>
             {
                 _results = results.ToList();
@@ -717,26 +758,32 @@ public sealed class SkillViewApp
             "OK");
     }
 
-    private void ShowSearchScreen()
+    /// Stage an install of the currently-selected search result. Bound to
+    /// `i` on the main view; the actual `gh skill install` invocation runs
+    /// in `OpenInstallDialog`.
+    private void StageInstall()
     {
-        if (_app is null) return;
-        if (_ghPath is null || _lastReport is null)
+        if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("gh not ready — press 'd' for Doctor");
+            SetStatus("no results to install");
             return;
         }
-        var screen = new SearchScreen(
-            _app,
-            _services.SearchService,
-            _services.PreviewService,
-            _services.Logger,
-            _ghPath,
-            _lastReport.Capabilities);
-        screen.Show();
-        if (screen.LastInstallRequest is { } req)
+        var row = _resultsTable.SelectedRow;
+        if (row < 0 || row >= _results.Count)
         {
-            OpenInstallDialog(req);
+            SetStatus("no result selected");
+            return;
         }
+        var pick = _results[row];
+        if (string.IsNullOrEmpty(pick.Repo))
+        {
+            SetStatus("no repo on selected row");
+            return;
+        }
+        OpenInstallDialog(new InstallRequest(
+            Repo: pick.Repo,
+            SkillName: pick.SkillName,
+            RepoPath: pick.Path));
     }
 
     private void OpenInstallDialog(InstallRequest request)
