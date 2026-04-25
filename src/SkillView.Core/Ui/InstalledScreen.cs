@@ -27,16 +27,44 @@ public static class InstalledScreen
             Height = Dim.Fill(),
         };
 
+        var filterLabel = new Label { Text = "Filter:", X = 0, Y = 0 };
+        var filterField = new TextField
+        {
+            X = 8, Y = 0,
+            Width = Dim.Percent(60) - 8,
+            Text = string.Empty,
+        };
+        TuiHelpers.ConfigureTextInput(filterField, "Base");
+
         var table = new TableView
         {
             X = 0,
-            Y = 0,
+            Y = 2,
             Width = Dim.Percent(60),
             Height = Dim.Fill(2),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
-        var rows = snapshot.Skills;
+        var allRows = snapshot.Skills;
+        IReadOnlyList<InstalledSkill> rows = allRows;
+
+        void ApplyFilter()
+        {
+            var q = filterField.Text.Trim();
+            if (q.Length == 0)
+            {
+                rows = allRows;
+            }
+            else
+            {
+                var cmp = StringComparison.OrdinalIgnoreCase;
+                rows = allRows.Where(s =>
+                    s.Name.Contains(q, cmp)
+                    || s.ResolvedPath.Contains(q, cmp)
+                    || s.Agents.Any(a => a.AgentId.Contains(q, cmp))
+                ).ToArray();
+            }
+        }
 
         void RebuildSource()
         {
@@ -75,7 +103,7 @@ public static class InstalledScreen
                     case "Agents": cs.MinWidth = 6; break;
                 }
             }
-            if (prevRow >= 0 && prevRow < rows.Length) table.SelectedRow = prevRow;
+            if (prevRow >= 0 && prevRow < rows.Count) table.SelectedRow = prevRow;
             table.Update();
         }
 
@@ -94,17 +122,17 @@ public static class InstalledScreen
         var detail = new Markdown
         {
             X = Pos.Right(table),
-            Y = 0,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
-            Text = rows.Length == 0 ? "(no skills found)" : RenderDetail(rows[0]),
+            Text = rows.Count == 0 ? "(no skills found)" : RenderDetail(rows[0]),
         };
         TuiHelpers.ConfigureMarkdownPane(detail, "Base");
 
         table.SelectedCellChanged += (_, _) =>
         {
             var row = table.SelectedRow;
-            if (row >= 0 && row < rows.Length)
+            if (row >= 0 && row < rows.Count)
             {
                 detail.Text = RenderDetail(rows[row]);
             }
@@ -115,46 +143,76 @@ public static class InstalledScreen
             X = 0,
             Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
-            Text = $" {rows.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
-                   (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only"),
+            Text = BuildFooter(rows.Count, allRows.Length, snapshot),
+        };
+
+        void RefreshFooter() => footer.Text = BuildFooter(rows.Count, allRows.Length, snapshot);
+
+        filterField.TextChanged += (_, _) =>
+        {
+            ApplyFilter();
+            RebuildSource();
+            RefreshFooter();
+            detail.Text = rows.Count == 0
+                ? "(no matches)"
+                : RenderDetail(rows[Math.Clamp(table.SelectedRow, 0, rows.Count - 1)]);
         };
 
         var statusBar = new StatusBar(onRemove is null
             ? new[]
             {
+                new Shortcut { Title = "/", HelpText = "Filter" },
                 new Shortcut { Title = "o", HelpText = "Open" },
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
                 new Shortcut { Title = "q", HelpText = "Quit" },
             }
             : new[]
             {
+                new Shortcut { Title = "/", HelpText = "Filter" },
                 new Shortcut { Title = "x", HelpText = "Remove" },
                 new Shortcut { Title = "o", HelpText = "Open" },
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
                 new Shortcut { Title = "q", HelpText = "Quit" },
             });
 
-        TuiHelpers.ApplyScheme("Base", window, table, detail, footer, statusBar);
+        TuiHelpers.ApplyScheme("Base", window, filterLabel, filterField, table, detail, footer, statusBar);
 
-        window.Add(table, detail, footer, statusBar);
+        window.Add(filterLabel, filterField, table, detail, footer, statusBar);
         window.KeyDown += (_, key) =>
         {
+            // Don't intercept letter shortcuts while the filter field has focus.
+            if (filterField.HasFocus)
+            {
+                if (key.KeyCode == KeyCode.Esc)
+                {
+                    table.SetFocus();
+                    key.Handled = true;
+                }
+                return;
+            }
             if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
             {
                 app.RequestStop();
                 key.Handled = true;
                 return;
             }
+            if (key.AsRune.Value == '/')
+            {
+                filterField.SetFocus();
+                filterField.SelectAll();
+                key.Handled = true;
+                return;
+            }
             if ((key.AsRune.Value == 'x' || key.AsRune.Value == 'X') && onRemove is not null)
             {
                 var i = table.SelectedRow;
-                if (i >= 0 && i < rows.Length) onRemove(rows[i]);
+                if (i >= 0 && i < rows.Count) onRemove(rows[i]);
                 key.Handled = true;
             }
             else if (key.AsRune.Value == 'o' || key.AsRune.Value == 'O')
             {
                 var i = table.SelectedRow;
-                if (i >= 0 && i < rows.Length)
+                if (i >= 0 && i < rows.Count)
                 {
                     TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
                 }
@@ -163,6 +221,14 @@ public static class InstalledScreen
         };
 
         app.Run(window);
+    }
+
+    private static string BuildFooter(int shown, int total, InventorySnapshot snapshot)
+    {
+        var counts = shown == total
+            ? $" {total} skill(s) across {snapshot.ScannedRoots.Length} root(s)"
+            : $" {shown} of {total} skill(s) (filtered) · {snapshot.ScannedRoots.Length} root(s)";
+        return counts + (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only");
     }
 
     internal static string RenderDetail(InstalledSkill s)
