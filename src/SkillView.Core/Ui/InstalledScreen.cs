@@ -122,12 +122,14 @@ public static class InstalledScreen
         var statusBar = new StatusBar(onRemove is null
             ? new[]
             {
+                new Shortcut { Title = "o", HelpText = "Open" },
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
                 new Shortcut { Title = "q", HelpText = "Quit" },
             }
             : new[]
             {
                 new Shortcut { Title = "x", HelpText = "Remove" },
+                new Shortcut { Title = "o", HelpText = "Open" },
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
                 new Shortcut { Title = "q", HelpText = "Quit" },
             });
@@ -147,6 +149,15 @@ public static class InstalledScreen
             {
                 var i = table.SelectedRow;
                 if (i >= 0 && i < rows.Length) onRemove(rows[i]);
+                key.Handled = true;
+            }
+            else if (key.AsRune.Value == 'o' || key.AsRune.Value == 'O')
+            {
+                var i = table.SelectedRow;
+                if (i >= 0 && i < rows.Length)
+                {
+                    TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
+                }
                 key.Handled = true;
             }
         };

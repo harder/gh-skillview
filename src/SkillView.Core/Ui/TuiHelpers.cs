@@ -21,6 +21,40 @@ internal static class TuiHelpers
     internal static bool IsWarpTerminal { get; } =
         Environment.GetEnvironmentVariable("TERM_PROGRAM")
             ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// Open a URL or local path in the platform's default handler — browser
+    /// for http(s) URLs, Explorer/Finder/file-manager for directories.
+    /// Returns true on success. Uses ProcessStartInfo with UseShellExecute on
+    /// Windows; falls back to `xdg-open` on Linux and `open` on macOS so the
+    /// AOT-published binary doesn't pull in shell-execute machinery it can't
+    /// use on Unix.
+    internal static bool OpenInDefaultHandler(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return false;
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target)
+                {
+                    UseShellExecute = true,
+                });
+                return true;
+            }
+            var opener = OperatingSystem.IsMacOS() ? "open" : "xdg-open";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = opener,
+                ArgumentList = { target },
+                UseShellExecute = false,
+            });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
     /// Truncate text to `maxLen` characters, appending "…" if it was clipped.
     internal static string Truncate(string? text, int maxLen)
     {
@@ -135,6 +169,7 @@ internal static class TuiHelpers
             ? "Ctrl+J, →, p, v  preview when results are focused\n"
             : "Enter, →, p, v  preview when results are focused\n") +
         "i  install the selected search result\n" +
+        "o  open the skill (GitHub URL or local folder)\n" +
         "e  toggle raw / rendered SKILL.md preview\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
@@ -149,7 +184,7 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · i install · e raw/render · l logs · d doctor · I installed · u update · c cleanup · F1 help · q quit";
+        + " · i install · o open · e raw/render · l logs · d doctor · I installed · u update · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
         ? "Select a result and press Ctrl+J, p, or v to preview."

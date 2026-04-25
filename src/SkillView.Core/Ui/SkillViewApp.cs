@@ -335,6 +335,7 @@ public sealed class SkillViewApp
         [
             new Shortcut { Title = "/", HelpText = "Search" },
             new Shortcut { Title = "i", HelpText = "Install" },
+            new Shortcut { Title = "o", HelpText = "Open" },
             new Shortcut { Title = "e", HelpText = "Raw/Render" },
             new Shortcut { Title = "I", HelpText = "Installed" },
             new Shortcut { Title = "u", HelpText = "Update" },
@@ -425,6 +426,11 @@ public sealed class SkillViewApp
         else if (rune.Value == 'i')
         {
             StageInstall();
+            key.Handled = true;
+        }
+        else if (rune.Value == 'o' || rune.Value == 'O')
+        {
+            OpenSelected();
             key.Handled = true;
         }
         else if (rune.Value == 'u' || rune.Value == 'U')
@@ -848,6 +854,39 @@ public sealed class SkillViewApp
             "SkillView — keys",
             TuiHelpers.HelpText,
             "OK");
+    }
+
+    /// Open the GitHub page for the selected search result in the system
+    /// browser. Bound to `o` on the main view.
+    private void OpenSelected()
+    {
+        if (_resultsTable is null || _results.Count == 0)
+        {
+            SetStatus("no result to open");
+            return;
+        }
+        var row = _resultsTable.SelectedRow;
+        if (row < 0 || row >= _results.Count)
+        {
+            SetStatus("no result selected");
+            return;
+        }
+        var pick = _results[row];
+        if (string.IsNullOrEmpty(pick.Repo))
+        {
+            SetStatus("no repo on selected row");
+            return;
+        }
+        var url = $"https://github.com/{pick.Repo}";
+        if (TuiHelpers.OpenInDefaultHandler(url))
+        {
+            SetStatus($"opened {url}");
+        }
+        else
+        {
+            SetStatus("open failed — see logs (l)");
+            _services.Logger.Warn("open", $"failed to open {url}");
+        }
     }
 
     /// Stage an install of the currently-selected search result. Bound to
