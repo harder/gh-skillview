@@ -58,7 +58,6 @@ public sealed class CleanupScreen
             Text = "Space toggles row.",
         };
 
-        var checkStates = new bool[_candidates.Length];
         var table = new TableView
         {
             X = 0, Y = 1,
@@ -68,42 +67,47 @@ public sealed class CleanupScreen
         };
         TuiHelpers.DisableTypeToSearch(table);
 
+        // Width state shared between the column-projection lambdas and the
+        // resize handler. Mutating these does not require rebuilding the
+        // table source; the closures re-read on every render.
+        var widths = new ColumnWidths { Name = 12, Path = 15 };
         var rowsList = _candidates.Select((c, i) => (i, c)).ToList();
-        void RebuildCleanupSource()
+        var inner = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
+            rowsList,
+            new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
+            {
+                ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
+                ["Name"] = row => TuiHelpers.Truncate(
+                    row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
+                    widths.Name),
+                ["Path"] = row => TuiHelpers.Truncate(TuiHelpers.ShortenPath(row.C.Path), widths.Path),
+            });
+        // RC5's CheckBoxTableSourceWrapperByIndex inserts the checkbox column,
+        // hooks Space-to-toggle and click-to-toggle on the table, and tracks
+        // checked rows in a HashSet<int> we can read directly. Replaces the
+        // old manual `bool[] checkStates` + " " column + Space KeyDown handler.
+        var wrapper = new CheckBoxTableSourceWrapperByIndex(table, inner);
+        table.Table = wrapper;
+        var style = table.Style;
+        style.ExpandLastColumn = true;
+        // Wrapper inserts " " at column 0, so Name is column 2, Path column 3.
+        var nameStyle = style.GetOrCreateColumnStyle(2);
+        nameStyle.MinWidth = 8;
+        var pathStyle = style.GetOrCreateColumnStyle(3);
+        pathStyle.MinWidth = 10;
+
+        void Recompute()
         {
-            var prevRow = table.SelectedRow;
             var viewportWidth = table.Viewport.Width;
             var available = viewportWidth > 0 ? Math.Max(40, viewportWidth - 4) : 70;
             // Fixed: checkbox(1) + Kind(11). Remainder split Name (35%) / Path (65%).
             var remaining = Math.Max(20, available - 1 - 11);
-            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.35));
-            var pathW = Math.Max(15, remaining - nameW);
-            table.Table = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
-                rowsList,
-                new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
-                {
-                    [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                    ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
-                    ["Name"] = row => TuiHelpers.Truncate(
-                        row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
-                        nameW),
-                    ["Path"] = row => TuiHelpers.Truncate(TuiHelpers.ShortenPath(row.C.Path), pathW),
-                });
-            var style = table.Style;
-            style.ExpandLastColumn = true;
-            for (var i = 0; i < table.Table.Columns; i++)
-            {
-                var cs = style.GetOrCreateColumnStyle(i);
-                switch (table.Table.ColumnNames[i])
-                {
-                    case "Name": cs.MinWidth = 8; cs.MaxWidth = nameW; break;
-                    case "Path": cs.MinWidth = 10; break;
-                }
-            }
-            if (prevRow >= 0 && prevRow < rowsList.Count) table.SelectedRow = prevRow;
+            widths.Name = Math.Max(12, (int)Math.Round(remaining * 0.35));
+            widths.Path = Math.Max(15, remaining - widths.Name);
+            nameStyle.MaxWidth = widths.Name;
             table.Update();
         }
-        RebuildCleanupSource();
+        Recompute();
         var lastCleanupWidth = -1;
         table.FrameChanged += (_, _) =>
         {
@@ -111,7 +115,7 @@ public sealed class CleanupScreen
             if (w > 0 && w != lastCleanupWidth)
             {
                 lastCleanupWidth = w;
-                RebuildCleanupSource();
+                Recompute();
             }
         };
 
@@ -123,9 +127,9 @@ public sealed class CleanupScreen
         };
         TuiHelpers.ConfigureMarkdownPane(detail, "Base");
 
-        table.SelectedCellChanged += (_, _) =>
+        table.ValueChanged += (_, _) =>
         {
-            var i = table.SelectedRow;
+            var i = table.GetSelectedRow();
             if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i]);
         };
 
@@ -149,19 +153,16 @@ public sealed class CleanupScreen
 
         TuiHelpers.ApplyScheme("Base", window, header, table, detail, status, statusBar);
 
-        // Space-to-toggle.
+        // Space-to-toggle is wired by CheckBoxTableSourceWrapperByIndex in
+        // its constructor; no manual handler needed here. RC5 also routes
+        // letter shortcuts through table.KeyDown so we still need to catch
+        // them before the table swallows them in OnKeyDownNotHandled.
         table.KeyDown += (_, key) =>
         {
-            if (key.AsRune.Value == ' ' && _candidates.Length > 0)
-            {
-                var idx = table.SelectedRow;
-                if (idx >= 0 && idx < _candidates.Length)
-                {
-                    checkStates[idx] = !checkStates[idx];
-                    table.SetNeedsDraw();
-                    key.Handled = true;
-                }
-            }
+            var r = key.AsRune.Value;
+            if (r == 'r' || r == 'R') { DoRemove(wrapper.CheckedRows, status); key.Handled = true; }
+            else if (r == 'i' || r == 'I') { DoIgnore(wrapper.CheckedRows, status); key.Handled = true; }
+            else if (r == 'x' || r == 'X') { DoExport(status); key.Handled = true; }
         };
 
         window.KeyDown += (_, key) =>
@@ -170,12 +171,7 @@ public sealed class CleanupScreen
             {
                 _app.RequestStop();
                 key.Handled = true;
-                return;
             }
-            var r = key.AsRune.Value;
-            if (r == 'r' || r == 'R') { DoRemove(checkStates, status); key.Handled = true; }
-            else if (r == 'i' || r == 'I') { DoIgnore(checkStates, status); key.Handled = true; }
-            else if (r == 'x' || r == 'X') { DoExport(status); key.Handled = true; }
         };
 
         window.Add(header, table, detail, status, statusBar);
@@ -183,13 +179,13 @@ public sealed class CleanupScreen
         _app.Run(window);
     }
 
-    private void DoRemove(bool[] checkStates, Label status)
+    private void DoRemove(HashSet<int> checkedRows, Label status)
     {
         var removed = 0;
         var failed = 0;
         for (var i = 0; i < _candidates.Length; i++)
         {
-            if (!checkStates[i]) continue;
+            if (!checkedRows.Contains(i)) continue;
             var c = _candidates[i];
             // For skill-backed candidates, run full validator. For empty dirs,
             // build a synthetic `Allowed` validation (empty dir is safe when
@@ -224,12 +220,12 @@ public sealed class CleanupScreen
         status.Text = $" removed {removed}, skipped/failed {failed}";
     }
 
-    private void DoIgnore(bool[] checkStates, Label status)
+    private void DoIgnore(HashSet<int> checkedRows, Label status)
     {
         var marked = 0;
         for (var i = 0; i < _candidates.Length; i++)
         {
-            if (!checkStates[i]) continue;
+            if (!checkedRows.Contains(i)) continue;
             var c = _candidates[i];
             var dir = c.Skill?.ResolvedPath ?? c.Path;
             if (!System.IO.Directory.Exists(dir)) continue;
@@ -325,5 +321,11 @@ public sealed class CleanupScreen
             ImmutableArray<RemoveValidator.Warning>.Empty,
             path,
             ImmutableArray<string>.Empty);
+    }
+
+    private sealed class ColumnWidths
+    {
+        public int Name;
+        public int Path;
     }
 }

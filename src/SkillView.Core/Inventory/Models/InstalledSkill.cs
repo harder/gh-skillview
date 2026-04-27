@@ -39,6 +39,11 @@ public sealed record InstalledSkill
 
     public required DateTimeOffset? InstalledAt { get; init; }
 
+    /// Source-bundle metadata when this install was placed by a packaging
+    /// tool (e.g. `npx skills`) that wrote a `.skill-lock.json`. Null for
+    /// installs not recorded in any lockfile.
+    public SkillPackage? Package { get; init; }
+
     public string? TreeSha => FrontMatter.GithubTreeSha;
     public bool Pinned => FrontMatter.Pinned;
 }

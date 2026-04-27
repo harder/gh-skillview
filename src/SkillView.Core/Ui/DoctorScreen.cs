@@ -64,12 +64,10 @@ public static class DoctorScreen
         var sb = new StringBuilder();
         sb.AppendLine("## Environment");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("|-------|-------|");
-        sb.AppendLine($"| gh path | `{r.GhPath ?? "(not found)"}` |");
-        sb.AppendLine($"| gh version | `{r.GhVersionRaw ?? "(unknown)"}` |");
-        sb.AppendLine($"| gh minimum | `{GhBinaryLocator.MinimumVersion}` {(r.GhMeetsMinimum ? "✅" : "❌ TOO OLD")} |");
-        sb.AppendLine($"| baseline | {(r.BaselineOk ? "✅ ok" : "⚠️ degraded")} |");
+        var ghVerOk = r.GhMeetsMinimum ? "✅" : "❌ too old";
+        sb.AppendLine($"- **gh**         `{r.GhPath ?? "(not found)"}`");
+        sb.AppendLine($"- **version**    `{r.GhVersionRaw ?? "(unknown)"}` (minimum `{GhBinaryLocator.MinimumVersion}` {ghVerOk})");
+        sb.AppendLine($"- **baseline**   {(r.BaselineOk ? "✅ ok" : "⚠️ degraded")}");
         sb.AppendLine();
 
         sb.AppendLine("## Auth");
@@ -80,15 +78,15 @@ public static class DoctorScreen
         }
         else
         {
-            sb.AppendLine($"**Active:** {r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"}");
+            sb.AppendLine($"- **active**     {r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"}");
             if (r.Auth.Hosts.Length > 1)
             {
-                sb.AppendLine($"**Other hosts:** {string.Join(", ", r.Auth.Hosts)}");
+                sb.AppendLine($"- **other hosts** {string.Join(", ", r.Auth.Hosts)}");
             }
         }
         sb.AppendLine();
 
-        sb.AppendLine("## Capabilities (`gh skill`)");
+        sb.AppendLine("## `gh skill` capabilities");
         sb.AppendLine();
         var c = r.Capabilities;
         if (!c.SkillSubcommandPresent)
@@ -97,31 +95,81 @@ public static class DoctorScreen
         }
         else
         {
-            sb.AppendLine("| Capability | Status |");
-            sb.AppendLine("|------------|--------|");
-            sb.AppendLine($"| `list --json` | {Mark(c.HasSkillList)} |");
-            sb.AppendLine($"| `install --allow-hidden-dirs` | {Mark(c.SupportsAllowHiddenDirs)} |");
-            sb.AppendLine($"| `install --upstream` | {Mark(c.SupportsUpstream)} |");
-            sb.AppendLine($"| `install --repo-path` | {Mark(c.SupportsRepoPath)} |");
-            sb.AppendLine($"| `install --from-local` | {Mark(c.SupportsFromLocal)} |");
-            sb.AppendLine($"| `update --dry-run` | {Mark(c.SupportsUpdateDryRun)} |");
-            sb.AppendLine($"| `update --all` | {Mark(c.SupportsUpdateAll)} |");
-            sb.AppendLine($"| `update --force` | {Mark(c.SupportsUpdateForce)} |");
-            sb.AppendLine($"| `update --unpin` | {Mark(c.SupportsUpdateUnpin)} |");
-            sb.AppendLine($"| `update --yes` | {Mark(c.SupportsUpdateYes)} |");
-            sb.AppendLine($"| `update --json` | {Mark(c.SupportsUpdateJson)} |");
-            sb.AppendLine($"| `search --json` | {Mark(c.SupportsSearchJson)} |");
-            sb.AppendLine($"| `search --owner` | {Mark(c.SupportsSearchOwner)} |");
-            sb.AppendLine($"| `search --limit` | {Mark(c.SupportsSearchLimit)} |");
+            // Grouped by subcommand and limited to flags that exist in the
+            // current gh release. Entries below correspond 1:1 to the probed
+            // tokens in CapabilityProbeParser.ProbedTokens — keep them in sync.
+            // Capabilities for flags that aren't in gh yet (--repo-path,
+            // --yes/--json on update, list subcommand) are intentionally
+            // omitted; they would always be ❌ and read as defects rather
+            // than as "not yet shipped upstream".
+            sb.AppendLine("**install**");
+            sb.AppendLine($"- `--allow-hidden-dirs`  {Mark(c.SupportsAllowHiddenDirs)}");
+            sb.AppendLine($"- `--upstream`           {Mark(c.SupportsUpstream)}");
+            sb.AppendLine($"- `--from-local`         {Mark(c.SupportsFromLocal)}");
+            sb.AppendLine();
+            sb.AppendLine("**update**");
+            sb.AppendLine($"- `--dry-run`            {Mark(c.SupportsUpdateDryRun)}");
+            sb.AppendLine($"- `--all`                {Mark(c.SupportsUpdateAll)}");
+            sb.AppendLine($"- `--force`              {Mark(c.SupportsUpdateForce)}");
+            sb.AppendLine($"- `--unpin`              {Mark(c.SupportsUpdateUnpin)}");
+            sb.AppendLine();
+            sb.AppendLine("**search**");
+            sb.AppendLine($"- `--json`               {Mark(c.SupportsSearchJson)}");
+            sb.AppendLine($"- `--owner`              {Mark(c.SupportsSearchOwner)}");
+            sb.AppendLine($"- `--limit`              {Mark(c.SupportsSearchLimit)}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("## Detected agents");
+        sb.AppendLine();
+        var agents = DetectInstalledAgents();
+        if (agents.Count == 0)
+        {
+            sb.AppendLine("_(no agent home directories detected under `~/`)_");
+        }
+        else
+        {
+            foreach (var (agent, path) in agents)
+            {
+                sb.AppendLine($"- **{agent}**  `{path}`");
+            }
         }
         sb.AppendLine();
 
         sb.AppendLine("## Logs");
         sb.AppendLine();
-        sb.AppendLine($"**Directory:** `{r.LogDirectory ?? "(unset)"}`");
+        sb.AppendLine($"`{r.LogDirectory ?? "(unset)"}`");
 
         return sb.ToString();
     }
 
     private static string Mark(bool on) => on ? "✅" : "❌";
+
+    /// Mirrors the heuristic in `InstallScreen.DetectInstalledAgents` so the
+    /// Doctor view shows what the install dialog will pre-check by default.
+    private static List<(string Agent, string Path)> DetectInstalledAgents()
+    {
+        var found = new List<(string Agent, string Path)>();
+        try
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrEmpty(home)) return found;
+            (string Agent, string RelPath)[] probes =
+            {
+                ("claude", ".claude"),
+                ("copilot", ".config/github-copilot"),
+                ("cursor", ".cursor"),
+                ("codex", ".codex"),
+                ("gemini", ".gemini"),
+                ("antigravity", ".antigravity"),
+            };
+            foreach (var (agent, rel) in probes)
+            {
+                var full = System.IO.Path.Combine(home, rel);
+                if (System.IO.Directory.Exists(full)) found.Add((agent, full));
+            }
+        }
+        catch { /* best-effort */ }
+        return found;
+    }
 }

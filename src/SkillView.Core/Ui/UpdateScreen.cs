@@ -58,7 +58,6 @@ public sealed class UpdateScreen
         };
 
         var tableLabel = new Label { Text = "Select skills to update. Press Space to toggle.", X = 0, Y = 0 };
-        var checkStates = new bool[_skills.Count];
         var table = new TableView
         {
             X = 0, Y = 1,
@@ -68,38 +67,36 @@ public sealed class UpdateScreen
         };
         TuiHelpers.DisableTypeToSearch(table);
 
+        var nameW = 12;
         var rowsList = _skills.Select((s, i) => (i, s)).ToList();
-        void RebuildUpdateSource()
+        var inner = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
+            rowsList,
+            new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
+            {
+                ["Name"] = row => TuiHelpers.Truncate(row.S.Name, nameW),
+                ["Scope"] = row => row.S.Scope.ToString(),
+                ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
+            });
+        // RC5 wrapper: inserts checkbox column at index 0, hooks Space and
+        // click toggling on the table, exposes the checked set as CheckedRows.
+        var wrapper = new CheckBoxTableSourceWrapperByIndex(table, inner);
+        table.Table = wrapper;
+        var style = table.Style;
+        style.ExpandLastColumn = true;
+        // Wrapper inserts " " at column 0, so Name is column 2.
+        var nameStyle = style.GetOrCreateColumnStyle(2);
+        nameStyle.MinWidth = 8;
+
+        void Recompute()
         {
-            var prevRow = table.SelectedRow;
             var viewportWidth = table.Viewport.Width;
             var available = viewportWidth > 0 ? Math.Max(30, viewportWidth - 4) : 50;
             // Fixed: checkbox(1) + Scope(6) + Flags(5). Remainder → Name.
-            var nameW = Math.Max(12, available - 1 - 6 - 5);
-            table.Table = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
-                rowsList,
-                new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
-                {
-                    [" "] = row => checkStates[row.Idx] ? "✓" : " ",
-                    ["Name"] = row => TuiHelpers.Truncate(row.S.Name, nameW),
-                    ["Scope"] = row => row.S.Scope.ToString(),
-                    ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
-                });
-            var style = table.Style;
-            style.ExpandLastColumn = true;
-            for (var i = 0; i < table.Table.Columns; i++)
-            {
-                var cs = style.GetOrCreateColumnStyle(i);
-                if (table.Table.ColumnNames[i] == "Name")
-                {
-                    cs.MinWidth = 8;
-                    cs.MaxWidth = nameW;
-                }
-            }
-            if (prevRow >= 0 && prevRow < rowsList.Count) table.SelectedRow = prevRow;
+            nameW = Math.Max(12, available - 1 - 6 - 5);
+            nameStyle.MaxWidth = nameW;
             table.Update();
         }
-        RebuildUpdateSource();
+        Recompute();
         var lastUpdateWidth = -1;
         table.FrameChanged += (_, _) =>
         {
@@ -107,7 +104,7 @@ public sealed class UpdateScreen
             if (w > 0 && w != lastUpdateWidth)
             {
                 lastUpdateWidth = w;
-                RebuildUpdateSource();
+                Recompute();
             }
         };
 
@@ -192,20 +189,8 @@ public sealed class UpdateScreen
             allBox, forceBox, unpinBox, yesBox,
             status, spinner, dryRunButton, updateButton, cancelButton, statusBar);
 
-        // Space on a row toggles its staged state.
-        table.KeyDown += (_, key) =>
-        {
-            if (key.AsRune.Value == ' ' && _skills.Count > 0)
-            {
-                var idx = table.SelectedRow;
-                if (idx >= 0 && idx < _skills.Count)
-                {
-                    checkStates[idx] = !checkStates[idx];
-                    table.SetNeedsDraw();
-                    key.Handled = true;
-                }
-            }
-        };
+        // Space-to-toggle is wired by CheckBoxTableSourceWrapperByIndex; no
+        // manual handler needed here.
 
         async Task RunAsync(bool dryRun)
         {
@@ -216,7 +201,7 @@ public sealed class UpdateScreen
             var skills = new List<string>();
             for (var i = 0; i < _skills.Count; i++)
             {
-                if (checkStates[i]) skills.Add(_skills[i].Name);
+                if (wrapper.CheckedRows.Contains(i)) skills.Add(_skills[i].Name);
             }
 
             if (!allChecked && skills.Count == 0)

@@ -266,11 +266,14 @@ internal static class TuiHelpers
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
     private static Scheme CreateEditableInputScheme()
     {
-        // Black background avoids the teal/green hue that DarkSlateGray
-        // produces on 16-color terminals.
-        var normal = new Attribute(StandardColor.White, StandardColor.Black);
+        // Distinct background (DarkBlue) so unfocused text fields are
+        // visually separated from the surrounding FrameView's black fill.
+        // Disabled state uses Black bg so the field visually "blends out"
+        // — otherwise an empty disabled field is indistinguishable from an
+        // empty enabled one.
+        var normal = new Attribute(StandardColor.White, StandardColor.DarkBlue);
         var focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
-        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.Black);
 
         return new Scheme
         {
@@ -359,6 +362,7 @@ internal static class TuiHelpers
             switch (header)
             {
                 case "Skill":
+                case "Name":
                     cs.MinWidth = Math.Min(8, skillWidth);
                     cs.MaxWidth = Math.Max(8, skillWidth);
                     break;
@@ -413,18 +417,18 @@ internal static class TuiHelpers
     }
 
     /// Disable type-to-search on a TableView and register preview shortcut
-    /// key bindings (p, v → Command.Accept → CellActivated).
+    /// key bindings (p, v, → → Command.Accept → Accepted event).
     ///
-    /// Terminal.Gui v2 RC4 has a known issue where TableView.OnKeyDown
-    /// intercepts ALL unbound letter keys for type-to-search *before* the
-    /// KeyDown event fires. This prevents single-letter shortcuts from
-    /// reaching event handlers. Replacing the Matcher disables that feature
-    /// while adding explicit bindings routes p/v through CellActivated.
+    /// In RC5 the View command model is: single-click / Space → Activate
+    /// (cursor placement, multi-select toggle); Enter / double-click →
+    /// Accept (the "open it" semantic). SkillView's preview shortcut is
+    /// "open this row", so we route p/v/Right to Command.Accept and let
+    /// the Accepted event drive PreviewSelectedAsync. Also adds Ctrl+J →
+    /// Accept for Warp terminals which send Ctrl+J in place of Enter.
     internal static void ConfigureTableKeyBindings(TableView table)
     {
         DisableTypeToSearch(table);
 
-        // Route p/v/→ through CellActivated (same path as Enter).
         // Right arrow is intuitive: it "points toward" the preview pane.
         // CursorRight already has a default binding in TableView, so replace it.
         table.KeyBindings.Add(KeyCode.P, Command.Accept);
@@ -432,6 +436,22 @@ internal static class TuiHelpers
         table.KeyBindings.Add(KeyCode.V, Command.Accept);
         table.KeyBindings.Add(KeyCode.V | KeyCode.ShiftMask, Command.Accept);
         table.KeyBindings.ReplaceCommands(KeyCode.CursorRight, Command.Accept);
+        // Warp terminal: Enter is intercepted at the terminal layer and
+        // arrives as Ctrl+J. Bind it to the same activation path so Warp
+        // users get preview on Enter without a separate workaround.
+        table.KeyBindings.Add(KeyCode.J | KeyCode.CtrlMask, Command.Accept);
+    }
+
+    /// RC5 replaced TableView.SelectedRow with the IValue<TableSelection?>
+    /// pattern. These helpers preserve SkillView's row-centric call sites
+    /// without sprinkling `Value?.Cursor.Y` everywhere.
+    internal static int GetSelectedRow(this TableView table)
+        => table.Value?.Cursor.Y ?? -1;
+
+    internal static void SetSelectedRow(this TableView table, int row)
+    {
+        if (row < 0) return;
+        table.SetSelection(0, row, false);
     }
 }
 

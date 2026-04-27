@@ -14,6 +14,8 @@ namespace SkillView.Ui;
 /// bleed through. Esc/q returns to the main view.
 public static class InstalledScreen
 {
+    private enum SortMode { Name, Package, Scope }
+
     public static void Show(IApplication app, InventorySnapshot snapshot, Action<InstalledSkill>? onRemove = null)
     {
         using var window = new Window
@@ -48,50 +50,84 @@ public static class InstalledScreen
         var allRows = snapshot.Skills;
         IReadOnlyList<InstalledSkill> rows = allRows;
 
+        // How many distinct packages are present — used by the footer hint
+        // and to decide whether the Package column is worth showing.
+        var packageCount = allRows
+            .Where(s => s.Package is not null)
+            .Select(s => s.Package!.Source)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        var hasPackages = packageCount > 0;
+
+        var sort = hasPackages ? SortMode.Package : SortMode.Name;
+
+        IReadOnlyList<InstalledSkill> ApplySort(IEnumerable<InstalledSkill> input) => sort switch
+        {
+            SortMode.Package => input
+                .OrderBy(s => s.Package?.Source ?? "~", StringComparer.OrdinalIgnoreCase) // unpackaged sorts last
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            SortMode.Scope => input
+                .OrderBy(s => s.Scope)
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            _ => input
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+        };
+
         void ApplyFilter()
         {
             var q = filterField.Text.Trim();
-            if (q.Length == 0)
-            {
-                rows = allRows;
-            }
-            else
+            IEnumerable<InstalledSkill> source = allRows;
+            if (q.Length > 0)
             {
                 var cmp = StringComparison.OrdinalIgnoreCase;
-                rows = allRows.Where(s =>
+                source = allRows.Where(s =>
                     s.Name.Contains(q, cmp)
                     || s.ResolvedPath.Contains(q, cmp)
                     || s.Agents.Any(a => a.AgentId.Contains(q, cmp))
-                ).ToArray();
+                    || (s.Package?.Source.Contains(q, cmp) ?? false));
             }
+            rows = ApplySort(source);
         }
 
-        void RebuildSource()
+        // Initial sort.
+        rows = ApplySort(allRows);
+
+        var nameW = 12;
+        var pkgW = 18;
+        var agentsW = 8;
+
+        // Build the source once; lambdas read from the mutable widths.
+        // Conditionally include the Package column — when no skills are
+        // packaged the column would be 100% blank and waste horizontal real
+        // estate. The lockfile reader still runs; this is purely display.
+        var columns = new Dictionary<string, Func<InstalledSkill, object>>
         {
-            var prevRow = table.SelectedRow;
-            var viewportWidth = table.Viewport.Width;
-            var available = viewportWidth > 0
-                ? Math.Max(40, viewportWidth - 6 /* col separators */)
-                : 70;
-            // Scope/Source/!/Lnk are short enums/flags; budget them as fixed.
-            // Name and Agents share the proportional remainder.
-            var fixedCols = 6 /*Scope*/ + 8 /*Source*/ + 1 /*!*/ + 3 /*Lnk*/;
-            var remaining = Math.Max(20, available - fixedCols);
-            var nameW = Math.Max(12, (int)Math.Round(remaining * 0.55));
-            var agentsW = Math.Max(8, remaining - nameW);
-            table.Table = new EnumerableTableSource<InstalledSkill>(
-                rows,
-                new Dictionary<string, Func<InstalledSkill, object>>
-                {
-                    ["Name"] = s => TuiHelpers.Truncate(s.Name, nameW),
-                    ["Scope"] = s => s.Scope.ToString(),
-                    ["Source"] = s => s.Provenance.ToString(),
-                    ["!"] = s => s.Validity == ValidityState.Valid ? "" : "!",
-                    ["Lnk"] = s => s.IsSymlinked ? "↩" : "",
-                    ["Agents"] = s => TuiHelpers.Truncate(
-                        TuiHelpers.AgentBadges(s.Agents.Select(a => a.AgentId)),
-                        agentsW),
-                });
+            ["Name"] = s => TuiHelpers.Truncate(s.Name, nameW),
+            ["Scope"] = s => DisplayScope(s.Scope),
+        };
+        if (hasPackages)
+        {
+            columns["Package"] = s => TuiHelpers.Truncate(s.Package?.Source ?? "", pkgW);
+        }
+        columns["!"] = s => s.Validity == ValidityState.Valid ? "" : "!";
+        columns["Lnk"] = s => s.IsSymlinked ? "↩" : "";
+        columns["Agents"] = s => TuiHelpers.Truncate(
+            TuiHelpers.AgentBadges(s.Agents.Select(a => a.AgentId)),
+            agentsW);
+
+        // EnumerableTableSource closes over the `rows` *variable*, but the
+        // wrapper / inner-source refresh happens by reassigning table.Table
+        // when filter or sort changes (cheap — just a new wrapper view over a
+        // pre-computed list).
+        InstalledTableSource? currentSource = null;
+
+        void BuildSource()
+        {
+            currentSource = new InstalledTableSource(rows, columns);
+            table.Table = currentSource;
             var style = table.Style;
             style.ExpandLastColumn = true;
             for (var i = 0; i < table.Table.Columns; i++)
@@ -100,14 +136,48 @@ public static class InstalledScreen
                 switch (table.Table.ColumnNames[i])
                 {
                     case "Name": cs.MinWidth = 8; cs.MaxWidth = nameW; break;
+                    case "Package": cs.MinWidth = 8; cs.MaxWidth = pkgW; break;
                     case "Agents": cs.MinWidth = 6; break;
                 }
             }
-            if (prevRow >= 0 && prevRow < rows.Count) table.SelectedRow = prevRow;
             table.Update();
         }
 
-        RebuildSource();
+        void Recompute()
+        {
+            var viewportWidth = table.Viewport.Width;
+            var available = viewportWidth > 0
+                ? Math.Max(40, viewportWidth - 6 /* col separators */)
+                : 70;
+            // Scope/!/Lnk are short fixed-width. Package + Name + Agents share
+            // the remainder. When Package isn't present, give Name more room.
+            var fixedCols = 6 /*Scope*/ + 1 /*!*/ + 3 /*Lnk*/;
+            var remaining = Math.Max(20, available - fixedCols);
+            if (hasPackages)
+            {
+                pkgW = Math.Max(12, (int)Math.Round(remaining * 0.30));
+                nameW = Math.Max(12, (int)Math.Round(remaining * 0.40));
+                agentsW = Math.Max(6, remaining - pkgW - nameW);
+            }
+            else
+            {
+                nameW = Math.Max(12, (int)Math.Round(remaining * 0.65));
+                agentsW = Math.Max(6, remaining - nameW);
+            }
+            // Column-style refs are stable; just update widths and redraw.
+            var style = table.Style;
+            for (var i = 0; i < (table.Table?.Columns ?? 0); i++)
+            {
+                var name = table.Table!.ColumnNames[i];
+                var cs = style.GetOrCreateColumnStyle(i);
+                if (name == "Name") cs.MaxWidth = nameW;
+                else if (name == "Package") cs.MaxWidth = pkgW;
+            }
+            table.SetNeedsDraw();
+        }
+
+        BuildSource();
+        Recompute();
         var lastWidth = -1;
         table.FrameChanged += (_, _) =>
         {
@@ -115,7 +185,7 @@ public static class InstalledScreen
             if (w > 0 && w != lastWidth)
             {
                 lastWidth = w;
-                RebuildSource();
+                Recompute();
             }
         };
 
@@ -129,9 +199,9 @@ public static class InstalledScreen
         };
         TuiHelpers.ConfigureMarkdownPane(detail, "Base");
 
-        table.SelectedCellChanged += (_, _) =>
+        table.ValueChanged += (_, _) =>
         {
-            var row = table.SelectedRow;
+            var row = table.GetSelectedRow();
             if (row >= 0 && row < rows.Count)
             {
                 detail.Text = RenderDetail(rows[row]);
@@ -143,44 +213,83 @@ public static class InstalledScreen
             X = 0,
             Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
-            Text = BuildFooter(rows.Count, allRows.Length, snapshot),
+            Text = BuildFooter(rows.Count, allRows.Length, snapshot, sort, packageCount),
         };
 
-        void RefreshFooter() => footer.Text = BuildFooter(rows.Count, allRows.Length, snapshot);
+        void RefreshFooter() =>
+            footer.Text = BuildFooter(rows.Count, allRows.Length, snapshot, sort, packageCount);
 
-        filterField.TextChanged += (_, _) =>
+        void RefreshAll()
         {
             ApplyFilter();
-            RebuildSource();
+            BuildSource();
+            Recompute();
             RefreshFooter();
             detail.Text = rows.Count == 0
                 ? "(no matches)"
-                : RenderDetail(rows[Math.Clamp(table.SelectedRow, 0, rows.Count - 1)]);
-        };
+                : RenderDetail(rows[Math.Clamp(table.GetSelectedRow(), 0, rows.Count - 1)]);
+        }
 
-        var statusBar = new StatusBar(onRemove is null
-            ? new[]
-            {
-                new Shortcut { Title = "/", HelpText = "Filter" },
-                new Shortcut { Title = "o", HelpText = "Open" },
-                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-                new Shortcut { Title = "q", HelpText = "Quit" },
-            }
-            : new[]
-            {
-                new Shortcut { Title = "/", HelpText = "Filter" },
-                new Shortcut { Title = "x", HelpText = "Remove" },
-                new Shortcut { Title = "o", HelpText = "Open" },
-                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-                new Shortcut { Title = "q", HelpText = "Quit" },
-            });
+        filterField.TextChanged += (_, _) => RefreshAll();
+
+        var statusBar = new StatusBar(BuildShortcuts(onRemove is not null, hasPackages));
 
         TuiHelpers.ApplyScheme("Base", window, filterLabel, filterField, table, detail, footer, statusBar);
 
         window.Add(filterLabel, filterField, table, detail, footer, statusBar);
+
+        // Single dispatcher used by both window.KeyDown and table.KeyDown.
+        // Returns true if the key was handled. We do NOT re-inject keys into
+        // the view hierarchy via NewKeyDownEvent — that re-enters Terminal.Gui's
+        // dispatch pipeline and crashes when the action (e.g. q → RequestStop)
+        // tears down the run loop mid-call.
+        bool HandleShortcut(Key key)
+        {
+            if (filterField.HasFocus) return false;
+            if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
+            {
+                app.RequestStop();
+                return true;
+            }
+            var r = key.AsRune.Value;
+            if (r == '/')
+            {
+                filterField.SetFocus();
+                filterField.SelectAll();
+                return true;
+            }
+            if (r == 's' || r == 'S')
+            {
+                sort = sort switch
+                {
+                    SortMode.Name => hasPackages ? SortMode.Package : SortMode.Scope,
+                    SortMode.Package => SortMode.Scope,
+                    _ => SortMode.Name,
+                };
+                RefreshAll();
+                return true;
+            }
+            if ((r == 'x' || r == 'X') && onRemove is not null)
+            {
+                var i = table.GetSelectedRow();
+                if (i >= 0 && i < rows.Count) onRemove(rows[i]);
+                return true;
+            }
+            if (r == 'o' || r == 'O')
+            {
+                var i = table.GetSelectedRow();
+                if (i >= 0 && i < rows.Count)
+                {
+                    TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
+                }
+                return true;
+            }
+            return false;
+        }
+
         window.KeyDown += (_, key) =>
         {
-            // Don't intercept letter shortcuts while the filter field has focus.
+            // Filter-field Esc returns focus to the table without quitting.
             if (filterField.HasFocus)
             {
                 if (key.KeyCode == KeyCode.Esc)
@@ -190,45 +299,55 @@ public static class InstalledScreen
                 }
                 return;
             }
-            if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
-            {
-                app.RequestStop();
-                key.Handled = true;
-                return;
-            }
-            if (key.AsRune.Value == '/')
-            {
-                filterField.SetFocus();
-                filterField.SelectAll();
-                key.Handled = true;
-                return;
-            }
-            if ((key.AsRune.Value == 'x' || key.AsRune.Value == 'X') && onRemove is not null)
-            {
-                var i = table.SelectedRow;
-                if (i >= 0 && i < rows.Count) onRemove(rows[i]);
-                key.Handled = true;
-            }
-            else if (key.AsRune.Value == 'o' || key.AsRune.Value == 'O')
-            {
-                var i = table.SelectedRow;
-                if (i >= 0 && i < rows.Count)
-                {
-                    TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
-                }
-                key.Handled = true;
-            }
+            if (HandleShortcut(key)) key.Handled = true;
+        };
+
+        // RC5: TableView swallows unbound printable letters in
+        // OnKeyDownNotHandled. Dispatch shortcuts directly here — the table's
+        // KeyDown event fires before OnKeyDownNotHandled.
+        table.KeyDown += (_, key) =>
+        {
+            if (HandleShortcut(key)) key.Handled = true;
         };
 
         app.Run(window);
     }
 
-    private static string BuildFooter(int shown, int total, InventorySnapshot snapshot)
+    private static Shortcut[] BuildShortcuts(bool canRemove, bool hasPackages)
+    {
+        var list = new List<Shortcut>
+        {
+            new() { Key = (Key)'/', Title = "/", HelpText = "Filter" },
+        };
+        if (canRemove) list.Add(new() { Key = (Key)'x', Title = "x", HelpText = "Remove" });
+        list.Add(new() { Key = (Key)'o', Title = "o", HelpText = "Open" });
+        if (hasPackages) list.Add(new() { Key = (Key)'s', Title = "s", HelpText = "Sort" });
+        list.Add(new() { Key = Key.Esc, Title = "Esc", HelpText = "Back" });
+        list.Add(new() { Key = (Key)'q', Title = "q", HelpText = "Quit" });
+        return list.ToArray();
+    }
+
+    private static string DisplayScope(Scope s) => s switch
+    {
+        Scope.User => "Global",
+        _ => s.ToString(),
+    };
+
+    private static string SortLabel(SortMode m) => m switch
+    {
+        SortMode.Package => "package",
+        SortMode.Scope => "scope",
+        _ => "name",
+    };
+
+    private static string BuildFooter(int shown, int total, InventorySnapshot snapshot, SortMode sort, int packageCount)
     {
         var counts = shown == total
             ? $" {total} skill(s) across {snapshot.ScannedRoots.Length} root(s)"
             : $" {shown} of {total} skill(s) (filtered) · {snapshot.ScannedRoots.Length} root(s)";
-        return counts + (snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only");
+        var pkgs = packageCount > 0 ? $" · {packageCount} package(s)" : "";
+        var srcSuffix = snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only";
+        return $"{counts}{pkgs} · sort: {SortLabel(sort)}{srcSuffix}";
     }
 
     internal static string RenderDetail(InstalledSkill s)
@@ -237,7 +356,7 @@ public static class InstalledScreen
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
         sb.AppendLine($"**path**: `{s.ResolvedPath}`  ");
-        sb.AppendLine($"**scope**: {s.Scope}  ");
+        sb.AppendLine($"**scope**: {DisplayScope(s.Scope)}  ");
         sb.AppendLine($"**provenance**: {s.Provenance}  ");
         sb.AppendLine($"**validity**: {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")}  ");
         sb.AppendLine($"**symlinked**: {s.IsSymlinked}  ");
@@ -248,6 +367,19 @@ public static class InstalledScreen
         if (s.InstalledAt is { } when_)
         {
             sb.AppendLine($"**installed**: {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+        }
+        if (s.Package is { } pkg)
+        {
+            sb.AppendLine();
+            sb.AppendLine("### 📦 Package");
+            sb.AppendLine();
+            sb.AppendLine($"**source**: `{pkg.Source}`  ");
+            sb.AppendLine($"**type**: {pkg.SourceType}  ");
+            if (pkg.SourceUrl is { Length: > 0 } url) sb.AppendLine($"**url**: {url}  ");
+            if (pkg.UpdatedAt is { } u)
+            {
+                sb.AppendLine($"**updated**: {u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+            }
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
         {
@@ -268,5 +400,14 @@ public static class InstalledScreen
             }
         }
         return sb.ToString();
+    }
+
+    /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we
+    /// can keep a stable named type for the `currentSource` field reassignment
+    /// pattern (avoids capturing inferred-anonymous generic locals).
+    private sealed class InstalledTableSource : EnumerableTableSource<InstalledSkill>
+    {
+        public InstalledTableSource(IReadOnlyList<InstalledSkill> rows, Dictionary<string, Func<InstalledSkill, object>> cols)
+            : base(rows, cols) { }
     }
 }

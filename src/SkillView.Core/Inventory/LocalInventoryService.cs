@@ -17,6 +17,7 @@ public sealed class LocalInventoryService
     private readonly ScanRootResolver _resolver;
     private readonly LocalSkillScanner _scanner;
     private readonly GhSkillListAdapter _listAdapter;
+    private readonly SkillLockFileReader _lockReader;
     private readonly Logger _logger;
 
     public LocalInventoryService(
@@ -28,6 +29,7 @@ public sealed class LocalInventoryService
         _resolver = resolver;
         _scanner = scanner;
         _listAdapter = listAdapter;
+        _lockReader = new SkillLockFileReader(logger);
         _logger = logger;
     }
 
@@ -69,6 +71,17 @@ public sealed class LocalInventoryService
         ghSw.Stop();
 
         var merged = Merge(scanned, ghRecords);
+
+        // Enrich with package-bundle metadata from any `.skill-lock.json`
+        // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
+        // written by `npx skills`). Free signal — best-effort.
+        var packages = _lockReader.LoadFromRoots(roots.Select(r => r.Path));
+        if (!packages.IsEmpty)
+        {
+            merged = merged
+                .Select(s => packages.TryGetValue(s.Name, out var pkg) ? s with { Package = pkg } : s)
+                .ToImmutableArray();
+        }
 
         if (!string.IsNullOrEmpty(options.FilterScope))
         {
