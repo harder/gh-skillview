@@ -16,7 +16,11 @@ public static class InstalledScreen
 {
     private enum SortMode { Name, Package, Scope }
 
-    public static void Show(IApplication app, InventorySnapshot snapshot, Action<InstalledSkill>? onRemove = null)
+    public static void Show(
+        IApplication app,
+        InventorySnapshot snapshot,
+        Action<InstalledSkill>? onRemove = null,
+        Action? onGoToSearch = null)
     {
         using var window = new Window
         {
@@ -237,6 +241,7 @@ public static class InstalledScreen
         TuiHelpers.ApplyScheme("Base", window, filterLabel, filterField, table, detail, footer, statusBar);
 
         window.Add(filterLabel, filterField, table, detail, footer, statusBar);
+        var goToSearchRequested = false;
 
         // Single dispatcher used by both window.KeyDown and table.KeyDown.
         // Returns true if the key was handled. We do NOT re-inject keys into
@@ -253,6 +258,12 @@ public static class InstalledScreen
             }
             var r = key.AsRune.Value;
             if (r == '/')
+            {
+                goToSearchRequested = true;
+                app.RequestStop();
+                return true;
+            }
+            if (r == 'f' || r == 'F')
             {
                 filterField.SetFocus();
                 filterField.SelectAll();
@@ -292,6 +303,13 @@ public static class InstalledScreen
             // Filter-field Esc returns focus to the table without quitting.
             if (filterField.HasFocus)
             {
+                if (key.AsRune.Value == '/')
+                {
+                    goToSearchRequested = true;
+                    app.RequestStop();
+                    key.Handled = true;
+                    return;
+                }
                 if (key.KeyCode == KeyCode.Esc)
                 {
                     table.SetFocus();
@@ -312,13 +330,18 @@ public static class InstalledScreen
 
         table.SetFocus();
         app.Run(window);
+        if (goToSearchRequested)
+        {
+            onGoToSearch?.Invoke();
+        }
     }
 
-    private static Shortcut[] BuildShortcuts(bool canRemove, bool hasPackages)
+    internal static Shortcut[] BuildShortcuts(bool canRemove, bool hasPackages)
     {
         var list = new List<Shortcut>
         {
-            new() { Key = (Key)'/', Title = "/", HelpText = "Filter" },
+            new() { Key = (Key)'/', Title = "/", HelpText = "Search" },
+            new() { Key = (Key)'f', Title = "f", HelpText = "Filter" },
         };
         if (canRemove) list.Add(new() { Key = (Key)'x', Title = "x", HelpText = "Remove" });
         list.Add(new() { Key = (Key)'o', Title = "o", HelpText = "Open" });

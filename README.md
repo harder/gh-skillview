@@ -199,6 +199,10 @@ These are stable and safe to depend on in scripts.
 
 | Key | Action |
 |---|---|
+| `/` | Return to the main Search view and focus the query box |
+| `f` | Focus the Installed filter field |
+| `o` | Open the selected installed skill folder |
+| `s` | Change sort mode |
 | `x` | Remove selected installed skill |
 | `Esc` or `q` | Close dialog |
 

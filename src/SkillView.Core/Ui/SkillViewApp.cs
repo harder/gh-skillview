@@ -53,6 +53,8 @@ public sealed class SkillViewApp
     private bool _showingRawPreview;
     private EnvironmentReport? _lastReport;
     private volatile bool _searching;
+    private volatile bool _userInteractedSinceLaunch;
+    private volatile bool _startupInstalledShown;
 
     private string _defaultStatus = " ready — press / to search or F1 for help";
     private object? _statusToken;
@@ -63,6 +65,8 @@ public sealed class SkillViewApp
         _services = services;
         _options = options;
     }
+
+    internal static bool ShouldOpenInstalledOnStartup(InventorySnapshot snapshot) => snapshot.Skills.Length > 0;
 
     // TODO(tg2): upstream — IApplication.Init is flagged RequiresUnreferencedCode /
     // RequiresDynamicCode in rc.4 via ConfigurationManager reflection. Surface to
@@ -184,9 +188,13 @@ public sealed class SkillViewApp
         // get swallowed before bubbling to the window.
         _resultsTable.KeyDown += (_, key) =>
         {
-            if (!key.Handled && OnWindowShortcut(key))
+            if (!key.Handled)
             {
-                key.Handled = true;
+                NoteUserInteraction();
+                if (OnWindowShortcut(key))
+                {
+                    key.Handled = true;
+                }
             }
         };
 
@@ -362,6 +370,7 @@ public sealed class SkillViewApp
     private void OnWindowKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        NoteUserInteraction();
         if (OnWindowShortcut(key))
         {
             key.Handled = true;
@@ -403,6 +412,7 @@ public sealed class SkillViewApp
 
     private void OnQueryFieldKey(object? sender, Key key)
     {
+        NoteUserInteraction();
         // Accept Enter and Ctrl+J as search submit triggers.
         // Ctrl+J is a workaround for Warp terminal which intercepts Enter
         // for its own block processing after the TUI enables mouse tracking.
@@ -424,6 +434,7 @@ public sealed class SkillViewApp
     /// Submit a search using the current Query/Owner/Limit fields.
     private void OnFilterFieldKey(object? sender, Key key)
     {
+        NoteUserInteraction();
         var isSubmit = key.KeyCode == KeyCode.Enter
             || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask);
         if (isSubmit)
@@ -449,6 +460,23 @@ public sealed class SkillViewApp
             var report = await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
             _lastReport = report;
             _ghPath = report.GhPath;
+
+            var snapshot = await _services.InventoryService.CaptureAsync(
+                report.GhPath,
+                report.Capabilities,
+                new LocalInventoryService.Options(
+                    ScanRoots: _options.ScanRoots,
+                    AllowHiddenDirs: false)
+            ).ConfigureAwait(false);
+
+            Invoke(() =>
+            {
+                if (ShouldAutoOpenInstalledOnStartup(snapshot))
+                {
+                    _startupInstalledShown = true;
+                    OpenInstalledSnapshot(snapshot);
+                }
+            });
 
             if (!report.GhFound)
             {
@@ -1023,9 +1051,26 @@ public sealed class SkillViewApp
             {
                 ClearBusy();
                 SetStatus($"{snapshot.Skills.Length} installed skill(s)");
-                InstalledScreen.Show(_app!, snapshot, target => OpenRemoveDialog(target, snapshot));
+                OpenInstalledSnapshot(snapshot);
             });
         }, "installed");
+    }
+
+    private void OpenInstalledSnapshot(InventorySnapshot snapshot)
+    {
+        if (_app is null) return;
+        InstalledScreen.Show(
+            _app,
+            snapshot,
+            target => OpenRemoveDialog(target, snapshot),
+            FocusSearchFromInstalled);
+    }
+
+    private void FocusSearchFromInstalled()
+    {
+        _queryField?.SetFocus();
+        _queryField?.SelectAll();
+        SetStatus("search ready");
     }
 
     private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
@@ -1198,6 +1243,16 @@ public sealed class SkillViewApp
             return;
         }
         _app.Invoke(action);
+    }
+
+    private bool ShouldAutoOpenInstalledOnStartup(InventorySnapshot snapshot) =>
+        !_startupInstalledShown
+        && !_userInteractedSinceLaunch
+        && ShouldOpenInstalledOnStartup(snapshot);
+
+    private void NoteUserInteraction()
+    {
+        _userInteractedSinceLaunch = true;
     }
 
     /// Fire-and-forget background work with exception guard. Catches any

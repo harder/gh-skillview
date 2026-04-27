@@ -249,7 +249,7 @@ internal static class TuiHelpers
         "I  show installed skills\n" +
         "u  update installed skills\n" +
         "c  review cleanup candidates\n" +
-        "   in Installed: x removes the selected skill\n" +
+        "   in Installed: / returns to Search, f filters, x removes the selected skill\n" +
         "F1 show this help\n" +
         "q  quit";
 
@@ -257,7 +257,7 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · i install · o open · e raw/render · l logs · d doctor · I installed · u update · c cleanup · F1 help · q quit";
+        + " · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
         ? "Select a result and press Ctrl+J, p, or v to preview."
