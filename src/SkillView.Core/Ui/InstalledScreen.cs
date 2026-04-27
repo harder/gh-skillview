@@ -310,6 +310,7 @@ public static class InstalledScreen
             if (HandleShortcut(key)) key.Handled = true;
         };
 
+        table.SetFocus();
         app.Run(window);
     }
 

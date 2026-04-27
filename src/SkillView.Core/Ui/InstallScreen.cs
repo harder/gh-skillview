@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Logging;
@@ -30,10 +31,9 @@ public sealed class InstallScreen
     // because AOT forbids reflection-based discovery, and `gh skill install
     // --help` doesn't enumerate valid agent names. Update this array when new
     // agents are added to the gh skill ecosystem.
-    public static readonly string[] KnownAgents =
-    {
-        "claude", "copilot", "cursor", "codex", "gemini", "antigravity",
-    };
+    public static readonly string[] KnownAgents = InstallAgentCatalog.GhIds.ToArray();
+
+    private static readonly ImmutableArray<InstallAgentCatalog.Entry> KnownAgentEntries = InstallAgentCatalog.Entries;
 
     // Labels are user-facing; values are the literals `gh skill install --scope`
     // accepts. "Global" reads more clearly than "User" — per `gh skill install
@@ -183,7 +183,7 @@ public sealed class InstallScreen
         var scopeHint = new Label
         {
             X = 13, Y = 1, Width = Dim.Fill(2),
-            Text = "Project = ./.<agent>/skills · Global = ~/.<agent>/skills (everywhere)",
+            Text = "Project = repo skill dir · Global = home skill dir (everywhere)",
         };
 
         var pathLabel = new Label { Text = "Custom path:", X = 0, Y = 2 };
@@ -196,19 +196,19 @@ public sealed class InstallScreen
         TuiHelpers.ConfigureTextInput(pathField, "Dialog");
 
         var agentsLabel = new Label { Text = "Agents     :", X = 0, Y = 3 };
-        var agentBoxes = new CheckBox[KnownAgents.Length];
+        var agentBoxes = new CheckBox[KnownAgentEntries.Length];
         var installedAgents = DetectInstalledAgents();
         var anyInstalled = installedAgents.Count > 0;
         var agentX = 13;
-        for (var i = 0; i < KnownAgents.Length; i++)
+        for (var i = 0; i < KnownAgentEntries.Length; i++)
         {
-            var name = KnownAgents[i];
+            var agent = KnownAgentEntries[i];
             agentBoxes[i] = new CheckBox
             {
-                X = agentX, Y = 3, Text = name,
-                Value = installedAgents.Contains(name) ? CheckState.Checked : CheckState.UnChecked,
+                X = agentX, Y = 3, Text = agent.Label,
+                Value = installedAgents.Contains(agent.GhId) ? CheckState.Checked : CheckState.UnChecked,
             };
-            agentX += name.Length + 6;
+            agentX += agent.Label.Length + 6;
         }
         var agentsHint = new Label
         {
@@ -302,7 +302,7 @@ public sealed class InstallScreen
             var agents = new List<string>();
             for (var i = 0; i < agentBoxes.Length; i++)
             {
-                if (agentBoxes[i].Value == CheckState.Checked) agents.Add(KnownAgents[i]);
+                if (agentBoxes[i].Value == CheckState.Checked) agents.Add(KnownAgentEntries[i].GhId);
             }
             var scopeIdx = scopeSelector.Value ?? 0;
             var scopeValue = ScopeChoices[Math.Clamp(scopeIdx, 0, ScopeChoices.Length - 1)].Value;
@@ -400,7 +400,7 @@ public sealed class InstallScreen
                     if (result.Succeeded)
                     {
                         status.Text = $" install succeeded — closing";
-                        _app.RequestStop();
+                        dialog.RequestStop();
                     }
                     else
                     {
@@ -431,7 +431,7 @@ public sealed class InstallScreen
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            _app.RequestStop();
+            dialog.RequestStop();
         };
 
         dialog.Add(sourceFrame, whereFrame, behaviorFrame,
@@ -442,7 +442,7 @@ public sealed class InstallScreen
         {
             if (key.KeyCode == KeyCode.Esc)
             {
-                _app.RequestStop();
+                dialog.RequestStop();
                 key.Handled = true;
             }
         };
@@ -476,11 +476,7 @@ public sealed class InstallScreen
         // "I'm not in a project" case.
         try
         {
-            var cwd = Directory.GetCurrentDirectory();
-            foreach (var agent in KnownAgents)
-            {
-                if (Directory.Exists(Path.Combine(cwd, "." + agent))) return 0;
-            }
+            if (InstallAgentCatalog.HasProjectScopeCandidate(Directory.GetCurrentDirectory())) return 0;
         }
         catch { /* fall through to User */ }
         return 1;
@@ -497,19 +493,7 @@ public sealed class InstallScreen
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (string.IsNullOrEmpty(home)) return found;
-            (string Agent, string RelPath)[] probes =
-            {
-                ("claude", ".claude"),
-                ("copilot", ".config/github-copilot"),
-                ("cursor", ".cursor"),
-                ("codex", ".codex"),
-                ("gemini", ".gemini"),
-                ("antigravity", ".antigravity"),
-            };
-            foreach (var (agent, rel) in probes)
-            {
-                if (Directory.Exists(Path.Combine(home, rel))) found.Add(agent);
-            }
+            return InstallAgentCatalog.DetectInstalledGhIds(home);
         }
         catch { /* best-effort detection */ }
         return found;

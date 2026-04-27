@@ -154,20 +154,7 @@ public static class DoctorScreen
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (string.IsNullOrEmpty(home)) return found;
-            (string Agent, string RelPath)[] probes =
-            {
-                ("claude", ".claude"),
-                ("copilot", ".config/github-copilot"),
-                ("cursor", ".cursor"),
-                ("codex", ".codex"),
-                ("gemini", ".gemini"),
-                ("antigravity", ".antigravity"),
-            };
-            foreach (var (agent, rel) in probes)
-            {
-                var full = System.IO.Path.Combine(home, rel);
-                if (System.IO.Directory.Exists(full)) found.Add((agent, full));
-            }
+            return InstallAgentCatalog.DetectInstalledDisplayEntries(home);
         }
         catch { /* best-effort */ }
         return found;

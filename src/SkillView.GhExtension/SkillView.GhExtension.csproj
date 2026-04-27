@@ -8,7 +8,7 @@
     <StripSymbols>true</StripSymbols>
     <InvariantGlobalization>true</InvariantGlobalization>
     <SelfContained>true</SelfContained>
-    <!-- TG2 rc.4 emits IL2026/IL3050/IL3053 through its ConfigurationManager
+    <!-- TG2 rc.6 still emits IL2026/IL3050/IL3053 through its ConfigurationManager
          reflection path. Suppressed until the upstream fix lands (§14 mandate). -->
     <NoWarn>$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>

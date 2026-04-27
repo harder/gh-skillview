@@ -97,6 +97,16 @@ public sealed class TuiHelpersTests
     }
 
     [Theory]
+    [InlineData("copilot", "C")]
+    [InlineData("github-copilot", "C")]
+    [InlineData("claude-code", "⟁")]
+    [InlineData("gemini-cli", "✦")]
+    public void AgentIcon_SupportsCurrentAgentIds(string agentId, string expected)
+    {
+        Assert.Equal(expected, TuiHelpers.AgentIcon(agentId));
+    }
+
+    [Theory]
     [InlineData('v')]
     [InlineData('V')]
     [InlineData('p')]

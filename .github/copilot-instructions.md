@@ -155,7 +155,7 @@ part of the public contract — scripts and agent hooks depend on them.
   `Dim.Percent` / `Dim.Fill` sizing.
 - Run modals via `_app.Run(dialog)`.
 - Bind key handlers on the `Window.KeyDown` event (not `AddCommand` — it's
-  `protected` in TG2 rc.4).
+  `protected` in the current TG2 RC surface).
 - Use `SelectedCellChanged` on `TableView` for live detail updates.
 - Track upstream issues with `// TODO(tg2):` comments.
 
@@ -192,4 +192,4 @@ These rules govern all changes — they are the project's architectural invarian
 - **`gh skill list --json`** (cli/cli#13215): not yet landed. `GhSkillListAdapter` is gated on `capabilities.HasSkillList` — flips automatically when `gh` adds the flags.
 - **`gh skill update --yes`**: not in v2.91.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
 - **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
-- **Terminal.Gui v2**: pinned at `2.0.0-rc.4`. Known AOT workarounds documented in `PHASE0_NOTES.md`; `TrimmerRootAssembly` required for the full assembly.
+- **Terminal.Gui v2**: pinned at `2.0.0-rc.6`. Known AOT workarounds documented in `PHASE0_NOTES.md`; `TrimmerRootAssembly` required for the full assembly.

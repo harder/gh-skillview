@@ -32,6 +32,7 @@ internal static class TuiHelpers
         return key switch
         {
             "claude" or "claude-code" or "claude_code" or "claudecode" => "⟁",
+            "copilot" or "github-copilot" => "C",
             "cursor" => "◫",
             "codex" or "openai-codex" => "◎",
             "gemini" or "gemini-cli" => "✦",
