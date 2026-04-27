@@ -9,14 +9,23 @@ public static class CapabilityProbeParser
 {
     /// Known flag tokens to probe per subcommand. Extend this list only when
     /// SkillView intentionally supports additional `gh` flags.
+    ///
+    /// Tokens commented out below are flags / subcommands SkillView is wired
+    /// to handle but which do not exist in the current `gh skill` (2.91 as
+    /// of writing). They are kept as code so re-enabling them is one
+    /// uncomment when the upstream feature lands.
     public static readonly ImmutableDictionary<string, ImmutableArray<string>> ProbedTokens =
         ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("install", ImmutableArray.Create(
-                "--allow-hidden-dirs", "--upstream", "--agent", "--repo-path", "--from-local"))
+                "--allow-hidden-dirs", "--upstream", "--agent", "--from-local"
+                /* "--repo-path" — not in gh 2.91; uncomment when added */))
             .Add("update", ImmutableArray.Create(
-                "--dry-run", "--all", "--force", "--unpin", "--yes", "--non-interactive", "--json"))
-            .Add("list", ImmutableArray.Create(
-                "--json", "--agent", "--scope"))
+                "--dry-run", "--all", "--force", "--unpin"
+                /* "--yes", "--non-interactive", "--json" — not in gh 2.91 */))
+            // "list" subcommand does not exist in gh 2.91. Probing it just
+            // produces a noisy "unknown command" error in the log. Re-add when
+            // `gh skill list` ships.
+            // .Add("list", ImmutableArray.Create("--json", "--agent", "--scope"))
             .Add("search", ImmutableArray.Create(
                 "--json", "--owner", "--limit"))
             .Add("preview", ImmutableArray<string>.Empty);

@@ -73,14 +73,19 @@ public class CapabilityProbeParserTests
     }
 
     [Fact]
-    public void ProbedTokens_match_prd_11_3()
+    public void ProbedTokens_match_current_gh_skill()
     {
-        // Sanity-check the static table against the PRD enumeration.
+        // Sanity-check the static table against the flags actually shipped in
+        // the current `gh skill` (2.91). When upstream adds --repo-path /
+        // --yes / --json / `gh skill list`, restore those probes in
+        // CapabilityProbeParser and add assertions here.
         Assert.Contains("--allow-hidden-dirs", CapabilityProbeParser.ProbedTokens["install"]);
-        Assert.Contains("--repo-path", CapabilityProbeParser.ProbedTokens["install"]);
+        Assert.Contains("--from-local", CapabilityProbeParser.ProbedTokens["install"]);
         Assert.Contains("--dry-run", CapabilityProbeParser.ProbedTokens["update"]);
         Assert.Contains("--unpin", CapabilityProbeParser.ProbedTokens["update"]);
-        Assert.Contains("--json", CapabilityProbeParser.ProbedTokens["list"]);
         Assert.Contains("--owner", CapabilityProbeParser.ProbedTokens["search"]);
+        Assert.Contains("--limit", CapabilityProbeParser.ProbedTokens["search"]);
+        // Subcommand absent from gh 2.91 — no probe for it today.
+        Assert.False(CapabilityProbeParser.ProbedTokens.ContainsKey("list"));
     }
 }
