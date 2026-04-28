@@ -23,12 +23,14 @@ public sealed class GhSkillPreviewService
 
     public async Task<PreviewResult> PreviewAsync(
         string ghPath,
+        CapabilityProfile capabilities,
         string repo,
         string? skillName,
         string? version = null,
+        bool allowHiddenDirs = false,
         CancellationToken cancellationToken = default)
     {
-        var args = BuildArgs(repo, skillName, version);
+        var args = BuildArgs(repo, skillName, version, capabilities, allowHiddenDirs);
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
@@ -52,7 +54,12 @@ public sealed class GhSkillPreviewService
         };
     }
 
-    internal static IReadOnlyList<string> BuildArgs(string repo, string? skillName, string? version)
+    internal static IReadOnlyList<string> BuildArgs(
+        string repo,
+        string? skillName,
+        string? version,
+        CapabilityProfile capabilities,
+        bool allowHiddenDirs = false)
     {
         var args = new List<string> { "skill", "preview" };
         if (!string.IsNullOrEmpty(version))
@@ -70,6 +77,12 @@ public sealed class GhSkillPreviewService
         {
             args.Add(skillName);
         }
+
+        if (allowHiddenDirs && capabilities.SupportsPreviewAllowHiddenDirs)
+        {
+            args.Add("--allow-hidden-dirs");
+        }
+
         return args;
     }
 

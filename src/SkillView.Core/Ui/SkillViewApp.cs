@@ -613,8 +613,9 @@ public sealed class SkillViewApp
         {
             using var cts = new CancellationTokenSource(PreviewTimeout);
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
+            var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
             var preview = await _services.PreviewService
-                .PreviewAsync(_ghPath, repo, pick.SkillName, cancellationToken: cts.Token)
+                .PreviewAsync(_ghPath, capabilities, repo, pick.SkillName, cancellationToken: cts.Token)
                 .ConfigureAwait(false);
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>

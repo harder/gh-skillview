@@ -1,29 +1,69 @@
 using SkillView.Gh;
+using System.Collections.Immutable;
 using Xunit;
 
 namespace SkillView.Tests.Gh;
 
 public class GhSkillPreviewServiceTests
 {
+    private static CapabilityProfile CapsWithPreview(params string[] previewFlags)
+        => CapabilityProfile.Empty with
+        {
+            SkillSubcommandPresent = true,
+            PreviewFlags = ImmutableHashSet.CreateRange(previewFlags),
+        };
+
     [Fact]
     public void BuildArgs_RepoOnly()
     {
-        var args = GhSkillPreviewService.BuildArgs("vercel-labs/skills", skillName: null, version: null);
+        var args = GhSkillPreviewService.BuildArgs(
+            "vercel-labs/skills",
+            skillName: null,
+            version: null,
+            capabilities: CapsWithPreview());
         Assert.Equal(new[] { "skill", "preview", "vercel-labs/skills" }, args);
     }
 
     [Fact]
     public void BuildArgs_RepoAndSkill()
     {
-        var args = GhSkillPreviewService.BuildArgs("vercel-labs/skills", "render-md", version: null);
+        var args = GhSkillPreviewService.BuildArgs(
+            "vercel-labs/skills",
+            "render-md",
+            version: null,
+            capabilities: CapsWithPreview());
         Assert.Equal(new[] { "skill", "preview", "vercel-labs/skills", "render-md" }, args);
     }
 
     [Fact]
     public void BuildArgs_VersionIsConcatenatedWithAt()
     {
-        var args = GhSkillPreviewService.BuildArgs("owner/repo", "skill", version: "v2.0.0");
+        var args = GhSkillPreviewService.BuildArgs(
+            "owner/repo",
+            "skill",
+            version: "v2.0.0",
+            capabilities: CapsWithPreview());
         Assert.Equal(new[] { "skill", "preview", "owner/repo@v2.0.0", "skill" }, args);
+    }
+
+    [Fact]
+    public void BuildArgs_AllowHiddenDirsRequiresCapability()
+    {
+        var missing = GhSkillPreviewService.BuildArgs(
+            "owner/repo",
+            "skill",
+            version: null,
+            capabilities: CapsWithPreview(),
+            allowHiddenDirs: true);
+        Assert.DoesNotContain("--allow-hidden-dirs", missing);
+
+        var present = GhSkillPreviewService.BuildArgs(
+            "owner/repo",
+            "skill",
+            version: null,
+            capabilities: CapsWithPreview("--allow-hidden-dirs"),
+            allowHiddenDirs: true);
+        Assert.Contains("--allow-hidden-dirs", present);
     }
 
     [Fact]

@@ -478,7 +478,7 @@ public static class CliDispatcher
         if (parsed.Repo is null)
         {
             Console.Error.WriteLine("skillview: preview requires a repo (OWNER/REPO)");
-            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--json]");
+            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--allow-hidden-dirs] [--json]");
             return ExitCodes.InvalidUsage;
         }
 
@@ -491,9 +491,11 @@ public static class CliDispatcher
 
         var preview = await services.PreviewService.PreviewAsync(
             report.GhPath!,
+            report.Capabilities,
             parsed.Repo,
             parsed.SkillName,
-            parsed.Version
+            parsed.Version,
+            parsed.AllowHiddenDirs
         ).ConfigureAwait(false);
 
         if (!preview.Succeeded)
@@ -508,17 +510,19 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool Json);
+    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool AllowHiddenDirs, bool Json);
 
     internal static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
     {
         string? repo = null, skill = null, version = null;
+        var allowHiddenDirs = false;
         var json = false;
         var positional = new List<string>();
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
             if (a == "--json") { json = true; continue; }
+            if (a == "--allow-hidden-dirs") { allowHiddenDirs = true; continue; }
             if (a.StartsWith("--version=", StringComparison.Ordinal)) { version = a["--version=".Length..]; continue; }
             if (a == "--version" && i + 1 < args.Count) { version = args[++i]; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
@@ -536,7 +540,7 @@ public static class CliDispatcher
                 repo = repo[..at];
             }
         }
-        return new ParsedPreviewArgs(repo, skill, version, json);
+        return new ParsedPreviewArgs(repo, skill, version, allowHiddenDirs, json);
     }
 
     private static void WritePreviewJson(PreviewResult p)
@@ -1497,7 +1501,7 @@ public static class CliDispatcher
               rescan              Capture a fresh inventory snapshot
               search <query> [--owner <o>] [--limit <n>] [--page <n>] [--json]
                                   Search available skills
-              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--json]
+              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--allow-hidden-dirs] [--json]
                                   Show a skill preview
               install <owner/repo>[@<ref>] [<skill>] [--agent <id>]...
                       [--scope project|user|custom] [--path <dir>]
