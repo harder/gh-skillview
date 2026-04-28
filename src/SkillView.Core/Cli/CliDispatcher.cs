@@ -722,7 +722,8 @@ public static class CliDispatcher
 
         // Refuse `--all` without `--yes` unless the probe has
         // confirmed `--yes`/`--non-interactive`, or the user has explicitly
-        // asked for a dry-run. This is the v2.91.0 hang-on-prompt guard.
+        // asked for a dry-run. This keeps the current `gh` baseline from
+        // waiting on an interactive prompt.
         if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
         {
             Console.Error.WriteLine(

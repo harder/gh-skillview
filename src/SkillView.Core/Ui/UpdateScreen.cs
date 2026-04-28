@@ -19,7 +19,7 @@ namespace SkillView.Ui;
 /// are skipped unless the user flips the `--force` or `--unpin` toggles.
 /// The "--all" toggle hands off to `gh skill update --all`; when the probe
 /// hasn't reported `--yes` or `--non-interactive`, the UI refuses the combo
-/// to avoid hanging on v2.91.0's interactive prompt.
+/// to avoid hanging on the current `gh` baseline's interactive prompt.
 public sealed class UpdateScreen
 {
     private readonly IApplication _app;
