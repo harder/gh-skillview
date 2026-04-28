@@ -720,9 +720,9 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        // Refuse `--all` without `--yes` unless the probe has
-        // confirmed `--yes`/`--non-interactive`, or the user has explicitly
-        // asked for a dry-run. This is the v2.91.0 hang-on-prompt guard.
+        // Refuse `--all` without `--yes` unless the probe has confirmed the
+        // current `gh` build accepts non-interactive updates, or the user has
+        // explicitly asked for a dry-run.
         if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
         {
             Console.Error.WriteLine(
