@@ -55,6 +55,7 @@ public sealed class SkillViewApp
     private volatile bool _searching;
     private volatile bool _userInteractedSinceLaunch;
     private volatile bool _startupInstalledShown;
+    private volatile bool _startupFocusPrimed;
 
     private string _defaultStatus = " ready — press / to search or F1 for help";
     private object? _statusToken;
@@ -175,6 +176,7 @@ public sealed class SkillViewApp
         };
         _limitUpDown.ValueChanging += (_, e) =>
         {
+            NoteUserInteraction();
             if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
         };
 
@@ -363,6 +365,19 @@ public sealed class SkillViewApp
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
+        AttachStartupPointerAndKeyTracking(
+            window,
+            _leftFrame,
+            _rightFrame,
+            _queryField,
+            _ownerField,
+            _limitUpDown,
+            _resultsTable);
+        AttachStartupFocusTracking(
+            _queryField,
+            _ownerField,
+            _limitUpDown,
+            _resultsTable);
 
         RefreshResultsTable();
         _services.Logger.Subscribe(OnLogEntry);
@@ -1078,7 +1093,7 @@ public sealed class SkillViewApp
     {
         _queryField?.SetFocus();
         _queryField?.SelectAll();
-        SetStatus("search ready");
+        RestoreDefaultStatus();
     }
 
     private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
@@ -1188,14 +1203,25 @@ public sealed class SkillViewApp
     private void SetDefaultStatus(string text) => Invoke(() =>
     {
         _defaultStatus = $" {text}";
+        ApplyDefaultStatus();
+        CancelStatusAutoClear();
+    });
+
+    private void RestoreDefaultStatus() => Invoke(() =>
+    {
+        ApplyDefaultStatus();
+        CancelStatusAutoClear();
+    });
+
+    private void ApplyDefaultStatus()
+    {
         if (_statusLabel is not null)
         {
             _statusLabel.Text = _defaultStatus;
             _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
             _statusLabel.SetNeedsDraw();
         }
-        CancelStatusAutoClear();
-    });
+    }
 
     private void ScheduleStatusAutoClear()
     {
@@ -1204,12 +1230,7 @@ public sealed class SkillViewApp
         _statusToken = _app.AddTimeout(StatusAutoClear, () =>
         {
             _statusToken = null;
-            if (_statusLabel is not null)
-            {
-                _statusLabel.Text = _defaultStatus;
-                _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
-                _statusLabel.SetNeedsDraw();
-            }
+            ApplyDefaultStatus();
             return false;
         });
     }
@@ -1263,6 +1284,70 @@ public sealed class SkillViewApp
     {
         _userInteractedSinceLaunch = true;
     }
+
+    private void AttachStartupPointerAndKeyTracking(params View?[] views)
+    {
+        foreach (var view in views)
+        {
+            if (view is null)
+            {
+                continue;
+            }
+
+            view.MouseEvent += (_, _) => NoteUserInteraction();
+            view.KeyDown += (_, _) => NoteUserInteraction();
+        }
+    }
+
+    private void AttachStartupFocusTracking(params View?[] views)
+    {
+        foreach (var view in views)
+        {
+            if (view is null)
+            {
+                continue;
+            }
+
+            view.HasFocusChanged += (_, _) =>
+            {
+                if (!view.HasFocus)
+                {
+                    return;
+                }
+
+                if (!_startupFocusPrimed)
+                {
+                    _startupFocusPrimed = true;
+                    return;
+                }
+
+                NoteUserInteraction();
+            };
+        }
+    }
+
+    internal Window BuildUiForTests() => BuildUi();
+
+    internal TextField? QueryFieldForTests => _queryField;
+
+    internal TextField? OwnerFieldForTests => _ownerField;
+
+    internal NumericUpDown<int>? LimitUpDownForTests => _limitUpDown;
+
+    internal TableView? ResultsTableForTests => _resultsTable;
+
+    internal bool UserInteractedSinceLaunchForTests => _userInteractedSinceLaunch;
+
+    internal string StatusTextForTests => _statusLabel?.Text.ToString() ?? string.Empty;
+
+    internal string DefaultStatusForTests => _defaultStatus;
+
+    internal void SetDefaultStatusForTests(string text) => SetDefaultStatus(text);
+
+    internal void FocusSearchFromInstalledForTests() => FocusSearchFromInstalled();
+
+    internal bool ShouldAutoOpenInstalledOnStartupForTests(InventorySnapshot snapshot) =>
+        ShouldAutoOpenInstalledOnStartup(snapshot);
 
     /// Fire-and-forget background work with exception guard. Catches any
     /// unhandled exception, logs it, and shows a status bar message so
