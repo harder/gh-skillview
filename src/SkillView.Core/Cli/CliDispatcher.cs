@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
