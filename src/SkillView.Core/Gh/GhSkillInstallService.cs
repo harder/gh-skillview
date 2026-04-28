@@ -7,7 +7,7 @@ namespace SkillView.Gh;
 /// Wraps `gh skill install`. Capability-gated flags
 /// (`--allow-hidden-dirs`, `--upstream`, `--agent` repeatable, `--repo-path`,
 /// `--from-local`) attach only when the probe confirms them. Scope / path /
-/// version / pin / force are emitted as baseline v2.91.0 flags.
+/// version / pin / force are emitted as baseline v2.92.0 flags.
 public sealed class GhSkillInstallService
 {
     private readonly ProcessRunner _runner;

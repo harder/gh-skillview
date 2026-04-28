@@ -107,6 +107,9 @@ public static class DoctorScreen
             sb.AppendLine($"- `--upstream`           {Mark(c.SupportsUpstream)}");
             sb.AppendLine($"- `--from-local`         {Mark(c.SupportsFromLocal)}");
             sb.AppendLine();
+            sb.AppendLine("**preview**");
+            sb.AppendLine($"- `--allow-hidden-dirs`  {Mark(c.SupportsPreviewAllowHiddenDirs)}");
+            sb.AppendLine();
             sb.AppendLine("**update**");
             sb.AppendLine($"- `--dry-run`            {Mark(c.SupportsUpdateDryRun)}");
             sb.AppendLine($"- `--all`                {Mark(c.SupportsUpdateAll)}");

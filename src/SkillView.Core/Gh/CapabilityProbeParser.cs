@@ -11,24 +11,24 @@ public static class CapabilityProbeParser
     /// SkillView intentionally supports additional `gh` flags.
     ///
     /// Tokens commented out below are flags / subcommands SkillView is wired
-    /// to handle but which do not exist in the current `gh skill` (2.91 as
-    /// of writing). They are kept as code so re-enabling them is one
-    /// uncomment when the upstream feature lands.
+    /// to handle but which do not exist in the current `gh skill` (2.92 as of
+    /// writing). They are kept as code so re-enabling them is one uncomment
+    /// when the upstream feature lands.
     public static readonly ImmutableDictionary<string, ImmutableArray<string>> ProbedTokens =
         ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("install", ImmutableArray.Create(
                 "--allow-hidden-dirs", "--upstream", "--agent", "--from-local"
-                /* "--repo-path" — not in gh 2.91; uncomment when added */))
+                /* "--repo-path" — not in gh 2.92; uncomment when added */))
             .Add("update", ImmutableArray.Create(
                 "--dry-run", "--all", "--force", "--unpin"
-                /* "--yes", "--non-interactive", "--json" — not in gh 2.91 */))
-            // "list" subcommand does not exist in gh 2.91. Probing it just
+                /* "--yes", "--non-interactive", "--json" — not in gh 2.92 */))
+            // "list" subcommand does not exist in gh 2.92. Probing it just
             // produces a noisy "unknown command" error in the log. Re-add when
             // `gh skill list` ships.
             // .Add("list", ImmutableArray.Create("--json", "--agent", "--scope"))
             .Add("search", ImmutableArray.Create(
                 "--json", "--owner", "--limit"))
-            .Add("preview", ImmutableArray<string>.Empty);
+            .Add("preview", ImmutableArray.Create("--allow-hidden-dirs"));
 
     /// Scan `helpText` for each exact token in `candidates`. Tokens are matched
     /// at word boundaries so `--agent` does not accidentally match `--agents`.

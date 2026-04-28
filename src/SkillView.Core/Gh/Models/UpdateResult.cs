@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 namespace SkillView.Gh.Models;
 
 /// Outcome of a `gh skill update` invocation. Captures the raw `StdOut`
-/// (`gh skill update` does not yet emit JSON as of v2.91.0; cli/cli#13215
+/// (`gh skill update` does not yet emit JSON as of v2.92.0; cli/cli#13215
 /// tracks `--json`). When `--dry-run` is set, the adapter parses the stdout
 /// into a best-effort list of `UpdateEntry` rows for UI preview; the raw
 /// body remains for direct rendering when the parse finds nothing.

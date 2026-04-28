@@ -72,19 +72,25 @@ public static class CliDispatcher
     }
 
     private static void WriteDoctorText(EnvironmentReport r, AppOptions options)
+        => Console.Out.Write(RenderDoctorText(r, options));
+
+    internal static string RenderDoctorText(EnvironmentReport r, AppOptions options)
     {
-        Console.Out.WriteLine($"invocation    : {options.InvocationMode}");
-        Console.Out.WriteLine($"gh path       : {r.GhPath ?? "(not found)"}");
-        Console.Out.WriteLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
-        Console.Out.WriteLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
-        Console.Out.WriteLine($"gh auth       : {AuthSummary(r.Auth)}");
-        Console.Out.WriteLine($"gh skill      : {(r.Capabilities.SkillSubcommandPresent ? "present" : "(not detected)")}");
-        Console.Out.WriteLine($"gh skill list : {(r.Capabilities.HasSkillList ? "present (--json supported)" : "(not detected — filesystem fallback in use)")}");
-        Console.Out.WriteLine($"capabilities  : {CapabilitiesSummary(r.Capabilities)}");
-        Console.Out.WriteLine($"debug         : {options.Debug}");
-        Console.Out.WriteLine($"log directory : {r.LogDirectory ?? "(unset)"}");
-        Console.Out.WriteLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
-        Console.Out.WriteLine($"baseline      : {(r.BaselineOk ? "ok" : "degraded")}");
+        var sb = new StringBuilder();
+        sb.AppendLine($"invocation    : {options.InvocationMode}");
+        sb.AppendLine($"gh path       : {r.GhPath ?? "(not found)"}");
+        sb.AppendLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
+        sb.AppendLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
+        sb.AppendLine($"gh auth       : {AuthSummary(r.Auth)}");
+        sb.AppendLine($"gh skill      : {(r.Capabilities.SkillSubcommandPresent ? "present" : "(not detected)")}");
+        sb.AppendLine($"gh skill list : {(r.Capabilities.HasSkillList ? "present (--json supported)" : "(not detected — filesystem fallback in use)")}");
+        sb.AppendLine($"gh skill preview : {(r.Capabilities.SupportsPreviewAllowHiddenDirs ? "allow-hidden-dirs supported" : "(not detected)")}");
+        sb.AppendLine($"capabilities  : {CapabilitiesSummary(r.Capabilities)}");
+        sb.AppendLine($"debug         : {options.Debug}");
+        sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
+        sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
+        sb.AppendLine($"baseline      : {(r.BaselineOk ? "ok" : "degraded")}");
+        return sb.ToString();
     }
 
     private static string AuthSummary(GhAuthStatus auth)
@@ -104,6 +110,7 @@ public static class CliDispatcher
         if (!c.SkillSubcommandPresent) return "(gh skill not detected)";
         var bits = new List<string>();
         if (c.SupportsAllowHiddenDirs) bits.Add("allow-hidden-dirs");
+        if (c.SupportsPreviewAllowHiddenDirs) bits.Add("preview-allow-hidden-dirs");
         if (c.SupportsUpstream) bits.Add("upstream");
         if (c.SupportsRepoPath) bits.Add("repo-path");
         if (c.SupportsFromLocal) bits.Add("from-local");
@@ -149,9 +156,11 @@ public static class CliDispatcher
             writer.WriteBoolean("supportsUpstream", r.Capabilities.SupportsUpstream);
             writer.WriteBoolean("supportsRepoPath", r.Capabilities.SupportsRepoPath);
             writer.WriteBoolean("supportsFromLocal", r.Capabilities.SupportsFromLocal);
+            writer.WriteBoolean("supportsPreviewAllowHiddenDirs", r.Capabilities.SupportsPreviewAllowHiddenDirs);
             writer.WriteBoolean("supportsUpdateJson", r.Capabilities.SupportsUpdateJson);
             writer.WriteBoolean("supportsUpdateYes", r.Capabilities.SupportsUpdateYes);
             WriteFlagArray(writer, "installFlags", r.Capabilities.InstallFlags);
+            WriteFlagArray(writer, "previewFlags", r.Capabilities.PreviewFlags);
             WriteFlagArray(writer, "updateFlags", r.Capabilities.UpdateFlags);
             WriteFlagArray(writer, "listFlags", r.Capabilities.ListFlags);
             WriteFlagArray(writer, "searchFlags", r.Capabilities.SearchFlags);
@@ -479,7 +488,7 @@ public static class CliDispatcher
         if (parsed.Repo is null)
         {
             Console.Error.WriteLine("skillview: preview requires a repo (OWNER/REPO)");
-            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--json]");
+            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--allow-hidden-dirs] [--json]");
             return ExitCodes.InvalidUsage;
         }
 
@@ -492,9 +501,11 @@ public static class CliDispatcher
 
         var preview = await services.PreviewService.PreviewAsync(
             report.GhPath!,
+            report.Capabilities,
             parsed.Repo,
             parsed.SkillName,
-            parsed.Version
+            parsed.Version,
+            parsed.AllowHiddenDirs
         ).ConfigureAwait(false);
 
         if (!preview.Succeeded)
@@ -509,17 +520,19 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool Json);
+    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool AllowHiddenDirs, bool Json);
 
     internal static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
     {
         string? repo = null, skill = null, version = null;
+        var allowHiddenDirs = false;
         var json = false;
         var positional = new List<string>();
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
             if (a == "--json") { json = true; continue; }
+            if (a == "--allow-hidden-dirs") { allowHiddenDirs = true; continue; }
             if (a.StartsWith("--version=", StringComparison.Ordinal)) { version = a["--version=".Length..]; continue; }
             if (a == "--version" && i + 1 < args.Count) { version = args[++i]; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
@@ -537,7 +550,7 @@ public static class CliDispatcher
                 repo = repo[..at];
             }
         }
-        return new ParsedPreviewArgs(repo, skill, version, json);
+        return new ParsedPreviewArgs(repo, skill, version, allowHiddenDirs, json);
     }
 
     private static void WritePreviewJson(PreviewResult p)
@@ -721,10 +734,9 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        // Refuse `--all` without `--yes` unless the probe has
-        // confirmed `--yes`/`--non-interactive`, or the user has explicitly
-        // asked for a dry-run. This keeps the current `gh` baseline from
-        // waiting on an interactive prompt.
+        // Refuse `--all` without `--yes` unless the probe has confirmed the
+        // current `gh` build accepts non-interactive updates, or the user has
+        // explicitly asked for a dry-run.
         if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
         {
             Console.Error.WriteLine(
@@ -1499,7 +1511,7 @@ public static class CliDispatcher
               rescan              Capture a fresh inventory snapshot
               search <query> [--owner <o>] [--limit <n>] [--page <n>] [--json]
                                   Search available skills
-              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--json]
+              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--allow-hidden-dirs] [--json]
                                   Show a skill preview
               install <owner/repo>[@<ref>] [<skill>] [--agent <id>]...
                       [--scope project|user|custom] [--path <dir>]

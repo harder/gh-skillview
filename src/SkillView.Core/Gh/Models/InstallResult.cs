@@ -3,7 +3,7 @@ namespace SkillView.Gh.Models;
 /// Outcome of a `gh skill install` invocation. The raw `StdOut` is preserved
 /// for UI surfacing — `gh skill install` prints an install summary that the
 /// adapter does not try to structurally parse (no `--json` on install as of
-/// v2.91.0; cli/cli#13215 tracks JSON output for automation).
+/// v2.92.0; cli/cli#13215 tracks JSON output for automation).
 public sealed record InstallResult
 {
     public required string Repo { get; init; }

@@ -24,7 +24,7 @@ SkillView is for people who want `gh skill` to feel easier to browse and safer t
 
 ### Runtime requirements
 
-- **GitHub CLI**: `gh` **v2.91.0 or newer**
+- **GitHub CLI**: `gh` **v2.92.0 or newer**
 - A terminal that supports standard ANSI TUI behavior
 - A working `gh` setup; `gh auth login` is recommended for the best experience
 

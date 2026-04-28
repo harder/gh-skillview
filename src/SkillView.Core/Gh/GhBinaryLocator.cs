@@ -9,9 +9,9 @@ namespace SkillView.Gh;
 /// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
-    /// Minimum supported `gh` — the first release that shipped the `gh skill`
-    /// subcommand set SkillView depends on.
-    public static readonly SemVer MinimumVersion = new(2, 91, 0);
+    /// Minimum supported `gh` — the first release that includes the capability
+    /// probes SkillView depends on.
+    public static readonly SemVer MinimumVersion = new(2, 92, 0);
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
@@ -59,7 +59,7 @@ public sealed class GhBinaryLocator
             return null;
         }
 
-        // `gh version 2.91.0 (2026-03-…)` — first non-empty line, second token
+        // `gh version 2.92.0 (2026-03-…)` — first non-empty line, second token
         foreach (var line in result.StdOut.Split('\n'))
         {
             var trimmed = line.Trim();

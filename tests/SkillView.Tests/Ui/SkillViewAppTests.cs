@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using SkillView.Bootstrapping;
+using SkillView.Gh;
+using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
@@ -11,6 +13,24 @@ namespace SkillView.Tests.Ui;
 
 public sealed class SkillViewAppTests
 {
+    private static GhAuthStatus LoggedInAuth(string? activeHost = "github.com") => new()
+    {
+        LoggedIn = true,
+        ActiveHost = activeHost,
+        Account = "octocat",
+        Hosts = activeHost is null ? ImmutableArray<string>.Empty : ImmutableArray.Create(activeHost),
+        RawOutput = string.Empty,
+    };
+
+    private static GhAuthStatus LoggedOutAuth(string? activeHost = "github.com") => new()
+    {
+        LoggedIn = false,
+        ActiveHost = activeHost,
+        Account = null,
+        Hosts = activeHost is null ? ImmutableArray<string>.Empty : ImmutableArray.Create(activeHost),
+        RawOutput = string.Empty,
+    };
+
     private static SkillViewApp CreateApp()
     {
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
@@ -118,5 +138,63 @@ public sealed class SkillViewAppTests
         app.FocusSearchFromInstalledForTests();
 
         Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
+    }
+
+    [Fact]
+    public void BuildRepoUrl_UsesGitHubCom_WhenAuthMissing()
+    {
+        var url = SkillViewApp.BuildRepoUrl(null, "owner/repo");
+
+        Assert.Equal("https://github.com/owner/repo", url);
+    }
+
+    [Fact]
+    public void BuildRepoUrl_UsesActiveHost_WhenAvailable()
+    {
+        var url = SkillViewApp.BuildRepoUrl(LoggedInAuth("ghe.example.com"), "owner/repo");
+
+        Assert.Equal("https://ghe.example.com/owner/repo", url);
+    }
+
+    [Fact]
+    public void BuildRepoUrl_FallsBackToGitHubCom_WhenLoggedOut()
+    {
+        var url = SkillViewApp.BuildRepoUrl(LoggedOutAuth("ghe.example.com"), "owner/repo");
+
+        Assert.Equal("https://github.com/owner/repo", url);
+    }
+
+    [Fact]
+    public void RenderSearchMetadata_UsesActiveHost_ForRepoUrl()
+    {
+        var metadata = SkillViewApp.RenderSearchMetadata(
+            new SearchResultSkill(
+                Description: "desc",
+                Namespace: "ns",
+                Path: "/skills/repo",
+                Repo: "owner/repo",
+                SkillName: "demo",
+                Stars: 42),
+            LoggedInAuth("ghe.example.com"));
+
+        Assert.Contains("https://ghe.example.com/owner/repo", metadata);
+        Assert.DoesNotContain("https://github.com/owner/repo", metadata);
+    }
+
+    [Theory]
+    [InlineData(".github/skills/demo", true)]
+    [InlineData("skills/demo", false)]
+    public void ShouldAllowHiddenDirPreview_DetectsHiddenPathSegments(string? path, bool expected)
+    {
+        var result = SkillViewApp.ShouldAllowHiddenDirPreview(
+            new SearchResultSkill(
+                Description: null,
+                Namespace: "ns",
+                Path: path,
+                Repo: "owner/repo",
+                SkillName: "demo",
+                Stars: null));
+
+        Assert.Equal(expected, result);
     }
 }
