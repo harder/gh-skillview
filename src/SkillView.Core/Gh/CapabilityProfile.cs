@@ -27,6 +27,7 @@ public sealed record CapabilityProfile
     public bool SupportsUpdateUnpin => UpdateFlags.Contains("--unpin");
     public bool SupportsUpdateYes => UpdateFlags.Contains("--yes") || UpdateFlags.Contains("--non-interactive");
     public bool SupportsUpdateJson => UpdateFlags.Contains("--json");
+    public bool SupportsPreviewAllowHiddenDirs => PreviewFlags.Contains("--allow-hidden-dirs");
     public bool HasSkillList => ListSubcommandPresent && ListFlags.Contains("--json");
     public bool SupportsListAgent => ListFlags.Contains("--agent");
     public bool SupportsListScope => ListFlags.Contains("--scope");

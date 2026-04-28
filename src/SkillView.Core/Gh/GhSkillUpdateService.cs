@@ -8,9 +8,9 @@ namespace SkillView.Gh;
 /// Wraps `gh skill update`. Capability-gated flags
 /// (`--dry-run`, `--all`, `--force`, `--unpin`, `--yes`/`--non-interactive`,
 /// `--json`) attach only when the probe confirms them. Positional skill
-/// names are passed through unconditionally; v2.91.0 accepts them.
+/// names are passed through unconditionally; v2.92.0 accepts them.
 ///
-/// `update --all` on v2.91.0 blocks on an interactive confirmation prompt
+/// `update --all` on v2.92.0 blocks on an interactive confirmation prompt
 /// when `--yes` is absent upstream. When the probe reports
 /// `SupportsUpdateYes`, the adapter appends the available flag so scripted
 /// callers don't hang. Until it lands, the caller can still pass specific

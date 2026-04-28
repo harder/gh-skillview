@@ -80,7 +80,7 @@ EntryPoint.RunAsync
 `GhSkillCapabilityProbe` parses `gh skill <sub> --help` output to detect which
 flags the installed `gh` version supports. Adapters only emit flags that the
 probe confirmed — this keeps the app forward-compatible with evolving `gh`
-releases.
+releases, including preview-only flags such as `--allow-hidden-dirs`.
 
 ## Key conventions
 
@@ -188,8 +188,8 @@ These rules govern all changes — they are the project's architectural invarian
 
 ## Key upstream dependencies and gating
 
-- **`gh` minimum**: v2.91.0. Hard-enforced in `GhBinaryLocator.MinimumVersion`.
+- **`gh` minimum**: v2.92.0. Hard-enforced in `GhBinaryLocator.MinimumVersion`.
 - **`gh skill list --json`** (cli/cli#13215): not yet landed. `GhSkillListAdapter` is gated on `capabilities.HasSkillList` — flips automatically when `gh` adds the flags.
-- **`gh skill update --yes`**: not in v2.91.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
+- **`gh skill update --yes`**: not in v2.92.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
 - **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
 - **Terminal.Gui v2**: pinned at `2.0.0-rc.6`. Known AOT workarounds documented in `PHASE0_NOTES.md`; `TrimmerRootAssembly` required for the full assembly.

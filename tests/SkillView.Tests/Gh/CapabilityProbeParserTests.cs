@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Gh;
 using Xunit;
 
@@ -51,6 +52,22 @@ public class CapabilityProbeParserTests
     }
 
     [Fact]
+    public void ScanTokens_detects_preview_allow_hidden_dirs()
+    {
+        const string previewHelp = """
+            Usage: gh skill preview [flags]
+
+            Flags:
+              --allow-hidden-dirs   Include hidden directories
+              -h, --help             help for preview
+            """;
+
+        var present = CapabilityProbeParser.ScanTokens(previewHelp, CapabilityProbeParser.ProbedTokens["preview"]);
+
+        Assert.Contains("--allow-hidden-dirs", present);
+    }
+
+    [Fact]
     public void LooksLikeHelpOutput_accepts_realistic_gh_help()
     {
         const string help = """
@@ -76,7 +93,7 @@ public class CapabilityProbeParserTests
     public void ProbedTokens_match_current_gh_skill()
     {
         // Sanity-check the static table against the flags actually shipped in
-        // the current `gh skill` (2.91). When upstream adds --repo-path /
+        // the current `gh skill` (2.92). When upstream adds --repo-path /
         // --yes / --json / `gh skill list`, restore those probes in
         // CapabilityProbeParser and add assertions here.
         Assert.Contains("--allow-hidden-dirs", CapabilityProbeParser.ProbedTokens["install"]);
@@ -85,7 +102,25 @@ public class CapabilityProbeParserTests
         Assert.Contains("--unpin", CapabilityProbeParser.ProbedTokens["update"]);
         Assert.Contains("--owner", CapabilityProbeParser.ProbedTokens["search"]);
         Assert.Contains("--limit", CapabilityProbeParser.ProbedTokens["search"]);
-        // Subcommand absent from gh 2.91 — no probe for it today.
+        Assert.Contains("--allow-hidden-dirs", CapabilityProbeParser.ProbedTokens["preview"]);
+        // Subcommand absent from gh 2.92 — no probe for it today.
         Assert.False(CapabilityProbeParser.ProbedTokens.ContainsKey("list"));
+    }
+
+    [Fact]
+    public void SupportsPreviewAllowHiddenDirs_reflects_preview_flags()
+    {
+        var profile = new CapabilityProfile
+        {
+            SkillSubcommandPresent = true,
+            ListSubcommandPresent = false,
+            SearchFlags = ImmutableHashSet<string>.Empty,
+            InstallFlags = ImmutableHashSet<string>.Empty,
+            UpdateFlags = ImmutableHashSet<string>.Empty,
+            ListFlags = ImmutableHashSet<string>.Empty,
+            PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
+        };
+
+        Assert.True(profile.SupportsPreviewAllowHiddenDirs);
     }
 }

@@ -24,7 +24,7 @@ SkillView is for people who want `gh skill` to feel easier to browse and safer t
 
 ### Runtime requirements
 
-- **GitHub CLI**: `gh` **v2.91.0 or newer**
+- **GitHub CLI**: `gh` **v2.92.0 or newer**
 - A terminal that supports standard ANSI TUI behavior
 - A working `gh` setup; `gh auth login` is recommended for the best experience
 
@@ -309,7 +309,7 @@ The app is designed around Native AOT constraints.
 
 SkillView does not assume every `gh` build supports the same flags.
 
-It probes `gh skill ... --help` and only emits flags the local installation actually supports. That keeps the app safer across evolving GitHub CLI releases.
+It probes `gh skill ... --help` and only emits flags the local installation actually supports, including preview-only capabilities like `--allow-hidden-dirs`. That keeps the app safer across evolving GitHub CLI releases.
 
 #### Safe mutation operations
 

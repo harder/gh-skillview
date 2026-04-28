@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 namespace SkillView.Gh.Models;
 
 /// Speculative shape of a `gh skill list --json` record. cli/cli#13215 has not
-/// landed as of v2.91.0 — the field set here is defensive and interpreted via
+/// landed as of v2.92.0 — the field set here is defensive and interpreted via
 /// tolerant JSON parsing (see `GhSkillListAdapter`). When the upstream schema
 /// lands, the adapter tightens; this record remains the SkillView-internal
 /// projection.

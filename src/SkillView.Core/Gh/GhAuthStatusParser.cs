@@ -5,7 +5,7 @@ namespace SkillView.Gh;
 
 /// Pure parser for `gh auth status` text output. Separated from the subprocess
 /// service so tests feed fixtures directly. `gh auth status` has no `--json`
-/// mode as of v2.91.0 — text parsing is the only option.
+/// mode as of v2.92.0 — text parsing is the only option.
 public static partial class GhAuthStatusParser
 {
     // "✓ Logged in to github.com account foo (keyring)" (v2.58+)

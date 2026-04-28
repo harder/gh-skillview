@@ -65,7 +65,7 @@ public class GhSkillSearchServiceTests
     public void BuildArgs_FallbackWhenCapabilitiesUnknown_IncludesJsonAndLimit()
     {
         // Empty capabilities (e.g. probe not yet run) → still emit the core
-        // flags so the call works against v2.91.0 (which has --json + --limit).
+        // flags so the call works against v2.92.0 (which has --json + --limit).
         var caps = CapabilityProfile.Empty;
         var args = GhSkillSearchService.BuildArgs("q", caps, owner: null, limit: 30, page: 1);
         Assert.Contains("--json", args);

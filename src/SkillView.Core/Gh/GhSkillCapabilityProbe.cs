@@ -39,7 +39,7 @@ public sealed class GhSkillCapabilityProbe
         var install = await ProbeSubAsync(ghPath, "install", cancellationToken).ConfigureAwait(false);
         var update = await ProbeSubAsync(ghPath, "update", cancellationToken).ConfigureAwait(false);
         var preview = await ProbeSubAsync(ghPath, "preview", cancellationToken).ConfigureAwait(false);
-        // `gh skill list` does not exist in gh 2.91 (cli/cli#13215). Probing
+        // `gh skill list` does not exist in gh 2.92 (cli/cli#13215). Probing
         // it just emits an "unknown command" error. When the upstream lands,
         // restore the probe and the list-related capability flags below.
         // var list = await ProbeSubAsync(ghPath, "list", cancellationToken).ConfigureAwait(false);

@@ -40,6 +40,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - For PTY-driven TUI testing, use an isolated temp workspace and verify
   side-effects from the shell after each destructive step. See
   `agent_docs/tui-pty-testing.md`.
+- SkillView now requires `gh` 2.92.0 or newer, and capability probing includes
+  preview support for `--allow-hidden-dirs`.
 - When testing install flows against current `gh`, do not assume the UI's
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
