@@ -68,6 +68,14 @@ public sealed class SkillViewApp
 
     internal static bool ShouldOpenInstalledOnStartup(InventorySnapshot snapshot) => snapshot.Skills.Length > 0;
 
+    internal static bool ShouldAutoOpenInstalledOnStartup(
+        InventorySnapshot snapshot,
+        bool startupInstalledShown,
+        bool userInteractedSinceLaunch) =>
+        !startupInstalledShown
+        && !userInteractedSinceLaunch
+        && ShouldOpenInstalledOnStartup(snapshot);
+
     // TODO(tg2): upstream — IApplication.Init is flagged RequiresUnreferencedCode /
     // RequiresDynamicCode in rc.4 via ConfigurationManager reflection. Surface to
     // gui-cs/Terminal.Gui with an AOT-friendly config model, then drop this.
@@ -1246,9 +1254,10 @@ public sealed class SkillViewApp
     }
 
     private bool ShouldAutoOpenInstalledOnStartup(InventorySnapshot snapshot) =>
-        !_startupInstalledShown
-        && !_userInteractedSinceLaunch
-        && ShouldOpenInstalledOnStartup(snapshot);
+        ShouldAutoOpenInstalledOnStartup(
+            snapshot,
+            _startupInstalledShown,
+            _userInteractedSinceLaunch);
 
     private void NoteUserInteraction()
     {

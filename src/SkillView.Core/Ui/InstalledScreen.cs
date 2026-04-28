@@ -15,6 +15,8 @@ namespace SkillView.Ui;
 public static class InstalledScreen
 {
     private enum SortMode { Name, Package, Scope }
+    internal enum ShortcutCommand { None, Close, GoToSearch, FocusFilter, FocusTable, CycleSort, Remove, Open }
+    internal readonly record struct ShortcutDecision(ShortcutCommand Command, bool RequestStop);
 
     public static void Show(
         IApplication app,
@@ -250,73 +252,60 @@ public static class InstalledScreen
         // tears down the run loop mid-call.
         bool HandleShortcut(Key key)
         {
-            if (filterField.HasFocus) return false;
-            if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
+            var decision = DecideShortcut(key, filterField.HasFocus, onRemove is not null);
+            if (decision.Command == ShortcutCommand.None)
+            {
+                return false;
+            }
+
+            if (decision.RequestStop)
             {
                 app.RequestStop();
-                return true;
             }
-            var r = key.AsRune.Value;
-            if (r == '/')
+
+            switch (decision.Command)
             {
-                goToSearchRequested = true;
-                app.RequestStop();
-                return true;
-            }
-            if (r == 'f' || r == 'F')
-            {
-                filterField.SetFocus();
-                filterField.SelectAll();
-                return true;
-            }
-            if (r == 's' || r == 'S')
-            {
-                sort = sort switch
+                case ShortcutCommand.GoToSearch:
+                    goToSearchRequested = true;
+                    break;
+                case ShortcutCommand.FocusFilter:
+                    filterField.SetFocus();
+                    filterField.SelectAll();
+                    break;
+                case ShortcutCommand.FocusTable:
+                    table.SetFocus();
+                    break;
+                case ShortcutCommand.CycleSort:
+                    sort = sort switch
+                    {
+                        SortMode.Name => hasPackages ? SortMode.Package : SortMode.Scope,
+                        SortMode.Package => SortMode.Scope,
+                        _ => SortMode.Name,
+                    };
+                    RefreshAll();
+                    break;
+                case ShortcutCommand.Remove:
                 {
-                    SortMode.Name => hasPackages ? SortMode.Package : SortMode.Scope,
-                    SortMode.Package => SortMode.Scope,
-                    _ => SortMode.Name,
-                };
-                RefreshAll();
-                return true;
-            }
-            if ((r == 'x' || r == 'X') && onRemove is not null)
-            {
-                var i = table.GetSelectedRow();
-                if (i >= 0 && i < rows.Count) onRemove(rows[i]);
-                return true;
-            }
-            if (r == 'o' || r == 'O')
-            {
-                var i = table.GetSelectedRow();
-                if (i >= 0 && i < rows.Count)
-                {
-                    TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
+                    var i = table.GetSelectedRow();
+                    if (i >= 0 && i < rows.Count) onRemove?.Invoke(rows[i]);
+                    break;
                 }
-                return true;
+                case ShortcutCommand.Open:
+                {
+                    var i = table.GetSelectedRow();
+                    if (i >= 0 && i < rows.Count)
+                    {
+                        TuiHelpers.OpenInDefaultHandler(rows[i].ResolvedPath);
+                    }
+                    break;
+                }
             }
-            return false;
+
+            return true;
         }
 
         window.KeyDown += (_, key) =>
         {
-            // Filter-field Esc returns focus to the table without quitting.
-            if (filterField.HasFocus)
-            {
-                if (key.AsRune.Value == '/')
-                {
-                    goToSearchRequested = true;
-                    app.RequestStop();
-                    key.Handled = true;
-                    return;
-                }
-                if (key.KeyCode == KeyCode.Esc)
-                {
-                    table.SetFocus();
-                    key.Handled = true;
-                }
-                return;
-            }
             if (HandleShortcut(key)) key.Handled = true;
         };
 
@@ -349,6 +338,50 @@ public static class InstalledScreen
         list.Add(new() { Key = Key.Esc, Title = "Esc", HelpText = "Back" });
         list.Add(new() { Key = (Key)'q', Title = "q", HelpText = "Quit" });
         return list.ToArray();
+    }
+
+    internal static ShortcutDecision DecideShortcut(Key key, bool filterHasFocus, bool canRemove)
+    {
+        if (filterHasFocus)
+        {
+            if (key.AsRune.Value == '/')
+            {
+                return new ShortcutDecision(ShortcutCommand.GoToSearch, RequestStop: true);
+            }
+
+            return key.KeyCode == KeyCode.Esc
+                ? new ShortcutDecision(ShortcutCommand.FocusTable, RequestStop: false)
+                : default;
+        }
+
+        if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
+        {
+            return new ShortcutDecision(ShortcutCommand.Close, RequestStop: true);
+        }
+
+        var r = key.AsRune.Value;
+        if (r == '/')
+        {
+            return new ShortcutDecision(ShortcutCommand.GoToSearch, RequestStop: true);
+        }
+        if (r == 'f' || r == 'F')
+        {
+            return new ShortcutDecision(ShortcutCommand.FocusFilter, RequestStop: false);
+        }
+        if (r == 's' || r == 'S')
+        {
+            return new ShortcutDecision(ShortcutCommand.CycleSort, RequestStop: false);
+        }
+        if (canRemove && (r == 'x' || r == 'X'))
+        {
+            return new ShortcutDecision(ShortcutCommand.Remove, RequestStop: false);
+        }
+        if (r == 'o' || r == 'O')
+        {
+            return new ShortcutDecision(ShortcutCommand.Open, RequestStop: false);
+        }
+
+        return default;
     }
 
     private static string DisplayScope(Scope s) => s switch
