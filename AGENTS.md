@@ -45,11 +45,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - When testing install flows against current `gh`, do not assume the UI's
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
-- Current package compatibility: Terminal.Gui `2.0.0-rc.6` is good, but
+- Current package compatibility: Terminal.Gui `2.0.0-rc.7` is good, but
   `Microsoft.NET.Test.Sdk` `18.4.0` breaks `TuiHelpersTests` with a
   `MemberNotNullWhenAttribute` `TypeLoadException` during Terminal.Gui config
   initialization. Keep the test SDK at `17.11.1` until that compatibility issue
   is resolved.
+- Terminal.Gui rc.7 no longer needs `TrimmerRootAssembly` for the old
+  `ConfigurationManager` trim issue; SkillView's AOT publish now verifies
+  cleanly without rooting the full TG2 assembly.
 - Record newly discovered PTY/session-specific bugs in
   `PTY_SESSION_UX_ISSUES.md`, not in the older `PHASE10_UX_ISSUES.md` backlog.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns

@@ -8,19 +8,14 @@
     <StripSymbols>true</StripSymbols>
     <InvariantGlobalization>true</InvariantGlobalization>
     <SelfContained>true</SelfContained>
-    <!-- TG2 rc.6 still emits IL2026/IL3050/IL3053 through its ConfigurationManager
-         reflection path. Suppressed until the upstream fix lands (§14 mandate). -->
+    <!-- Keep TG2 trim warnings suppressed while we validate the broader rc.7
+         AOT surface beyond the ConfigurationManager trim-safety fix (§14 mandate). -->
     <NoWarn>$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SkillView.Core\SkillView.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- TODO(tg2): upstream — mirrors SkillView.App; see that project for detail. -->
-    <TrimmerRootAssembly Include="Terminal.Gui" />
   </ItemGroup>
 
 </Project>

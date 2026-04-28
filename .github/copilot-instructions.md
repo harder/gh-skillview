@@ -96,10 +96,11 @@ Every code path must be Native AOT safe. This means:
 - **Regex**: use `[GeneratedRegex]` partial methods, never `new Regex(...)`.
 - **YAML**: hand-rolled subset parser (`FrontMatterParser`), not YamlDotNet.
 - **Arg parsing**: hand-rolled `ArgParser`, not any third-party library.
-- **TG2 trimming**: both exe projects root `Terminal.Gui` as a
-  `TrimmerRootAssembly` and suppress `IL2026`/`IL3050`/`IL3053`. Mark new
-  TG2 call sites with `[UnconditionalSuppressMessage]` if the analyzer flags
-  them, and add a `// TODO(tg2):` comment referencing the upstream issue.
+- **TG2 trimming**: rc.7 removed the old `ConfigurationManager`
+  `TrimmerRootAssembly` requirement. The exe projects still suppress
+  `IL2026`/`IL3050`/`IL3053` while the broader TG2 AOT surface is validated.
+  Mark new TG2 call sites with `[UnconditionalSuppressMessage]` if the analyzer
+  flags them, and add a `// TODO(tg2):` comment referencing the upstream issue.
 
 ### Immutability
 
@@ -193,4 +194,4 @@ These rules govern all changes — they are the project's architectural invarian
 - **`gh skill list --json`** (cli/cli#13215): not yet landed. `GhSkillListAdapter` is gated on `capabilities.HasSkillList` — flips automatically when `gh` adds the flags.
 - **`gh skill update --yes`**: not in v2.92.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
 - **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
-- **Terminal.Gui v2**: pinned at `2.0.0-rc.6`. Known AOT workarounds documented in `PHASE0_NOTES.md`; `TrimmerRootAssembly` required for the full assembly.
+- **Terminal.Gui v2**: pinned at `2.0.0-rc.7`. The old `TrimmerRootAssembly` workaround is retired; remaining AOT caveats are documented in `PHASE0_NOTES.md`.

@@ -4,13 +4,13 @@
     <OutputType>Library</OutputType>
     <RootNamespace>SkillView</RootNamespace>
     <AssemblyName>SkillView.Core</AssemblyName>
-    <!-- NOTE: IsAotCompatible=true would promote Terminal.Gui rc.6's trim
-         warnings (Configuration scope JSON converters via reflection) to errors.
-         TODO(tg2): upstream an AOT-safe config surface and re-enable this flag. -->
+    <!-- NOTE: Terminal.Gui rc.7 fixed ConfigurationManager trim-safety, but we
+         still keep IsAotCompatible off until the broader TG2 AOT surface is
+         re-evaluated under publish verification. -->
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Terminal.Gui" Version="2.0.0-rc.6" />
+    <PackageReference Include="Terminal.Gui" Version="2.0.0-rc.7" />
   </ItemGroup>
 
   <ItemGroup>
