@@ -78,9 +78,10 @@ EntryPoint.RunAsync
 ### Capability gating
 
 `GhSkillCapabilityProbe` parses `gh skill <sub> --help` output to detect which
-flags the installed `gh` version supports. Adapters only emit flags that the
-probe confirmed — this keeps the app forward-compatible with evolving `gh`
-releases.
+flags the installed `gh` version supports. That covers preview probing/support
+for shared flags like `--allow-hidden-dirs` as well as install-time gating.
+Adapters only emit flags that the probe confirmed — this keeps the app
+forward-compatible with evolving `gh` releases.
 
 ## Key conventions
 

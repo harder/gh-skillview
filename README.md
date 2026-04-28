@@ -309,7 +309,7 @@ The app is designed around Native AOT constraints.
 
 SkillView does not assume every `gh` build supports the same flags.
 
-It probes `gh skill ... --help` and only emits flags the local installation actually supports. That keeps the app safer across evolving GitHub CLI releases.
+It probes `gh skill ... --help` so preview and install features can discover the flags the local installation actually supports, including shared flags like `--allow-hidden-dirs`. That keeps the app safer across evolving GitHub CLI releases.
 
 #### Safe mutation operations
 
