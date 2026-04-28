@@ -71,19 +71,25 @@ public static class CliDispatcher
     }
 
     private static void WriteDoctorText(EnvironmentReport r, AppOptions options)
+        => Console.Out.Write(RenderDoctorText(r, options));
+
+    internal static string RenderDoctorText(EnvironmentReport r, AppOptions options)
     {
-        Console.Out.WriteLine($"invocation    : {options.InvocationMode}");
-        Console.Out.WriteLine($"gh path       : {r.GhPath ?? "(not found)"}");
-        Console.Out.WriteLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
-        Console.Out.WriteLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
-        Console.Out.WriteLine($"gh auth       : {AuthSummary(r.Auth)}");
-        Console.Out.WriteLine($"gh skill      : {(r.Capabilities.SkillSubcommandPresent ? "present" : "(not detected)")}");
-        Console.Out.WriteLine($"gh skill list : {(r.Capabilities.HasSkillList ? "present (--json supported)" : "(not detected — filesystem fallback in use)")}");
-        Console.Out.WriteLine($"capabilities  : {CapabilitiesSummary(r.Capabilities)}");
-        Console.Out.WriteLine($"debug         : {options.Debug}");
-        Console.Out.WriteLine($"log directory : {r.LogDirectory ?? "(unset)"}");
-        Console.Out.WriteLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
-        Console.Out.WriteLine($"baseline      : {(r.BaselineOk ? "ok" : "degraded")}");
+        var sb = new StringBuilder();
+        sb.AppendLine($"invocation    : {options.InvocationMode}");
+        sb.AppendLine($"gh path       : {r.GhPath ?? "(not found)"}");
+        sb.AppendLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
+        sb.AppendLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
+        sb.AppendLine($"gh auth       : {AuthSummary(r.Auth)}");
+        sb.AppendLine($"gh skill      : {(r.Capabilities.SkillSubcommandPresent ? "present" : "(not detected)")}");
+        sb.AppendLine($"gh skill list : {(r.Capabilities.HasSkillList ? "present (--json supported)" : "(not detected — filesystem fallback in use)")}");
+        sb.AppendLine($"gh skill preview : {(r.Capabilities.SupportsPreviewAllowHiddenDirs ? "allow-hidden-dirs supported" : "(not detected)")}");
+        sb.AppendLine($"capabilities  : {CapabilitiesSummary(r.Capabilities)}");
+        sb.AppendLine($"debug         : {options.Debug}");
+        sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
+        sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
+        sb.AppendLine($"baseline      : {(r.BaselineOk ? "ok" : "degraded")}");
+        return sb.ToString();
     }
 
     private static string AuthSummary(GhAuthStatus auth)
@@ -103,6 +109,7 @@ public static class CliDispatcher
         if (!c.SkillSubcommandPresent) return "(gh skill not detected)";
         var bits = new List<string>();
         if (c.SupportsAllowHiddenDirs) bits.Add("allow-hidden-dirs");
+        if (c.SupportsPreviewAllowHiddenDirs) bits.Add("preview-allow-hidden-dirs");
         if (c.SupportsUpstream) bits.Add("upstream");
         if (c.SupportsRepoPath) bits.Add("repo-path");
         if (c.SupportsFromLocal) bits.Add("from-local");
@@ -148,9 +155,11 @@ public static class CliDispatcher
             writer.WriteBoolean("supportsUpstream", r.Capabilities.SupportsUpstream);
             writer.WriteBoolean("supportsRepoPath", r.Capabilities.SupportsRepoPath);
             writer.WriteBoolean("supportsFromLocal", r.Capabilities.SupportsFromLocal);
+            writer.WriteBoolean("supportsPreviewAllowHiddenDirs", r.Capabilities.SupportsPreviewAllowHiddenDirs);
             writer.WriteBoolean("supportsUpdateJson", r.Capabilities.SupportsUpdateJson);
             writer.WriteBoolean("supportsUpdateYes", r.Capabilities.SupportsUpdateYes);
             WriteFlagArray(writer, "installFlags", r.Capabilities.InstallFlags);
+            WriteFlagArray(writer, "previewFlags", r.Capabilities.PreviewFlags);
             WriteFlagArray(writer, "updateFlags", r.Capabilities.UpdateFlags);
             WriteFlagArray(writer, "listFlags", r.Capabilities.ListFlags);
             WriteFlagArray(writer, "searchFlags", r.Capabilities.SearchFlags);

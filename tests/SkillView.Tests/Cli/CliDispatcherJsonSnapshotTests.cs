@@ -70,9 +70,57 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Equal("/usr/bin/gh", doc.GetProperty("ghPath").GetString());
         Assert.True(doc.GetProperty("ghMeetsMinimum").GetBoolean());
         Assert.True(doc.GetProperty("baselineOk").GetBoolean());
+        var caps = doc.GetProperty("capabilities");
+        Assert.False(caps.GetProperty("supportsPreviewAllowHiddenDirs").GetBoolean());
+        Assert.Equal(0, caps.GetProperty("previewFlags").GetArrayLength());
         Assert.True(doc.TryGetProperty("auth", out _));
         Assert.True(doc.TryGetProperty("capabilities", out _));
         Assert.True(doc.TryGetProperty("scanRoots", out _));
+    }
+
+    [Fact]
+    public void Doctor_JsonReportsPreviewHiddenDirCapability()
+    {
+        var report = SampleReport() with
+        {
+            Capabilities = CapabilityProfile.Empty with
+            {
+                SkillSubcommandPresent = true,
+                PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
+            },
+        };
+
+        var doc = Parse(CliDispatcher.RenderDoctorJson(report, DefaultOptions()));
+        var caps = doc.GetProperty("capabilities");
+        Assert.True(caps.GetProperty("supportsPreviewAllowHiddenDirs").GetBoolean());
+        Assert.Equal(1, caps.GetProperty("previewFlags").GetArrayLength());
+        Assert.Equal("--allow-hidden-dirs", caps.GetProperty("previewFlags")[0].GetString());
+    }
+
+    [Fact]
+    public void Doctor_TextReportsPreviewHiddenDirCapability()
+    {
+        var report = SampleReport() with
+        {
+            Capabilities = CapabilityProfile.Empty with
+            {
+                SkillSubcommandPresent = true,
+                PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
+            },
+        };
+
+        var body = CliDispatcher.RenderDoctorText(report, DefaultOptions());
+        Assert.Contains("gh skill preview : allow-hidden-dirs supported", body);
+        Assert.Contains("preview-allow-hidden-dirs", body);
+    }
+
+    [Fact]
+    public void Doctor_TextMarksPreviewHiddenDirCapabilityAbsent()
+    {
+        var body = CliDispatcher.RenderDoctorText(SampleReport(), DefaultOptions());
+
+        Assert.Contains("gh skill preview : (not detected)", body);
+        Assert.DoesNotContain("preview-allow-hidden-dirs", body);
     }
 
     // --- list ------------------------------------------------------------
