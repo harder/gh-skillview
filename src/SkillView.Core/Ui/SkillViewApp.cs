@@ -754,7 +754,7 @@ public sealed class SkillViewApp
         }
         else
         {
-            text = RenderSearchMetadata(_results[row]);
+            text = RenderSearchMetadata(_results[row], _lastReport?.Auth.ActiveHost);
         }
         _metadataPane.Text = text;
 
@@ -767,7 +767,18 @@ public sealed class SkillViewApp
         if (_metadataFrame is not null) _metadataFrame.Height = height + 2; // borders
     }
 
-    private static string RenderSearchMetadata(SearchResultSkill s)
+    internal static string BuildRepoUrl(string? activeHost, string? repo)
+    {
+        if (string.IsNullOrWhiteSpace(repo))
+        {
+            return string.Empty;
+        }
+
+        var host = string.IsNullOrWhiteSpace(activeHost) ? "github.com" : activeHost.Trim();
+        return $"https://{host}/{repo.Trim()}";
+    }
+
+    internal static string RenderSearchMetadata(SearchResultSkill s, string? activeHost)
     {
         // One **label**: value pair per line. Labels are bold to anchor the
         // eye on the left edge; values are plain so URLs / paths read clean.
@@ -778,8 +789,9 @@ public sealed class SkillViewApp
         sb.AppendLine($"**Repo**  : {s.Repo ?? "—"}");
         if (s.Stars is { } st)
             sb.AppendLine($"**Stars** : ★ {st.ToString(CultureInfo.InvariantCulture)}");
-        if (!string.IsNullOrWhiteSpace(s.Repo))
-            sb.AppendLine($"**URL**   : https://github.com/{s.Repo}");
+        var repoUrl = BuildRepoUrl(activeHost, s.Repo);
+        if (!string.IsNullOrEmpty(repoUrl))
+            sb.AppendLine($"**URL**   : {repoUrl}");
         if (!string.IsNullOrWhiteSpace(s.Path))
             sb.AppendLine($"**Path**  : {s.Path}");
         if (!string.IsNullOrWhiteSpace(s.Namespace))
@@ -926,7 +938,7 @@ public sealed class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
-        var url = $"https://github.com/{pick.Repo}";
+        var url = BuildRepoUrl(_lastReport?.Auth.ActiveHost, pick.Repo);
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
             SetStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);

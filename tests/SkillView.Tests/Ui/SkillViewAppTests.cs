@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Bootstrapping;
+using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
@@ -118,5 +119,38 @@ public sealed class SkillViewAppTests
         app.FocusSearchFromInstalledForTests();
 
         Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
+    }
+
+    [Fact]
+    public void BuildRepoUrl_UsesGitHubCom_WhenActiveHostMissing()
+    {
+        var url = SkillViewApp.BuildRepoUrl(null, "owner/repo");
+
+        Assert.Equal("https://github.com/owner/repo", url);
+    }
+
+    [Fact]
+    public void BuildRepoUrl_UsesActiveHost_WhenAvailable()
+    {
+        var url = SkillViewApp.BuildRepoUrl("ghe.example.com", "owner/repo");
+
+        Assert.Equal("https://ghe.example.com/owner/repo", url);
+    }
+
+    [Fact]
+    public void RenderSearchMetadata_UsesActiveHost_ForRepoUrl()
+    {
+        var metadata = SkillViewApp.RenderSearchMetadata(
+            new SearchResultSkill(
+                Description: "desc",
+                Namespace: "ns",
+                Path: "/skills/repo",
+                Repo: "owner/repo",
+                SkillName: "demo",
+                Stars: 42),
+            "ghe.example.com");
+
+        Assert.Contains("https://ghe.example.com/owner/repo", metadata);
+        Assert.DoesNotContain("https://github.com/owner/repo", metadata);
     }
 }
