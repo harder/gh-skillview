@@ -615,7 +615,13 @@ public sealed class SkillViewApp
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
             var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
             var preview = await _services.PreviewService
-                .PreviewAsync(_ghPath, capabilities, repo, pick.SkillName, cancellationToken: cts.Token)
+                .PreviewAsync(
+                    _ghPath,
+                    capabilities,
+                    repo,
+                    pick.SkillName,
+                    allowHiddenDirs: ShouldAllowHiddenDirPreview(pick),
+                    cancellationToken: cts.Token)
                 .ConfigureAwait(false);
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
@@ -754,7 +760,7 @@ public sealed class SkillViewApp
         }
         else
         {
-            text = RenderSearchMetadata(_results[row], _lastReport?.Auth.ActiveHost);
+            text = RenderSearchMetadata(_results[row], _lastReport?.Auth);
         }
         _metadataPane.Text = text;
 
@@ -767,18 +773,18 @@ public sealed class SkillViewApp
         if (_metadataFrame is not null) _metadataFrame.Height = height + 2; // borders
     }
 
-    internal static string BuildRepoUrl(string? activeHost, string? repo)
+    internal static string BuildRepoUrl(GhAuthStatus? auth, string? repo)
     {
         if (string.IsNullOrWhiteSpace(repo))
         {
             return string.Empty;
         }
 
-        var host = string.IsNullOrWhiteSpace(activeHost) ? "github.com" : activeHost.Trim();
+        var host = GetRepoLinkHost(auth) ?? "github.com";
         return $"https://{host}/{repo.Trim()}";
     }
 
-    internal static string RenderSearchMetadata(SearchResultSkill s, string? activeHost)
+    internal static string RenderSearchMetadata(SearchResultSkill s, GhAuthStatus? auth)
     {
         // One **label**: value pair per line. Labels are bold to anchor the
         // eye on the left edge; values are plain so URLs / paths read clean.
@@ -789,7 +795,7 @@ public sealed class SkillViewApp
         sb.AppendLine($"**Repo**  : {s.Repo ?? "—"}");
         if (s.Stars is { } st)
             sb.AppendLine($"**Stars** : ★ {st.ToString(CultureInfo.InvariantCulture)}");
-        var repoUrl = BuildRepoUrl(activeHost, s.Repo);
+        var repoUrl = BuildRepoUrl(auth, s.Repo);
         if (!string.IsNullOrEmpty(repoUrl))
             sb.AppendLine($"**URL**   : {repoUrl}");
         if (!string.IsNullOrWhiteSpace(s.Path))
@@ -826,6 +832,28 @@ public sealed class SkillViewApp
             prevBlank = string.IsNullOrWhiteSpace(line);
         }
         return sb.ToString();
+    }
+
+    internal static bool ShouldAllowHiddenDirPreview(SearchResultSkill skill)
+    {
+        if (string.IsNullOrWhiteSpace(skill.Path))
+        {
+            return false;
+        }
+
+        return skill.Path
+            .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment.Length > 0 && segment[0] == '.');
+    }
+
+    private static string? GetRepoLinkHost(GhAuthStatus? auth)
+    {
+        if (auth is not { LoggedIn: true })
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(auth.ActiveHost) ? null : auth.ActiveHost.Trim();
     }
 
     private void ToggleRightPane()
@@ -938,7 +966,7 @@ public sealed class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
-        var url = BuildRepoUrl(_lastReport?.Auth.ActiveHost, pick.Repo);
+        var url = BuildRepoUrl(_lastReport?.Auth, pick.Repo);
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
             SetStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
