@@ -241,6 +241,7 @@ internal static class TuiHelpers
         (IsWarpTerminal
             ? "Ctrl+J, →, p, v  preview when results are focused\n"
             : "Enter, →, p, v  preview when results are focused\n") +
+        "h  toggle hidden-dir access for preview/install\n" +
         "i  install the selected search result\n" +
         "o  open the skill (GitHub URL or local folder)\n" +
         "e  toggle raw / rendered SKILL.md preview\n" +
@@ -257,7 +258,7 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
+        + " · h hidden dirs · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
         ? "Select a result and press Ctrl+J, p, or v to preview."

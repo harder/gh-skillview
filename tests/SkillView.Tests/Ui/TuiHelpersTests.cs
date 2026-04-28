@@ -90,6 +90,12 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void HelpText_DocumentsHiddenDirToggle()
+    {
+        Assert.Contains("hidden-dir", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void WelcomeHint_IsNotEmpty()
     {
         Assert.True(TuiHelpers.WelcomeHint.Length > 0);

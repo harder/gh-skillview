@@ -14,8 +14,9 @@ namespace SkillView.Ui;
 /// minimum a user has selected in the results table: repo, optional
 /// skill name within the repo, and an optional repo-relative path
 /// (when the search produced a directory hit rather than a top-level
-/// repo). `InstallScreen` picks the rest of the flags interactively.
-public sealed record InstallRequest(string Repo, string? SkillName, string? RepoPath);
+/// repo). `InstallScreen` picks the rest of the flags interactively, but the
+/// parent screen can seed obvious toggles such as hidden-dir access.
+public sealed record InstallRequest(string Repo, string? SkillName, string? RepoPath, bool AllowHiddenDirs = false);
 
 /// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill +
 /// repo-path) and runs `gh skill install` with the flags the user has
@@ -244,6 +245,7 @@ public sealed class InstallScreen
             allowHiddenBox = new CheckBox
             {
                 X = 0, Y = behaviorRow, Text = "_allow scanning .dot directories",
+                Value = _request.AllowHiddenDirs ? CheckState.Checked : CheckState.UnChecked,
             };
             behaviorFrame.Add(allowHiddenBox);
             behaviorRow++;

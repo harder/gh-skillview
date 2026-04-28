@@ -28,6 +28,7 @@ public sealed class SkillViewApp
     private TextField? _queryField;
     private TextField? _ownerField;
     private NumericUpDown<int>? _limitUpDown;
+    private CheckBox? _hiddenDirsBox;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
     private TextView? _previewRawPane;
@@ -45,7 +46,7 @@ public sealed class SkillViewApp
 
     private const int MinMetadataHeight = 3;
     private const int MaxMetadataHeight = 8;
-    private const string ItemActionsText = "  [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
+    private const string ItemActionsText = "  [h] Hidden dirs    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
 
     private List<SearchResultSkill> _results = new();
     private string? _ghPath;
@@ -180,10 +181,22 @@ public sealed class SkillViewApp
             if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
         };
 
+        _hiddenDirsBox = new CheckBox
+        {
+            X = 0,
+            Y = 2,
+            Text = "_allow hidden dirs for preview/install",
+        };
+        _hiddenDirsBox.ValueChanged += (_, _) =>
+        {
+            NoteUserInteraction();
+            RefreshHiddenDirUi();
+        };
+
         _resultsTable = new TableView
         {
             X = 0,
-            Y = 3,
+            Y = 4,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             FullRowSelect = true,
@@ -234,7 +247,7 @@ public sealed class SkillViewApp
             }
         };
 
-        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _resultsTable);
+        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _hiddenDirsBox, _resultsTable);
 
         _rightFrame = new FrameView
         {
@@ -334,6 +347,7 @@ public sealed class SkillViewApp
         _statusBarPreview = new StatusBar(
         [
             new Shortcut { Title = "/", HelpText = "Search" },
+            new Shortcut { Title = "h", HelpText = "Hidden dirs" },
             new Shortcut { Title = "i", HelpText = "Install" },
             new Shortcut { Title = "o", HelpText = "Open" },
             new Shortcut { Title = "e", HelpText = "Raw/Render" },
@@ -357,11 +371,12 @@ public sealed class SkillViewApp
 
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown,
+            queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _hiddenDirsBox,
             _resultsTable, _previewPane, _previewRawPane, _metadataPane, _logPane,
             _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         // Invert the actions hint so it reads as a status-bar-style strip.
         _itemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+        RefreshHiddenDirUi();
 
         window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
@@ -372,11 +387,13 @@ public sealed class SkillViewApp
             _queryField,
             _ownerField,
             _limitUpDown,
+            _hiddenDirsBox,
             _resultsTable);
         AttachStartupFocusTracking(
             _queryField,
             _ownerField,
             _limitUpDown,
+            _hiddenDirsBox,
             _resultsTable);
 
         RefreshResultsTable();
@@ -418,6 +435,11 @@ public sealed class SkillViewApp
         {
             _queryField?.SetFocus();
             if (_queryField is not null) _queryField.SelectAll();
+            return true;
+        }
+        if (rune.Value == 'h' || rune.Value == 'H')
+        {
+            ToggleHiddenDirAccess();
             return true;
         }
         if (rune.Value == 'q' || rune.Value == 'Q') { _app?.RequestStop(); return true; }
@@ -494,6 +516,16 @@ public sealed class SkillViewApp
 
             Invoke(() =>
             {
+                if (_hiddenDirsBox is not null)
+                {
+                    _hiddenDirsBox.Enabled = SupportsHiddenDirToggle(report.Capabilities);
+                    if (!_hiddenDirsBox.Enabled)
+                    {
+                        _hiddenDirsBox.Value = CheckState.UnChecked;
+                    }
+                    RefreshHiddenDirUi();
+                }
+
                 if (ShouldAutoOpenInstalledOnStartup(snapshot))
                 {
                     _startupInstalledShown = true;
@@ -620,7 +652,7 @@ public sealed class SkillViewApp
                     capabilities,
                     repo,
                     pick.SkillName,
-                    allowHiddenDirs: ShouldAllowHiddenDirPreview(pick),
+                    allowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled),
                     cancellationToken: cts.Token)
                 .ConfigureAwait(false);
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
@@ -846,6 +878,12 @@ public sealed class SkillViewApp
             .Any(segment => segment.Length > 0 && segment[0] == '.');
     }
 
+    internal static bool ShouldAllowHiddenDirs(SearchResultSkill skill, bool userEnabled) =>
+        userEnabled || ShouldAllowHiddenDirPreview(skill);
+
+    internal static bool SupportsHiddenDirToggle(CapabilityProfile capabilities) =>
+        capabilities.SupportsAllowHiddenDirs || capabilities.SupportsPreviewAllowHiddenDirs;
+
     private static string? GetRepoLinkHost(GhAuthStatus? auth)
     {
         if (auth is not { LoggedIn: true })
@@ -854,6 +892,29 @@ public sealed class SkillViewApp
         }
 
         return string.IsNullOrWhiteSpace(auth.ActiveHost) ? null : auth.ActiveHost.Trim();
+    }
+
+    private bool HiddenDirsEnabled => _hiddenDirsBox?.Value == CheckState.Checked;
+
+    private void ToggleHiddenDirAccess()
+    {
+        if (_hiddenDirsBox is null || !_hiddenDirsBox.Enabled)
+        {
+            return;
+        }
+
+        _hiddenDirsBox.Value = HiddenDirsEnabled ? CheckState.UnChecked : CheckState.Checked;
+    }
+
+    private void RefreshHiddenDirUi()
+    {
+        if (_itemActionsLabel is null)
+        {
+            return;
+        }
+
+        var state = HiddenDirsEnabled ? "on" : "off";
+        _itemActionsLabel.Text = $"  [h] Hidden dirs: {state}    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
     }
 
     private void ToggleRightPane()
@@ -1003,7 +1064,8 @@ public sealed class SkillViewApp
         OpenInstallDialog(new InstallRequest(
             Repo: pick.Repo,
             SkillName: pick.SkillName,
-            RepoPath: pick.Path));
+            RepoPath: pick.Path,
+            AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
     }
 
     private void OpenInstallDialog(InstallRequest request)
@@ -1374,6 +1436,8 @@ public sealed class SkillViewApp
     internal TextField? OwnerFieldForTests => _ownerField;
 
     internal NumericUpDown<int>? LimitUpDownForTests => _limitUpDown;
+
+    internal CheckBox? HiddenDirsBoxForTests => _hiddenDirsBox;
 
     internal TableView? ResultsTableForTests => _resultsTable;
 

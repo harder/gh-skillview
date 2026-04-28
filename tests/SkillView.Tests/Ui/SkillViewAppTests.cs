@@ -4,6 +4,8 @@ using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using SkillView.Ui;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -43,6 +45,19 @@ public sealed class SkillViewAppTests
             SubcommandArgs: Array.Empty<string>());
 
         return new SkillViewApp(services, options);
+    }
+
+    private static IEnumerable<View> Descendants(View root)
+    {
+        foreach (var child in root.SubViews)
+        {
+            yield return child;
+
+            foreach (var nested in Descendants(child))
+            {
+                yield return nested;
+            }
+        }
     }
 
     private static InventorySnapshot SnapshotWithInstalledSkill() => InventorySnapshot.Empty with
@@ -141,6 +156,17 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void BuildUi_ExposesHiddenDirToggleOnSearchScreen()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.Contains(
+            Descendants(window).OfType<CheckBox>(),
+            box => box.Text.ToString().Contains("hidden", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void BuildRepoUrl_UsesGitHubCom_WhenAuthMissing()
     {
         var url = SkillViewApp.BuildRepoUrl(null, "owner/repo");
@@ -194,6 +220,25 @@ public sealed class SkillViewAppTests
                 Repo: "owner/repo",
                 SkillName: "demo",
                 Stars: null));
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("skills/demo", false, false)]
+    [InlineData("skills/demo", true, true)]
+    [InlineData(".github/skills/demo", false, true)]
+    public void ShouldAllowHiddenDirs_UsesToggleOrHiddenPath(string? path, bool userEnabled, bool expected)
+    {
+        var result = SkillViewApp.ShouldAllowHiddenDirs(
+            new SearchResultSkill(
+                Description: null,
+                Namespace: "ns",
+                Path: path,
+                Repo: "owner/repo",
+                SkillName: "demo",
+                Stars: null),
+            userEnabled);
 
         Assert.Equal(expected, result);
     }
