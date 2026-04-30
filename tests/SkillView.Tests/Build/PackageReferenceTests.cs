@@ -6,11 +6,11 @@ namespace SkillView.Tests.Build;
 public sealed class PackageReferenceTests
 {
     [Fact]
-    public void SkillViewCore_PinsTerminalGuiToRc7()
+    public void SkillViewCore_UsesTerminalGuiV2()
     {
         var text = ReadProjectFile("src", "SkillView.Core", "SkillView.Core.csproj");
 
-        Assert.Contains("""<PackageReference Include="Terminal.Gui" Version="2.0.0-rc.7" />""", text);
+        Assert.Contains("""<PackageReference Include="Terminal.Gui" Version="2.0.1" />""", text);
     }
 
     [Theory]
