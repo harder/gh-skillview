@@ -74,12 +74,31 @@ public sealed class InstallScreen
 
     public void Show()
     {
+        using var lifetime = new CancellationTokenSource();
         using var dialog = new Dialog
         {
             Title = $"Install — {_request.Repo}{(_request.SkillName is null ? "" : "/" + _request.SkillName)}",
             Width = Dim.Percent(85),
             Height = Dim.Percent(85),
         };
+
+        void InvokeIfActive(Action action)
+        {
+            if (lifetime.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _app.Invoke(() =>
+            {
+                if (lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                action();
+            });
+        }
 
         // ── SOURCE ─────────────────────────────────────────────────────
         var sourceFrame = new FrameView
@@ -393,8 +412,9 @@ public sealed class InstallScreen
                     _request.Repo,
                     skillName,
                     _capabilities,
-                    options).ConfigureAwait(false);
-                _app.Invoke(() =>
+                    options,
+                    lifetime.Token).ConfigureAwait(false);
+                InvokeIfActive(() =>
                 {
                     LastResult = result;
                     spinner.AutoSpin = false;
@@ -414,10 +434,14 @@ public sealed class InstallScreen
                     }
                 });
             }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+                _logger.Debug("install", "install canceled because the dialog closed");
+            }
             catch (Exception ex)
             {
                 _logger.Error("install", ex.Message);
-                _app.Invoke(() =>
+                InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -433,6 +457,7 @@ public sealed class InstallScreen
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             dialog.RequestStop();
         };
 
@@ -444,6 +469,7 @@ public sealed class InstallScreen
         {
             if (key.KeyCode == KeyCode.Esc)
             {
+                lifetime.Cancel();
                 dialog.RequestStop();
                 key.Handled = true;
             }
@@ -451,7 +477,14 @@ public sealed class InstallScreen
 
         Refresh();
         installButton.SetFocus();
-        _app.Run(dialog);
+        try
+        {
+            _app.Run(dialog);
+        }
+        finally
+        {
+            lifetime.Cancel();
+        }
     }
 
     private int SourceFrameHeight()

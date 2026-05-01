@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       gh_version:
-        description: 'Override gh version (e.g., 2.91.0 or latest)'
+        description: 'Override gh version (e.g., 2.92.0 or latest)'
         required: false
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - gh-version: '2.91.0'
+          - gh-version: '2.92.0'
             required: true
           - gh-version: 'latest'
             required: false

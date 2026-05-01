@@ -50,6 +50,7 @@ public sealed class UpdateScreen
 
     public void Show()
     {
+        using var lifetime = new CancellationTokenSource();
         using var window = new Window
         {
             Title = "Update skills",
@@ -57,6 +58,24 @@ public sealed class UpdateScreen
             Width = Dim.Fill(),
             Height = Dim.Fill(),
         };
+
+        void InvokeIfActive(Action action)
+        {
+            if (lifetime.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _app.Invoke(() =>
+            {
+                if (lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                action();
+            });
+        }
 
         var tableLabel = new Label { Text = "Select skills to update. Press Space to toggle.", X = 0, Y = 0 };
         var table = new TableView
@@ -234,8 +253,8 @@ public sealed class UpdateScreen
             try
             {
                 var result = await _update.UpdateAsync(
-                    _ghPath, _capabilities, options).ConfigureAwait(false);
-                _app.Invoke(() =>
+                    _ghPath, _capabilities, options, lifetime.Token).ConfigureAwait(false);
+                InvokeIfActive(() =>
                 {
                     LastResult = result;
                     spinner.AutoSpin = false;
@@ -270,10 +289,14 @@ public sealed class UpdateScreen
                     }
                 });
             }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+                _logger.Debug("update", "update canceled because the dialog closed");
+            }
             catch (Exception ex)
             {
                 _logger.Error("update", ex.Message);
-                _app.Invoke(() =>
+                InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -298,6 +321,7 @@ public sealed class UpdateScreen
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             _app.RequestStop();
         };
 
@@ -312,13 +336,21 @@ public sealed class UpdateScreen
         {
             if (key.KeyCode == KeyCode.Esc)
             {
+                lifetime.Cancel();
                 _app.RequestStop();
                 key.Handled = true;
             }
         };
 
         updateButton.SetFocus();
-        _app.Run(window);
+        try
+        {
+            _app.Run(window);
+        }
+        finally
+        {
+            lifetime.Cancel();
+        }
     }
 
     private static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills)

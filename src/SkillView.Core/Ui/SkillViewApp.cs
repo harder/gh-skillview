@@ -23,8 +23,12 @@ public sealed class SkillViewApp
 {
     private readonly TuiServices _services;
     private readonly AppOptions _options;
+    private readonly Func<IApplication> _applicationFactory;
+    private readonly bool _probeOnRun;
 
     private IApplication? _app;
+    private CancellationTokenSource? _runLifetime;
+    private bool _hasRunLifetime;
     private TextField? _queryField;
     private TextField? _ownerField;
     private NumericUpDown<int>? _limitUpDown;
@@ -63,9 +67,20 @@ public sealed class SkillViewApp
     private static readonly TimeSpan StatusAutoClear = TimeSpan.FromSeconds(6);
 
     public SkillViewApp(TuiServices services, AppOptions options)
+        : this(services, options, static () => Application.Create().Init(), probeOnRun: true)
+    {
+    }
+
+    internal SkillViewApp(
+        TuiServices services,
+        AppOptions options,
+        Func<IApplication> applicationFactory,
+        bool probeOnRun)
     {
         _services = services;
         _options = options;
+        _applicationFactory = applicationFactory;
+        _probeOnRun = probeOnRun;
     }
 
     internal static bool ShouldOpenInstalledOnStartup(InventorySnapshot snapshot) => snapshot.Skills.Length > 0;
@@ -85,35 +100,50 @@ public sealed class SkillViewApp
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
     public int Run()
     {
-        // Catch any unhandled exceptions so they get logged instead of silently crashing
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        IApplication? app = null;
+        Window? window = null;
+        var runLifetime = new CancellationTokenSource();
+        _hasRunLifetime = true;
+        _runLifetime = runLifetime;
+
+        // Catch any unhandled exceptions so they get logged instead of silently crashing.
+        UnhandledExceptionEventHandler onUnhandledException = (_, args) =>
         {
             if (args.ExceptionObject is Exception ex)
             {
                 _services.Logger.Error("CRASH", $"Unhandled: {ex}");
             }
         };
+        AppDomain.CurrentDomain.UnhandledException += onUnhandledException;
 
-        _app = Application.Create().Init();
-        using var window = BuildUi();
-
-        // RC5 routes Enter (View base default), p/v/CursorRight (rebound in
-        // ConfigureTableKeyBindings), and Warp's Ctrl+J directly through
-        // Command.Accept → the Accepted event on the table. Query field Enter
-        // is handled by OnQueryFieldKey. No global key intercept needed.
-
-        ProbeGhAsync();
         try
         {
-            _app.Run(window);
+            app = _applicationFactory();
+            _app = app;
+            window = BuildUi();
+
+            // RC5 routes Enter (View base default), p/v/CursorRight (rebound in
+            // ConfigureTableKeyBindings), and Warp's Ctrl+J directly through
+            // Command.Accept → the Accepted event on the table. Query field Enter
+            // is handled by OnQueryFieldKey. No global key intercept needed.
+
+            if (_probeOnRun)
+            {
+                ProbeGhAsync();
+            }
+
+            app.Run(window);
         }
         finally
         {
-            // Dispose the application to ensure the console driver sends
-            // terminal reset sequences (disable SGR mouse tracking, restore
-            // cursor, etc.). Without this, mouse escape sequences leak into
-            // the shell prompt — especially visible in Warp.
-            (_app as IDisposable)?.Dispose();
+            AppDomain.CurrentDomain.UnhandledException -= onUnhandledException;
+            CancelStatusAutoClear();
+            runLifetime.Cancel();
+            runLifetime.Dispose();
+            _runLifetime = null;
+            _app = null;
+            window?.Dispose();
+            app?.Dispose();
         }
         return ExitCodes.Success;
     }
@@ -500,9 +530,9 @@ public sealed class SkillViewApp
 
     private void ProbeGhAsync()
     {
-        RunBackground(async () =>
+        RunBackground(async cancellationToken =>
         {
-            var report = await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            var report = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
             _lastReport = report;
             _ghPath = report.GhPath;
 
@@ -511,7 +541,8 @@ public sealed class SkillViewApp
                 report.Capabilities,
                 new LocalInventoryService.Options(
                     ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false)
+                    AllowHiddenDirs: false),
+                cancellationToken
             ).ConfigureAwait(false);
 
             Invoke(() =>
@@ -567,6 +598,7 @@ public sealed class SkillViewApp
 
         _searching = true;
         SetBusy($"searching {query}…");
+        var cancellationToken = GetRunLifetimeToken();
         try
         {
             var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
@@ -574,7 +606,7 @@ public sealed class SkillViewApp
                 Owner: owner,
                 Limit: limit ?? GhSkillSearchService.DefaultLimit);
             var response = await _services.SearchService
-                .SearchAsync(_ghPath, query, capabilities, options)
+                .SearchAsync(_ghPath, query, capabilities, options, cancellationToken)
                 .ConfigureAwait(false);
             var results = response.Results;
             Invoke(() =>
@@ -596,6 +628,10 @@ public sealed class SkillViewApp
                     ? "no matches"
                     : $"{results.Count} result(s) — Enter, p, or v to preview");
             });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _services.Logger.Debug("search", "search canceled during shutdown");
         }
         catch (Exception ex)
         {
@@ -641,9 +677,11 @@ public sealed class SkillViewApp
         }
 
         SetBusy($"preview {repo}/{pick.SkillName}…");
+        var runCancellationToken = GetRunLifetimeToken();
         try
         {
-            using var cts = new CancellationTokenSource(PreviewTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(runCancellationToken);
+            cts.CancelAfter(PreviewTimeout);
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
             var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
             var preview = await _services.PreviewService
@@ -678,6 +716,10 @@ public sealed class SkillViewApp
                     SetStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
                 }
             });
+        }
+        catch (OperationCanceledException) when (runCancellationToken.IsCancellationRequested)
+        {
+            _services.Logger.Debug("preview", "preview canceled during shutdown");
         }
         catch (OperationCanceledException)
         {
@@ -1082,7 +1124,7 @@ public sealed class SkillViewApp
         if (installScreen.LastResult is { Succeeded: true } result)
         {
             SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…", TuiHelpers.NotificationLevel.Success);
-            RunBackground(async () =>
+            RunBackground(async cancellationToken =>
             {
                 var report = _lastReport;
                 if (report is null) return;
@@ -1091,7 +1133,8 @@ public sealed class SkillViewApp
                     report.Capabilities,
                     new LocalInventoryService.Options(
                         ScanRoots: _options.ScanRoots,
-                        AllowHiddenDirs: false)
+                        AllowHiddenDirs: false),
+                    cancellationToken
                 ).ConfigureAwait(false);
                 Invoke(() =>
                     SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
@@ -1112,7 +1155,7 @@ public sealed class SkillViewApp
             return;
         }
         SetBusy("scanning inventory for update picker…");
-        RunBackground(async () =>
+        RunBackground(async cancellationToken =>
         {
             var report = _lastReport;
             if (report is null) return;
@@ -1121,7 +1164,8 @@ public sealed class SkillViewApp
                 report.Capabilities,
                 new LocalInventoryService.Options(
                     ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false)
+                    AllowHiddenDirs: false),
+                cancellationToken
             ).ConfigureAwait(false);
             Invoke(() =>
             {
@@ -1137,14 +1181,15 @@ public sealed class SkillViewApp
                 if (screen.LastResult is { DryRun: false, Succeeded: true })
                 {
                     SetStatus("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
-                    RunBackground(async () =>
+                    RunBackground(async nestedCancellationToken =>
                     {
                         var post = await _services.InventoryService.CaptureAsync(
                             report.GhPath,
                             report.Capabilities,
                             new LocalInventoryService.Options(
                                 ScanRoots: _options.ScanRoots,
-                                AllowHiddenDirs: false)
+                                AllowHiddenDirs: false),
+                            nestedCancellationToken
                         ).ConfigureAwait(false);
                         Invoke(() =>
                             SetStatus($"updated — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
@@ -1162,16 +1207,17 @@ public sealed class SkillViewApp
     {
         if (_app is null) return;
         SetBusy("scanning inventory…");
-        RunBackground(async () =>
+        RunBackground(async cancellationToken =>
         {
-            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
             _lastReport = report;
             var snapshot = await _services.InventoryService.CaptureAsync(
                 report.GhPath,
                 report.Capabilities,
                 new LocalInventoryService.Options(
                     ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false)
+                    AllowHiddenDirs: false),
+                cancellationToken
             ).ConfigureAwait(false);
             Invoke(() =>
             {
@@ -1208,7 +1254,7 @@ public sealed class SkillViewApp
         if (screen.LastReport is { Succeeded: true } report)
         {
             SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…", TuiHelpers.NotificationLevel.Success);
-            RunBackground(async () =>
+            RunBackground(async cancellationToken =>
             {
                 var report2 = _lastReport;
                 if (report2 is null) return;
@@ -1217,7 +1263,8 @@ public sealed class SkillViewApp
                     report2.Capabilities,
                     new LocalInventoryService.Options(
                         ScanRoots: _options.ScanRoots,
-                        AllowHiddenDirs: false)
+                        AllowHiddenDirs: false),
+                    cancellationToken
                 ).ConfigureAwait(false);
                 Invoke(() =>
                     SetStatus($"removed — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
@@ -1229,16 +1276,17 @@ public sealed class SkillViewApp
     {
         if (_app is null) return;
         SetBusy("scanning for cleanup candidates…");
-        RunBackground(async () =>
+        RunBackground(async cancellationToken =>
         {
-            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
             _lastReport = report;
             var snapshot = await _services.InventoryService.CaptureAsync(
                 report.GhPath,
                 report.Capabilities,
                 new LocalInventoryService.Options(
                     ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false)
+                    AllowHiddenDirs: false),
+                cancellationToken
             ).ConfigureAwait(false);
             var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
             Invoke(() =>
@@ -1263,9 +1311,9 @@ public sealed class SkillViewApp
             return;
         }
         SetBusy("probing environment…");
-        RunBackground(async () =>
+        RunBackground(async cancellationToken =>
         {
-            var report = await _services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+            var report = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
             _lastReport = report;
             Invoke(() =>
             {
@@ -1369,12 +1417,32 @@ public sealed class SkillViewApp
 
     private void Invoke(Action action)
     {
-        if (_app is null)
+        var lifetime = _runLifetime;
+        var app = _app;
+
+        if (app is not null)
         {
-            action();
+            if (lifetime?.IsCancellationRequested == true)
+            {
+                return;
+            }
+
+            app.Invoke(() =>
+            {
+                if (lifetime?.IsCancellationRequested == true)
+                {
+                    return;
+                }
+
+                action();
+            });
             return;
         }
-        _app.Invoke(action);
+
+        if (!_hasRunLifetime)
+        {
+            action();
+        }
     }
 
     private bool ShouldAutoOpenInstalledOnStartup(InventorySnapshot snapshot) =>
@@ -1457,13 +1525,18 @@ public sealed class SkillViewApp
     /// Fire-and-forget background work with exception guard. Catches any
     /// unhandled exception, logs it, and shows a status bar message so
     /// failures are never silently swallowed.
-    private void RunBackground(Func<Task> work, string operation)
+    private void RunBackground(Func<CancellationToken, Task> work, string operation)
     {
+        var cancellationToken = GetRunLifetimeToken();
         _ = Task.Run(async () =>
         {
             try
             {
-                await work().ConfigureAwait(false);
+                await work(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _services.Logger.Debug(operation, $"{operation} canceled during shutdown");
             }
             catch (Exception ex)
             {
@@ -1478,6 +1551,8 @@ public sealed class SkillViewApp
                         TuiHelpers.NotificationLevel.Error);
                 });
             }
-        });
+        }, cancellationToken);
     }
+
+    private CancellationToken GetRunLifetimeToken() => _runLifetime?.Token ?? CancellationToken.None;
 }

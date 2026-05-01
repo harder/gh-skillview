@@ -18,8 +18,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `src/SkillView.GhExtension/` — `gh skillview` extension entrypoint.
 - `tests/SkillView.Tests/` — xUnit coverage for core services, CLI JSON output,
   and TUI helpers.
-- `PHASE*_NOTES.md`, `implementation-plan.md` — design decisions and phase
-  history.
+- `implementation-plan.md` — roadmap and detailed design references by section.
 
 ## How
 
@@ -50,9 +49,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `MemberNotNullWhenAttribute` `TypeLoadException` during Terminal.Gui config
   initialization. Keep the test SDK at `17.11.1` until that compatibility issue
   is resolved.
+- Terminal.Gui's modern lifecycle is now the right default for SkillView:
+  use `Application.Create().Init()` to create the app instance and
+  `IApplication.Dispose()` / `using` for teardown. Do not add new uses of the
+  legacy static `Application.Init()` / `Application.Shutdown()` path.
+- Tie async TUI work to the lifetime of the owning app/dialog with a
+  `CancellationToken`, and only update UI through `app.Invoke()` while that
+  lifetime is still active. Do not fall back to direct UI mutation after
+  teardown.
 - Terminal.Gui rc.7 no longer needs `TrimmerRootAssembly` for the old
   `ConfigurationManager` trim issue; SkillView's AOT publish now verifies
   cleanly without rooting the full TG2 assembly.
+- Prefer `KeyBindings` for view-local command remaps like table preview
+  shortcuts. Keep the current window/table `KeyDown` routing for app-level
+  single-letter shortcuts because `TableView` still swallows unbound printable
+  keys before they bubble.
 - Record newly discovered PTY/session-specific bugs in
   `PTY_SESSION_UX_ISSUES.md`, not in the older `PHASE10_UX_ISSUES.md` backlog.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
@@ -61,5 +72,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
+- `agent_docs/running-tests.md` — standard verification commands, UI-focused
+  test filters, and opt-in `gh` contract-test workflow details.
+- `agent_docs/release-engineering.md` — release workflow, asset naming, AOT RID
+  matrix, and attestation conventions.
 - `agent_docs/tui-pty-testing.md` — sandboxed PTY workflow, synchronization
   strategy, verification scripts, and known pitfalls for terminal UI testing.

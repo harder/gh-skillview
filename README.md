@@ -1,46 +1,46 @@
 # gh-skillview
 
-`gh-skillview` is a friendly terminal app for exploring, installing, updating, and cleaning up AI agent skills built on top of `gh skill`.
+`gh-skillview` is a Terminal UI and CLI for discovering, previewing, installing, updating, removing, and cleaning up AI agent skills built on top of [`gh skill`](https://cli.github.com/manual/gh_skill).
 
-It ships in two forms:
+It ships as both:
 
-1. **GitHub CLI extension**: `gh skillview`
-2. **Standalone binary**: `skillview`
+1. a GitHub CLI extension: `gh skillview`
+2. a standalone binary: `skillview`
 
-SkillView gives you a fast Terminal UI for common workflows, plus scriptable CLI commands when you want JSON output or automation.
+SkillView does **not** replace `gh skill`. It gives developers a faster full-screen workflow for the common cases, plus a scriptable CLI for inventory and maintenance tasks that are easier to reason about with SkillView’s safety checks and JSON output.
 
-## Why use it?
+![SkillView screenshot](./screenshot.png)
 
-SkillView is for people who want `gh skill` to feel easier to browse and safer to operate.
+## Why this exists
 
-- Search and preview skills without leaving the terminal
-- Install with guided options instead of memorizing flags
-- Inspect installed skills across scan roots
-- Run update dry-runs before changing anything
-- Remove skills with safety checks
-- Find cleanup candidates such as duplicates, broken symlinks, and orphaned files
+`gh skill` is powerful, but once you start working with a lot of skills it helps to have:
+
+- side-by-side search results and `SKILL.md` previews
+- guided install and update flows instead of memorizing flags
+- a unified view of installed skills across project, user, and custom roots
+- safe remove and cleanup workflows for duplicates, broken symlinks, residue, and malformed installs
+- a CLI you can script without giving up the interactive TUI
+
+## What SkillView wraps
+
+SkillView builds on GitHub CLI’s preview `gh skill` support. If you are new to the underlying commands, start with these docs:
+
+- [`gh skill`](https://cli.github.com/manual/gh_skill)
+- [`gh skill search`](https://cli.github.com/manual/gh_skill_search)
+- [`gh skill preview`](https://cli.github.com/manual/gh_skill_preview)
+- [`gh skill install`](https://cli.github.com/manual/gh_skill_install)
+- [`gh skill update`](https://cli.github.com/manual/gh_skill_update)
+- [Agent Skills specification](https://agentskills.io/specification)
 
 ## Requirements
 
-### Runtime requirements
+- **GitHub CLI** `gh` **2.92.0 or newer**
+- a working `gh` setup; `gh auth login` is recommended
+- a terminal with normal ANSI TUI support
 
-- **GitHub CLI**: `gh` **v2.92.0 or newer**
-- A terminal that supports standard ANSI TUI behavior
-- A working `gh` setup; `gh auth login` is recommended for the best experience
+`gh skill` is still in preview and subject to change. SkillView probes the installed `gh` binary and only enables features whose flags are actually available.
 
-SkillView wraps `gh skill`, so `gh` is the main runtime dependency.
-
-### Build requirements
-
-- **.NET SDK**: `10.0.100` or newer in the same feature band
-- On Linux AOT publish: `clang` and `zlib1g-dev`
-
-### Notes
-
-- Release binaries are **Native AOT** and **self-contained**
-- You do **not** need a .NET runtime installed to use release artifacts
-
-## Installation
+## Install
 
 ### Install as a GitHub CLI extension
 
@@ -51,7 +51,7 @@ gh extension install harder/gh-skillview
 gh skillview
 ```
 
-To upgrade later:
+Upgrade later with:
 
 ```bash
 gh extension upgrade harder/gh-skillview
@@ -59,8 +59,7 @@ gh extension upgrade harder/gh-skillview
 
 ### Install as a standalone binary
 
-Download the right asset from the
-[latest release](https://github.com/harder/gh-skillview/releases) and place it on your `PATH`.
+Download the right asset from the [latest release](https://github.com/harder/gh-skillview/releases), place it on your `PATH`, and run `skillview`.
 
 | Platform | Asset |
 |---|---|
@@ -71,74 +70,103 @@ Download the right asset from the
 | macOS x64 | `skillview-osx-x64` |
 | macOS ARM64 | `skillview-osx-arm64` |
 
+Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.
+
 ## Quick start
 
-### Launch the TUI
+Launch the TUI:
 
 ```bash
 gh skillview
 ```
 
-or, if you installed the standalone binary:
+or:
 
 ```bash
 skillview
 ```
 
-### First commands to try
+A few good first commands:
 
 ```bash
 skillview doctor
-skillview search prompt
-skillview list
+skillview search terraform
+skillview list --json
 skillview update --dry-run
 skillview cleanup
 ```
 
-### How the app behaves
+## How to use SkillView
 
-- **No subcommand** launches the full-screen TUI
-- **A subcommand** runs in CLI mode
-- The binary name decides the invocation style:
-  - `gh-skillview` -> GitHub CLI extension mode
-  - `skillview` -> standalone mode
+### TUI overview
 
-## Usage
+Run SkillView with no subcommand to open the full-screen interface.
 
-### Common CLI commands
+| View or flow | What it does | How to open |
+|---|---|---|
+| **Main search view** | Search public skills, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. | Launch the app |
+| **Doctor** | Shows `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. | `d` |
+| **Installed** | Lists installed skills across discovered roots, lets you filter, sort, inspect details, open the folder, or start removal. | `I` |
+| **Install dialog** | Installs the selected skill with version, scope, agent, path, overwrite, and capability-gated options like hidden-dir scanning or local installs. | `i` from search results |
+| **Update view** | Dry-runs or applies updates for installed skills, including `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `u` |
+| **Remove dialog** | Validates whether a skill can be removed safely before deleting anything. | `x` from Installed |
+| **Cleanup view** | Finds duplicates, broken symlinks, residue, and other cleanup candidates; remove or ignore them in batches. | `c` |
+
+### Main view workflow
+
+The main window is built for the common “discover and inspect” loop:
+
+1. Type a search query and press `Enter`.
+2. Browse results in the left table.
+3. Preview the selected skill on the right.
+4. Press `i` to stage an install, `o` to open the repo in a browser, or `l` to inspect logs.
+
+If you prefer the CLI, every major workflow also has a subcommand.
+
+### Keyboard highlights
+
+| Key | Action |
+|---|---|
+| `/` | Focus the search box |
+| `Enter` | Search from the query box, or preview from a results table |
+| `p`, `v`, `→` | Preview the selected search result |
+| `i` | Open the install flow from the selected result |
+| `d` | Open Doctor |
+| `I` | Open Installed |
+| `u` | Open Update |
+| `c` | Open Cleanup |
+| `l` or `r` | Toggle the right pane between preview and logs |
+| `q` | Quit the current top-level view |
+
+Inside modal or full-screen subviews, `Esc` consistently backs out.
+
+**Warp note:** if `Enter` is unreliable after the first interaction, use `Ctrl+J` or `→` for preview.
+
+## CLI usage
+
+SkillView runs in CLI mode when you provide a subcommand.
+
+| Command | What it is for |
+|---|---|
+| `skillview doctor` | Inspect environment, auth, capabilities, and log paths |
+| `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
+| `skillview rescan` | Re-run inventory capture and print a summary |
+| `skillview search <query>` | Search public repositories for skills |
+| `skillview preview OWNER/REPO [SKILL]` | Render a skill preview without installing |
+| `skillview install OWNER/REPO [SKILL]` | Install a skill with SkillView’s wrappers and diff output |
+| `skillview update [...]` | Dry-run or apply skill updates |
+| `skillview remove <skill>` | Remove an installed skill with safety checks |
+| `skillview cleanup` | Report or apply cleanup actions |
+
+Examples:
 
 ```bash
-skillview                      # launch the TUI
-skillview doctor               # environment, auth, and capability report
-skillview doctor --json
-skillview doctor --clear-logs
-
-skillview list
 skillview list --json
-skillview list --scope=user
-skillview list --agent=claude
-
-skillview rescan
-
-skillview search <query>
-skillview search <query> --owner <owner> --limit 50 --page 2 --json
-
-skillview preview OWNER/REPO [SKILL]
-skillview preview OWNER/REPO@v1.2.3 [SKILL] --json
-
-skillview install OWNER/REPO [SKILL] --agent claude --scope user
-skillview install OWNER/REPO@v1.0.0 [SKILL] --pin --json
-
+skillview search prompt --owner github
+skillview preview github/awesome-copilot documentation-writer
+skillview install github/awesome-copilot git-commit --agent claude-code --scope user
 skillview update --dry-run
-skillview update render-md fetch-url
-skillview update --all --yes
-
-skillview remove render-md
-skillview remove render-md --yes
-
-skillview cleanup
 skillview cleanup --apply --yes
-skillview cleanup --output cleanup-report.txt
 ```
 
 ### Global flags
@@ -146,16 +174,14 @@ skillview cleanup --output cleanup-report.txt
 ```bash
 skillview --debug
 skillview --scan-root /path/to/skills
-skillview list --json --debug
+skillview --scan-root /path/one --scan-root /path/two list --json
 ```
 
-- `--debug` works **before or after** the subcommand
+- `--debug` works before or after the subcommand
 - `--scan-root` is repeatable
 - `SKILLVIEW_LOG=debug` is also supported
 
 ### Exit codes
-
-These are stable and safe to depend on in scripts.
 
 | Code | Meaning |
 |---|---|
@@ -165,186 +191,68 @@ These are stable and safe to depend on in scripts.
 | `10` | Environment error |
 | `20` | No matches |
 
-## Keyboard reference
+## Troubleshooting
 
-### Main TUI
-
-| Key | Action |
-|---|---|
-| `/` | Focus the search box |
-| `Enter` | Run search (query box) or preview (results) |
-| `→` | Preview the selected result |
-| `p` or `v` | Preview the selected result |
-| `Esc` | Leave the query box and return focus to results |
-| `l` or `r` | Toggle the right pane between preview and logs |
-| `d` | Open Doctor |
-| `I` | Open installed skills inventory |
-| `s` | Open the full search dialog |
-| `u` | Open update dialog |
-| `c` | Open cleanup dialog |
-| `F1` | Show help |
-| `q` | Quit |
-
-### Search dialog
-
-| Key | Action |
-|---|---|
-| `Enter` | Search |
-| `→`, `p`, or `v` | Preview selected result |
-| `i` | Stage install for the selected result |
-| `/` | Focus the query field |
-| `Esc` or `q` | Close dialog |
-
-### Installed dialog
-
-| Key | Action |
-|---|---|
-| `/` | Return to the main Search view and focus the query box |
-| `f` | Focus the Installed filter field |
-| `o` | Open the selected installed skill folder |
-| `s` | Change sort mode |
-| `x` | Remove selected installed skill |
-| `Esc` or `q` | Close dialog |
-
-### Update dialog
-
-| Key | Action |
-|---|---|
-| `Space` | Toggle the selected skill |
-| `Dry-run` button | Preview updates without changing anything |
-| `Update` button | Run update |
-| `Esc` | Close dialog |
-
-### Cleanup dialog
-
-| Key | Action |
-|---|---|
-| `Space` | Toggle the selected cleanup candidate |
-| `r` | Remove checked candidates |
-| `i` | Mark checked candidates as ignored |
-| `x` | Export cleanup report |
-| `Esc` | Close dialog |
-
-### Remove and install dialogs
-
-- `Esc` closes the dialog
-- Buttons are keyboard accessible through the normal Terminal.Gui focus model
-
-## Logging
-
-SkillView keeps a rotating file log and redacts sensitive material before writing.
+SkillView keeps a rotating file log and redacts sensitive values before writing.
 
 - Linux: `~/.cache/SkillView/logs`
 - macOS: `~/Library/Caches/SkillView/logs`
 - Windows: `%LOCALAPPDATA%\\SkillView\\logs`
 
-Behavior:
+If the TUI behaves unexpectedly:
 
-- daily rotation
-- 14-day retention
-- 50 MB total size budget
-- GitHub tokens, `Authorization:` headers, and URL userinfo are redacted
+1. run with `--debug`
+2. open Doctor with `d`
+3. check the log file
 
-## Architecture
+## For developers
 
-SkillView is intentionally small and explicit.
+Build requirements:
 
-### High-level design
+- .NET SDK `10.0.100` or newer in the same feature band
+- on Linux AOT publish: `clang` and `zlib1g-dev`
 
-- **3 production projects**
-- **1 test project**
+### Architecture
+
+SkillView is intentionally small and explicit:
+
+- **3 production projects**: `SkillView.Core`, `SkillView.App`, `SkillView.GhExtension`
+- **1 test project**: `SkillView.Tests`
 - shared logic lives in `SkillView.Core`
 - both executables call the same entry point
 - no DI container
-- no reflection-heavy runtime magic
+- Native AOT-safe code paths by default
 
-### Execution flow
+Execution flow:
 
 ```text
-Program.cs (thin entrypoint)
+Program.cs
   -> EntryPoint.RunAsync(args)
      -> ArgParser.Parse(...)
      -> TuiServices.Build(...)
-     -> CLI mode: CliDispatcher.RunAsync(...)
-     -> TUI mode: SkillViewApp.Run()
+     -> CLI: CliDispatcher.RunAsync(...)
+     -> TUI: SkillViewApp.Run()
 ```
 
-### Project structure
+### Project layout
 
-| Project | Purpose |
+| Path | Purpose |
 |---|---|
-| `src/SkillView.Core` | Domain logic, adapters, inventory, logging, and Terminal UI |
-| `src/SkillView.App` | Standalone `skillview` executable |
-| `src/SkillView.GhExtension` | `gh-skillview` extension executable |
-| `tests/SkillView.Tests` | xUnit tests |
-
-### Core package layout
-
-| Directory | Responsibility |
-|---|---|
-| `Bootstrapping` | Entry point, argument parsing, app options |
-| `Cli` | Subcommand dispatcher and JSON/text rendering |
-| `Environment` | `gh` discovery, version checks, auth and capability probing |
-| `Gh` | Adapters for `gh skill` commands |
-| `Gh/Models` | Records returned by adapters |
-| `Inventory` | Filesystem scanning, parsing, reconciliation, cleanup classification |
-| `Inventory/Models` | Installed skill and front-matter models |
-| `Logging` | In-memory logger, redaction, file sink |
-| `Subprocess` | Safe argv-array process execution |
-| `Ui` | Terminal.Gui screens and helpers |
-
-### Important architectural choices
-
-#### Native AOT first
-
-The app is designed around Native AOT constraints.
-
-- no reflection-based discovery
-- `System.Text.Json` source generators for JSON
-- generated regexes instead of runtime regex compilation
-- hand-rolled argument parsing
-- hand-rolled front-matter parsing instead of a YAML dependency
-
-#### Capability-gated `gh` integration
-
-SkillView does not assume every `gh` build supports the same flags.
-
-It probes `gh skill ... --help` so preview and install features can discover the flags the local installation actually supports, including shared flags like `--allow-hidden-dirs`. That keeps the app safer across evolving GitHub CLI releases.
-
-#### Safe mutation operations
-
-Install, update, remove, and cleanup flows all rescan inventory after changes. Removal logic resolves paths, checks root containment, and refuses dangerous operations by default.
-
-## Repository layout
-
-```text
-.
-├── src/
-│   ├── SkillView.App/
-│   ├── SkillView.Core/
-│   └── SkillView.GhExtension/
-├── tests/
-│   └── SkillView.Tests/
-├── script/
-├── .github/
-│   └── workflows/
-├── Directory.Build.props
-├── Directory.Build.targets
-├── SkillView.sln
-└── global.json
-```
-
-## Development guide
+| `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui screens |
+| `src/SkillView.App/` | Standalone `skillview` entrypoint |
+| `src/SkillView.GhExtension/` | `gh skillview` extension entrypoint |
+| `tests/SkillView.Tests/` | xUnit coverage |
+| `.github/workflows/` | CI, contract tests, and release workflows |
 
 ### Build and test
 
 ```bash
 dotnet restore
 dotnet build
-dotnet test
+dotnet test --no-build
 ```
 
-There is no separate lint step. Build warnings are treated as errors through shared MSBuild settings.
+There is no separate lint step. Build warnings and code-style violations are treated as errors.
 
 ### Run locally
 
@@ -361,60 +269,14 @@ dotnet publish src/SkillView.App -c Release -r osx-arm64 \
   -p:PublishAot=true -p:StripSymbols=true -o dist/app
 ```
 
-Example for Linux x64:
+On Linux, install `clang` and `zlib1g-dev` first.
 
-```bash
-dotnet publish src/SkillView.App -c Release -r linux-x64 \
-  -p:PublishAot=true -p:StripSymbols=true -o dist/app
-```
+## Built with
 
-### Test philosophy
-
-- xUnit for unit and behavior tests
-- snapshot coverage for JSON-emitting CLI commands
-- contract tests for `gh` integration
-- release workflow verifies published artifacts
-
-### Contributing notes
-
-When changing behavior:
-
-1. Prefer explicit, AOT-safe code over clever abstractions
-2. Keep entrypoints tiny and business logic in `SkillView.Core`
-3. Use `ProcessRunner` for subprocess work instead of shell composition
-4. Preserve exit-code behavior for CLI consumers
-5. Add or update tests with code changes
-
-## Terminal compatibility
-
-SkillView works best in terminals with full ANSI and xterm key support.
-
-| Terminal | Status |
-|---|---|
-| Terminal.app (macOS) | ✅ Full support |
-| iTerm2 | ✅ Full support |
-| Kitty | ✅ Full support |
-| Alacritty | ✅ Full support |
-| Ghostty | ✅ Full support |
-| Windows Terminal | ✅ Full support |
-| Warp (macOS) | ⚠️ Partial — Enter key unreliable after first interaction; use `Ctrl+J` or `→` instead |
-
-If you encounter issues in your terminal, try `--debug` and check the log output. See the [Logging](#logging) section for log file locations.
-
-## Under the hood
-
-SkillView is built with:
-
-- [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) (v2) — the cross-platform .NET TUI framework that powers the full-screen interface
-- [GitHub CLI](https://cli.github.com/) (`gh`) — all GitHub interaction flows through `gh skill` commands
-- [.NET 10](https://dotnet.microsoft.com/) with Native AOT — single-binary, no runtime required
-- [xUnit](https://xunit.net/) — test framework
-
-## Acknowledgements
-
-- The [GitHub CLI](https://cli.github.com/) team for the CLI, the extension framework, and the `gh skill` commands that make this project possible.
-- The [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) maintainers ([@tig](https://github.com/tig), [@tznind](https://github.com/tznind), and contributors) for building a serious cross-platform TUI framework for .NET. The v2 rewrite is ambitious and impressive.
-- The [GitHub Copilot](https://github.com/features/copilot) and [Claude Code](https://claude.com/product/claude-code) teams — this project uses AI-assisted development.
+- [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) - the cross-platform .NET TUI framework
+- [GitHub CLI](https://cli.github.com/) - all GitHub interaction flows through gh skill commands
+- [.NET 10](https://dotnet.microsoft.com/) with Native AOT - single-binary, no runtime required
+- [xUnit](https://xunit.net/)
 
 ## License
 

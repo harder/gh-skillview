@@ -21,8 +21,9 @@ Phases 0–8 are complete. Current phase roadmap:
 | 8 | Release engineering — six-RID AOT matrix, SLSA attestations, end-to-end install verification | ✅ Done |
 | 9 | Hardening — contract tests, error classification, TG2 upstream review, scan diagnostics | ✅ Done |
 
-Consult `implementation-plan.md` (§22) for detailed phase specs. Each completed
-phase has a `PHASE<N>_NOTES.md` with findings, test counts, and carry-forwards.
+Consult `implementation-plan.md` (§22) for detailed phase specs. Durable
+agent-facing workflow notes now live in `AGENTS.md` and focused files under
+`agent_docs/`.
 
 ## Build, test, publish
 
@@ -194,4 +195,4 @@ These rules govern all changes — they are the project's architectural invarian
 - **`gh skill list --json`** (cli/cli#13215): not yet landed. `GhSkillListAdapter` is gated on `capabilities.HasSkillList` — flips automatically when `gh` adds the flags.
 - **`gh skill update --yes`**: not in v2.92.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
 - **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
-- **Terminal.Gui v2**: pinned at `2.0.0-rc.7`. The old `TrimmerRootAssembly` workaround is retired; remaining AOT caveats are documented in `PHASE0_NOTES.md`.
+- **Terminal.Gui v2**: pinned at `2.0.0-rc.7`. The old `TrimmerRootAssembly` workaround is retired. Use `Application.Create().Init()` + `IApplication.Dispose()`, keep async UI work tied to app/dialog lifetime cancellation, and track any remaining framework workarounds with `// TODO(tg2): upstream`.

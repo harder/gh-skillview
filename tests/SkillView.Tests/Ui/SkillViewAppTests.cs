@@ -4,6 +4,8 @@ using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using SkillView.Ui;
@@ -45,6 +47,20 @@ public sealed class SkillViewAppTests
             SubcommandArgs: Array.Empty<string>());
 
         return new SkillViewApp(services, options);
+    }
+
+    private static SkillViewApp CreateApp(bool probeOnRun)
+    {
+        var services = TuiServices.Build(new Logger(LogLevel.Debug));
+        var options = new AppOptions(
+            InvocationMode.Standalone,
+            DispatchMode.Tui,
+            Debug: false,
+            ScanRoots: Array.Empty<string>(),
+            SubcommandName: null,
+            SubcommandArgs: Array.Empty<string>());
+
+        return new SkillViewApp(services, options, static () => Application.Create().Init(), probeOnRun);
     }
 
     private static IEnumerable<View> Descendants(View root)
@@ -241,5 +257,41 @@ public sealed class SkillViewAppTests
             userEnabled);
 
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Run_DisposesCreatedApplication()
+    {
+        IApplication? created = null;
+        IApplication? disposed = null;
+
+        void HandleCreated(object? _, EventArgs<IApplication> e)
+        {
+            created = e.Value;
+            e.Value.StopAfterFirstIteration = true;
+        }
+
+        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        {
+            disposed = e.Value;
+        }
+
+        Application.InstanceCreated += HandleCreated;
+        Application.InstanceDisposed += HandleDisposed;
+        try
+        {
+            var app = CreateApp(probeOnRun: false);
+
+            var exitCode = app.Run();
+
+            Assert.Equal(ExitCodes.Success, exitCode);
+            Assert.NotNull(created);
+            Assert.Same(created, disposed);
+        }
+        finally
+        {
+            Application.InstanceCreated -= HandleCreated;
+            Application.InstanceDisposed -= HandleDisposed;
+        }
     }
 }

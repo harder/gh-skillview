@@ -53,9 +53,8 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-# SkillView — internal planning / phase notes kept out of public git
+# SkillView — internal planning / local notes kept out of public git
 implementation-plan.md
-PHASE*_NOTES.md
 PHASE*_UX_ISSUES.md
 dist/
 .DS_Store
