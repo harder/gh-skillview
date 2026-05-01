@@ -18,7 +18,6 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `src/SkillView.GhExtension/` — `gh skillview` extension entrypoint.
 - `tests/SkillView.Tests/` — xUnit coverage for core services, CLI JSON output,
   and TUI helpers.
-- `implementation-plan.md` — roadmap and detailed design references by section.
 
 ## How
 
@@ -64,8 +63,6 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   shortcuts. Keep the current window/table `KeyDown` routing for app-level
   single-letter shortcuts because `TableView` still swallows unbound printable
   keys before they bubble.
-- Record newly discovered PTY/session-specific bugs in
-  `PTY_SESSION_UX_ISSUES.md`, not in the older `PHASE10_UX_ISSUES.md` backlog.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.
