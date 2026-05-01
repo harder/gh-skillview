@@ -42,6 +42,7 @@ public sealed class SkillViewAppTests
             InvocationMode.Standalone,
             DispatchMode.Tui,
             Debug: false,
+            Theme: AppTheme.Default,
             ScanRoots: Array.Empty<string>(),
             SubcommandName: null,
             SubcommandArgs: Array.Empty<string>());
@@ -56,6 +57,7 @@ public sealed class SkillViewAppTests
             InvocationMode.Standalone,
             DispatchMode.Tui,
             Debug: false,
+            Theme: AppTheme.Default,
             ScanRoots: Array.Empty<string>(),
             SubcommandName: null,
             SubcommandArgs: Array.Empty<string>());
@@ -180,6 +182,18 @@ public sealed class SkillViewAppTests
         Assert.Contains(
             Descendants(window).OfType<CheckBox>(),
             box => box.Text.ToString().Contains("hidden", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BuildUi_ExposesAgentFilterOnSearchScreen()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.NotNull(app.AgentFieldForTests);
+        Assert.Contains(
+            Descendants(window).OfType<Label>(),
+            label => string.Equals(label.Text.ToString(), "Agent:", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -104,7 +104,7 @@ Run SkillView with no subcommand to open the full-screen interface.
 
 | View or flow | What it does | How to open |
 |---|---|---|
-| **Main search view** | Search public skills, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. | Launch the app |
+| **Main search view** | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. | Launch the app |
 | **Doctor** | Shows `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. | `d` |
 | **Installed** | Lists installed skills across discovered roots, lets you filter, sort, inspect details, open the folder, or start removal. | `I` |
 | **Install dialog** | Installs the selected skill with version, scope, agent, path, overwrite, and capability-gated options like hidden-dir scanning or local installs. | `i` from search results |
@@ -116,7 +116,7 @@ Run SkillView with no subcommand to open the full-screen interface.
 
 The main window is built for the common “discover and inspect” loop:
 
-1. Type a search query and press `Enter`.
+1. Type a search query, and optionally narrow the next search with the **Owner**, **Agent**, and **Limit** fields.
 2. Browse results in the left table.
 3. Preview the selected skill on the right.
 4. Press `i` to stage an install, `o` to open the repo in a browser, or `l` to inspect logs.
@@ -173,11 +173,13 @@ skillview cleanup --apply --yes
 
 ```bash
 skillview --debug
+skillview --theme high-contrast
 skillview --scan-root /path/to/skills
 skillview --scan-root /path/one --scan-root /path/two list --json
 ```
 
 - `--debug` works before or after the subcommand
+- `--theme` currently supports `default` and `high-contrast`
 - `--scan-root` is repeatable
 - `SKILLVIEW_LOG=debug` is also supported
 

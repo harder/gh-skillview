@@ -5,6 +5,7 @@ public sealed record AppOptions(
     InvocationMode InvocationMode,
     DispatchMode DispatchMode,
     bool Debug,
+    AppTheme Theme,
     IReadOnlyList<string> ScanRoots,
     string? SubcommandName,
     IReadOnlyList<string> SubcommandArgs

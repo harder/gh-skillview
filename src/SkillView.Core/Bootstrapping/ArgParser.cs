@@ -12,6 +12,7 @@ public static class ArgParser
     {
         var invocation = DetermineInvocationMode(processPath);
         var debug = Environment.GetEnvironmentVariable("SKILLVIEW_LOG")?.Equals("debug", StringComparison.OrdinalIgnoreCase) ?? false;
+        var theme = ParseTheme(Environment.GetEnvironmentVariable("SKILLVIEW_THEME"));
         var scanRoots = new List<string>();
         string? subcommand = null;
         var subcommandArgs = new List<string>();
@@ -26,6 +27,22 @@ public static class ArgParser
             if (arg == "--debug")
             {
                 debug = true;
+                continue;
+            }
+
+            if (arg.StartsWith("--theme=", StringComparison.Ordinal))
+            {
+                theme = ParseTheme(arg["--theme=".Length..]);
+                continue;
+            }
+
+            if (arg == "--theme")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    throw new ArgumentException("--theme requires a value");
+                }
+                theme = ParseTheme(args[++i]);
                 continue;
             }
 
@@ -60,10 +77,18 @@ public static class ArgParser
             invocation,
             dispatch,
             debug,
+            theme,
             scanRoots,
             subcommand,
             subcommandArgs);
     }
+
+    internal static AppTheme ParseTheme(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "high-contrast" or "highcontrast" or "contrast" => AppTheme.HighContrast,
+            _ => AppTheme.Default,
+        };
 
     private static InvocationMode DetermineInvocationMode(string processPath)
     {

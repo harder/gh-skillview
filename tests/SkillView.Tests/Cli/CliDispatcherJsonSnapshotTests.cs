@@ -21,6 +21,7 @@ public class CliDispatcherJsonSnapshotTests
         InvocationMode.Standalone,
         DispatchMode.Cli,
         Debug: false,
+        Theme: AppTheme.Default,
         ScanRoots: Array.Empty<string>(),
         SubcommandName: "doctor",
         SubcommandArgs: new[] { "--json" });

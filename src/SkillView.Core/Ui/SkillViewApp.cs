@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using SkillView.Bootstrapping;
@@ -25,12 +26,14 @@ public sealed class SkillViewApp
     private readonly AppOptions _options;
     private readonly Func<IApplication> _applicationFactory;
     private readonly bool _probeOnRun;
+    private readonly SearchAgentMetadataCache _searchAgentMetadata = new();
 
     private IApplication? _app;
     private CancellationTokenSource? _runLifetime;
     private bool _hasRunLifetime;
     private TextField? _queryField;
     private TextField? _ownerField;
+    private TextField? _agentField;
     private NumericUpDown<int>? _limitUpDown;
     private CheckBox? _hiddenDirsBox;
     private TableView? _resultsTable;
@@ -100,6 +103,7 @@ public sealed class SkillViewApp
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
     public int Run()
     {
+        TuiHelpers.SetTheme(_options.Theme);
         IApplication? app = null;
         Window? window = null;
         var runLifetime = new CancellationTokenSource();
@@ -211,10 +215,21 @@ public sealed class SkillViewApp
             if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
         };
 
+        var agentLabel = new Label { Text = "Agent:", X = 0, Y = 2 };
+        _agentField = new TextField
+        {
+            X = 8,
+            Y = 2,
+            Width = 22,
+            Text = string.Empty,
+        };
+        TuiHelpers.ConfigureTextInput(_agentField, "Base");
+        _agentField.KeyDown += OnFilterFieldKey;
+
         _hiddenDirsBox = new CheckBox
         {
             X = 0,
-            Y = 2,
+            Y = 3,
             Text = "_allow hidden dirs for preview/install",
         };
         _hiddenDirsBox.ValueChanged += (_, _) =>
@@ -226,7 +241,7 @@ public sealed class SkillViewApp
         _resultsTable = new TableView
         {
             X = 0,
-            Y = 4,
+            Y = 5,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             FullRowSelect = true,
@@ -277,7 +292,7 @@ public sealed class SkillViewApp
             }
         };
 
-        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _hiddenDirsBox, _resultsTable);
+        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, agentLabel, _agentField, _hiddenDirsBox, _resultsTable);
 
         _rightFrame = new FrameView
         {
@@ -401,7 +416,7 @@ public sealed class SkillViewApp
 
         TuiHelpers.ApplyScheme("Base",
             window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, _hiddenDirsBox,
+            queryLabel, _queryField, ownerLabel, _ownerField, agentLabel, _agentField, limitLabel, _limitUpDown, _hiddenDirsBox,
             _resultsTable, _previewPane, _previewRawPane, _metadataPane, _logPane,
             _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         // Invert the actions hint so it reads as a status-bar-style strip.
@@ -416,12 +431,14 @@ public sealed class SkillViewApp
             _rightFrame,
             _queryField,
             _ownerField,
+            _agentField,
             _limitUpDown,
             _hiddenDirsBox,
             _resultsTable);
         AttachStartupFocusTracking(
             _queryField,
             _ownerField,
+            _agentField,
             _limitUpDown,
             _hiddenDirsBox,
             _resultsTable);
@@ -524,8 +541,13 @@ public sealed class SkillViewApp
         var query = _queryField?.Text.Trim() ?? string.Empty;
         if (string.IsNullOrEmpty(query)) return;
         var owner = _ownerField?.Text.Trim();
+        var agent = _agentField?.Text.Trim();
         var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
-        _ = RunSearchAsync(query, string.IsNullOrEmpty(owner) ? null : owner, limit);
+        _ = RunSearchAsync(
+            query,
+            string.IsNullOrEmpty(owner) ? null : owner,
+            limit,
+            string.IsNullOrEmpty(agent) ? null : agent);
     }
 
     private void ProbeGhAsync()
@@ -583,7 +605,7 @@ public sealed class SkillViewApp
         }, "probe");
     }
 
-    private async Task RunSearchAsync(string query, string? owner = null, int? limit = null)
+    private async Task RunSearchAsync(string query, string? owner = null, int? limit = null, string? agent = null)
     {
         if (_ghPath is null)
         {
@@ -609,24 +631,23 @@ public sealed class SkillViewApp
                 .SearchAsync(_ghPath, query, capabilities, options, cancellationToken)
                 .ConfigureAwait(false);
             var results = response.Results;
+            var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
             Invoke(() =>
             {
-                _results = results.ToList();
+                _results = filteredResults.ToList();
                 RefreshResultsTable();
                 UpdateMetadataPane();
                 _resultsTable?.SetFocus();
-                _services.Logger.Info("search", $"results loaded: count={_results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
+                _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
                 if (!_showingLogs)
                 {
-                    SetPreviewText(results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint);
+                    SetPreviewText(_results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint);
                 }
                 if (_previewFrame is not null)
                 {
                     _previewFrame.Title = "SKILL.md";
                 }
-                SetStatus(results.Count == 0
-                    ? "no matches"
-                    : $"{results.Count} result(s) — Enter, p, or v to preview");
+                SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -650,6 +671,62 @@ public sealed class SkillViewApp
     }
 
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(30);
+
+    private async Task<IReadOnlyList<SearchResultSkill>> FilterResultsByAgentAsync(
+        IReadOnlyList<SearchResultSkill> results,
+        string? requestedAgent,
+        CancellationToken cancellationToken)
+    {
+        var normalizedAgent = SearchAgentMetadataCache.NormalizeAgent(requestedAgent);
+        if (normalizedAgent is null || _ghPath is null)
+        {
+            return results;
+        }
+
+        var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
+        foreach (var result in results)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_searchAgentMetadata.Has(result))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(result.Repo))
+            {
+                _searchAgentMetadata.Store(result, ImmutableArray<string>.Empty);
+                continue;
+            }
+
+            try
+            {
+                var preview = await _services.PreviewService
+                    .PreviewAsync(
+                        _ghPath,
+                        capabilities,
+                        result.Repo,
+                        result.SkillName,
+                        allowHiddenDirs: ShouldAllowHiddenDirs(result, HiddenDirsEnabled),
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+                var agents = preview.Succeeded
+                    ? SearchAgentMetadataCache.ExtractAgentsFromMarkdown(preview.MarkdownBody ?? preview.Body ?? string.Empty)
+                    : ImmutableArray<string>.Empty;
+                _searchAgentMetadata.Store(result, agents);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _services.Logger.Warn("search.agent", $"{result.Repo}/{result.SkillName}: {ex.Message}");
+                _searchAgentMetadata.Store(result, ImmutableArray<string>.Empty);
+            }
+        }
+
+        return _searchAgentMetadata.Filter(results, normalizedAgent);
+    }
 
     private async Task PreviewSelectedAsync()
     {
@@ -879,6 +956,21 @@ public sealed class SkillViewApp
         if (!string.IsNullOrWhiteSpace(s.Description))
             sb.AppendLine($"**About** : {s.Description}");
         return sb.ToString();
+    }
+
+    internal static string DescribeSearchResults(int totalCount, int shownCount, string? requestedAgent)
+    {
+        var normalizedAgent = SearchAgentMetadataCache.NormalizeAgent(requestedAgent);
+        if (normalizedAgent is null)
+        {
+            return shownCount == 0
+                ? "no matches"
+                : $"{shownCount} result(s) — Enter, p, or v to preview";
+        }
+
+        return shownCount == 0
+            ? $"no matches for agent {normalizedAgent}"
+            : $"{shownCount} of {totalCount} result(s) match {normalizedAgent}";
     }
 
     /// TG2 RC4's Markdown renderer collapses tight bullet lists into one
@@ -1123,6 +1215,7 @@ public sealed class SkillViewApp
         installScreen.Show();
         if (installScreen.LastResult is { Succeeded: true } result)
         {
+            _services.ListAdapter.Invalidate();
             SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…", TuiHelpers.NotificationLevel.Success);
             RunBackground(async cancellationToken =>
             {
@@ -1180,6 +1273,7 @@ public sealed class SkillViewApp
                 screen.Show();
                 if (screen.LastResult is { DryRun: false, Succeeded: true })
                 {
+                    _services.ListAdapter.Invalidate();
                     SetStatus("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
                     RunBackground(async nestedCancellationToken =>
                     {
@@ -1253,6 +1347,7 @@ public sealed class SkillViewApp
         screen.Show();
         if (screen.LastReport is { Succeeded: true } report)
         {
+            _services.ListAdapter.Invalidate();
             SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…", TuiHelpers.NotificationLevel.Success);
             RunBackground(async cancellationToken =>
             {
@@ -1296,6 +1391,10 @@ public sealed class SkillViewApp
                     _app!, _services.RemoveService, _services.Logger,
                     candidates, snapshot.ScannedRoots, snapshot.Skills);
                 screen.Show();
+                if (screen.RemovedCount > 0)
+                {
+                    _services.ListAdapter.Invalidate();
+                }
                 SetStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
             });
         }, "cleanup");
@@ -1502,6 +1601,8 @@ public sealed class SkillViewApp
     internal TextField? QueryFieldForTests => _queryField;
 
     internal TextField? OwnerFieldForTests => _ownerField;
+
+    internal TextField? AgentFieldForTests => _agentField;
 
     internal NumericUpDown<int>? LimitUpDownForTests => _limitUpDown;
 

@@ -22,6 +22,7 @@ public sealed class CleanupScreen
     private readonly ImmutableArray<CleanupClassifier.Candidate> _candidates;
     private readonly IReadOnlyList<ScanRoot> _scanRoots;
     private readonly IReadOnlyList<InstalledSkill> _allSkills;
+    private readonly Func<string, int> _confirmBatchRemoval;
 
     public int RemovedCount { get; private set; }
     public int IgnoredCount { get; private set; }
@@ -32,7 +33,8 @@ public sealed class CleanupScreen
         Logger logger,
         ImmutableArray<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<ScanRoot> scanRoots,
-        IReadOnlyList<InstalledSkill> allSkills)
+        IReadOnlyList<InstalledSkill> allSkills,
+        Func<string, int>? confirmBatchRemoval = null)
     {
         _app = app;
         _remove = remove;
@@ -40,6 +42,7 @@ public sealed class CleanupScreen
         _candidates = candidates;
         _scanRoots = scanRoots;
         _allSkills = allSkills;
+        _confirmBatchRemoval = confirmBatchRemoval ?? ConfirmBatchRemoval;
     }
 
     public void Show()
@@ -181,6 +184,23 @@ public sealed class CleanupScreen
 
     private void DoRemove(HashSet<int> checkedRows, Label status)
     {
+        var selected = checkedRows
+            .Where(i => i >= 0 && i < _candidates.Length)
+            .Select(i => _candidates[i])
+            .ToImmutableArray();
+        if (selected.IsDefaultOrEmpty)
+        {
+            status.Text = " no cleanup candidates selected";
+            return;
+        }
+
+        var response = _confirmBatchRemoval(BuildRemoveConfirmationText(selected));
+        if (response != 1)
+        {
+            status.Text = " cleanup removal canceled";
+            return;
+        }
+
         var removed = 0;
         var failed = 0;
         for (var i = 0; i < _candidates.Length; i++)
@@ -218,6 +238,34 @@ public sealed class CleanupScreen
         }
         RemovedCount += removed;
         status.Text = $" removed {removed}, skipped/failed {failed}";
+    }
+
+    internal static string BuildRemoveConfirmationText(
+        IReadOnlyList<CleanupClassifier.Candidate> selected)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"Remove {selected.Count} cleanup candidate(s)?");
+        sb.AppendLine();
+        foreach (var group in selected
+                     .GroupBy(candidate => candidate.Kind)
+                     .OrderBy(group => group.Key.ToString(), StringComparer.Ordinal))
+        {
+            sb.AppendLine($"- {TuiHelpers.ShortKind(group.Key)}: {group.Count()}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Paths:");
+        foreach (var candidate in selected.Take(3))
+        {
+            sb.AppendLine($"- {candidate.Path}");
+        }
+
+        if (selected.Count > 3)
+        {
+            sb.AppendLine($"- …and {selected.Count - 3} more");
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private void DoIgnore(HashSet<int> checkedRows, Label status)
@@ -328,4 +376,12 @@ public sealed class CleanupScreen
         public int Name;
         public int Path;
     }
+
+    private int ConfirmBatchRemoval(string message) =>
+        MessageBox.Query(
+            _app,
+            "Confirm cleanup removal",
+            message,
+            "Cancel",
+            "Remove") ?? 0;
 }

@@ -79,6 +79,36 @@ public class ArgParserTests
     }
 
     [Fact]
+    public void ThemeFlagBeforeSubcommandIsConsumed()
+    {
+        var opts = ArgParser.Parse(
+            "skillview",
+            new[] { "--theme", "high-contrast", "list", "--json" });
+
+        Assert.Equal(AppTheme.HighContrast, opts.Theme);
+        Assert.Equal("list", opts.SubcommandName);
+        Assert.Equal(new[] { "--json" }, opts.SubcommandArgs);
+    }
+
+    [Fact]
+    public void ThemeDefaultsFromEnvironment()
+    {
+        var previous = System.Environment.GetEnvironmentVariable("SKILLVIEW_THEME");
+        try
+        {
+            System.Environment.SetEnvironmentVariable("SKILLVIEW_THEME", "high-contrast");
+
+            var opts = ArgParser.Parse("skillview", Array.Empty<string>());
+
+            Assert.Equal(AppTheme.HighContrast, opts.Theme);
+        }
+        finally
+        {
+            System.Environment.SetEnvironmentVariable("SKILLVIEW_THEME", previous);
+        }
+    }
+
+    [Fact]
     public void ScanRootAfterSubcommandIsNotConsumedAsGlobal()
     {
         // Only `--debug` is recognised post-subcommand. `--scan-root` is a

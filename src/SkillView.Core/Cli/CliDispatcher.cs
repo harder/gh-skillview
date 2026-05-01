@@ -199,6 +199,7 @@ public static class CliDispatcher
 
     private static async Task<int> RescanAsync(AppOptions options, TuiServices services)
     {
+        services.ListAdapter.Invalidate();
         var (snapshot, _) = await CaptureInventoryAsync(options, services).ConfigureAwait(false);
         var d = snapshot.Diagnostics;
         Console.Out.WriteLine($"rescan: {snapshot.Skills.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
@@ -635,6 +636,7 @@ public static class CliDispatcher
             return result.ExitCode == 0 ? ExitCodes.UserError : ExitCodes.EnvironmentError;
         }
 
+        services.ListAdapter.Invalidate();
         var postSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             report.Capabilities,
@@ -790,6 +792,7 @@ public static class CliDispatcher
         }
         else
         {
+            services.ListAdapter.Invalidate();
             var postSnapshot = await services.InventoryService.CaptureAsync(
                 report.GhPath,
                 report.Capabilities,
@@ -1141,6 +1144,10 @@ public static class CliDispatcher
         else
         {
             result = services.RemoveService.Remove(validation);
+            if (result.Succeeded)
+            {
+                services.ListAdapter.Invalidate();
+            }
         }
 
         if (parsed.Json) WriteRemoveJson(result, target, parsed, validation);
@@ -1307,7 +1314,12 @@ public static class CliDispatcher
                         validation.Allowed ? "requires second-confirm" : "validation refused")));
                     continue;
                 }
-                applied.Add((c, services.RemoveService.Remove(validation)));
+                var removal = services.RemoveService.Remove(validation);
+                applied.Add((c, removal));
+                if (removal.Succeeded)
+                {
+                    services.ListAdapter.Invalidate();
+                }
             }
         }
 

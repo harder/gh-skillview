@@ -15,11 +15,13 @@ public sealed class GhSkillListAdapter
 {
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
+    private readonly GhSkillListCache _cache;
 
     public GhSkillListAdapter(ProcessRunner runner, Logger logger)
     {
         _runner = runner;
         _logger = logger;
+        _cache = new GhSkillListCache();
     }
 
     public async Task<ImmutableArray<GhSkillListRecord>> ListAsync(
@@ -32,6 +34,12 @@ public sealed class GhSkillListAdapter
         if (!capabilities.HasSkillList)
         {
             return ImmutableArray<GhSkillListRecord>.Empty;
+        }
+
+        if (_cache.TryGet(ghPath, scope, agent, out var cached))
+        {
+            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={cached.Length}");
+            return cached;
         }
 
         var args = new List<string> { "skill", "list", "--json" };
@@ -55,11 +63,16 @@ public sealed class GhSkillListAdapter
 
         if (string.IsNullOrWhiteSpace(result.StdOut))
         {
+            _cache.Store(ghPath, scope, agent, ImmutableArray<GhSkillListRecord>.Empty);
             return ImmutableArray<GhSkillListRecord>.Empty;
         }
 
-        return Parse(result.StdOut, _logger);
+        var parsed = Parse(result.StdOut, _logger);
+        _cache.Store(ghPath, scope, agent, parsed);
+        return parsed;
     }
+
+    public void Invalidate() => _cache.Invalidate();
 
     /// Parses a JSON payload into `GhSkillListRecord`s. Accepts either a top-
     /// level array or a top-level object with a records array under one of

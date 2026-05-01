@@ -1,4 +1,5 @@
 using System.Text;
+using SkillView.Bootstrapping;
 using SkillView.Inventory;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -16,6 +17,10 @@ namespace SkillView.Ui;
 /// consistent and avoids duplicating truncation / label logic.
 internal static class TuiHelpers
 {
+    internal static AppTheme CurrentTheme { get; private set; } = AppTheme.Default;
+
+    internal static void SetTheme(AppTheme theme) => CurrentTheme = theme;
+
     /// Detect whether we're running inside Warp terminal, which has known
     /// issues with Enter key delivery to TUI apps on macOS.
     internal static bool IsWarpTerminal { get; } =
@@ -73,9 +78,13 @@ internal static class TuiHelpers
     {
         var (fg, bg) = level switch
         {
+            NotificationLevel.Success when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Green),
+            NotificationLevel.Warn when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Yellow),
+            NotificationLevel.Error when CurrentTheme == AppTheme.HighContrast => (StandardColor.White, StandardColor.Red),
             NotificationLevel.Success => (StandardColor.Black, StandardColor.Green),
             NotificationLevel.Warn => (StandardColor.Black, StandardColor.Yellow),
             NotificationLevel.Error => (StandardColor.White, StandardColor.Red),
+            _ when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.White),
             _ => (StandardColor.White, StandardColor.Black),
         };
         var normal = new Attribute(fg, bg);
@@ -241,6 +250,7 @@ internal static class TuiHelpers
         (IsWarpTerminal
             ? "Ctrl+J, →, p, v  preview when results are focused\n"
             : "Enter, →, p, v  preview when results are focused\n") +
+        "Owner / Agent / Limit  refine the next search before you submit it\n" +
         "h  toggle hidden-dir access for preview/install\n" +
         "i  install the selected search result\n" +
         "o  open the skill (GitHub URL or local folder)\n" +
@@ -258,7 +268,7 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · h hidden dirs · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
+        + " · owner/agent filters · h hidden dirs · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
         ? "Select a result and press Ctrl+J, p, or v to preview."
@@ -268,14 +278,26 @@ internal static class TuiHelpers
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
     private static Scheme CreateEditableInputScheme()
     {
-        // Distinct background (DarkBlue) so unfocused text fields are
-        // visually separated from the surrounding FrameView's black fill.
-        // Disabled state uses Black bg so the field visually "blends out"
-        // — otherwise an empty disabled field is indistinguishable from an
-        // empty enabled one.
-        var normal = new Attribute(StandardColor.White, StandardColor.DarkBlue);
-        var focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
-        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.Black);
+        Attribute normal;
+        Attribute focus;
+        Attribute disabled;
+        if (CurrentTheme == AppTheme.HighContrast)
+        {
+            normal = new Attribute(StandardColor.Black, StandardColor.White);
+            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+        }
+        else
+        {
+            // Distinct background (DarkBlue) so unfocused text fields are
+            // visually separated from the surrounding FrameView's black fill.
+            // Disabled state uses Black bg so the field visually "blends out"
+            // — otherwise an empty disabled field is indistinguishable from an
+            // empty enabled one.
+            normal = new Attribute(StandardColor.White, StandardColor.DarkBlue);
+            focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
+            disabled = new Attribute(StandardColor.DarkGray, StandardColor.Black);
+        }
 
         return new Scheme
         {
@@ -296,9 +318,21 @@ internal static class TuiHelpers
     /// Create an explicit scheme for read-only panes (preview, logs).
     private static Scheme CreateReadOnlyPaneScheme()
     {
-        var normal = new Attribute(StandardColor.White, StandardColor.Black);
-        var focus = new Attribute(StandardColor.White, StandardColor.Blue);
-        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+        Attribute normal;
+        Attribute focus;
+        Attribute disabled;
+        if (CurrentTheme == AppTheme.HighContrast)
+        {
+            normal = new Attribute(StandardColor.Black, StandardColor.White);
+            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+        }
+        else
+        {
+            normal = new Attribute(StandardColor.White, StandardColor.Black);
+            focus = new Attribute(StandardColor.White, StandardColor.Blue);
+            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+        }
 
         return new Scheme
         {
@@ -387,9 +421,21 @@ internal static class TuiHelpers
     /// row is clearly visible (inverted colors for Focus state).
     internal static void ConfigureTableScheme(TableView table)
     {
-        var normal = new Attribute(StandardColor.White, StandardColor.Black);
-        var selected = new Attribute(StandardColor.Black, StandardColor.Cyan);
-        var disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+        Attribute normal;
+        Attribute selected;
+        Attribute disabled;
+        if (CurrentTheme == AppTheme.HighContrast)
+        {
+            normal = new Attribute(StandardColor.Black, StandardColor.White);
+            selected = new Attribute(StandardColor.Black, StandardColor.Yellow);
+            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+        }
+        else
+        {
+            normal = new Attribute(StandardColor.White, StandardColor.Black);
+            selected = new Attribute(StandardColor.Black, StandardColor.Cyan);
+            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
+        }
 
         table.SetScheme(new Scheme
         {
