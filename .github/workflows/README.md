@@ -69,4 +69,4 @@ If any release job fails, `notify-failure` opens or reuses an open GitHub issue 
 ## Related docs
 
 - `agent_docs/release-engineering.md`
-- `docs/runbooks/release-rollback.md` *(planned in backlog item #8)*
+- `docs/runbooks/release-rollback.md`

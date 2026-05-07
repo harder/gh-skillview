@@ -12,6 +12,7 @@
 - Each release build leg restores, builds in `Release`, and runs the full test suite before publishing AOT assets.
 - Release artifact uploads keep 30-day retention, and a failed release opens or reuses an issue with the run link for follow-up.
 - `.github/workflows/README.md` is the operator-facing overview for CI/release workflow behavior.
+- `docs/runbooks/release-rollback.md` is the rollback procedure for live GitHub Releases and the current dark-launch package-manager jobs.
 - Homebrew dark-launch scaffolding lives in `packaging/homebrew/skillview.rb.tmpl` and currently only generates a formula artifact from stable-tag assets.
 - WinGet dark-launch scaffolding lives in `packaging/winget/` and currently only generates manifest artifacts for package id `harder.SkillView`.
 - Keep package-manager jobs gated behind repo variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) until real publish automation is ready.

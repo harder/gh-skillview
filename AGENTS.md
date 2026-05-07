@@ -99,5 +99,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   test filters, and opt-in `gh` contract-test workflow details.
 - `agent_docs/release-engineering.md` — release workflow, asset naming, AOT RID
   matrix, and attestation conventions.
+- `docs/runbooks/release-rollback.md` — rollback steps for live GitHub Releases
+  and the current Homebrew / WinGet dark-launch artifacts.
 - `agent_docs/tui-pty-testing.md` — sandboxed PTY workflow, synchronization
   strategy, verification scripts, and known pitfalls for terminal UI testing.
