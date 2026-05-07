@@ -245,9 +245,9 @@ public static class InstalledScreen
         window.Add(filterLabel, filterField, table, detail, footer, statusBar);
         var goToSearchRequested = false;
 
-        // Single dispatcher used by both window.KeyDown and table.KeyDown.
-        // Returns true if the key was handled. We do NOT re-inject keys into
-        // the view hierarchy via NewKeyDownEvent — that re-enters Terminal.Gui's
+        // Single dispatcher for window.KeyDown. Returns true if the key was
+        // handled. We do NOT re-inject keys into the view hierarchy via
+        // NewKeyDownEvent — that re-enters Terminal.Gui's
         // dispatch pipeline and crashes when the action (e.g. q → RequestStop)
         // tears down the run loop mid-call.
         bool HandleShortcut(Key key)
@@ -305,14 +305,6 @@ public static class InstalledScreen
         }
 
         window.KeyDown += (_, key) =>
-        {
-            if (HandleShortcut(key)) key.Handled = true;
-        };
-
-        // RC5: TableView swallows unbound printable letters in
-        // OnKeyDownNotHandled. Dispatch shortcuts directly here — the table's
-        // KeyDown event fires before OnKeyDownNotHandled.
-        table.KeyDown += (_, key) =>
         {
             if (HandleShortcut(key)) key.Handled = true;
         };
@@ -412,52 +404,80 @@ public static class InstalledScreen
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
-        sb.AppendLine($"**path**: `{s.ResolvedPath}`  ");
-        sb.AppendLine($"**scope**: {DisplayScope(s.Scope)}  ");
-        sb.AppendLine($"**provenance**: {s.Provenance}  ");
-        sb.AppendLine($"**validity**: {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")}  ");
-        sb.AppendLine($"**symlinked**: {s.IsSymlinked}  ");
-        sb.AppendLine($"**pinned**: {s.Pinned}  ");
-        sb.AppendLine($"**ignored**: {s.Ignored}  ");
-        sb.AppendLine($"**tree-sha**: `{s.TreeSha ?? "(unset)"}`  ");
-        sb.AppendLine($"**version**: {s.FrontMatter.Version ?? "(unset)"}  ");
+
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath)} |");
+        sb.AppendLine($"| Scope | {MarkdownTableFormatter.FormatTableCell(DisplayScope(s.Scope))} |");
+        sb.AppendLine($"| Provenance | {MarkdownTableFormatter.FormatTableCell(s.Provenance.ToString())} |");
+        sb.AppendLine($"| Validity | {MarkdownTableFormatter.FormatTableCell(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
+        sb.AppendLine($"| Symlinked | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked))} |");
+        sb.AppendLine($"| Pinned | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned))} |");
+        sb.AppendLine($"| Ignored | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored))} |");
+        sb.AppendLine($"| Tree SHA | {MarkdownTableFormatter.FormatCodeSpan(s.TreeSha ?? "(unset)")} |");
+        sb.AppendLine($"| Version | {MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version ?? "(unset)")} |");
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"**installed**: {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+            sb.AppendLine($"| Installed | {MarkdownTableFormatter.FormatTableCell(when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
         }
         if (s.Package is { } pkg)
         {
             sb.AppendLine();
-            sb.AppendLine("### 📦 Package");
+            sb.AppendLine("## Package");
             sb.AppendLine();
-            sb.AppendLine($"**source**: `{pkg.Source}`  ");
-            sb.AppendLine($"**type**: {pkg.SourceType}  ");
-            if (pkg.SourceUrl is { Length: > 0 } url) sb.AppendLine($"**url**: {url}  ");
+            sb.AppendLine("| Field | Value |");
+            sb.AppendLine("| --- | --- |");
+            sb.AppendLine($"| Source | {MarkdownTableFormatter.FormatCodeSpan(pkg.Source)} |");
+            sb.AppendLine($"| Type | {MarkdownTableFormatter.FormatTableCell(pkg.SourceType)} |");
+            if (pkg.SourceUrl is { Length: > 0 } url)
+            {
+                sb.AppendLine($"| Package URL | {FormatTableLink(url)} |");
+            }
             if (pkg.UpdatedAt is { } u)
             {
-                sb.AppendLine($"**updated**: {u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+                sb.AppendLine($"| Updated | {MarkdownTableFormatter.FormatTableCell(u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
             }
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
         {
             sb.AppendLine();
-            sb.AppendLine("### Description");
+            sb.AppendLine("## Description");
             sb.AppendLine();
             sb.AppendLine(desc);
         }
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("### Agents");
+            sb.AppendLine("## Agents");
             sb.AppendLine();
+            sb.AppendLine("| Agent | Link | Path |");
+            sb.AppendLine("| --- | --- | --- |");
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"- {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** ({kind}) `{a.Path}`");
+                sb.AppendLine($"| {TuiHelpers.AgentIcon(a.AgentId)} **{MarkdownTableFormatter.FormatTableCell(a.AgentId)}** | {MarkdownTableFormatter.FormatTableCell(kind)} | {MarkdownTableFormatter.FormatCodeSpan(a.Path)} |");
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
+
+    private static string FormatBool(bool value) => value ? "Yes" : "No";
+
+    private static string FormatTableLink(string value)
+    {
+        var normalized = MarkdownTableFormatter.NormalizeTableValue(value);
+        return $"[{MarkdownTableFormatter.FormatTableCell(normalized)}]({EscapeMarkdownLinkDestination(normalized)})";
+    }
+
+    private static string EscapeMarkdownLinkDestination(string value) =>
+        value
+            .Replace("%", "%25", StringComparison.Ordinal)
+            .Replace(" ", "%20", StringComparison.Ordinal)
+            .Replace("(", "%28", StringComparison.Ordinal)
+            .Replace(")", "%29", StringComparison.Ordinal)
+            .Replace("|", "%7C", StringComparison.Ordinal);
 
     /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we
     /// can keep a stable named type for the `currentSource` field reassignment

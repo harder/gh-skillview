@@ -353,7 +353,7 @@ public sealed class UpdateScreen
         }
     }
 
-    private static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills)
+    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills)
     {
         var sb = new System.Text.StringBuilder();
         var heading = dryRun ? "Dry-run results" : "Update results";
@@ -362,7 +362,7 @@ public sealed class UpdateScreen
         var scope = allChecked
             ? "_all skills_"
             : skills.Count == 1
-                ? $"`{skills[0]}`"
+                ? MarkdownTableFormatter.FormatCodeSpan(skills[0])
                 : $"{skills.Count} skills";
         sb.AppendLine($"**Scope:** {scope}  ·  **Exit:** {result.ExitCode}  ·  **Entries:** {result.Entries.Length}");
         sb.AppendLine();

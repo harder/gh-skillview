@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>SkillView</RootNamespace>
     <AssemblyName>SkillView.Core</AssemblyName>
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.0.2-develop.51</TerminalGuiVersion>
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.0.2-develop.57</TerminalGuiVersion>
     <!-- NOTE: Terminal.Gui rc.7 fixed ConfigurationManager trim-safety, but we
          still keep IsAotCompatible off until the broader TG2 AOT surface is
          re-evaluated under publish verification. -->

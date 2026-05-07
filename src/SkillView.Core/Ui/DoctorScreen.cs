@@ -65,9 +65,13 @@ public static class DoctorScreen
         sb.AppendLine("## Environment");
         sb.AppendLine();
         var ghVerOk = r.GhMeetsMinimum ? "✅" : "❌ too old";
-        sb.AppendLine($"- **gh**         `{r.GhPath ?? "(not found)"}`");
-        sb.AppendLine($"- **version**    `{r.GhVersionRaw ?? "(unknown)"}` (minimum `{GhBinaryLocator.MinimumVersion}` {ghVerOk})");
-        sb.AppendLine($"- **baseline**   {(r.BaselineOk ? "✅ ok" : "⚠️ degraded")}");
+        sb.AppendLine("| Item | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| gh | {MarkdownTableFormatter.FormatCodeSpan(r.GhPath ?? "(not found)")} |");
+        sb.AppendLine(
+            $"| version | {MarkdownTableFormatter.FormatCodeSpan(r.GhVersionRaw ?? "(unknown)")} " +
+            $"(minimum {MarkdownTableFormatter.FormatCodeSpan(GhBinaryLocator.MinimumVersion.ToString())} {ghVerOk}) |");
+        sb.AppendLine($"| baseline | {MarkdownTableFormatter.FormatTableCell(r.BaselineOk ? "✅ ok" : "⚠️ degraded")} |");
         sb.AppendLine();
 
         sb.AppendLine("## Auth");
@@ -78,10 +82,12 @@ public static class DoctorScreen
         }
         else
         {
-            sb.AppendLine($"- **active**     {r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"}");
+            sb.AppendLine("| Item | Value |");
+            sb.AppendLine("| --- | --- |");
+            sb.AppendLine($"| active | {MarkdownTableFormatter.FormatTableCell($"{r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"}")} |");
             if (r.Auth.Hosts.Length > 1)
             {
-                sb.AppendLine($"- **other hosts** {string.Join(", ", r.Auth.Hosts)}");
+                sb.AppendLine($"| other hosts | {MarkdownTableFormatter.FormatTableCell(string.Join(", ", r.Auth.Hosts))} |");
             }
         }
         sb.AppendLine();
@@ -95,31 +101,32 @@ public static class DoctorScreen
         }
         else
         {
-            // Grouped by subcommand and limited to flags that exist in the
-            // current gh release. Entries below correspond 1:1 to the probed
-            // tokens in CapabilityProbeParser.ProbedTokens — keep them in sync.
-            // Capabilities for flags that aren't in gh yet (--repo-path,
-            // --yes/--json on update, list subcommand) are intentionally
-            // omitted; they would always be ❌ and read as defects rather
-            // than as "not yet shipped upstream".
-            sb.AppendLine("**install**");
-            sb.AppendLine($"- `--allow-hidden-dirs`  {Mark(c.SupportsAllowHiddenDirs)}");
-            sb.AppendLine($"- `--upstream`           {Mark(c.SupportsUpstream)}");
-            sb.AppendLine($"- `--from-local`         {Mark(c.SupportsFromLocal)}");
-            sb.AppendLine();
-            sb.AppendLine("**preview**");
-            sb.AppendLine($"- `--allow-hidden-dirs`  {Mark(c.SupportsPreviewAllowHiddenDirs)}");
-            sb.AppendLine();
-            sb.AppendLine("**update**");
-            sb.AppendLine($"- `--dry-run`            {Mark(c.SupportsUpdateDryRun)}");
-            sb.AppendLine($"- `--all`                {Mark(c.SupportsUpdateAll)}");
-            sb.AppendLine($"- `--force`              {Mark(c.SupportsUpdateForce)}");
-            sb.AppendLine($"- `--unpin`              {Mark(c.SupportsUpdateUnpin)}");
-            sb.AppendLine();
-            sb.AppendLine("**search**");
-            sb.AppendLine($"- `--json`               {Mark(c.SupportsSearchJson)}");
-            sb.AppendLine($"- `--owner`              {Mark(c.SupportsSearchOwner)}");
-            sb.AppendLine($"- `--limit`              {Mark(c.SupportsSearchLimit)}");
+            // Capability entries must correspond 1:1 to CapabilityProbeParser.ProbedTokens.
+            // Keep in sync when adding/removing flags. Only show flags in current gh release;
+            // omit future flags to avoid appearing as defects.
+            AppendCapabilitySection(
+                sb,
+                "install",
+                ("`--allow-hidden-dirs`", c.SupportsAllowHiddenDirs),
+                ("`--upstream`", c.SupportsUpstream),
+                ("`--from-local`", c.SupportsFromLocal));
+            AppendCapabilitySection(
+                sb,
+                "preview",
+                ("`--allow-hidden-dirs`", c.SupportsPreviewAllowHiddenDirs));
+            AppendCapabilitySection(
+                sb,
+                "update",
+                ("`--dry-run`", c.SupportsUpdateDryRun),
+                ("`--all`", c.SupportsUpdateAll),
+                ("`--force`", c.SupportsUpdateForce),
+                ("`--unpin`", c.SupportsUpdateUnpin));
+            AppendCapabilitySection(
+                sb,
+                "search",
+                ("`--json`", c.SupportsSearchJson),
+                ("`--owner`", c.SupportsSearchOwner),
+                ("`--limit`", c.SupportsSearchLimit));
         }
         sb.AppendLine();
 
@@ -132,18 +139,39 @@ public static class DoctorScreen
         }
         else
         {
+            sb.AppendLine("| Agent | Path |");
+            sb.AppendLine("| --- | --- |");
             foreach (var (agent, path) in agents)
             {
-                sb.AppendLine($"- **{agent}**  `{path}`");
+                sb.AppendLine(
+                    $"| {MarkdownTableFormatter.FormatTableCell(agent)} | " +
+                    $"{MarkdownTableFormatter.FormatCodeSpan(path)} |");
             }
         }
         sb.AppendLine();
 
         sb.AppendLine("## Logs");
         sb.AppendLine();
-        sb.AppendLine($"`{r.LogDirectory ?? "(unset)"}`");
+        sb.AppendLine("| Item | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| directory | {MarkdownTableFormatter.FormatCodeSpan(r.LogDirectory ?? "(unset)")} |");
 
         return sb.ToString();
+    }
+
+    private static void AppendCapabilitySection(StringBuilder sb, string name, params (string Flag, bool Supported)[] rows)
+    {
+        sb.AppendLine($"### {name}");
+        sb.AppendLine();
+        sb.AppendLine("| Flag | Supported |");
+        sb.AppendLine("| --- | --- |");
+        foreach (var (flag, supported) in rows)
+        {
+            sb.AppendLine(
+                $"| {MarkdownTableFormatter.FormatTableCell(flag)} | " +
+                $"{MarkdownTableFormatter.FormatTableCell(Mark(supported))} |");
+        }
+        sb.AppendLine();
     }
 
     private static string Mark(bool on) => on ? "✅" : "❌";

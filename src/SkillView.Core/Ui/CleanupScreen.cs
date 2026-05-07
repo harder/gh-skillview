@@ -156,21 +156,13 @@ public sealed class CleanupScreen
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 
-        // Space-to-toggle is wired by CheckBoxTableSourceWrapperByIndex in
-        // its constructor; no manual handler needed here. RC5 also routes
-        // letter shortcuts through table.KeyDown so we still need to catch
-        // them before the table swallows them in OnKeyDownNotHandled.
-        table.KeyDown += (_, key) =>
+        window.KeyDown += (_, key) =>
         {
             var r = key.AsRune.Value;
             if (r == 'r' || r == 'R') { DoRemove(wrapper.CheckedRows, status); key.Handled = true; }
             else if (r == 'i' || r == 'I') { DoIgnore(wrapper.CheckedRows, status); key.Handled = true; }
             else if (r == 'x' || r == 'X') { DoExport(status); key.Handled = true; }
-        };
-
-        window.KeyDown += (_, key) =>
-        {
-            if (key.KeyCode == KeyCode.Esc)
+            else if (key.KeyCode == KeyCode.Esc)
             {
                 _app.RequestStop();
                 key.Handled = true;
@@ -323,22 +315,24 @@ public sealed class CleanupScreen
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
-    private static string RenderDetail(CleanupClassifier.Candidate c)
+    internal static string RenderDetail(CleanupClassifier.Candidate c)
     {
         var sb = new StringBuilder();
         sb.AppendLine("## Candidate");
         sb.AppendLine();
-        sb.AppendLine($"**kind**: **{c.Kind}**  ");
-        sb.AppendLine($"**path**: `{c.Path}`  ");
-        sb.AppendLine($"**reason**: {c.Reason}  ");
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| Kind | **{MarkdownTableFormatter.FormatTableCell(c.Kind.ToString())}** |");
+        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(c.Path)} |");
+        sb.AppendLine($"| Reason | {MarkdownTableFormatter.FormatTableCell(c.Reason)} |");
         if (c.Skill is { } s)
         {
             sb.AppendLine();
-            sb.AppendLine("---");
+            sb.AppendLine("## Installed skill");
             sb.AppendLine();
             sb.AppendLine(InstalledScreen.RenderDetail(s));
         }
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)

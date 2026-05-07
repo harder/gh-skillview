@@ -156,7 +156,7 @@ public sealed class SkillViewApp
             _app = app;
             window = BuildUi();
 
-            // RC5 routes Enter (View base default), p/v/CursorRight (rebound in
+            // TableView routes Enter (View base default), p/v/CursorRight (rebound in
             // ConfigureTableKeyBindings), and Warp's Ctrl+J directly through
             // Command.Accept → the Accepted event on the table. Query field Enter
             // is handled by OnQueryFieldKey. No global key intercept needed.
@@ -289,23 +289,6 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
         TuiHelpers.ConfigureTableScheme(_resultsTable);
-
-        // RC5: TableView.OnKeyDownNotHandled now consumes any unbound
-        // printable letter key (returns true even when the type-to-search
-        // matcher rejected it). Catch SkillView's single-letter shortcuts
-        // here — KeyDown fires before OnKeyDownNotHandled — so they don't
-        // get swallowed before bubbling to the window.
-        _resultsTable.KeyDown += (_, key) =>
-        {
-            if (!key.Handled)
-            {
-                NoteUserInteraction();
-                if (OnWindowShortcut(key))
-                {
-                    key.Handled = true;
-                }
-            }
-        };
 
         // Accepted fires on Enter, double-click, p, v, CursorRight, and
         // Ctrl+J (Warp) — all routed through Command.Accept by the View
@@ -505,10 +488,7 @@ public sealed class SkillViewApp
         }
     }
 
-    /// Centralised single-letter shortcut dispatcher used by both
-    /// `window.KeyDown` and `_resultsTable.KeyDown`. The latter is required
-    /// because RC5's TableView swallows unbound printable letters in
-    /// `OnKeyDownNotHandled`, preventing them from bubbling to the window.
+    /// Centralised single-letter shortcut dispatcher for `window.KeyDown`.
     /// Returns true if the key was consumed.
     private bool OnWindowShortcut(Key key)
     {

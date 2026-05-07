@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using SkillView.Inventory;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
+using SkillView.Logging;
 using SkillView.Ui;
 using Xunit;
 
@@ -66,10 +68,124 @@ public sealed class TerminalEscapeSanitizerTests
             Ignored = false,
             IsSymlinked = false,
             InstalledAt = null,
+            Package = new SkillPackage(
+                Source: "pkg\x1b]0;bad\x07",
+                SourceType: "git",
+                SourceUrl: "https://example.test/\x1b]0;bad\x07demo",
+                InstalledAt: null,
+                UpdatedAt: null),
         });
 
         Assert.DoesNotContain('\x1b', detail);
         Assert.DoesNotContain('\x07', detail);
-        Assert.Contains("desctext", detail);
+        Assert.Contains("## Summary", detail);
+        Assert.Contains("`pkg`", detail);
+        Assert.DoesNotContain("bad", detail);
     }
+
+    [Fact]
+    public void RenderCleanupDetail_StripsEscapeSequences_FromCandidateMetadata()
+    {
+        var detail = CleanupScreen.RenderDetail(new CleanupClassifier.Candidate(
+            CleanupClassifier.CandidateKind.Malformed,
+            "/skills/demo\x1b]0;bad\x07",
+            "reason\x1b]8;;https://example.test\x07text",
+            Skill: null));
+
+        Assert.DoesNotContain('\x1b', detail);
+        Assert.DoesNotContain('\x07', detail);
+        Assert.Contains("| Field | Value |", detail);
+        Assert.Contains("reasontext", detail);
+        Assert.DoesNotContain("bad", detail);
+    }
+
+    [Fact]
+    public void BuildRemoveSummary_StripsEscapeSequences_AndUsesStructuredTables()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray.Create(
+                new RemoveValidator.Error(
+                    RemoveValidator.ErrorKind.ContainsGitDirectory,
+                    ".git\x1b]0;bad\x07 found")),
+            Warnings: ImmutableArray.Create(
+                new RemoveValidator.Warning(
+                    RemoveValidator.WarningKind.HasIncomingSymlinks,
+                    "2 other install(s)\x1b]8;;https://example.test\x07 symlink in")),
+            ResolvedPath: "/skills/demo\x1b]0;bad\x07",
+            IncomingSymlinkPaths: ImmutableArray.Create("/agents/demo\x1b]0;bad\x07"));
+
+        var screen = new RemoveScreen(
+            null!,
+            new RemoveService(new Logger()),
+            new Logger(),
+            CreateSkill(),
+            validation);
+
+        var summary = screen.BuildSummary();
+
+        Assert.DoesNotContain('\x1b', summary);
+        Assert.DoesNotContain('\x07', summary);
+        Assert.Contains("### Target", summary);
+        Assert.Contains("| Field | Value |", summary);
+        Assert.Contains("### Errors", summary);
+        Assert.Contains("| Kind | Detail |", summary);
+        Assert.Contains("### Warnings", summary);
+        Assert.Contains("### Evidence", summary);
+        Assert.DoesNotContain("bad", summary);
+    }
+
+    [Fact]
+    public void BuildRemoveSummary_UsesLongerCodeSpanDelimiterForBackticks()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray.Create(
+                new RemoveValidator.Error(
+                    RemoveValidator.ErrorKind.ContainsGitDirectory,
+                    "path contains `ticks`")),
+            Warnings: ImmutableArray.Create(
+                new RemoveValidator.Warning(
+                    RemoveValidator.WarningKind.HasIncomingSymlinks,
+                    "linked from `agent`")),
+            ResolvedPath: "/skills/demo`copy",
+            IncomingSymlinkPaths: ImmutableArray.Create("/agents/demo`copy"));
+
+        var screen = new RemoveScreen(
+            null!,
+            new RemoveService(new Logger()),
+            new Logger(),
+            CreateSkill() with
+            {
+                Name = "demo`copy",
+                ResolvedPath = "/skills/demo`copy",
+                Agents = ImmutableArray.Create(
+                    new AgentMembership("claude", "/agents/demo`copy", true)),
+            },
+            validation);
+
+        var summary = screen.BuildSummary();
+
+        Assert.Contains("| Path | `` /skills/demo`copy `` |", summary);
+        Assert.Contains("| Resolved | `` /skills/demo`copy `` |", summary);
+        Assert.Contains("| claude | symlink | `` /agents/demo`copy `` |", summary);
+        Assert.Contains("| Incoming symlink | `` /agents/demo`copy `` |", summary);
+    }
+
+    private static InstalledSkill CreateSkill() => new()
+    {
+        Name = "demo\x1b]0;bad\x07",
+        ResolvedPath = "/skills/demo\x1b]0;bad\x07",
+        ScanRoot = "/skills",
+        Scope = Scope.User,
+        Agents = ImmutableArray.Create(
+            new AgentMembership("claude", "/agents/demo\x1b]0;bad\x07", true)),
+        FrontMatter = new SkillFrontMatter
+        {
+            Name = "demo",
+        },
+        Validity = ValidityState.Valid,
+        Provenance = Provenance.FsScan,
+        Ignored = false,
+        IsSymlinked = true,
+        InstalledAt = null,
+    };
 }

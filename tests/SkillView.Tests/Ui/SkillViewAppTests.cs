@@ -230,6 +230,17 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void BuildUi_WindowShortcutFocusesQueryField()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        _ = window.NewKeyDownEvent(new Key('/'));
+
+        Assert.True(app.QueryFieldForTests!.HasFocus);
+    }
+
+    [Fact]
     public void BuildRepoUrl_UsesGitHubCom_WhenAuthMissing()
     {
         var url = SkillViewApp.BuildRepoUrl(null, "owner/repo");
