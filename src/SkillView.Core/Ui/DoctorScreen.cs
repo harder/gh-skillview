@@ -99,6 +99,9 @@ public static class DoctorScreen
         }
         else
         {
+            // Capability entries must correspond 1:1 to CapabilityProbeParser.ProbedTokens.
+            // Keep in sync when adding/removing flags. Only show flags in current gh release;
+            // omit future flags to avoid appearing as defects.
             AppendCapabilitySection(
                 sb,
                 "install",
