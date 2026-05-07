@@ -8,11 +8,6 @@
     <StripSymbols>true</StripSymbols>
     <InvariantGlobalization>true</InvariantGlobalization>
     <SelfContained>true</SelfContained>
-    <SkillViewAppSuppressAotWarnings Condition="'$(SkillViewAppSuppressAotWarnings)' == ''">true</SkillViewAppSuppressAotWarnings>
-    <!-- Keep the broader TG2 warning mask on by default, but allow verification
-         publishes to expose the SkillViewApp call sites by setting
-         SkillViewAppSuppressAotWarnings=false. -->
-    <NoWarn Condition="'$(SkillViewAppSuppressAotWarnings)' == 'true'">$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
