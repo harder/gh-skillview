@@ -21,6 +21,17 @@ SkillView does **not** replace `gh skill`. It gives developers a faster full-scr
 - safe remove and cleanup workflows for duplicates, broken symlinks, residue, and malformed installs
 - a CLI you can script without giving up the interactive TUI
 
+## SkillView vs raw `gh skill`
+
+SkillView complements `gh skill`; it does not try to replace every low-level command.
+
+| If you need to... | Reach for... | Why |
+|---|---|---|
+| browse and compare skills quickly | **SkillView TUI** | side-by-side search, metadata, preview, logs, and staged install/update/remove flows |
+| script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
+| experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
+| debug whether a feature is available in your installed GitHub CLI | **`skillview doctor`** | capability probing shows what the local `gh` actually supports |
+
 ## What SkillView wraps
 
 SkillView builds on GitHub CLI’s preview `gh skill` support. If you are new to the underlying commands, start with these docs:
@@ -71,6 +82,8 @@ Download the right asset from the [latest release](https://github.com/harder/gh-
 | macOS ARM64 | `skillview-osx-arm64` |
 
 Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.
+
+Homebrew and WinGet scaffolding now exists in the release workflow, but those channels are still dark-launch only and are not public install paths yet.
 
 ## Quick start
 
@@ -144,6 +157,14 @@ Inside modal or full-screen subviews, `Esc` consistently backs out.
 
 **Warp note:** if `Enter` is unreliable after the first interaction, use `Ctrl+J` or `→` for preview.
 
+### Themes and configuration
+
+- `--theme default` keeps the standard palette.
+- `--theme high-contrast` boosts selection/status visibility for lower-contrast terminals.
+- `SKILLVIEW_THEME=high-contrast` is the environment-variable equivalent of `--theme high-contrast`.
+- Terminal.Gui configuration loading is enabled before app init, but SkillView-specific theming is still flag-driven today.
+- Keybindings are intentionally fixed in-app right now; there is no SkillView keybinding remap file yet, so the shortcuts documented here are the supported contract.
+
 ## CLI usage
 
 SkillView runs in CLI mode when you provide a subcommand.
@@ -201,6 +222,25 @@ skillview --scan-root /path/one --scan-root /path/two list --json
 | `10` | Environment error |
 | `20` | No matches |
 
+### Automation and AI-agent usage
+
+SkillView’s CLI is designed to be automation-friendly when you want higher-level safety than raw `gh skill`.
+
+- Prefer `--json` on commands that support it: `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
+- Use exit codes as the control surface for scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches.
+- Put global flags like `--scan-root` and `--theme` **before** the subcommand; only `--debug` is accepted after the subcommand.
+- `skillview doctor --json` is the fastest way for an agent or script to confirm `gh` version, auth state, capability probes, and log location before attempting an install/update flow.
+
+Examples:
+
+```bash
+skillview doctor --json
+skillview list --json
+skillview search prompt --owner github --json
+skillview update --all --dry-run --json
+skillview cleanup --candidates --json
+```
+
 ## Troubleshooting
 
 SkillView keeps a rotating file log and redacts sensitive values before writing.
@@ -214,6 +254,14 @@ If the TUI behaves unexpectedly:
 1. run with `--debug`
 2. open Doctor with `d`
 3. check the log file
+
+If you open a bug, include:
+
+1. `skillview --version`
+2. your terminal emulator and OS
+3. the exact command or TUI flow
+4. whether `gh auth status` is healthy
+5. the relevant debug log excerpt if you have one
 
 ## For developers
 
@@ -241,7 +289,7 @@ Program.cs
      -> ArgParser.Parse(...)
      -> TuiServices.Build(...)
      -> CLI: CliDispatcher.RunAsync(...)
-     -> TUI: SkillViewApp.Run()
+     -> TUI: SkillViewApp.RunAsync(...)
 ```
 
 ### Project layout
