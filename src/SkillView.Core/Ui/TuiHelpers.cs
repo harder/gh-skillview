@@ -490,11 +490,11 @@ internal static class TuiHelpers
         table.KeyBindings.Add(KeyCode.J | KeyCode.CtrlMask, Command.Accept);
     }
 
-    /// RC5 replaced TableView.SelectedRow with the IValue<TableSelection?>
-    /// pattern. These helpers preserve SkillView's row-centric call sites
-    /// without sprinkling `Value?.Cursor.Y` everywhere.
+    /// TG2 uses the IValue<TableSelection?> pattern for TableView selection.
+    /// These helpers preserve SkillView's row-centric call sites without
+    /// sprinkling `Value?.SelectedCell.Y` everywhere.
     internal static int GetSelectedRow(this TableView table)
-        => table.Value?.Cursor.Y ?? -1;
+        => table.Value?.SelectedCell.Y ?? -1;
 
     internal static void SetSelectedRow(this TableView table, int row)
     {

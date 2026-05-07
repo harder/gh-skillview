@@ -10,7 +10,7 @@ public sealed class PackageReferenceTests
     {
         var text = ReadProjectFile("src", "SkillView.Core", "SkillView.Core.csproj");
 
-        Assert.Contains("""<PackageReference Include="Terminal.Gui" Version="2.0.1" />""", text);
+        Assert.Contains("""<PackageReference Include="Terminal.Gui" Version="2.0.2-develop.51" />""", text);
     }
 
     [Theory]
