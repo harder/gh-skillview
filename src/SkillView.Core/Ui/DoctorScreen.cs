@@ -67,9 +67,11 @@ public static class DoctorScreen
         var ghVerOk = r.GhMeetsMinimum ? "✅" : "❌ too old";
         sb.AppendLine("| Item | Value |");
         sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| gh | `{r.GhPath ?? "(not found)"}` |");
-        sb.AppendLine($"| version | `{r.GhVersionRaw ?? "(unknown)"}` (minimum `{GhBinaryLocator.MinimumVersion}` {ghVerOk}) |");
-        sb.AppendLine($"| baseline | {(r.BaselineOk ? "✅ ok" : "⚠️ degraded")} |");
+        sb.AppendLine($"| gh | {MarkdownTableFormatter.FormatCodeSpan(r.GhPath ?? "(not found)")} |");
+        sb.AppendLine(
+            $"| version | {MarkdownTableFormatter.FormatCodeSpan(r.GhVersionRaw ?? "(unknown)")} " +
+            $"(minimum {MarkdownTableFormatter.FormatCodeSpan(GhBinaryLocator.MinimumVersion.ToString())} {ghVerOk}) |");
+        sb.AppendLine($"| baseline | {MarkdownTableFormatter.FormatTableCell(r.BaselineOk ? "✅ ok" : "⚠️ degraded")} |");
         sb.AppendLine();
 
         sb.AppendLine("## Auth");
@@ -82,10 +84,10 @@ public static class DoctorScreen
         {
             sb.AppendLine("| Item | Value |");
             sb.AppendLine("| --- | --- |");
-            sb.AppendLine($"| active | {r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"} |");
+            sb.AppendLine($"| active | {MarkdownTableFormatter.FormatTableCell($"{r.Auth.Account ?? "?"}@{r.Auth.ActiveHost ?? "?"}")} |");
             if (r.Auth.Hosts.Length > 1)
             {
-                sb.AppendLine($"| other hosts | {string.Join(", ", r.Auth.Hosts)} |");
+                sb.AppendLine($"| other hosts | {MarkdownTableFormatter.FormatTableCell(string.Join(", ", r.Auth.Hosts))} |");
             }
         }
         sb.AppendLine();
@@ -141,7 +143,9 @@ public static class DoctorScreen
             sb.AppendLine("| --- | --- |");
             foreach (var (agent, path) in agents)
             {
-                sb.AppendLine($"| {agent} | `{path}` |");
+                sb.AppendLine(
+                    $"| {MarkdownTableFormatter.FormatTableCell(agent)} | " +
+                    $"{MarkdownTableFormatter.FormatCodeSpan(path)} |");
             }
         }
         sb.AppendLine();
@@ -150,7 +154,7 @@ public static class DoctorScreen
         sb.AppendLine();
         sb.AppendLine("| Item | Value |");
         sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| directory | `{r.LogDirectory ?? "(unset)"}` |");
+        sb.AppendLine($"| directory | {MarkdownTableFormatter.FormatCodeSpan(r.LogDirectory ?? "(unset)")} |");
 
         return sb.ToString();
     }
@@ -163,7 +167,9 @@ public static class DoctorScreen
         sb.AppendLine("| --- | --- |");
         foreach (var (flag, supported) in rows)
         {
-            sb.AppendLine($"| {flag} | {Mark(supported)} |");
+            sb.AppendLine(
+                $"| {MarkdownTableFormatter.FormatTableCell(flag)} | " +
+                $"{MarkdownTableFormatter.FormatTableCell(Mark(supported))} |");
         }
         sb.AppendLine();
     }
