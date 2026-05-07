@@ -89,6 +89,8 @@ skillview
 A few good first commands:
 
 ```bash
+skillview --help
+skillview --version
 skillview doctor
 skillview search terraform
 skillview list --json
@@ -172,12 +174,18 @@ skillview cleanup --apply --yes
 ### Global flags
 
 ```bash
+skillview --help
+skillview --version
+gh skillview --help
+gh skillview --version
 skillview --debug
 skillview --theme high-contrast
 skillview --scan-root /path/to/skills
 skillview --scan-root /path/one --scan-root /path/two list --json
 ```
 
+- `--help` prints a Markdown usage guide for the active entrypoint (`skillview` or `gh skillview`)
+- `--version` prints both the SkillView version and the Terminal.Gui version in use
 - `--debug` works before or after the subcommand
 - `--theme` currently supports `default` and `high-contrast`
 - `--scan-root` is repeatable

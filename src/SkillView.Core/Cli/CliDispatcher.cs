@@ -32,8 +32,8 @@ public static class CliDispatcher
             "update" => await UpdateAsync(options, services).ConfigureAwait(false),
             "remove" => await RemoveAsync(options, services).ConfigureAwait(false),
             "cleanup" => await CleanupAsync(options, services).ConfigureAwait(false),
-            "--help" or "-h" or "help" => PrintHelp(),
-            "--version" or "-V" => PrintVersion(),
+            "--help" or "-h" or "help" => PrintHelp(options),
+            "--version" or "-V" => PrintVersion(options),
             _ => UnknownSubcommand(options.SubcommandName ?? "<null>", services.Logger),
         };
     }
@@ -1504,80 +1504,118 @@ public static class CliDispatcher
         return ExitCodes.InvalidUsage;
     }
 
-    private static int PrintHelp()
+    internal static string RenderHelpMarkdown(AppOptions options)
     {
-        Console.Out.WriteLine("""
-            SkillView — view and manage AI agent skills via gh skill.
+        var command = GetCommandName(options.InvocationMode);
+        var alternateCommand = options.InvocationMode == InvocationMode.GhExtension ? "skillview" : "gh skillview";
 
-            Usage:
-              skillview [--debug] [--scan-root <path>]
-              skillview <subcommand> [args]
+        return $$"""
+            # SkillView
 
-            Subcommands:
-              doctor [--json] [--clear-logs]
-                                  Show environment, auth, and gh support details
-              list   [--json] [--scope=project|user|custom]
-                     [--agent=<id>] [--path=<dir>] [--allow-hidden-dirs]
-                                  List installed skills. Uses `gh skill list`
-                                  when available; otherwise scans the filesystem.
-              rescan              Capture a fresh inventory snapshot
-              search <query> [--owner <o>] [--limit <n>] [--page <n>] [--json]
-                                  Search available skills
-              preview <owner/repo>[@<ref>] [<skill>] [--version <ref>] [--allow-hidden-dirs] [--json]
-                                  Show a skill preview
-              install <owner/repo>[@<ref>] [<skill>] [--agent <id>]...
-                      [--scope project|user|custom] [--path <dir>]
-                      [--version <ref>] [--pin] [--force] [--upstream <url>]
-                      [--repo-path <p>] [--from-local] [--allow-hidden-dirs] [--json]
-                                  Install a skill and refresh the inventory
-              update [<skill>]... [--all] [--dry-run] [--force] [--unpin]
-                     [--yes] [--json]
-                                  Update installed skills. After a real update,
-                                  SkillView refreshes the inventory.
-                                  Refuses --all without --yes on gh builds
-                                  that would otherwise stop for confirmation.
-              remove <name> [--agent <id>] [--yes] [--json]
-                                  Safely remove an installed skill.
-                                  Dry-run by default; re-run with --yes
-                                  to make changes.
-                                  Requires --yes to accept warnings such as
-                                  git-tracked files or incoming symlinks.
-              cleanup [--candidates=kind,...] [--apply] [--yes]
-                      [--json] [--output <path>]
-                                  Find and optionally remove cleanup candidates:
-                                  malformed, orphan, duplicate,
-                                  broken-symlink, hidden-nested,
-                                  broken-shared-mapping, and empty-directory.
-                                  Respects `.skillview-ignore` markers.
-                                  --apply requires --yes.
+            SkillView is a terminal UI and scriptable CLI for discovering, previewing, installing, updating, removing, and cleaning up AI agent skills on top of `gh skill`.
 
-            Global flags:
-              --debug             Enable Debug-level logging; accepted anywhere
-                                  on the command line (before or after the
-                                  subcommand). Streams to stderr in CLI mode.
-              --scan-root <path>  Add a custom scan root (repeatable)
-              --help | -h         Show this help
-              --version | -V      Show version
+            You are running the `{{command}}` entrypoint. The alternate entrypoint is `{{alternateCommand}}`.
 
-            Environment:
-              SKILLVIEW_LOG=debug  Alternative to --debug (flag takes precedence)
+            ## Usage
 
-            Exit codes (aligned with cli/cli#13215):
-               0  Success / nothing to do
-               1  User-level error (input, conflict, refused destructive op)
-               2  Invalid usage (bad flags, missing args)
-              10  Environment error (gh missing / too old / no capability)
-              20  No matches
+            ```text
+            {{command}} [global options]
+            {{command}} <subcommand> [subcommand options]
+            ```
 
-            With no subcommand, the TUI launches.
-            """);
+            With no subcommand, SkillView launches the full-screen TUI.
+
+            ## Quick start
+
+            ```bash
+            {{command}}
+            {{command}} doctor
+            {{command}} search terraform
+            {{command}} list --json
+            {{command}} update --dry-run
+            {{command}} cleanup
+            ```
+
+            ## Global options
+
+            | Global flag | What it does |
+            | --- | --- |
+            | `--help`, `-h` | Show this Markdown help view. |
+            | `--version`, `-V` | Show the SkillView version. |
+            | `--debug` | Enable debug logging. This flag works before or after the subcommand and streams logs to stderr in CLI mode. |
+            | `--theme <name>` | Select the TUI theme. Supported values are `default` and `high-contrast`. You can also set `SKILLVIEW_THEME`. |
+            | `--scan-root <path>` | Add a custom scan root. Repeat this flag to scan multiple roots. |
+
+            ## Subcommands
+
+            | Subcommand | Purpose | Key options |
+            | --- | --- | --- |
+            | `doctor` | Inspect `gh`, auth state, capability probes, log path, and scan roots. | `--json`, `--clear-logs` |
+            | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs` |
+            | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
+            | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
+            | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--json` |
+            | `install OWNER/REPO [SKILL]` | Install a skill, then rescan inventory. | `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--repo-path`, `--from-local`, `--allow-hidden-dirs`, `--json` |
+            | `update [SKILL...]` | Dry-run or apply updates for one or many installed skills. | `--all`, `--dry-run`, `--force`, `--unpin`, `--yes`, `--json` |
+            | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
+            | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
+
+            ## Common examples
+
+            ```bash
+            {{command}} doctor --json
+            {{command}} list --scope user --json
+            {{command}} search prompt --owner github
+            {{command}} preview github/awesome-copilot documentation-writer
+            {{command}} install github/awesome-copilot git-commit --agent claude-code --scope user
+            {{command}} update --all --dry-run
+            {{command}} remove git-commit --yes
+            {{command}} cleanup --apply --yes
+            ```
+
+            ## Notes
+
+            - SkillView only emits capability-gated flags when the installed `gh` build supports them.
+            - `--debug` is the only global flag accepted after a subcommand. Put other global flags before the subcommand.
+            - `SKILLVIEW_LOG=debug` is the environment-variable alternative to `--debug`.
+
+            ## Exit codes
+
+            | Code | Meaning |
+            | --- | --- |
+            | `0` | Success or nothing to do |
+            | `1` | User-level error |
+            | `2` | Invalid usage |
+            | `10` | Environment error |
+            | `20` | No matches |
+            """;
+    }
+
+    private static int PrintHelp(AppOptions options)
+    {
+        Console.Out.WriteLine(RenderHelpMarkdown(options));
         return ExitCodes.Success;
     }
 
-    private static int PrintVersion()
+    internal static string RenderVersionText(AppOptions options)
     {
-        var version = typeof(CliDispatcher).Assembly.GetName().Version?.ToString() ?? "0.0.0";
-        Console.Out.WriteLine($"skillview {version}");
+        var version = typeof(CliDispatcher).Assembly.GetName().Version;
+        var versionText = version is null
+            ? "0.0.0"
+            : version.Revision == 0
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : version.ToString();
+        var terminalGuiVersion = typeof(Terminal.Gui.Views.Window).Assembly.GetName().Version?.ToString() ?? "unknown";
+
+        return $"{GetCommandName(options.InvocationMode)} {versionText} (Terminal.Gui {terminalGuiVersion})";
+    }
+
+    private static int PrintVersion(AppOptions options)
+    {
+        Console.Out.WriteLine(RenderVersionText(options));
         return ExitCodes.Success;
     }
+
+    private static string GetCommandName(InvocationMode invocationMode) =>
+        invocationMode == InvocationMode.GhExtension ? "gh skillview" : "skillview";
 }
