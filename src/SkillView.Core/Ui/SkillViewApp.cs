@@ -112,8 +112,8 @@ public sealed class SkillViewApp
         && ShouldOpenInstalledOnStartup(snapshot);
 
     // Terminal.Gui 2.1.1 fixed the AOT configuration crash that originally forced
-    // the old local suppression workaround. Verification publishes now run with
-    // SkillViewAppSuppressAotWarnings=false to prove this init path stays clean.
+    // the old local suppression workaround, so this startup path now runs without
+    // any SkillView-specific AOT suppression switch.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
