@@ -67,6 +67,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via
   `IApplication.RunAsync(..., ct, ...)`.
+- `SkillViewApp` now keeps the search shell and pane state, while
+  `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
+  doctor orchestration plus the shared inventory capture/rescan flow. Put new
+  workflow-level behavior there unless it truly belongs to the search shell.
 - Terminal.Gui rc.7 no longer needs `TrimmerRootAssembly` for the old
   `ConfigurationManager` trim issue; SkillView's AOT publish now verifies
   cleanly without rooting the full TG2 assembly.

@@ -28,6 +28,7 @@ public sealed class SkillViewApp
     private readonly Func<IApplication> _applicationFactory;
     private readonly bool _probeOnRun;
     private readonly SearchAgentMetadataCache _searchAgentMetadata = new();
+    private readonly SkillViewWorkflowCoordinator _workflows;
 
     private IApplication? _app;
     private CancellationTokenSource? _runLifetime;
@@ -85,6 +86,20 @@ public sealed class SkillViewApp
         _options = options;
         _applicationFactory = applicationFactory;
         _probeOnRun = probeOnRun;
+        _workflows = new SkillViewWorkflowCoordinator(
+            services,
+            options,
+            () => _app,
+            () => _ghPath,
+            () => _lastReport,
+            report => _lastReport = report,
+            SetBusy,
+            ClearBusy,
+            SetStatus,
+            SetStatus,
+            Invoke,
+            RunBackground,
+            FocusSearchFromInstalled);
     }
 
     internal static bool ShouldOpenInstalledOnStartup(InventorySnapshot snapshot) => snapshot.Skills.Length > 0;
@@ -518,12 +533,12 @@ public sealed class SkillViewApp
         if (rune.Value == 'q' || rune.Value == 'Q') { _app?.RequestStop(); return true; }
         if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R') { ToggleRightPane(); return true; }
         if (rune.Value == 'e' || rune.Value == 'E') { TogglePreviewMode(); return true; }
-        if (rune.Value == 'd' || rune.Value == 'D') { ShowDoctor(); return true; }
-        if (rune.Value == 'I') { ShowInstalled(); return true; }
+        if (rune.Value == 'd' || rune.Value == 'D') { _workflows.ShowDoctor(); return true; }
+        if (rune.Value == 'I') { _workflows.ShowInstalled(); return true; }
         if (rune.Value == 'i') { StageInstall(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
-        if (rune.Value == 'u' || rune.Value == 'U') { ShowUpdateScreen(); return true; }
-        if (rune.Value == 'c' || rune.Value == 'C') { ShowCleanupScreen(); return true; }
+        if (rune.Value == 'u' || rune.Value == 'U') { _workflows.ShowUpdateScreen(); return true; }
+        if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1) { ShowHelp(); return true; }
         return false;
     }
@@ -608,7 +623,7 @@ public sealed class SkillViewApp
                 if (ShouldAutoOpenInstalledOnStartup(snapshot))
                 {
                     _startupInstalledShown = true;
-                    OpenInstalledSnapshot(snapshot);
+                    _workflows.OpenInstalledSnapshot(snapshot);
                 }
             });
 
@@ -1224,141 +1239,11 @@ public sealed class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
-        OpenInstallDialog(new InstallRequest(
+        _workflows.OpenInstallDialog(new InstallRequest(
             Repo: pick.Repo,
             SkillName: pick.SkillName,
             RepoPath: pick.Path,
             AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
-    }
-
-    private void OpenInstallDialog(InstallRequest request)
-    {
-        if (_app is null || _ghPath is null || _lastReport is null) return;
-        var installScreen = new InstallScreen(
-            _app,
-            _services.InstallService,
-            _services.Logger,
-            _ghPath,
-            _lastReport.Capabilities,
-            request);
-        installScreen.Show();
-        if (installScreen.LastResult is { Succeeded: true } result)
-        {
-            _services.ListAdapter.Invalidate();
-            SetStatus($"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…", TuiHelpers.NotificationLevel.Success);
-            RunBackground(async cancellationToken =>
-            {
-                var report = _lastReport;
-                if (report is null) return;
-                var snapshot = await _services.InventoryService.CaptureAsync(
-                    report.GhPath,
-                    report.Capabilities,
-                    new LocalInventoryService.Options(
-                        ScanRoots: _options.ScanRoots,
-                        AllowHiddenDirs: false),
-                    cancellationToken
-                ).ConfigureAwait(false);
-                Invoke(() =>
-                    SetStatus($"installed — inventory now {snapshot.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
-            }, "rescan");
-        }
-        else if (installScreen.LastResult is { } failed)
-        {
-            SetStatus($"install failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
-        }
-    }
-
-    private void ShowUpdateScreen()
-    {
-        if (_app is null) return;
-        if (_ghPath is null || _lastReport is null)
-        {
-            SetStatus("gh not ready — press 'd' for Doctor");
-            return;
-        }
-        SetBusy("scanning inventory for update picker…");
-        RunBackground(async cancellationToken =>
-        {
-            var report = _lastReport;
-            if (report is null) return;
-            var snapshot = await _services.InventoryService.CaptureAsync(
-                report.GhPath,
-                report.Capabilities,
-                new LocalInventoryService.Options(
-                    ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false),
-                cancellationToken
-            ).ConfigureAwait(false);
-            Invoke(() =>
-            {
-                ClearBusy();
-                var screen = new UpdateScreen(
-                    _app!,
-                    _services.UpdateService,
-                    _services.Logger,
-                    _ghPath!,
-                    report.Capabilities,
-                    snapshot.Skills);
-                screen.Show();
-                if (screen.LastResult is { DryRun: false, Succeeded: true })
-                {
-                    _services.ListAdapter.Invalidate();
-                    SetStatus("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
-                    RunBackground(async nestedCancellationToken =>
-                    {
-                        var post = await _services.InventoryService.CaptureAsync(
-                            report.GhPath,
-                            report.Capabilities,
-                            new LocalInventoryService.Options(
-                                ScanRoots: _options.ScanRoots,
-                                AllowHiddenDirs: false),
-                            nestedCancellationToken
-                        ).ConfigureAwait(false);
-                        Invoke(() =>
-                            SetStatus($"updated — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
-                    }, "rescan");
-                }
-                else if (screen.LastResult is { Succeeded: false } failed)
-                {
-                    SetStatus($"update failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
-                }
-            });
-        }, "update");
-    }
-
-    private void ShowInstalled()
-    {
-        if (_app is null) return;
-        SetBusy("scanning inventory…");
-        RunBackground(async cancellationToken =>
-        {
-            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _lastReport = report;
-            var snapshot = await _services.InventoryService.CaptureAsync(
-                report.GhPath,
-                report.Capabilities,
-                new LocalInventoryService.Options(
-                    ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false),
-                cancellationToken
-            ).ConfigureAwait(false);
-            Invoke(() =>
-            {
-                ClearBusy();
-                SetStatus($"{snapshot.Skills.Length} installed skill(s)");
-                OpenInstalledSnapshot(snapshot);
-            });
-        }, "installed");
-    }
-
-    private void OpenInstalledSnapshot(InventorySnapshot snapshot)
-    {
-        if (_app is null) return;
-        InstalledScreen.Show(
-            _app,
-            snapshot,
-            target => OpenRemoveDialog(target, snapshot),
-            FocusSearchFromInstalled);
     }
 
     private void FocusSearchFromInstalled()
@@ -1366,89 +1251,6 @@ public sealed class SkillViewApp
         _queryField?.SetFocus();
         _queryField?.SelectAll();
         RestoreDefaultStatus();
-    }
-
-    private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
-    {
-        if (_app is null) return;
-        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
-        var screen = new RemoveScreen(_app, _services.RemoveService, _services.Logger, target, validation);
-        screen.Show();
-        if (screen.LastReport is { Succeeded: true } report)
-        {
-            _services.ListAdapter.Invalidate();
-            SetStatus($"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…", TuiHelpers.NotificationLevel.Success);
-            RunBackground(async cancellationToken =>
-            {
-                var report2 = _lastReport;
-                if (report2 is null) return;
-                var post = await _services.InventoryService.CaptureAsync(
-                    report2.GhPath,
-                    report2.Capabilities,
-                    new LocalInventoryService.Options(
-                        ScanRoots: _options.ScanRoots,
-                        AllowHiddenDirs: false),
-                    cancellationToken
-                ).ConfigureAwait(false);
-                Invoke(() =>
-                    SetStatus($"removed — inventory now {post.Skills.Length} skill(s)", TuiHelpers.NotificationLevel.Success));
-            }, "rescan");
-        }
-    }
-
-    private void ShowCleanupScreen()
-    {
-        if (_app is null) return;
-        SetBusy("scanning for cleanup candidates…");
-        RunBackground(async cancellationToken =>
-        {
-            var report = _lastReport ?? await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _lastReport = report;
-            var snapshot = await _services.InventoryService.CaptureAsync(
-                report.GhPath,
-                report.Capabilities,
-                new LocalInventoryService.Options(
-                    ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false),
-                cancellationToken
-            ).ConfigureAwait(false);
-            var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
-            Invoke(() =>
-            {
-                ClearBusy();
-                var screen = new CleanupScreen(
-                    _app!, _services.RemoveService, _services.Logger,
-                    candidates, snapshot.ScannedRoots, snapshot.Skills);
-                screen.Show();
-                if (screen.RemovedCount > 0)
-                {
-                    _services.ListAdapter.Invalidate();
-                }
-                SetStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
-            });
-        }, "cleanup");
-    }
-
-    private void ShowDoctor()
-    {
-        if (_app is null) return;
-        // Freeze UI on the last report if we have one; otherwise probe now.
-        if (_lastReport is not null)
-        {
-            DoctorScreen.Show(_app, _lastReport);
-            return;
-        }
-        SetBusy("probing environment…");
-        RunBackground(async cancellationToken =>
-        {
-            var report = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _lastReport = report;
-            Invoke(() =>
-            {
-                ClearBusy();
-                DoctorScreen.Show(_app!, report);
-            });
-        }, "doctor");
     }
 
     private void OnLogEntry(LogEntry _)
