@@ -373,9 +373,30 @@ public sealed class UpdateScreen
             sb.AppendLine();
             if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
             {
-                sb.AppendLine("```");
-                sb.AppendLine(result.ErrorMessage.TrimEnd());
-                sb.AppendLine("```");
+                AppendFencedBlock(sb, result.ErrorMessage);
+            }
+            return sb.ToString();
+        }
+        if (dryRun && result.Entries.Length > 0)
+        {
+            sb.AppendLine("| Skill | Status | Change |");
+            sb.AppendLine("| --- | --- | --- |");
+            foreach (var entry in result.Entries)
+            {
+                var change = string.IsNullOrWhiteSpace(entry.FromVersion) && string.IsNullOrWhiteSpace(entry.ToVersion)
+                    ? "—"
+                    : MarkdownTableFormatter.FormatCodeSpan($"{entry.FromVersion ?? "?"} -> {entry.ToVersion ?? "?"}");
+                sb.AppendLine(
+                    $"| {MarkdownTableFormatter.FormatCodeSpan(entry.Name)} | " +
+                    $"{MarkdownTableFormatter.FormatTableCell(entry.Status)} | " +
+                    $"{change} |");
+            }
+            if (!string.IsNullOrWhiteSpace(result.StdOut))
+            {
+                sb.AppendLine();
+                sb.AppendLine("### Raw output");
+                sb.AppendLine();
+                AppendFencedBlock(sb, result.StdOut);
             }
             return sb.ToString();
         }
@@ -386,9 +407,34 @@ public sealed class UpdateScreen
                 : "_Completed with no output._");
             return sb.ToString();
         }
-        sb.AppendLine("```");
-        sb.AppendLine(result.StdOut.TrimEnd());
-        sb.AppendLine("```");
+        AppendFencedBlock(sb, result.StdOut);
         return sb.ToString();
+    }
+
+    private static void AppendFencedBlock(System.Text.StringBuilder sb, string text)
+    {
+        var sanitized = TerminalEscapeSanitizer.Sanitize(text)?.TrimEnd() ?? string.Empty;
+        var fenceLength = 3;
+        var currentRun = 0;
+        foreach (var ch in sanitized)
+        {
+            if (ch == '`')
+            {
+                currentRun++;
+                if (currentRun >= fenceLength)
+                {
+                    fenceLength = currentRun + 1;
+                }
+            }
+            else
+            {
+                currentRun = 0;
+            }
+        }
+
+        var fence = new string('`', fenceLength);
+        sb.AppendLine(fence);
+        sb.AppendLine(sanitized);
+        sb.AppendLine(fence);
     }
 }
