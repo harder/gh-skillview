@@ -66,7 +66,7 @@ public sealed class RemoveScreen
             Width = Dim.Fill(), Height = Dim.Fill(bottomReserve),
             Text = BuildSummary(),
         };
-        TuiHelpers.ConfigureMarkdownPane(summary, "Base");
+        TuiHelpers.ConfigureMarkdownPane(summary, SkillViewStyling.BaseSchemeName);
 
         Label? pickerLabel = null;
         OptionSelector? agentPicker = null;
@@ -133,9 +133,9 @@ public sealed class RemoveScreen
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
             ]);
 
-        TuiHelpers.ApplyScheme("Base", window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
-        if (pickerLabel is not null) TuiHelpers.ApplyScheme("Base", pickerLabel);
-        if (agentPicker is not null) TuiHelpers.ApplyScheme("Base", agentPicker);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
+        if (pickerLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, pickerLabel);
+        if (agentPicker is not null) TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, agentPicker);
 
         removeButton.Accepting += (_, ev) =>
         {

@@ -128,7 +128,7 @@ public sealed class CleanupScreen
             Width = Dim.Fill(), Height = Dim.Fill(3),
             Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
         };
-        TuiHelpers.ConfigureMarkdownPane(detail, "Base");
+        TuiHelpers.ConfigureMarkdownPane(detail, SkillViewStyling.BaseSchemeName);
 
         table.ValueChanged += (_, _) =>
         {
@@ -154,7 +154,7 @@ public sealed class CleanupScreen
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
         ]);
 
-        TuiHelpers.ApplyScheme("Base", window, header, table, detail, status, statusBar);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 
         // Space-to-toggle is wired by CheckBoxTableSourceWrapperByIndex in
         // its constructor; no manual handler needed here. RC5 also routes

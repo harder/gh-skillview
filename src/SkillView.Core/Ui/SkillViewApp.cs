@@ -194,14 +194,14 @@ public sealed class SkillViewApp
             Text = string.Empty,
         };
         _queryField.KeyDown += OnQueryFieldKey;
-        TuiHelpers.ConfigureTextInput(_queryField, "Base");
+        TuiHelpers.ConfigureTextInput(_queryField, SkillViewStyling.BaseSchemeName);
 
         var ownerLabel = new Label { Text = "Owner:", X = 0, Y = 1 };
         _ownerField = new TextField
         {
             X = 8, Y = 1, Width = 22, Text = string.Empty,
         };
-        TuiHelpers.ConfigureTextInput(_ownerField, "Base");
+        TuiHelpers.ConfigureTextInput(_ownerField, SkillViewStyling.BaseSchemeName);
         _ownerField.KeyDown += OnFilterFieldKey;
 
         var limitLabel = new Label { Text = "Limit:", X = 32, Y = 1 };
@@ -225,7 +225,7 @@ public sealed class SkillViewApp
             Width = 22,
             Text = string.Empty,
         };
-        TuiHelpers.ConfigureTextInput(_agentField, "Base");
+        TuiHelpers.ConfigureTextInput(_agentField, SkillViewStyling.BaseSchemeName);
         _agentField.KeyDown += OnFilterFieldKey;
 
         _hiddenDirsBox = new CheckBox
@@ -334,7 +334,7 @@ public sealed class SkillViewApp
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
             Text = "_(no selection)_",
         };
-        TuiHelpers.ConfigureMarkdownPane(_metadataPane, "Base");
+        TuiHelpers.ConfigureMarkdownPane(_metadataPane, SkillViewStyling.BaseSchemeName);
         _metadataFrame.Add(_metadataPane);
 
         _previewFrame = new FrameView
@@ -351,7 +351,7 @@ public sealed class SkillViewApp
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
             Text = TuiHelpers.WelcomeHint,
         };
-        TuiHelpers.ConfigureMarkdownPane(_previewPane, "Base");
+        TuiHelpers.ConfigureMarkdownPane(_previewPane, SkillViewStyling.BaseSchemeName);
 
         _previewRawPane = new TextView
         {
@@ -359,7 +359,7 @@ public sealed class SkillViewApp
             Text = TuiHelpers.WelcomeHint,
             Visible = false,
         };
-        TuiHelpers.ConfigureReadOnlyPane(_previewRawPane, "Base");
+        TuiHelpers.ConfigureReadOnlyPane(_previewRawPane, SkillViewStyling.BaseSchemeName);
         _previewFrame.Add(_previewPane, _previewRawPane);
 
         _logPane = new TextView
@@ -370,7 +370,7 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
             Visible = false,
         };
-        TuiHelpers.ConfigureReadOnlyPane(_logPane, "Base");
+        TuiHelpers.ConfigureReadOnlyPane(_logPane, SkillViewStyling.BaseSchemeName);
 
         _rightFrame.Add(_itemActionsLabel, _metadataFrame, _previewFrame, _logPane);
 
@@ -416,7 +416,7 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
-        TuiHelpers.ApplyScheme("Base",
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
             window, _leftFrame, _rightFrame,
             queryLabel, _queryField, ownerLabel, _ownerField, agentLabel, _agentField, limitLabel, _limitUpDown, _hiddenDirsBox,
             _resultsTable, _previewPane, _previewRawPane, _metadataPane, _logPane,

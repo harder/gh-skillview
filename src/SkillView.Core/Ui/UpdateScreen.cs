@@ -134,7 +134,7 @@ public sealed class UpdateScreen
             Width = Dim.Fill(), Height = Dim.Fill(5),
             Text = "## Dry-run results\n\n_Press **Dry-run** to preview pending updates._",
         };
-        TuiHelpers.ConfigureMarkdownPane(preview, "Base");
+        TuiHelpers.ConfigureMarkdownPane(preview, SkillViewStyling.BaseSchemeName);
 
         var allBox = new CheckBox
         {
@@ -204,7 +204,7 @@ public sealed class UpdateScreen
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
         ]);
 
-        TuiHelpers.ApplyScheme("Base",
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
             window, tableLabel, table, preview,
             allBox, forceBox, unpinBox, yesBox,
             status, spinner, dryRunButton, updateButton, cancelButton, statusBar);

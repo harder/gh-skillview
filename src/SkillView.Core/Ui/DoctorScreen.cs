@@ -36,7 +36,7 @@ public static class DoctorScreen
             Height = Dim.Fill(1),
             Text = body,
         };
-        TuiHelpers.ConfigureMarkdownPane(text, "Base");
+        TuiHelpers.ConfigureMarkdownPane(text, SkillViewStyling.BaseSchemeName);
 
         var statusBar = new StatusBar(
         [
@@ -44,7 +44,7 @@ public static class DoctorScreen
             new Shortcut { Title = "q", HelpText = "Quit" },
         ]);
 
-        TuiHelpers.ApplyScheme("Base", window, text, statusBar);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, text, statusBar);
 
         window.Add(text, statusBar);
         window.KeyDown += (_, key) =>

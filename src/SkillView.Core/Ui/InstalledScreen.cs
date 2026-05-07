@@ -42,7 +42,7 @@ public static class InstalledScreen
             Width = Dim.Percent(60) - 8,
             Text = string.Empty,
         };
-        TuiHelpers.ConfigureTextInput(filterField, "Base");
+        TuiHelpers.ConfigureTextInput(filterField, SkillViewStyling.BaseSchemeName);
 
         var table = new TableView
         {
@@ -203,7 +203,7 @@ public static class InstalledScreen
             Height = Dim.Fill(2),
             Text = rows.Count == 0 ? "(no skills found)" : RenderDetail(rows[0]),
         };
-        TuiHelpers.ConfigureMarkdownPane(detail, "Base");
+        TuiHelpers.ConfigureMarkdownPane(detail, SkillViewStyling.BaseSchemeName);
 
         table.ValueChanged += (_, _) =>
         {
@@ -240,7 +240,7 @@ public static class InstalledScreen
 
         var statusBar = new StatusBar(BuildShortcuts(onRemove is not null, hasPackages));
 
-        TuiHelpers.ApplyScheme("Base", window, filterLabel, filterField, table, detail, footer, statusBar);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, filterLabel, filterField, table, detail, footer, statusBar);
 
         window.Add(filterLabel, filterField, table, detail, footer, statusBar);
         var goToSearchRequested = false;

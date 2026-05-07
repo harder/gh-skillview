@@ -140,10 +140,10 @@ public sealed class TuiHelpersTests
         var label = new Label();
         var field = new TextField();
 
-        TuiHelpers.ApplyScheme("Base", label, field, null);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, label, field, null);
 
-        Assert.Equal("Base", label.SchemeName);
-        Assert.Equal("Base", field.SchemeName);
+        Assert.Equal(SkillViewStyling.BaseSchemeName, label.SchemeName);
+        Assert.Equal(SkillViewStyling.BaseSchemeName, field.SchemeName);
     }
 
     [Fact]
@@ -155,11 +155,11 @@ public sealed class TuiHelpersTests
             WordWrap = false,
         };
 
-        TuiHelpers.ConfigureReadOnlyPane(view, "Dialog");
+        TuiHelpers.ConfigureReadOnlyPane(view, SkillViewStyling.DialogSchemeName);
 
         Assert.True(view.ReadOnly);
         Assert.True(view.WordWrap);
-        Assert.Equal("Dialog", view.SchemeName);
+        Assert.Equal(SkillViewStyling.DialogSchemeName, view.SchemeName);
     }
 
     [Fact]

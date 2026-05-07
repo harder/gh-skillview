@@ -113,7 +113,7 @@ public sealed class InstallScreen
             X = 13, Y = 0, Width = 32,
             Text = _request.SkillName ?? string.Empty,
         };
-        TuiHelpers.ConfigureTextInput(skillField, "Dialog");
+        TuiHelpers.ConfigureTextInput(skillField, SkillViewStyling.DialogSchemeName);
         var skillHint = new Label
         {
             X = Pos.Right(skillField) + 2, Y = 0,
@@ -125,7 +125,7 @@ public sealed class InstallScreen
         {
             X = 13, Y = 1, Width = 20, Text = string.Empty,
         };
-        TuiHelpers.ConfigureTextInput(versionField, "Dialog");
+        TuiHelpers.ConfigureTextInput(versionField, SkillViewStyling.DialogSchemeName);
         var pinBox = new CheckBox
         {
             X = Pos.Right(versionField) + 2, Y = 1,
@@ -156,7 +156,7 @@ public sealed class InstallScreen
                 X = 13, Y = nextRow, Width = 32,
                 Text = _request.RepoPath ?? string.Empty,
             };
-            TuiHelpers.ConfigureTextInput(repoPathField, "Dialog");
+            TuiHelpers.ConfigureTextInput(repoPathField, SkillViewStyling.DialogSchemeName);
             repoPathHint = new Label
             {
                 X = Pos.Right(repoPathField) + 2, Y = nextRow,
@@ -171,7 +171,7 @@ public sealed class InstallScreen
             {
                 X = 13, Y = nextRow, Width = 40, Text = string.Empty,
             };
-            TuiHelpers.ConfigureTextInput(upstreamField, "Dialog");
+            TuiHelpers.ConfigureTextInput(upstreamField, SkillViewStyling.DialogSchemeName);
             upstreamHint = new Label
             {
                 X = Pos.Right(upstreamField) + 2, Y = nextRow,
@@ -213,7 +213,7 @@ public sealed class InstallScreen
             Text = string.Empty,
             Enabled = false,
         };
-        TuiHelpers.ConfigureTextInput(pathField, "Dialog");
+        TuiHelpers.ConfigureTextInput(pathField, SkillViewStyling.DialogSchemeName);
 
         var agentsLabel = new Label { Text = "Agents     :", X = 0, Y = 3 };
         var agentBoxes = new CheckBox[KnownAgentEntries.Length];
@@ -379,7 +379,7 @@ public sealed class InstallScreen
         if (fromLocalBox is not null) fromLocalBox.ValueChanged += (_, _) => Refresh();
         foreach (var cb in agentBoxes) cb.ValueChanged += (_, _) => Refresh();
 
-        TuiHelpers.ApplyScheme("Dialog",
+        TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, sourceFrame, whereFrame, behaviorFrame,
             skillLabel, skillField, skillHint,
             versionLabel, versionField, pinBox, versionResolved,
@@ -388,11 +388,11 @@ public sealed class InstallScreen
             agentsLabel, agentsHint,
             forceBox,
             previewLabel, status, spinner);
-        if (repoPathLabel is not null) TuiHelpers.ApplyScheme("Dialog", repoPathLabel, repoPathField!, repoPathHint!);
-        if (upstreamLabel is not null) TuiHelpers.ApplyScheme("Dialog", upstreamLabel, upstreamField!, upstreamHint!);
-        if (allowHiddenBox is not null) TuiHelpers.ApplyScheme("Dialog", allowHiddenBox);
-        if (fromLocalBox is not null) TuiHelpers.ApplyScheme("Dialog", fromLocalBox);
-        foreach (var cb in agentBoxes) TuiHelpers.ApplyScheme("Dialog", cb);
+        if (repoPathLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, repoPathLabel, repoPathField!, repoPathHint!);
+        if (upstreamLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, upstreamLabel, upstreamField!, upstreamHint!);
+        if (allowHiddenBox is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, allowHiddenBox);
+        if (fromLocalBox is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, fromLocalBox);
+        foreach (var cb in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, cb);
 
         installButton.Accepting += async (_, ev) =>
         {
