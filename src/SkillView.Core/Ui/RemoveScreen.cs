@@ -274,7 +274,7 @@ public sealed class RemoveScreen
                     sb.AppendLine($"- `{link}`");
             }
         }
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private string BuildStatusLine()

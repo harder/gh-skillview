@@ -320,7 +320,7 @@ public sealed class CleanupScreen
             sb.AppendLine($"  path : {c.Path}");
             sb.AppendLine($"  why  : {c.Reason}");
         }
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private static string RenderDetail(CleanupClassifier.Candidate c)

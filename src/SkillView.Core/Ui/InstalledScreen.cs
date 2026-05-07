@@ -456,7 +456,7 @@ public static class InstalledScreen
                 sb.AppendLine($"- {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** ({kind}) `{a.Path}`");
             }
         }
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we

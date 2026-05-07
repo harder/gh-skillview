@@ -69,6 +69,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - On Terminal.Gui `2.0.2-develop.51`, `TableView.CollectionNavigator = null`
   works again for disabling type-to-search. Prefer that documented path over
   the old custom matcher workaround.
+- Sanitize untrusted text before assigning it to preview/detail/log panes.
+  `TerminalEscapeSanitizer` is now the shared UI-layer guard for remote preview
+  markdown, search metadata, installed-skill detail markdown, cleanup/remove
+  summaries, and rendered log text.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.

@@ -957,7 +957,7 @@ public sealed class SkillViewApp
             sb.AppendLine($"**Ns**    : {s.Namespace}");
         if (!string.IsNullOrWhiteSpace(s.Description))
             sb.AppendLine($"**About** : {s.Description}");
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     internal static string DescribeSearchResults(int totalCount, int shownCount, string? requestedAgent)
@@ -1072,7 +1072,9 @@ public sealed class SkillViewApp
             var log = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
             if (_logPane is not null)
             {
-                _logPane.Text = log.Length > 0 ? log : "(no log entries yet)";
+                _logPane.Text = log.Length > 0
+                    ? TerminalEscapeSanitizer.Sanitize(log) ?? string.Empty
+                    : "(no log entries yet)";
             }
         }
     }
@@ -1081,8 +1083,9 @@ public sealed class SkillViewApp
     /// TextView pane so toggling between them via `e` keeps the same content.
     private void SetPreviewText(string text)
     {
-        if (_previewPane is not null) _previewPane.Text = NormalizeMarkdownLists(text);
-        if (_previewRawPane is not null) _previewRawPane.Text = text;
+        var sanitized = TerminalEscapeSanitizer.Sanitize(text) ?? string.Empty;
+        if (_previewPane is not null) _previewPane.Text = NormalizeMarkdownLists(sanitized);
+        if (_previewRawPane is not null) _previewRawPane.Text = sanitized;
     }
 
     private void TogglePreviewMode()
