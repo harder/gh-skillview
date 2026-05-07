@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SkillView.Tests" />
+    <InternalsVisibleTo Include="SkillView.IntegrationTests" />
   </ItemGroup>
 
 </Project>

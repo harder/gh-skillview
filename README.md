@@ -227,7 +227,7 @@ Build requirements:
 SkillView is intentionally small and explicit:
 
 - **3 production projects**: `SkillView.Core`, `SkillView.App`, `SkillView.GhExtension`
-- **1 test project**: `SkillView.Tests`
+- **2 test projects**: `SkillView.Tests`, `SkillView.IntegrationTests`
 - shared logic lives in `SkillView.Core`
 - both executables call the same entry point
 - no DI container
@@ -251,7 +251,8 @@ Program.cs
 | `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui screens |
 | `src/SkillView.App/` | Standalone `skillview` entrypoint |
 | `src/SkillView.GhExtension/` | `gh skillview` extension entrypoint |
-| `tests/SkillView.Tests/` | xUnit coverage |
+| `tests/SkillView.Tests/` | xUnit coverage for unit and screen-level tests |
+| `tests/SkillView.IntegrationTests/` | In-process Terminal.Gui ANSI-driver smoke tests |
 | `.github/workflows/` | CI, contract tests, and release workflows |
 
 ### Build and test

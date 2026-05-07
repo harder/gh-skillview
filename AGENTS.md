@@ -18,11 +18,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `src/SkillView.GhExtension/` — `gh skillview` extension entrypoint.
 - `tests/SkillView.Tests/` — xUnit coverage for core services, CLI JSON output,
   and TUI helpers.
+- `tests/SkillView.IntegrationTests/` — in-process Terminal.Gui integration
+  smoke tests using the ANSI driver and one event-loop tick.
 
 ## How
 
 - Build/style verification: `dotnet build`
 - Full tests: `dotnet test --no-build`
+- Integration tests only: `dotnet test tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj`
 - Launch TUI: `src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview`
 - For CLI global flags such as `--scan-root`, pass them **before** the
   subcommand: `skillview --scan-root /tmp/root list --json`
