@@ -122,8 +122,115 @@ jobs:
           build_script_override: script/build-noop.sh
           generate_attestations: true
 
-  notify-failure:
+  # Dark-launch scaffold only. Generates a formula from release assets but does
+  # not commit or push to the tap yet.
+  publish-homebrew:
     needs: [build, release]
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    env:
+      RELEASE_REF: ${{ github.ref_name }}
+      RELEASE_REPO: ${{ github.repository }}
+      HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Generate formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p generated/homebrew
+          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-osx-arm64"
+          DARWIN_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-osx-x64"
+          LINUX_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-arm64"
+          LINUX_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-x64"
+          DARWIN_ARM64_SHA=$(sha256sum artifacts/skillview-osx-arm64 | cut -d' ' -f1)
+          DARWIN_X64_SHA=$(sha256sum artifacts/skillview-osx-x64 | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(sha256sum artifacts/skillview-linux-arm64 | cut -d' ' -f1)
+          LINUX_X64_SHA=$(sha256sum artifacts/skillview-linux-x64 | cut -d' ' -f1)
+          sed \
+            -e "s|{{VERSION}}|${RELEASE_REF#v}|g" \
+            -e "s|{{URL_DARWIN_ARM64}}|${DARWIN_ARM64_URL}|g" \
+            -e "s|{{URL_DARWIN_X64}}|${DARWIN_X64_URL}|g" \
+            -e "s|{{URL_LINUX_ARM64}}|${LINUX_ARM64_URL}|g" \
+            -e "s|{{URL_LINUX_X64}}|${LINUX_X64_URL}|g" \
+            -e "s|{{SHA_DARWIN_ARM64}}|${DARWIN_ARM64_SHA}|g" \
+            -e "s|{{SHA_DARWIN_X64}}|${DARWIN_X64_SHA}|g" \
+            -e "s|{{SHA_LINUX_ARM64}}|${LINUX_ARM64_SHA}|g" \
+            -e "s|{{SHA_LINUX_X64}}|${LINUX_X64_SHA}|g" \
+            packaging/homebrew/skillview.rb.tmpl \
+            > generated/homebrew/skillview.rb
+          printf 'Dark-launch only: generated formula for %s (target tap: %s)\n' "${RELEASE_REF}" "${HOMEBREW_TAP_REPO:-harder/homebrew-tap}"
+
+      - name: Upload generated formula
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula-${{ github.ref_name }}
+          path: generated/homebrew/skillview.rb
+          retention-days: 30
+
+  # Dark-launch scaffold only. Generates WinGet manifests from release assets
+  # but does not submit them to microsoft/winget-pkgs yet.
+  publish-winget:
+    needs: [build, release]
+    runs-on: windows-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.WINGET_ENABLED == 'true' }}
+    env:
+      RELEASE_REF: ${{ github.ref_name }}
+      RELEASE_REPO: ${{ github.repository }}
+      WINGET_PACKAGE_ID: harder.SkillView
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-win-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Generate manifests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path generated/winget | Out-Null
+          $version = $env:RELEASE_REF.Substring(1)
+          $urlX64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-x64.exe"
+          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-arm64.exe"
+          $shaX64 = (Get-FileHash artifacts/skillview-win-x64.exe -Algorithm SHA256).Hash
+          $shaArm64 = (Get-FileHash artifacts/skillview-win-arm64.exe -Algorithm SHA256).Hash
+
+          (Get-Content packaging/winget/harder.SkillView.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
+            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.yaml
+
+          (Get-Content packaging/winget/harder.SkillView.locale.en-US.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
+            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.locale.en-US.yaml
+
+          ((Get-Content packaging/winget/harder.SkillView.installer.yaml.tmpl -Raw).
+            Replace('{{VERSION}}', $version).
+            Replace('{{URL_WIN_X64}}', $urlX64).
+            Replace('{{SHA_WIN_X64}}', $shaX64).
+            Replace('{{URL_WIN_ARM64}}', $urlArm64).
+            Replace('{{SHA_WIN_ARM64}}', $shaArm64)) |
+            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.installer.yaml
+
+          Write-Host "Dark-launch only: generated WinGet manifests for $env:WINGET_PACKAGE_ID $version"
+
+      - name: Upload generated WinGet manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-manifests-${{ github.ref_name }}
+          path: generated/winget/*
+          retention-days: 30
+
+  notify-failure:
+    needs: [build, release, publish-homebrew, publish-winget]
     if: failure()
     runs-on: ubuntu-latest
     env:

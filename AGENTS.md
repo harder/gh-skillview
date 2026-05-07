@@ -71,6 +71,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new
   workflow-level behavior there unless it truly belongs to the search shell.
+- Package-manager dark-launch scaffolding lives under `packaging/` and the
+  release workflow only generates Homebrew / WinGet artifacts when the repo
+  variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
+  explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
 - Terminal.Gui rc.7 no longer needs `TrimmerRootAssembly` for the old
   `ConfigurationManager` trim issue; SkillView's AOT publish now verifies
   cleanly without rooting the full TG2 assembly.

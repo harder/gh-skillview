@@ -23,7 +23,10 @@ Runs on pushes and pull requests targeting `main`.
 **Pipeline**
 
 ```text
-build (6 RIDs, restore/build/test/publish) -> release -> notify-failure (on error)
+build (6 RIDs, restore/build/test/publish) -> release
+                                             -> publish-homebrew (dark-launch, stable tags only, opt-in)
+                                             -> publish-winget (dark-launch, stable tags only, opt-in)
+                                             -> notify-failure (on error)
 ```
 
 **Build matrix**
@@ -51,6 +54,13 @@ Release runs are serialized with a workflow-level concurrency lock so two publis
 - Standalone binaries: `skillview-<rid>[.exe]`
 
 Artifacts are uploaded per RID and then merged by the final release job, which publishes via `cli/gh-extension-precompile@v2` and generates attestations.
+
+**Package-manager dark launch**
+
+- `publish-homebrew` is gated behind `HOMEBREW_TAP_ENABLED == true` and generates a formula artifact from `packaging/homebrew/skillview.rb.tmpl`.
+- Recommended future tap target: `harder/homebrew-tap` via repo variable `HOMEBREW_TAP_REPO`.
+- `publish-winget` is gated behind `WINGET_ENABLED == true` and generates manifest artifacts from `packaging/winget/`.
+- Both jobs stop at generated artifacts today; they do **not** push to a tap repo or submit to `winget-pkgs` yet.
 
 **Failure handling**
 
