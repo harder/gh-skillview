@@ -232,46 +232,67 @@ public sealed class RemoveScreen
         _app.Run(window);
     }
 
-    private string BuildSummary()
+    internal string BuildSummary()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"## Remove — {_target.Name}");
+        sb.AppendLine($"## Remove — {FormatTableCell(_target.Name)}");
         sb.AppendLine();
-        sb.AppendLine($"**path**: `{_target.ResolvedPath}`  ");
-        sb.AppendLine($"**resolved**: `{_validation.ResolvedPath}`  ");
-        sb.AppendLine($"**scope**: {_target.Scope}  ");
-        sb.AppendLine($"**symlink**: {_target.IsSymlinked}  ");
-        sb.AppendLine($"**pinned**: {_target.Pinned}  ");
+        sb.AppendLine("### Target");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| Path | `{FormatCodeSpan(_target.ResolvedPath)}` |");
+        sb.AppendLine($"| Resolved | `{FormatCodeSpan(_validation.ResolvedPath)}` |");
+        sb.AppendLine($"| Scope | {FormatTableCell(_target.Scope.ToString())} |");
+        sb.AppendLine($"| Symlink | {FormatTableCell(_target.IsSymlinked.ToString())} |");
+        sb.AppendLine($"| Pinned | {FormatTableCell(_target.Pinned.ToString())} |");
         if (_target.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("### Agents");
+            sb.AppendLine("### Agent memberships");
             sb.AppendLine();
+            sb.AppendLine("| Agent | Kind | Path |");
+            sb.AppendLine("| --- | --- | --- |");
             foreach (var a in _target.Agents)
-                sb.AppendLine($"- **{a.AgentId}** ({(a.IsSymlink ? "symlink" : "direct")}) `{a.Path}`");
+            {
+                sb.AppendLine(
+                    $"| {FormatTableCell(a.AgentId)} | {FormatTableCell(a.IsSymlink ? "symlink" : "direct")} | `{FormatCodeSpan(a.Path)}` |");
+            }
         }
         if (_validation.Errors.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("### ⛔ REFUSED — safety rules triggered");
+            sb.AppendLine("### Errors");
             sb.AppendLine();
+            sb.AppendLine("| Kind | Detail |");
+            sb.AppendLine("| --- | --- |");
             foreach (var e in _validation.Errors)
-                sb.AppendLine($"- ✗ **{e.Kind}:** {e.Detail}");
+            {
+                sb.AppendLine($"| `{FormatCodeSpan(e.Kind.ToString())}` | {FormatTableCell(e.Detail)} |");
+            }
         }
         if (_validation.Warnings.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("### ⚠️ WARNINGS — second confirmation required");
+            sb.AppendLine("### Warnings");
             sb.AppendLine();
+            sb.AppendLine("| Kind | Detail |");
+            sb.AppendLine("| --- | --- |");
             foreach (var w in _validation.Warnings)
-                sb.AppendLine($"- ! **{w.Kind}:** {w.Detail}");
-            if (_validation.IncomingSymlinkPaths.Length > 0)
             {
-                sb.AppendLine();
-                sb.AppendLine("**Incoming symlinks:**");
-                sb.AppendLine();
-                foreach (var link in _validation.IncomingSymlinkPaths)
-                    sb.AppendLine($"- `{link}`");
+                sb.AppendLine($"| `{FormatCodeSpan(w.Kind.ToString())}` | {FormatTableCell(w.Detail)} |");
+            }
+        }
+        if (_validation.IncomingSymlinkPaths.Length > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("### Evidence");
+            sb.AppendLine();
+            sb.AppendLine("| Type | Value |");
+            sb.AppendLine("| --- | --- |");
+            foreach (var link in _validation.IncomingSymlinkPaths)
+            {
+                sb.AppendLine($"| Incoming symlink | `{FormatCodeSpan(link)}` |");
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
@@ -283,4 +304,13 @@ public sealed class RemoveScreen
         if (_validation.RequiresSecondConfirm) return " review warnings, then check the box and press Remove";
         return " ready — press Remove to delete (irreversible)";
     }
+
+    private static string FormatCodeSpan(string value) =>
+        FormatTableCell(value).Replace("`", "\\`", StringComparison.Ordinal);
+
+    private static string FormatTableCell(string value) =>
+        (TerminalEscapeSanitizer.Sanitize(value) ?? string.Empty)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("|", "\\|", StringComparison.Ordinal);
 }

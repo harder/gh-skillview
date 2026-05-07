@@ -315,22 +315,24 @@ public sealed class CleanupScreen
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
-    private static string RenderDetail(CleanupClassifier.Candidate c)
+    internal static string RenderDetail(CleanupClassifier.Candidate c)
     {
         var sb = new StringBuilder();
         sb.AppendLine("## Candidate");
         sb.AppendLine();
-        sb.AppendLine($"**kind**: **{c.Kind}**  ");
-        sb.AppendLine($"**path**: `{c.Path}`  ");
-        sb.AppendLine($"**reason**: {c.Reason}  ");
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| Kind | **{FormatTableCell(c.Kind.ToString())}** |");
+        sb.AppendLine($"| Path | `{FormatCodeSpan(c.Path)}` |");
+        sb.AppendLine($"| Reason | {FormatTableCell(c.Reason)} |");
         if (c.Skill is { } s)
         {
             sb.AppendLine();
-            sb.AppendLine("---");
+            sb.AppendLine("## Installed skill");
             sb.AppendLine();
             sb.AppendLine(InstalledScreen.RenderDetail(s));
         }
-        return sb.ToString();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)
@@ -368,6 +370,15 @@ public sealed class CleanupScreen
         public int Name;
         public int Path;
     }
+
+    private static string FormatCodeSpan(string value) =>
+        FormatTableCell(value).Replace("`", "\\`", StringComparison.Ordinal);
+
+    private static string FormatTableCell(string value) =>
+        (TerminalEscapeSanitizer.Sanitize(value) ?? string.Empty)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("|", "\\|", StringComparison.Ordinal);
 
     private int ConfirmBatchRemoval(string message) =>
         MessageBox.Query(
