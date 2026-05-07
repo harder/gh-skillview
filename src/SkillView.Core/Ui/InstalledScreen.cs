@@ -404,52 +404,66 @@ public static class InstalledScreen
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
-        sb.AppendLine($"**path**: `{s.ResolvedPath}`  ");
-        sb.AppendLine($"**scope**: {DisplayScope(s.Scope)}  ");
-        sb.AppendLine($"**provenance**: {s.Provenance}  ");
-        sb.AppendLine($"**validity**: {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")}  ");
-        sb.AppendLine($"**symlinked**: {s.IsSymlinked}  ");
-        sb.AppendLine($"**pinned**: {s.Pinned}  ");
-        sb.AppendLine($"**ignored**: {s.Ignored}  ");
-        sb.AppendLine($"**tree-sha**: `{s.TreeSha ?? "(unset)"}`  ");
-        sb.AppendLine($"**version**: {s.FrontMatter.Version ?? "(unset)"}  ");
+
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine("| Field | Value |");
+        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"| Path | `{s.ResolvedPath}` |");
+        sb.AppendLine($"| Scope | {DisplayScope(s.Scope)} |");
+        sb.AppendLine($"| Provenance | {s.Provenance} |");
+        sb.AppendLine($"| Validity | {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
+        sb.AppendLine($"| Symlinked | {FormatBool(s.IsSymlinked)} |");
+        sb.AppendLine($"| Pinned | {FormatBool(s.Pinned)} |");
+        sb.AppendLine($"| Ignored | {FormatBool(s.Ignored)} |");
+        sb.AppendLine($"| Tree SHA | `{s.TreeSha ?? "(unset)"}` |");
+        sb.AppendLine($"| Version | {s.FrontMatter.Version ?? "(unset)"} |");
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"**installed**: {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+            sb.AppendLine($"| Installed | {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
         }
         if (s.Package is { } pkg)
         {
             sb.AppendLine();
-            sb.AppendLine("### 📦 Package");
+            sb.AppendLine("## Package");
             sb.AppendLine();
-            sb.AppendLine($"**source**: `{pkg.Source}`  ");
-            sb.AppendLine($"**type**: {pkg.SourceType}  ");
-            if (pkg.SourceUrl is { Length: > 0 } url) sb.AppendLine($"**url**: {url}  ");
+            sb.AppendLine("| Field | Value |");
+            sb.AppendLine("| --- | --- |");
+            sb.AppendLine($"| Source | `{pkg.Source}` |");
+            sb.AppendLine($"| Type | {pkg.SourceType} |");
+            if (pkg.SourceUrl is { Length: > 0 } url)
+            {
+                sb.AppendLine($"| Package URL | [{url}]({url}) |");
+            }
             if (pkg.UpdatedAt is { } u)
             {
-                sb.AppendLine($"**updated**: {u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}  ");
+                sb.AppendLine($"| Updated | {u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
             }
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
         {
             sb.AppendLine();
-            sb.AppendLine("### Description");
+            sb.AppendLine("## Description");
             sb.AppendLine();
             sb.AppendLine(desc);
         }
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("### Agents");
+            sb.AppendLine("## Agents");
             sb.AppendLine();
+            sb.AppendLine("| Agent | Link | Path |");
+            sb.AppendLine("| --- | --- | --- |");
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"- {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** ({kind}) `{a.Path}`");
+                sb.AppendLine($"| {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** | {kind} | `{a.Path}` |");
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
+
+    private static string FormatBool(bool value) => value ? "Yes" : "No";
 
     /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we
     /// can keep a stable named type for the `currentSource` field reassignment

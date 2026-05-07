@@ -66,10 +66,18 @@ public sealed class TerminalEscapeSanitizerTests
             Ignored = false,
             IsSymlinked = false,
             InstalledAt = null,
+            Package = new SkillPackage(
+                Source: "pkg\x1b]0;bad\x07",
+                SourceType: "git",
+                SourceUrl: "https://example.test/\x1b]0;bad\x07demo",
+                InstalledAt: null,
+                UpdatedAt: null),
         });
 
         Assert.DoesNotContain('\x1b', detail);
         Assert.DoesNotContain('\x07', detail);
-        Assert.Contains("desctext", detail);
+        Assert.Contains("## Summary", detail);
+        Assert.Contains("`pkg`", detail);
+        Assert.DoesNotContain("bad", detail);
     }
 }

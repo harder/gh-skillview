@@ -28,8 +28,13 @@ public sealed class DoctorScreenTests
 
         var body = DoctorScreen.Render(report);
 
-        Assert.Contains("**preview**", body);
-        Assert.Contains("`--allow-hidden-dirs`  ✅", body);
+        Assert.Contains("## Environment", body);
+        Assert.Contains("| Item | Value |", body);
+        Assert.Contains("| gh | `/usr/bin/gh` |", body);
+        Assert.Contains("| version | `gh version 2.91.0`", body);
+        Assert.Contains("### preview", body);
+        Assert.Contains("| Flag | Supported |", body);
+        Assert.Contains("| `--allow-hidden-dirs` | ✅ |", body);
     }
 
     [Fact]
@@ -48,7 +53,7 @@ public sealed class DoctorScreenTests
 
         var body = DoctorScreen.Render(report);
 
-        Assert.Contains("**preview**", body);
-        Assert.Contains("`--allow-hidden-dirs`  ❌", body);
+        Assert.Contains("### preview", body);
+        Assert.Contains("| `--allow-hidden-dirs` | ❌ |", body);
     }
 }
