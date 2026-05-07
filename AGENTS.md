@@ -51,6 +51,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `TuiHelpersTests` with a `MemberNotNullWhenAttribute` `TypeLoadException`
   during Terminal.Gui config initialization, so keep the test SDK at `17.11.1`
   until that compatibility issue is resolved.
+- `src/SkillView.Core/SkillView.Core.csproj` owns the default
+  `TerminalGuiVersion` property. Keep the `PackageReference` on
+  `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
+  editing source.
 - Terminal.Gui's modern lifecycle is now the right default for SkillView:
   use `Application.Create().Init()` to create the app instance and
   `IApplication.Dispose()` / `using` for teardown. Do not add new uses of the
