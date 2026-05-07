@@ -163,14 +163,25 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void ConfigureTableChrome_HidesVerticalLines()
+    public void ConfigureTableChrome_HidesOnlyOuterVerticalChrome()
     {
-        var table = new TableView();
+        var table = new TableView
+        {
+            Style =
+            {
+                ShowVerticalCellLines = true,
+                ShowVerticalCellLineForFirstColumn = true,
+                ShowVerticalCellLineForLastColumn = true,
+                ShowVerticalHeaderLines = true,
+            },
+        };
 
         TuiHelpers.ConfigureTableChrome(table);
 
-        Assert.False(table.Style.ShowVerticalCellLines);
-        Assert.False(table.Style.ShowVerticalHeaderLines);
+        Assert.True(table.Style.ShowVerticalCellLines);
+        Assert.False(table.Style.ShowVerticalCellLineForFirstColumn);
+        Assert.False(table.Style.ShowVerticalCellLineForLastColumn);
+        Assert.True(table.Style.ShowVerticalHeaderLines);
     }
 
     [Fact]

@@ -455,8 +455,8 @@ internal static class TuiHelpers
 
     internal static void ConfigureTableChrome(TableView table)
     {
-        table.Style.ShowVerticalCellLines = false;
-        table.Style.ShowVerticalHeaderLines = false;
+        table.Style.ShowVerticalCellLineForFirstColumn = false;
+        table.Style.ShowVerticalCellLineForLastColumn = false;
     }
 
     /// Disable type-to-search on a TableView so printable shortcuts reach
