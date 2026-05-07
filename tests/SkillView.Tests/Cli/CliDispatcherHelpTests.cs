@@ -16,9 +16,12 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("# SkillView", stdout);
+        Assert.Contains("SkillView complements `gh skill`", stdout);
         Assert.Contains("## Usage", stdout);
         Assert.Contains("| Global flag | What it does |", stdout);
         Assert.Contains("| Subcommand | Purpose |", stdout);
+        Assert.Contains("Homebrew and WinGet scaffolding", stdout);
+        Assert.Contains("automation-friendly", stdout);
     }
 
     [Fact]

@@ -1514,6 +1514,8 @@ public static class CliDispatcher
 
             SkillView is a terminal UI and scriptable CLI for discovering, previewing, installing, updating, removing, and cleaning up AI agent skills on top of `gh skill`.
 
+            SkillView complements `gh skill`: use SkillView for guided TUI flows and automation-friendly CLI wrappers, and reach for raw `gh skill` when you need a brand-new upstream preview flag before SkillView exposes it.
+
             You are running the `{{command}}` entrypoint. The alternate entrypoint is `{{alternateCommand}}`.
 
             ## Usage
@@ -1573,11 +1575,20 @@ public static class CliDispatcher
             {{command}} cleanup --apply --yes
             ```
 
+            ## Automation
+
+            SkillView is automation-friendly when you want safer wrappers than raw `gh skill`.
+
+            - Prefer `--json` on `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
+            - Use exit codes in scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches.
+            - Put global flags like `--scan-root` and `--theme` before the subcommand; only `--debug` is accepted after the subcommand.
+
             ## Notes
 
             - SkillView only emits capability-gated flags when the installed `gh` build supports them.
             - `--debug` is the only global flag accepted after a subcommand. Put other global flags before the subcommand.
             - `SKILLVIEW_LOG=debug` is the environment-variable alternative to `--debug`.
+            - Homebrew and WinGet scaffolding exists in the release workflow, but those channels are still dark-launch only and are not public install paths yet.
 
             ## Exit codes
 
