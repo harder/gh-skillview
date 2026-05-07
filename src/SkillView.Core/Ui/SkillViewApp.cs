@@ -9,6 +9,7 @@ using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using Terminal.Gui.App;
+using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -104,6 +105,7 @@ public sealed class SkillViewApp
     public int Run()
     {
         TuiHelpers.SetTheme(_options.Theme);
+        ConfigurationManager.Enable(ConfigLocations.All);
         IApplication? app = null;
         Window? window = null;
         var runLifetime = new CancellationTokenSource();

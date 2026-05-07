@@ -5,6 +5,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using Terminal.Gui.App;
+using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -306,6 +307,44 @@ public sealed class SkillViewAppTests
         {
             Application.InstanceCreated -= HandleCreated;
             Application.InstanceDisposed -= HandleDisposed;
+        }
+    }
+
+    [Fact]
+    public void Run_EnablesConfigurationManager_BeforeCreatingApplication()
+    {
+        ConfigurationManager.Disable(resetToHardCodedDefaults: true);
+        var enabledAtFactory = false;
+
+        try
+        {
+            var services = TuiServices.Build(new Logger(LogLevel.Debug));
+            var options = new AppOptions(
+                InvocationMode.Standalone,
+                DispatchMode.Tui,
+                Debug: false,
+                Theme: AppTheme.Default,
+                ScanRoots: Array.Empty<string>(),
+                SubcommandName: null,
+                SubcommandArgs: Array.Empty<string>());
+
+            var app = new SkillViewApp(services, options, () =>
+            {
+                enabledAtFactory = ConfigurationManager.IsEnabled;
+                var created = Application.Create();
+                created.Init("ansi");
+                created.StopAfterFirstIteration = true;
+                return created;
+            }, probeOnRun: false);
+
+            var exitCode = app.Run();
+
+            Assert.Equal(ExitCodes.Success, exitCode);
+            Assert.True(enabledAtFactory);
+        }
+        finally
+        {
+            ConfigurationManager.Disable(resetToHardCodedDefaults: true);
         }
     }
 }
