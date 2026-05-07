@@ -409,18 +409,18 @@ public static class InstalledScreen
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Path | `{s.ResolvedPath}` |");
-        sb.AppendLine($"| Scope | {DisplayScope(s.Scope)} |");
-        sb.AppendLine($"| Provenance | {s.Provenance} |");
-        sb.AppendLine($"| Validity | {(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
-        sb.AppendLine($"| Symlinked | {FormatBool(s.IsSymlinked)} |");
-        sb.AppendLine($"| Pinned | {FormatBool(s.Pinned)} |");
-        sb.AppendLine($"| Ignored | {FormatBool(s.Ignored)} |");
-        sb.AppendLine($"| Tree SHA | `{s.TreeSha ?? "(unset)"}` |");
-        sb.AppendLine($"| Version | {s.FrontMatter.Version ?? "(unset)"} |");
+        sb.AppendLine($"| Path | `{FormatCodeSpan(s.ResolvedPath)}` |");
+        sb.AppendLine($"| Scope | {FormatTableCell(DisplayScope(s.Scope))} |");
+        sb.AppendLine($"| Provenance | {FormatTableCell(s.Provenance.ToString())} |");
+        sb.AppendLine($"| Validity | {FormatTableCell(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
+        sb.AppendLine($"| Symlinked | {FormatTableCell(FormatBool(s.IsSymlinked))} |");
+        sb.AppendLine($"| Pinned | {FormatTableCell(FormatBool(s.Pinned))} |");
+        sb.AppendLine($"| Ignored | {FormatTableCell(FormatBool(s.Ignored))} |");
+        sb.AppendLine($"| Tree SHA | `{FormatCodeSpan(s.TreeSha ?? "(unset)")}` |");
+        sb.AppendLine($"| Version | {FormatTableCell(s.FrontMatter.Version ?? "(unset)")} |");
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"| Installed | {when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
+            sb.AppendLine($"| Installed | {FormatTableCell(when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
         }
         if (s.Package is { } pkg)
         {
@@ -429,15 +429,15 @@ public static class InstalledScreen
             sb.AppendLine();
             sb.AppendLine("| Field | Value |");
             sb.AppendLine("| --- | --- |");
-            sb.AppendLine($"| Source | `{pkg.Source}` |");
-            sb.AppendLine($"| Type | {pkg.SourceType} |");
+            sb.AppendLine($"| Source | `{FormatCodeSpan(pkg.Source)}` |");
+            sb.AppendLine($"| Type | {FormatTableCell(pkg.SourceType)} |");
             if (pkg.SourceUrl is { Length: > 0 } url)
             {
-                sb.AppendLine($"| Package URL | [{url}]({url}) |");
+                sb.AppendLine($"| Package URL | {FormatTableLink(url)} |");
             }
             if (pkg.UpdatedAt is { } u)
             {
-                sb.AppendLine($"| Updated | {u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} |");
+                sb.AppendLine($"| Updated | {FormatTableCell(u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
             }
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
@@ -457,13 +457,39 @@ public static class InstalledScreen
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"| {TuiHelpers.AgentIcon(a.AgentId)} **{a.AgentId}** | {kind} | `{a.Path}` |");
+                sb.AppendLine($"| {TuiHelpers.AgentIcon(a.AgentId)} **{FormatTableCell(a.AgentId)}** | {FormatTableCell(kind)} | `{FormatCodeSpan(a.Path)}` |");
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private static string FormatBool(bool value) => value ? "Yes" : "No";
+
+    private static string FormatTableLink(string value)
+    {
+        var normalized = NormalizeTableValue(value);
+        return $"[{FormatTableCell(normalized)}]({EscapeMarkdownLinkDestination(normalized)})";
+    }
+
+    private static string FormatCodeSpan(string value) =>
+        FormatTableCell(value).Replace("`", "\\`", StringComparison.Ordinal);
+
+    private static string FormatTableCell(string value) =>
+        NormalizeTableValue(value)
+            .Replace("|", "\\|", StringComparison.Ordinal);
+
+    private static string NormalizeTableValue(string value) =>
+        (TerminalEscapeSanitizer.Sanitize(value) ?? string.Empty)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+
+    private static string EscapeMarkdownLinkDestination(string value) =>
+        value
+            .Replace("%", "%25", StringComparison.Ordinal)
+            .Replace(" ", "%20", StringComparison.Ordinal)
+            .Replace("(", "%28", StringComparison.Ordinal)
+            .Replace(")", "%29", StringComparison.Ordinal)
+            .Replace("|", "%7C", StringComparison.Ordinal);
 
     /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we
     /// can keep a stable named type for the `currentSource` field reassignment
