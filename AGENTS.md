@@ -47,7 +47,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
 - Current package compatibility: SkillView is on Terminal.Gui
-  `2.0.2-develop.51`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
+  `2.0.2-develop.57`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
   `TuiHelpersTests` with a `MemberNotNullWhenAttribute` `TypeLoadException`
   during Terminal.Gui config initialization, so keep the test SDK at `17.11.1`
   until that compatibility issue is resolved.
@@ -82,7 +82,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   shortcuts. Keep the current window/table `KeyDown` routing for app-level
   single-letter shortcuts because `TableView` still swallows unbound printable
   keys before they bubble.
-- On Terminal.Gui `2.0.2-develop.51`, `TableView.CollectionNavigator = null`
+- On Terminal.Gui `2.0.2-develop.57`, `TableView.CollectionNavigator = null`
   works again for disabling type-to-search. Prefer that documented path over
   the old custom matcher workaround.
 - Sanitize untrusted text before assigning it to preview/detail/log panes.
