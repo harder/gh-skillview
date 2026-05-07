@@ -173,6 +173,23 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void ConfigureTableKeyBindings_RoutesPreviewKeyToAccepted()
+    {
+        var table = new TableView();
+        var accepted = false;
+
+        table.Accepted += (_, _) =>
+        {
+            accepted = true;
+        };
+        TuiHelpers.ConfigureTableKeyBindings(table);
+
+        _ = table.NewKeyDownEvent(new Key('p'));
+
+        Assert.True(accepted);
+    }
+
+    [Fact]
     public void ConfigureTableKeyBindings_PreservesDisabledTypeToSearch()
     {
         var table = new TableView();

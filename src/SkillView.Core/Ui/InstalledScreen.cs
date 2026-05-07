@@ -245,9 +245,9 @@ public static class InstalledScreen
         window.Add(filterLabel, filterField, table, detail, footer, statusBar);
         var goToSearchRequested = false;
 
-        // Single dispatcher used by both window.KeyDown and table.KeyDown.
-        // Returns true if the key was handled. We do NOT re-inject keys into
-        // the view hierarchy via NewKeyDownEvent — that re-enters Terminal.Gui's
+        // Single dispatcher for window.KeyDown. Returns true if the key was
+        // handled. We do NOT re-inject keys into the view hierarchy via
+        // NewKeyDownEvent — that re-enters Terminal.Gui's
         // dispatch pipeline and crashes when the action (e.g. q → RequestStop)
         // tears down the run loop mid-call.
         bool HandleShortcut(Key key)
@@ -305,14 +305,6 @@ public static class InstalledScreen
         }
 
         window.KeyDown += (_, key) =>
-        {
-            if (HandleShortcut(key)) key.Handled = true;
-        };
-
-        // RC5: TableView swallows unbound printable letters in
-        // OnKeyDownNotHandled. Dispatch shortcuts directly here — the table's
-        // KeyDown event fires before OnKeyDownNotHandled.
-        table.KeyDown += (_, key) =>
         {
             if (HandleShortcut(key)) key.Handled = true;
         };

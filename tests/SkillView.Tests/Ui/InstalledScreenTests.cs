@@ -1,4 +1,5 @@
 using SkillView.Ui;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Xunit;
 
@@ -31,6 +32,15 @@ public sealed class InstalledScreenTests
         var decision = InstalledScreen.DecideShortcut(new Key('f'), filterHasFocus: false, canRemove: true);
 
         Assert.Equal(InstalledScreen.ShortcutCommand.FocusFilter, decision.Command);
+        Assert.False(decision.RequestStop);
+    }
+
+    [Fact]
+    public void DecideShortcut_EscapeFromFilterFocusesTable()
+    {
+        var decision = InstalledScreen.DecideShortcut(new Key(KeyCode.Esc), filterHasFocus: true, canRemove: true);
+
+        Assert.Equal(InstalledScreen.ShortcutCommand.FocusTable, decision.Command);
         Assert.False(decision.RequestStop);
     }
 }

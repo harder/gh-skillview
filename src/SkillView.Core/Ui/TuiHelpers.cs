@@ -457,9 +457,7 @@ internal static class TuiHelpers
     /// view-level handlers instead of being consumed by the built-in search.
     internal static void DisableTypeToSearch(TableView table)
     {
-        // TG2's XML docs explicitly support null here to disable type-to-search,
-        // but the current prerelease still annotates the property as non-nullable.
-        table.CollectionNavigator = null!;
+        table.CollectionNavigator = null;
     }
 
     /// Disable type-to-search on a TableView and register preview shortcut

@@ -156,21 +156,13 @@ public sealed class CleanupScreen
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 
-        // Space-to-toggle is wired by CheckBoxTableSourceWrapperByIndex in
-        // its constructor; no manual handler needed here. RC5 also routes
-        // letter shortcuts through table.KeyDown so we still need to catch
-        // them before the table swallows them in OnKeyDownNotHandled.
-        table.KeyDown += (_, key) =>
+        window.KeyDown += (_, key) =>
         {
             var r = key.AsRune.Value;
             if (r == 'r' || r == 'R') { DoRemove(wrapper.CheckedRows, status); key.Handled = true; }
             else if (r == 'i' || r == 'I') { DoIgnore(wrapper.CheckedRows, status); key.Handled = true; }
             else if (r == 'x' || r == 'X') { DoExport(status); key.Handled = true; }
-        };
-
-        window.KeyDown += (_, key) =>
-        {
-            if (key.KeyCode == KeyCode.Esc)
+            else if (key.KeyCode == KeyCode.Esc)
             {
                 _app.RequestStop();
                 key.Handled = true;
