@@ -77,8 +77,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
 - Terminal.Gui `2.1.1-develop.125` fixed the old AOT configuration crash.
   Keep the modern `Application.Create().Init()` lifecycle, and do not re-add
-  the removed local `UnconditionalSuppressMessage` workaround unless AOT
-  publish starts failing again.
+  the removed local `UnconditionalSuppressMessage` workaround unless a
+  verification publish with `SkillViewAppSuppressAotWarnings=false` starts
+  failing again.
 - Prefer `KeyBindings` for view-local command remaps like table preview
   shortcuts. Keep the current window/table `KeyDown` routing for app-level
   single-letter shortcuts because `TableView` still swallows unbound printable

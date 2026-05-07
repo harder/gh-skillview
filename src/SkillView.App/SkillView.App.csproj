@@ -8,9 +8,11 @@
     <StripSymbols>true</StripSymbols>
     <InvariantGlobalization>true</InvariantGlobalization>
     <SelfContained>true</SelfContained>
-    <!-- Keep TG2 trim warnings suppressed while we validate the broader rc.7
-         AOT surface beyond the ConfigurationManager trim-safety fix (§14 mandate). -->
-    <NoWarn>$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
+    <SkillViewAppSuppressAotWarnings Condition="'$(SkillViewAppSuppressAotWarnings)' == ''">true</SkillViewAppSuppressAotWarnings>
+    <!-- Keep the broader TG2 warning mask on by default, but allow verification
+         publishes to expose the SkillViewApp call sites by setting
+         SkillViewAppSuppressAotWarnings=false. -->
+    <NoWarn Condition="'$(SkillViewAppSuppressAotWarnings)' == 'true'">$(NoWarn);IL2026;IL3050;IL3053</NoWarn>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
