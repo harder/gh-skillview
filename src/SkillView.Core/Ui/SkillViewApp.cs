@@ -284,6 +284,7 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
         TuiHelpers.ConfigureTableScheme(_resultsTable);
+        TuiHelpers.ConfigureTableChrome(_resultsTable);
 
         // Accepted fires on Enter, double-click, p, v, CursorRight, and
         // Ctrl+J (Warp) — all routed through Command.Accept by the View

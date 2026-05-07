@@ -163,6 +163,17 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void ConfigureTableChrome_HidesVerticalLines()
+    {
+        var table = new TableView();
+
+        TuiHelpers.ConfigureTableChrome(table);
+
+        Assert.False(table.Style.ShowVerticalCellLines);
+        Assert.False(table.Style.ShowVerticalHeaderLines);
+    }
+
+    [Fact]
     public void DisableTypeToSearch_ClearsCollectionNavigator()
     {
         var table = new TableView();

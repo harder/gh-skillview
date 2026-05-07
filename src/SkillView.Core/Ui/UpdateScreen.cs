@@ -86,6 +86,7 @@ public sealed class UpdateScreen
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
+        TuiHelpers.ConfigureTableChrome(table);
 
         var nameW = 12;
         var rowsList = _skills.Select((s, i) => (i, s)).ToList();

@@ -453,6 +453,12 @@ internal static class TuiHelpers
         });
     }
 
+    internal static void ConfigureTableChrome(TableView table)
+    {
+        table.Style.ShowVerticalCellLines = false;
+        table.Style.ShowVerticalHeaderLines = false;
+    }
+
     /// Disable type-to-search on a TableView so printable shortcuts reach
     /// view-level handlers instead of being consumed by the built-in search.
     internal static void DisableTypeToSearch(TableView table)
