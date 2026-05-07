@@ -98,11 +98,14 @@ Every code path must be Native AOT safe. This means:
 - **YAML**: hand-rolled subset parser (`FrontMatterParser`), not YamlDotNet.
 - **Arg parsing**: hand-rolled `ArgParser`, not any third-party library.
 - **TG2 trimming**: `Terminal.Gui` `2.1.1-develop.125` fixed the old AOT
-  configuration crash. Keep the modern `Application.Create().Init()` /
-  `IApplication.Dispose()` lifecycle, and do not add new project-wide
-  `IL2026`/`IL3050`/`IL3053` masks or `[UnconditionalSuppressMessage]`
-  workarounds unless a new TG2 analyzer regression is reproduced, documented,
-  and tied to a `// TODO(tg2): upstream` note.
+  configuration crash for the app host, so `SkillView.App` no longer needs the
+  old local `IL2026`/`IL3050`/`IL3053` suppressions. Keep the modern
+  `Application.Create().Init()` / `IApplication.Dispose()` lifecycle, and do
+  not add new suppressions or `[UnconditionalSuppressMessage]` workarounds
+  unless a new TG2 analyzer regression is reproduced, documented, and tied to a
+  `// TODO(tg2): upstream` note. `SkillView.GhExtension` still carries its
+  current project-level TG2-related `NoWarn` entries until that host is
+  separately re-evaluated under AOT publish verification.
 
 ### Immutability
 
@@ -197,7 +200,9 @@ These rules govern all changes — they are the project's architectural invarian
 - **`gh skill update --yes`**: not in v2.92.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
 - **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
 - **Terminal.Gui v2**: defaulted via `SkillView.Core.csproj` to
-  `2.1.1-develop.125`. The old AOT configuration crash is fixed there, so keep
-  the modern `Application.Create().Init()` + `IApplication.Dispose()` lifecycle,
-  tie async UI work to app/dialog lifetime cancellation, and track any real
-  remaining framework workarounds with `// TODO(tg2): upstream`.
+  `2.1.1-develop.125`. The old AOT configuration crash is fixed there for the
+  app host, so keep the modern `Application.Create().Init()` +
+  `IApplication.Dispose()` lifecycle, tie async UI work to app/dialog lifetime
+  cancellation, and track any real remaining framework workarounds with
+  `// TODO(tg2): upstream`. `SkillView.GhExtension` still retains its current
+  project-level TG2-related `NoWarn` entries pending separate re-evaluation.
