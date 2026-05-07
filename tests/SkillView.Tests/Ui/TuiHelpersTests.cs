@@ -163,20 +163,22 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void NoSearchMatcher_RejectsAllKeys()
+    public void DisableTypeToSearch_ClearsCollectionNavigator()
     {
-        var matcher = NoSearchMatcher.Instance;
-        Assert.False(matcher.IsCompatibleKey(new Key('a')));
-        Assert.False(matcher.IsCompatibleKey(new Key('z')));
-        Assert.False(matcher.IsCompatibleKey(new Key('1')));
-        Assert.False(matcher.IsCompatibleKey(new Key(KeyCode.Enter)));
+        var table = new TableView();
+
+        TuiHelpers.DisableTypeToSearch(table);
+
+        Assert.Null(table.CollectionNavigator);
     }
 
     [Fact]
-    public void NoSearchMatcher_NeverMatches()
+    public void ConfigureTableKeyBindings_PreservesDisabledTypeToSearch()
     {
-        var matcher = NoSearchMatcher.Instance;
-        Assert.False(matcher.IsMatch("test", "test"));
-        Assert.False(matcher.IsMatch("a", "abc"));
+        var table = new TableView();
+
+        TuiHelpers.ConfigureTableKeyBindings(table);
+
+        Assert.Null(table.CollectionNavigator);
     }
 }

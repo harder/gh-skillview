@@ -43,11 +43,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - When testing install flows against current `gh`, do not assume the UI's
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
-- Current package compatibility: Terminal.Gui `2.0.0-rc.7` is good, but
-  `Microsoft.NET.Test.Sdk` `18.4.0` breaks `TuiHelpersTests` with a
-  `MemberNotNullWhenAttribute` `TypeLoadException` during Terminal.Gui config
-  initialization. Keep the test SDK at `17.11.1` until that compatibility issue
-  is resolved.
+- Current package compatibility: SkillView is on Terminal.Gui
+  `2.0.2-develop.51`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
+  `TuiHelpersTests` with a `MemberNotNullWhenAttribute` `TypeLoadException`
+  during Terminal.Gui config initialization, so keep the test SDK at `17.11.1`
+  until that compatibility issue is resolved.
 - Terminal.Gui's modern lifecycle is now the right default for SkillView:
   use `Application.Create().Init()` to create the app instance and
   `IApplication.Dispose()` / `using` for teardown. Do not add new uses of the
@@ -63,6 +63,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   shortcuts. Keep the current window/table `KeyDown` routing for app-level
   single-letter shortcuts because `TableView` still swallows unbound printable
   keys before they bubble.
+- On Terminal.Gui `2.0.2-develop.51`, `TableView.CollectionNavigator = null`
+  works again for disabling type-to-search. Prefer that documented path over
+  the old custom matcher workaround.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.

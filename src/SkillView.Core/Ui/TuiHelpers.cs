@@ -453,15 +453,13 @@ internal static class TuiHelpers
         });
     }
 
-    /// Disable type-to-search on a TableView. Terminal.Gui v2 RC4's
-    /// OnKeyDown intercepts ALL unbound letter keys for type-to-search
-    /// before the KeyDown event fires, preventing single-letter shortcuts
-    /// from reaching event handlers. Replacing the Matcher disables that.
-    /// TODO(tg2): remove once upstream supports CollectionNavigator = null
-    /// without NRE.
+    /// Disable type-to-search on a TableView so printable shortcuts reach
+    /// view-level handlers instead of being consumed by the built-in search.
     internal static void DisableTypeToSearch(TableView table)
     {
-        table.CollectionNavigator.Matcher = NoSearchMatcher.Instance;
+        // TG2's XML docs explicitly support null here to disable type-to-search,
+        // but the current prerelease still annotates the property as non-nullable.
+        table.CollectionNavigator = null!;
     }
 
     /// Disable type-to-search on a TableView and register preview shortcut
@@ -501,16 +499,4 @@ internal static class TuiHelpers
         if (row < 0) return;
         table.SetSelection(0, row, false);
     }
-}
-
-/// Matcher that rejects all keys, effectively disabling TableView's
-/// built-in type-to-search (CollectionNavigator) feature. Setting
-/// CollectionNavigator to null is documented as supported but causes
-/// a NullReferenceException in TG2 v2 RC4; this workaround avoids
-/// the NRE while achieving the same effect.
-internal sealed class NoSearchMatcher : ICollectionNavigatorMatcher
-{
-    internal static readonly NoSearchMatcher Instance = new();
-    public bool IsCompatibleKey(Key key) => false;
-    public bool IsMatch(string search, object value) => false;
 }
