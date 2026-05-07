@@ -102,22 +102,30 @@ public sealed class SkillViewApp
     // gui-cs/Terminal.Gui with an AOT-friendly config model, then drop this.
     [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
-    public int Run()
+    public int Run() => RunAsync().GetAwaiter().GetResult();
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
+    public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         TuiHelpers.SetTheme(_options.Theme);
         ConfigurationManager.Enable(ConfigLocations.All);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ExitCodes.Success;
+        }
+
         IApplication? app = null;
         Window? window = null;
-        var runLifetime = new CancellationTokenSource();
+        using var runLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _hasRunLifetime = true;
         _runLifetime = runLifetime;
 
-        // Catch any unhandled exceptions so they get logged instead of silently crashing.
         UnhandledExceptionEventHandler onUnhandledException = (_, args) =>
         {
             if (args.ExceptionObject is Exception ex)
             {
-                _services.Logger.Error("CRASH", $"Unhandled: {ex}");
+                LogUnhandledException(ex);
             }
         };
         AppDomain.CurrentDomain.UnhandledException += onUnhandledException;
@@ -125,6 +133,11 @@ public sealed class SkillViewApp
         try
         {
             app = _applicationFactory();
+            if (runLifetime.IsCancellationRequested)
+            {
+                return ExitCodes.Success;
+            }
+
             _app = app;
             window = BuildUi();
 
@@ -138,20 +151,31 @@ public sealed class SkillViewApp
                 ProbeGhAsync();
             }
 
-            app.Run(window);
+            await app.RunAsync(window, runLifetime.Token, HandleRunLoopException).ConfigureAwait(false);
         }
         finally
         {
             AppDomain.CurrentDomain.UnhandledException -= onUnhandledException;
             CancelStatusAutoClear();
             runLifetime.Cancel();
-            runLifetime.Dispose();
+            _hasRunLifetime = false;
             _runLifetime = null;
             _app = null;
             window?.Dispose();
             app?.Dispose();
         }
         return ExitCodes.Success;
+    }
+
+    private bool HandleRunLoopException(Exception ex)
+    {
+        LogUnhandledException(ex);
+        return false;
+    }
+
+    private void LogUnhandledException(Exception ex)
+    {
+        _services.Logger.Error("CRASH", $"Unhandled: {ex}");
     }
 
     private Window BuildUi()

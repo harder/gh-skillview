@@ -66,6 +66,15 @@ public sealed class SkillViewAppTests
         return new SkillViewApp(services, options, static () => Application.Create().Init(), probeOnRun);
     }
 
+    private static AppOptions CreateOptions() => new(
+        InvocationMode.Standalone,
+        DispatchMode.Tui,
+        Debug: false,
+        Theme: AppTheme.Default,
+        ScanRoots: Array.Empty<string>(),
+        SubcommandName: null,
+        SubcommandArgs: Array.Empty<string>());
+
     private static IEnumerable<View> Descendants(View root)
     {
         foreach (var child in root.SubViews)
@@ -159,6 +168,29 @@ public sealed class SkillViewAppTests
 
         Assert.False(app.UserInteractedSinceLaunchForTests);
         Assert.True(app.ShouldAutoOpenInstalledOnStartupForTests(SnapshotWithInstalledSkill()));
+    }
+
+    [Fact]
+    public async Task RunAsync_ReturnsSuccess_WithoutCreatingApplication_WhenAlreadyCanceled()
+    {
+        var services = TuiServices.Build(new Logger(LogLevel.Debug));
+        var factoryCalled = false;
+        var app = new SkillViewApp(
+            services,
+            CreateOptions(),
+            () =>
+            {
+                factoryCalled = true;
+                return Application.Create().Init();
+            },
+            probeOnRun: false);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var exitCode = await app.RunAsync(cts.Token);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.False(factoryCalled);
     }
 
     [Fact]

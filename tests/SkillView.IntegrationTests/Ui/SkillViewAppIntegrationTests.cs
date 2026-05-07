@@ -9,7 +9,7 @@ namespace SkillView.IntegrationTests.Ui;
 public sealed class SkillViewAppIntegrationTests
 {
     [Fact]
-    public void Run_WithAnsiDriverAndSingleTick_ReturnsSuccess()
+    public async Task RunAsync_WithAnsiDriverAndSingleTick_ReturnsSuccess()
     {
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
         var options = new AppOptions(
@@ -23,7 +23,7 @@ public sealed class SkillViewAppIntegrationTests
 
         var app = new SkillViewApp(services, options, CreateAnsiApp, probeOnRun: false);
 
-        var exitCode = app.Run();
+        var exitCode = await app.RunAsync();
 
         Assert.Equal(ExitCodes.Success, exitCode);
     }

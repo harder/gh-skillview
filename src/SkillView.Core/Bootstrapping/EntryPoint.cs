@@ -69,7 +69,7 @@ public static class EntryPoint
 
             var ui = new SkillViewApp(services, options);
             logger.Debug("startup", $"TUI boot time {startupStopwatch.ElapsedMilliseconds}ms");
-            return ui.Run();
+            return await ui.RunAsync().ConfigureAwait(false);
         }
         finally
         {
