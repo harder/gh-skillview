@@ -7,8 +7,13 @@ on:
 
 permissions:
   contents: write
+  issues: write
   id-token: write        # SLSA attestations
   attestations: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -54,6 +59,15 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
       - name: Publish AOT (extension binary)
         shell: bash
         run: |
@@ -90,6 +104,7 @@ jobs:
         with:
           name: dist-${{ matrix.rid }}
           path: dist/out/*
+          retention-days: 30
 
   release:
     needs: build
@@ -106,3 +121,44 @@ jobs:
         with:
           build_script_override: script/build-noop.sh
           generate_attestations: true
+
+  notify-failure:
+    needs: [build, release]
+    if: failure()
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_REF: ${{ github.ref_name }}
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Release workflow failed on ${process.env.RELEASE_REF}`;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const existing = openIssues.find(issue => issue.title === title);
+            if (existing) {
+              core.info(`Open failure issue already exists: #${existing.number}`);
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body: [
+                `The release workflow failed for \`${process.env.RELEASE_REF}\`.`,
+                '',
+                `- Workflow run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                '- Workflow guide: `.github/workflows/README.md`',
+                '- Rollback runbook: `docs/runbooks/release-rollback.md` *(planned backlog item #8)*'
+              ].join('\n')
+            });

@@ -8,3 +8,7 @@
 - `cli/gh-extension-precompile@v2` is the release publisher and attestation source. Keep `script/build-noop.sh` as the no-op build override for that action.
 - Linux AOT publish still needs `clang` and `zlib1g-dev`.
 - Keep `workflow_dispatch` enabled so release packaging can be exercised without pushing a tag.
+- `release.yml` now serializes publishes with a workflow-level concurrency lock.
+- Each release build leg restores, builds in `Release`, and runs the full test suite before publishing AOT assets.
+- Release artifact uploads keep 30-day retention, and a failed release opens or reuses an issue with the run link for follow-up.
+- `.github/workflows/README.md` is the operator-facing overview for CI/release workflow behavior.
