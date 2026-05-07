@@ -13,7 +13,7 @@ public sealed class CleanupScreenTests
     {
         var candidate = new CleanupClassifier.Candidate(
             CleanupClassifier.CandidateKind.Duplicate,
-            "/skills/demo",
+            "/skills/demo`copy",
             "duplicate install",
             Skill("demo", "/skills/demo"));
 
@@ -22,7 +22,7 @@ public sealed class CleanupScreenTests
         Assert.Contains("## Candidate", detail);
         Assert.Contains("| Field | Value |", detail);
         Assert.Contains("| Kind | **Duplicate** |", detail);
-        Assert.Contains("| Path | `/skills/demo` |", detail);
+        Assert.Contains("| Path | `` /skills/demo`copy `` |", detail);
         Assert.Contains("| Reason | duplicate install |", detail);
         Assert.Contains("## Installed skill", detail);
         Assert.Contains("## Summary", detail);

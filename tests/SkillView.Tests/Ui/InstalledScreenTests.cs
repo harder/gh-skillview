@@ -94,12 +94,12 @@ public sealed class InstalledScreenTests
         var detail = InstalledScreen.RenderDetail(new InstalledSkill
         {
             Name = "demo",
-            ResolvedPath = "/skills/demo|stable",
+            ResolvedPath = "/skills/demo|`stable",
             ScanRoot = "/skills",
             Scope = Scope.User,
             Agents =
             [
-                new AgentMembership("copilot", "/Users/test/.config/skills/demo\nlinked", IsSymlink: false),
+                new AgentMembership("copilot", "/Users/test/.config/skills/demo`\nlinked", IsSymlink: false),
             ],
             FrontMatter = SkillFrontMatter.Empty with
             {
@@ -111,20 +111,20 @@ public sealed class InstalledScreenTests
             IsSymlinked = false,
             InstalledAt = null,
             Package = new SkillPackage(
-                Source: "owner/repo|fork",
+                Source: "owner/repo|`fork",
                 SourceType: "git",
-                SourceUrl: "https://example.test/owner/repo|fork",
+                SourceUrl: "https://example.test/owner/repo|`fork",
                 InstalledAt: null,
                 UpdatedAt: null),
         });
 
-        Assert.Contains("| Path | `/skills/demo\\|stable` |", detail);
+        Assert.Contains("| Path | `` /skills/demo\\|`stable `` |", detail);
         Assert.Contains("| Version | 1.2.3 beta |", detail);
-        Assert.Contains("| Source | `owner/repo\\|fork` |", detail);
+        Assert.Contains("| Source | `` owner/repo\\|`fork `` |", detail);
         Assert.Contains(
-            "| Package URL | [https://example.test/owner/repo\\|fork](https://example.test/owner/repo%7Cfork) |",
+            "| Package URL | [https://example.test/owner/repo\\|`fork](https://example.test/owner/repo%7C`fork) |",
             detail);
-        Assert.Contains("**copilot** | direct | `/Users/test/.config/skills/demo linked` |", detail);
+        Assert.Contains("**copilot** | direct | `` /Users/test/.config/skills/demo` linked `` |", detail);
         Assert.DoesNotContain("1.2.3\nbeta", detail);
     }
 }

@@ -235,17 +235,17 @@ public sealed class RemoveScreen
     internal string BuildSummary()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"## Remove — {FormatTableCell(_target.Name)}");
+        sb.AppendLine($"## Remove — {MarkdownTableFormatter.FormatTableCell(_target.Name)}");
         sb.AppendLine();
         sb.AppendLine("### Target");
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Path | `{FormatCodeSpan(_target.ResolvedPath)}` |");
-        sb.AppendLine($"| Resolved | `{FormatCodeSpan(_validation.ResolvedPath)}` |");
-        sb.AppendLine($"| Scope | {FormatTableCell(_target.Scope.ToString())} |");
-        sb.AppendLine($"| Symlink | {FormatTableCell(_target.IsSymlinked.ToString())} |");
-        sb.AppendLine($"| Pinned | {FormatTableCell(_target.Pinned.ToString())} |");
+        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(_target.ResolvedPath)} |");
+        sb.AppendLine($"| Resolved | {MarkdownTableFormatter.FormatCodeSpan(_validation.ResolvedPath)} |");
+        sb.AppendLine($"| Scope | {MarkdownTableFormatter.FormatTableCell(_target.Scope.ToString())} |");
+        sb.AppendLine($"| Symlink | {MarkdownTableFormatter.FormatTableCell(_target.IsSymlinked.ToString())} |");
+        sb.AppendLine($"| Pinned | {MarkdownTableFormatter.FormatTableCell(_target.Pinned.ToString())} |");
         if (_target.Agents.Length > 0)
         {
             sb.AppendLine();
@@ -256,7 +256,7 @@ public sealed class RemoveScreen
             foreach (var a in _target.Agents)
             {
                 sb.AppendLine(
-                    $"| {FormatTableCell(a.AgentId)} | {FormatTableCell(a.IsSymlink ? "symlink" : "direct")} | `{FormatCodeSpan(a.Path)}` |");
+                    $"| {MarkdownTableFormatter.FormatTableCell(a.AgentId)} | {MarkdownTableFormatter.FormatTableCell(a.IsSymlink ? "symlink" : "direct")} | {MarkdownTableFormatter.FormatCodeSpan(a.Path)} |");
             }
         }
         if (_validation.Errors.Length > 0)
@@ -268,7 +268,7 @@ public sealed class RemoveScreen
             sb.AppendLine("| --- | --- |");
             foreach (var e in _validation.Errors)
             {
-                sb.AppendLine($"| `{FormatCodeSpan(e.Kind.ToString())}` | {FormatTableCell(e.Detail)} |");
+                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(e.Kind.ToString())} | {MarkdownTableFormatter.FormatTableCell(e.Detail)} |");
             }
         }
         if (_validation.Warnings.Length > 0)
@@ -280,7 +280,7 @@ public sealed class RemoveScreen
             sb.AppendLine("| --- | --- |");
             foreach (var w in _validation.Warnings)
             {
-                sb.AppendLine($"| `{FormatCodeSpan(w.Kind.ToString())}` | {FormatTableCell(w.Detail)} |");
+                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(w.Kind.ToString())} | {MarkdownTableFormatter.FormatTableCell(w.Detail)} |");
             }
         }
         if (_validation.IncomingSymlinkPaths.Length > 0)
@@ -292,7 +292,7 @@ public sealed class RemoveScreen
             sb.AppendLine("| --- | --- |");
             foreach (var link in _validation.IncomingSymlinkPaths)
             {
-                sb.AppendLine($"| Incoming symlink | `{FormatCodeSpan(link)}` |");
+                sb.AppendLine($"| Incoming symlink | {MarkdownTableFormatter.FormatCodeSpan(link)} |");
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
@@ -305,12 +305,4 @@ public sealed class RemoveScreen
         return " ready — press Remove to delete (irreversible)";
     }
 
-    private static string FormatCodeSpan(string value) =>
-        FormatTableCell(value).Replace("`", "\\`", StringComparison.Ordinal);
-
-    private static string FormatTableCell(string value) =>
-        (TerminalEscapeSanitizer.Sanitize(value) ?? string.Empty)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Replace("|", "\\|", StringComparison.Ordinal);
 }

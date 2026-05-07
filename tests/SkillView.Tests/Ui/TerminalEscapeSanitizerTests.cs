@@ -134,6 +134,42 @@ public sealed class TerminalEscapeSanitizerTests
         Assert.DoesNotContain("bad", summary);
     }
 
+    [Fact]
+    public void BuildRemoveSummary_UsesLongerCodeSpanDelimiterForBackticks()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray.Create(
+                new RemoveValidator.Error(
+                    RemoveValidator.ErrorKind.ContainsGitDirectory,
+                    "path contains `ticks`")),
+            Warnings: ImmutableArray.Create(
+                new RemoveValidator.Warning(
+                    RemoveValidator.WarningKind.HasIncomingSymlinks,
+                    "linked from `agent`")),
+            ResolvedPath: "/skills/demo`copy",
+            IncomingSymlinkPaths: ImmutableArray.Create("/agents/demo`copy"));
+
+        var screen = new RemoveScreen(
+            null!,
+            new RemoveService(new Logger()),
+            new Logger(),
+            CreateSkill() with
+            {
+                Name = "demo`copy",
+                ResolvedPath = "/skills/demo`copy",
+                Agents = ImmutableArray.Create(
+                    new AgentMembership("claude", "/agents/demo`copy", true)),
+            },
+            validation);
+
+        var summary = screen.BuildSummary();
+
+        Assert.Contains("| Path | `` /skills/demo`copy `` |", summary);
+        Assert.Contains("| Resolved | `` /skills/demo`copy `` |", summary);
+        Assert.Contains("| claude | symlink | `` /agents/demo`copy `` |", summary);
+        Assert.Contains("| Incoming symlink | `` /agents/demo`copy `` |", summary);
+    }
+
     private static InstalledSkill CreateSkill() => new()
     {
         Name = "demo\x1b]0;bad\x07",

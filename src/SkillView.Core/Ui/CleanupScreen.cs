@@ -322,9 +322,9 @@ public sealed class CleanupScreen
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Kind | **{FormatTableCell(c.Kind.ToString())}** |");
-        sb.AppendLine($"| Path | `{FormatCodeSpan(c.Path)}` |");
-        sb.AppendLine($"| Reason | {FormatTableCell(c.Reason)} |");
+        sb.AppendLine($"| Kind | **{MarkdownTableFormatter.FormatTableCell(c.Kind.ToString())}** |");
+        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(c.Path)} |");
+        sb.AppendLine($"| Reason | {MarkdownTableFormatter.FormatTableCell(c.Reason)} |");
         if (c.Skill is { } s)
         {
             sb.AppendLine();
@@ -370,15 +370,6 @@ public sealed class CleanupScreen
         public int Name;
         public int Path;
     }
-
-    private static string FormatCodeSpan(string value) =>
-        FormatTableCell(value).Replace("`", "\\`", StringComparison.Ordinal);
-
-    private static string FormatTableCell(string value) =>
-        (TerminalEscapeSanitizer.Sanitize(value) ?? string.Empty)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Replace("|", "\\|", StringComparison.Ordinal);
 
     private int ConfirmBatchRemoval(string message) =>
         MessageBox.Query(
