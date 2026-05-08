@@ -230,10 +230,21 @@ internal static class TuiHelpers
     /// Configure a Terminal.Gui Markdown view for the preview pane. The
     /// built-in Markdown view uses Markdig to render styled headings, code
     /// blocks, tables, links, and lists with a built-in vertical scrollbar.
-    internal static void ConfigureMarkdownPane(Markdown view, string schemeName)
+    internal static void ConfigureMarkdownPane(Markdown view, string schemeName, Func<string, bool>? openTarget = null)
     {
         view.SchemeName = schemeName;
         view.SetScheme(CreateReadOnlyPaneScheme());
+        openTarget ??= OpenInDefaultHandler;
+        view.LinkClicked += (_, args) =>
+        {
+            if (string.IsNullOrWhiteSpace(args.Url) || args.Url.StartsWith('#'))
+            {
+                return;
+            }
+
+            _ = openTarget(args.Url);
+            args.Handled = true;
+        };
     }
 
     internal static void ConfigureTextInput(TextField view, string schemeName)
@@ -255,6 +266,7 @@ internal static class TuiHelpers
         "i  install the selected search result\n" +
         "o  open the skill (GitHub URL or local folder)\n" +
         "e  toggle raw / rendered SKILL.md preview\n" +
+        "Rendered markdown  Ctrl+A selects all, Ctrl+C copy selection, click links to open\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
         "I  show installed skills\n" +
@@ -268,11 +280,11 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · owner/agent filters · h hidden dirs · i install · o open · e raw/render · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
+        + " · owner/agent filters · h hidden dirs · i install · o open · e raw/render · rendered preview Ctrl+C copy + links · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
-        ? "Select a result and press Ctrl+J, p, or v to preview."
-        : "Select a result and press Enter, →, p, or v to preview.";
+        ? "Select a result and press Ctrl+J, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening."
+        : "Select a result and press Enter, →, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening.";
 
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
@@ -459,20 +471,22 @@ internal static class TuiHelpers
         table.Style.ShowVerticalCellLineForLastColumn = false;
     }
 
-    /// Disable type-to-search on a TableView so printable shortcuts reach
-    /// view-level handlers instead of being consumed by the built-in search.
+    /// Disable a TableView's built-in type-to-search by clearing its
+    /// CollectionNavigator so printable shortcuts reach view-level handlers.
     internal static void DisableTypeToSearch(TableView table)
     {
         table.CollectionNavigator = null;
     }
 
-    /// Disable type-to-search on a TableView and register preview shortcut
+    /// Disable built-in type-to-search on a TableView and register preview
+    /// shortcut
     /// key bindings (p, v, → → Command.Accept → Accepted event).
     ///
-    /// In RC5 the View command model is: single-click / Space → Activate
-    /// (cursor placement, multi-select toggle); Enter / double-click →
-    /// Accept (the "open it" semantic). SkillView's preview shortcut is
-    /// "open this row", so we route p/v/Right to Command.Accept and let
+    /// In current Terminal.Gui rc builds, TableView still distinguishes
+    /// Activate-style interactions (single-click / Space for cursor placement
+    /// and checkbox toggles) from Accept-style interactions (Enter /
+    /// double-click for "open this row"). SkillView's preview shortcut maps
+    /// to the Accept path, so we route p/v/Right to Command.Accept and let
     /// the Accepted event drive PreviewSelectedAsync. Also adds Ctrl+J →
     /// Accept for Warp terminals which send Ctrl+J in place of Enter.
     internal static void ConfigureTableKeyBindings(TableView table)

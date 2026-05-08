@@ -96,10 +96,31 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void HelpText_DocumentsRenderedMarkdownCopySupport()
+    {
+        Assert.Contains("Ctrl+C", TuiHelpers.HelpText);
+        Assert.Contains("copy", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void WelcomeHint_IsNotEmpty()
     {
         Assert.True(TuiHelpers.WelcomeHint.Length > 0);
         Assert.Contains("help", TuiHelpers.WelcomeHint);
+    }
+
+    [Fact]
+    public void WelcomeHint_DocumentsRenderedMarkdownCopySupport()
+    {
+        Assert.Contains("Ctrl+C", TuiHelpers.WelcomeHint);
+        Assert.Contains("copy", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PreviewHint_DocumentsRenderedMarkdownCopySupport()
+    {
+        Assert.Contains("Ctrl+C", TuiHelpers.PreviewHint);
+        Assert.Contains("copy", TuiHelpers.PreviewHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -163,6 +184,60 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void ConfigureMarkdownPane_RoutesLinkClicksThroughProvidedOpener()
+    {
+        var openedTargets = new List<string>();
+        var view = new TestMarkdown();
+
+        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName, target =>
+        {
+            openedTargets.Add(target);
+            return true;
+        });
+
+        var handled = view.RaiseLinkClicked("https://example.test/docs");
+
+        Assert.True(handled);
+        Assert.Equal(["https://example.test/docs"], openedTargets);
+    }
+
+    [Fact]
+    public void ConfigureMarkdownPane_MarksNonAnchorLinksHandledWhenProvidedOpenerFails()
+    {
+        var openedTargets = new List<string>();
+        var view = new TestMarkdown();
+
+        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName, target =>
+        {
+            openedTargets.Add(target);
+            return false;
+        });
+
+        var handled = view.RaiseLinkClicked("https://example.test/docs");
+
+        Assert.True(handled);
+        Assert.Equal(["https://example.test/docs"], openedTargets);
+    }
+
+    [Fact]
+    public void ConfigureMarkdownPane_DoesNotInterceptAnchorLinks()
+    {
+        var openedTargets = new List<string>();
+        var view = new TestMarkdown();
+
+        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName, target =>
+        {
+            openedTargets.Add(target);
+            return true;
+        });
+
+        var handled = view.RaiseLinkClicked("#details");
+
+        Assert.False(handled);
+        Assert.Empty(openedTargets);
+    }
+
+    [Fact]
     public void ConfigureTableChrome_HidesOnlyOuterVerticalChrome()
     {
         var table = new TableView
@@ -219,5 +294,19 @@ public sealed class TuiHelpersTests
         TuiHelpers.ConfigureTableKeyBindings(table);
 
         Assert.Null(table.CollectionNavigator);
+    }
+
+    private sealed class TestMarkdown : Markdown
+    {
+        public bool RaiseLinkClicked(string url)
+        {
+            var method = typeof(Markdown).GetMethod(
+                "RaiseLinkClicked",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+            Assert.NotNull(method);
+
+            return Assert.IsType<bool>(method.Invoke(this, [url]));
+        }
     }
 }
