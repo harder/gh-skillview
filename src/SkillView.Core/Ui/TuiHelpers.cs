@@ -286,6 +286,19 @@ internal static class TuiHelpers
         ? "Select a result and press Ctrl+J, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening."
         : "Select a result and press Enter, →, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening.";
 
+    internal static Shortcut[] WithMarkdownShortcuts(IEnumerable<Shortcut> shortcuts, bool includeOpenLink = true)
+    {
+        var list = shortcuts.ToList();
+        list.Add(new Shortcut { Title = "Ctrl+A", HelpText = "Select" });
+        list.Add(new Shortcut { Title = "Ctrl+C", HelpText = "Copy" });
+        if (includeOpenLink)
+        {
+            list.Add(new Shortcut { Title = "Click", HelpText = "Open link" });
+        }
+
+        return list.ToArray();
+    }
+
     /// Create an explicit scheme for editable text inputs using only basic
     /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
     private static Scheme CreateEditableInputScheme()

@@ -38,11 +38,11 @@ public static class DoctorScreen
         };
         TuiHelpers.ConfigureMarkdownPane(text, SkillViewStyling.BaseSchemeName);
 
-        var statusBar = new StatusBar(
+        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
         [
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
             new Shortcut { Title = "q", HelpText = "Quit" },
-        ]);
+        ]));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, text, statusBar);
 

@@ -111,9 +111,9 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // This branch pins Terminal.Gui to 2.1.0-rc.3, so keep this startup path
-    // aligned with the current rc-based guidance rather than claiming the later
-    // 2.1.1-develop AOT configuration-crash fix applies here.
+    // SkillView now pins the stable Terminal.Gui 2.1.0 release, so keep this
+    // startup path aligned with the 2.1.0-era AOT guidance rather than
+    // claiming the later 2.1.1-develop configuration-crash fix applies here.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
@@ -409,7 +409,7 @@ public sealed class SkillViewApp
             AutoSpin = false,
         };
 
-        _statusBarPreview = new StatusBar(
+        _statusBarPreview = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
         [
             new Shortcut { Title = "/", HelpText = "Search" },
             new Shortcut { Title = "h", HelpText = "Hidden dirs" },
@@ -423,7 +423,7 @@ public sealed class SkillViewApp
             new Shortcut { Title = "l", HelpText = "Logs" },
             new Shortcut { Key = Key.F1, Title = "Help" },
             new Shortcut { Title = "q", HelpText = "Quit" },
-        ]);
+        ]));
         _statusBarLogs = new StatusBar(
         [
             new Shortcut { Title = "l", HelpText = "Preview" },
@@ -956,16 +956,16 @@ public sealed class SkillViewApp
     {
         // One **label**: value pair per line. Labels are bold to anchor the
         // eye on the left edge; values are plain so URLs / paths read clean.
+        // Keep the repo row clickable so the sidebar stays compact without a
+        // redundant second URL line.
         // Avoid Markdown headings — TG2's renderer expands them into taller
         // blocks and consumes vertical space we'd rather give the preview.
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"**Skill** : {s.SkillName ?? "(unnamed)"}");
-        sb.AppendLine($"**Repo**  : {s.Repo ?? "—"}");
+        var repoUrl = BuildRepoUrl(auth, s.Repo);
+        sb.AppendLine($"**Repo**  : {FormatRepoValue(s.Repo, repoUrl)}");
         if (s.Stars is { } st)
             sb.AppendLine($"**Stars** : ★ {st.ToString(CultureInfo.InvariantCulture)}");
-        var repoUrl = BuildRepoUrl(auth, s.Repo);
-        if (!string.IsNullOrEmpty(repoUrl))
-            sb.AppendLine($"**URL**   : {repoUrl}");
         if (!string.IsNullOrWhiteSpace(s.Path))
             sb.AppendLine($"**Path**  : {s.Path}");
         if (!string.IsNullOrWhiteSpace(s.Namespace))
@@ -974,6 +974,30 @@ public sealed class SkillViewApp
             sb.AppendLine($"**About** : {s.Description}");
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
+
+    private static string FormatRepoValue(string? repo, string repoUrl)
+    {
+        if (string.IsNullOrWhiteSpace(repo))
+        {
+            return "—";
+        }
+
+        var trimmedRepo = repo.Trim();
+        if (string.IsNullOrEmpty(repoUrl))
+        {
+            return trimmedRepo;
+        }
+
+        return $"[{trimmedRepo}]({EscapeMarkdownLinkDestination(repoUrl)})";
+    }
+
+    private static string EscapeMarkdownLinkDestination(string value) =>
+        value
+            .Replace("%", "%25", StringComparison.Ordinal)
+            .Replace(" ", "%20", StringComparison.Ordinal)
+            .Replace("(", "%28", StringComparison.Ordinal)
+            .Replace(")", "%29", StringComparison.Ordinal)
+            .Replace("|", "%7C", StringComparison.Ordinal);
 
     internal static string DescribeSearchResults(int totalCount, int shownCount, string? requestedAgent)
     {

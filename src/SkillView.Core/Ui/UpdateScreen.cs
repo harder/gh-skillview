@@ -197,13 +197,13 @@ public sealed class UpdateScreen
             Y = Pos.AnchorEnd(2),
         };
 
-        var statusBar = new StatusBar(
+        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
         [
             new Shortcut { Title = "Space", HelpText = "Toggle" },
             new Shortcut { Title = "d", HelpText = "Dry-run" },
             new Shortcut { Title = "u", HelpText = "Update" },
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-        ]);
+        ], includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
             window, tableLabel, table, preview,
