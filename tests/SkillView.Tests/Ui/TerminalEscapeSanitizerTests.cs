@@ -100,7 +100,7 @@ public sealed class TerminalEscapeSanitizerTests
     }
 
     [Fact]
-    public void BuildRemoveSummary_StripsEscapeSequences_AndUsesStructuredTables()
+    public void BuildRemoveSummary_StripsEscapeSequences_AndUsesFriendlyStructuredSections()
     {
         var validation = new RemoveValidator.RemoveValidation(
             Errors: ImmutableArray.Create(
@@ -125,13 +125,45 @@ public sealed class TerminalEscapeSanitizerTests
 
         Assert.DoesNotContain('\x1b', summary);
         Assert.DoesNotContain('\x07', summary);
-        Assert.Contains("### Target", summary);
+        Assert.Contains("## Blocked", summary);
+        Assert.Contains("### Selection", summary);
         Assert.Contains("| Field | Value |", summary);
-        Assert.Contains("### Errors", summary);
-        Assert.Contains("| Kind | Detail |", summary);
+        Assert.Contains("### Skills", summary);
+        Assert.Contains("| Skill | Path |", summary);
+        Assert.Contains("### Why SkillView is blocking this", summary);
         Assert.Contains("### Warnings", summary);
-        Assert.Contains("### Evidence", summary);
+        Assert.Contains("### Related links", summary);
         Assert.DoesNotContain("bad", summary);
+    }
+
+    [Fact]
+    public void BuildRemoveSummary_UsesFriendlyCopyInsteadOfValidatorEnumNames()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray.Create(
+                new RemoveValidator.Error(
+                    RemoveValidator.ErrorKind.ContainsGitDirectory,
+                    ".git found")),
+            Warnings: ImmutableArray.Create(
+                new RemoveValidator.Warning(
+                    RemoveValidator.WarningKind.HasIncomingSymlinks,
+                    "2 other install(s) symlink in")),
+            ResolvedPath: "/skills/demo",
+            IncomingSymlinkPaths: ImmutableArray.Create("/agents/demo"));
+
+        var screen = new RemoveScreen(
+            null!,
+            new RemoveService(new Logger()),
+            new Logger(),
+            CreateSkill(),
+            validation);
+
+        var summary = screen.BuildSummary();
+
+        Assert.DoesNotContain("ContainsGitDirectory", summary);
+        Assert.DoesNotContain("HasIncomingSymlinks", summary);
+        Assert.Contains("git clone", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("link", summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -165,9 +197,8 @@ public sealed class TerminalEscapeSanitizerTests
         var summary = screen.BuildSummary();
 
         Assert.Contains("| Path | `` /skills/demo`copy `` |", summary);
-        Assert.Contains("| Resolved | `` /skills/demo`copy `` |", summary);
-        Assert.Contains("| claude | symlink | `` /agents/demo`copy `` |", summary);
-        Assert.Contains("| Incoming symlink | `` /agents/demo`copy `` |", summary);
+        Assert.Contains("| demo`copy | `` /skills/demo`copy `` |", summary);
+        Assert.Contains("| `` /agents/demo`copy `` |", summary);
     }
 
     private static InstalledSkill CreateSkill() => new()

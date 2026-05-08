@@ -1,4 +1,4 @@
-using System.Text;
+using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -10,21 +10,35 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Phase 6 safe-remove dialog. Renders the `RemoveValidator` output, blocks
-/// when errors are present, and requires a second confirmation when the
-/// validator reports warnings (tracked-by-git / incoming-symlinks).
+/// Wizard-based remove flow with progressive disclosure:
+/// pick the scope, review the consequence, then confirm if the action is safe.
 public sealed class RemoveScreen
 {
     private readonly IApplication _app;
     private readonly RemoveService _remove;
     private readonly Logger _logger;
     private readonly InstalledSkill _target;
-    private readonly RemoveValidator.RemoveValidation _validation;
+    private readonly InventorySnapshot _snapshot;
+    private readonly RemoveValidator.RemoveValidation? _legacyValidation;
 
-    public RemoveService.RemoveReport? LastReport { get; private set; }
+    public RemoveService.BatchRemoveReport? LastReport { get; private set; }
     public bool Confirmed { get; private set; }
 
     public RemoveScreen(
+        IApplication app,
+        RemoveService remove,
+        Logger logger,
+        InstalledSkill target,
+        InventorySnapshot snapshot)
+    {
+        _app = app;
+        _remove = remove;
+        _logger = logger;
+        _target = target;
+        _snapshot = snapshot;
+    }
+
+    internal RemoveScreen(
         IApplication app,
         RemoveService remove,
         Logger logger,
@@ -35,150 +49,178 @@ public sealed class RemoveScreen
         _remove = remove;
         _logger = logger;
         _target = target;
-        _validation = validation;
+        _snapshot = new InventorySnapshot
+        {
+            Skills = [target],
+            ScannedRoots = ImmutableArray<ScanRoot>.Empty,
+            UsedGhSkillList = false,
+            CapturedAt = DateTimeOffset.UtcNow,
+        };
+        _legacyValidation = validation;
     }
 
     public void Show()
     {
-        using var window = new Window
+        var targets = RemoveTargetResolver.BuildTargets(_target, _snapshot);
+        var selectedIndex = FindInitialSelection(targets);
+        var currentEvaluation = Evaluate(targets[selectedIndex]);
+
+        using var wizard = new Wizard
         {
             Title = $"Remove — {_target.Name}",
-            X = 0, Y = 0,
+        };
+
+        var chooseStep = new WizardStep
+        {
+            Title = "Choose",
+            NextButtonText = "Review",
+            HelpText = "Pick what you want to remove. Package and repo scopes only appear when SkillView has explicit metadata.",
+        };
+
+        var choiceLabel = new Label
+        {
+            X = 0,
+            Y = 0,
+            Text = "What do you want to remove?",
+        };
+        var choicePicker = new OptionSelector
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(4),
+            Labels = targets.Select(target => target.Title).ToArray(),
+            Value = selectedIndex,
+        };
+        var choiceDescription = new Label
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(),
+            Text = targets[0].Description,
+        };
+        chooseStep.Add(choiceLabel, choicePicker, choiceDescription);
+
+        var reviewStep = new WizardStep
+        {
+            Title = "Review",
+        };
+        var review = new Markdown
+        {
+            X = 0,
+            Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
+            Text = RemoveWizardContent.BuildReviewMarkdown(currentEvaluation),
         };
+        TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
+        reviewStep.Add(review);
 
-        // Picker: "All agents" + one row per AgentMembership. With 0 agents
-        // the picker degenerates to just "All", so skip the radio entirely.
-        var pickerLabels = new List<string> { "_All agents (full skill removal)" };
-        foreach (var a in _target.Agents)
+        var confirmStep = new WizardStep
         {
-            var kind = a.IsSymlink ? "symlink" : "direct ⚠ canonical";
-            pickerLabels.Add($"{a.AgentId} — {kind}: {TuiHelpers.Truncate(a.Path, 48)}");
-        }
-        var hasAgentChoice = _target.Agents.Length > 0;
-        var pickerRows = hasAgentChoice ? pickerLabels.Count + 1 /* label */ : 0;
-        var bottomReserve = 4 + pickerRows;
-
-        var summary = new Markdown
-        {
-            X = 0, Y = 0,
-            Width = Dim.Fill(), Height = Dim.Fill(bottomReserve),
-            Text = BuildSummary(),
+            Title = "Confirm",
         };
-        TuiHelpers.ConfigureMarkdownPane(summary, SkillViewStyling.BaseSchemeName);
-
-        Label? pickerLabel = null;
-        OptionSelector? agentPicker = null;
-        // Track the picker's selected index ourselves; OptionSelector exposes
-        // `Value` as the label string, and 1–9/a keys need to drive selection.
-        var selectedAgent = 0;
-        if (hasAgentChoice)
+        var confirmText = new Markdown
         {
-            pickerLabel = new Label
-            {
-                X = 0, Y = Pos.AnchorEnd(pickerRows + 3),
-                Text = "Remove from (1-9 / a):",
-            };
-            agentPicker = new OptionSelector
-            {
-                X = 0, Y = Pos.AnchorEnd(pickerRows + 2),
-                Labels = pickerLabels,
-                Value = 0,
-            };
-            agentPicker.ValueChanged += (_, _) =>
-            {
-                if (agentPicker.Value is int idx) selectedAgent = idx;
-            };
-        }
-
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(3),
+            Text = RemoveWizardContent.BuildConfirmMarkdown(currentEvaluation),
+        };
+        TuiHelpers.ConfigureMarkdownPane(confirmText, SkillViewStyling.BaseSchemeName);
         var secondConfirm = new CheckBox
         {
-            X = 0, Y = Pos.AnchorEnd(3),
-            Text = "_I understand the warnings and want to proceed",
-            Visible = _validation.RequiresSecondConfirm,
+            X = 0,
+            Y = Pos.AnchorEnd(2),
+            Text = "_I understand the warnings and want to continue",
+            Visible = currentEvaluation.RequiresSecondConfirm,
         };
-
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(2),
-            Width = Dim.Fill(36),
-            Text = BuildStatusLine(),
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(),
+            Text = string.Empty,
         };
+        confirmStep.Add(confirmText, secondConfirm, status);
 
-        var removeButton = new Button
+        TuiHelpers.ApplyScheme(
+            SkillViewStyling.BaseSchemeName,
+            wizard,
+            choiceLabel,
+            choicePicker,
+            choiceDescription,
+            review,
+            confirmText,
+            secondConfirm,
+            status);
+
+        wizard.AddStep(chooseStep);
+        wizard.AddStep(reviewStep);
+        wizard.AddStep(confirmStep);
+
+        void RefreshEvaluation()
         {
-            Text = "_Remove",
-            X = Pos.AnchorEnd(30),
-            Y = Pos.AnchorEnd(2),
-            Enabled = _validation.Allowed,
-        };
-        var cancelButton = new Button
-        {
-            Text = "_Cancel",
-            X = Pos.AnchorEnd(12),
-            Y = Pos.AnchorEnd(2),
-            IsDefault = true,
-        };
-
-        var statusBar = hasAgentChoice
-            ? new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-            [
-                new Shortcut { Title = "a", HelpText = "All" },
-                new Shortcut { Title = "1-9", HelpText = "Pick agent" },
-                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
-            ], includeOpenLink: false))
-            : new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-            [
-                new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
-            ], includeOpenLink: false));
-
-        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
-        if (pickerLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, pickerLabel);
-        if (agentPicker is not null) TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, agentPicker);
-
-        removeButton.Accepting += (_, ev) =>
-        {
-            ev.Handled = true;
-            var pick = selectedAgent;
-            // Per-agent symlink removal doesn't trigger the canonical
-            // validator's safety rules (those guard the canonical path).
-            // Direct memberships fall back to the canonical removal flow,
-            // which means they DO need _validation.Allowed.
-            var perAgent = pick > 0 && pick - 1 < _target.Agents.Length
-                ? _target.Agents[pick - 1]
-                : (AgentMembership?)null;
-            var canonicalPath = perAgent is null || !perAgent.IsSymlink;
-            if (canonicalPath && !_validation.Allowed) return;
-            if (canonicalPath && _validation.RequiresSecondConfirm && secondConfirm.Value != CheckState.Checked)
+            var target = targets[selectedIndex];
+            currentEvaluation = Evaluate(target);
+            choiceDescription.Text = target.Description;
+            review.Text = RemoveWizardContent.BuildReviewMarkdown(currentEvaluation);
+            confirmText.Text = RemoveWizardContent.BuildConfirmMarkdown(currentEvaluation);
+            secondConfirm.Visible = currentEvaluation.RequiresSecondConfirm;
+            secondConfirm.Value = CheckState.UnChecked;
+            status.Text = currentEvaluation.CanExecute
+                ? " ready"
+                : " blocked — choose a different option or close";
+            reviewStep.NextButtonText = currentEvaluation.CanExecute ? "Continue" : "Close";
+            reviewStep.HelpText = currentEvaluation.CanExecute
+                ? "Review the impact, then continue to confirm."
+                : "SkillView can't do this safely. Use Close or go Back to choose a less destructive option.";
+            confirmStep.Enabled = currentEvaluation.CanExecute;
+            confirmStep.NextButtonText = RemoveWizardContent.ActionText(target);
+            confirmStep.HelpText = currentEvaluation.RequiresSecondConfirm
+                ? "Final confirmation is required because SkillView found related installs or repository state."
+                : "Finish to apply this removal.";
+            if (!currentEvaluation.CanExecute && wizard.CurrentStep == confirmStep)
             {
-                status.Text = " second-confirm required (check the box)";
+                wizard.CurrentStep = reviewStep;
+            }
+        }
+
+        choicePicker.ValueChanged += (_, _) =>
+        {
+            if (choicePicker.Value is int value && value >= 0 && value < targets.Length)
+            {
+                selectedIndex = value;
+                RefreshEvaluation();
+            }
+        };
+
+        wizard.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+
+            if (wizard.CurrentStep != confirmStep)
+            {
+                _app.RequestStop();
                 return;
             }
-            Confirmed = true;
+
+            if (currentEvaluation.RequiresSecondConfirm && secondConfirm.Value != CheckState.Checked)
+            {
+                status.Text = " check the confirmation box to continue";
+                return;
+            }
+
             status.Text = " removing…";
+
             try
             {
-                if (perAgent is { IsSymlink: true } symlinkAgent)
-                {
-                    System.IO.File.Delete(symlinkAgent.Path);
-                    _logger.Info("remove.agent", $"unlinked {symlinkAgent.AgentId}: {symlinkAgent.Path}");
-                    status.Text = $" unlinked {symlinkAgent.AgentId} ({symlinkAgent.Path})";
-                    LastReport = new RemoveService.RemoveReport(
-                        Succeeded: true,
-                        ResolvedPath: symlinkAgent.Path,
-                        FilesDeleted: 1,
-                        DirectoriesDeleted: 0,
-                        Errors: System.Collections.Immutable.ImmutableArray<string>.Empty,
-                        DryRun: false);
-                    _app.RequestStop();
-                    return;
-                }
-                var report = _remove.Remove(_validation);
+                var report = Execute(currentEvaluation);
                 LastReport = report;
-                if (report.Succeeded)
+                if (report.Succeeded || report.TargetsDeleted > 0)
                 {
-                    status.Text = $" removed ({report.FilesDeleted} file(s), {report.DirectoriesDeleted} dir(s))";
+                    Confirmed = true;
                     _app.RequestStop();
                 }
                 else
@@ -192,117 +234,73 @@ public sealed class RemoveScreen
                 status.Text = " remove failed — see logs";
             }
         };
-        cancelButton.Accepting += (_, ev) =>
-        {
-            ev.Handled = true;
-            _app.RequestStop();
-        };
 
-        window.Add(summary, secondConfirm, status, removeButton, cancelButton, statusBar);
-        if (pickerLabel is not null) window.Add(pickerLabel);
-        if (agentPicker is not null) window.Add(agentPicker);
-        window.KeyDown += (_, key) =>
+        wizard.KeyDown += (_, key) =>
         {
-            if (key.KeyCode == KeyCode.Esc)
+            if (key.KeyCode != KeyCode.Esc)
             {
-                _app.RequestStop();
-                key.Handled = true;
                 return;
             }
-            if (agentPicker is null) return;
-            var rune = key.AsRune.Value;
-            if (rune == 'a' || rune == 'A')
-            {
-                selectedAgent = 0;
-                agentPicker.Value = 0;
-                key.Handled = true;
-            }
-            else if (rune >= '1' && rune <= '9')
-            {
-                var idx = rune - '0'; // 1-based agent index
-                if (idx <= _target.Agents.Length)
-                {
-                    selectedAgent = idx;
-                    agentPicker.Value = idx;
-                    key.Handled = true;
-                }
-            }
+
+            _app.RequestStop();
+            key.Handled = true;
         };
-        cancelButton.SetFocus();
-        _app.Run(window);
+
+        RefreshEvaluation();
+        _app.Run(wizard);
     }
 
     internal string BuildSummary()
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"## Remove — {MarkdownTableFormatter.FormatTableCell(_target.Name)}");
-        sb.AppendLine();
-        sb.AppendLine("### Target");
-        sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(_target.ResolvedPath)} |");
-        sb.AppendLine($"| Resolved | {MarkdownTableFormatter.FormatCodeSpan(_validation.ResolvedPath)} |");
-        sb.AppendLine($"| Scope | {MarkdownTableFormatter.FormatTableCell(_target.Scope.ToString())} |");
-        sb.AppendLine($"| Symlink | {MarkdownTableFormatter.FormatTableCell(_target.IsSymlinked.ToString())} |");
-        sb.AppendLine($"| Pinned | {MarkdownTableFormatter.FormatTableCell(_target.Pinned.ToString())} |");
-        if (_target.Agents.Length > 0)
+        if (_legacyValidation is not null)
         {
-            sb.AppendLine();
-            sb.AppendLine("### Agent memberships");
-            sb.AppendLine();
-            sb.AppendLine("| Agent | Kind | Path |");
-            sb.AppendLine("| --- | --- | --- |");
-            foreach (var a in _target.Agents)
-            {
-                sb.AppendLine(
-                    $"| {MarkdownTableFormatter.FormatTableCell(a.AgentId)} | {MarkdownTableFormatter.FormatTableCell(a.IsSymlink ? "symlink" : "direct")} | {MarkdownTableFormatter.FormatCodeSpan(a.Path)} |");
-            }
+            return RemoveWizardContent.BuildLegacySummary(_target, _legacyValidation);
         }
-        if (_validation.Errors.Length > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("### Errors");
-            sb.AppendLine();
-            sb.AppendLine("| Kind | Detail |");
-            sb.AppendLine("| --- | --- |");
-            foreach (var e in _validation.Errors)
-            {
-                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(e.Kind.ToString())} | {MarkdownTableFormatter.FormatTableCell(e.Detail)} |");
-            }
-        }
-        if (_validation.Warnings.Length > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("### Warnings");
-            sb.AppendLine();
-            sb.AppendLine("| Kind | Detail |");
-            sb.AppendLine("| --- | --- |");
-            foreach (var w in _validation.Warnings)
-            {
-                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(w.Kind.ToString())} | {MarkdownTableFormatter.FormatTableCell(w.Detail)} |");
-            }
-        }
-        if (_validation.IncomingSymlinkPaths.Length > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("### Evidence");
-            sb.AppendLine();
-            sb.AppendLine("| Type | Value |");
-            sb.AppendLine("| --- | --- |");
-            foreach (var link in _validation.IncomingSymlinkPaths)
-            {
-                sb.AppendLine($"| Incoming symlink | {MarkdownTableFormatter.FormatCodeSpan(link)} |");
-            }
-        }
-        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
+
+        var target = RemoveTargetResolver.BuildTargets(_target, _snapshot)[0];
+        return RemoveWizardContent.BuildReviewMarkdown(Evaluate(target));
     }
 
-    private string BuildStatusLine()
+    private RemoveTargetEvaluation Evaluate(RemoveTarget target)
     {
-        if (!_validation.Allowed) return " refused — see errors above";
-        if (_validation.RequiresSecondConfirm) return " review warnings, then check the box and press Remove";
-        return " ready — press Remove to delete (irreversible)";
+        if (_legacyValidation is not null && target.Kind == RemoveTargetKind.CurrentInstall)
+        {
+            return new RemoveTargetEvaluation(
+                target,
+                [new RemoveTargetItem(_target, _legacyValidation)]);
+        }
+
+        return RemoveTargetResolver.Evaluate(target, _snapshot);
     }
 
+    private RemoveService.BatchRemoveReport Execute(RemoveTargetEvaluation evaluation)
+    {
+        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
+        {
+            System.IO.File.Delete(agent.Path);
+            _logger.Info("remove.agent", $"unlinked {agent.AgentId}: {agent.Path}");
+            return new RemoveService.BatchRemoveReport(
+                Succeeded: true,
+                TargetsDeleted: 1,
+                FilesDeleted: 1,
+                DirectoriesDeleted: 0,
+                Errors: ImmutableArray<string>.Empty,
+                DryRun: false);
+        }
+
+        return _remove.RemoveMany(evaluation.Items.Select(item => item.Validation));
+    }
+
+    private int FindInitialSelection(ImmutableArray<RemoveTarget> targets)
+    {
+        for (var i = 0; i < targets.Length; i++)
+        {
+            if (Evaluate(targets[i]).CanExecute)
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
 }

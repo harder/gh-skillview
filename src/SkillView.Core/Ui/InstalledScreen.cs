@@ -419,6 +419,10 @@ public static class InstalledScreen
         sb.AppendLine($"| Ignored | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored))} |");
         sb.AppendLine($"| Tree SHA | {MarkdownTableFormatter.FormatCodeSpan(s.TreeSha ?? "(unset)")} |");
         sb.AppendLine($"| Version | {MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version ?? "(unset)")} |");
+        if (s.FrontMatter.Upstream is { Length: > 0 } upstream)
+        {
+            sb.AppendLine($"| Upstream | {FormatTableLink(upstream)} |");
+        }
         if (s.InstalledAt is { } when_)
         {
             sb.AppendLine($"| Installed | {MarkdownTableFormatter.FormatTableCell(when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
