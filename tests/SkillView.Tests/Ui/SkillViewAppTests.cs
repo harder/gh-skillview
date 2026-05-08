@@ -277,8 +277,9 @@ public sealed class SkillViewAppTests
                 Stars: 42),
             LoggedInAuth("ghe.example.com"));
 
-        Assert.Contains("https://ghe.example.com/owner/repo", metadata);
+        Assert.Contains("**Repo**  : [owner/repo](https://ghe.example.com/owner/repo)", metadata);
         Assert.DoesNotContain("https://github.com/owner/repo", metadata);
+        Assert.DoesNotContain("**URL**", metadata);
     }
 
     [Theory]

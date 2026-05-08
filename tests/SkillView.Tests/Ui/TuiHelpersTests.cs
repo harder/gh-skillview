@@ -123,6 +123,38 @@ public sealed class TuiHelpersTests
         Assert.Contains("copy", TuiHelpers.PreviewHint, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void WithMarkdownShortcuts_AppendsSelectCopyAndOpenLinkHints()
+    {
+        var shortcuts = TuiHelpers.WithMarkdownShortcuts(
+        [
+            new Shortcut { Title = "x", HelpText = "Base" },
+        ]);
+
+        Assert.Collection(
+            shortcuts,
+            shortcut =>
+            {
+                Assert.Equal("x", shortcut.Title);
+                Assert.Equal("Base", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("Ctrl+A", shortcut.Title);
+                Assert.Equal("Select", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("Ctrl+C", shortcut.Title);
+                Assert.Equal("Copy", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("Click", shortcut.Title);
+                Assert.Equal("Open link", shortcut.HelpText);
+            });
+    }
+
     [Theory]
     [InlineData("copilot", "C")]
     [InlineData("github-copilot", "C")]

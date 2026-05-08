@@ -47,7 +47,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
 - Current package compatibility: SkillView is pinned to Terminal.Gui
-  `2.1.0-rc.3`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
+  `2.1.0`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
   `TuiHelpersTests` with a `MemberNotNullWhenAttribute` `TypeLoadException`
   during Terminal.Gui config initialization, so keep the test SDK at `17.11.1`
   until that compatibility issue is resolved.
@@ -75,7 +75,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
-- Terminal.Gui `2.1.0-rc.3` remains compatible with the modern
+- Terminal.Gui `2.1.0` remains compatible with the modern
   `Application.Create().Init()` lifecycle; the local
   `UnconditionalSuppressMessage` workaround and temporary App-level warning mask
   stay removed after a verification publish proved the App entrypoint no longer

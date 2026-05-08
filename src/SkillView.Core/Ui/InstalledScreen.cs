@@ -239,7 +239,7 @@ public static class InstalledScreen
 
         filterField.TextChanged += (_, _) => RefreshAll();
 
-        var statusBar = new StatusBar(BuildShortcuts(onRemove is not null, hasPackages));
+        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(BuildShortcuts(onRemove is not null, hasPackages)));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, filterLabel, filterField, table, detail, footer, statusBar);
 

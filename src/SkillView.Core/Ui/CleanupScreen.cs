@@ -146,14 +146,14 @@ public sealed class CleanupScreen
                 : $" {_candidates.Length} candidate(s)",
         };
 
-        var statusBar = new StatusBar(
+        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
         [
             new Shortcut { Title = "Space", HelpText = "Toggle" },
             new Shortcut { Title = "r", HelpText = "Remove" },
             new Shortcut { Title = "i", HelpText = "Ignore" },
             new Shortcut { Title = "x", HelpText = "Export" },
             new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-        ]);
+        ], includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 

@@ -122,16 +122,16 @@ public sealed class RemoveScreen
         };
 
         var statusBar = hasAgentChoice
-            ? new StatusBar(
+            ? new StatusBar(TuiHelpers.WithMarkdownShortcuts(
             [
                 new Shortcut { Title = "a", HelpText = "All" },
                 new Shortcut { Title = "1-9", HelpText = "Pick agent" },
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
-            ])
-            : new StatusBar(
+            ], includeOpenLink: false))
+            : new StatusBar(TuiHelpers.WithMarkdownShortcuts(
             [
                 new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Cancel" },
-            ]);
+            ], includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, summary, secondConfirm, status, removeButton, cancelButton, statusBar);
         if (pickerLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, pickerLabel);

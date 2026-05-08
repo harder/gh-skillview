@@ -18,13 +18,14 @@ public class FileLogSinkTests
         var dir = NewTempDir();
         try
         {
-            using var sink = new FileLogSink(dir);
+            var recent = new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero);
+            using var sink = new FileLogSink(dir, () => recent);
             sink.Append(new LogEntry(
-                new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero),
+                recent,
                 LogLevel.Info, "test", "hello"));
             sink.Dispose();
 
-            var file = Path.Combine(dir, "skillview-2026-04-23.log");
+            var file = Path.Combine(dir, LogPaths.FileNameForDate(DateOnly.FromDateTime(recent.LocalDateTime)));
             Assert.True(File.Exists(file));
             Assert.Contains("hello", File.ReadAllText(file));
         }
