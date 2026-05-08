@@ -81,12 +81,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   stay removed after a verification publish proved the App entrypoint no longer
   needs them.
 - Prefer `KeyBindings` for view-local command remaps like table preview
-  shortcuts. Keep the current window/table `KeyDown` routing for app-level
-  single-letter shortcuts because `TableView` still swallows unbound printable
-  keys before they bubble.
-- On Terminal.Gui `2.0.2-develop.57`, `TableView.CollectionNavigator = null`
-  works again for disabling type-to-search. Prefer that documented path over
-  the old custom matcher workaround.
+  shortcuts. Keep the current window/table `KeyDown` routing where the app is
+  intentionally centralizing whole-screen actions (search/install/open/logs,
+  installed-screen filter/sort/remove, cleanup actions, etc.), not because of
+  the old `TableView` type-to-search swallowing bug.
+- On Terminal.Gui `2.1.0`, `TableView.CollectionNavigator = null` is the
+  supported way to disable type-to-search. Treat `#5232` as the fix for the old
+  printable-key swallowing behavior and prefer this documented path over the old
+  custom matcher workaround.
 - Sanitize untrusted text before assigning it to preview/detail/log panes.
   `TerminalEscapeSanitizer` is now the shared UI-layer guard for remote preview
   markdown, search metadata, installed-skill detail markdown, cleanup/remove

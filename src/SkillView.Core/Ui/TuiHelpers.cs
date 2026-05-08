@@ -495,13 +495,13 @@ internal static class TuiHelpers
     /// shortcut
     /// key bindings (p, v, → → Command.Accept → Accepted event).
     ///
-    /// In current Terminal.Gui rc builds, TableView still distinguishes
-    /// Activate-style interactions (single-click / Space for cursor placement
-    /// and checkbox toggles) from Accept-style interactions (Enter /
-    /// double-click for "open this row"). SkillView's preview shortcut maps
-    /// to the Accept path, so we route p/v/Right to Command.Accept and let
-    /// the Accepted event drive PreviewSelectedAsync. Also adds Ctrl+J →
-    /// Accept for Warp terminals which send Ctrl+J in place of Enter.
+    /// TableView still distinguishes Activate-style interactions (single-click
+    /// / Space for cursor placement and checkbox toggles) from Accept-style
+    /// interactions (Enter / double-click for "open this row"). SkillView's
+    /// preview shortcut maps to the Accept path, so we route p/v/Right to
+    /// Command.Accept and let the Accepted event drive PreviewSelectedAsync.
+    /// Also adds Ctrl+J → Accept for Warp terminals which send Ctrl+J in place
+    /// of Enter.
     internal static void ConfigureTableKeyBindings(TableView table)
     {
         DisableTypeToSearch(table);
