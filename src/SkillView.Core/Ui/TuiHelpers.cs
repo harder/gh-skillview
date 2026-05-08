@@ -459,20 +459,22 @@ internal static class TuiHelpers
         table.Style.ShowVerticalCellLineForLastColumn = false;
     }
 
-    /// Disable type-to-search on a TableView so printable shortcuts reach
-    /// view-level handlers instead of being consumed by the built-in search.
+    /// Disable a TableView's built-in type-to-search by clearing its
+    /// CollectionNavigator so printable shortcuts reach view-level handlers.
     internal static void DisableTypeToSearch(TableView table)
     {
         table.CollectionNavigator = null;
     }
 
-    /// Disable type-to-search on a TableView and register preview shortcut
+    /// Disable built-in type-to-search on a TableView and register preview
+    /// shortcut
     /// key bindings (p, v, → → Command.Accept → Accepted event).
     ///
-    /// In RC5 the View command model is: single-click / Space → Activate
-    /// (cursor placement, multi-select toggle); Enter / double-click →
-    /// Accept (the "open it" semantic). SkillView's preview shortcut is
-    /// "open this row", so we route p/v/Right to Command.Accept and let
+    /// In current Terminal.Gui rc builds, TableView still distinguishes
+    /// Activate-style interactions (single-click / Space for cursor placement
+    /// and checkbox toggles) from Accept-style interactions (Enter /
+    /// double-click for "open this row"). SkillView's preview shortcut maps
+    /// to the Accept path, so we route p/v/Right to Command.Accept and let
     /// the Accepted event drive PreviewSelectedAsync. Also adds Ctrl+J →
     /// Accept for Warp terminals which send Ctrl+J in place of Enter.
     internal static void ConfigureTableKeyBindings(TableView table)
