@@ -34,6 +34,23 @@ public sealed class RemoveService
             DryRun: false);
     }
 
+    public sealed record BatchRemoveReport(
+        bool Succeeded,
+        int TargetsDeleted,
+        int FilesDeleted,
+        int DirectoriesDeleted,
+        ImmutableArray<string> Errors,
+        bool DryRun)
+    {
+        public static BatchRemoveReport FromSingle(RemoveReport report, int targetsDeleted) => new(
+            Succeeded: report.Succeeded,
+            TargetsDeleted: targetsDeleted,
+            FilesDeleted: report.FilesDeleted,
+            DirectoriesDeleted: report.DirectoriesDeleted,
+            Errors: report.Errors,
+            DryRun: report.DryRun);
+    }
+
     /// Removes a previously-validated skill directory. Callers MUST run
     /// `RemoveValidator.Validate` first and honor its errors and warnings;
     /// this method does NOT re-run the safety rules.
@@ -157,5 +174,48 @@ public sealed class RemoveService
             DirectoriesDeleted: dirs,
             Errors: errors.ToImmutable(),
             DryRun: false);
+    }
+
+    public BatchRemoveReport RemoveMany(
+        IEnumerable<RemoveValidator.RemoveValidation> validations,
+        Options? options = null)
+    {
+        options ??= new Options();
+
+        var errors = ImmutableArray.CreateBuilder<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var targetsDeleted = 0;
+        var filesDeleted = 0;
+        var directoriesDeleted = 0;
+
+        foreach (var validation in validations)
+        {
+            var key = PathResolver.Normalize(validation.ResolvedPath);
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            var report = Remove(validation, options);
+            filesDeleted += report.FilesDeleted;
+            directoriesDeleted += report.DirectoriesDeleted;
+            if (report.Succeeded)
+            {
+                targetsDeleted++;
+            }
+
+            foreach (var error in report.Errors)
+            {
+                errors.Add($"{validation.ResolvedPath}: {error}");
+            }
+        }
+
+        return new BatchRemoveReport(
+            Succeeded: errors.Count == 0,
+            TargetsDeleted: targetsDeleted,
+            FilesDeleted: filesDeleted,
+            DirectoriesDeleted: directoriesDeleted,
+            Errors: errors.ToImmutable(),
+            DryRun: options.DryRun);
     }
 }

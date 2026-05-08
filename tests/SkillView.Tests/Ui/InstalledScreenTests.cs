@@ -62,6 +62,7 @@ public sealed class InstalledScreenTests
             {
                 Description = "Example description",
                 Version = "1.2.3",
+                Upstream = "https://example.test/upstream/demo",
             },
             Validity = ValidityState.Valid,
             Provenance = Provenance.CliList,
@@ -81,6 +82,7 @@ public sealed class InstalledScreenTests
         Assert.Contains("| Path | `/skills/demo` |", detail);
         Assert.Contains("| Scope | Global |", detail);
         Assert.Contains("| Validity | ✅ Valid |", detail);
+        Assert.Contains("| Upstream | [https://example.test/upstream/demo](https://example.test/upstream/demo) |", detail);
         Assert.Contains("## Package", detail);
         Assert.Contains("| Source | `owner/repo` |", detail);
         Assert.Contains("| Package URL | [https://example.test/owner/repo](https://example.test/owner/repo) |", detail);
@@ -104,6 +106,7 @@ public sealed class InstalledScreenTests
             FrontMatter = SkillFrontMatter.Empty with
             {
                 Version = "1.2.3\nbeta",
+                Upstream = "https://example.test/upstream|`demo",
             },
             Validity = ValidityState.Valid,
             Provenance = Provenance.CliList,
@@ -120,6 +123,9 @@ public sealed class InstalledScreenTests
 
         Assert.Contains("| Path | `` /skills/demo\\|`stable `` |", detail);
         Assert.Contains("| Version | 1.2.3 beta |", detail);
+        Assert.Contains(
+            "| Upstream | [https://example.test/upstream\\|`demo](https://example.test/upstream%7C`demo) |",
+            detail);
         Assert.Contains("| Source | `` owner/repo\\|`fork `` |", detail);
         Assert.Contains(
             "| Package URL | [https://example.test/owner/repo\\|`fork](https://example.test/owner/repo%7C`fork) |",

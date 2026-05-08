@@ -238,20 +238,33 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
-        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
-        var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, validation);
+        var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
         screen.Show();
-        if (screen.LastReport is { Succeeded: true } report)
+        if (screen.LastReport is { TargetsDeleted: > 0 } report)
         {
             _services.ListAdapter.Invalidate();
             _setStatusWithLevel(
-                $"removed {target.Name} ({report.FilesDeleted} file(s)) — rescanning…",
-                TuiHelpers.NotificationLevel.Success);
+                report.Succeeded
+                    ? $"removed {report.TargetsDeleted} skill(s) ({report.FilesDeleted} file(s)) — rescanning…"
+                    : $"partially removed {report.TargetsDeleted} skill(s); {report.Errors.Length} error(s) — rescanning…",
+                report.Succeeded
+                    ? TuiHelpers.NotificationLevel.Success
+                    : TuiHelpers.NotificationLevel.Warn);
             var envReport = _getLastReport();
             if (envReport is not null)
             {
-                QueueInventoryRescan(envReport, successStatus: "removed — inventory now {0} skill(s)");
+                QueueInventoryRescan(
+                    envReport,
+                    successStatus: report.Succeeded
+                        ? "removed — inventory now {0} skill(s)"
+                        : "partial remove — inventory now {0} skill(s)");
             }
+        }
+        else if (screen.LastReport is { Errors.Length: > 0 } failedReport)
+        {
+            _setStatusWithLevel(
+                $"remove failed — {failedReport.Errors.Length} error(s); no files removed",
+                TuiHelpers.NotificationLevel.Error);
         }
     }
 

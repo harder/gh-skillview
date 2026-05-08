@@ -98,4 +98,42 @@ public class RemoveServiceTests : IDisposable
         Assert.False(report.Succeeded);
         Assert.True(Directory.Exists(dir));
     }
+
+    [Fact]
+    public void RemoveMany_HappyPath_DeletesEveryValidatedTarget()
+    {
+        var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);
+        var (second, secondDir) = MakeSkill("group-two", extraFiles: 1);
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+
+        var svc = new RemoveService(_logger);
+        var report = svc.RemoveMany([firstValidation, secondValidation]);
+
+        Assert.True(report.Succeeded);
+        Assert.Equal(2, report.TargetsDeleted);
+        Assert.False(Directory.Exists(firstDir));
+        Assert.False(Directory.Exists(secondDir));
+        Assert.True(report.FilesDeleted >= 4);
+    }
+
+    [Fact]
+    public void RemoveMany_ReturnsPartialSuccess_WhenLaterTargetIsRefused()
+    {
+        var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);
+        var (second, secondDir) = MakeSkill("group-two", extraFiles: 1);
+        Directory.CreateDirectory(Path.Combine(secondDir, ".git"));
+
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+
+        var svc = new RemoveService(_logger);
+        var report = svc.RemoveMany([firstValidation, secondValidation]);
+
+        Assert.False(report.Succeeded);
+        Assert.Equal(1, report.TargetsDeleted);
+        Assert.False(Directory.Exists(firstDir));
+        Assert.True(Directory.Exists(secondDir));
+        Assert.NotEmpty(report.Errors);
+    }
 }
