@@ -69,6 +69,7 @@ public sealed class CleanupScreen
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
+        TuiHelpers.ConfigureTableChrome(table);
 
         // Width state shared between the column-projection lambdas and the
         // resize handler. Mutating these does not require rebuilding the

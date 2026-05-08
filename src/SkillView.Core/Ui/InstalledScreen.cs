@@ -53,6 +53,7 @@ public static class InstalledScreen
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(table);
+        TuiHelpers.ConfigureTableChrome(table);
         var allRows = snapshot.Skills;
         IReadOnlyList<InstalledSkill> rows = allRows;
 

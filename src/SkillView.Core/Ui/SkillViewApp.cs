@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
@@ -112,15 +111,11 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // TODO(tg2): upstream — IApplication.Init is flagged RequiresUnreferencedCode /
-    // RequiresDynamicCode in rc.4 via ConfigurationManager reflection. Surface to
-    // gui-cs/Terminal.Gui with an AOT-friendly config model, then drop this.
-    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
-    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
+    // Terminal.Gui 2.1.1 fixed the AOT configuration crash that originally forced
+    // the old local suppression workaround, so this startup path now runs without
+    // any SkillView-specific AOT suppression switch.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
-    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
-    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "TG2 v2 init uses config reflection; tracked via TODO(tg2) for upstream fix.")]
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         TuiHelpers.SetTheme(_options.Theme);
@@ -289,6 +284,7 @@ public sealed class SkillViewApp
         };
         TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
         TuiHelpers.ConfigureTableScheme(_resultsTable);
+        TuiHelpers.ConfigureTableChrome(_resultsTable);
 
         // Accepted fires on Enter, double-click, p, v, CursorRight, and
         // Ctrl+J (Warp) — all routed through Command.Accept by the View

@@ -163,6 +163,28 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void ConfigureTableChrome_HidesOnlyOuterVerticalChrome()
+    {
+        var table = new TableView
+        {
+            Style =
+            {
+                ShowVerticalCellLines = true,
+                ShowVerticalCellLineForFirstColumn = true,
+                ShowVerticalCellLineForLastColumn = true,
+                ShowVerticalHeaderLines = true,
+            },
+        };
+
+        TuiHelpers.ConfigureTableChrome(table);
+
+        Assert.True(table.Style.ShowVerticalCellLines);
+        Assert.False(table.Style.ShowVerticalCellLineForFirstColumn);
+        Assert.False(table.Style.ShowVerticalCellLineForLastColumn);
+        Assert.True(table.Style.ShowVerticalHeaderLines);
+    }
+
+    [Fact]
     public void DisableTypeToSearch_ClearsCollectionNavigator()
     {
         var table = new TableView();

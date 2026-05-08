@@ -354,6 +354,42 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public async Task RunAsync_DisposesCreatedApplication()
+    {
+        IApplication? created = null;
+        IApplication? disposed = null;
+
+        void HandleCreated(object? _, EventArgs<IApplication> e)
+        {
+            created = e.Value;
+            e.Value.StopAfterFirstIteration = true;
+        }
+
+        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        {
+            disposed = e.Value;
+        }
+
+        Application.InstanceCreated += HandleCreated;
+        Application.InstanceDisposed += HandleDisposed;
+        try
+        {
+            var app = CreateApp(probeOnRun: false);
+
+            var exitCode = await app.RunAsync();
+
+            Assert.Equal(ExitCodes.Success, exitCode);
+            Assert.NotNull(created);
+            Assert.Same(created, disposed);
+        }
+        finally
+        {
+            Application.InstanceCreated -= HandleCreated;
+            Application.InstanceDisposed -= HandleDisposed;
+        }
+    }
+
+    [Fact]
     public void Run_EnablesConfigurationManager_BeforeCreatingApplication()
     {
         ConfigurationManager.Disable(resetToHardCodedDefaults: true);

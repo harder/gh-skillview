@@ -4,10 +4,11 @@
     <OutputType>Library</OutputType>
     <RootNamespace>SkillView</RootNamespace>
     <AssemblyName>SkillView.Core</AssemblyName>
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.0.2-develop.57</TerminalGuiVersion>
-    <!-- NOTE: Terminal.Gui rc.7 fixed ConfigurationManager trim-safety, but we
-         still keep IsAotCompatible off until the broader TG2 AOT surface is
-         re-evaluated under publish verification. -->
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.1-develop.125</TerminalGuiVersion>
+    <!-- Terminal.Gui 2.1.1-develop.125 remains centrally pinned here so CI can
+         override it via MSBuild while the app host keeps the modern AOT-safe
+         lifecycle and the gh extension's separate TG2 NoWarn review stays local
+         to that project. -->
   </PropertyGroup>
 
   <ItemGroup>
