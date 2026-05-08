@@ -242,7 +242,8 @@ internal static class TuiHelpers
                 return;
             }
 
-            args.Handled = openTarget(args.Url);
+            _ = openTarget(args.Url);
+            args.Handled = true;
         };
     }
 

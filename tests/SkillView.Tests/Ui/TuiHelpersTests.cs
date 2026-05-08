@@ -202,15 +202,21 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void ConfigureMarkdownPane_LeavesLinkUnhandledWhenProvidedOpenerFails()
+    public void ConfigureMarkdownPane_MarksNonAnchorLinksHandledWhenProvidedOpenerFails()
     {
+        var openedTargets = new List<string>();
         var view = new TestMarkdown();
 
-        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName, _ => false);
+        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName, target =>
+        {
+            openedTargets.Add(target);
+            return false;
+        });
 
         var handled = view.RaiseLinkClicked("https://example.test/docs");
 
-        Assert.False(handled);
+        Assert.True(handled);
+        Assert.Equal(["https://example.test/docs"], openedTargets);
     }
 
     [Fact]
