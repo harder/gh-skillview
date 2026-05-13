@@ -38,7 +38,7 @@ public class GhCliContractTests
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
         var locator = new GhBinaryLocator(runner, logger);
-        var version = await locator.GetVersionAsync(path!);
+        var version = await locator.GetVersionAsync(path!, TestContext.Current.CancellationToken);
 
         Assert.NotNull(version);
         Assert.True(SemVer.TryParse(version, out var parsed));
@@ -55,7 +55,7 @@ public class GhCliContractTests
 
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
-        var result = await runner.RunAsync(path!, new[] { "skill", "--help" });
+        var result = await runner.RunAsync(path!, new[] { "skill", "--help" }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded, $"gh skill --help exited with {result.ExitCode}");
         var output = result.StdOut;
@@ -76,7 +76,7 @@ public class GhCliContractTests
 
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
-        var result = await runner.RunAsync(path!, new[] { "skill", "search", "--help" });
+        var result = await runner.RunAsync(path!, new[] { "skill", "search", "--help" }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded, $"gh skill search --help exited with {result.ExitCode}");
         Assert.Contains("--json", result.StdOut, StringComparison.OrdinalIgnoreCase);
@@ -91,7 +91,7 @@ public class GhCliContractTests
 
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
-        var result = await runner.RunAsync(path!, new[] { "skill", "install", "--help" });
+        var result = await runner.RunAsync(path!, new[] { "skill", "install", "--help" }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded, $"gh skill install --help exited {result.ExitCode}");
         var output = result.StdOut;
@@ -109,7 +109,7 @@ public class GhCliContractTests
 
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
-        var result = await runner.RunAsync(path!, new[] { "skill", "update", "--help" });
+        var result = await runner.RunAsync(path!, new[] { "skill", "update", "--help" }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded, $"gh skill update --help exited {result.ExitCode}");
         Assert.Contains("--all", result.StdOut, StringComparison.OrdinalIgnoreCase);
@@ -126,9 +126,10 @@ public class GhCliContractTests
         var runner = new ProcessRunner(logger);
 
         // Run the same help commands the capability probe uses.
-        var searchHelp = await runner.RunAsync(path!, new[] { "skill", "search", "--help" });
-        var installHelp = await runner.RunAsync(path!, new[] { "skill", "install", "--help" });
-        var updateHelp = await runner.RunAsync(path!, new[] { "skill", "update", "--help" });
+        var ct = TestContext.Current.CancellationToken;
+        var searchHelp = await runner.RunAsync(path!, new[] { "skill", "search", "--help" }, cancellationToken: ct);
+        var installHelp = await runner.RunAsync(path!, new[] { "skill", "install", "--help" }, cancellationToken: ct);
+        var updateHelp = await runner.RunAsync(path!, new[] { "skill", "update", "--help" }, cancellationToken: ct);
 
         // All should succeed.
         Assert.True(searchHelp.Succeeded);

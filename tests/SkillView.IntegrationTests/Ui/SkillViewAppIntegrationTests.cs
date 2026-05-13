@@ -23,7 +23,7 @@ public sealed class SkillViewAppIntegrationTests
 
         var app = new SkillViewApp(services, options, CreateAnsiApp, probeOnRun: false);
 
-        var exitCode = await app.RunAsync();
+        var exitCode = await app.RunAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ExitCodes.Success, exitCode);
     }

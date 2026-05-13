@@ -98,8 +98,8 @@ public sealed class UpdateScreen
                 ["Scope"] = row => row.S.Scope.ToString(),
                 ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
             });
-        // RC5 wrapper: inserts checkbox column at index 0, hooks Space and
-        // click toggling on the table, exposes the checked set as CheckedRows.
+        // CheckBoxTableSourceWrapperByIndex: inserts checkbox column at index 0,
+        // hooks Space and click toggling on the table, exposes the checked set as CheckedRows.
         var wrapper = new CheckBoxTableSourceWrapperByIndex(table, inner);
         table.Table = wrapper;
         var style = table.Style;

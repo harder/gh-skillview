@@ -377,7 +377,7 @@ public sealed class SkillViewAppTests
         {
             var app = CreateApp(probeOnRun: false);
 
-            var exitCode = await app.RunAsync();
+            var exitCode = await app.RunAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(ExitCodes.Success, exitCode);
             Assert.NotNull(created);
