@@ -19,6 +19,10 @@ internal sealed class InstalledTabView : FrameView
 {
     private enum SortMode { Name, Package, Scope }
 
+    /// winget-tui-style pin filter cycle for the Installed table.
+    /// Maps to: All rows · only pinned · only unpinned.
+    internal enum PinFilter { All, PinnedOnly, UnpinnedOnly }
+
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
@@ -35,6 +39,7 @@ internal sealed class InstalledTabView : FrameView
     private IReadOnlyList<InstalledSkill> _rows = Array.Empty<InstalledSkill>();
     private IReadOnlyList<InstalledSkill> _all = Array.Empty<InstalledSkill>();
     private SortMode _sort = SortMode.Name;
+    private PinFilter _pinFilter = PinFilter.All;
     private bool _hasPackages;
     private int _packageCount;
     private int _lastWidth = -1;
@@ -100,7 +105,9 @@ internal sealed class InstalledTabView : FrameView
         // Per-tab StatusBar lives at the bottom of the tab view so its hints
         // ride along with visibility instead of competing with the global
         // window status bar for the same row.
-        _statusBar = new StatusBar(InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: false));
+        // Per-tab StatusBar — extend BuildShortcuts with the tab-only P
+        // pin-filter shortcut so users see all the keys winget-tui style.
+        _statusBar = new StatusBar(WithPinShortcut(InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: false)));
 
         _filterField.TextChanged += (_, _) => RefreshAll();
         _table.ValueChanged += (_, _) =>
@@ -169,7 +176,7 @@ internal sealed class InstalledTabView : FrameView
 
         // Per-tab status bar adapts to whether packages are present (Sort key
         // is only useful when there are multiple sort modes worth cycling).
-        var newShortcuts = InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: _hasPackages);
+        var newShortcuts = WithPinShortcut(InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: _hasPackages));
         _statusBar.RemoveAll();
         foreach (var s in newShortcuts) _statusBar.Add(s);
 
@@ -194,8 +201,47 @@ internal sealed class InstalledTabView : FrameView
                 || s.Agents.Any(a => a.AgentId.Contains(q, cmp))
                 || (s.Package?.Source.Contains(q, cmp) ?? false));
         }
+        source = _pinFilter switch
+        {
+            PinFilter.PinnedOnly   => source.Where(s => s.Pinned),
+            PinFilter.UnpinnedOnly => source.Where(s => !s.Pinned),
+            _                      => source,
+        };
         _rows = ApplySort(source);
     }
+
+    private static Shortcut[] WithPinShortcut(Shortcut[] existing)
+    {
+        var pin = new Shortcut { Title = "P", HelpText = "Pin filter" };
+        // Insert before the trailing Esc/q pair so it sits with the other
+        // filter/sort keys.
+        var insertAt = existing.Length;
+        for (var i = 0; i < existing.Length; i++)
+        {
+            if (existing[i].Title == "Esc")
+            {
+                insertAt = i;
+                break;
+            }
+        }
+        var list = existing.ToList();
+        list.Insert(insertAt, pin);
+        return list.ToArray();
+    }
+
+    internal static PinFilter CyclePin(PinFilter current) => current switch
+    {
+        PinFilter.All          => PinFilter.PinnedOnly,
+        PinFilter.PinnedOnly   => PinFilter.UnpinnedOnly,
+        _                      => PinFilter.All,
+    };
+
+    internal static string DescribePin(PinFilter f) => f switch
+    {
+        PinFilter.PinnedOnly   => "pinned only",
+        PinFilter.UnpinnedOnly => "unpinned only",
+        _                      => "all",
+    };
 
     private IReadOnlyList<InstalledSkill> ApplySort(IEnumerable<InstalledSkill> input) => _sort switch
     {
@@ -305,12 +351,25 @@ internal sealed class InstalledTabView : FrameView
             SortMode.Scope => "scope",
             _ => "name",
         };
-        _footer.Text = $"{counts}{pkgs} · sort: {sortLabel}{srcSuffix}";
+        var pinSuffix = _pinFilter == PinFilter.All ? "" : $" · 📌 {DescribePin(_pinFilter)}";
+        _footer.Text = $"{counts}{pkgs} · sort: {sortLabel}{pinSuffix}{srcSuffix}";
     }
 
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        // `P` (capital) cycles the pin filter — handled here rather than via
+        // InstalledScreen.DecideShortcut so the static test surface stays
+        // unchanged. Only fires when the filter field doesn't own focus so
+        // typing a literal P in the filter still works.
+        if (!_filterField.HasFocus && key.AsRune.Value == 'P')
+        {
+            _pinFilter = CyclePin(_pinFilter);
+            RefreshAll();
+            key.Handled = true;
+            return;
+        }
+
         var decision = InstalledScreen.DecideShortcut(key, _filterField.HasFocus, canRemove: true);
         if (decision.Command == InstalledScreen.ShortcutCommand.None) return;
 

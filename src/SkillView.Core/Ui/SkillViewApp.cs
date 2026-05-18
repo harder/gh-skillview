@@ -62,6 +62,11 @@ public sealed class SkillViewApp
     private const string ItemActionsText = "  [h] Hidden dirs    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
 
     private List<SearchResultSkill> _results = new();
+    // Original gh-skill-search ordering for the current query — preserved so
+    // the `S` sort cycle's "Off" mode can restore it. Re-set by RunSearchAsync
+    // on each fresh fetch.
+    private List<SearchResultSkill> _resultsNaturalOrder = new();
+    private SearchSort _searchSort = SearchSort.Off;
     private string? _ghPath;
     private bool _showingLogs;
     private bool _showingRawPreview;
@@ -75,6 +80,11 @@ public sealed class SkillViewApp
     private volatile bool _userInteractedSinceLaunch;
     private volatile bool _startupInstalledShown;
     private volatile bool _startupFocusPrimed;
+
+    /// Sort modes for the Search tab results table. Mirrors winget-tui's
+    /// app.sort_field cycle in src/app.rs. Off restores the natural ordering
+    /// returned by `gh skill search` (which is itself relevance-ranked).
+    internal enum SearchSort { Off, StarsDesc, NameAsc, NameDesc, RepoAsc }
 
     private string _defaultStatus = " ready — press / to search or F1 for help";
     private object? _statusToken;
@@ -529,6 +539,15 @@ public sealed class SkillViewApp
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
+        // Search-tab sort cycle. Lower-case `s` is unused at this level so
+        // accept both — matches winget-tui's `S` semantics while staying
+        // permissive about case.
+        if ((rune.Value == 'S' || rune.Value == 's') && _activeTab == SkillViewTab.Search)
+        {
+            HandleSearchSortKey();
+            return true;
+        }
+
         // Tab navigation — direct (1/2/3) and cyclic (←/→).
         if (rune.Value == '1') { ActivateTab(SkillViewTab.Search); return true; }
         if (rune.Value == '2') { ActivateTab(SkillViewTab.Installed); return true; }
@@ -741,7 +760,8 @@ public sealed class SkillViewApp
                     _services.Logger.Debug("search", $"dropping stale results for generation {generation}");
                     return;
                 }
-                _results = filteredResults.ToList();
+                _resultsNaturalOrder = filteredResults.ToList();
+                _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
                 RefreshResultsTable();
                 UpdateMetadataPane();
                 _resultsTable?.SetFocus();
@@ -934,6 +954,54 @@ public sealed class SkillViewApp
         {
             Invoke(ClearBusy);
         }
+    }
+
+    /// Sort the natural-order results into a new list per the active sort
+    /// mode. Pure — extracted so the cycle behavior can be unit-tested.
+    internal static List<SearchResultSkill> ApplySearchSort(
+        IReadOnlyList<SearchResultSkill> source,
+        SearchSort sort) => sort switch
+    {
+        SearchSort.StarsDesc => source
+            .OrderByDescending(s => s.Stars ?? -1)
+            .ThenBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+            .ToList(),
+        SearchSort.NameAsc => source
+            .OrderBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+            .ToList(),
+        SearchSort.NameDesc => source
+            .OrderByDescending(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+            .ToList(),
+        SearchSort.RepoAsc => source
+            .OrderBy(s => s.Repo, StringComparer.OrdinalIgnoreCase)
+            .ToList(),
+        _ => source.ToList(),
+    };
+
+    internal static SearchSort CycleSearchSort(SearchSort current) => current switch
+    {
+        SearchSort.Off       => SearchSort.StarsDesc,
+        SearchSort.StarsDesc => SearchSort.NameAsc,
+        SearchSort.NameAsc   => SearchSort.NameDesc,
+        SearchSort.NameDesc  => SearchSort.RepoAsc,
+        _                    => SearchSort.Off,
+    };
+
+    internal static string DescribeSearchSort(SearchSort sort) => sort switch
+    {
+        SearchSort.StarsDesc => "sort: stars ↓",
+        SearchSort.NameAsc   => "sort: name ↑",
+        SearchSort.NameDesc  => "sort: name ↓",
+        SearchSort.RepoAsc   => "sort: repo ↑",
+        _                    => "sort: off (gh order)",
+    };
+
+    private void HandleSearchSortKey()
+    {
+        _searchSort = CycleSearchSort(_searchSort);
+        _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
+        RefreshResultsTable();
+        SetStatus(DescribeSearchSort(_searchSort));
     }
 
     private void RefreshResultsTable()
