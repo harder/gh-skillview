@@ -65,6 +65,11 @@ public sealed class SkillViewApp
     private bool _showingRawPreview;
     private EnvironmentReport? _lastReport;
     private volatile bool _searching;
+    // Monotonic generation counter — bumped on each RunSearchAsync invocation
+    // and captured at submit time. Result painting checks for stale generation
+    // and silently drops out-of-band completions. Mirrors winget-tui's
+    // app.view_generation pattern in src/app.rs.
+    private long _searchGeneration;
     private volatile bool _userInteractedSinceLaunch;
     private volatile bool _startupInstalledShown;
     private volatile bool _startupFocusPrimed;
@@ -368,11 +373,11 @@ public sealed class SkillViewApp
         _statusBarPreview = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
         [
             new Shortcut { Title = "/", HelpText = "Search" },
-            new Shortcut { Title = "h", HelpText = "Hidden dirs" },
+            new Shortcut { Title = "1/2/3", HelpText = "Tabs" },
             new Shortcut { Title = "i", HelpText = "Install" },
+            new Shortcut { Title = "I", HelpText = "Install…" },
             new Shortcut { Title = "o", HelpText = "Open" },
             new Shortcut { Title = "e", HelpText = "Raw/Render" },
-            new Shortcut { Title = "I", HelpText = "Installed" },
             new Shortcut { Title = "u", HelpText = "Update" },
             new Shortcut { Title = "c", HelpText = "Cleanup" },
             new Shortcut { Title = "d", HelpText = "Doctor" },
@@ -640,6 +645,7 @@ public sealed class SkillViewApp
         }
 
         _searching = true;
+        var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
         SetBusy($"searching {query}…");
         var cancellationToken = GetRunLifetimeToken();
         try
@@ -655,6 +661,13 @@ public sealed class SkillViewApp
             var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
             Invoke(() =>
             {
+                if (System.Threading.Interlocked.Read(ref _searchGeneration) != generation)
+                {
+                    // A newer search has already taken effect — drop these
+                    // results silently so we never paint stale data.
+                    _services.Logger.Debug("search", $"dropping stale results for generation {generation}");
+                    return;
+                }
                 _results = filteredResults.ToList();
                 RefreshResultsTable();
                 UpdateMetadataPane();
