@@ -7,7 +7,7 @@ It ships as both:
 1. a GitHub CLI extension: `gh skillview`
 2. a standalone binary: `skillview`
 
-SkillView does **not** replace `gh skill`. It gives developers a faster full-screen workflow for the common cases, plus a scriptable CLI for inventory and maintenance tasks that are easier to reason about with SkillView’s safety checks and JSON output.
+SkillView does **not** replace `gh skill`. It gives developers a faster full-screen workflow for the common cases, plus a scriptable CLI for inventory and maintenance tasks that are easier to reason about with SkillView's safety checks and JSON output.
 
 ![SkillView screenshot](./screenshot.png)
 
@@ -15,7 +15,8 @@ SkillView does **not** replace `gh skill`. It gives developers a faster full-scr
 
 `gh skill` is powerful, but once you start working with a lot of skills it helps to have:
 
-- side-by-side search results and `SKILL.md` previews
+- a tabbed workspace where Search, Installed, and Updates live side-by-side
+- a persistent detail pane showing metadata and rendered `SKILL.md`
 - guided install and update flows instead of memorizing flags
 - a unified view of installed skills across project, user, and custom roots
 - safe remove and cleanup workflows for duplicates, broken symlinks, residue, and malformed installs
@@ -27,14 +28,14 @@ SkillView complements `gh skill`; it does not try to replace every low-level com
 
 | If you need to... | Reach for... | Why |
 |---|---|---|
-| browse and compare skills quickly | **SkillView TUI** | side-by-side search, metadata, preview, logs, and staged install/update/remove flows |
+| browse and compare skills quickly | **SkillView TUI** | tabbed Search/Installed/Updates layout with a persistent detail pane, batch updates, and staged install/remove flows |
 | script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
 | experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
 | debug whether a feature is available in your installed GitHub CLI | **`skillview doctor`** | capability probing shows what the local `gh` actually supports |
 
 ## What SkillView wraps
 
-SkillView builds on GitHub CLI’s preview `gh skill` support. If you are new to the underlying commands, start with these docs:
+SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to the underlying commands, start with these docs:
 
 - [`gh skill`](https://cli.github.com/manual/gh_skill)
 - [`gh skill search`](https://cli.github.com/manual/gh_skill_search)
@@ -47,7 +48,7 @@ SkillView builds on GitHub CLI’s preview `gh skill` support. If you are new to
 
 - **GitHub CLI** `gh` **2.92.0 or newer**
 - a working `gh` setup; `gh auth login` is recommended
-- a terminal with normal ANSI TUI support
+- a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 
 `gh skill` is still in preview and subject to change. SkillView probes the installed `gh` binary and only enables features whose flags are actually available.
 
@@ -83,7 +84,7 @@ Download the right asset from the [latest release](https://github.com/harder/gh-
 
 Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.
 
-Homebrew and WinGet scaffolding now exists in the release workflow, but those channels are still dark-launch only and are not public install paths yet.
+Homebrew and WinGet scaffolding exists in the release workflow, but those channels are dark-launch only and are not public install paths yet.
 
 ## Quick start
 
@@ -113,57 +114,102 @@ skillview cleanup
 
 ## How to use SkillView
 
-### TUI overview
+### TUI layout
 
-Run SkillView with no subcommand to open the full-screen interface.
+The TUI is organized around three primary tabs in a persistent top header — **Search**, **Installed**, and **Updates** — plus a Doctor view reachable on demand. Each tab pairs a list on the left (60% of the width) with a contextual detail pane on the right (40%). The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
-| View or flow | What it does | How to open |
+| Tab / view | What it does | How to open |
 |---|---|---|
-| **Main search view** | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. | Launch the app |
-| **Doctor** | Shows `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. | `d` |
-| **Installed** | Lists installed skills across discovered roots, lets you filter, sort, inspect details, open the folder, or start removal. | `I` |
-| **Install dialog** | Installs the selected skill with version, scope, agent, path, overwrite, and capability-gated options like hidden-dir scanning or local installs. | `i` from search results |
-| **Update view** | Dry-runs or applies updates for installed skills, including `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `u` |
-| **Remove dialog** | Validates whether a skill can be removed safely before deleting anything. | `x` from Installed |
+| **Search** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
+| **Installed** ▣ | Lists installed skills across discovered roots, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
+| **Updates** △ | Mark skills with `Space`/`a` and batch-update with `U`, single-update the current row with `u`, or dry-run the whole inventory. Honors `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `3`, `u`, click the pill, or `←/→` |
+| **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
+| **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Search result |
+| **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and capability-gated options (hidden-dir scanning, upstream, local installs). | `I` from a Search result, or **Advanced…** from the compact modal |
+| **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
+| **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
 | **Cleanup view** | Finds duplicates, broken symlinks, residue, and other cleanup candidates; remove or ignore them in batches. | `c` |
+| **Help overlay** | Grouped Markdown reference for every keybinding. | `?` or `F1` |
+
+Each tab preserves its own state (filter text, selection, sort, marks) when you switch away and back.
 
 ### Main view workflow
 
-The main window is built for the common “discover and inspect” loop:
+The main "discover and inspect" loop:
 
 1. Type a search query, and optionally narrow the next search with the **Owner**, **Agent**, and **Limit** fields.
-2. Browse results in the left table.
-3. Preview the selected skill on the right.
-4. Press `i` to stage an install, `o` to open the repo in a browser, or `l` to inspect logs.
+2. Browse results in the left table; selection drives the detail pane on the right.
+3. Press `S` to cycle a sort (stars ↓ → name ↑ → name ↓ → repo ↑ → off). The active sort column's header shows the direction.
+4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
+5. Press `i` to stage an install, or `I` for the advanced wizard.
 
-If you prefer the CLI, every major workflow also has a subcommand.
+The same operations are available from the CLI.
 
-### Keyboard highlights
+### Keyboard reference
+
+Navigation:
 
 | Key | Action |
 |---|---|
+| `1` / `2` / `3` | Jump directly to Search / Installed / Updates |
+| `←` / `→` | Cycle tabs |
+| `↑` / `↓`, `PgUp` / `PgDn`, `Home` / `End` | Move through rows |
+| `Tab` / `Shift+Tab` | Move focus between list and detail |
 | `/` | Focus the search box |
-| `Enter` | Search from the query box, or preview from a results table |
-| `p`, `v`, `→` | Preview the selected search result |
-| `i` | Open the install flow from the selected result |
-| `d` | Open Doctor |
-| `I` | Open Installed |
-| `u` | Open Update |
-| `c` | Open Cleanup |
-| `l` or `r` | Toggle the right pane between preview and logs |
-| `q` | Quit the current top-level view |
+| `?` or `F1` | Open the help overlay |
+| `Esc` | Back out of the current sub-view / modal |
+| `q` | Quit |
 
-Inside modal or full-screen subviews, `Esc` consistently backs out.
+Search tab:
+
+| Key | Action |
+|---|---|
+| `Enter` (or `Ctrl+J` in Warp) | Submit search from the query field, or preview from the results table |
+| `p`, `v`, `→` | Preview the selected result |
+| `S` | Cycle results sort |
+| `i` | Compact install for the selected result |
+| `I` | Advanced install wizard for the selected result |
+| `o` | Open the repo in a browser |
+| `e` | Toggle raw / rendered preview |
+| `h` | Toggle hidden-dir access for preview/install |
+| `l` | Toggle the right pane between preview and logs |
+
+Installed tab:
+
+| Key | Action |
+|---|---|
+| `f` | Focus the filter field |
+| `s` | Cycle sort (name / package / scope) |
+| `P` | Cycle pin filter (all / pinned only / unpinned only) |
+| `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
+| `o` | Open the skill folder |
+
+Updates tab:
+
+| Key | Action |
+|---|---|
+| `Space` | Toggle the mark on the current row |
+| `a` | Mark all visible rows |
+| `A` | Clear all marks |
+| `u` | Update the current row only |
+| `U` | Update every marked row |
+| `d` | Dry-run with the current selection |
+
+Other:
+
+| Key | Action |
+|---|---|
+| `d` | Open Doctor (full-screen) |
+| `c` | Open Cleanup |
 
 **Warp note:** if `Enter` is unreliable after the first interaction, use `Ctrl+J` or `→` for preview.
 
 ### Themes and configuration
 
-- `--theme default` keeps the standard palette.
-- `--theme high-contrast` boosts selection/status visibility for lower-contrast terminals.
+- `--theme default` uses the SkillView warm palette (gold accent, beige text, dark surfaces, mint/red/blue/purple state colors) on truecolor terminals.
+- `--theme high-contrast` switches to a 16-color StandardColor scheme for screen readers, terminals without truecolor, or low-contrast environments.
 - `SKILLVIEW_THEME=high-contrast` is the environment-variable equivalent of `--theme high-contrast`.
-- Terminal.Gui configuration loading is enabled before app init, but SkillView-specific theming is still flag-driven today.
-- Keybindings are intentionally fixed in-app right now; there is no SkillView keybinding remap file yet, so the shortcuts documented here are the supported contract.
+- Keybindings are intentionally fixed in-app; there is no SkillView keybinding remap file, so the shortcuts documented here are the supported contract.
 
 ## CLI usage
 
@@ -176,7 +222,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview rescan` | Re-run inventory capture and print a summary |
 | `skillview search <query>` | Search public repositories for skills |
 | `skillview preview OWNER/REPO [SKILL]` | Render a skill preview without installing |
-| `skillview install OWNER/REPO [SKILL]` | Install a skill with SkillView’s wrappers and diff output |
+| `skillview install OWNER/REPO [SKILL]` | Install a skill with SkillView's wrappers and diff output |
 | `skillview update [...]` | Dry-run or apply skill updates |
 | `skillview remove <skill>` | Remove an installed skill with safety checks |
 | `skillview cleanup` | Report or apply cleanup actions |
@@ -208,7 +254,7 @@ skillview --scan-root /path/one --scan-root /path/two list --json
 - `--help` prints a Markdown usage guide for the active entrypoint (`skillview` or `gh skillview`)
 - `--version` prints both the SkillView version and the Terminal.Gui version in use
 - `--debug` works before or after the subcommand
-- `--theme` currently supports `default` and `high-contrast`
+- `--theme` accepts `default` or `high-contrast`
 - `--scan-root` is repeatable
 - `SKILLVIEW_LOG=debug` is also supported
 
@@ -224,7 +270,7 @@ skillview --scan-root /path/one --scan-root /path/two list --json
 
 ### Automation and AI-agent usage
 
-SkillView’s CLI is designed to be automation-friendly when you want higher-level safety than raw `gh skill`.
+SkillView's CLI is designed to be automation-friendly when you want higher-level safety than raw `gh skill`.
 
 - Prefer `--json` on commands that support it: `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
 - Use exit codes as the control surface for scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches.
@@ -247,7 +293,7 @@ SkillView keeps a rotating file log and redacts sensitive values before writing.
 
 - Linux: `~/.cache/SkillView/logs`
 - macOS: `~/Library/Caches/SkillView/logs`
-- Windows: `%LOCALAPPDATA%\\SkillView\\logs`
+- Windows: `%LOCALAPPDATA%\SkillView\logs`
 
 If the TUI behaves unexpectedly:
 
@@ -292,11 +338,15 @@ Program.cs
      -> TUI: SkillViewApp.RunAsync(...)
 ```
 
+The TUI is a single Terminal.Gui `Window` that hosts a persistent `TabBarView` header and four embedded view classes — `SearchTabView` logic lives inside `SkillViewApp` itself, `InstalledTabView` and `UpdatesTabView` in `src/SkillView.Core/Ui/Tabs/`, and `DoctorTabView` as a full-screen overlay. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
+
 ### Project layout
 
 | Path | Purpose |
 |---|---|
-| `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui screens |
+| `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui views |
+| `src/SkillView.Core/Ui/Tabs/` | `InstalledTabView`, `UpdatesTabView`, `DoctorTabView` |
+| `src/SkillView.Core/Ui/Theming/` | Color palette + `ColorScheme` factories |
 | `src/SkillView.App/` | Standalone `skillview` entrypoint |
 | `src/SkillView.GhExtension/` | `gh skillview` extension entrypoint |
 | `tests/SkillView.Tests/` | xUnit coverage for unit and screen-level tests |
@@ -332,9 +382,9 @@ On Linux, install `clang` and `zlib1g-dev` first.
 
 ## Built with
 
-- [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) - the cross-platform .NET TUI framework
-- [GitHub CLI](https://cli.github.com/) - all GitHub interaction flows through gh skill commands
-- [.NET 10](https://dotnet.microsoft.com/) with Native AOT - single-binary, no runtime required
+- [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) — the cross-platform .NET TUI framework
+- [GitHub CLI](https://cli.github.com/) — all GitHub interaction flows through `gh skill` commands
+- [.NET 10](https://dotnet.microsoft.com/) with Native AOT — single-binary, no runtime required
 - [xUnit](https://xunit.net/)
 
 ## License
