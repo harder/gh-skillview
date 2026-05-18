@@ -46,6 +46,8 @@ public sealed class SkillViewApp
     private SpinnerView? _spinner;
     private StatusBar? _statusBarPreview;
     private StatusBar? _statusBarLogs;
+    private TabBarView? _tabBar;
+    private SkillViewTab _activeTab = SkillViewTab.Search;
     private FrameView? _leftFrame;
     private SkillDetailPaneView? _detailPane;
     private FrameView? _rightFrame;
@@ -204,6 +206,16 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
         };
 
+        // Top header strip: tabs on the right, "Skill View" wordmark on the
+        // left. Stays present across all tab views, mirroring winget-tui's
+        // Search / Installed / Upgrades header.
+        _tabBar = new TabBarView
+        {
+            X = 0,
+            Y = 0,
+        };
+        _tabBar.TabActivated += (_, tab) => ActivateTab(tab);
+
         // 60/40 list/detail split mirrors winget-tui's package list vs.
         // detail-panel proportions — gives results more horizontal room for
         // long repo names while leaving the detail pane wide enough to read
@@ -212,7 +224,7 @@ public sealed class SkillViewApp
         {
             Title = "Search",
             X = 0,
-            Y = 0,
+            Y = 1,
             Width = Dim.Percent(60),
             Height = Dim.Fill(2),
         };
@@ -323,7 +335,7 @@ public sealed class SkillViewApp
         _detailPane = new SkillDetailPaneView(ItemActionsText, TuiHelpers.WelcomeHint)
         {
             X = Pos.Right(_leftFrame),
-            Y = 0,
+            Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
@@ -387,7 +399,7 @@ public sealed class SkillViewApp
         _itemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
         RefreshHiddenDirUi();
 
-        window.Add(_leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
+        window.Add(_tabBar, _leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
             window,
@@ -460,7 +472,51 @@ public sealed class SkillViewApp
         if (rune.Value == 'u' || rune.Value == 'U') { _workflows.ShowUpdateScreen(); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1) { ShowHelp(); return true; }
+
+        // Tab navigation — direct (1/2/3) and cyclic (←/→).
+        if (rune.Value == '1') { ActivateTab(SkillViewTab.Search); return true; }
+        if (rune.Value == '2') { ActivateTab(SkillViewTab.Installed); return true; }
+        if (rune.Value == '3') { ActivateTab(SkillViewTab.Updates); return true; }
+        if (key.KeyCode == KeyCode.CursorLeft)  { CycleTab(-1); return true; }
+        if (key.KeyCode == KeyCode.CursorRight) { CycleTab(+1); return true; }
         return false;
+    }
+
+    /// Switch active tab. For now Search is the embedded view; Installed and
+    /// Updates open their (modal) screens — they will become embedded tab
+    /// views in Phases 4 and 5. The tab bar always reflects the *intended*
+    /// active tab even when the underlying view is still modal.
+    private void ActivateTab(SkillViewTab tab)
+    {
+        if (tab == _activeTab && tab == SkillViewTab.Search) return;
+        _activeTab = tab;
+        _tabBar?.SetActiveTab(tab);
+        switch (tab)
+        {
+            case SkillViewTab.Search:
+                // No-op: Search is the always-rendered base view.
+                _queryField?.SetFocus();
+                break;
+            case SkillViewTab.Installed:
+                _workflows.ShowInstalled();
+                _activeTab = SkillViewTab.Search;
+                _tabBar?.SetActiveTab(SkillViewTab.Search);
+                break;
+            case SkillViewTab.Updates:
+                _workflows.ShowUpdateScreen();
+                _activeTab = SkillViewTab.Search;
+                _tabBar?.SetActiveTab(SkillViewTab.Search);
+                break;
+        }
+    }
+
+    private void CycleTab(int delta)
+    {
+        var values = new[] { SkillViewTab.Search, SkillViewTab.Installed, SkillViewTab.Updates };
+        var idx = Array.IndexOf(values, _activeTab);
+        if (idx < 0) idx = 0;
+        idx = (idx + delta + values.Length) % values.Length;
+        ActivateTab(values[idx]);
     }
 
     private void OnQueryFieldKey(object? sender, Key key)
