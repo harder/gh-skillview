@@ -47,6 +47,7 @@ public sealed class SkillViewApp
     private StatusBar? _statusBarPreview;
     private StatusBar? _statusBarLogs;
     private FrameView? _leftFrame;
+    private SkillDetailPaneView? _detailPane;
     private FrameView? _rightFrame;
     private FrameView? _metadataFrame;
     private FrameView? _previewFrame;
@@ -203,12 +204,16 @@ public sealed class SkillViewApp
             Height = Dim.Fill(),
         };
 
+        // 60/40 list/detail split mirrors winget-tui's package list vs.
+        // detail-panel proportions — gives results more horizontal room for
+        // long repo names while leaving the detail pane wide enough to read
+        // wrapped SKILL.md prose without horizontal scroll.
         _leftFrame = new FrameView
         {
             Title = "Search",
             X = 0,
             Y = 0,
-            Width = Dim.Percent(50),
+            Width = Dim.Percent(60),
             Height = Dim.Fill(2),
         };
 
@@ -315,83 +320,21 @@ public sealed class SkillViewApp
 
         _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, agentLabel, _agentField, _hiddenDirsBox, _resultsTable);
 
-        _rightFrame = new FrameView
+        _detailPane = new SkillDetailPaneView(ItemActionsText, TuiHelpers.WelcomeHint)
         {
-            // No title — the inner Details / SKILL.md frames carry their own.
             X = Pos.Right(_leftFrame),
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
-        // Right pane stacks vertically: per-item actions on top (1 line),
-        // metadata strip (auto-sized to content), then the preview body fills
-        // the rest. Metadata-on-top keeps item context visible while the
-        // preview scrolls, and the actions bar advertises 'i/o/e' at point
-        // of use rather than burying them in the main bottom status bar.
-        _itemActionsLabel = new Label
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = 1,
-            Text = ItemActionsText,
-        };
-
-        // Metadata in its own bordered FrameView so the boundary between
-        // skill details and the SKILL.md preview body is visually obvious.
-        _metadataFrame = new FrameView
-        {
-            Title = "Details",
-            X = 0,
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = MinMetadataHeight + 2 /* borders */,
-            BorderStyle = LineStyle.Single,
-        };
-        _metadataPane = new Markdown
-        {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
-            Text = "_(no selection)_",
-        };
-        TuiHelpers.ConfigureMarkdownPane(_metadataPane, SkillViewStyling.BaseSchemeName);
-        _metadataFrame.Add(_metadataPane);
-
-        _previewFrame = new FrameView
-        {
-            Title = "SKILL.md",
-            X = 0,
-            Y = Pos.Bottom(_metadataFrame),
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            BorderStyle = LineStyle.Single,
-        };
-        _previewPane = new Markdown
-        {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
-            Text = TuiHelpers.WelcomeHint,
-        };
-        TuiHelpers.ConfigureMarkdownPane(_previewPane, SkillViewStyling.BaseSchemeName);
-
-        _previewRawPane = new TextView
-        {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
-            Text = TuiHelpers.WelcomeHint,
-            Visible = false,
-        };
-        TuiHelpers.ConfigureReadOnlyPane(_previewRawPane, SkillViewStyling.BaseSchemeName);
-        _previewFrame.Add(_previewPane, _previewRawPane);
-
-        _logPane = new TextView
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            Visible = false,
-        };
-        TuiHelpers.ConfigureReadOnlyPane(_logPane, SkillViewStyling.BaseSchemeName);
-
-        _rightFrame.Add(_itemActionsLabel, _metadataFrame, _previewFrame, _logPane);
+        _rightFrame        = _detailPane;
+        _itemActionsLabel  = _detailPane.ItemActionsLabel;
+        _metadataFrame     = _detailPane.MetadataFrame;
+        _metadataPane      = _detailPane.MetadataPane;
+        _previewFrame      = _detailPane.PreviewFrame;
+        _previewPane       = _detailPane.PreviewPane;
+        _previewRawPane    = _detailPane.PreviewRawPane;
+        _logPane           = _detailPane.LogPane;
 
         _statusLabel = new Label
         {
