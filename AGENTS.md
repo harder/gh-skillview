@@ -47,10 +47,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
 - Current package compatibility: SkillView is pinned to Terminal.Gui
-  `2.1.0`. `Microsoft.NET.Test.Sdk` `18.4.0` still breaks
-  `TuiHelpersTests` with a `MemberNotNullWhenAttribute` `TypeLoadException`
-  during Terminal.Gui config initialization, so keep the test SDK at `17.11.1`
-  until that compatibility issue is resolved.
+  `2.2.0-rc.3`. Test projects use `Microsoft.NET.Test.Sdk` `18.5.1`,
+  `xunit.v3` `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. If tests fail
+  to compile on missing `TestContext`, rerun `dotnet restore` so stale xUnit
+  2.x assets are replaced.
 - `src/SkillView.Core/SkillView.Core.csproj` owns the default
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
@@ -75,7 +75,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
-- Terminal.Gui `2.1.0` remains compatible with the modern
+- Terminal.Gui `2.2.0-rc.3` remains compatible with the modern
   `Application.Create().Init()` lifecycle; the local
   `UnconditionalSuppressMessage` workaround and temporary App-level warning mask
   stay removed after a verification publish proved the App entrypoint no longer
@@ -85,7 +85,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   intentionally centralizing whole-screen actions (search/install/open/logs,
   installed-screen filter/sort/remove, cleanup actions, etc.), not because of
   the old `TableView` type-to-search swallowing bug.
-- On Terminal.Gui `2.1.0`, `TableView.CollectionNavigator = null` is the
+- On Terminal.Gui `2.2.0-rc.3`, `TableView.CollectionNavigator = null` is the
   supported way to disable type-to-search. Treat `#5232` as the fix for the old
   printable-key swallowing behavior and prefer this documented path over the old
   custom matcher workaround.

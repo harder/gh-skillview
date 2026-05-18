@@ -20,6 +20,8 @@ public class CliDispatcherHelpTests
         Assert.Contains("## Usage", stdout);
         Assert.Contains("| Global flag | What it does |", stdout);
         Assert.Contains("| Subcommand | Purpose |", stdout);
+        Assert.Contains("| `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |", stdout);
+        Assert.DoesNotContain("`--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs`", stdout);
         Assert.Contains("Homebrew and WinGet scaffolding", stdout);
         Assert.Contains("automation-friendly", stdout);
     }

@@ -24,6 +24,16 @@ namespace SkillView.Ui.Tabs;
 /// static helper on UpdateScreen so the 3 UpdateScreenTests stay green.
 internal sealed class UpdatesTabView : FrameView
 {
+    internal readonly record struct CapabilityUiState(
+        bool SupportsAll,
+        string AllLabel,
+        bool SupportsForce,
+        bool SupportsUnpin,
+        bool SupportsYes,
+        string YesLabel,
+        bool YesDefaultChecked,
+        bool SupportsDryRun);
+
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<GhSkillUpdateService> _updateServiceFactory;
@@ -49,6 +59,7 @@ internal sealed class UpdatesTabView : FrameView
     private CheckBoxTableSourceWrapperByIndex? _wrapper;
     private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
     private int _nameW = 12;
+    private long _loadGeneration;
 
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
@@ -96,31 +107,23 @@ internal sealed class UpdatesTabView : FrameView
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
 
-        // Capability-gated toggles. Labels include hints when the gh build
-        // doesn't support the flag so users understand why they're disabled.
-        var caps = _capabilitiesProvider();
         _allBox = new CheckBox
         {
             X = 0, Y = Pos.AnchorEnd(4),
-            Text = caps.SupportsUpdateAll ? "_all" : "_all (not supported)",
-            Enabled = caps.SupportsUpdateAll,
+            Text = "_all",
         };
         _forceBox = new CheckBox
         {
-            X = 10, Y = Pos.AnchorEnd(4),
-            Text = "_force", Enabled = caps.SupportsUpdateForce,
+            X = 10, Y = Pos.AnchorEnd(4), Text = "_force",
         };
         _unpinBox = new CheckBox
         {
-            X = 22, Y = Pos.AnchorEnd(4),
-            Text = "_unpin", Enabled = caps.SupportsUpdateUnpin,
+            X = 22, Y = Pos.AnchorEnd(4), Text = "_unpin",
         };
         _yesBox = new CheckBox
         {
             X = 34, Y = Pos.AnchorEnd(4),
-            Text = caps.SupportsUpdateYes ? "_yes" : "yes (needs gh --yes)",
-            Enabled = caps.SupportsUpdateYes,
-            Value = caps.SupportsUpdateYes ? CheckState.Checked : CheckState.UnChecked,
+            Text = "_yes",
         };
 
         _status = new Label
@@ -141,7 +144,6 @@ internal sealed class UpdatesTabView : FrameView
             Text = "_Dry-run",
             X = Pos.Center() - 22,
             Y = Pos.AnchorEnd(2),
-            Enabled = caps.SupportsUpdateDryRun,
         };
         _updateButton = new Button
         {
@@ -177,6 +179,8 @@ internal sealed class UpdatesTabView : FrameView
             _allBox, _forceBox, _unpinBox, _yesBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar);
 
+        ApplyCapabilities(_capabilitiesProvider());
+
         KeyDown += OnKeyDown;
 
         Add(_tableLabel, _table, _preview,
@@ -186,21 +190,49 @@ internal sealed class UpdatesTabView : FrameView
 
     internal async Task LoadAsync()
     {
+        var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         Visible = true;
+        RefreshCapabilities();
         _status.Text = " loading inventory…";
         try
         {
             var snapshot = await _snapshotLoader().ConfigureAwait(false);
-            await _runOnUi(() => Populate(snapshot)).ConfigureAwait(false);
+            await _runOnUi(() =>
+            {
+                if (!IsCurrentLoad(loadGeneration))
+                {
+                    return;
+                }
+
+                RefreshCapabilities();
+                Populate(snapshot);
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             await _runOnUi(() =>
             {
+                if (!IsCurrentLoad(loadGeneration))
+                {
+                    return;
+                }
+
                 _status.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
             }).ConfigureAwait(false);
         }
     }
+
+    internal void RefreshCapabilities() => ApplyCapabilities(_capabilitiesProvider());
+
+    internal static CapabilityUiState DescribeCapabilityState(CapabilityProfile caps) => new(
+        SupportsAll: caps.SupportsUpdateAll,
+        AllLabel: caps.SupportsUpdateAll ? "_all" : "_all (not supported)",
+        SupportsForce: caps.SupportsUpdateForce,
+        SupportsUnpin: caps.SupportsUpdateUnpin,
+        SupportsYes: caps.SupportsUpdateYes,
+        YesLabel: caps.SupportsUpdateYes ? "_yes" : "yes (needs gh --yes)",
+        YesDefaultChecked: caps.SupportsUpdateYes,
+        SupportsDryRun: caps.SupportsUpdateDryRun);
 
     private void Populate(InventorySnapshot snapshot)
     {
@@ -225,6 +257,54 @@ internal sealed class UpdatesTabView : FrameView
         _preview.Text = "## Updates\n\n_Press **Dry-run** to preview, or mark rows and **U** to update all marked._";
         _table.SetFocus();
     }
+
+    private void ApplyCapabilities(CapabilityProfile caps)
+    {
+        var state = DescribeCapabilityState(caps);
+
+        var allWasEnabled = _allBox.Enabled;
+        var forceWasEnabled = _forceBox.Enabled;
+        var unpinWasEnabled = _unpinBox.Enabled;
+        var yesWasEnabled = _yesBox.Enabled;
+        var keepAllChecked = _allBox.Enabled && _allBox.Value == CheckState.Checked;
+        var keepForceChecked = _forceBox.Enabled && _forceBox.Value == CheckState.Checked;
+        var keepUnpinChecked = _unpinBox.Enabled && _unpinBox.Value == CheckState.Checked;
+        var keepYesChecked = _yesBox.Enabled && _yesBox.Value == CheckState.Checked;
+
+        _allBox.Text = state.AllLabel;
+        _allBox.Enabled = state.SupportsAll;
+        _allBox.Value = state.SupportsAll && allWasEnabled && keepAllChecked
+            ? CheckState.Checked
+            : CheckState.UnChecked;
+
+        _forceBox.Enabled = state.SupportsForce;
+        _forceBox.Value = state.SupportsForce && forceWasEnabled && keepForceChecked
+            ? CheckState.Checked
+            : CheckState.UnChecked;
+
+        _unpinBox.Enabled = state.SupportsUnpin;
+        _unpinBox.Value = state.SupportsUnpin && unpinWasEnabled && keepUnpinChecked
+            ? CheckState.Checked
+            : CheckState.UnChecked;
+
+        _yesBox.Text = state.YesLabel;
+        _yesBox.Enabled = state.SupportsYes;
+        _yesBox.Value = state.SupportsYes
+            ? (yesWasEnabled
+                ? (keepYesChecked ? CheckState.Checked : CheckState.UnChecked)
+                : (state.YesDefaultChecked ? CheckState.Checked : CheckState.UnChecked))
+            : CheckState.UnChecked;
+
+        _dryRunButton.Enabled = state.SupportsDryRun;
+    }
+
+    private bool IsCurrentLoad(long loadGeneration) =>
+        Interlocked.Read(ref _loadGeneration) == loadGeneration;
+
+    internal CheckBox AllBoxForTests => _allBox;
+    internal Button DryRunButtonForTests => _dryRunButton;
+    internal string StatusTextForTests => _status.Text.ToString();
+    internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
 
     private void RecomputeColumnWidths()
     {

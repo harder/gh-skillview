@@ -242,8 +242,8 @@ public static class CliDispatcher
             if (a == "--scope" && i + 1 < args.Count) { scope = args[++i]; continue; }
             if (a.StartsWith("--agent=", StringComparison.Ordinal)) { agent = a["--agent=".Length..]; continue; }
             if (a == "--agent" && i + 1 < args.Count) { agent = args[++i]; continue; }
-            if (a.StartsWith("--path=", StringComparison.Ordinal)) { path = a["--path=".Length..]; continue; }
-            if (a == "--path" && i + 1 < args.Count) { path = args[++i]; continue; }
+            if (a.StartsWith("--dir=", StringComparison.Ordinal)) { path = a["--dir=".Length..]; continue; }
+            if (a == "--dir" && i + 1 < args.Count) { path = args[++i]; continue; }
             if (a == "--allow-hidden-dirs") { /* handled via inventory.CaptureAsync */ continue; }
         }
         if (!string.IsNullOrEmpty(path)) scanRoots.Add(path!);
@@ -1553,7 +1553,7 @@ public static class CliDispatcher
             | Subcommand | Purpose | Key options |
             | --- | --- | --- |
             | `doctor` | Inspect `gh`, auth state, capability probes, log path, and scan roots. | `--json`, `--clear-logs` |
-            | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs` |
+            | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--json` |

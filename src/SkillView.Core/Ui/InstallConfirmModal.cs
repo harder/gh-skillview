@@ -97,13 +97,6 @@ internal sealed class InstallConfirmModal
             Text = string.Empty, Visible = false,
         };
         TuiHelpers.ConfigureTextInput(customPathField, SkillViewStyling.DialogSchemeName);
-        scopeSelector.ValueChanged += (_, _) =>
-        {
-            var isCustom = scopeSelector.Value == 2;
-            customPathLabel.Visible = isCustom;
-            customPathField.Visible = isCustom;
-        };
-
         var agentsLabel = new Label { X = 1, Y = 6, Text = "Agents:" };
         var home = Environment.GetEnvironmentVariable("HOME")
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -156,10 +149,24 @@ internal sealed class InstallConfirmModal
             Text = "Cancel",
         };
 
+        string? CurrentValidationError() => ValidateSelection(
+            scopeSelector.Value ?? 0,
+            customPathField.Text.ToString() ?? string.Empty);
+
+        WireValidation(scopeSelector, customPathLabel, customPathField, installButton, status, spinner);
+
         installButton.Accepting += async (_, ev) =>
         {
             ev.Handled = true;
             if (spinner.Visible) return;
+
+            var validationError = CurrentValidationError();
+            if (validationError is not null)
+            {
+                status.Text = $" {validationError}";
+                return;
+            }
+
             spinner.Visible = true;
             spinner.AutoSpin = true;
             installButton.Enabled = false;
@@ -196,7 +203,7 @@ internal sealed class InstallConfirmModal
                         status.Text = snippet.Length > 0
                             ? $" install failed (exit {installResult.ExitCode}): {snippet}"
                             : $" install failed (exit {installResult.ExitCode}) — see logs";
-                        installButton.Enabled = true;
+                        installButton.Enabled = CurrentValidationError() is null;
                         advancedButton.Enabled = true;
                     }
                 });
@@ -210,7 +217,7 @@ internal sealed class InstallConfirmModal
                     spinner.Visible = false;
                     outcome = Outcome.Failed;
                     status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
-                    installButton.Enabled = true;
+                    installButton.Enabled = CurrentValidationError() is null;
                     advancedButton.Enabled = true;
                 });
             }
@@ -304,5 +311,42 @@ internal sealed class InstallConfirmModal
             Agents: selectedAgentIds.Count > 0 ? selectedAgentIds : null,
             Scope: scope,
             Path: path);
+    }
+
+    internal static string? ValidateSelection(int scopeIndex, string customPath) =>
+        scopeIndex == 2 && string.IsNullOrWhiteSpace(customPath)
+            ? "enter a custom install path"
+            : null;
+
+    internal static void WireValidation(
+        OptionSelector scopeSelector,
+        Label customPathLabel,
+        TextField customPathField,
+        Button installButton,
+        Label status,
+        SpinnerView spinner)
+    {
+        void RefreshInstallValidity()
+        {
+            var validationError = ValidateSelection(
+                scopeSelector.Value ?? 0,
+                customPathField.Text.ToString() ?? string.Empty);
+            installButton.Enabled = !spinner.Visible && validationError is null;
+            if (!spinner.Visible)
+            {
+                status.Text = validationError is null ? " ready" : $" {validationError}";
+            }
+        }
+
+        scopeSelector.ValueChanged += (_, _) =>
+        {
+            var isCustom = scopeSelector.Value == 2;
+            customPathLabel.Visible = isCustom;
+            customPathField.Visible = isCustom;
+            RefreshInstallValidity();
+        };
+        customPathField.TextChanged += (_, _) => RefreshInstallValidity();
+
+        RefreshInstallValidity();
     }
 }

@@ -46,6 +46,7 @@ internal sealed class InstalledTabView : FrameView
     private int _nameW = 12;
     private int _pkgW = 18;
     private int _agentsW = 8;
+    private long _loadGeneration;
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
@@ -140,17 +141,33 @@ internal sealed class InstalledTabView : FrameView
     /// each call refreshes the inventory.
     internal async Task LoadAsync()
     {
+        var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         Visible = true;
         _footer.Text = " loading inventory…";
         try
         {
             var snapshot = await _snapshotLoader().ConfigureAwait(false);
-            await _runOnUi(() => Populate(snapshot)).ConfigureAwait(false);
+            await _runOnUi(() =>
+            {
+                if (!IsCurrentLoad(loadGeneration))
+                {
+                    return;
+                }
+
+                Populate(snapshot);
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            await _runOnUi(() => _footer.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}")
-                .ConfigureAwait(false);
+            await _runOnUi(() =>
+            {
+                if (!IsCurrentLoad(loadGeneration))
+                {
+                    return;
+                }
+
+                _footer.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+            }).ConfigureAwait(false);
         }
     }
 
@@ -158,6 +175,7 @@ internal sealed class InstalledTabView : FrameView
     /// another async load. Used by startup auto-open so we don't double-scan.
     internal void LoadSeeded(InventorySnapshot snapshot)
     {
+        Interlocked.Increment(ref _loadGeneration);
         Visible = true;
         Populate(snapshot);
     }
@@ -430,4 +448,9 @@ internal sealed class InstalledTabView : FrameView
         public InstalledTableSource(IReadOnlyList<InstalledSkill> rows, Dictionary<string, Func<InstalledSkill, object>> cols)
             : base(rows, cols) { }
     }
+
+    private bool IsCurrentLoad(long loadGeneration) =>
+        Interlocked.Read(ref _loadGeneration) == loadGeneration;
+
+    internal IReadOnlyList<string> VisibleSkillNamesForTests => _rows.Select(s => s.Name).ToArray();
 }

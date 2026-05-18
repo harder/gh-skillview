@@ -235,8 +235,10 @@ public sealed class SkillViewAppTests
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('/'));
 
+        Assert.Equal(SkillViewTab.Search, app.ActiveTabForTests);
         Assert.True(app.QueryFieldForTests!.HasFocus);
     }
 

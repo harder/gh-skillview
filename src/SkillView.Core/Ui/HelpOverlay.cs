@@ -23,34 +23,35 @@ internal static class HelpOverlay
 
 ## Search & filter
 
-- **/** — focus the search box
-- **f** — cycle source filter (planned)
-- **P** — cycle pin filter (planned, Installed/Updates)
-- **r** — refresh current view (planned)
-- **S** — cycle sort (planned)
+- **/** — jump to the Search tab and focus the query box
+- **f** — focus the Installed filter
+- **s / S** — cycle sort in the active Search or Installed tab
+- **P** — cycle Installed pin filter
 
 ## Actions
 
-- **i** — install selected (compact modal — planned)
-- **I** — install advanced / show Installed view
-- **u / U** — update selected · update all marked
-- **x** — remove selected (planned compact confirm)
-- **p** — pin / unpin (planned)
-- **o** — open homepage in browser
+- **Enter** — preview the selected search result
+- **i** — install selected via compact confirm
+- **I** — install selected via advanced wizard
+- **u** — open Updates from Search, or update the current row in Updates
+- **U** — update all marked rows in Updates
+- **x** — remove the selected installed skill
+- **o** — open the selected repo or path
 - **e** — toggle raw / rendered preview
 
-## Batch (Updates tab — planned)
+## Batch (Updates tab)
 
 - **Space** — toggle mark on current row
-- **a** — mark / unmark all visible
+- **a / A** — mark all / clear all
+- **d** — dry-run marked or selected updates
 
 ## Modes
 
 - **?** or **F1** — toggle this help
-- **d** — open Doctor
+- **d** — open Doctor from Search / Installed
 - **c** — review cleanup candidates
 - **h** — toggle hidden-dir access for preview/install
-- **l** — show / hide logs
+- **l / r** — show / hide logs
 - **q / Esc** — quit at root · close modal otherwise
 
 _Press **Esc**, **Enter**, or **?** to close._

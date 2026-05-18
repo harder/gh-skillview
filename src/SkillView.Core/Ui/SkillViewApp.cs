@@ -528,6 +528,14 @@ public sealed class SkillViewApp
         var rune = key.AsRune;
         if (rune.Value == '/')
         {
+            if (_inDoctor)
+            {
+                LeaveDoctor();
+            }
+            if (_activeTab != SkillViewTab.Search)
+            {
+                ActivateTab(SkillViewTab.Search);
+            }
             _queryField?.SetFocus();
             if (_queryField is not null) _queryField.SelectAll();
             return true;
@@ -753,6 +761,8 @@ public sealed class SkillViewApp
                     }
                     RefreshHiddenDirUi();
                 }
+
+                _updatesTab?.RefreshCapabilities();
 
                 if (ShouldAutoOpenInstalledOnStartup(snapshot))
                 {
@@ -1685,6 +1695,15 @@ public sealed class SkillViewApp
 
     internal bool ShouldAutoOpenInstalledOnStartupForTests(InventorySnapshot snapshot) =>
         ShouldAutoOpenInstalledOnStartup(snapshot);
+
+    internal SkillViewTab ActiveTabForTests => _activeTab;
+
+    internal void ForceActiveTabForTests(SkillViewTab tab)
+    {
+        _activeTab = tab;
+        _tabBar?.SetActiveTab(tab);
+        ShowSearchPanes(tab == SkillViewTab.Search);
+    }
 
     /// Fire-and-forget background work with exception guard. Catches any
     /// unhandled exception, logs it, and shows a status bar message so
