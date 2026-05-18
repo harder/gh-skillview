@@ -1096,13 +1096,23 @@ public sealed class SkillViewApp
         });
         int starsW = widths[0], nameW = widths[1], repoW = widths[2];
 
+        // Suffix the active sort column with a direction glyph so the user
+        // can see at a glance what `S` last did. Inactive columns stay clean.
+        var starsHeader = _searchSort == SearchSort.StarsDesc ? "★ ↓" : "★";
+        var nameHeader  = _searchSort switch
+        {
+            SearchSort.NameAsc  => "Name ↑",
+            SearchSort.NameDesc => "Name ↓",
+            _                   => "Name",
+        };
+        var repoHeader  = _searchSort == SearchSort.RepoAsc ? "Repo ↑" : "Repo";
         var source = new EnumerableTableSource<SearchResultSkill>(
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                ["★"] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                ["Name"] = s => TuiHelpers.Truncate(s.SkillName, nameW),
-                ["Repo"] = s => TuiHelpers.Truncate(s.Repo, repoW),
+                [starsHeader] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                [nameHeader]  = s => TuiHelpers.Truncate(s.SkillName, nameW),
+                [repoHeader]  = s => TuiHelpers.Truncate(s.Repo, repoW),
             });
         _resultsTable.Table = source;
         TuiHelpers.ApplyColumnStyles(_resultsTable, nameW, repoW, starsW, 0);

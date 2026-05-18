@@ -405,9 +405,12 @@ internal static class TuiHelpers
 
         for (var i = 0; i < table.Table.Columns; i++)
         {
+            // Headers may now carry trailing sort glyphs ("Name ↓") — match
+            // on the leading token so glyphs don't break style assignment.
             var header = table.Table.ColumnNames[i];
+            var leading = header.Split(' ', 2)[0];
             var cs = style.GetOrCreateColumnStyle(i);
-            switch (header)
+            switch (leading)
             {
                 case "Skill":
                 case "Name":
