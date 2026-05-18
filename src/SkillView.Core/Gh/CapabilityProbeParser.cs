@@ -22,10 +22,12 @@ public static class CapabilityProbeParser
             .Add("update", ImmutableArray.Create(
                 "--dry-run", "--all", "--force", "--unpin"
                 /* "--yes", "--non-interactive", "--json" — not in gh 2.92 */))
-            // "list" subcommand does not exist in gh 2.92. Probing it just
-            // produces a noisy "unknown command" error in the log. Re-add when
-            // `gh skill list` ships.
-            // .Add("list", ImmutableArray.Create("--json", "--agent", "--scope"))
+            // `gh skill list` is being added in cli/cli PR #13418 (closing
+            // #13245). The flag set there is `--json --agent --scope --dir`.
+            // The probe is harmless when the subcommand is absent: the help
+            // call returns no usable output and ListSubcommandPresent stays
+            // false, leaving the filesystem-scan fallback in charge.
+            .Add("list", ImmutableArray.Create("--json", "--agent", "--scope", "--dir"))
             .Add("search", ImmutableArray.Create(
                 "--json", "--owner", "--limit"))
             .Add("preview", ImmutableArray.Create("--allow-hidden-dirs"));

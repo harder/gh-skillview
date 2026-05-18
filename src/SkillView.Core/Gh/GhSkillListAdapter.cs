@@ -6,11 +6,14 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill list --json` (cli/cli#13215). Only called when the
-/// capability probe reports `HasSkillList`. The JSON schema for the upstream
-/// command is not yet frozen, so this adapter parses tolerantly via
-/// `JsonDocument` (AOT-safe) and pulls values from a set of likely field
-/// names. When the schema stabilizes, tighten this.
+/// Wraps `gh skill list --json` (cli/cli#13245, implemented in PR #13418).
+/// Only called when the capability probe reports `HasSkillList`. The
+/// upstream-canonical JSON fields are read first; legacy / alternate field
+/// names are kept as defensive fallbacks in case the schema shifts before
+/// the PR merges. All parsing goes through `JsonDocument` (AOT-safe).
+///
+/// Canonical upstream shape per the PR:
+///   { skillName, hosts:[], scope, sourceURL, version, pinned, path }
 public sealed class GhSkillListAdapter
 {
     private readonly ProcessRunner _runner;
@@ -132,33 +135,60 @@ public sealed class GhSkillListAdapter
 
     private static GhSkillListRecord ReadRecord(JsonElement obj)
     {
-        var agents = ImmutableArray.CreateBuilder<string>();
-        if (obj.TryGetProperty("agents", out var agentsEl) && agentsEl.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var a in agentsEl.EnumerateArray())
-            {
-                if (a.ValueKind == JsonValueKind.String)
-                {
-                    var s = a.GetString();
-                    if (!string.IsNullOrEmpty(s)) agents.Add(s);
-                }
-            }
-        }
+        // Upstream emits the agent list under `hosts` (always an array, even
+        // for single-agent installs and empty for --dir scans). Older /
+        // alternate payloads used `agents`; read both, prefer `hosts`.
+        var hosts = ReadStringArray(obj, "hosts", "agents");
+
+        var sourceUrl = GetString(obj, "sourceURL", "source_url");
+        var repo = GetString(obj, "repo", "repository");
 
         return new GhSkillListRecord
         {
-            Name = GetString(obj, "name", "skillName", "skill_name"),
+            // skillName is the upstream-canonical field; legacy `name` /
+            // `skill_name` payloads still parse.
+            Name = GetString(obj, "skillName", "name", "skill_name"),
+            // path is upstream-canonical; the older keys stay as fallbacks
+            // (some early SkillView log fixtures used installPath).
             Path = GetString(obj, "path", "installPath", "install_path"),
             ResolvedPath = GetString(obj, "resolvedPath", "resolved_path", "canonicalPath"),
-            Repo = GetString(obj, "repo", "repository"),
+            SourceUrl = sourceUrl,
+            Repo = repo,
             Agent = GetString(obj, "agent"),
             Scope = GetString(obj, "scope"),
             Version = GetString(obj, "version", "ref"),
+            // Upstream `gh skill list` doesn't emit tree-sha — keep the
+            // fallback keys for parity with payloads that include it.
             GithubTreeSha = GetString(obj, "githubTreeSha", "github_tree_sha", "github-tree-sha", "treeSha", "tree_sha", "sha"),
             Pinned = GetBool(obj, "pinned", "isPinned"),
+            // Upstream doesn't emit isSymlink — filesystem scan resolves it.
+            // Legacy payloads can still feed the field for testing.
             IsSymlink = GetBool(obj, "isSymlink", "symlink", "is_symlink"),
-            Agents = agents.ToImmutable(),
+            Hosts = hosts,
         };
+    }
+
+    private static ImmutableArray<string> ReadStringArray(JsonElement obj, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!obj.TryGetProperty(name, out var el) || el.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<string>();
+            foreach (var item in el.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var s = item.GetString();
+                    if (!string.IsNullOrEmpty(s)) builder.Add(s);
+                }
+            }
+            return builder.ToImmutable();
+        }
+        return ImmutableArray<string>.Empty;
     }
 
     private static string? GetString(JsonElement obj, params string[] names)

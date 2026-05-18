@@ -147,7 +147,11 @@ public sealed class LocalInventoryService
             else
             {
                 // CLI claims this install but filesystem scan didn't see it.
-                // Emit as CliList-only, with the path the CLI reported.
+                // Emit as CliList-only, with the path the CLI reported. The
+                // upstream `gh skill list` shape (cli/cli#13418) makes
+                // `hosts: []` always an array; we adapt that to AgentMembership
+                // entries. SourceUrl lands on FrontMatter.Upstream so the UI
+                // can render the source link from CliList-only records.
                 var path = rec.ResolvedPath ?? rec.Path ?? string.Empty;
                 outputBuilder.Add(new InstalledSkill
                 {
@@ -155,15 +159,16 @@ public sealed class LocalInventoryService
                     ResolvedPath = path,
                     ScanRoot = path,
                     Scope = ParseScope(rec.Scope) ?? Scope.Custom,
-                    Agents = rec.Agents.IsDefaultOrEmpty
+                    Agents = rec.Hosts.IsDefaultOrEmpty
                         ? (rec.Agent is null
                             ? ImmutableArray<AgentMembership>.Empty
                             : ImmutableArray.Create(new AgentMembership(rec.Agent, path, rec.IsSymlink)))
-                        : rec.Agents.Select(a => new AgentMembership(a, path, rec.IsSymlink)).ToImmutableArray(),
+                        : rec.Hosts.Select(a => new AgentMembership(a, path, rec.IsSymlink)).ToImmutableArray(),
                     FrontMatter = new SkillFrontMatter
                     {
                         Name = rec.Name,
                         Version = rec.Version,
+                        Upstream = rec.SourceUrl ?? rec.Repo,
                         GithubTreeSha = rec.GithubTreeSha,
                         Pinned = rec.Pinned,
                     },
