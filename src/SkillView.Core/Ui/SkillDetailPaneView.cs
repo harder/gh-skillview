@@ -3,6 +3,14 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
+// Terminal.Gui 2.2 marks TextView [Obsolete] in favor of gui-cs/Editor, which
+// is an editor-grade widget intended for full document editing. SkillView uses
+// TextView only as a read-only scrollable text surface for the raw SKILL.md
+// preview and the log pane — neither needs an editing model, and pulling in a
+// second NuGet for two read-only panes isn't justified. Suppress narrowly so
+// the rest of the file is still checked.
+#pragma warning disable CS0618 // TextView obsolete — see note above.
+
 namespace SkillView.Ui;
 
 /// Right-pane container for skill details: a one-line item-actions hint, an

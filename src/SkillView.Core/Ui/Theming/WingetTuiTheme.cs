@@ -6,7 +6,7 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 namespace SkillView.Ui.Theming;
 
 /// Color palette and scheme factories matching the winget-tui (shanselman/winget-tui)
-/// Ratatui implementation, ported to Terminal.Gui 2.1 24-bit color attributes.
+/// Ratatui implementation, ported to Terminal.Gui 2.2 24-bit color attributes.
 ///
 /// All colors are RGB literals — the truecolor codepath fires on any terminal
 /// whose $COLORTERM declares truecolor / 24bit support. Terminals that don't

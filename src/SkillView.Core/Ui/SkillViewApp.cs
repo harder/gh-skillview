@@ -39,9 +39,11 @@ public sealed class SkillViewApp
     private CheckBox? _hiddenDirsBox;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
+#pragma warning disable CS0618 // TextView obsolete in TG2.2 — see SkillDetailPaneView note.
     private TextView? _previewRawPane;
     private Markdown? _metadataPane;
     private TextView? _logPane;
+#pragma warning restore CS0618
     private Label? _statusLabel;
     private SpinnerView? _spinner;
     private StatusBar? _statusBarPreview;
@@ -135,9 +137,8 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // SkillView now pins the stable Terminal.Gui 2.1.0 release, so keep this
-    // startup path aligned with the 2.1.0-era AOT guidance rather than
-    // claiming the later 2.1.1-develop configuration-crash fix applies here.
+    // SkillView pins the Terminal.Gui 2.2.0-rc.3 release; this startup path
+    // stays aligned with TG2 AOT guidance and the modern lifecycle.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)

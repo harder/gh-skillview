@@ -4,11 +4,10 @@
     <OutputType>Library</OutputType>
     <RootNamespace>SkillView</RootNamespace>
     <AssemblyName>SkillView.Core</AssemblyName>
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.0</TerminalGuiVersion>
-    <!-- Terminal.Gui 2.1.0 remains centrally pinned here so CI can
-         override it via MSBuild while the app host keeps the modern AOT-safe
-         lifecycle and the gh extension's separate TG2 NoWarn review stays local
-         to that project. -->
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.2.0-rc.3</TerminalGuiVersion>
+    <!-- Terminal.Gui is centrally pinned here so CI can override it via
+         MSBuild while the app host keeps the modern AOT-safe lifecycle and the
+         gh extension's separate TG2 NoWarn review stays local to that project. -->
   </PropertyGroup>
 
   <ItemGroup>

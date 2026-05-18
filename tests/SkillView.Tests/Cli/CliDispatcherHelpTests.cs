@@ -50,7 +50,9 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("Terminal.Gui", stdout, StringComparison.Ordinal);
-        Assert.Contains("2.1.0", stdout, StringComparison.Ordinal);
+        // The runtime AssemblyVersion drops the package "-rc.3" suffix and
+        // surfaces as "2.2.0.0"; assert on the leading SemVer triplet.
+        Assert.Contains("2.2.0", stdout, StringComparison.Ordinal);
     }
 
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string processPath, params string[] args)

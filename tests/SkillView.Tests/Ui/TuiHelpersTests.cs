@@ -202,11 +202,13 @@ public sealed class TuiHelpersTests
     [Fact]
     public void ConfigureReadOnlyPane_SetsReadableDefaults()
     {
+#pragma warning disable CS0618 // TextView obsolete in TG2.2 — see SkillDetailPaneView note.
         var view = new TextView
         {
             ReadOnly = false,
             WordWrap = false,
         };
+#pragma warning restore CS0618
 
         TuiHelpers.ConfigureReadOnlyPane(view, SkillViewStyling.DialogSchemeName);
 
