@@ -54,6 +54,7 @@ public sealed class SkillViewApp
     private FrameView? _metadataFrame;
     private FrameView? _previewFrame;
     private Label? _itemActionsLabel;
+    private SkillView.Ui.Tabs.InstalledTabView? _installedTab;
 
     private const int MinMetadataHeight = 3;
     private const int MaxMetadataHeight = 8;
@@ -404,7 +405,30 @@ public sealed class SkillViewApp
         _itemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
         RefreshHiddenDirUi();
 
-        window.Add(_tabBar, _leftFrame, _rightFrame, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
+        _installedTab = new SkillView.Ui.Tabs.InstalledTabView(
+            runOnUi: action =>
+            {
+                var tcs = new TaskCompletionSource();
+                Invoke(() =>
+                {
+                    try { action(); tcs.TrySetResult(); }
+                    catch (Exception ex) { tcs.TrySetException(ex); }
+                });
+                return tcs.Task;
+            },
+            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
+            onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
+            onLeaveTab: () => ActivateTab(SkillViewTab.Search),
+            onGoToSearch: () => { ActivateTab(SkillViewTab.Search); FocusSearchFromInstalled(); })
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+            Visible = false,
+        };
+
+        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
             window,
@@ -491,32 +515,44 @@ public sealed class SkillViewApp
         return false;
     }
 
-    /// Switch active tab. For now Search is the embedded view; Installed and
-    /// Updates open their (modal) screens — they will become embedded tab
-    /// views in Phases 4 and 5. The tab bar always reflects the *intended*
-    /// active tab even when the underlying view is still modal.
+    /// Switch active tab. Search and Installed are embedded views — flipping
+    /// the Visible flags swaps them in-place without re-running the app loop.
+    /// Updates still routes to the existing modal screen (Phase 5 will embed).
     private void ActivateTab(SkillViewTab tab)
     {
-        if (tab == _activeTab && tab == SkillViewTab.Search) return;
+        if (tab == _activeTab) return;
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
         switch (tab)
         {
             case SkillViewTab.Search:
-                // No-op: Search is the always-rendered base view.
+                ShowSearchPanes(true);
+                if (_installedTab is not null) _installedTab.Visible = false;
                 _queryField?.SetFocus();
                 break;
             case SkillViewTab.Installed:
-                _workflows.ShowInstalled();
-                _activeTab = SkillViewTab.Search;
-                _tabBar?.SetActiveTab(SkillViewTab.Search);
+                ShowSearchPanes(false);
+                if (_installedTab is not null)
+                {
+                    _installedTab.Visible = true;
+                    _ = _installedTab.LoadAsync();
+                }
                 break;
             case SkillViewTab.Updates:
+                // Updates is still a modal screen (Phase 5). Snap the tab
+                // indicator back to Search once the modal closes so the
+                // header doesn't claim a tab we're not in.
                 _workflows.ShowUpdateScreen();
                 _activeTab = SkillViewTab.Search;
                 _tabBar?.SetActiveTab(SkillViewTab.Search);
                 break;
         }
+    }
+
+    private void ShowSearchPanes(bool visible)
+    {
+        if (_leftFrame is not null)  _leftFrame.Visible  = visible;
+        if (_rightFrame is not null) _rightFrame.Visible = visible;
     }
 
     private void CycleTab(int delta)
@@ -608,7 +644,16 @@ public sealed class SkillViewApp
                 if (ShouldAutoOpenInstalledOnStartup(snapshot))
                 {
                     _startupInstalledShown = true;
-                    _workflows.OpenInstalledSnapshot(snapshot);
+                    // Seed the embedded tab with the snapshot we already have,
+                    // then activate it (skips the duplicate inventory scan
+                    // LoadAsync would otherwise trigger).
+                    if (_installedTab is not null)
+                    {
+                        ShowSearchPanes(false);
+                        _activeTab = SkillViewTab.Installed;
+                        _tabBar?.SetActiveTab(SkillViewTab.Installed);
+                        _installedTab.LoadSeeded(snapshot);
+                    }
                 }
             });
 

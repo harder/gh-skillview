@@ -168,27 +168,6 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "update");
     }
 
-    public void ShowInstalled()
-    {
-        if (_getApp() is null)
-        {
-            return;
-        }
-
-        _setBusy("scanning inventory…");
-        _runBackground(async cancellationToken =>
-        {
-            var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            _invoke(() =>
-            {
-                _clearBusy();
-                _setStatus($"{snapshot.Skills.Length} installed skill(s)");
-                OpenInstalledSnapshot(snapshot);
-            });
-        }, "installed");
-    }
-
     public void ShowCleanupScreen()
     {
         var app = _getApp();
@@ -252,22 +231,26 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "doctor");
     }
 
-    public void OpenInstalledSnapshot(InventorySnapshot snapshot)
-    {
-        var app = _getApp();
-        if (app is null)
-        {
-            return;
-        }
 
-        InstalledScreen.Show(
-            app,
-            snapshot,
-            target => OpenRemoveDialog(target, snapshot),
-            _focusSearchFromInstalled);
+    public Task<InventorySnapshot> CaptureInventorySnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        // Used by the embedded InstalledTabView / UpdatesTabView for their
+        // on-activate snapshot loads. Probes the environment lazily so the
+        // first tab activation doesn't hard-fail when gh hasn't been probed
+        // yet (mirrors the lazy-probe in ShowDoctor).
+        return CaptureForTabAsync(cancellationToken);
     }
 
-    private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
+    public void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot) =>
+        OpenRemoveDialogInternal(target, snapshot);
+
+    private async Task<InventorySnapshot> CaptureForTabAsync(CancellationToken cancellationToken)
+    {
+        var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
+        return await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void OpenRemoveDialogInternal(InstalledSkill target, InventorySnapshot snapshot)
     {
         var app = _getApp();
         if (app is null)
