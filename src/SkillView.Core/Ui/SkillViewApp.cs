@@ -55,6 +55,7 @@ public sealed class SkillViewApp
     private FrameView? _previewFrame;
     private Label? _itemActionsLabel;
     private SkillView.Ui.Tabs.InstalledTabView? _installedTab;
+    private SkillView.Ui.Tabs.UpdatesTabView? _updatesTab;
 
     private const int MinMetadataHeight = 3;
     private const int MaxMetadataHeight = 8;
@@ -405,17 +406,19 @@ public sealed class SkillViewApp
         _itemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
         RefreshHiddenDirUi();
 
-        _installedTab = new SkillView.Ui.Tabs.InstalledTabView(
-            runOnUi: action =>
+        Func<Action, Task> runOnUi = action =>
+        {
+            var tcs = new TaskCompletionSource();
+            Invoke(() =>
             {
-                var tcs = new TaskCompletionSource();
-                Invoke(() =>
-                {
-                    try { action(); tcs.TrySetResult(); }
-                    catch (Exception ex) { tcs.TrySetException(ex); }
-                });
-                return tcs.Task;
-            },
+                try { action(); tcs.TrySetResult(); }
+                catch (Exception ex) { tcs.TrySetException(ex); }
+            });
+            return tcs.Task;
+        };
+
+        _installedTab = new SkillView.Ui.Tabs.InstalledTabView(
+            runOnUi: runOnUi,
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Search),
@@ -428,7 +431,25 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
-        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
+        _updatesTab = new SkillView.Ui.Tabs.UpdatesTabView(
+            runOnUi: runOnUi,
+            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
+            updateServiceFactory: () => _services.UpdateService,
+            ghPathProvider: () => _ghPath,
+            capabilitiesProvider: () => _lastReport?.Capabilities ?? CapabilityProfile.Empty,
+            logger: _services.Logger,
+            onLeaveTab: () => ActivateTab(SkillViewTab.Search),
+            onUpdateApplied: () => _services.ListAdapter.Invalidate())
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+            Visible = false,
+        };
+
+        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _updatesTab,
+                   _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
             window,
@@ -502,7 +523,9 @@ public sealed class SkillViewApp
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
-        if (rune.Value == 'u' || rune.Value == 'U') { _workflows.ShowUpdateScreen(); return true; }
+        // `u` jumps to the Updates tab (embedded). The actual single-row vs.
+        // batch update keys live on the tab itself (u current row, U marked).
+        if (rune.Value == 'u' || rune.Value == 'U') { ActivateTab(SkillViewTab.Updates); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
@@ -515,19 +538,24 @@ public sealed class SkillViewApp
         return false;
     }
 
-    /// Switch active tab. Search and Installed are embedded views — flipping
-    /// the Visible flags swaps them in-place without re-running the app loop.
-    /// Updates still routes to the existing modal screen (Phase 5 will embed).
+    /// Switch active tab. All three (Search / Installed / Updates) are
+    /// embedded views — flipping the Visible flags swaps them in-place
+    /// without re-running the app loop.
     private void ActivateTab(SkillViewTab tab)
     {
         if (tab == _activeTab) return;
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
+
+        // Hide every non-Search tab by default; the requested one is then
+        // revealed below.
+        if (_installedTab is not null) _installedTab.Visible = false;
+        if (_updatesTab   is not null) _updatesTab.Visible   = false;
+
         switch (tab)
         {
             case SkillViewTab.Search:
                 ShowSearchPanes(true);
-                if (_installedTab is not null) _installedTab.Visible = false;
                 _queryField?.SetFocus();
                 break;
             case SkillViewTab.Installed:
@@ -539,12 +567,12 @@ public sealed class SkillViewApp
                 }
                 break;
             case SkillViewTab.Updates:
-                // Updates is still a modal screen (Phase 5). Snap the tab
-                // indicator back to Search once the modal closes so the
-                // header doesn't claim a tab we're not in.
-                _workflows.ShowUpdateScreen();
-                _activeTab = SkillViewTab.Search;
-                _tabBar?.SetActiveTab(SkillViewTab.Search);
+                ShowSearchPanes(false);
+                if (_updatesTab is not null)
+                {
+                    _updatesTab.Visible = true;
+                    _ = _updatesTab.LoadAsync();
+                }
                 break;
         }
     }

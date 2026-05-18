@@ -123,50 +123,6 @@ internal sealed class SkillViewWorkflowCoordinator
         }
     }
 
-    public void ShowUpdateScreen()
-    {
-        var app = _getApp();
-        var ghPath = _getGhPath();
-        var report = _getLastReport();
-        if (app is null)
-        {
-            return;
-        }
-
-        if (ghPath is null || report is null)
-        {
-            _setStatus("gh not ready — press 'd' for Doctor");
-            return;
-        }
-
-        _setBusy("scanning inventory for update picker…");
-        _runBackground(async cancellationToken =>
-        {
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            _invoke(() =>
-            {
-                _clearBusy();
-                var screen = new UpdateScreen(
-                    app,
-                    _services.UpdateService,
-                    _services.Logger,
-                    ghPath,
-                    report.Capabilities,
-                    snapshot.Skills);
-                screen.Show();
-                if (screen.LastResult is { DryRun: false, Succeeded: true })
-                {
-                    _services.ListAdapter.Invalidate();
-                    _setStatusWithLevel("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
-                    QueueInventoryRescan(report, successStatus: "updated — inventory now {0} skill(s)");
-                }
-                else if (screen.LastResult is { Succeeded: false } failed)
-                {
-                    _setStatusWithLevel($"update failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
-                }
-            });
-        }, "update");
-    }
 
     public void ShowCleanupScreen()
     {
