@@ -56,6 +56,10 @@ public sealed class SkillViewApp
     private Label? _itemActionsLabel;
     private SkillView.Ui.Tabs.InstalledTabView? _installedTab;
     private SkillView.Ui.Tabs.UpdatesTabView? _updatesTab;
+    private SkillView.Ui.Tabs.DoctorTabView? _doctorTab;
+    // Remembered before Doctor took over so Esc returns to where the user was.
+    private SkillViewTab _tabBeforeDoctor = SkillViewTab.Search;
+    private bool _inDoctor;
 
     private const int MinMetadataHeight = 3;
     private const int MaxMetadataHeight = 8;
@@ -458,7 +462,17 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
-        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _updatesTab,
+        _doctorTab = new SkillView.Ui.Tabs.DoctorTabView(
+            onLeaveTab: LeaveDoctor)
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+            Visible = false,
+        };
+
+        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _updatesTab, _doctorTab,
                    _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
@@ -525,7 +539,7 @@ public sealed class SkillViewApp
         if (rune.Value == 'q' || rune.Value == 'Q') { _app?.RequestStop(); return true; }
         if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R') { ToggleRightPane(); return true; }
         if (rune.Value == 'e' || rune.Value == 'E') { TogglePreviewMode(); return true; }
-        if (rune.Value == 'd' || rune.Value == 'D') { _workflows.ShowDoctor(); return true; }
+        if (rune.Value == 'd' || rune.Value == 'D') { EnterDoctor(); return true; }
         // winget-tui keybindings:
         //   i → compact install modal (one screen, sensible defaults)
         //   I → advanced install wizard (multi-step InstallScreen)
@@ -600,6 +614,57 @@ public sealed class SkillViewApp
     {
         if (_leftFrame is not null)  _leftFrame.Visible  = visible;
         if (_rightFrame is not null) _rightFrame.Visible = visible;
+    }
+
+    /// Replace whatever tab is currently visible with the Doctor view. We
+    /// remember the prior tab so LeaveDoctor can restore it; if Doctor is
+    /// already on screen this is a no-op.
+    private void EnterDoctor()
+    {
+        if (_inDoctor || _doctorTab is null) return;
+        _tabBeforeDoctor = _activeTab;
+        _inDoctor = true;
+        ShowSearchPanes(false);
+        if (_installedTab is not null) _installedTab.Visible = false;
+        if (_updatesTab   is not null) _updatesTab.Visible   = false;
+
+        // Make sure the report is fresh — probe lazily if we never have.
+        if (_lastReport is not null)
+        {
+            _doctorTab.SetReport(_lastReport);
+            _doctorTab.Visible = true;
+            _doctorTab.SetFocus();
+            return;
+        }
+
+        // Probe in the background; reveal an empty pane in the meantime so
+        // the user sees the screen flip even before the report lands.
+        _doctorTab.Visible = true;
+        SetBusy("probing environment for Doctor…");
+        RunBackground(async cancellationToken =>
+        {
+            var probed = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
+            _lastReport = probed;
+            Invoke(() =>
+            {
+                ClearBusy();
+                _doctorTab.SetReport(probed);
+                _doctorTab.SetFocus();
+            });
+        }, "doctor");
+    }
+
+    private void LeaveDoctor()
+    {
+        if (!_inDoctor || _doctorTab is null) return;
+        _inDoctor = false;
+        _doctorTab.Visible = false;
+        // Re-enter the previously-active primary tab. We force-set _activeTab
+        // to something different first so ActivateTab's no-op guard doesn't
+        // suppress the re-show.
+        var restore = _tabBeforeDoctor;
+        _activeTab = restore == SkillViewTab.Search ? SkillViewTab.Installed : SkillViewTab.Search;
+        ActivateTab(restore);
     }
 
     private void CycleTab(int delta)

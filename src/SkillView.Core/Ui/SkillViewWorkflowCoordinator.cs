@@ -159,33 +159,6 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "cleanup");
     }
 
-    public void ShowDoctor()
-    {
-        var app = _getApp();
-        if (app is null)
-        {
-            return;
-        }
-
-        var report = _getLastReport();
-        if (report is not null)
-        {
-            DoctorScreen.Show(app, report);
-            return;
-        }
-
-        _setBusy("probing environment…");
-        _runBackground(async cancellationToken =>
-        {
-            var probed = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _rememberReport(probed);
-            _invoke(() =>
-            {
-                _clearBusy();
-                DoctorScreen.Show(app, probed);
-            });
-        }, "doctor");
-    }
 
 
     public Task<InventorySnapshot> CaptureInventorySnapshotAsync(CancellationToken cancellationToken = default)
