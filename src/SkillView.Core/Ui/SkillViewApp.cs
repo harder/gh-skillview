@@ -466,8 +466,12 @@ public sealed class SkillViewApp
         if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R') { ToggleRightPane(); return true; }
         if (rune.Value == 'e' || rune.Value == 'E') { TogglePreviewMode(); return true; }
         if (rune.Value == 'd' || rune.Value == 'D') { _workflows.ShowDoctor(); return true; }
-        if (rune.Value == 'I') { _workflows.ShowInstalled(); return true; }
-        if (rune.Value == 'i') { StageInstall(); return true; }
+        // winget-tui keybindings:
+        //   i → compact install modal (one screen, sensible defaults)
+        //   I → advanced install wizard (multi-step InstallScreen)
+        // The Installed view is reached via `2` (jump-to-tab) or ←/→ cycling.
+        if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
+        if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         if (rune.Value == 'u' || rune.Value == 'U') { _workflows.ShowUpdateScreen(); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
@@ -1216,7 +1220,7 @@ public sealed class SkillViewApp
     /// Stage an install of the currently-selected search result. Bound to
     /// `i` on the main view; the actual `gh skill install` invocation runs
     /// in `OpenInstallDialog`.
-    private void StageInstall()
+    private void StageInstall(bool forceAdvanced = false)
     {
         if (_resultsTable is null || _results.Count == 0)
         {
@@ -1235,11 +1239,13 @@ public sealed class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
-        _workflows.OpenInstallDialog(new InstallRequest(
-            Repo: pick.Repo,
-            SkillName: pick.SkillName,
-            RepoPath: pick.Path,
-            AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
+        _workflows.OpenInstallDialog(
+            new InstallRequest(
+                Repo: pick.Repo,
+                SkillName: pick.SkillName,
+                RepoPath: pick.Path,
+                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
+            forceAdvanced: forceAdvanced);
     }
 
     private void FocusSearchFromInstalled()

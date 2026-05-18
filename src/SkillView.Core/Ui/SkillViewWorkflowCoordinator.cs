@@ -52,7 +52,12 @@ internal sealed class SkillViewWorkflowCoordinator
         _focusSearchFromInstalled = focusSearchFromInstalled;
     }
 
-    public void OpenInstallDialog(InstallRequest request)
+    /// Open the install flow. By default takes the compact one-screen modal
+    /// matching winget-tui's `i` shortcut — Scope radio + agents row + Install.
+    /// If the user picks "Advanced…" (or `forceAdvanced: true` is requested by
+    /// the caller for the `I` shortcut), escalates to the full multi-step
+    /// <see cref="InstallScreen"/> wizard.
+    public void OpenInstallDialog(InstallRequest request, bool forceAdvanced = false)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
@@ -60,6 +65,38 @@ internal sealed class SkillViewWorkflowCoordinator
         if (app is null || ghPath is null || report is null)
         {
             return;
+        }
+
+        if (!forceAdvanced)
+        {
+            var compact = new InstallConfirmModal(
+                app,
+                _services.InstallService,
+                _services.Logger,
+                ghPath,
+                report.Capabilities,
+                request);
+            var compactResult = compact.Show();
+            switch (compactResult.Outcome)
+            {
+                case InstallConfirmModal.Outcome.Installed when compactResult.Install is { Succeeded: true } r:
+                    _services.ListAdapter.Invalidate();
+                    _setStatusWithLevel(
+                        $"installed {r.Repo}{(r.SkillName is null ? "" : "/" + r.SkillName)} — rescanning…",
+                        TuiHelpers.NotificationLevel.Success);
+                    QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                    return;
+                case InstallConfirmModal.Outcome.Failed when compactResult.Install is { } f:
+                    _setStatusWithLevel(
+                        $"install failed (exit {f.ExitCode}) — see logs (l)",
+                        TuiHelpers.NotificationLevel.Error);
+                    return;
+                case InstallConfirmModal.Outcome.Cancelled:
+                    return;
+                case InstallConfirmModal.Outcome.EscalateToAdvanced:
+                    // Fall through to the advanced wizard below.
+                    break;
+            }
         }
 
         var installScreen = new InstallScreen(
