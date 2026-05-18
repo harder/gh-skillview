@@ -1,6 +1,7 @@
 using System.Text;
 using SkillView.Bootstrapping;
 using SkillView.Inventory;
+using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -74,18 +75,22 @@ internal static class TuiHelpers
 
     /// Build a Scheme whose Normal attribute matches the requested
     /// notification level. Intended for the bottom status bar Label.
+    /// HighContrast theme uses StandardColor 16-color terminal codes for
+    /// fidelity on bare terminals; Default theme uses winget-tui's truecolor
+    /// palette via WingetTuiTheme.
     internal static Scheme CreateStatusScheme(NotificationLevel level)
     {
+        if (CurrentTheme != AppTheme.HighContrast)
+        {
+            return WingetTuiTheme.CreateStatusScheme(level);
+        }
+
         var (fg, bg) = level switch
         {
-            NotificationLevel.Success when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Green),
-            NotificationLevel.Warn when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Yellow),
-            NotificationLevel.Error when CurrentTheme == AppTheme.HighContrast => (StandardColor.White, StandardColor.Red),
             NotificationLevel.Success => (StandardColor.Black, StandardColor.Green),
             NotificationLevel.Warn => (StandardColor.Black, StandardColor.Yellow),
             NotificationLevel.Error => (StandardColor.White, StandardColor.Red),
-            _ when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.White),
-            _ => (StandardColor.White, StandardColor.Black),
+            _ => (StandardColor.Black, StandardColor.White),
         };
         var normal = new Attribute(fg, bg);
         return new Scheme
@@ -299,30 +304,19 @@ internal static class TuiHelpers
         return list.ToArray();
     }
 
-    /// Create an explicit scheme for editable text inputs using only basic
-    /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
+    /// Create an explicit scheme for editable text inputs. HighContrast keeps
+    /// 16-color StandardColor codes for terminal-default fidelity; the Default
+    /// theme uses winget-tui's truecolor palette via WingetTuiTheme.
     private static Scheme CreateEditableInputScheme()
     {
-        Attribute normal;
-        Attribute focus;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            return WingetTuiTheme.CreateEditableInputScheme();
         }
-        else
-        {
-            // Distinct background (DarkBlue) so unfocused text fields are
-            // visually separated from the surrounding FrameView's black fill.
-            // Disabled state uses Black bg so the field visually "blends out"
-            // — otherwise an empty disabled field is indistinguishable from an
-            // empty enabled one.
-            normal = new Attribute(StandardColor.White, StandardColor.DarkBlue);
-            focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         return new Scheme
         {
@@ -343,21 +337,14 @@ internal static class TuiHelpers
     /// Create an explicit scheme for read-only panes (preview, logs).
     private static Scheme CreateReadOnlyPaneScheme()
     {
-        Attribute normal;
-        Attribute focus;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            return WingetTuiTheme.CreateReadOnlyPaneScheme();
         }
-        else
-        {
-            normal = new Attribute(StandardColor.White, StandardColor.Black);
-            focus = new Attribute(StandardColor.White, StandardColor.Blue);
-            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         return new Scheme
         {
@@ -443,24 +430,19 @@ internal static class TuiHelpers
     }
 
     /// Apply a high-contrast color scheme to a TableView so the selected
-    /// row is clearly visible (inverted colors for Focus state).
+    /// row is clearly visible (inverted colors for Focus state). Default theme
+    /// uses the winget-tui Accent gold; HighContrast keeps StandardColor codes.
     internal static void ConfigureTableScheme(TableView table)
     {
-        Attribute normal;
-        Attribute selected;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            selected = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            table.SetScheme(WingetTuiTheme.CreateTableScheme());
+            return;
         }
-        else
-        {
-            normal = new Attribute(StandardColor.White, StandardColor.Black);
-            selected = new Attribute(StandardColor.Black, StandardColor.Cyan);
-            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var selected = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         table.SetScheme(new Scheme
         {

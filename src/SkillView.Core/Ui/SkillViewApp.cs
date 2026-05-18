@@ -120,6 +120,7 @@ public sealed class SkillViewApp
     {
         TuiHelpers.SetTheme(_options.Theme);
         ConfigurationManager.Enable(ConfigLocations.All);
+        SkillView.Ui.Theming.WingetTuiTheme.Register(_options.Theme);
         if (cancellationToken.IsCancellationRequested)
         {
             return ExitCodes.Success;
