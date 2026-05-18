@@ -377,7 +377,7 @@ public sealed class SkillViewApp
             new Shortcut { Title = "c", HelpText = "Cleanup" },
             new Shortcut { Title = "d", HelpText = "Doctor" },
             new Shortcut { Title = "l", HelpText = "Logs" },
-            new Shortcut { Key = Key.F1, Title = "Help" },
+            new Shortcut { Title = "?", HelpText = "Help" },
             new Shortcut { Title = "q", HelpText = "Quit" },
         ]));
         _statusBarLogs = new StatusBar(
@@ -471,7 +471,7 @@ public sealed class SkillViewApp
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         if (rune.Value == 'u' || rune.Value == 'U') { _workflows.ShowUpdateScreen(); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
-        if (key.KeyCode == KeyCode.F1) { ShowHelp(); return true; }
+        if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
         // Tab navigation — direct (1/2/3) and cyclic (←/→).
         if (rune.Value == '1') { ActivateTab(SkillViewTab.Search); return true; }
@@ -1177,11 +1177,7 @@ public sealed class SkillViewApp
     private void ShowHelp()
     {
         if (_app is null) return;
-        MessageBox.Query(
-            _app,
-            "SkillView — keys",
-            TuiHelpers.HelpText,
-            "OK");
+        HelpOverlay.Show(_app);
     }
 
     /// Open the GitHub page for the selected search result in the system
