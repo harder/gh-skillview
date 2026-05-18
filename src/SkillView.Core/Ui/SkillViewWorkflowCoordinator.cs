@@ -275,6 +275,48 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
+        // Compact path: a single skill with no second-confirm warnings and no
+        // validation errors gets the winget-tui `[y] yes  [n] no` confirm.
+        // Anything more involved (package/repo group, incoming symlinks,
+        // errors) escalates to the full RemoveScreen wizard.
+        var targets = RemoveTargetResolver.BuildTargets(target, snapshot);
+        var primary = targets.IsEmpty ? null : (RemoveTarget?)targets[0];
+        if (primary is { } primaryTarget)
+        {
+            var evaluation = RemoveTargetResolver.Evaluate(primaryTarget, snapshot);
+            if (RemoveConfirmModal.CanRunCompact(evaluation))
+            {
+                var modal = new RemoveConfirmModal(app, _services.RemoveService, _services.Logger, target, evaluation);
+                var compactResult = modal.Show();
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Removed
+                    && compactResult.Report is { Succeeded: true })
+                {
+                    _services.ListAdapter.Invalidate();
+                    _setStatusWithLevel(
+                        $"removed {target.Name} — rescanning…",
+                        TuiHelpers.NotificationLevel.Success);
+                    var envReportCompact = _getLastReport();
+                    if (envReportCompact is not null)
+                    {
+                        QueueInventoryRescan(envReportCompact, successStatus: "removed — inventory now {0} skill(s)");
+                    }
+                    return;
+                }
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Failed)
+                {
+                    _setStatusWithLevel(
+                        $"remove failed — {compactResult.Report?.Errors.FirstOrDefault() ?? "see logs (l)"}",
+                        TuiHelpers.NotificationLevel.Error);
+                    return;
+                }
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Cancelled)
+                {
+                    return;
+                }
+                // Outcome.EscalateToWizard → fall through to the wizard below.
+            }
+        }
+
         var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
         screen.Show();
         if (screen.LastReport is { TargetsDeleted: > 0 } report)
