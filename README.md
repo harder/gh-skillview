@@ -361,7 +361,7 @@ dotnet build
 dotnet test --no-build
 ```
 
-The repo currently pins Terminal.Gui `2.2.0-rc.3` and uses xUnit v3 test APIs
+The repo currently pins Terminal.Gui `2.2.1` and uses xUnit v3 test APIs
 like `TestContext`; if you pulled package changes, run `dotnet restore` before
 building so stale package assets do not leave the test projects on xUnit 2.x.
 

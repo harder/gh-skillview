@@ -137,7 +137,7 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // SkillView pins the Terminal.Gui 2.2.0-rc.3 release; this startup path
+    // SkillView pins the Terminal.Gui 2.2.1 release; this startup path
     // stays aligned with TG2 AOT guidance and the modern lifecycle.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
