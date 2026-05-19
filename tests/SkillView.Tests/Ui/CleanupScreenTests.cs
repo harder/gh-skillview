@@ -1,13 +1,215 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Logging;
 using SkillView.Ui;
+using Terminal.Gui.Views;
 using Xunit;
 
 namespace SkillView.Tests.Ui;
 
 public sealed class CleanupScreenTests
 {
+    [Fact]
+    public void DoRemove_RemovesEmptyDirectoryCandidateInsideScanRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var emptyDir = Path.Combine(root, "empty-dir");
+        Directory.CreateDirectory(emptyDir);
+
+        try
+        {
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.EmptyDirectory,
+                emptyDir,
+                "empty directory under scan root",
+                Skill: null);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.False(Directory.Exists(emptyDir));
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void DoRemove_RemovesBrokenSymlinkCandidateInsideScanRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var missingTarget = Path.Combine(root, "missing-target");
+        var brokenLink = Path.Combine(root, "broken-link");
+        Directory.CreateSymbolicLink(brokenLink, missingTarget);
+
+        try
+        {
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.BrokenSymlink,
+                brokenLink,
+                "broken symlink",
+                Skill: null);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.False(File.Exists(brokenLink) || Directory.Exists(brokenLink) || PathResolver.IsSymlink(brokenLink));
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void DoRemove_RemovesBrokenSymlinkCandidateWhenCandidateCarriesSkill()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var missingTarget = Path.Combine(root, "missing-target");
+        var brokenLink = Path.Combine(root, "broken-link");
+        Directory.CreateSymbolicLink(brokenLink, missingTarget);
+
+        try
+        {
+            var skill = Skill("broken-link", brokenLink) with
+            {
+                Validity = ValidityState.BrokenSymlink,
+            };
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.BrokenSymlink,
+                brokenLink,
+                "broken symlink",
+                Skill: skill);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)], [skill]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.False(File.Exists(brokenLink) || Directory.Exists(brokenLink) || PathResolver.IsSymlink(brokenLink));
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void DoRemove_SkipsEmptyDirectoryCandidateWhenDirectoryBecomesNonEmpty()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var emptyDir = Path.Combine(root, "empty-dir");
+        Directory.CreateDirectory(emptyDir);
+        File.WriteAllText(Path.Combine(emptyDir, "added.txt"), "now non-empty");
+
+        try
+        {
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.EmptyDirectory,
+                emptyDir,
+                "empty directory under scan root",
+                Skill: null);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.True(Directory.Exists(emptyDir));
+            Assert.Equal(0, screen.RemovedCount);
+            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void DoRemove_SkipsBrokenSymlinkCandidateWhenPathBecomesDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var missingTarget = Path.Combine(root, "missing-target");
+        var brokenLink = Path.Combine(root, "broken-link");
+        Directory.CreateSymbolicLink(brokenLink, missingTarget);
+        File.Delete(brokenLink);
+        Directory.CreateDirectory(brokenLink);
+        File.WriteAllText(Path.Combine(brokenLink, "added.txt"), "real directory now");
+
+        try
+        {
+            var skill = Skill("broken-link", brokenLink) with
+            {
+                Validity = ValidityState.BrokenSymlink,
+            };
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.BrokenSymlink,
+                brokenLink,
+                "broken symlink",
+                Skill: skill);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)], [skill]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.True(Directory.Exists(brokenLink));
+            Assert.Equal(0, screen.RemovedCount);
+            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void DoRemove_SkipsEmptyDirectoryCandidateWhenPathBecomesSymlink()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var target = Path.Combine(root, "empty-dir");
+        Directory.CreateDirectory(target);
+        var elsewhere = Path.Combine(root, "elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        Directory.Delete(target);
+        Directory.CreateSymbolicLink(target, elsewhere);
+
+        try
+        {
+            var candidate = new CleanupClassifier.Candidate(
+                CleanupClassifier.CandidateKind.EmptyDirectory,
+                target,
+                "empty directory under scan root",
+                Skill: null);
+            var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
+            var status = new Label();
+
+            InvokeDoRemove(screen, [0], status);
+
+            Assert.True(PathResolver.IsSymlink(target));
+            Assert.Equal(0, screen.RemovedCount);
+            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
     [Fact]
     public void RenderDetail_UsesStructuredMarkdownSections()
     {
@@ -95,4 +297,24 @@ public sealed class CleanupScreenTests
         IsSymlinked = false,
         InstalledAt = null,
     };
+
+    private static CleanupScreen CreateScreen(
+        ImmutableArray<CleanupClassifier.Candidate> candidates,
+        IReadOnlyList<ScanRoot> scanRoots,
+        IReadOnlyList<InstalledSkill>? allSkills = null) =>
+        new(
+            app: null!,
+            remove: new RemoveService(new Logger()),
+            logger: new Logger(),
+            candidates,
+            scanRoots,
+            allSkills: allSkills ?? Array.Empty<InstalledSkill>(),
+            confirmBatchRemoval: _ => 1);
+
+    private static void InvokeDoRemove(CleanupScreen screen, IEnumerable<int> checkedRows, Label status)
+    {
+        var method = typeof(CleanupScreen).GetMethod("DoRemove", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(screen, [new HashSet<int>(checkedRows), status]);
+    }
 }

@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
 using System.IO;
+using SkillView.Bootstrapping;
 using SkillView.Cli;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Logging;
+using SkillView.Ui;
 using Xunit;
 
 namespace SkillView.Tests.Cli;
@@ -85,6 +88,25 @@ public class CliDispatcherErrorTests : IDisposable
     {
         var args = CliDispatcher.ParseCleanupArgs(new[] { "--output", "/tmp/report.md" });
         Assert.Equal("/tmp/report.md", args.Output);
+    }
+
+    [Fact]
+    public async Task CleanupApply_RemovesBrokenSymlinkCandidate()
+    {
+        var brokenLink = Path.Combine(_tempRoot, "broken-link");
+        Directory.CreateSymbolicLink(brokenLink, Path.Combine(_tempRoot, "missing-target"));
+
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "skillview",
+            "--scan-root", _tempRoot,
+            "cleanup", "--candidates", "BrokenSymlink", "--apply", "--yes", "--json");
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.Contains("\"apply\": true", stdout);
+        Assert.Contains("\"kind\": \"BrokenSymlink\"", stdout);
+        Assert.Contains("\"succeeded\": true", stdout);
+        Assert.False(PathResolver.IsSymlink(brokenLink));
+        Assert.True(string.IsNullOrWhiteSpace(stderr));
     }
 
     // --- update parser edge cases ----------------------------------------
@@ -225,5 +247,28 @@ public class CliDispatcherErrorTests : IDisposable
         var json = CliDispatcher.RenderCleanupJson(candidates, applied, parsed);
         Assert.Contains("\"apply\": true", json);
         Assert.Contains("\"applied\"", json);
+    }
+
+    private static async Task<(int ExitCode, string Stdout, string Stderr)> RunCliAsync(string processPath, params string[] args)
+    {
+        var originalOut = Console.Out;
+        var originalErr = Console.Error;
+        using var stdoutWriter = new StringWriter();
+        using var stderrWriter = new StringWriter();
+        Console.SetOut(stdoutWriter);
+        Console.SetError(stderrWriter);
+
+        try
+        {
+            var options = ArgParser.Parse(processPath, args);
+            var services = TuiServices.Build(new Logger(LogLevel.Info));
+            var exitCode = await CliDispatcher.RunAsync(options, services).ConfigureAwait(false);
+            return (exitCode, stdoutWriter.ToString(), stderrWriter.ToString());
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalErr);
+        }
     }
 }
