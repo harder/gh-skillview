@@ -3,7 +3,6 @@ using System.Text;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
-using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace SkillView.Ui;
 
@@ -43,12 +42,10 @@ internal sealed class StatusStripView : View
         var width = Viewport.Width;
         if (width <= 0) return true;
 
-        var bg = WingetTuiTheme.Surface;
-        var fg = WingetTuiTheme.TextSecondary;
-        var accentFg = WingetTuiTheme.Accent;
+        var (strip, statusText, hintAccent) = TuiHelpers.GetStatusStripAttributes();
 
         Move(0, 0);
-        SetAttribute(new Attribute(fg, bg));
+        SetAttribute(strip);
         AddStr(new string(' ', width));
 
         // Left badges.
@@ -56,7 +53,7 @@ internal sealed class StatusStripView : View
         if (_leftBadges.Length > 0)
         {
             Move(x, 0);
-            SetAttribute(new Attribute(fg, bg));
+            SetAttribute(strip);
             AddStr(" " + _leftBadges + " ");
             x += 1 + _leftBadges.Length + 1;
         }
@@ -66,21 +63,22 @@ internal sealed class StatusStripView : View
         {
             var centerX = Math.Max(x, width / 4);
             Move(centerX, 0);
-            SetAttribute(new Attribute(WingetTuiTheme.TextPrimary, bg));
+            SetAttribute(statusText);
             AddStr(TuiHelpers.Truncate(_statusText, width / 2));
         }
 
-        // Right hints — rendered right-aligned using TruncateHintsForTests to
-        // determine which pairs fit, then drawn right-to-left.
-        var visibleHints = TruncateHintsForTests(_hints, width - x);
+        // Right hints — budget excludes left badges AND the center-status
+        // region so hints can never overwrite the status text (Bug 1).
+        var leftEdge = ComputeHintLeftEdge(width, x, _statusText);
+        var visibleHints = TruncateHintsForTests(_hints, width - leftEdge);
         if (visibleHints.Count > 0)
         {
             var rightText = BuildHintsText(visibleHints);
             var rx = width - rightText.Length;
-            if (rx > x)
+            if (rx >= leftEdge)  // >= allows exact-fit rendering (Bug 2)
             {
                 Move(rx, 0);
-                SetAttribute(new Attribute(accentFg, bg));
+                SetAttribute(hintAccent);
                 AddStr(rightText);
             }
         }
@@ -99,6 +97,18 @@ internal sealed class StatusStripView : View
             sb.Append(hint.Label);
         }
         return sb.ToString();
+    }
+
+    /// Compute the leftmost x-position available for right-aligned hints.
+    /// Accounts for both the left-badge end and the center-status text region
+    /// so that hints are never budgeted into space occupied by the status.
+    internal static int ComputeHintLeftEdge(int width, int leftBadgeEnd, string statusText)
+    {
+        if (statusText.Length == 0)
+            return leftBadgeEnd;
+        var centerX = Math.Max(leftBadgeEnd, width / 4);
+        var centerEnd = centerX + Math.Min(statusText.Length, width / 2);
+        return Math.Max(leftBadgeEnd, centerEnd);
     }
 
     /// Pure layout helper usable from tests. Given an ordered list of hints

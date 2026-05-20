@@ -464,6 +464,26 @@ internal static class TuiHelpers
         });
     }
 
+    /// Return the three drawing attributes used by StatusStripView.
+    /// Default theme uses the winget-tui truecolor palette; HighContrast uses
+    /// 16-color StandardColor codes so bare terminals keep legible contrast.
+    internal static (Attribute Strip, Attribute StripText, Attribute StripAccent) GetStatusStripAttributes()
+    {
+        if (CurrentTheme != AppTheme.HighContrast)
+        {
+            return (
+                new Attribute(WingetTuiTheme.TextSecondary, WingetTuiTheme.Surface),
+                new Attribute(WingetTuiTheme.TextPrimary,   WingetTuiTheme.Surface),
+                new Attribute(WingetTuiTheme.Accent,        WingetTuiTheme.Surface)
+            );
+        }
+        return (
+            new Attribute(StandardColor.Gray,   StandardColor.Black),
+            new Attribute(StandardColor.White,  StandardColor.Black),
+            new Attribute(StandardColor.Yellow, StandardColor.Black)
+        );
+    }
+
     internal static void ConfigureTableChrome(TableView table)
     {
         table.Style.ShowVerticalCellLineForFirstColumn = false;
