@@ -239,93 +239,51 @@ public sealed class SkillViewApp
         };
         _tabBar.TabActivated += (_, tab) => ActivateTab(tab);
 
-        // 60/40 list/detail split mirrors winget-tui's package list vs.
-        // detail-panel proportions — gives results more horizontal room for
-        // long repo names while leaving the detail pane wide enough to read
-        // wrapped SKILL.md prose without horizontal scroll.
-        _leftFrame = new FrameView
+        // Discover workspace — owns the 60/40 search-shell layout (left frame
+        // with query controls + results table, right detail pane).  All inner
+        // controls are exposed as properties so existing event-handler and
+        // rendering code below can reference them without further changes.
+        _discoverTab = new SkillView.Ui.Tabs.DiscoverTabView(ItemActionsText, TuiHelpers.WelcomeHint)
         {
-            Title = "Search",
             X = 0,
             Y = 1,
-            Width = Dim.Percent(60),
+            Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
 
-        // Compact single-line text fields. Distinct edit-field scheme
-        // (applied via ConfigureTextInput) gives them a visible inverse
-        // background so they don't blend into the surrounding FrameView.
-        var queryLabel = new Label
-        {
-            Text = "Query:",
-            X = 0,
-            Y = 0,
-        };
-        _queryField = new TextField
-        {
-            X = 8,
-            Y = 0,
-            Width = Dim.Fill(),
-            Text = string.Empty,
-        };
+        // Pull control references from the workspace so the rest of BuildUi
+        // and all existing call sites continue to work unchanged.
+        _leftFrame       = _discoverTab.LeftFrame;
+        _queryField      = _discoverTab.QueryField;
+        _ownerField      = _discoverTab.OwnerField;
+        _limitUpDown     = _discoverTab.LimitUpDown;
+        _agentField      = _discoverTab.AgentField;
+        _hiddenDirsBox   = _discoverTab.HiddenDirsBox;
+        _resultsTable    = _discoverTab.ResultsTable;
+        _detailPane      = _discoverTab.DetailPane;
+        _rightFrame      = _discoverTab.DetailPane;
+        _itemActionsLabel = _discoverTab.DetailPane.ItemActionsLabel;
+        _metadataFrame   = _discoverTab.DetailPane.MetadataFrame;
+        _metadataPane    = _discoverTab.DetailPane.MetadataPane;
+        _previewFrame    = _discoverTab.DetailPane.PreviewFrame;
+        _previewPane     = _discoverTab.DetailPane.PreviewPane;
+        _previewRawPane  = _discoverTab.DetailPane.PreviewRawPane;
+        _logPane         = _discoverTab.DetailPane.LogPane;
+
+        // Wire event handlers that require SkillViewApp state.
         _queryField.KeyDown += OnQueryFieldKey;
-        TuiHelpers.ConfigureTextInput(_queryField, SkillViewStyling.BaseSchemeName);
-
-        var ownerLabel = new Label { Text = "Owner:", X = 0, Y = 1 };
-        _ownerField = new TextField
-        {
-            X = 8, Y = 1, Width = 22, Text = string.Empty,
-        };
-        TuiHelpers.ConfigureTextInput(_ownerField, SkillViewStyling.BaseSchemeName);
         _ownerField.KeyDown += OnFilterFieldKey;
-
-        var limitLabel = new Label { Text = "Limit:", X = 32, Y = 1 };
-        _limitUpDown = new NumericUpDown<int>
-        {
-            X = 39, Y = 1,
-            Value = GhSkillSearchService.DefaultLimit,
-            Increment = 10,
-        };
+        _agentField.KeyDown += OnFilterFieldKey;
         _limitUpDown.ValueChanging += (_, e) =>
         {
             NoteUserInteraction();
             if (e.NewValue < 1 || e.NewValue > 200) e.Handled = true;
-        };
-
-        var agentLabel = new Label { Text = "Agent:", X = 0, Y = 2 };
-        _agentField = new TextField
-        {
-            X = 8,
-            Y = 2,
-            Width = 22,
-            Text = string.Empty,
-        };
-        TuiHelpers.ConfigureTextInput(_agentField, SkillViewStyling.BaseSchemeName);
-        _agentField.KeyDown += OnFilterFieldKey;
-
-        _hiddenDirsBox = new CheckBox
-        {
-            X = 0,
-            Y = 3,
-            Text = "_allow hidden dirs for preview/install",
         };
         _hiddenDirsBox.ValueChanged += (_, _) =>
         {
             NoteUserInteraction();
             RefreshHiddenDirUi();
         };
-
-        _resultsTable = new TableView
-        {
-            X = 0,
-            Y = 5,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            FullRowSelect = true,
-        };
-        TuiHelpers.ConfigureTableKeyBindings(_resultsTable);
-        TuiHelpers.ConfigureTableScheme(_resultsTable);
-        TuiHelpers.ConfigureTableChrome(_resultsTable);
 
         // Accepted fires on Enter, double-click, p, v, CursorRight, and
         // Ctrl+J (Warp) — all routed through Command.Accept by the View
@@ -352,24 +310,6 @@ public sealed class SkillViewApp
                 RefreshResultsTable();
             }
         };
-
-        _leftFrame.Add(queryLabel, _queryField, ownerLabel, _ownerField, limitLabel, _limitUpDown, agentLabel, _agentField, _hiddenDirsBox, _resultsTable);
-
-        _detailPane = new SkillDetailPaneView(ItemActionsText, TuiHelpers.WelcomeHint)
-        {
-            X = Pos.Right(_leftFrame),
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(2),
-        };
-        _rightFrame        = _detailPane;
-        _itemActionsLabel  = _detailPane.ItemActionsLabel;
-        _metadataFrame     = _detailPane.MetadataFrame;
-        _metadataPane      = _detailPane.MetadataPane;
-        _previewFrame      = _detailPane.PreviewFrame;
-        _previewPane       = _detailPane.PreviewPane;
-        _previewRawPane    = _detailPane.PreviewRawPane;
-        _logPane           = _detailPane.LogPane;
 
         _statusLabel = new Label
         {
@@ -414,12 +354,7 @@ public sealed class SkillViewApp
         };
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
-            window, _leftFrame, _rightFrame,
-            queryLabel, _queryField, ownerLabel, _ownerField, agentLabel, _agentField, limitLabel, _limitUpDown, _hiddenDirsBox,
-            _resultsTable, _previewPane, _previewRawPane, _metadataPane, _logPane,
-            _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
-        // Invert the actions hint so it reads as a status-bar-style strip.
-        _itemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+            window, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         RefreshHiddenDirUi();
 
         Func<Action, Task> runOnUi = action =>
@@ -474,17 +409,6 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
-        // Skeleton placeholders for the workflow-first tab model. These views
-        // are created here so the shell can expose them via test hooks and add
-        // them to the window's view graph; actual content extraction into these
-        // views is scoped to a later task.
-        _discoverTab = new SkillView.Ui.Tabs.DiscoverTabView
-        {
-            X = 0,
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(2),
-        };
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView
         {
             X = 0,
@@ -493,8 +417,8 @@ public sealed class SkillViewApp
             Height = Dim.Fill(2),
         };
 
-        window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _updatesTab, _doctorTab,
-                   _discoverTab, _changesTab,
+        window.Add(_tabBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
+                   _changesTab,
                    _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
@@ -644,8 +568,11 @@ public sealed class SkillViewApp
 
     private void ShowSearchPanes(bool visible)
     {
-        if (_leftFrame is not null)  _leftFrame.Visible  = visible;
-        if (_rightFrame is not null) _rightFrame.Visible = visible;
+        if (_discoverTab is not null) _discoverTab.Visible = visible;
+        // Also explicitly control left-frame visibility to replicate the old
+        // per-frame assignment, which has the side-effect of resetting log-mode's
+        // hidden left-frame whenever the Discover tab is re-activated.
+        if (_leftFrame is not null) _leftFrame.Visible = visible;
     }
 
     /// Replace whatever tab is currently visible with the Doctor view. We

@@ -111,4 +111,13 @@ internal sealed class SkillDetailPaneView : FrameView
         SchemeName = SchemeNames.Base;
         ItemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
     }
+
+    /// Update the metadata pane with a set of chip-style labels.  Pass no
+    /// arguments (or an empty array) to reset to the "(no selection)" placeholder.
+    internal void SetMetadataChips(params string[] chips)
+    {
+        MetadataPane.Text = chips.Length == 0
+            ? "_(no selection)_"
+            : string.Join("  ", System.Linq.Enumerable.Select(chips, c => $"**{c}**"));
+    }
 }
