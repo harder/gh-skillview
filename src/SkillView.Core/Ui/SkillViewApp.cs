@@ -404,7 +404,13 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
-        _changesTab = new SkillView.Ui.Tabs.ChangesTabView
+        _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
+            runOnUi: runOnUi,
+            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
+            onActivateUpdates: OpenUpdatesFromChanges,
+            onActivateCleanup: () => _workflows.ShowCleanupScreen(),
+            onActivateDoctor: EnterDoctor,
+            onLeaveTab: () => ActivateTab(SkillViewTab.Discover))
         {
             X = 0,
             Y = 1,
@@ -533,6 +539,7 @@ public sealed class SkillViewApp
         // revealed below.
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab   is not null) _updatesTab.Visible   = false;
+        if (_changesTab   is not null) _changesTab.Visible   = false;
 
         switch (tab)
         {
@@ -549,13 +556,11 @@ public sealed class SkillViewApp
                 }
                 break;
             case SkillViewTab.Changes:
-                // Adapter: UpdatesTabView hosts the content until it is
-                // extracted into ChangesTabView in a later task.
                 ShowSearchPanes(false);
-                if (_updatesTab is not null)
+                if (_changesTab is not null)
                 {
-                    _updatesTab.Visible = true;
-                    _ = _updatesTab.LoadAsync();
+                    _changesTab.Visible = true;
+                    _ = _changesTab.LoadAsync();
                 }
                 break;
         }
@@ -570,6 +575,16 @@ public sealed class SkillViewApp
         if (_leftFrame is not null) _leftFrame.Visible = visible;
     }
 
+    /// Drill into the UpdatesTabView from the Changes queue.
+    /// Hides the queue and shows the full Updates view in its place.
+    private void OpenUpdatesFromChanges()
+    {
+        if (_updatesTab is null) return;
+        if (_changesTab is not null) _changesTab.Visible = false;
+        _updatesTab.Visible = true;
+        _ = _updatesTab.LoadAsync();
+    }
+
     /// Replace whatever tab is currently visible with the Doctor view. We
     /// remember the prior tab so LeaveDoctor can restore it; if Doctor is
     /// already on screen this is a no-op.
@@ -581,6 +596,7 @@ public sealed class SkillViewApp
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab   is not null) _updatesTab.Visible   = false;
+        if (_changesTab   is not null) _changesTab.Visible   = false;
 
         // Make sure the report is fresh — probe lazily if we never have.
         if (_lastReport is not null)
