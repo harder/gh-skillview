@@ -41,9 +41,7 @@ public sealed class SkillViewApp
     private TableView? _resultsTable;
     private Markdown? _previewPane;
     private Editor? _previewRawPane;
-    private Markdown? _metadataPane;
-    private Editor? _logPane;
-    private Label? _statusLabel;
+    private Editor? _logPane;    private Label? _statusLabel;
     private SpinnerView? _spinner;
     private StatusBar? _statusBarPreview;
     private StatusBar? _statusBarLogs;
@@ -64,8 +62,6 @@ public sealed class SkillViewApp
     private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;
     private bool _inDoctor;
 
-    private const int MinMetadataHeight = 3;
-    private const int MaxMetadataHeight = 8;
     private const string ItemActionsText = "  [h] Hidden dirs    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
 
     private List<SearchResultSkill> _results = new();
@@ -264,7 +260,6 @@ public sealed class SkillViewApp
         _rightFrame      = _discoverTab.DetailPane;
         _itemActionsLabel = _discoverTab.DetailPane.ItemActionsLabel;
         _metadataFrame   = _discoverTab.DetailPane.MetadataFrame;
-        _metadataPane    = _discoverTab.DetailPane.MetadataPane;
         _previewFrame    = _discoverTab.DetailPane.PreviewFrame;
         _previewPane     = _discoverTab.DetailPane.PreviewPane;
         _previewRawPane  = _discoverTab.DetailPane.PreviewRawPane;
@@ -1113,26 +1108,12 @@ public sealed class SkillViewApp
     /// independent of whether the SKILL.md preview has been loaded yet.
     private void UpdateMetadataPane()
     {
-        if (_metadataPane is null) return;
+        if (_discoverTab is null) return;
         var row = _resultsTable?.GetSelectedRow() ?? -1;
-        string text;
-        if (row < 0 || row >= _results.Count)
-        {
-            text = "_(no selection)_";
-        }
-        else
-        {
-            text = RenderSearchMetadata(_results[row], _lastReport?.Auth);
-        }
-        _metadataPane.Text = text;
-
-        // Auto-size metadata height so short entries don't waste space and
-        // longer ones don't scroll. Count rendered lines (non-empty terminal
-        // lines — Markdown renderer keeps our single-line fields intact).
-        var lines = text.Replace("\r\n", "\n").Split('\n');
-        var nonBlank = lines.Count(l => !string.IsNullOrWhiteSpace(l));
-        var height = Math.Clamp(nonBlank, MinMetadataHeight, MaxMetadataHeight);
-        if (_metadataFrame is not null) _metadataFrame.Height = height + 2; // borders
+        var text = row >= 0 && row < _results.Count
+            ? RenderSearchMetadata(_results[row], _lastReport?.Auth)
+            : null;
+        _discoverTab.DetailPane.SetMetadataContent(text);
     }
 
     internal static string BuildRepoUrl(GhAuthStatus? auth, string? repo)

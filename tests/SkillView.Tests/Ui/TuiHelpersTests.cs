@@ -212,6 +212,48 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void SetMetadataContent_UpdatesMetadataPaneText()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+        const string markdown = "**name**: my-skill\n\n**repo**: owner/repo";
+
+        pane.SetMetadataContent(markdown);
+
+        Assert.Equal(markdown, pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataContent_Null_ResetsToPlaceholder()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        pane.SetMetadataContent(null);
+
+        Assert.Equal("_(no selection)_", pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataChips_RoutesThrough_SetMetadataContent()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        pane.SetMetadataChips("Claude", "Copilot");
+
+        Assert.Equal("**Claude**  **Copilot**", pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataChips_NoArgs_ResetsToPlaceholder()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+        pane.SetMetadataChips("something");  // set first
+
+        pane.SetMetadataChips();  // then clear
+
+        Assert.Equal("_(no selection)_", pane.MetadataPane.Text);
+    }
+
+    [Fact]
     public void ConfigureReadOnlyPane_SetsReadableDefaults()
     {
         var view = new Editor();

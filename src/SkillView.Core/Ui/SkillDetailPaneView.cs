@@ -19,6 +19,7 @@ namespace SkillView.Ui;
 internal sealed class SkillDetailPaneView : FrameView
 {
     private const int MinMetadataHeight = 3;
+    private const int MaxMetadataHeight = 8;
 
     internal Label ItemActionsLabel { get; }
     internal FrameView MetadataFrame { get; }
@@ -112,12 +113,25 @@ internal sealed class SkillDetailPaneView : FrameView
         ItemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
     }
 
+    /// Update the metadata pane with a raw markdown string and auto-size the
+    /// surrounding frame.  Pass null or empty to reset to the "(no selection)"
+    /// placeholder.
+    internal void SetMetadataContent(string? markdown)
+    {
+        var text = string.IsNullOrEmpty(markdown) ? "_(no selection)_" : markdown;
+        MetadataPane.Text = text;
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        var nonBlank = lines.Count(l => !string.IsNullOrWhiteSpace(l));
+        MetadataFrame.Height = Math.Clamp(nonBlank, MinMetadataHeight, MaxMetadataHeight) + 2;
+    }
+
     /// Update the metadata pane with a set of chip-style labels.  Pass no
     /// arguments (or an empty array) to reset to the "(no selection)" placeholder.
     internal void SetMetadataChips(params string[] chips)
     {
-        MetadataPane.Text = chips.Length == 0
-            ? "_(no selection)_"
+        var markdown = chips.Length == 0
+            ? null
             : string.Join("  ", System.Linq.Enumerable.Select(chips, c => $"**{c}**"));
+        SetMetadataContent(markdown);
     }
 }
