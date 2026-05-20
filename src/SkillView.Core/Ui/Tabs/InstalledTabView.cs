@@ -17,7 +17,7 @@ namespace SkillView.Ui.Tabs;
 /// RenderDetail, ShortcutCommand) so the test surface stays intact.
 internal sealed class InstalledTabView : FrameView
 {
-    private enum SortMode { Name, Package, Scope }
+    private enum SortMode { Name, Package, Location }
 
     /// winget-tui-style pin filter cycle for the Installed table.
     /// Maps to: All rows · only pinned · only unpinned.
@@ -267,7 +267,7 @@ internal sealed class InstalledTabView : FrameView
             .OrderBy(s => s.Package?.Source ?? "~", StringComparer.OrdinalIgnoreCase)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray(),
-        SortMode.Scope => input
+        SortMode.Location => input
             .OrderBy(s => s.Scope)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray(),
@@ -366,7 +366,7 @@ internal sealed class InstalledTabView : FrameView
         var sortLabel = _sort switch
         {
             SortMode.Package => "package",
-            SortMode.Scope => "scope",
+            SortMode.Location => "location",
             _ => "name",
         };
         var pinSuffix = _pinFilter == PinFilter.All ? "" : $" · 📌 {DescribePin(_pinFilter)}";
@@ -410,8 +410,8 @@ internal sealed class InstalledTabView : FrameView
             case InstalledScreen.ShortcutCommand.CycleSort:
                 _sort = _sort switch
                 {
-                    SortMode.Name => _hasPackages ? SortMode.Package : SortMode.Scope,
-                    SortMode.Package => SortMode.Scope,
+                    SortMode.Name => _hasPackages ? SortMode.Package : SortMode.Location,
+                    SortMode.Package => SortMode.Location,
                     _ => SortMode.Name,
                 };
                 RefreshAll();
