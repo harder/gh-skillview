@@ -92,19 +92,17 @@ internal sealed class ChangesTabView : FrameView
         try
         {
             var snapshot = await _snapshotLoader().ConfigureAwait(false);
-            // A single aggregate row — update availability is unknown at this point.
-            var updates = snapshot.Skills.Length > 0
-                ? (IEnumerable<string>)[$"{snapshot.Skills.Length} skill(s) installed — check for updates"]
-                : [];
-            var cleanup     = CleanupClassifier
-                                .Classify(snapshot, snapshot.ScannedRoots)
-                                .Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
-            var diagnostics = new[] { "Run Doctor" };
+            // Only queue items backed by real pending state.
+            // Update availability is unknown until the user runs a dry-run; Doctor
+            // is always accessible via 'd'. Neither belongs in the pending queue.
+            var cleanup = CleanupClassifier
+                            .Classify(snapshot, snapshot.ScannedRoots)
+                            .Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
 
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen) return;
-                Load(updates, cleanup, diagnostics);
+                Load(updates: [], cleanup, diagnostics: []);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)

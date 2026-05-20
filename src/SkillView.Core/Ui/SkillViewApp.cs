@@ -61,6 +61,8 @@ public sealed class SkillViewApp
     // Remembered before Doctor took over so Esc returns to where the user was.
     private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;
     private bool _inDoctor;
+    // Set when Updates is drilled into from the Changes queue so Esc returns to Changes.
+    private bool _openedUpdatesFromChanges;
 
     private const string ItemActionsText = "  [h] Hidden dirs    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
 
@@ -384,7 +386,7 @@ public sealed class SkillViewApp
             ghPathProvider: () => _ghPath,
             capabilitiesProvider: () => _lastReport?.Capabilities ?? CapabilityProfile.Empty,
             logger: _services.Logger,
-            onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
+            onLeaveTab: LeaveUpdates,
             onUpdateApplied: () => _services.ListAdapter.Invalidate())
         {
             X = 0,
@@ -407,9 +409,13 @@ public sealed class SkillViewApp
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
-            onActivateUpdates: () => _workflows.OpenUpdatesFromChanges(
-                hideChanges: () => _changesTab!.Visible = false,
-                activateUpdates: hideChanges => _updatesTab!.ActivateFromChanges(hideChanges)),
+            onActivateUpdates: () =>
+            {
+                _openedUpdatesFromChanges = true;
+                _workflows.OpenUpdatesFromChanges(
+                    hideChanges: () => _changesTab!.Visible = false,
+                    activateUpdates: hideChanges => _updatesTab!.ActivateFromChanges(hideChanges));
+            },
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
                 hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
@@ -629,6 +635,26 @@ public sealed class SkillViewApp
         var restore = _tabBeforeDoctor;
         _activeTab = restore == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
         ActivateTab(restore);
+    }
+
+    /// Esc handler for the Updates view. When drilled in from Changes, returns
+    /// to Changes; otherwise falls back to Discover. Mirrors LeaveDoctor's
+    /// no-op-guard bypass.
+    private void LeaveUpdates()
+    {
+        if (_updatesTab is not null) _updatesTab.Visible = false;
+        if (_openedUpdatesFromChanges)
+        {
+            _openedUpdatesFromChanges = false;
+            // _activeTab is still Changes since drill-in bypasses ActivateTab.
+            // Force the no-op guard by temporarily setting to a different tab.
+            _activeTab = SkillViewTab.Discover;
+            ActivateTab(SkillViewTab.Changes);
+        }
+        else
+        {
+            ActivateTab(SkillViewTab.Discover);
+        }
     }
 
     private void CycleTab(int delta)
