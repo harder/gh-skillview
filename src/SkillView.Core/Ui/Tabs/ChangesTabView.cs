@@ -92,7 +92,10 @@ internal sealed class ChangesTabView : FrameView
         try
         {
             var snapshot = await _snapshotLoader().ConfigureAwait(false);
-            var updates     = snapshot.Skills.Select(s => s.Name);
+            // A single aggregate row — update availability is unknown at this point.
+            var updates = snapshot.Skills.Length > 0
+                ? (IEnumerable<string>)[$"{snapshot.Skills.Length} skill(s) installed — check for updates"]
+                : [];
             var cleanup     = CleanupClassifier
                                 .Classify(snapshot, snapshot.ScannedRoots)
                                 .Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
@@ -133,7 +136,7 @@ internal sealed class ChangesTabView : FrameView
 
         var style = _table.Style;
         style.ExpandLastColumn = true;
-        var kindStyle = style.GetOrCreateColumnStyle(1);
+        var kindStyle = style.GetOrCreateColumnStyle(0);
         kindStyle.MinWidth = 11;
         kindStyle.MaxWidth = 14;
 

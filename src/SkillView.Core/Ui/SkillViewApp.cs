@@ -407,7 +407,9 @@ public sealed class SkillViewApp
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
-            onActivateUpdates: () => _workflows.OpenUpdatesFromChanges(_changesTab!, _updatesTab!),
+            onActivateUpdates: () => _workflows.OpenUpdatesFromChanges(
+                hideChanges: () => _changesTab!.Visible = false,
+                activateUpdates: hideChanges => _updatesTab!.ActivateFromChanges(hideChanges)),
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
                 hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
