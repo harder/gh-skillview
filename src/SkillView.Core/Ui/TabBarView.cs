@@ -11,13 +11,13 @@ namespace SkillView.Ui;
 /// matches the visual left-to-right order and the numeric jump keys (1/2/3).
 internal enum SkillViewTab
 {
-    Search    = 0,
+    Discover  = 0,
     Installed = 1,
-    Updates   = 2,
+    Changes   = 2,
 }
 
-/// Top header strip showing the three primary tabs (Search / Installed /
-/// Updates) as winget-tui-style "pills". The active tab is rendered with
+/// Top header strip showing the three primary tabs (Discover / Installed /
+/// Changes) as winget-tui-style "pills". The active tab is rendered with
 /// the accent color and a bullet indicator; inactive tabs are dim.
 ///
 /// Click hit-testing maps mouse-down to a tab change via the
@@ -30,16 +30,16 @@ internal sealed class TabBarView : View
 {
     private static readonly (SkillViewTab Tab, string Icon, string Label)[] Tabs =
     {
-        (SkillViewTab.Search,    "◇", "Search"),
+        (SkillViewTab.Discover,  "◇", "Discover"),
         (SkillViewTab.Installed, "▣", "Installed"),
-        (SkillViewTab.Updates,   "△", "Updates"),
+        (SkillViewTab.Changes,   "△", "Changes"),
     };
 
     /// One column per tab. Recomputed on every Draw so the layout reflows on
     /// terminal resize without needing an explicit FrameChanged hook.
     private readonly Dictionary<SkillViewTab, (int X, int Width)> _tabRegions = new();
 
-    private SkillViewTab _active = SkillViewTab.Search;
+    private SkillViewTab _active = SkillViewTab.Discover;
 
     internal event EventHandler<SkillViewTab>? TabActivated;
 
@@ -60,13 +60,17 @@ internal sealed class TabBarView : View
         SetNeedsDraw();
     }
 
+    /// Returns the display labels of all tabs in visual order. Used by tests
+    /// to verify the workflow-first labelling without parsing drawn output.
+    internal IReadOnlyList<string> TabLabelsForTests => Tabs.Select(t => t.Label).ToArray();
+
     protected override bool OnDrawingContent (DrawContext? context)
     {
         var viewport = Viewport;
         var width = viewport.Width;
         if (width <= 0) return true;
 
-        // Build right-anchored tabs: "  Skill View          ◇ Search   ▣ Installed   △ Updates  "
+        // Build right-anchored tabs: "  Skill View          ◇ Discover   ▣ Installed   △ Changes  "
         // Logo on the left, tabs flush right with a 2-cell gap between pills.
         const string logo = "  Skill View";
         var inactiveFg = WingetTuiTheme.TextSecondary;

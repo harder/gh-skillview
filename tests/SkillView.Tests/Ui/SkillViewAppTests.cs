@@ -238,7 +238,7 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('/'));
 
-        Assert.Equal(SkillViewTab.Search, app.ActiveTabForTests);
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
         Assert.True(app.QueryFieldForTests!.HasFocus);
     }
 
@@ -428,5 +428,39 @@ public sealed class SkillViewAppTests
         {
             ConfigurationManager.Disable(resetToHardCodedDefaults: true);
         }
+    }
+
+    [Fact]
+    public void BuildUi_DefaultsToDiscoverTab()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_ExposesChangesTabHook()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.NotNull(app.ChangesTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_TabBarUsesWorkflowFirstLabels()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var tabBar = app.TabBarForTests;
+        Assert.NotNull(tabBar);
+        var labels = tabBar!.TabLabelsForTests;
+        Assert.Contains("Discover", labels);
+        Assert.Contains("Installed", labels);
+        Assert.Contains("Changes", labels);
+        Assert.DoesNotContain("Search", labels);
+        Assert.DoesNotContain("Updates", labels);
     }
 }

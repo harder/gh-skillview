@@ -48,7 +48,7 @@ public sealed class SkillViewApp
     private StatusBar? _statusBarPreview;
     private StatusBar? _statusBarLogs;
     private TabBarView? _tabBar;
-    private SkillViewTab _activeTab = SkillViewTab.Search;
+    private SkillViewTab _activeTab = SkillViewTab.Discover;
     private FrameView? _leftFrame;
     private SkillDetailPaneView? _detailPane;
     private FrameView? _rightFrame;
@@ -58,8 +58,10 @@ public sealed class SkillViewApp
     private SkillView.Ui.Tabs.InstalledTabView? _installedTab;
     private SkillView.Ui.Tabs.UpdatesTabView? _updatesTab;
     private SkillView.Ui.Tabs.DoctorTabView? _doctorTab;
+    private SkillView.Ui.Tabs.DiscoverTabView? _discoverTab;
+    private SkillView.Ui.Tabs.ChangesTabView? _changesTab;
     // Remembered before Doctor took over so Esc returns to where the user was.
-    private SkillViewTab _tabBeforeDoctor = SkillViewTab.Search;
+    private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;
     private bool _inDoctor;
 
     private const int MinMetadataHeight = 3;
@@ -435,8 +437,8 @@ public sealed class SkillViewApp
             runOnUi: runOnUi,
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
-            onLeaveTab: () => ActivateTab(SkillViewTab.Search),
-            onGoToSearch: () => { ActivateTab(SkillViewTab.Search); FocusSearchFromInstalled(); })
+            onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
+            onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); })
         {
             X = 0,
             Y = 1,
@@ -452,7 +454,7 @@ public sealed class SkillViewApp
             ghPathProvider: () => _ghPath,
             capabilitiesProvider: () => _lastReport?.Capabilities ?? CapabilityProfile.Empty,
             logger: _services.Logger,
-            onLeaveTab: () => ActivateTab(SkillViewTab.Search),
+            onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onUpdateApplied: () => _services.ListAdapter.Invalidate())
         {
             X = 0,
@@ -472,7 +474,27 @@ public sealed class SkillViewApp
             Visible = false,
         };
 
+        // Skeleton placeholders for the workflow-first tab model. These views
+        // are created here so the shell can expose them via test hooks and add
+        // them to the window's view graph; actual content extraction into these
+        // views is scoped to a later task.
+        _discoverTab = new SkillView.Ui.Tabs.DiscoverTabView
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+        };
+        _changesTab = new SkillView.Ui.Tabs.ChangesTabView
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+        };
+
         window.Add(_tabBar, _leftFrame, _rightFrame, _installedTab, _updatesTab, _doctorTab,
+                   _discoverTab, _changesTab,
                    _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
@@ -531,9 +553,9 @@ public sealed class SkillViewApp
             {
                 LeaveDoctor();
             }
-            if (_activeTab != SkillViewTab.Search)
+            if (_activeTab != SkillViewTab.Discover)
             {
-                ActivateTab(SkillViewTab.Search);
+                ActivateTab(SkillViewTab.Discover);
             }
             _queryField?.SetFocus();
             if (_queryField is not null) _queryField.SelectAll();
@@ -555,31 +577,31 @@ public sealed class SkillViewApp
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
-        // `u` jumps to the Updates tab (embedded). The actual single-row vs.
+        // `u` jumps to the Changes tab (embedded). The actual single-row vs.
         // batch update keys live on the tab itself (u current row, U marked).
-        if (rune.Value == 'u' || rune.Value == 'U') { ActivateTab(SkillViewTab.Updates); return true; }
+        if (rune.Value == 'u' || rune.Value == 'U') { ActivateTab(SkillViewTab.Changes); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
         // Search-tab sort cycle. Lower-case `s` is unused at this level so
         // accept both — matches winget-tui's `S` semantics while staying
         // permissive about case.
-        if ((rune.Value == 'S' || rune.Value == 's') && _activeTab == SkillViewTab.Search)
+        if ((rune.Value == 'S' || rune.Value == 's') && _activeTab == SkillViewTab.Discover)
         {
             HandleSearchSortKey();
             return true;
         }
 
         // Tab navigation — direct (1/2/3) and cyclic (←/→).
-        if (rune.Value == '1') { ActivateTab(SkillViewTab.Search); return true; }
+        if (rune.Value == '1') { ActivateTab(SkillViewTab.Discover); return true; }
         if (rune.Value == '2') { ActivateTab(SkillViewTab.Installed); return true; }
-        if (rune.Value == '3') { ActivateTab(SkillViewTab.Updates); return true; }
+        if (rune.Value == '3') { ActivateTab(SkillViewTab.Changes); return true; }
         if (key.KeyCode == KeyCode.CursorLeft)  { CycleTab(-1); return true; }
         if (key.KeyCode == KeyCode.CursorRight) { CycleTab(+1); return true; }
         return false;
     }
 
-    /// Switch active tab. All three (Search / Installed / Updates) are
+    /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
     private void ActivateTab(SkillViewTab tab)
@@ -588,14 +610,14 @@ public sealed class SkillViewApp
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
 
-        // Hide every non-Search tab by default; the requested one is then
+        // Hide every non-Discover tab by default; the requested one is then
         // revealed below.
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab   is not null) _updatesTab.Visible   = false;
 
         switch (tab)
         {
-            case SkillViewTab.Search:
+            case SkillViewTab.Discover:
                 ShowSearchPanes(true);
                 _queryField?.SetFocus();
                 break;
@@ -607,7 +629,9 @@ public sealed class SkillViewApp
                     _ = _installedTab.LoadAsync();
                 }
                 break;
-            case SkillViewTab.Updates:
+            case SkillViewTab.Changes:
+                // Adapter: UpdatesTabView hosts the content until it is
+                // extracted into ChangesTabView in a later task.
                 ShowSearchPanes(false);
                 if (_updatesTab is not null)
                 {
@@ -671,13 +695,13 @@ public sealed class SkillViewApp
         // to something different first so ActivateTab's no-op guard doesn't
         // suppress the re-show.
         var restore = _tabBeforeDoctor;
-        _activeTab = restore == SkillViewTab.Search ? SkillViewTab.Installed : SkillViewTab.Search;
+        _activeTab = restore == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
         ActivateTab(restore);
     }
 
     private void CycleTab(int delta)
     {
-        var values = new[] { SkillViewTab.Search, SkillViewTab.Installed, SkillViewTab.Updates };
+        var values = new[] { SkillViewTab.Discover, SkillViewTab.Installed, SkillViewTab.Changes };
         var idx = Array.IndexOf(values, _activeTab);
         if (idx < 0) idx = 0;
         idx = (idx + delta + values.Length) % values.Length;
@@ -1705,11 +1729,15 @@ public sealed class SkillViewApp
 
     internal SkillViewTab ActiveTabForTests => _activeTab;
 
+    internal SkillView.Ui.Tabs.ChangesTabView? ChangesTabForTests => _changesTab;
+
+    internal TabBarView? TabBarForTests => _tabBar;
+
     internal void ForceActiveTabForTests(SkillViewTab tab)
     {
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
-        ShowSearchPanes(tab == SkillViewTab.Search);
+        ShowSearchPanes(tab == SkillViewTab.Discover);
     }
 
     /// Fire-and-forget background work with exception guard. Catches any
