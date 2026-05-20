@@ -1,6 +1,7 @@
 using System.IO;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Ui;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -119,7 +120,7 @@ internal sealed class ChangesTabView : FrameView
         IEnumerable<string> cleanup,
         IEnumerable<string> diagnostics)
     {
-        _rows = ChangesQueueBuilder.Build(updates, cleanup, diagnostics);
+        _rows = ChangesQueueBuilder.BuildForTests(updates, cleanup, diagnostics);
 
         var source = new EnumerableTableSource<ChangesQueueRow>(
             _rows,

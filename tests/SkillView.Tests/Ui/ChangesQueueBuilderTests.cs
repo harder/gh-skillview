@@ -1,4 +1,4 @@
-using SkillView.Ui.Tabs;
+using SkillView.Ui;
 using Xunit;
 
 namespace SkillView.Tests.Ui;
@@ -8,7 +8,7 @@ public sealed class ChangesQueueBuilderTests
     [Fact]
     public void Build_OrdersUpdateBeforeCleanupBeforeDiagnostics()
     {
-        var rows = ChangesQueueBuilder.Build(
+        var rows = ChangesQueueBuilder.BuildForTests(
             updates: ["skillA", "skillB"],
             cleanup: ["orphaned.md"],
             diagnostics: ["Doctor"]);
@@ -27,14 +27,14 @@ public sealed class ChangesQueueBuilderTests
     [Fact]
     public void Build_EmptyInputs_ReturnsEmpty()
     {
-        var rows = ChangesQueueBuilder.Build([], [], []);
+        var rows = ChangesQueueBuilder.BuildForTests([], [], []);
         Assert.Empty(rows);
     }
 
     [Fact]
     public void Build_OnlyUpdateItems_ReturnsOnlyUpdateRows()
     {
-        var rows = ChangesQueueBuilder.Build(["skill1", "skill2"], [], []);
+        var rows = ChangesQueueBuilder.BuildForTests(["skill1", "skill2"], [], []);
 
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.Equal("Update", r.Kind));
@@ -43,7 +43,7 @@ public sealed class ChangesQueueBuilderTests
     [Fact]
     public void Build_OnlyCleanupItems_ReturnsOnlyCleanupRows()
     {
-        var rows = ChangesQueueBuilder.Build([], ["broken-link", "empty-dir"], []);
+        var rows = ChangesQueueBuilder.BuildForTests([], ["broken-link", "empty-dir"], []);
 
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.Equal("Cleanup", r.Kind));
@@ -52,7 +52,7 @@ public sealed class ChangesQueueBuilderTests
     [Fact]
     public void Build_OnlyDiagnosticsItems_ReturnsOnlyDiagnosticsRows()
     {
-        var rows = ChangesQueueBuilder.Build([], [], ["Run Doctor"]);
+        var rows = ChangesQueueBuilder.BuildForTests([], [], ["Run Doctor"]);
 
         Assert.Single(rows);
         Assert.Equal("Diagnostics", rows[0].Kind);
@@ -62,7 +62,7 @@ public sealed class ChangesQueueBuilderTests
     [Fact]
     public void Build_PreservesInsertionOrderWithinKind()
     {
-        var rows = ChangesQueueBuilder.Build(
+        var rows = ChangesQueueBuilder.BuildForTests(
             updates: ["first", "second", "third"],
             cleanup: [],
             diagnostics: []);

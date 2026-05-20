@@ -306,6 +306,15 @@ internal sealed class UpdatesTabView : FrameView
     internal string StatusTextForTests => _status.Text.ToString();
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
 
+    /// Activate this view as a drill-in from the Changes workspace.
+    /// Hides the Changes tab via <paramref name="hideChanges"/>, then shows and loads this view.
+    internal void ActivateFromChanges(Action hideChanges)
+    {
+        hideChanges();
+        Visible = true;
+        _ = LoadAsync();
+    }
+
     private void RecomputeColumnWidths()
     {
         var viewportWidth = _table.Viewport.Width;

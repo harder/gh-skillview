@@ -1,4 +1,4 @@
-namespace SkillView.Ui.Tabs;
+namespace SkillView.Ui;
 
 /// Data row for the Changes workspace maintenance queue.
 internal readonly record struct ChangesQueueRow(string Kind, string Title);
@@ -9,7 +9,7 @@ internal readonly record struct ChangesQueueRow(string Kind, string Title);
 /// Has no side effects and no dependency on Terminal.Gui.
 internal static class ChangesQueueBuilder
 {
-    internal static IReadOnlyList<ChangesQueueRow> Build(
+    internal static IReadOnlyList<ChangesQueueRow> BuildForTests(
         IEnumerable<string> updates,
         IEnumerable<string> cleanup,
         IEnumerable<string> diagnostics)

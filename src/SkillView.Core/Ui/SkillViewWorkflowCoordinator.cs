@@ -2,6 +2,7 @@ using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Ui.Tabs;
 using Terminal.Gui.App;
 
 namespace SkillView.Ui;
@@ -292,5 +293,10 @@ internal sealed class SkillViewWorkflowCoordinator
                 ScanRoots: _options.ScanRoots,
                 AllowHiddenDirs: false),
             cancellationToken);
+
+    /// Drill into the Updates workspace from the Changes queue.
+    /// Hides the Changes tab and activates the Updates tab via <see cref="UpdatesTabView.ActivateFromChanges"/>.
+    internal void OpenUpdatesFromChanges(ChangesTabView changesTab, UpdatesTabView updatesTab) =>
+        updatesTab.ActivateFromChanges(() => changesTab.Visible = false);
 
 }

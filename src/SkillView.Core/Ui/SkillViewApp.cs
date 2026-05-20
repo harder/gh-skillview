@@ -407,9 +407,11 @@ public sealed class SkillViewApp
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
-            onActivateUpdates: OpenUpdatesFromChanges,
+            onActivateUpdates: () => _workflows.OpenUpdatesFromChanges(_changesTab!, _updatesTab!),
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
-            onActivateDoctor: EnterDoctor,
+            onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
+                hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
+                enterDoctor: EnterDoctor),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover))
         {
             X = 0,
@@ -573,16 +575,6 @@ public sealed class SkillViewApp
         // per-frame assignment, which has the side-effect of resetting log-mode's
         // hidden left-frame whenever the Discover tab is re-activated.
         if (_leftFrame is not null) _leftFrame.Visible = visible;
-    }
-
-    /// Drill into the UpdatesTabView from the Changes queue.
-    /// Hides the queue and shows the full Updates view in its place.
-    private void OpenUpdatesFromChanges()
-    {
-        if (_updatesTab is null) return;
-        if (_changesTab is not null) _changesTab.Visible = false;
-        _updatesTab.Visible = true;
-        _ = _updatesTab.LoadAsync();
     }
 
     /// Replace whatever tab is currently visible with the Doctor view. We

@@ -65,4 +65,13 @@ internal sealed class DoctorTabView : FrameView
     {
         _body.Text = DoctorScreen.Render(report);
     }
+
+    /// Activate the Doctor view as a drill-in from the Changes workspace.
+    /// Hides the Changes tab via <paramref name="hideChanges"/>, then delegates
+    /// to the full <paramref name="enterDoctor"/> flow.
+    internal void ActivateFromChanges(Action hideChanges, Action enterDoctor)
+    {
+        hideChanges();
+        enterDoctor();
+    }
 }
