@@ -1,5 +1,6 @@
 using SkillView.Inventory;
 using SkillView.Ui;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
@@ -334,6 +335,36 @@ public sealed class TuiHelpersTests
         TuiHelpers.ConfigureTableKeyBindings(table);
 
         Assert.Null(table.CollectionNavigator);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_SetsHeavyBorderWhenFocused()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: true);
+
+        Assert.Equal(LineStyle.Heavy, frame.BorderStyle);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_SetsRoundedBorderWhenUnfocused()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: false);
+
+        Assert.Equal(LineStyle.Rounded, frame.BorderStyle);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_AlwaysSetsBaseSchemeName()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: true);
+
+        Assert.Equal(SkillViewStyling.BaseSchemeName, frame.SchemeName);
     }
 
     private sealed class TestMarkdown : Markdown

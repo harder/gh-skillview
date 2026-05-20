@@ -516,4 +516,14 @@ internal static class TuiHelpers
         if (row < 0) return;
         table.SetSelection(0, row, false);
     }
+
+    /// Apply a focused or unfocused border style to a FrameView. The focused
+    /// pane gets a Heavy border and the accent-colored Base scheme; unfocused
+    /// panes get a Rounded border and the default Base scheme. This makes the
+    /// currently active pane unmistakable without requiring an extra overlay.
+    internal static void ApplyFocusFrameStyle(FrameView frame, bool hasFocus)
+    {
+        frame.BorderStyle = hasFocus ? LineStyle.Heavy : LineStyle.Rounded;
+        frame.SchemeName = SchemeNames.Base;
+    }
 }
