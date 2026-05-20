@@ -1,8 +1,10 @@
 using SkillView.Inventory;
 using SkillView.Ui;
 using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.Text;
+using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Xunit;
 
@@ -200,20 +202,24 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void SkillDetailPaneView_UsesEditorViews_ForRawPreviewAndLogs()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        Assert.IsType<Editor>(pane.PreviewRawPane);
+        Assert.IsType<Editor>(pane.LogPane);
+    }
+
+    [Fact]
     public void ConfigureReadOnlyPane_SetsReadableDefaults()
     {
-#pragma warning disable CS0618 // TextView obsolete in TG2.2 — see SkillDetailPaneView note.
-        var view = new TextView
-        {
-            ReadOnly = false,
-            WordWrap = false,
-        };
-#pragma warning restore CS0618
+        var view = new Editor();
 
         TuiHelpers.ConfigureReadOnlyPane(view, SkillViewStyling.DialogSchemeName);
 
         Assert.True(view.ReadOnly);
         Assert.True(view.WordWrap);
+        Assert.True(view.ViewportSettings.HasFlag(ViewportSettingsFlags.HasVerticalScrollBar));
         Assert.Equal(SkillViewStyling.DialogSchemeName, view.SchemeName);
     }
 

@@ -5,6 +5,7 @@
     <RootNamespace>SkillView</RootNamespace>
     <AssemblyName>SkillView.Core</AssemblyName>
     <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.2.1</TerminalGuiVersion>
+    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.2.1</TerminalGuiEditorVersion>
     <!-- Terminal.Gui is centrally pinned here so CI can override it via
          MSBuild while the app host keeps the modern AOT-safe lifecycle and the
          gh extension's separate TG2 NoWarn review stays local to that project. -->
@@ -12,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
+    <PackageReference Include="Terminal.Gui.Editor" Version="$(TerminalGuiEditorVersion)" />
   </ItemGroup>
 
   <ItemGroup>

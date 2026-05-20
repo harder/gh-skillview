@@ -1,15 +1,8 @@
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Editor;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
-
-// Terminal.Gui 2.2 marks TextView [Obsolete] in favor of gui-cs/Editor, which
-// is an editor-grade widget intended for full document editing. SkillView uses
-// TextView only as a read-only scrollable text surface for the raw SKILL.md
-// preview and the log pane — neither needs an editing model, and pulling in a
-// second NuGet for two read-only panes isn't justified. Suppress narrowly so
-// the rest of the file is still checked.
-#pragma warning disable CS0618 // TextView obsolete — see note above.
 
 namespace SkillView.Ui;
 
@@ -32,8 +25,8 @@ internal sealed class SkillDetailPaneView : FrameView
     internal Markdown MetadataPane { get; }
     internal FrameView PreviewFrame { get; }
     internal Markdown PreviewPane { get; }
-    internal TextView PreviewRawPane { get; }
-    internal TextView LogPane { get; }
+    internal Editor PreviewRawPane { get; }
+    internal Editor LogPane { get; }
 
     /// `actionsText` is the one-line hint strip rendered at the top of the
     /// pane. `welcomeText` seeds both preview views before any selection is
@@ -89,9 +82,10 @@ internal sealed class SkillDetailPaneView : FrameView
         };
         TuiHelpers.ConfigureMarkdownPane(PreviewPane, SchemeNames.Base);
 
-        PreviewRawPane = new TextView
+        PreviewRawPane = new Editor
         {
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
+            CanFocus = false,
             Text = welcomeText,
             Visible = false,
         };
@@ -101,12 +95,13 @@ internal sealed class SkillDetailPaneView : FrameView
         // Logs overlay the rest of the pane when surfaced via `l`. They sit
         // outside MetadataFrame/PreviewFrame so the toggle is a single
         // visibility flip rather than a layout rebuild.
-        LogPane = new TextView
+        LogPane = new Editor
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
+            CanFocus = false,
             Visible = false,
         };
         TuiHelpers.ConfigureReadOnlyPane(LogPane, SchemeNames.Base);

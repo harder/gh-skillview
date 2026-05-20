@@ -4,6 +4,7 @@ using SkillView.Inventory;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.Text;
 using Terminal.Gui.ViewBase;
@@ -223,8 +224,7 @@ internal static class TuiHelpers
         }
     }
 
-#pragma warning disable CS0618 // TextView obsolete in TG2.2 — read-only pane usage; see SkillDetailPaneView note.
-    internal static void ConfigureReadOnlyPane(TextView view, string schemeName, bool wordWrap = true)
+    internal static void ConfigureReadOnlyPane(Editor view, string schemeName, bool wordWrap = true)
     {
         view.ReadOnly = true;
         view.WordWrap = wordWrap;
@@ -232,7 +232,6 @@ internal static class TuiHelpers
         view.SchemeName = schemeName;
         view.SetScheme(CreateReadOnlyPaneScheme());
     }
-#pragma warning restore CS0618
 
     /// Configure a Terminal.Gui Markdown view for the preview pane. The
     /// built-in Markdown view uses Markdig to render styled headings, code

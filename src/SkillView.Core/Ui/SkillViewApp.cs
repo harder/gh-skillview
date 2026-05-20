@@ -10,6 +10,7 @@ using SkillView.Logging;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -39,11 +40,9 @@ public sealed class SkillViewApp
     private CheckBox? _hiddenDirsBox;
     private TableView? _resultsTable;
     private Markdown? _previewPane;
-#pragma warning disable CS0618 // TextView obsolete in TG2.2 — see SkillDetailPaneView note.
-    private TextView? _previewRawPane;
+    private Editor? _previewRawPane;
     private Markdown? _metadataPane;
-    private TextView? _logPane;
-#pragma warning restore CS0618
+    private Editor? _logPane;
     private Label? _statusLabel;
     private SpinnerView? _spinner;
     private StatusBar? _statusBarPreview;
@@ -1363,7 +1362,7 @@ public sealed class SkillViewApp
     }
 
     /// Mirror text into both the rendered Markdown pane and the raw
-    /// TextView pane so toggling between them via `e` keeps the same content.
+    /// editor pane so toggling between them via `e` keeps the same content.
     private void SetPreviewText(string text)
     {
         var sanitized = TerminalEscapeSanitizer.Sanitize(text) ?? string.Empty;
@@ -1375,6 +1374,8 @@ public sealed class SkillViewApp
     {
         if (_previewPane is null || _previewRawPane is null || _showingLogs) return;
         _showingRawPreview = !_showingRawPreview;
+        _previewPane.CanFocus = !_showingRawPreview;
+        _previewRawPane.CanFocus = _showingRawPreview;
         _previewPane.Visible = !_showingRawPreview;
         _previewRawPane.Visible = _showingRawPreview;
         SetStatus(_showingRawPreview ? "preview: raw SKILL.md" : "preview: rendered");
@@ -1383,11 +1384,14 @@ public sealed class SkillViewApp
     private void ShowPreviewPane()
     {
         _showingLogs = false;
+        if (_previewPane is not null) _previewPane.CanFocus = !_showingRawPreview;
+        if (_previewRawPane is not null) _previewRawPane.CanFocus = _showingRawPreview;
         if (_previewPane is not null) _previewPane.Visible = !_showingRawPreview;
         if (_previewRawPane is not null) _previewRawPane.Visible = _showingRawPreview;
         if (_metadataFrame is not null) _metadataFrame.Visible = true;
         if (_previewFrame is not null) _previewFrame.Visible = true;
         if (_itemActionsLabel is not null) _itemActionsLabel.Visible = true;
+        if (_logPane is not null) _logPane.CanFocus = false;
         if (_logPane is not null) _logPane.Visible = false;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = false;
@@ -1402,11 +1406,14 @@ public sealed class SkillViewApp
     private void ShowLogPane()
     {
         _showingLogs = true;
+        if (_previewPane is not null) _previewPane.CanFocus = false;
         if (_previewPane is not null) _previewPane.Visible = false;
+        if (_previewRawPane is not null) _previewRawPane.CanFocus = false;
         if (_previewRawPane is not null) _previewRawPane.Visible = false;
         if (_metadataFrame is not null) _metadataFrame.Visible = false;
         if (_previewFrame is not null) _previewFrame.Visible = false;
         if (_itemActionsLabel is not null) _itemActionsLabel.Visible = false;
+        if (_logPane is not null) _logPane.CanFocus = true;
         if (_logPane is not null) _logPane.Visible = true;
         if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
         if (_statusBarLogs is not null) _statusBarLogs.Visible = true;
