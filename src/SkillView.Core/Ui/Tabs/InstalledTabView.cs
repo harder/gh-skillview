@@ -281,7 +281,7 @@ internal sealed class InstalledTabView : FrameView
         var columns = new Dictionary<string, Func<InstalledSkill, object>>
         {
             ["Name"] = s => TuiHelpers.Truncate(s.Name, _nameW),
-            ["Scope"] = s => DisplayScope(s.Scope),
+            ["Location"] = s => InstalledInventoryFormatter.DescribeLocation(s),
         };
         if (_hasPackages)
         {
@@ -290,7 +290,7 @@ internal sealed class InstalledTabView : FrameView
         columns["!"] = s => s.Validity == ValidityState.Valid ? "" : "!";
         columns["Lnk"] = s => s.IsSymlinked ? "↩" : "";
         columns["Agents"] = s => TuiHelpers.Truncate(
-            TuiHelpers.AgentBadges(s.Agents.Select(a => a.AgentId)),
+            InstalledInventoryFormatter.DescribeAgents(s),
             _agentsW);
 
         _table.Table = new InstalledTableSource(_rows, columns);
@@ -359,8 +359,8 @@ internal sealed class InstalledTabView : FrameView
             return;
         }
         var counts = _rows.Count == _all.Count
-            ? $" {_all.Count} skill(s) across {_snapshot.ScannedRoots.Length} root(s)"
-            : $" {_rows.Count} of {_all.Count} skill(s) (filtered) · {_snapshot.ScannedRoots.Length} root(s)";
+            ? $" {_all.Count} skill(s) across {_snapshot.ScannedRoots.Length} location(s)"
+            : $" {_rows.Count} of {_all.Count} skill(s) (filtered) · {_snapshot.ScannedRoots.Length} location(s)";
         var pkgs = _packageCount > 0 ? $" · {_packageCount} package(s)" : "";
         var srcSuffix = _snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only";
         var sortLabel = _sort switch
@@ -436,12 +436,6 @@ internal sealed class InstalledTabView : FrameView
             }
         }
     }
-
-    private static string DisplayScope(Scope s) => s switch
-    {
-        Scope.User => "Global",
-        _ => s.ToString(),
-    };
 
     private sealed class InstalledTableSource : EnumerableTableSource<InstalledSkill>
     {
