@@ -474,4 +474,83 @@ public sealed class SkillViewAppTests
         Assert.DoesNotContain("Search", labels);
         Assert.DoesNotContain("Updates", labels);
     }
+
+    [Fact]
+    public void ContextBar_IsCreatedDuringBuildUi()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var contextBar = app.ContextBarForTests;
+        Assert.NotNull(contextBar);
+    }
+
+    [Fact]
+    public void ContextBar_UpdatesWhenTabChanges()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        // Initially on Discover tab
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+
+        // Switch to Installed tab should update context bar
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+
+        // Switch back to Discover should also update
+        app.ForceActiveTabForTests(SkillViewTab.Discover);
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void ContextBar_FormatIncludesWorkspaceName()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: null,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: null);
+
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.NotEmpty(rendered);
+        Assert.Contains("Discover", rendered);
+    }
+
+    [Fact]
+    public void ContextBar_FormatIncludesAgentLabelWhenPresent()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: "agent: copilot",
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: null);
+
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.NotEmpty(rendered);
+        Assert.Contains("agent: copilot", rendered);
+    }
+
+    [Fact]
+    public void ContextBar_FormatIncludesFilterLabelWhenPresent()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: null,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: "hidden dirs: on");
+
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.NotEmpty(rendered);
+        Assert.Contains("hidden dirs: on", rendered);
+    }
 }

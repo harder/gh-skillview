@@ -433,6 +433,7 @@ public sealed class SkillViewApp
 
         RefreshResultsTable();
         _services.Logger.Subscribe(OnLogEntry);
+        UpdateContextBar();
 
         if (TuiHelpers.IsWarpTerminal)
         {
@@ -555,6 +556,7 @@ public sealed class SkillViewApp
                 }
                 break;
         }
+        UpdateContextBar();
     }
 
     private void ShowSearchPanes(bool visible)
@@ -688,6 +690,7 @@ public sealed class SkillViewApp
         var owner = _ownerField?.Text.Trim();
         var agent = _agentField?.Text.Trim();
         var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
+        UpdateContextBar();
         _ = RunSearchAsync(
             query,
             string.IsNullOrEmpty(owner) ? null : owner,
@@ -1282,6 +1285,48 @@ public sealed class SkillViewApp
 
         var state = HiddenDirsEnabled ? "on" : "off";
         _detailPane.SetActionsText($"[h] Hidden dirs: {state}    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview");
+        UpdateContextBar();
+    }
+
+    private void UpdateContextBar()
+    {
+        if (_contextBar is null) return;
+
+        var workspaceName = _activeTab switch
+        {
+            SkillViewTab.Discover => "Discover",
+            SkillViewTab.Installed => "Installed",
+            SkillViewTab.Changes => "Changes",
+            _ => null
+        };
+
+        string? agentLabel = null;
+        string? filterLabel = null;
+
+        // For Discover tab, show agent filter and hidden-dirs state.
+        if (_activeTab == SkillViewTab.Discover)
+        {
+            var agent = _agentField?.Text?.Trim();
+            if (!string.IsNullOrEmpty(agent))
+            {
+                agentLabel = $"agent: {agent}";
+            }
+
+            if (HiddenDirsEnabled)
+            {
+                filterLabel = "hidden dirs: on";
+            }
+        }
+
+        var state = new ContextBarState(
+            Workspace: workspaceName,
+            AgentLabel: agentLabel,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: filterLabel);
+
+        _contextBar.Update(state);
     }
 
     private void ToggleRightPane()
@@ -1704,6 +1749,8 @@ public sealed class SkillViewApp
 
     internal SkillView.Ui.Tabs.ChangesTabView? ChangesTabForTests => _changesTab;
 
+    internal ContextBarView? ContextBarForTests => _contextBar;
+
     internal TabBarView? TabBarForTests => _tabBar;
 
     internal void ForceActiveTabForTests(SkillViewTab tab)
@@ -1711,6 +1758,7 @@ public sealed class SkillViewApp
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
         ShowSearchPanes(tab == SkillViewTab.Discover);
+        UpdateContextBar();
     }
 
     /// Fire-and-forget background work with exception guard. Catches any

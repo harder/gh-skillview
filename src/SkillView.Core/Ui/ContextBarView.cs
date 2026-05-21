@@ -50,6 +50,7 @@ internal sealed class ContextBarView : View
     {
         var sb = new StringBuilder();
 
+        AppendChip(sb, state.Workspace);
         AppendChip(sb, state.AgentLabel);
         AppendLocations(sb, state.LocationLabel);
         AppendChip(sb, state.ProvenanceLabel);
