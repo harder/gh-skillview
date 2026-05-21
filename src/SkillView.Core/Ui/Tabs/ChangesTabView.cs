@@ -25,6 +25,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly Action _onActivateCleanup;
     private readonly Action _onActivateDoctor;
     private readonly Action _onLeaveTab;
+    private readonly Action? _onStateChange;
 
     private readonly TableView _table;
     private readonly Label _status;
@@ -39,7 +40,8 @@ internal sealed class ChangesTabView : FrameView
         Action onActivateUpdates,
         Action onActivateCleanup,
         Action onActivateDoctor,
-        Action onLeaveTab)
+        Action onLeaveTab,
+        Action? onStateChange = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -47,6 +49,7 @@ internal sealed class ChangesTabView : FrameView
         _onActivateCleanup = onActivateCleanup;
         _onActivateDoctor = onActivateDoctor;
         _onLeaveTab = onLeaveTab;
+        _onStateChange = onStateChange;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -95,10 +98,11 @@ internal sealed class ChangesTabView : FrameView
             // Only queue items backed by real pending state.
             // Update availability is unknown until the user runs a dry-run; Doctor
             // is always accessible via 'd'. Neither belongs in the pending queue.
-            var cleanup = CleanupClassifier
+            var cleanupItems = CleanupClassifier
                             .Classify(snapshot, snapshot.ScannedRoots)
-                            .Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
-            var summary = DescribeWorkspaceSummary(snapshot, cleanup.Any());
+                            .ToArray();
+            var cleanup = cleanupItems.Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
+            var summary = DescribeWorkspaceSummary(snapshot, cleanupItems.Length > 0);
 
             await _runOnUi(() =>
             {
@@ -147,12 +151,16 @@ internal sealed class ChangesTabView : FrameView
 
         if (_rows.Count > 0)
             _table.SetFocus();
+
+        _onStateChange?.Invoke();
     }
 
     // Tests only -----------------------------------------------------------
 
     internal int RowCountForTests => _rows.Count;
     internal string StatusTextForTests => _status.Text.ToString();
+
+    internal int GetPendingCount() => _rows.Count;
 
     // Internals ------------------------------------------------------------
 
@@ -187,12 +195,18 @@ internal sealed class ChangesTabView : FrameView
 
     private static string DescribeWorkspaceSummary(InventorySnapshot snapshot, bool hasPendingCleanup)
     {
-        if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))
-            return "Needs review";
+        // Only show health concerns if they translate to actionable queue rows.
+        // Health flags by themselves matter for the Installed detail pane but
+        // don't belong in Changes unless cleanup items are actually queued.
+        if (hasPendingCleanup)
+        {
+            if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))
+                return "Needs review";
+            if (snapshot.Skills.Any(skill => skill.IsSymlinked))
+                return "Symlink";
+            return "Maintenance pending";
+        }
 
-        if (snapshot.Skills.Any(skill => skill.IsSymlinked))
-            return "Symlink";
-
-        return hasPendingCleanup ? "Maintenance pending" : "Healthy";
+        return "Healthy";
     }
 }

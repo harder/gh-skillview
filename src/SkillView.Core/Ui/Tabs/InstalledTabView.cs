@@ -28,6 +28,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
+    private readonly Action? _onFilterChange;
 
     private readonly TextField _filterField;
     private readonly TableView _table;
@@ -53,13 +54,15 @@ internal sealed class InstalledTabView : FrameView
         Func<Task<InventorySnapshot>> snapshotLoader,
         Action<InstalledSkill, InventorySnapshot> onRemove,
         Action onLeaveTab,
-        Action onGoToSearch)
+        Action onGoToSearch,
+        Action? onFilterChange = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
         _onRemove = onRemove;
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
+        _onFilterChange = onFilterChange;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -302,7 +305,7 @@ internal sealed class InstalledTabView : FrameView
             {
                 case "Name": cs.MinWidth = 8; cs.MaxWidth = _nameW; break;
                 case "Package": cs.MinWidth = 8; cs.MaxWidth = _pkgW; break;
-                case "Health": cs.MinWidth = 10; cs.MaxWidth = 14; break;
+                case "Health": cs.MinWidth = 12; cs.MaxWidth = 14; break;
                 case "Agents": cs.MinWidth = 6; break;
             }
         }
@@ -315,11 +318,11 @@ internal sealed class InstalledTabView : FrameView
         var available = viewportWidth > 0
             ? Math.Max(40, viewportWidth - 6)
             : 70;
-        // Location column width is the max of all possible values from
-        // InstalledInventoryFormatter.DescribeLocation: "User" (4), "Project" (7), "Custom" (6).
+        // Location column: max("User", "Project", "Custom") = "Project" = 7 chars.
+        // Health column: max("Healthy", "Symlink", "Needs review") = "Needs review" = 12 chars.
         const int LocationColumnWidth = 7;
-        const int HealthColumnMinWidth = 10;
-        var fixedCols = LocationColumnWidth + HealthColumnMinWidth;
+        const int HealthColumnWidth = 12;
+        var fixedCols = LocationColumnWidth + HealthColumnWidth;
         var remaining = Math.Max(20, available - fixedCols);
         if (_hasPackages)
         {
@@ -353,6 +356,7 @@ internal sealed class InstalledTabView : FrameView
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
             : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
+        _onFilterChange?.Invoke();
     }
 
     private void RefreshFooter()
@@ -456,6 +460,15 @@ internal sealed class InstalledTabView : FrameView
 
     private bool IsCurrentLoad(long loadGeneration) =>
         Interlocked.Read(ref _loadGeneration) == loadGeneration;
+
+    internal string GetFilterText() => _filterField.Text.Trim();
+
+    internal string? GetPinFilterState() => _pinFilter switch
+    {
+        PinFilter.PinnedOnly   => "pinned only",
+        PinFilter.UnpinnedOnly => "unpinned only",
+        _                      => null
+    };
 
     internal IReadOnlyList<string> VisibleSkillNamesForTests => _rows.Select(s => s.Name).ToArray();
 }

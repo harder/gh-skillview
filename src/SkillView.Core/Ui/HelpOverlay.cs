@@ -33,17 +33,10 @@ internal static class HelpOverlay
 - **Enter** — preview the selected search result
 - **i** — install selected via compact confirm
 - **I** — install selected via advanced wizard
-- **u** — open Changes from Discover, or update the current row in Changes
-- **U** — update all marked rows in Changes
+- **u** — open Changes tab from Discover
 - **x** — remove the selected installed skill
 - **o** — open the selected repo or path
 - **e** — toggle raw / rendered preview
-
-## Batch (Changes tab)
-
-- **Space** — toggle mark on current row
-- **a / A** — mark all / clear all
-- **d** — dry-run marked or selected updates
 
 ## Modes
 

@@ -116,13 +116,13 @@ skillview cleanup
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Each tab pairs a list on the left (60% of the width) with a contextual detail pane on the right (40%). The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes uses a full-width table for the maintenance queue. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across discovered roots, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Changes** △ | Mark skills with `Space`/`a` and batch-update with `U`, single-update the current row with `u`, or dry-run the whole inventory. Honors `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `3`, `u`, click the pill, or `←/→` |
+| **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and capability-gated options (hidden-dir scanning, upstream, local installs). | `I` from a Discover result, or **Advanced…** from the compact modal |
@@ -188,12 +188,7 @@ Changes tab:
 
 | Key | Action |
 |---|---|
-| `Space` | Toggle the mark on the current row |
-| `a` | Mark all visible rows |
-| `A` | Clear all marks |
-| `u` | Update the current row only |
-| `U` | Update every marked row |
-| `d` | Dry-run with the current selection |
+| `Enter` | Open the selected maintenance item |
 
 Other:
 

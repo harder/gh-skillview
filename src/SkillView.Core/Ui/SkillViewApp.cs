@@ -351,7 +351,8 @@ public sealed class SkillViewApp
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
-            onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); })
+            onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
+            onFilterChange: UpdateContextBar)
         {
             X = 0,
             Y = 2,
@@ -401,7 +402,8 @@ public sealed class SkillViewApp
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
                 hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
                 enterDoctor: EnterDoctor),
-            onLeaveTab: () => ActivateTab(SkillViewTab.Discover))
+            onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
+            onStateChange: UpdateContextBar)
         {
             X = 0,
             Y = 2,
@@ -458,7 +460,7 @@ public sealed class SkillViewApp
     private bool OnWindowShortcut(Key key)
     {
         // Don't intercept plain-letter typing while a text input is focused.
-        if (_queryField?.HasFocus == true || _ownerField?.HasFocus == true || _limitUpDown?.HasFocus == true)
+        if (_queryField?.HasFocus == true || _ownerField?.HasFocus == true || _agentField?.HasFocus == true || _limitUpDown?.HasFocus == true)
         {
             return false;
         }
@@ -1315,6 +1317,31 @@ public sealed class SkillViewApp
             if (HiddenDirsEnabled)
             {
                 filterLabel = "hidden dirs: on";
+            }
+        }
+
+        // For Installed tab, show filter text and pin filter state.
+        if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
+        {
+            var filter = _installedTab.GetFilterText();
+            if (!string.IsNullOrEmpty(filter))
+            {
+                filterLabel = $"filter: {filter}";
+            }
+            var pinFilter = _installedTab.GetPinFilterState();
+            if (pinFilter is not null)
+            {
+                agentLabel = pinFilter;
+            }
+        }
+
+        // For Changes tab, show count of pending items.
+        if (_activeTab == SkillViewTab.Changes && _changesTab is not null)
+        {
+            var count = _changesTab.GetPendingCount();
+            if (count > 0)
+            {
+                filterLabel = $"{count} pending";
             }
         }
 
