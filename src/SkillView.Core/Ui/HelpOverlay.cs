@@ -19,13 +19,13 @@ internal static class HelpOverlay
 - **PgUp / PgDn**, **Home / End** — jump
 - **Tab / Shift+Tab** — focus list ↔ detail
 - **← / →** — previous / next tab
-- **1 / 2 / 3** — Search · Installed · Updates
+- **1 / 2 / 3** — Discover · Installed · Changes
 
 ## Search & filter
 
-- **/** — jump to the Search tab and focus the query box
+- **/** — jump to the Discover tab and focus the query box
 - **f** — focus the Installed filter
-- **s / S** — cycle sort in the active Search or Installed tab
+- **s / S** — cycle sort in the active Discover or Installed tab
 - **P** — cycle Installed pin filter
 
 ## Actions
@@ -33,13 +33,13 @@ internal static class HelpOverlay
 - **Enter** — preview the selected search result
 - **i** — install selected via compact confirm
 - **I** — install selected via advanced wizard
-- **u** — open Updates from Search, or update the current row in Updates
-- **U** — update all marked rows in Updates
+- **u** — open Changes from Discover, or update the current row in Changes
+- **U** — update all marked rows in Changes
 - **x** — remove the selected installed skill
 - **o** — open the selected repo or path
 - **e** — toggle raw / rendered preview
 
-## Batch (Updates tab)
+## Batch (Changes tab)
 
 - **Space** — toggle mark on current row
 - **a / A** — mark all / clear all
@@ -48,7 +48,7 @@ internal static class HelpOverlay
 ## Modes
 
 - **?** or **F1** — toggle this help
-- **d** — open Doctor from Search / Installed
+- **d** — open Doctor from Discover / Installed
 - **c** — review cleanup candidates
 - **h** — toggle hidden-dir access for preview/install
 - **l / r** — show / hide logs

@@ -41,10 +41,10 @@ public sealed class SkillViewApp
     private TableView? _resultsTable;
     private Markdown? _previewPane;
     private Editor? _previewRawPane;
-    private Editor? _logPane;    private Label? _statusLabel;
+    private Editor? _logPane;
+    private ContextBarView? _contextBar;
+    private StatusStripView? _statusStrip;
     private SpinnerView? _spinner;
-    private StatusBar? _statusBarPreview;
-    private StatusBar? _statusBarLogs;
     private TabBarView? _tabBar;
     private SkillViewTab _activeTab = SkillViewTab.Discover;
     private FrameView? _leftFrame;
@@ -91,7 +91,8 @@ public sealed class SkillViewApp
     /// returned by `gh skill search` (which is itself relevance-ranked).
     internal enum SearchSort { Off, StarsDesc, NameAsc, NameDesc, RepoAsc }
 
-    private string _defaultStatus = " ready — press / to search or F1 for help";
+    private string _defaultStatus = "ready — press / to search or F1 for help";
+    private string _currentStatus = string.Empty;
     private object? _statusToken;
     private static readonly TimeSpan StatusAutoClear = TimeSpan.FromSeconds(6);
 
@@ -244,7 +245,7 @@ public sealed class SkillViewApp
         _discoverTab = new SkillView.Ui.Tabs.DiscoverTabView(ItemActionsText, TuiHelpers.WelcomeHint)
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
@@ -308,12 +309,18 @@ public sealed class SkillViewApp
             }
         };
 
-        _statusLabel = new Label
+        _contextBar = new ContextBarView
         {
             X = 0,
-            Y = Pos.AnchorEnd(2),
-            Width = Dim.Fill(10),
-            Text = " ready — press / to search or F1 for help",
+            Y = 1,
+            Width = Dim.Fill(),
+        };
+
+        _statusStrip = new StatusStripView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(),
         };
         _spinner = new SpinnerView
         {
@@ -325,33 +332,7 @@ public sealed class SkillViewApp
             AutoSpin = false,
         };
 
-        _statusBarPreview = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Title = "/", HelpText = "Search" },
-            new Shortcut { Title = "1/2/3", HelpText = "Tabs" },
-            new Shortcut { Title = "i", HelpText = "Install" },
-            new Shortcut { Title = "I", HelpText = "Install…" },
-            new Shortcut { Title = "o", HelpText = "Open" },
-            new Shortcut { Title = "e", HelpText = "Raw/Render" },
-            new Shortcut { Title = "u", HelpText = "Update" },
-            new Shortcut { Title = "c", HelpText = "Cleanup" },
-            new Shortcut { Title = "d", HelpText = "Doctor" },
-            new Shortcut { Title = "l", HelpText = "Logs" },
-            new Shortcut { Title = "?", HelpText = "Help" },
-            new Shortcut { Title = "q", HelpText = "Quit" },
-        ]));
-        _statusBarLogs = new StatusBar(
-        [
-            new Shortcut { Title = "l", HelpText = "Preview" },
-            new Shortcut { Key = Key.F1, Title = "Help" },
-            new Shortcut { Title = "q", HelpText = "Quit" },
-        ])
-        {
-            Visible = false,
-        };
-
-        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
-            window, _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
+        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, _spinner);
         RefreshHiddenDirUi();
 
         Func<Action, Task> runOnUi = action =>
@@ -373,7 +354,7 @@ public sealed class SkillViewApp
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); })
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
             Visible = false,
@@ -390,7 +371,7 @@ public sealed class SkillViewApp
             onUpdateApplied: () => _services.ListAdapter.Invalidate())
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
             Visible = false,
@@ -400,7 +381,7 @@ public sealed class SkillViewApp
             onLeaveTab: LeaveDoctor)
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
             Visible = false,
@@ -423,14 +404,14 @@ public sealed class SkillViewApp
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover))
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(2),
         };
 
-        window.Add(_tabBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
+        window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
                    _changesTab,
-                   _statusLabel, _spinner, _statusBarPreview, _statusBarLogs);
+                   _spinner, _statusStrip);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
             window,
@@ -1361,14 +1342,13 @@ public sealed class SkillViewApp
         if (_itemActionsLabel is not null) _itemActionsLabel.Visible = true;
         if (_logPane is not null) _logPane.CanFocus = false;
         if (_logPane is not null) _logPane.Visible = false;
-        if (_statusBarPreview is not null) _statusBarPreview.Visible = true;
-        if (_statusBarLogs is not null) _statusBarLogs.Visible = false;
         if (_leftFrame is not null) _leftFrame.Visible = true;
         if (_rightFrame is not null)
         {
             _rightFrame.X = _leftFrame is not null ? Pos.Right(_leftFrame) : 0;
             _rightFrame.Width = Dim.Fill();
         }
+        UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
     }
 
     private void ShowLogPane()
@@ -1383,14 +1363,13 @@ public sealed class SkillViewApp
         if (_itemActionsLabel is not null) _itemActionsLabel.Visible = false;
         if (_logPane is not null) _logPane.CanFocus = true;
         if (_logPane is not null) _logPane.Visible = true;
-        if (_statusBarPreview is not null) _statusBarPreview.Visible = false;
-        if (_statusBarLogs is not null) _statusBarLogs.Visible = true;
         if (_leftFrame is not null) _leftFrame.Visible = false;
         if (_rightFrame is not null)
         {
             _rightFrame.X = 0;
             _rightFrame.Width = Dim.Fill();
         }
+        UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
     }
 
     private void ShowHelp()
@@ -1486,12 +1465,7 @@ public sealed class SkillViewApp
 
     private void SetStatus(string text, TuiHelpers.NotificationLevel level) => Invoke(() =>
     {
-        if (_statusLabel is not null)
-        {
-            _statusLabel.Text = $" {text}";
-            _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(level));
-            _statusLabel.SetNeedsDraw();
-        }
+        UpdateStatusStrip(text, level);
         ScheduleStatusAutoClear();
     });
 
@@ -1500,25 +1474,83 @@ public sealed class SkillViewApp
     /// messages fall back to after `StatusAutoClear`.
     private void SetDefaultStatus(string text) => Invoke(() =>
     {
-        _defaultStatus = $" {text}";
-        ApplyDefaultStatus();
+        _defaultStatus = text;
+        UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
         CancelStatusAutoClear();
     });
 
     private void RestoreDefaultStatus() => Invoke(() =>
     {
-        ApplyDefaultStatus();
+        UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
         CancelStatusAutoClear();
     });
 
-    private void ApplyDefaultStatus()
+    private void UpdateStatusStrip(string text, TuiHelpers.NotificationLevel level)
     {
-        if (_statusLabel is not null)
+        _currentStatus = text;
+        if (_statusStrip is null) return;
+
+        var hints = GetCurrentHints();
+        var badges = GetCurrentBadges();
+        _statusStrip.Update(text, hints, badges);
+    }
+
+    private List<StatusHint> GetCurrentHints()
+    {
+        if (_showingLogs)
         {
-            _statusLabel.Text = _defaultStatus;
-            _statusLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
-            _statusLabel.SetNeedsDraw();
+            return [
+                new StatusHint("l", "Preview"),
+                new StatusHint("?", "Help"),
+                new StatusHint("q", "Quit"),
+            ];
         }
+
+        return _activeTab switch
+        {
+            SkillViewTab.Discover => [
+                new StatusHint("/", "Search"),
+                new StatusHint("1/2/3", "Tabs"),
+                new StatusHint("i", "Install"),
+                new StatusHint("I", "Install…"),
+                new StatusHint("o", "Open"),
+                new StatusHint("e", "Raw/Render"),
+                new StatusHint("u", "Changes"),
+                new StatusHint("c", "Cleanup"),
+                new StatusHint("d", "Doctor"),
+                new StatusHint("l", "Logs"),
+                new StatusHint("?", "Help"),
+                new StatusHint("q", "Quit"),
+            ],
+            SkillViewTab.Installed => [
+                new StatusHint("f", "Filter"),
+                new StatusHint("s", "Sort"),
+                new StatusHint("P", "Pin"),
+                new StatusHint("x", "Remove"),
+                new StatusHint("o", "Open"),
+                new StatusHint("/", "Discover"),
+                new StatusHint("?", "Help"),
+                new StatusHint("q", "Quit"),
+            ],
+            SkillViewTab.Changes => [
+                new StatusHint("1/2/3", "Tabs"),
+                new StatusHint("u", "Updates"),
+                new StatusHint("c", "Cleanup"),
+                new StatusHint("d", "Doctor"),
+                new StatusHint("?", "Help"),
+                new StatusHint("q", "Quit"),
+            ],
+            _ => [
+                new StatusHint("?", "Help"),
+                new StatusHint("q", "Quit"),
+            ],
+        };
+    }
+
+    private string GetCurrentBadges()
+    {
+        // Future: surface facets like agent, location, health here
+        return string.Empty;
     }
 
     private void ScheduleStatusAutoClear()
@@ -1528,7 +1560,7 @@ public sealed class SkillViewApp
         _statusToken = _app.AddTimeout(StatusAutoClear, () =>
         {
             _statusToken = null;
-            ApplyDefaultStatus();
+            UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
             return false;
         });
     }
@@ -1547,10 +1579,7 @@ public sealed class SkillViewApp
             _spinner.Visible = true;
             _spinner.AutoSpin = true;
         }
-        if (_statusLabel is not null)
-        {
-            _statusLabel.Text = $" {text}";
-        }
+        UpdateStatusStrip(text, TuiHelpers.NotificationLevel.Info);
     });
 
     private void ClearBusy()
@@ -1660,7 +1689,7 @@ public sealed class SkillViewApp
 
     internal bool UserInteractedSinceLaunchForTests => _userInteractedSinceLaunch;
 
-    internal string StatusTextForTests => _statusLabel?.Text.ToString() ?? string.Empty;
+    internal string StatusTextForTests => _currentStatus;
 
     internal string DefaultStatusForTests => _defaultStatus;
 

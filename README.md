@@ -15,7 +15,7 @@ SkillView does **not** replace `gh skill`. It gives developers a faster full-scr
 
 `gh skill` is powerful, but once you start working with a lot of skills it helps to have:
 
-- a tabbed workspace where Search, Installed, and Updates live side-by-side
+- a tabbed workspace where Discover, Installed, and Changes live side-by-side
 - a persistent detail pane showing metadata and rendered `SKILL.md`
 - guided install and update flows instead of memorizing flags
 - a unified view of installed skills across project, user, and custom roots
@@ -28,7 +28,7 @@ SkillView complements `gh skill`; it does not try to replace every low-level com
 
 | If you need to... | Reach for... | Why |
 |---|---|---|
-| browse and compare skills quickly | **SkillView TUI** | tabbed Search/Installed/Updates layout with a persistent detail pane, batch updates, and staged install/remove flows |
+| browse and compare skills quickly | **SkillView TUI** | tabbed Discover/Installed/Changes layout with a persistent detail pane, batch updates, and staged install/remove flows |
 | script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
 | experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
 | debug whether a feature is available in your installed GitHub CLI | **`skillview doctor`** | capability probing shows what the local `gh` actually supports |
@@ -116,16 +116,16 @@ skillview cleanup
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Search**, **Installed**, and **Updates** — plus a Doctor view reachable on demand. Each tab pairs a list on the left (60% of the width) with a contextual detail pane on the right (40%). The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Each tab pairs a list on the left (60% of the width) with a contextual detail pane on the right (40%). The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
-| **Search** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
+| **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across discovered roots, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Updates** △ | Mark skills with `Space`/`a` and batch-update with `U`, single-update the current row with `u`, or dry-run the whole inventory. Honors `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `3`, `u`, click the pill, or `←/→` |
+| **Changes** △ | Mark skills with `Space`/`a` and batch-update with `U`, single-update the current row with `u`, or dry-run the whole inventory. Honors `--all`, `--force`, and `--unpin` when the local `gh` supports them. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
-| **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Search result |
-| **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and capability-gated options (hidden-dir scanning, upstream, local installs). | `I` from a Search result, or **Advanced…** from the compact modal |
+| **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
+| **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and capability-gated options (hidden-dir scanning, upstream, local installs). | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
 | **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
 | **Cleanup view** | Finds duplicates, broken symlinks, residue, and other cleanup candidates; remove or ignore them in batches. | `c` |
@@ -151,16 +151,16 @@ Navigation:
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` | Jump directly to Search / Installed / Updates |
+| `1` / `2` / `3` | Jump directly to Discover / Installed / Changes |
 | `←` / `→` | Cycle tabs |
 | `↑` / `↓`, `PgUp` / `PgDn`, `Home` / `End` | Move through rows |
 | `Tab` / `Shift+Tab` | Move focus between list and detail |
-| `/` | Jump to Search and focus the search box |
+| `/` | Jump to Discover and focus the search box |
 | `?` or `F1` | Open the help overlay |
 | `Esc` | Back out of the current sub-view / modal |
 | `q` | Quit |
 
-Search tab:
+Discover tab:
 
 | Key | Action |
 |---|---|
@@ -184,7 +184,7 @@ Installed tab:
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
 
-Updates tab:
+Changes tab:
 
 | Key | Action |
 |---|---|
