@@ -187,15 +187,11 @@ internal sealed class ChangesTabView : FrameView
 
     private static string DescribeWorkspaceSummary(InventorySnapshot snapshot, bool hasPendingCleanup)
     {
-        if (snapshot.Skills.Any(skill => SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked) == "Needs review"))
-        {
+        if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))
             return "Needs review";
-        }
 
-        if (snapshot.Skills.Any(skill => SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked) == "Symlink"))
-        {
+        if (snapshot.Skills.Any(skill => skill.IsSymlinked))
             return "Symlink";
-        }
 
         return hasPendingCleanup ? "Maintenance pending" : "Healthy";
     }
