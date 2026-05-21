@@ -116,7 +116,7 @@ internal sealed class InstalledTabView : FrameView
             var row = _table.GetSelectedRow();
             if (row >= 0 && row < _rows.Count)
             {
-                _detail.Text = InstalledScreen.RenderDetail(_rows[row]);
+                _detail.Text = RenderDetail(_rows[row]);
             }
         };
         _table.FrameChanged += (_, _) =>
@@ -202,7 +202,7 @@ internal sealed class InstalledTabView : FrameView
         BuildTableSource();
         RecomputeColumnWidths();
         RefreshFooter();
-        _detail.Text = _rows.Count == 0 ? "(no matches)" : InstalledScreen.RenderDetail(_rows[0]);
+        _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
         _table.SetFocus();
     }
 
@@ -287,8 +287,7 @@ internal sealed class InstalledTabView : FrameView
         {
             columns["Package"] = s => TuiHelpers.Truncate(s.Package?.Source ?? "", _pkgW);
         }
-        columns["!"] = s => s.Validity == ValidityState.Valid ? "" : "!";
-        columns["Lnk"] = s => s.IsSymlinked ? "↩" : "";
+        columns["Health"] = s => SkillHealthFormatter.RowBadge(s.Validity, s.IsSymlinked);
         columns["Agents"] = s => TuiHelpers.Truncate(
             InstalledInventoryFormatter.DescribeAgents(s),
             _agentsW);
@@ -303,6 +302,7 @@ internal sealed class InstalledTabView : FrameView
             {
                 case "Name": cs.MinWidth = 8; cs.MaxWidth = _nameW; break;
                 case "Package": cs.MinWidth = 8; cs.MaxWidth = _pkgW; break;
+                case "Health": cs.MinWidth = 10; cs.MaxWidth = 14; break;
                 case "Agents": cs.MinWidth = 6; break;
             }
         }
@@ -348,7 +348,7 @@ internal sealed class InstalledTabView : FrameView
         RefreshFooter();
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
-            : InstalledScreen.RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
+            : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
     }
 
     private void RefreshFooter()
@@ -441,6 +441,13 @@ internal sealed class InstalledTabView : FrameView
     {
         public InstalledTableSource(IReadOnlyList<InstalledSkill> rows, Dictionary<string, Func<InstalledSkill, object>> cols)
             : base(rows, cols) { }
+    }
+
+    private static string RenderDetail(InstalledSkill skill)
+    {
+        var detail = InstalledScreen.RenderDetail(skill);
+        var health = SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked);
+        return $"**Health** : {health}\n\n{detail}";
     }
 
     private bool IsCurrentLoad(long loadGeneration) =>

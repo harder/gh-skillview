@@ -99,6 +99,7 @@ internal sealed class DiscoverTabView : FrameView
             Width = Dim.Fill(),
             Height = Dim.Fill(),
         };
+        DetailPane.SetHealthSummary("Remote preview");
 
         // Apply scheme to all owned controls so the workspace is self-contained.
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,

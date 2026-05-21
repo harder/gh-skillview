@@ -98,11 +98,12 @@ internal sealed class ChangesTabView : FrameView
             var cleanup = CleanupClassifier
                             .Classify(snapshot, snapshot.ScannedRoots)
                             .Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
+            var summary = DescribeWorkspaceSummary(snapshot, cleanup.Any());
 
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen) return;
-                Load(updates: [], cleanup, diagnostics: []);
+                Load(updates: [], cleanup, diagnostics: [], summary);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -119,7 +120,8 @@ internal sealed class ChangesTabView : FrameView
     internal void Load(
         IEnumerable<string> updates,
         IEnumerable<string> cleanup,
-        IEnumerable<string> diagnostics)
+        IEnumerable<string> diagnostics,
+        string summary = "Healthy")
     {
         _rows = ChangesQueueBuilder.BuildForTests(updates, cleanup, diagnostics);
 
@@ -140,8 +142,8 @@ internal sealed class ChangesTabView : FrameView
 
         _table.Update();
         _status.Text = _rows.Count == 0
-            ? " no pending changes — everything looks good"
-            : $" {_rows.Count} item(s) pending · Enter to open · Esc to go back";
+            ? $" {summary} · no pending changes — everything looks good"
+            : $" {summary} · {_rows.Count} item(s) pending · Enter to open · Esc to go back";
 
         if (_rows.Count > 0)
             _table.SetFocus();
@@ -181,5 +183,20 @@ internal sealed class ChangesTabView : FrameView
             key.Handled = true;
             ActivateSelectedRow();
         }
+    }
+
+    private static string DescribeWorkspaceSummary(InventorySnapshot snapshot, bool hasPendingCleanup)
+    {
+        if (snapshot.Skills.Any(skill => SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked) == "Needs review"))
+        {
+            return "Needs review";
+        }
+
+        if (snapshot.Skills.Any(skill => SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked) == "Symlink"))
+        {
+            return "Symlink";
+        }
+
+        return hasPendingCleanup ? "Maintenance pending" : "Healthy";
     }
 }

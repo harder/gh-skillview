@@ -230,6 +230,17 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void BuildUi_SeedsDiscoverDetailFeedback()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.Contains(
+            Descendants(window).OfType<Label>(),
+            label => label.Text.ToString().Contains("Remote preview", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void BuildUi_WindowShortcutFocusesQueryField()
     {
         var app = CreateApp();

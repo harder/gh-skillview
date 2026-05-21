@@ -1294,13 +1294,13 @@ public sealed class SkillViewApp
 
     private void RefreshHiddenDirUi()
     {
-        if (_itemActionsLabel is null)
+        if (_detailPane is null)
         {
             return;
         }
 
         var state = HiddenDirsEnabled ? "on" : "off";
-        _itemActionsLabel.Text = $"  [h] Hidden dirs: {state}    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
+        _detailPane.SetActionsText($"[h] Hidden dirs: {state}    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview");
     }
 
     private void ToggleRightPane()

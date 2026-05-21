@@ -20,6 +20,8 @@ internal sealed class SkillDetailPaneView : FrameView
 {
     private const int MinMetadataHeight = 3;
     private const int MaxMetadataHeight = 8;
+    private string _actionsText;
+    private string? _healthSummary;
 
     internal Label ItemActionsLabel { get; }
     internal FrameView MetadataFrame { get; }
@@ -35,6 +37,7 @@ internal sealed class SkillDetailPaneView : FrameView
     /// status-bar strip rather than blending into the panel.
     internal SkillDetailPaneView(string actionsText, string welcomeText)
     {
+        _actionsText = actionsText.Trim();
         // No frame title — the inner Details / SKILL.md frames carry their own.
         BorderStyle = LineStyle.None;
         // Vertical stack: actions strip · auto-sized metadata · preview body.
@@ -47,7 +50,7 @@ internal sealed class SkillDetailPaneView : FrameView
             Y = 0,
             Width = Dim.Fill(),
             Height = 1,
-            Text = actionsText,
+            Text = string.Empty,
         };
 
         MetadataFrame = new FrameView
@@ -111,6 +114,19 @@ internal sealed class SkillDetailPaneView : FrameView
 
         SchemeName = SchemeNames.Base;
         ItemActionsLabel.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+        RefreshHeader();
+    }
+
+    internal void SetHealthSummary(string? summary)
+    {
+        _healthSummary = summary;
+        RefreshHeader();
+    }
+
+    internal void SetActionsText(string actionsText)
+    {
+        _actionsText = actionsText.Trim();
+        RefreshHeader();
     }
 
     /// Update the metadata pane with a raw markdown string and auto-size the
@@ -133,5 +149,12 @@ internal sealed class SkillDetailPaneView : FrameView
             ? null
             : string.Join("  ", System.Linq.Enumerable.Select(chips, c => $"**{c}**"));
         SetMetadataContent(markdown);
+    }
+
+    private void RefreshHeader()
+    {
+        ItemActionsLabel.Text = string.IsNullOrWhiteSpace(_healthSummary)
+            ? _actionsText
+            : $"{_healthSummary}  ·  {_actionsText}";
     }
 }
