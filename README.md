@@ -121,7 +121,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 | Tab / view | What it does | How to open |
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
-| **Installed** ▣ | Lists installed skills across discovered roots, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
+| **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
 | **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
@@ -179,7 +179,7 @@ Installed tab:
 | Key | Action |
 |---|---|
 | `f` | Focus the filter field |
-| `s` | Cycle sort (name / package / scope) |
+| `s` | Cycle sort (name / package / location) |
 | `P` | Cycle pin filter (all / pinned only / unpinned only) |
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
@@ -333,14 +333,14 @@ Program.cs
      -> TUI: SkillViewApp.RunAsync(...)
 ```
 
-The TUI is a single Terminal.Gui `Window` that hosts a persistent `TabBarView` header and four embedded view classes — `SearchTabView` logic lives inside `SkillViewApp` itself, `InstalledTabView` and `UpdatesTabView` in `src/SkillView.Core/Ui/Tabs/`, and `DoctorTabView` as a full-screen overlay. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
+The TUI is a single Terminal.Gui `Window` that hosts a persistent `TabBarView` header and four embedded view classes — `DiscoverTabView` logic lives inside `SkillViewApp` itself, `InstalledTabView`, `ChangesTabView`, and `DoctorTabView` in `src/SkillView.Core/Ui/Tabs/`. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
 
 ### Project layout
 
 | Path | Purpose |
 |---|---|
 | `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui views |
-| `src/SkillView.Core/Ui/Tabs/` | `InstalledTabView`, `UpdatesTabView`, `DoctorTabView` |
+| `src/SkillView.Core/Ui/Tabs/` | `DiscoverTabView` (inline), `InstalledTabView`, `ChangesTabView`, `DoctorTabView` |
 | `src/SkillView.Core/Ui/Theming/` | Color palette + `ColorScheme` factories |
 | `src/SkillView.App/` | Standalone `skillview` entrypoint |
 | `src/SkillView.GhExtension/` | `gh skillview` extension entrypoint |

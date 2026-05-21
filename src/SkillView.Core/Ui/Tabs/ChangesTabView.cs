@@ -146,7 +146,7 @@ internal sealed class ChangesTabView : FrameView
 
         _table.Update();
         _status.Text = _rows.Count == 0
-            ? $" {summary} · no pending changes — everything looks good"
+            ? $" {summary} · no pending cleanup"
             : $" {summary} · {_rows.Count} item(s) pending · Enter to open · Esc to go back";
 
         if (_rows.Count > 0)
@@ -198,6 +198,8 @@ internal sealed class ChangesTabView : FrameView
         // Only show health concerns if they translate to actionable queue rows.
         // Health flags by themselves matter for the Installed detail pane but
         // don't belong in Changes unless cleanup items are actually queued.
+        // This summary describes cleanup state only — update availability is
+        // unknown until dry-run and diagnostics are always accessible via 'd'.
         if (hasPendingCleanup)
         {
             if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))
@@ -207,6 +209,6 @@ internal sealed class ChangesTabView : FrameView
             return "Maintenance pending";
         }
 
-        return "Healthy";
+        return "No cleanup items";
     }
 }

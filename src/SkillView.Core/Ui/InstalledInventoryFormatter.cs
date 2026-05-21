@@ -15,6 +15,15 @@ internal static class InstalledInventoryFormatter
         _             => "Custom",
     };
 
+    /// Returns a short human-readable label for the provenance.
+    internal static string DescribeProvenance(InstalledSkill skill) => skill.Provenance switch
+    {
+        Provenance.FsScan  => "Disk",
+        Provenance.CliList => "List",
+        Provenance.Both    => "Disk+List",
+        _                  => "Unknown",
+    };
+
     /// Returns the agent badge string for the skill, e.g. "🤖 🖥️" for
     /// multi-agent installs. Delegates to <see cref="TuiHelpers.AgentBadges"/>
     /// so the badge icons stay in one place.

@@ -1304,6 +1304,9 @@ public sealed class SkillViewApp
 
         string? agentLabel = null;
         string? filterLabel = null;
+        string? locationLabel = null;
+        string? provenanceLabel = null;
+        string? healthLabel = null;
 
         // For Discover tab, show agent filter and hidden-dirs state.
         if (_activeTab == SkillViewTab.Discover)
@@ -1320,7 +1323,8 @@ public sealed class SkillViewApp
             }
         }
 
-        // For Installed tab, show filter text and pin filter state.
+        // For Installed tab, show filter text, pin filter state, and live context
+        // from the current selection (location, provenance, health).
         if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
         {
             var filter = _installedTab.GetFilterText();
@@ -1332,6 +1336,14 @@ public sealed class SkillViewApp
             if (pinFilter is not null)
             {
                 agentLabel = pinFilter;
+            }
+
+            var selected = _installedTab.GetSelectedSkill();
+            if (selected is not null)
+            {
+                locationLabel = InstalledInventoryFormatter.DescribeLocation(selected);
+                provenanceLabel = InstalledInventoryFormatter.DescribeProvenance(selected);
+                healthLabel = SkillHealthFormatter.RowBadge(selected.Validity, selected.IsSymlinked);
             }
         }
 
@@ -1348,9 +1360,9 @@ public sealed class SkillViewApp
         var state = new ContextBarState(
             Workspace: workspaceName,
             AgentLabel: agentLabel,
-            LocationLabel: null,
-            ProvenanceLabel: null,
-            HealthLabel: null,
+            LocationLabel: locationLabel,
+            ProvenanceLabel: provenanceLabel,
+            HealthLabel: healthLabel,
             FilterLabel: filterLabel);
 
         _contextBar.Update(state);
@@ -1606,7 +1618,7 @@ public sealed class SkillViewApp
             ],
             SkillViewTab.Changes => [
                 new StatusHint("1/2/3", "Tabs"),
-                new StatusHint("u", "Updates"),
+                new StatusHint("u", "Changes"),
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),
@@ -1621,8 +1633,37 @@ public sealed class SkillViewApp
 
     private string GetCurrentBadges()
     {
-        // Future: surface facets like agent, location, health here
-        return string.Empty;
+        var parts = new List<string>();
+
+        // Show active facets from Installed tab selection if applicable.
+        if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
+        {
+            var selected = _installedTab.GetSelectedSkill();
+            if (selected is not null)
+            {
+                var agents = InstalledInventoryFormatter.DescribeAgents(selected);
+                if (!string.IsNullOrEmpty(agents))
+                {
+                    parts.Add(agents);
+                }
+            }
+        }
+
+        // Show agent filter on Discover tab.
+        if (_activeTab == SkillViewTab.Discover)
+        {
+            var agent = _agentField?.Text?.Trim();
+            if (!string.IsNullOrEmpty(agent))
+            {
+                var badge = TuiHelpers.AgentBadges([agent]);
+                if (!string.IsNullOrEmpty(badge))
+                {
+                    parts.Add(badge);
+                }
+            }
+        }
+
+        return parts.Count > 0 ? string.Join(" ", parts) : string.Empty;
     }
 
     private void ScheduleStatusAutoClear()

@@ -470,5 +470,11 @@ internal sealed class InstalledTabView : FrameView
         _                      => null
     };
 
+    internal InstalledSkill? GetSelectedSkill()
+    {
+        var idx = _table.GetSelectedRow();
+        return idx >= 0 && idx < _rows.Count ? _rows[idx] : null;
+    }
+
     internal IReadOnlyList<string> VisibleSkillNamesForTests => _rows.Select(s => s.Name).ToArray();
 }
