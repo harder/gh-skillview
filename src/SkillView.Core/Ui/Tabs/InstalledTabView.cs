@@ -315,7 +315,9 @@ internal sealed class InstalledTabView : FrameView
         var available = viewportWidth > 0
             ? Math.Max(40, viewportWidth - 6)
             : 70;
-        const int LocationColumnWidth = 6;
+        // Location column width is the max of all possible values from
+        // InstalledInventoryFormatter.DescribeLocation: "User" (4), "Project" (7), "Custom" (6).
+        const int LocationColumnWidth = 7;
         const int HealthColumnMinWidth = 10;
         var fixedCols = LocationColumnWidth + HealthColumnMinWidth;
         var remaining = Math.Max(20, available - fixedCols);

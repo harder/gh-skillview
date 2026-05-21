@@ -47,10 +47,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
 - Current package compatibility: SkillView is pinned to Terminal.Gui
-  `2.2.2-develop.18`. Test projects use `Microsoft.NET.Test.Sdk` `18.5.1`,
-  `xunit.v3` `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. If tests fail
-  to compile on missing `TestContext`, rerun `dotnet restore` so stale xUnit
-  2.x assets are replaced.
+  `2.2.2-develop.18` (develop branch build for fixes not yet in stable) and
+  Terminal.Gui.Editor `2.2.3` (latest stable, compatible with develop base).
+  This pairing is intentional: the develop build addresses prior hangs while
+  the stable editor is forward-compatible. Test projects use
+  `Microsoft.NET.Test.Sdk` `18.5.1`, `xunit.v3` `3.2.2`, and
+  `xunit.runner.visualstudio` `3.1.5`. If tests fail to compile on missing
+  `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are replaced.
 - `src/SkillView.Core/SkillView.Core.csproj` owns the default
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
