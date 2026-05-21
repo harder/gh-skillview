@@ -315,7 +315,9 @@ internal sealed class InstalledTabView : FrameView
         var available = viewportWidth > 0
             ? Math.Max(40, viewportWidth - 6)
             : 70;
-        var fixedCols = 6 + 1 + 3;
+        const int LocationColumnWidth = 6;
+        const int HealthColumnMinWidth = 10;
+        var fixedCols = LocationColumnWidth + HealthColumnMinWidth;
         var remaining = Math.Max(20, available - fixedCols);
         if (_hasPackages)
         {
