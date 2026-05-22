@@ -31,6 +31,26 @@ public sealed class InstalledInventoryFormatterTests
         Assert.Equal("Custom", InstalledInventoryFormatter.DescribeLocation(skill));
     }
 
+    [Theory]
+    [InlineData(Scope.User, "USR")]
+    [InlineData(Scope.Project, "PRJ")]
+    [InlineData(Scope.Custom, "CUS")]
+    public void DescribeTableLocation_UsesCompactCodes(Scope scope, string expected)
+    {
+        var skill = MakeSkill(scope: scope);
+
+        Assert.Equal(expected, InstalledInventoryFormatter.DescribeTableLocation(skill));
+    }
+
+    [Theory]
+    [InlineData("anthropics/skills", "ant…/skills")]
+    [InlineData("cloudflare/skills", "clo…/skills")]
+    [InlineData("coreyhaines31/marketingskills", "cor…/marketingskills")]
+    public void DescribeTablePackageSource_TrimsOwnerPrefix(string source, string expected)
+    {
+        Assert.Equal(expected, InstalledInventoryFormatter.DescribeTablePackageSource(source));
+    }
+
     [Fact]
     public void DescribeAgents_NoAgents_ReturnsDash()
     {
@@ -46,8 +66,7 @@ public sealed class InstalledInventoryFormatterTests
 
         var result = InstalledInventoryFormatter.DescribeAgents(skill);
 
-        Assert.False(string.IsNullOrEmpty(result));
-        Assert.DoesNotContain("—", result);
+        Assert.Equal("GHC", result);
     }
 
     [Fact]

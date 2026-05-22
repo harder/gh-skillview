@@ -15,10 +15,11 @@ namespace SkillView.Ui.Tabs;
 /// Shows a prioritised list of pending work (Update · Cleanup · Diagnostics)
 /// and hands off to the appropriate specialist view when a row is activated.
 ///
-/// Layout: full-width table over the whole pane; bottom status bar with
-/// shortcuts. No split detail pane — the row title is the summary.
+/// Layout: full-width table over the whole pane; one compact status line at the
+/// bottom. No split detail pane — the row title is the summary.
 internal sealed class ChangesTabView : FrameView
 {
+    private const int KindColumnWidth = 11;
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
     private readonly Action _onActivateUpdates;
@@ -28,9 +29,8 @@ internal sealed class ChangesTabView : FrameView
     private readonly Action? _onStateChange;
 
     private readonly TableView _table;
+    private readonly Markdown _detail;
     private readonly Label _status;
-    private readonly StatusBar _statusBar;
-
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private long _loadGeneration;
 
@@ -58,31 +58,37 @@ internal sealed class ChangesTabView : FrameView
         _table = new TableView
         {
             X = 0, Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(3),
+            Width = Dim.Percent(48),
+            Height = Dim.Fill(1),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
         TuiHelpers.ConfigureTableChrome(_table);
+        _table.ValueChanged += (_, _) => UpdateDetail();
+        _table.FrameChanged += (_, _) => RecomputeColumnWidths();
+
+        _detail = new Markdown
+        {
+            X = Pos.Right(_table) + 1,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(1),
+            Text = "## Changes\n\n_Select a queue item to inspect its details._",
+        };
+        TuiHelpers.ConfigureMarkdownPane(_detail, SchemeNames.Base);
 
         _status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(2),
+            X = 0, Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Text = " loading…",
         };
 
-        _statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Key = Key.Enter, Title = "Enter", HelpText = "Open" },
-            new Shortcut { Key = Key.Esc,   Title = "Esc",   HelpText = "Back" },
-        ], includeOpenLink: false));
-
-        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _status, _statusBar);
+        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _detail, _status);
 
         _table.KeyDown += OnTableKeyDown;
 
-        Add(_table, _status, _statusBar);
+        Add(_table, _detail, _status);
     }
 
     /// Load the maintenance queue from the inventory snapshot.
@@ -101,13 +107,20 @@ internal sealed class ChangesTabView : FrameView
             var cleanupItems = CleanupClassifier
                             .Classify(snapshot, snapshot.ScannedRoots)
                             .ToArray();
-            var cleanup = cleanupItems.Select(c => $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}");
+            var cleanup = cleanupItems.Select(c => new ChangesQueueRow(
+                Kind: "Cleanup",
+                Title: $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}",
+                Detail: CleanupScreen.RenderDetail(c)));
             var summary = DescribeWorkspaceSummary(snapshot, cleanupItems.Length > 0);
 
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen) return;
-                Load(updates: [], cleanup, diagnostics: [], summary);
+                LoadRows(
+                [
+                    .. cleanup,
+                ],
+                summary);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -127,8 +140,14 @@ internal sealed class ChangesTabView : FrameView
         IEnumerable<string> diagnostics,
         string summary = "Healthy")
     {
-        _rows = ChangesQueueBuilder.BuildForTests(updates, cleanup, diagnostics);
+        LoadRows(ChangesQueueBuilder.BuildForTests(updates, cleanup, diagnostics), summary);
+    }
 
+    private void LoadRows(
+        IReadOnlyList<ChangesQueueRow> rows,
+        string summary)
+    {
+        _rows = rows;
         var source = new EnumerableTableSource<ChangesQueueRow>(
             _rows,
             new Dictionary<string, Func<ChangesQueueRow, object>>
@@ -139,18 +158,21 @@ internal sealed class ChangesTabView : FrameView
         _table.Table = source;
 
         var style = _table.Style;
-        style.ExpandLastColumn = true;
+        style.ExpandLastColumn = false;
         var kindStyle = style.GetOrCreateColumnStyle(0);
-        kindStyle.MinWidth = 11;
-        kindStyle.MaxWidth = 14;
+        kindStyle.MinWidth = KindColumnWidth;
+        kindStyle.MaxWidth = KindColumnWidth;
 
+        RecomputeColumnWidths();
         _table.Update();
-        _status.Text = _rows.Count == 0
-            ? $" {summary} · no pending cleanup"
-            : $" {summary} · {_rows.Count} item(s) pending · Enter to open · Esc to go back";
+        _status.Text = BuildStatusText(summary);
+        UpdateDetail();
 
         if (_rows.Count > 0)
+        {
+            _table.SetSelectedRow(0);
             _table.SetFocus();
+        }
 
         _onStateChange?.Invoke();
     }
@@ -161,6 +183,8 @@ internal sealed class ChangesTabView : FrameView
     internal string StatusTextForTests => _status.Text.ToString();
 
     internal int GetPendingCount() => _rows.Count;
+
+    internal string GetQueueLabel() => DescribeQueueLabel();
 
     // Internals ------------------------------------------------------------
 
@@ -175,6 +199,82 @@ internal sealed class ChangesTabView : FrameView
             case "Cleanup":     _onActivateCleanup(); break;
             case "Diagnostics": _onActivateDoctor();  break;
         }
+    }
+
+    private void UpdateDetail()
+    {
+        var row = _table.GetSelectedRow();
+        _detail.Text = row >= 0 && row < _rows.Count
+            ? _rows[row].Detail ?? RenderDetail(_rows[row])
+            : "## Changes\n\n_No pending work._";
+    }
+
+    private static string RenderDetail(ChangesQueueRow row)
+    {
+        var summary = row.Kind switch
+        {
+            "Update" => "Run the selected update workflow to inspect package-level changes before applying them.",
+            "Cleanup" => "Review the pending cleanup item, then confirm removal from the cleanup workflow.",
+            "Diagnostics" => "Open Doctor for the selected diagnostic item and inspect the current environment report.",
+            _ => "Inspect the selected queue item.",
+        };
+
+        return $"## {row.Kind}\n\n- **Item:** `{row.Title}`\n\n{summary}";
+    }
+
+    private string BuildStatusText(string summary)
+    {
+        if (_rows.Count == 0)
+        {
+            return $" {summary}";
+        }
+
+        var label = DescribeQueueLabel();
+        return label == "Changes"
+            ? $" {summary} · {_rows.Count} items"
+            : $" {label} · {_rows.Count}";
+    }
+
+    private string DescribeQueueLabel()
+    {
+        if (_rows.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var distinctKinds = _rows
+            .Select(row => row.Kind)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (distinctKinds.Length != 1)
+        {
+            return "Changes";
+        }
+
+        return distinctKinds[0] switch
+        {
+            "Cleanup" => _rows.Count == 1 ? "Cleanup candidate" : "Cleanup candidates",
+            "Update" => _rows.Count == 1 ? "Update" : "Updates",
+            "Diagnostics" => _rows.Count == 1 ? "Diagnostic" : "Diagnostics",
+            _ => distinctKinds[0],
+        };
+    }
+
+    private void RecomputeColumnWidths()
+    {
+        if (_table.Table is null)
+        {
+            return;
+        }
+
+        var available = _table.Viewport.Width > 0
+            ? Math.Max(32, _table.Viewport.Width - 4)
+            : 48;
+        var titleWidth = Math.Max(20, available - KindColumnWidth);
+        var titleStyle = _table.Style.GetOrCreateColumnStyle(1);
+        titleStyle.MinWidth = titleWidth;
+        titleStyle.MaxWidth = titleWidth;
+        _table.SetNeedsDraw();
     }
 
     private void OnTableKeyDown(object? sender, Key key)

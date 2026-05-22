@@ -19,7 +19,7 @@ namespace SkillView.Ui;
 internal sealed class SkillDetailPaneView : FrameView
 {
     private const int MinMetadataHeight = 3;
-    private const int MaxMetadataHeight = 8;
+    private const int MaxMetadataHeight = 5;
     private string _actionsText;
     private string? _healthSummary;
 
@@ -38,16 +38,15 @@ internal sealed class SkillDetailPaneView : FrameView
     internal SkillDetailPaneView(string actionsText, string welcomeText)
     {
         _actionsText = actionsText.Trim();
-        // No frame title — the inner Details / SKILL.md frames carry their own.
-        BorderStyle = LineStyle.None;
-        // Vertical stack: actions strip · auto-sized metadata · preview body.
-        // Metadata-on-top keeps item context visible while the preview scrolls,
-        // and the actions bar advertises i/o/e at point of use rather than
-        // burying them in the bottom status bar.
+        Title = "Details";
+        BorderStyle = LineStyle.Single;
+        // Vertical stack: auto-sized metadata · preview body · action strip.
+        // Keeping actions at the bottom mirrors winget's detail panes and keeps
+        // the content area visually calmer.
         ItemActionsLabel = new Label
         {
             X = 0,
-            Y = 0,
+            Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Height = 1,
             Text = string.Empty,
@@ -55,29 +54,29 @@ internal sealed class SkillDetailPaneView : FrameView
 
         MetadataFrame = new FrameView
         {
-            Title = "Details",
+            Title = string.Empty,
             X = 0,
-            Y = 1,
+            Y = 0,
             Width = Dim.Fill(),
             Height = MinMetadataHeight + 2,
-            BorderStyle = LineStyle.Single,
+            BorderStyle = LineStyle.None,
         };
         MetadataPane = new Markdown
         {
             X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
-            Text = "_(no selection)_",
+            Text = "_Select a skill to preview._",
         };
         TuiHelpers.ConfigureMarkdownPane(MetadataPane, SchemeNames.Base);
         MetadataFrame.Add(MetadataPane);
 
         PreviewFrame = new FrameView
         {
-            Title = "SKILL.md",
+            Title = string.Empty,
             X = 0,
             Y = Pos.Bottom(MetadataFrame),
             Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            BorderStyle = LineStyle.Single,
+            Height = Dim.Fill(1),
+            BorderStyle = LineStyle.None,
         };
         PreviewPane = new Markdown
         {
@@ -134,7 +133,7 @@ internal sealed class SkillDetailPaneView : FrameView
     /// placeholder.
     internal void SetMetadataContent(string? markdown)
     {
-        var text = string.IsNullOrEmpty(markdown) ? "_(no selection)_" : markdown;
+        var text = string.IsNullOrEmpty(markdown) ? "_Select a skill to preview._" : markdown;
         MetadataPane.Text = text;
         var lines = text.Replace("\r\n", "\n").Split('\n');
         var nonBlank = lines.Count(l => !string.IsNullOrWhiteSpace(l));

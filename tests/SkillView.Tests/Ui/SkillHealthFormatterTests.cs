@@ -19,4 +19,18 @@ public sealed class SkillHealthFormatterTests
 
         Assert.Equal(expected, badge);
     }
+
+    [Theory]
+    [InlineData(ValidityState.Valid, false, "OK")]
+    [InlineData(ValidityState.Valid, true, "SYM")]
+    [InlineData(ValidityState.MissingSkillMd, false, "REV")]
+    public void CompactBadge_UsesShortForms(
+        ValidityState validity,
+        bool isSymlinked,
+        string expected)
+    {
+        var badge = SkillHealthFormatter.CompactBadge(validity, isSymlinked);
+
+        Assert.Equal(expected, badge);
+    }
 }

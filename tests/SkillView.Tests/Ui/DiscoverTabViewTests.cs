@@ -6,6 +6,30 @@ namespace SkillView.Tests.Ui;
 public sealed class DiscoverTabViewTests
 {
     [Fact]
+    public void BuildFilterSummary_OmitsDefaultState()
+    {
+        var summary = DiscoverTabView.BuildFilterSummaryForTests(
+            owner: string.Empty,
+            agent: string.Empty,
+            limit: 30,
+            hiddenDirs: false);
+
+        Assert.Equal(string.Empty, summary);
+    }
+
+    [Fact]
+    public void BuildFilterSummary_UsesCompactWingetStyleCopy()
+    {
+        var summary = DiscoverTabView.BuildFilterSummaryForTests(
+            owner: "github",
+            agent: "copilot",
+            limit: 25,
+            hiddenDirs: true);
+
+        Assert.Equal("Filters: owner github · agent copilot · limit 25 · hidden dirs on", summary);
+    }
+
+    [Fact]
     public void BuildFacetSummary_UsesLocationsWording()
     {
         var summary = DiscoverTabView.BuildFacetSummaryForTests(

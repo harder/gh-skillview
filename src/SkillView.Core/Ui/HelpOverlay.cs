@@ -12,43 +12,44 @@ namespace SkillView.Ui;
 /// with the rest of the app. Dismisses on Esc, Enter, `?`, or button click.
 internal static class HelpOverlay
 {
-    private const string MarkdownBody = """
-## Navigation
+    internal static string BuildMarkdown() => """
+## Primary
 
-- **↑ / k**, **↓ / j** — move row · scroll detail when focused
-- **PgUp / PgDn**, **Home / End** — jump
-- **Tab / Shift+Tab** — focus list ↔ detail
-- **← / →** — previous / next tab
-- **1 / 2 / 3** — Discover · Installed · Changes
+- **↑ / ↓** — move selection
+- **Enter** — preview the selected search result or open the selected change item
+- **f** — filters in Discover · filter box in Installed
+- **1 / 2 / 3** or **← / →** — switch tabs
+- **?** or **F1** — show this help
 
-## Search & filter
+## Discover
 
-- **/** — jump to the Discover tab and focus the query box
-- **f** — focus the Installed filter
-- **s / S** — cycle sort in the active Discover or Installed tab
-- **P** — cycle Installed pin filter
-
-## Actions
-
-- **Enter** — preview the selected search result
+- **/** — focus the Discover query box
 - **i** — install selected via compact confirm
 - **I** — install selected via advanced wizard
-- **u** — open Changes tab from Discover
+- **o** — open the selected repo in the browser
+
+## Installed
+
 - **x** — remove the selected installed skill
-- **o** — open the selected repo or path
+- **o** — open the selected skill path
+
+## Changes
+
+- **c** — open cleanup
+- **d** — open Doctor
+
+## Advanced
+
+- **s / S** — cycle sort in Discover or Installed
+- **P** — cycle Installed pin filter
 - **e** — toggle raw / rendered preview
-
-## Modes
-
-- **?** or **F1** — toggle this help
-- **d** — open Doctor from Discover / Installed
-- **c** — review cleanup candidates
-- **h** — toggle hidden-dir access for preview/install
 - **l / r** — show / hide logs
 - **q / Esc** — quit at root · close modal otherwise
 
 _Press **Esc**, **Enter**, or **?** to close._
 """;
+
+    internal static string MarkdownBodyForTests => BuildMarkdown();
 
     internal static void Show(IApplication app)
     {
@@ -66,7 +67,7 @@ _Press **Esc**, **Enter**, or **?** to close._
             Y = 0,
             Width = Dim.Fill(2),
             Height = Dim.Fill(2),
-            Text = MarkdownBody,
+            Text = BuildMarkdown(),
         };
         TuiHelpers.ConfigureMarkdownPane(body, SchemeNames.Dialog);
         dialog.Add(body);

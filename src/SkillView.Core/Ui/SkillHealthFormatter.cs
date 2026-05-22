@@ -10,4 +10,11 @@ internal static class SkillHealthFormatter
             : validity == ValidityState.Valid
                 ? "Healthy"
                 : "Needs review";
+
+    internal static string CompactBadge(ValidityState validity, bool isSymlinked) =>
+        isSymlinked
+            ? "SYM"
+            : validity == ValidityState.Valid
+                ? "OK"
+                : "REV";
 }

@@ -14,10 +14,10 @@ internal readonly record struct ContextBarState(
     string? FilterLabel);
 
 /// One-line bar rendered directly below the tab strip that surfaces the active
-/// agent, Locations, provenance, health, and quick-filter state as compact
+/// agent, location, provenance, health, and quick-filter state as compact
 /// labelled chips.
 ///
-/// Rendering uses "Locations" / "Install locations" wording (never "roots").
+/// Rendering uses "Location" / "Install location" wording (never "roots").
 /// "roots" is reserved for doctor-grade diagnostics only (§ spec §50).
 internal sealed class ContextBarView : View
 {
@@ -52,16 +52,10 @@ internal sealed class ContextBarView : View
     {
         var sb = new StringBuilder();
 
-        AppendChip(sb, state.Workspace);
         AppendChip(sb, state.AgentLabel);
-        AppendLocations(sb, state.LocationLabel);
-        AppendChip(sb, state.ProvenanceLabel);
-
-        if (!string.IsNullOrWhiteSpace(state.HealthLabel))
-        {
-            AppendSep(sb);
-            sb.Append(state.HealthLabel);
-        }
+        AppendLabeledValue(sb, "Location", state.LocationLabel);
+        AppendLabeledValue(sb, "Source", state.ProvenanceLabel);
+        AppendLabeledValue(sb, "Health", state.HealthLabel);
 
         if (!string.IsNullOrWhiteSpace(state.FilterLabel))
         {
@@ -72,12 +66,16 @@ internal sealed class ContextBarView : View
         return sb.ToString();
     }
 
-    private static void AppendLocations(StringBuilder sb, string? locationLabel)
+    internal static bool ShouldShowForTests(ContextBarState state) =>
+        !string.IsNullOrWhiteSpace(FormatForTests(state));
+
+    private static void AppendLabeledValue(StringBuilder sb, string label, string? value)
     {
-        if (string.IsNullOrWhiteSpace(locationLabel)) return;
+        if (string.IsNullOrWhiteSpace(value)) return;
         AppendSep(sb);
-        sb.Append("Locations: ");
-        sb.Append(locationLabel);
+        sb.Append(label);
+        sb.Append(": ");
+        sb.Append(value);
     }
 
     private static void AppendChip(StringBuilder sb, string? value)

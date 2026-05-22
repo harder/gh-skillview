@@ -221,13 +221,53 @@ public sealed class CleanupScreenTests
 
         var detail = CleanupScreen.RenderDetail(candidate);
 
-        Assert.Contains("## Candidate", detail);
+        Assert.Contains("## Selected", detail);
         Assert.Contains("| Field | Value |", detail);
         Assert.Contains("| Kind | **Duplicate** |", detail);
         Assert.Contains("| Path | `` /skills/demo`copy `` |", detail);
         Assert.Contains("| Reason | duplicate install |", detail);
-        Assert.Contains("## Installed skill", detail);
+        Assert.Contains("## Skill", detail);
         Assert.Contains("## Summary", detail);
+    }
+
+    [Fact]
+    public void BuildShortcuts_UsesCompactOrderedCleanupActions()
+    {
+        var shortcuts = CleanupScreen.BuildShortcutsForTests();
+
+        Assert.Collection(
+            shortcuts,
+            shortcut =>
+            {
+                Assert.Equal("Space", shortcut.Title);
+                Assert.Equal("Select", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("r", shortcut.Title);
+                Assert.Equal("Remove", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("i", shortcut.Title);
+                Assert.Equal("Ignore", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("x", shortcut.Title);
+                Assert.Equal("Export", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("Esc", shortcut.Title);
+                Assert.Equal("Back", shortcut.HelpText);
+            });
+    }
+
+    [Fact]
+    public void BuildHeaderText_UsesShortSelectionHint()
+    {
+        Assert.Equal("Select with Space.", CleanupScreen.BuildHeaderTextForTests());
     }
 
     [Fact]

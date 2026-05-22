@@ -6,7 +6,7 @@ namespace SkillView.Tests.Ui;
 public sealed class ContextBarViewTests
 {
     [Fact]
-    public void FormatForTests_ContainsLocationsWording()
+    public void FormatForTests_ContainsLocationWording()
     {
         var state = new ContextBarState(
             Workspace: "Discover",
@@ -18,7 +18,8 @@ public sealed class ContextBarViewTests
 
         var text = ContextBarView.FormatForTests(state);
 
-        Assert.Contains("Locations", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Location:", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Source:", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -34,6 +35,7 @@ public sealed class ContextBarViewTests
 
         var text = ContextBarView.FormatForTests(state);
 
+        Assert.Contains("Health:", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2 warnings", text);
     }
 
@@ -83,5 +85,21 @@ public sealed class ContextBarViewTests
         var text = ContextBarView.FormatForTests(state);
 
         Assert.Contains("pinned", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FormatForTests_WorkspaceOnly_OmitsLowSignalChrome()
+    {
+        var state = new ContextBarState(
+            Workspace: "Installed",
+            AgentLabel: null,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: null);
+
+        var text = ContextBarView.FormatForTests(state);
+
+        Assert.Equal(string.Empty, text);
     }
 }

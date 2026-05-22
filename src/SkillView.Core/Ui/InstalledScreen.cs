@@ -79,12 +79,6 @@ public static class InstalledScreen
         return default;
     }
 
-    private static string DisplayScope(Scope s) => s switch
-    {
-        Scope.User => "Global",
-        _ => s.ToString(),
-    };
-
     internal static string RenderDetail(InstalledSkill s)
     {
         var sb = new System.Text.StringBuilder();
@@ -93,41 +87,46 @@ public static class InstalledScreen
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath)} |");
-        sb.AppendLine($"| Scope | {MarkdownTableFormatter.FormatTableCell(DisplayScope(s.Scope))} |");
-        sb.AppendLine($"| Provenance | {MarkdownTableFormatter.FormatTableCell(s.Provenance.ToString())} |");
-        sb.AppendLine($"| Validity | {MarkdownTableFormatter.FormatTableCell(s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}")} |");
-        sb.AppendLine($"| Symlinked | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked))} |");
-        sb.AppendLine($"| Pinned | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned))} |");
-        sb.AppendLine($"| Ignored | {MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored))} |");
-        sb.AppendLine($"| Tree SHA | {MarkdownTableFormatter.FormatCodeSpan(s.TreeSha ?? "(unset)")} |");
-        sb.AppendLine($"| Version | {MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version ?? "(unset)")} |");
+        AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
+        AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeLocation(s)));
+        AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeProvenance(s)));
+        AppendDetailItem(sb, "Health", MarkdownTableFormatter.FormatTableCell(
+            s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
+        AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
+        AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned)));
+        AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
+        if (!string.IsNullOrWhiteSpace(s.TreeSha))
+        {
+            AppendDetailItem(sb, "Tree SHA", MarkdownTableFormatter.FormatCodeSpan(s.TreeSha));
+        }
+        if (!string.IsNullOrWhiteSpace(s.FrontMatter.Version))
+        {
+            AppendDetailItem(sb, "Version", MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version));
+        }
         if (s.FrontMatter.Upstream is { Length: > 0 } upstream)
         {
-            sb.AppendLine($"| Upstream | {FormatTableLink(upstream)} |");
+            AppendDetailItem(sb, "Upstream", FormatTableLink(upstream));
         }
         if (s.InstalledAt is { } when_)
         {
-            sb.AppendLine($"| Installed | {MarkdownTableFormatter.FormatTableCell(when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
+            AppendDetailItem(sb, "Installed", MarkdownTableFormatter.FormatTableCell(
+                when_.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
         }
         if (s.Package is { } pkg)
         {
             sb.AppendLine();
             sb.AppendLine("## Package");
             sb.AppendLine();
-            sb.AppendLine("| Field | Value |");
-            sb.AppendLine("| --- | --- |");
-            sb.AppendLine($"| Source | {MarkdownTableFormatter.FormatCodeSpan(pkg.Source)} |");
-            sb.AppendLine($"| Type | {MarkdownTableFormatter.FormatTableCell(pkg.SourceType)} |");
+            AppendDetailItem(sb, "Package source", MarkdownTableFormatter.FormatCodeSpan(pkg.Source));
+            AppendDetailItem(sb, "Package type", MarkdownTableFormatter.FormatTableCell(pkg.SourceType));
             if (pkg.SourceUrl is { Length: > 0 } url)
             {
-                sb.AppendLine($"| Package URL | {FormatTableLink(url)} |");
+                AppendDetailItem(sb, "Package URL", FormatTableLink(url));
             }
             if (pkg.UpdatedAt is { } u)
             {
-                sb.AppendLine($"| Updated | {MarkdownTableFormatter.FormatTableCell(u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))} |");
+                AppendDetailItem(sb, "Updated", MarkdownTableFormatter.FormatTableCell(
+                    u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
             }
         }
         if (s.FrontMatter.Description is { Length: > 0 } desc)
@@ -142,18 +141,34 @@ public static class InstalledScreen
             sb.AppendLine();
             sb.AppendLine("## Agents");
             sb.AppendLine();
-            sb.AppendLine("| Agent | Link | Path |");
-            sb.AppendLine("| --- | --- | --- |");
             foreach (var a in s.Agents)
             {
                 var kind = a.IsSymlink ? "symlink" : "direct";
-                sb.AppendLine($"| {TuiHelpers.AgentIcon(a.AgentId)} **{MarkdownTableFormatter.FormatTableCell(a.AgentId)}** | {MarkdownTableFormatter.FormatTableCell(kind)} | {MarkdownTableFormatter.FormatCodeSpan(a.Path)} |");
+                sb.Append("- ");
+                sb.Append(TuiHelpers.AgentIcon(a.AgentId));
+                sb.Append(" **");
+                sb.Append(MarkdownTableFormatter.FormatTableCell(a.AgentId));
+                sb.Append("** — ");
+                sb.Append(MarkdownTableFormatter.FormatTableCell(kind));
+                sb.AppendLine();
+                sb.Append("  Path: ");
+                sb.AppendLine(MarkdownTableFormatter.FormatCodeSpan(a.Path));
+                sb.AppendLine();
             }
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
     private static string FormatBool(bool value) => value ? "Yes" : "No";
+
+    private static void AppendDetailItem(System.Text.StringBuilder sb, string label, string value)
+    {
+        sb.Append("- **");
+        sb.Append(label);
+        sb.Append(":** ");
+        sb.AppendLine(value);
+        sb.AppendLine();
+    }
 
     private static string FormatTableLink(string value)
     {

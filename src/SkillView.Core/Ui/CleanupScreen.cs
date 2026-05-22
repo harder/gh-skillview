@@ -58,7 +58,7 @@ public sealed class CleanupScreen
         var header = new Label
         {
             X = 0, Y = 0,
-            Text = "Space toggles row.",
+            Text = BuildHeaderText(),
         };
 
         var table = new TableView
@@ -147,13 +147,8 @@ public sealed class CleanupScreen
         };
 
         var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Title = "Space", HelpText = "Toggle" },
-            new Shortcut { Title = "r", HelpText = "Remove" },
-            new Shortcut { Title = "i", HelpText = "Ignore" },
-            new Shortcut { Title = "x", HelpText = "Export" },
-            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-        ], includeOpenLink: false));
+            BuildShortcuts(),
+            includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 
@@ -328,7 +323,7 @@ public sealed class CleanupScreen
     internal static string RenderDetail(CleanupClassifier.Candidate c)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("## Candidate");
+        sb.AppendLine("## Selected");
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("| --- | --- |");
@@ -338,12 +333,27 @@ public sealed class CleanupScreen
         if (c.Skill is { } s)
         {
             sb.AppendLine();
-            sb.AppendLine("## Installed skill");
+            sb.AppendLine("## Skill");
             sb.AppendLine();
             sb.AppendLine(InstalledScreen.RenderDetail(s));
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
+
+    internal static Shortcut[] BuildShortcutsForTests() => BuildShortcuts();
+
+    internal static string BuildHeaderTextForTests() => BuildHeaderText();
+
+    private static Shortcut[] BuildShortcuts() =>
+    [
+        new Shortcut { Title = "Space", HelpText = "Select" },
+        new Shortcut { Title = "r", HelpText = "Remove" },
+        new Shortcut { Title = "i", HelpText = "Ignore" },
+        new Shortcut { Title = "x", HelpText = "Export" },
+        new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+    ];
+
+    private static string BuildHeaderText() => "Select with Space.";
 
     private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)
     {

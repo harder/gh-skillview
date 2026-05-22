@@ -29,27 +29,32 @@ internal static class TuiHelpers
         Environment.GetEnvironmentVariable("TERM_PROGRAM")
             ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
 
-    /// Compact Unicode badge for a known agent. Falls back to the first
-    /// letter (uppercased) for unknown agents so unfamiliar IDs still
-    /// render as a one-cell glyph in the Agents column.
+    /// Compact text badge for a known agent. Falls back to a derived
+    /// 3-character uppercase abbreviation for unknown agents so unfamiliar
+    /// IDs still render compactly in the Agents column.
     internal static string AgentIcon(string? agentId)
     {
         if (string.IsNullOrWhiteSpace(agentId)) return "?";
         var key = agentId.Trim().ToLowerInvariant();
         return key switch
         {
-            "claude" or "claude-code" or "claude_code" or "claudecode" => "⟁",
-            "copilot" or "github-copilot" => "C",
-            "cursor" => "◫",
-            "codex" or "openai-codex" => "◎",
-            "gemini" or "gemini-cli" => "✦",
-            "opencode" or "open-code" => "⬡",
-            _ => char.ToUpperInvariant(key[0]).ToString(),
+            "claude" or "claude-code" or "claude_code" or "claudecode" => "CLD",
+            "copilot" or "github-copilot" => "GHC",
+            "cursor" => "CSR",
+            "codex" or "openai-codex" => "CDX",
+            "gemini" or "gemini-cli" => "GMI",
+            "aider" => "AID",
+            "continue" => "CNT",
+            "cline" => "CLN",
+            "windsurf" => "WND",
+            "opencode" or "open-code" => "OPN",
+            "antigravity" => "ANT",
+            _ => DeriveAgentAbbreviation(key),
         };
     }
 
-    /// Concatenate one icon per distinct agent ID, preserving discovery
-    /// order. Returns "—" when the list is empty.
+    /// Concatenate one compact label per distinct agent ID, preserving
+    /// discovery order. Returns "—" when the list is empty.
     internal static string AgentBadges(IEnumerable<string> agentIds)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +67,27 @@ internal static class TuiHelpers
             sb.Append(AgentIcon(id));
         }
         return sb.Length == 0 ? "—" : sb.ToString();
+    }
+
+    private static string DeriveAgentAbbreviation(string key)
+    {
+        Span<char> chars = stackalloc char[3];
+        var count = 0;
+        foreach (var c in key)
+        {
+            if (!char.IsLetterOrDigit(c))
+            {
+                continue;
+            }
+
+            chars[count++] = char.ToUpperInvariant(c);
+            if (count == chars.Length)
+            {
+                break;
+            }
+        }
+
+        return count == 0 ? "?" : new string(chars[..count]);
     }
 
     /// Severity of a transient status message. Drives the color of the
@@ -267,8 +293,7 @@ internal static class TuiHelpers
         (IsWarpTerminal
             ? "Ctrl+J, →, p, v  preview when results are focused\n"
             : "Enter, →, p, v  preview when results are focused\n") +
-        "Owner / Agent / Limit  refine the next search before you submit it\n" +
-        "h  toggle hidden-dir access for preview/install\n" +
+        "f  open Discover filters (owner, agent, limit, hidden dirs)\n" +
         "i  install the selected search result\n" +
         "o  open the skill (GitHub URL or local folder)\n" +
         "e  toggle raw / rendered SKILL.md preview\n" +
@@ -287,12 +312,15 @@ internal static class TuiHelpers
     /// Compact single-line hint shown in the welcome/preview pane. Same
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
-        (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · owner/agent filters · h hidden dirs · i install · I advanced install · 1/2/3 tabs · o open · e raw/render · rendered preview Ctrl+C copy + links · l logs · d doctor · u changes · c cleanup · F1 help · q quit";
+        "Enter a query and press Enter to search.\n\n"
+        + "Press f to edit filters. Press ? for help and all keys.";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
-        ? "Select a result and press Ctrl+J, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening."
-        : "Select a result and press Enter, →, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening.";
+        ? "Select a skill to preview.\n\nPress Ctrl+J, p, or v to load the selected SKILL.md."
+        : "Select a skill to preview.\n\nPress Enter, →, p, or v to load the selected SKILL.md.";
+
+    internal static string NoResultsHint { get; } =
+        "No results.\n\nTry a different query or press f to edit filters.";
 
     internal static Shortcut[] WithMarkdownShortcuts(IEnumerable<Shortcut> shortcuts, bool includeOpenLink = true)
     {

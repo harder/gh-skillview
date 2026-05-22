@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Text;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Gh;
@@ -64,7 +65,7 @@ public sealed class SkillViewApp
     // Set when Updates is drilled into from the Changes queue so Esc returns to Changes.
     private bool _openedUpdatesFromChanges;
 
-    private const string ItemActionsText = "  [h] Hidden dirs    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview";
+    private const string ItemActionsText = "[Enter] Preview    [i] Install    [o] Open    [?] More";
 
     private List<SearchResultSkill> _results = new();
     // Original gh-skill-search ordering for the current query — preserved so
@@ -85,6 +86,9 @@ public sealed class SkillViewApp
     private volatile bool _userInteractedSinceLaunch;
     private volatile bool _startupInstalledShown;
     private volatile bool _startupFocusPrimed;
+    private bool _contextBarShown = true;
+    private View? _lastDiscoverFocus;
+    private string? _loadedPreviewKey;
 
     /// Sort modes for the Search tab results table. Mirrors winget-tui's
     /// app.sort_field cycle in src/app.rs. Off restores the natural ordering
@@ -281,6 +285,7 @@ public sealed class SkillViewApp
         {
             NoteUserInteraction();
             RefreshHiddenDirUi();
+            UpdateDiscoverActions();
         };
 
         // Accepted fires on Enter, double-click, p, v, CursorRight, and
@@ -455,12 +460,37 @@ public sealed class SkillViewApp
         }
     }
 
+    private void RememberStickyFocus(View view)
+    {
+        if (ReferenceEquals(view, _queryField)
+            || ReferenceEquals(view, _ownerField)
+            || ReferenceEquals(view, _agentField)
+            || ReferenceEquals(view, _limitUpDown)
+            || ReferenceEquals(view, _hiddenDirsBox)
+            || ReferenceEquals(view, _resultsTable))
+        {
+            _lastDiscoverFocus = view;
+        }
+    }
+
+    private void RestoreDiscoverFocus()
+    {
+        if (_lastDiscoverFocus is not null)
+        {
+            _lastDiscoverFocus.SetFocus();
+            return;
+        }
+
+        _queryField?.SetFocus();
+    }
+
     /// Centralised single-letter shortcut dispatcher for `window.KeyDown`.
     /// Returns true if the key was consumed.
     private bool OnWindowShortcut(Key key)
     {
-        // Don't intercept plain-letter typing while a text input is focused.
-        if (_queryField?.HasFocus == true || _ownerField?.HasFocus == true || _agentField?.HasFocus == true || _limitUpDown?.HasFocus == true)
+        // Let printable text keep going to the focused input, but keep global
+        // navigation (tab arrows, help, slash, etc.) available everywhere.
+        if (TextInputHasFocus() && IsPrintableTextInputKey(key))
         {
             return false;
         }
@@ -480,9 +510,9 @@ public sealed class SkillViewApp
             if (_queryField is not null) _queryField.SelectAll();
             return true;
         }
-        if (rune.Value == 'h' || rune.Value == 'H')
+        if ((rune.Value == 'f' || rune.Value == 'F') && _activeTab == SkillViewTab.Discover)
         {
-            ToggleHiddenDirAccess();
+            OpenDiscoverFilters();
             return true;
         }
         if (rune.Value == 'q' || rune.Value == 'Q') { _app?.RequestStop(); return true; }
@@ -520,6 +550,25 @@ public sealed class SkillViewApp
         return false;
     }
 
+    private bool TextInputHasFocus() =>
+        _queryField?.HasFocus == true
+        || _ownerField?.HasFocus == true
+        || _agentField?.HasFocus == true
+        || _limitUpDown?.HasFocus == true;
+
+    private static bool IsPrintableTextInputKey(Key key)
+    {
+        var rune = key.AsRune;
+        if (rune.Value == 0)
+        {
+            return false;
+        }
+
+        return !Rune.IsControl(rune)
+            && key.KeyCode != KeyCode.CursorLeft
+            && key.KeyCode != KeyCode.CursorRight;
+    }
+
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
@@ -539,7 +588,7 @@ public sealed class SkillViewApp
         {
             case SkillViewTab.Discover:
                 ShowSearchPanes(true);
-                _queryField?.SetFocus();
+                RestoreDiscoverFocus();
                 break;
             case SkillViewTab.Installed:
                 ShowSearchPanes(false);
@@ -560,6 +609,17 @@ public sealed class SkillViewApp
         }
         UpdateContextBar();
     }
+
+    internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
+    {
+        _resultsNaturalOrder = results.ToList();
+        _results = results.ToList();
+        RefreshResultsTable();
+        UpdateMetadataPane();
+        UpdatePreviewPlaceholder();
+    }
+
+    internal void SetPreviewTextForTests(string text) => SetPreviewText(text);
 
     private void ShowSearchPanes(bool visible)
     {
@@ -582,6 +642,7 @@ public sealed class SkillViewApp
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab   is not null) _updatesTab.Visible   = false;
         if (_changesTab   is not null) _changesTab.Visible   = false;
+        RefreshShellChrome();
 
         // Make sure the report is fresh — probe lazily if we never have.
         if (_lastReport is not null)
@@ -618,6 +679,7 @@ public sealed class SkillViewApp
         // to something different first so ActivateTab's no-op guard doesn't
         // suppress the re-show.
         var restore = _tabBeforeDoctor;
+        RefreshShellChrome();
         _activeTab = restore == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
         ActivateTab(restore);
     }
@@ -805,17 +867,21 @@ public sealed class SkillViewApp
                 }
                 _resultsNaturalOrder = filteredResults.ToList();
                 _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
+                _loadedPreviewKey = null;
                 RefreshResultsTable();
+                RefreshDiscoverResultsTitle();
                 UpdateMetadataPane();
+                UpdatePreviewPlaceholder();
+                UpdateDiscoverActions();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
                 if (!_showingLogs)
                 {
-                    SetPreviewText(_results.Count == 0 ? TuiHelpers.WelcomeHint : TuiHelpers.PreviewHint);
+                    SetPreviewText(_results.Count == 0 ? TuiHelpers.NoResultsHint : TuiHelpers.PreviewHint);
                 }
                 if (_previewFrame is not null)
                 {
-                    _previewFrame.Title = "SKILL.md";
+                    _previewFrame.Title = "Preview";
                 }
                 SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
             });
@@ -943,12 +1009,13 @@ public sealed class SkillViewApp
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
+                _loadedPreviewKey = preview.Succeeded ? BuildPreviewSelectionKey(pick) : null;
                 SetPreviewText(preview.Succeeded
                     ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
                     : $"(preview failed: exit {preview.ExitCode})\n\n{preview.ErrorMessage}");
                 if (_previewFrame is not null)
                 {
-                    _previewFrame.Title = $"SKILL.md — {repo}/{pick.SkillName}";
+                    _previewFrame.Title = $"Preview — {repo}/{pick.SkillName}";
                 }
                 ShowPreviewPane();
                 if (preview.Succeeded)
@@ -973,6 +1040,7 @@ public sealed class SkillViewApp
             _services.Logger.Warn("preview", "preview timed out");
             Invoke(() =>
             {
+                _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
             });
@@ -983,6 +1051,7 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             Invoke(() =>
             {
+                _loadedPreviewKey = null;
                 SetPreviewText(snippet.Length > 0
                     ? $"(preview failed)\n\n{snippet}"
                     : "(preview failed)\n\nSee logs for details.");
@@ -1104,16 +1173,6 @@ public sealed class SkillViewApp
             return;
         }
 
-        var current = _previewPane.Text.ToString() ?? string.Empty;
-        if (current.Length > 0
-            && current != TuiHelpers.PreviewHint
-            && current != TuiHelpers.WelcomeHint
-            && !current.StartsWith("Selected: ", StringComparison.Ordinal)
-            && !current.StartsWith("(no selection)", StringComparison.Ordinal))
-        {
-            return;
-        }
-
         var row = _resultsTable?.GetSelectedRow() ?? -1;
         if (row < 0 || row >= _results.Count)
         {
@@ -1121,8 +1180,14 @@ public sealed class SkillViewApp
         }
 
         var pick = _results[row];
+        _loadedPreviewKey = null;
         SetPreviewText($"Selected: {pick.Repo}/{pick.SkillName}\n\n{TuiHelpers.PreviewHint}");
     }
+
+    internal static string BuildDiscoverPreviewBodyForTests(
+        string? description,
+        string previewText,
+        bool includeDescription) => BuildDiscoverPreviewBody(description, previewText, includeDescription);
 
     /// Render the metadata sidebar for the currently-selected search result.
     /// Mirrors SkillsGate's metadata panel: name, description, source, URL,
@@ -1151,25 +1216,49 @@ public sealed class SkillViewApp
 
     internal static string RenderSearchMetadata(SearchResultSkill s, GhAuthStatus? auth)
     {
-        // One **label**: value pair per line. Labels are bold to anchor the
-        // eye on the left edge; values are plain so URLs / paths read clean.
-        // Keep the repo row clickable so the sidebar stays compact without a
-        // redundant second URL line.
-        // Avoid Markdown headings — TG2's renderer expands them into taller
-        // blocks and consumes vertical space we'd rather give the preview.
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"**Skill** : {s.SkillName ?? "(unnamed)"}");
         var repoUrl = BuildRepoUrl(auth, s.Repo);
-        sb.AppendLine($"**Repo**  : {FormatRepoValue(s.Repo, repoUrl)}");
+        AppendSearchMetadataItem(sb, "Name", s.SkillName ?? "(unnamed)");
+        AppendSearchMetadataItem(sb, "Repo", FormatRepoValue(s.Repo, repoUrl));
         if (s.Stars is { } st)
-            sb.AppendLine($"**Stars** : ★ {st.ToString(CultureInfo.InvariantCulture)}");
+            AppendSearchMetadataItem(sb, "Stars", $"★ {st.ToString(CultureInfo.InvariantCulture)}");
         if (!string.IsNullOrWhiteSpace(s.Path))
-            sb.AppendLine($"**Path**  : {s.Path}");
+            AppendSearchMetadataItem(sb, "Path", s.Path);
         if (!string.IsNullOrWhiteSpace(s.Namespace))
-            sb.AppendLine($"**Ns**    : {s.Namespace}");
-        if (!string.IsNullOrWhiteSpace(s.Description))
-            sb.AppendLine($"**About** : {s.Description}");
+            AppendSearchMetadataItem(sb, "Namespace", s.Namespace);
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
+    }
+
+    private static void AppendSearchMetadataItem(System.Text.StringBuilder sb, string label, string value)
+    {
+        sb.Append("- **");
+        sb.Append(label);
+        sb.Append(":** ");
+        sb.AppendLine(value);
+    }
+
+    private static string BuildDiscoverPreviewBody(string? description, string previewText, bool includeDescription)
+    {
+        var trimmedPreview = previewText.Trim();
+        var sanitizedDescription = TerminalEscapeSanitizer.Sanitize(description ?? string.Empty) ?? string.Empty;
+        if (!includeDescription || string.IsNullOrWhiteSpace(sanitizedDescription))
+        {
+            return trimmedPreview;
+        }
+
+        var trimmedDescription = sanitizedDescription.Trim();
+        if (trimmedPreview.Length == 0)
+        {
+            return trimmedDescription;
+        }
+
+        var sb = new StringBuilder(trimmedDescription.Length + trimmedPreview.Length + 8);
+        sb.AppendLine(trimmedDescription);
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.Append(trimmedPreview);
+        return sb.ToString();
     }
 
     private static string FormatRepoValue(string? repo, string repoUrl)
@@ -1202,13 +1291,13 @@ public sealed class SkillViewApp
         if (normalizedAgent is null)
         {
             return shownCount == 0
-                ? "no matches"
-                : $"{shownCount} result(s) — Enter, p, or v to preview";
+                ? "no results"
+                : $"{shownCount} result(s)";
         }
 
         return shownCount == 0
-            ? $"no matches for agent {normalizedAgent}"
-            : $"{shownCount} of {totalCount} result(s) match {normalizedAgent}";
+            ? $"no results for {normalizedAgent}"
+            : $"{shownCount} of {totalCount} result(s) for {normalizedAgent}";
     }
 
     /// TG2 RC4's Markdown renderer collapses tight bullet lists into one
@@ -1268,26 +1357,99 @@ public sealed class SkillViewApp
 
     private bool HiddenDirsEnabled => _hiddenDirsBox?.Value == CheckState.Checked;
 
-    private void ToggleHiddenDirAccess()
+    private void RefreshHiddenDirUi()
     {
-        if (_hiddenDirsBox is null || !_hiddenDirsBox.Enabled)
+        RefreshDiscoverFilterSummary();
+        UpdateDiscoverActions();
+        UpdateContextBar();
+    }
+
+    private void RefreshDiscoverFilterSummary()
+    {
+        if (_discoverTab is null)
         {
             return;
         }
 
-        _hiddenDirsBox.Value = HiddenDirsEnabled ? CheckState.UnChecked : CheckState.Checked;
+        var summary = DescribeDiscoverFilters(includePrefix: true);
+        var showSummary = summary.Length > 0;
+        _discoverTab.FilterSummaryLabel.Text = summary;
+        _discoverTab.FilterSummaryLabel.Visible = showSummary;
+        _discoverTab.ResultsTable.Y = showSummary ? 4 : 3;
     }
 
-    private void RefreshHiddenDirUi()
+    private string DescribeDiscoverFilters(bool includePrefix)
+    {
+        var summary = SkillView.Ui.Tabs.DiscoverTabView.BuildFilterSummaryForTests(
+            owner: _ownerField?.Text.Trim() ?? string.Empty,
+            agent: _agentField?.Text.Trim() ?? string.Empty,
+            limit: _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit,
+            hiddenDirs: HiddenDirsEnabled);
+
+        return includePrefix
+            ? summary
+            : summary["Filters: ".Length..];
+    }
+
+    private void RefreshDiscoverResultsTitle()
+    {
+        if (_discoverTab is null)
+        {
+            return;
+        }
+
+        _discoverTab.LeftFrame.Title = _results.Count == 0
+            ? "Search Results"
+            : $"Search Results ({_results.Count})";
+    }
+
+    private void UpdateDiscoverActions()
     {
         if (_detailPane is null)
         {
             return;
         }
 
-        var state = HiddenDirsEnabled ? "on" : "off";
-        _detailPane.SetActionsText($"[h] Hidden dirs: {state}    [i] Install    [o] Open in browser    [e] Raw / Rendered    [Enter] Preview");
-        UpdateContextBar();
+        _detailPane.SetActionsText(_results.Count == 0
+            ? "[f] Filters    [?] Help"
+            : ItemActionsText);
+    }
+
+    private void OpenDiscoverFilters()
+    {
+        if (_app is null || _ownerField is null || _agentField is null || _limitUpDown is null || _hiddenDirsBox is null)
+        {
+            return;
+        }
+
+        var dialog = new DiscoverFiltersDialog(
+            _app,
+            owner: _ownerField.Text.Trim(),
+            agent: _agentField.Text.Trim(),
+            limit: _limitUpDown.Value,
+            hiddenDirs: HiddenDirsEnabled,
+            supportsHiddenDirs: _hiddenDirsBox.Enabled);
+        var result = dialog.Show();
+        if (!result.Accepted)
+        {
+            return;
+        }
+
+        NoteUserInteraction();
+        _ownerField.Text = result.Owner;
+        _agentField.Text = result.Agent;
+        _limitUpDown.Value = result.Limit;
+        _hiddenDirsBox.Value = result.HiddenDirs ? CheckState.Checked : CheckState.UnChecked;
+        RefreshHiddenDirUi();
+
+        if (!string.IsNullOrWhiteSpace(_queryField?.Text))
+        {
+            SubmitSearch();
+        }
+        else
+        {
+            SetStatus("discover filters updated");
+        }
     }
 
     private void UpdateContextBar()
@@ -1296,6 +1458,7 @@ public sealed class SkillViewApp
 
         var workspaceName = _activeTab switch
         {
+            _ when _inDoctor => "Doctor",
             SkillViewTab.Discover => "Discover",
             SkillViewTab.Installed => "Installed",
             SkillViewTab.Changes => "Changes",
@@ -1308,23 +1471,22 @@ public sealed class SkillViewApp
         string? provenanceLabel = null;
         string? healthLabel = null;
 
-        // For Discover tab, show agent filter and hidden-dirs state.
-        if (_activeTab == SkillViewTab.Discover)
+        if (_inDoctor)
         {
-            var agent = _agentField?.Text?.Trim();
-            if (!string.IsNullOrEmpty(agent))
-            {
-                agentLabel = $"agent: {agent}";
-            }
-
-            if (HiddenDirsEnabled)
-            {
-                filterLabel = "hidden dirs: on";
-            }
+            var doctorState = new ContextBarState(
+                Workspace: workspaceName,
+                AgentLabel: null,
+                LocationLabel: null,
+                ProvenanceLabel: null,
+                HealthLabel: null,
+                FilterLabel: null);
+            _contextBar.Update(doctorState);
+            ApplyContextBarVisibility(ContextBarView.ShouldShowForTests(doctorState));
+            return;
         }
 
-        // For Installed tab, show filter text, pin filter state, and live context
-        // from the current selection (location, provenance, health).
+        // For Installed, keep the shell chrome focused on active filters/pin
+        // state; the selected row's metadata already lives in the detail pane.
         if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
         {
             var filter = _installedTab.GetFilterText();
@@ -1337,23 +1499,16 @@ public sealed class SkillViewApp
             {
                 agentLabel = pinFilter;
             }
-
-            var selected = _installedTab.GetSelectedSkill();
-            if (selected is not null)
-            {
-                locationLabel = InstalledInventoryFormatter.DescribeLocation(selected);
-                provenanceLabel = InstalledInventoryFormatter.DescribeProvenance(selected);
-                healthLabel = SkillHealthFormatter.RowBadge(selected.Validity, selected.IsSymlinked);
-            }
         }
 
         // For Changes tab, show count of pending items.
         if (_activeTab == SkillViewTab.Changes && _changesTab is not null)
         {
+            var label = _changesTab.GetQueueLabel();
             var count = _changesTab.GetPendingCount();
-            if (count > 0)
+            if (!string.IsNullOrWhiteSpace(label) && count > 0)
             {
-                filterLabel = $"{count} pending";
+                filterLabel = $"{label} · {count}";
             }
         }
 
@@ -1366,6 +1521,46 @@ public sealed class SkillViewApp
             FilterLabel: filterLabel);
 
         _contextBar.Update(state);
+        ApplyContextBarVisibility(ContextBarView.ShouldShowForTests(state));
+    }
+
+    private void ApplyContextBarVisibility(bool visible)
+    {
+        if (_contextBar is null)
+        {
+            return;
+        }
+
+        if (_contextBarShown == visible)
+        {
+            _contextBar.Visible = visible;
+            return;
+        }
+
+        _contextBarShown = visible;
+        _contextBar.Visible = visible;
+        var contentY = visible ? 2 : 1;
+        var contentFill = visible ? 2 : 1;
+        ApplyTopOffset(_discoverTab, contentY, contentFill);
+        ApplyTopOffset(_installedTab, contentY, contentFill);
+        ApplyTopOffset(_updatesTab, contentY, contentFill);
+        ApplyTopOffset(_doctorTab, contentY, contentFill);
+        ApplyTopOffset(_changesTab, contentY, contentFill);
+        _contextBar.SuperView?.SetNeedsLayout();
+        _contextBar.SuperView?.SetNeedsDraw();
+    }
+
+    private static void ApplyTopOffset(View? view, int y, int fillBottom)
+    {
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Y = y;
+        view.Height = Dim.Fill(fillBottom);
+        view.SetNeedsLayout();
+        view.SetNeedsDraw();
     }
 
     private void RefreshShellChrome()
@@ -1384,8 +1579,8 @@ public sealed class SkillViewApp
         if (_showingLogs)
         {
             ShowPreviewPane();
-            SetPreviewText(TuiHelpers.PreviewHint);
-            if (_previewFrame is not null) _previewFrame.Title = "SKILL.md";
+            UpdatePreviewPlaceholder();
+            if (_previewFrame is not null) _previewFrame.Title = "Preview";
         }
         else
         {
@@ -1405,9 +1600,22 @@ public sealed class SkillViewApp
     private void SetPreviewText(string text)
     {
         var sanitized = TerminalEscapeSanitizer.Sanitize(text) ?? string.Empty;
-        if (_previewPane is not null) _previewPane.Text = NormalizeMarkdownLists(sanitized);
-        if (_previewRawPane is not null) _previewRawPane.Text = sanitized;
+        var selected = GetSelectedResult();
+        var includeDescription = selected is not null
+            && !string.Equals(_loadedPreviewKey, BuildPreviewSelectionKey(selected), StringComparison.Ordinal);
+        var body = BuildDiscoverPreviewBody(selected?.Description, sanitized, includeDescription);
+        if (_previewPane is not null) _previewPane.Text = NormalizeMarkdownLists(body);
+        if (_previewRawPane is not null) _previewRawPane.Text = body;
     }
+
+    private SearchResultSkill? GetSelectedResult()
+    {
+        var row = _resultsTable?.GetSelectedRow() ?? -1;
+        return row >= 0 && row < _results.Count ? _results[row] : null;
+    }
+
+    private static string BuildPreviewSelectionKey(SearchResultSkill skill) =>
+        $"{skill.Repo ?? string.Empty}/{skill.SkillName ?? string.Empty}";
 
     private void TogglePreviewMode()
     {
@@ -1417,7 +1625,7 @@ public sealed class SkillViewApp
         _previewRawPane.CanFocus = _showingRawPreview;
         _previewPane.Visible = !_showingRawPreview;
         _previewRawPane.Visible = _showingRawPreview;
-        SetStatus(_showingRawPreview ? "preview: raw SKILL.md" : "preview: rendered");
+        SetStatus(_showingRawPreview ? "preview: source" : "preview: rendered");
     }
 
     private void ShowPreviewPane()
@@ -1592,47 +1800,38 @@ public sealed class SkillViewApp
             return [
                 new StatusHint("l", "Preview"),
                 new StatusHint("?", "Help"),
-                new StatusHint("q", "Quit"),
             ];
         }
 
-        return _activeTab switch
+        if (_inDoctor)
         {
-            SkillViewTab.Discover => [
-                new StatusHint("/", "Search"),
-                new StatusHint("1/2/3", "Tabs"),
-                new StatusHint("i", "Install"),
-                new StatusHint("I", "Install…"),
-                new StatusHint("o", "Open"),
-                new StatusHint("e", "Raw/Render"),
-                new StatusHint("u", "Changes"),
-                new StatusHint("c", "Cleanup"),
-                new StatusHint("d", "Doctor"),
-                new StatusHint("l", "Logs"),
+            return [
+                new StatusHint("Esc", "Back"),
                 new StatusHint("?", "Help"),
-                new StatusHint("q", "Quit"),
+            ];
+        }
+
+        return         _activeTab switch
+        {
+        SkillViewTab.Discover => [
+            new StatusHint("f", "Filters"),
+            new StatusHint("1/2/3", "Tabs"),
+            new StatusHint("?", "Help"),
             ],
             SkillViewTab.Installed => [
                 new StatusHint("f", "Filter"),
-                new StatusHint("s", "Sort"),
-                new StatusHint("P", "Pin"),
                 new StatusHint("x", "Remove"),
-                new StatusHint("o", "Open"),
-                new StatusHint("/", "Discover"),
+                new StatusHint("1/2/3", "Tabs"),
                 new StatusHint("?", "Help"),
-                new StatusHint("q", "Quit"),
             ],
             SkillViewTab.Changes => [
-                new StatusHint("1/2/3", "Tabs"),
-                new StatusHint("u", "Changes"),
+                new StatusHint("Enter", "Open"),
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),
-                new StatusHint("q", "Quit"),
             ],
             _ => [
                 new StatusHint("?", "Help"),
-                new StatusHint("q", "Quit"),
             ],
         };
     }
@@ -1650,21 +1849,7 @@ public sealed class SkillViewApp
                 var agents = InstalledInventoryFormatter.DescribeAgents(selected);
                 if (!string.IsNullOrEmpty(agents))
                 {
-                    parts.Add(agents);
-                }
-            }
-        }
-
-        // Show agent filter on Discover tab.
-        if (_activeTab == SkillViewTab.Discover)
-        {
-            var agent = _agentField?.Text?.Trim();
-            if (!string.IsNullOrEmpty(agent))
-            {
-                var badge = TuiHelpers.AgentBadges([agent]);
-                if (!string.IsNullOrEmpty(badge))
-                {
-                    parts.Add(badge);
+                    parts.Add($"Agents {agents}");
                 }
             }
         }
@@ -1781,6 +1966,8 @@ public sealed class SkillViewApp
                     return;
                 }
 
+                RememberStickyFocus(view);
+
                 if (!_startupFocusPrimed)
                 {
                     _startupFocusPrimed = true;
@@ -1827,6 +2014,10 @@ public sealed class SkillViewApp
 
     internal StatusStripView? StatusStripForTests => _statusStrip;
 
+    internal IReadOnlyList<StatusHint> CurrentHintsForTests => GetCurrentHints();
+
+    internal string PreviewTextForTests => _previewPane?.Text.ToString() ?? string.Empty;
+
     internal TabBarView? TabBarForTests => _tabBar;
 
     internal SkillView.Ui.Tabs.InstalledTabView? InstalledTabForTests => _installedTab;
@@ -1836,6 +2027,10 @@ public sealed class SkillViewApp
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
         ShowSearchPanes(tab == SkillViewTab.Discover);
+        if (tab == SkillViewTab.Discover)
+        {
+            RestoreDiscoverFocus();
+        }
         UpdateContextBar();
     }
 

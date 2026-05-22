@@ -20,7 +20,6 @@ internal sealed class DoctorTabView : FrameView
 {
     private readonly Action _onLeaveTab;
     private readonly Markdown _body;
-    private readonly StatusBar _statusBar;
 
     internal DoctorTabView(Action onLeaveTab)
     {
@@ -33,18 +32,12 @@ internal sealed class DoctorTabView : FrameView
         {
             X = 0, Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(),
             Text = "_(loading…)_",
         };
         TuiHelpers.ConfigureMarkdownPane(_body, SchemeNames.Base);
 
-        _statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-            new Shortcut { Title = "q",   HelpText = "Quit" },
-        ]));
-
-        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _body, _statusBar);
+        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _body);
 
         KeyDown += (_, key) =>
         {
@@ -56,7 +49,7 @@ internal sealed class DoctorTabView : FrameView
             }
         };
 
-        Add(_body, _statusBar);
+        Add(_body);
     }
 
     /// Replace the rendered body with a fresh report. Call this on activate

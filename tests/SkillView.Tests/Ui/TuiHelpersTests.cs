@@ -93,9 +93,10 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void HelpText_DocumentsHiddenDirToggle()
+    public void HelpText_DocumentsDiscoverFilters()
     {
-        Assert.Contains("hidden-dir", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Discover filters", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hidden dirs", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -113,25 +114,24 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void WelcomeHint_DocumentsRenderedMarkdownCopySupport()
+    public void WelcomeHint_DocumentsSearchAndFilters()
     {
-        Assert.Contains("Ctrl+C", TuiHelpers.WelcomeHint);
-        Assert.Contains("copy", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Enter", TuiHelpers.WelcomeHint);
+        Assert.Contains("filters", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void WelcomeHint_DocumentsAdvancedInstallAndTabNavigation()
+    public void WelcomeHint_DocumentsHelpEntryPoint()
     {
-        Assert.Contains("I advanced install", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
-        Assert.Contains("1/2/3 tabs", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
-        Assert.DoesNotContain("I installed", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
+        Assert.Contains("?", TuiHelpers.WelcomeHint);
+        Assert.Contains("keys", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void PreviewHint_DocumentsRenderedMarkdownCopySupport()
+    public void PreviewHint_ExplainsHowToLoadTheSelectedSkill()
     {
-        Assert.Contains("Ctrl+C", TuiHelpers.PreviewHint);
-        Assert.Contains("copy", TuiHelpers.PreviewHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Select a skill", TuiHelpers.PreviewHint);
+        Assert.Contains("SKILL.md", TuiHelpers.PreviewHint);
     }
 
     [Fact]
@@ -167,10 +167,12 @@ public sealed class TuiHelpersTests
     }
 
     [Theory]
-    [InlineData("copilot", "C")]
-    [InlineData("github-copilot", "C")]
-    [InlineData("claude-code", "⟁")]
-    [InlineData("gemini-cli", "✦")]
+    [InlineData("copilot", "GHC")]
+    [InlineData("github-copilot", "GHC")]
+    [InlineData("claude-code", "CLD")]
+    [InlineData("gemini-cli", "GMI")]
+    [InlineData("cursor", "CSR")]
+    [InlineData("codex", "CDX")]
     public void AgentIcon_SupportsCurrentAgentIds(string agentId, string expected)
     {
         Assert.Equal(expected, TuiHelpers.AgentIcon(agentId));
@@ -220,6 +222,18 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void SkillDetailPaneView_UsesSingleContinuousOuterPane()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        Assert.Equal(LineStyle.Single, pane.BorderStyle);
+        Assert.Equal(LineStyle.None, pane.MetadataFrame.BorderStyle);
+        Assert.Equal(LineStyle.None, pane.PreviewFrame.BorderStyle);
+        Assert.Equal(string.Empty, pane.MetadataFrame.Title.ToString());
+        Assert.Equal(string.Empty, pane.PreviewFrame.Title.ToString());
+    }
+
+    [Fact]
     public void SetMetadataContent_UpdatesMetadataPaneText()
     {
         var pane = new SkillDetailPaneView("actions", "welcome");
@@ -237,7 +251,7 @@ public sealed class TuiHelpersTests
 
         pane.SetMetadataContent(null);
 
-        Assert.Equal("_(no selection)_", pane.MetadataPane.Text);
+        Assert.Equal("_Select a skill to preview._", pane.MetadataPane.Text);
     }
 
     [Fact]
@@ -258,7 +272,7 @@ public sealed class TuiHelpersTests
 
         pane.SetMetadataChips();  // then clear
 
-        Assert.Equal("_(no selection)_", pane.MetadataPane.Text);
+        Assert.Equal("_Select a skill to preview._", pane.MetadataPane.Text);
     }
 
     [Fact]

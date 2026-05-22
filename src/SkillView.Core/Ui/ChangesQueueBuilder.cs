@@ -1,7 +1,7 @@
 namespace SkillView.Ui;
 
 /// Data row for the Changes workspace maintenance queue.
-internal readonly record struct ChangesQueueRow(string Kind, string Title);
+internal readonly record struct ChangesQueueRow(string Kind, string Title, string? Detail = null);
 
 /// Pure builder for the Changes workspace maintenance queue.
 /// Concatenates pending work in fixed priority order:

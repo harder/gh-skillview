@@ -18,6 +18,10 @@ namespace SkillView.Ui.Tabs;
 internal sealed class InstalledTabView : FrameView
 {
     private enum SortMode { Name, Package, Location }
+    private enum FocusTarget { Table, Filter }
+    private const int LocationColumnWidth = 3;
+    private const int StateColumnWidth = 5;
+    private const int AgentsColumnWidth = 5;
 
     /// winget-tui-style pin filter cycle for the Installed table.
     /// Maps to: All rows · only pinned · only unpinned.
@@ -34,8 +38,6 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
-    private readonly StatusBar _statusBar;
-
     private InventorySnapshot? _snapshot;
     private IReadOnlyList<InstalledSkill> _rows = Array.Empty<InstalledSkill>();
     private IReadOnlyList<InstalledSkill> _all = Array.Empty<InstalledSkill>();
@@ -47,6 +49,7 @@ internal sealed class InstalledTabView : FrameView
     private int _nameW = 12;
     private int _pkgW = 18;
     private int _agentsW = 8;
+    private FocusTarget _lastFocusedTarget = FocusTarget.Table;
     private long _loadGeneration;
 
     internal InstalledTabView(
@@ -69,6 +72,13 @@ internal sealed class InstalledTabView : FrameView
         Visible = false;
 
         var filterLabel = new Label { Text = "Filter:", X = 0, Y = 0 };
+        var guideLabel = new Label
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Text = BuildGuideText(),
+        };
         _filterField = new TextField
         {
             X = 8, Y = 0,
@@ -76,24 +86,39 @@ internal sealed class InstalledTabView : FrameView
             Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(_filterField, SchemeNames.Base);
+        _filterField.HasFocusChanged += (_, _) =>
+        {
+            if (_filterField.HasFocus)
+            {
+                _lastFocusedTarget = FocusTarget.Filter;
+            }
+        };
 
         _table = new TableView
         {
             X = 0,
-            Y = 2,
+            Y = 3,
             Width = Dim.Percent(60),
-            Height = Dim.Fill(2),
+            Height = Dim.Fill(1),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
         TuiHelpers.ConfigureTableChrome(_table);
+        _table.Style.ShowVerticalCellLineForLastColumn = true;
+        _table.HasFocusChanged += (_, _) =>
+        {
+            if (_table.HasFocus)
+            {
+                _lastFocusedTarget = FocusTarget.Table;
+            }
+        };
 
         _detail = new Markdown
         {
-            X = Pos.Right(_table),
-            Y = 2,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(2),
+            X = Pos.Right(_table) + 1,
+            Y = 3,
+            Width = Dim.Fill(1),
+            Height = Dim.Fill(1),
             Text = "(no skills loaded)",
         };
         TuiHelpers.ConfigureMarkdownPane(_detail, SchemeNames.Base);
@@ -101,17 +126,10 @@ internal sealed class InstalledTabView : FrameView
         _footer = new Label
         {
             X = 0,
-            Y = Pos.AnchorEnd(2),
+            Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Text = " loading inventory…",
         };
-
-        // Per-tab StatusBar lives at the bottom of the tab view so its hints
-        // ride along with visibility instead of competing with the global
-        // window status bar for the same row.
-        // Per-tab StatusBar — extend BuildShortcuts with the tab-only P
-        // pin-filter shortcut so users see all the keys winget-tui style.
-        _statusBar = new StatusBar(WithPinShortcut(InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: false)));
 
         _filterField.TextChanged += (_, _) => RefreshAll();
         _table.ValueChanged += (_, _) =>
@@ -125,10 +143,12 @@ internal sealed class InstalledTabView : FrameView
         };
         _table.FrameChanged += (_, _) =>
         {
-            var w = _table.Viewport.Width;
-            if (w > 0 && w != _lastWidth)
+            var width = ResolveWidthForLayout(
+                _table.Viewport.Width,
+                _table.Frame.Width,
+                _lastWidth > 0 ? _lastWidth : 70);
+            if (width != _lastWidth)
             {
-                _lastWidth = w;
                 RecomputeColumnWidths();
             }
         };
@@ -136,9 +156,9 @@ internal sealed class InstalledTabView : FrameView
         KeyDown += OnKeyDown;
 
         TuiHelpers.ApplyScheme(SchemeNames.Base,
-            this, filterLabel, _filterField, _table, _detail, _footer, _statusBar);
+            this, filterLabel, guideLabel, _filterField, _table, _detail, _footer);
 
-        Add(filterLabel, _filterField, _table, _detail, _footer, _statusBar);
+        Add(filterLabel, guideLabel, _filterField, _table, _detail, _footer);
     }
 
     /// Kick off a snapshot load and reveal the tab. Safe to call repeatedly —
@@ -196,18 +216,13 @@ internal sealed class InstalledTabView : FrameView
         _hasPackages = _packageCount > 0;
         _sort = _hasPackages ? SortMode.Package : SortMode.Name;
 
-        // Per-tab status bar adapts to whether packages are present (Sort key
-        // is only useful when there are multiple sort modes worth cycling).
-        var newShortcuts = WithPinShortcut(InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: _hasPackages));
-        _statusBar.RemoveAll();
-        foreach (var s in newShortcuts) _statusBar.Add(s);
-
         ApplyFilter();
-        BuildTableSource();
         RecomputeColumnWidths();
+        BuildTableSource();
+        ScheduleDeferredWidthStabilization();
         RefreshFooter();
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
-        _table.SetFocus();
+        RestoreFocus();
         _onStateChange?.Invoke();
     }
 
@@ -231,25 +246,6 @@ internal sealed class InstalledTabView : FrameView
             _                      => source,
         };
         _rows = ApplySort(source);
-    }
-
-    private static Shortcut[] WithPinShortcut(Shortcut[] existing)
-    {
-        var pin = new Shortcut { Title = "P", HelpText = "Pin filter" };
-        // Insert before the trailing Esc/q pair so it sits with the other
-        // filter/sort keys.
-        var insertAt = existing.Length;
-        for (var i = 0; i < existing.Length; i++)
-        {
-            if (existing[i].Title == "Esc")
-            {
-                insertAt = i;
-                break;
-            }
-        }
-        var list = existing.ToList();
-        list.Insert(insertAt, pin);
-        return list.ToArray();
     }
 
     internal static PinFilter CyclePin(PinFilter current) => current switch
@@ -286,29 +282,32 @@ internal sealed class InstalledTabView : FrameView
         var columns = new Dictionary<string, Func<InstalledSkill, object>>
         {
             ["Name"] = s => TuiHelpers.Truncate(s.Name, _nameW),
-            ["Location"] = s => InstalledInventoryFormatter.DescribeLocation(s),
+            ["Loc"] = s => InstalledInventoryFormatter.DescribeTableLocation(s),
         };
         if (_hasPackages)
         {
-            columns["Package"] = s => TuiHelpers.Truncate(s.Package?.Source ?? "", _pkgW);
+            columns["Package"] = s => TuiHelpers.Truncate(
+                InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source),
+                _pkgW);
         }
-        columns["Health"] = s => SkillHealthFormatter.RowBadge(s.Validity, s.IsSymlinked);
+        columns["State"] = s => SkillHealthFormatter.CompactBadge(s.Validity, s.IsSymlinked);
         columns["Agents"] = s => TuiHelpers.Truncate(
             InstalledInventoryFormatter.DescribeAgents(s),
             _agentsW);
 
         _table.Table = new InstalledTableSource(_rows, columns);
         var style = _table.Style;
-        style.ExpandLastColumn = true;
+        style.ExpandLastColumn = false;
         for (var i = 0; i < _table.Table.Columns; i++)
         {
             var cs = style.GetOrCreateColumnStyle(i);
             switch (_table.Table.ColumnNames[i])
             {
-                case "Name": cs.MinWidth = 8; cs.MaxWidth = _nameW; break;
-                case "Package": cs.MinWidth = 8; cs.MaxWidth = _pkgW; break;
-                case "Health": cs.MinWidth = 12; cs.MaxWidth = 14; break;
-                case "Agents": cs.MinWidth = 6; break;
+                case "Name": cs.MinWidth = _nameW; cs.MaxWidth = _nameW; break;
+                case "Package": cs.MinWidth = _pkgW; cs.MaxWidth = _pkgW; break;
+                case "Loc": cs.MinWidth = LocationColumnWidth; cs.MaxWidth = LocationColumnWidth; break;
+                case "State": cs.MinWidth = StateColumnWidth; cs.MaxWidth = StateColumnWidth; break;
+                case "Agents": cs.MinWidth = AgentsColumnWidth; cs.MaxWidth = AgentsColumnWidth; break;
             }
         }
         _table.Update();
@@ -316,44 +315,108 @@ internal sealed class InstalledTabView : FrameView
 
     private void RecomputeColumnWidths()
     {
-        var viewportWidth = _table.Viewport.Width;
-        var available = viewportWidth > 0
-            ? Math.Max(40, viewportWidth - 6)
-            : 70;
-        // Location column: max("User", "Project", "Custom") = "Project" = 7 chars.
-        // Health column: max("Healthy", "Symlink", "Needs review") = "Needs review" = 12 chars.
-        const int LocationColumnWidth = 7;
-        const int HealthColumnWidth = 12;
-        var fixedCols = LocationColumnWidth + HealthColumnWidth;
+        var width = ResolveWidthForLayout(
+            _table.Viewport.Width,
+            _table.Frame.Width,
+            _lastWidth > 0 ? _lastWidth : 70);
+        _lastWidth = width;
+
+        var available = Math.Max(40, width - 6);
+        var fixedCols = LocationColumnWidth + StateColumnWidth + AgentsColumnWidth;
         var remaining = Math.Max(20, available - fixedCols);
+        _agentsW = AgentsColumnWidth;
         if (_hasPackages)
         {
-            _pkgW = Math.Max(12, (int)Math.Round(remaining * 0.30));
-            _nameW = Math.Max(12, (int)Math.Round(remaining * 0.40));
-            _agentsW = Math.Max(6, remaining - _pkgW - _nameW);
+            _pkgW = Math.Max(18, (int)Math.Round(remaining * 0.54));
+            _nameW = Math.Max(12, remaining - _pkgW);
         }
         else
         {
-            _nameW = Math.Max(12, (int)Math.Round(remaining * 0.65));
-            _agentsW = Math.Max(6, remaining - _nameW);
+            _nameW = Math.Max(12, remaining);
         }
         var style = _table.Style;
         for (var i = 0; i < (_table.Table?.Columns ?? 0); i++)
         {
             var name = _table.Table!.ColumnNames[i];
             var cs = style.GetOrCreateColumnStyle(i);
-            if (name == "Name") cs.MaxWidth = _nameW;
-            else if (name == "Package") cs.MaxWidth = _pkgW;
+            if (name == "Name")
+            {
+                cs.MinWidth = _nameW;
+                cs.MaxWidth = _nameW;
+            }
+            else if (name == "Package")
+            {
+                cs.MinWidth = _pkgW;
+                cs.MaxWidth = _pkgW;
+            }
+            else if (name == "Agents")
+            {
+                cs.MinWidth = AgentsColumnWidth;
+                cs.MaxWidth = AgentsColumnWidth;
+            }
         }
+        _table.Update();
         _table.SetNeedsDraw();
+    }
+
+    internal static int ResolveWidthForLayoutForTests(int viewportWidth, int frameWidth, int fallbackWidth) =>
+        ResolveWidthForLayout(viewportWidth, frameWidth, fallbackWidth);
+
+    private static int ResolveWidthForLayout(int viewportWidth, int frameWidth, int fallbackWidth)
+    {
+        if (viewportWidth > 0)
+        {
+            return viewportWidth;
+        }
+
+        return fallbackWidth;
+    }
+
+    private static string BuildGuideText() =>
+        "Matches name/path/agent/package · USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
+
+    private void ScheduleDeferredWidthStabilization()
+    {
+        QueueDeferredWidthStabilization(remainingPasses: 3);
+    }
+
+    private void QueueDeferredWidthStabilization(int remainingPasses)
+    {
+        _ = _runOnUi(() =>
+        {
+            if (!Visible || _table.Table is null)
+            {
+                return;
+            }
+
+            RecomputeColumnWidths();
+
+            if (remainingPasses > 1)
+            {
+                QueueDeferredWidthStabilization(remainingPasses - 1);
+            }
+        });
+    }
+
+    private void RestoreFocus()
+    {
+        switch (_lastFocusedTarget)
+        {
+            case FocusTarget.Filter:
+                _filterField.SetFocus();
+                break;
+            default:
+                _table.SetFocus();
+                break;
+        }
     }
 
     private void RefreshAll()
     {
         if (_snapshot is null) return;
         ApplyFilter();
-        BuildTableSource();
         RecomputeColumnWidths();
+        BuildTableSource();
         RefreshFooter();
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
@@ -369,10 +432,10 @@ internal sealed class InstalledTabView : FrameView
             return;
         }
         var counts = _rows.Count == _all.Count
-            ? $" {_all.Count} skill(s) across {_snapshot.ScannedRoots.Length} location(s)"
-            : $" {_rows.Count} of {_all.Count} skill(s) (filtered) · {_snapshot.ScannedRoots.Length} location(s)";
+            ? $" {_all.Count} skill(s) · {_snapshot.ScannedRoots.Length} location(s)"
+            : $" {_rows.Count} of {_all.Count} skill(s) · {_snapshot.ScannedRoots.Length} location(s)";
         var pkgs = _packageCount > 0 ? $" · {_packageCount} package(s)" : "";
-        var srcSuffix = _snapshot.UsedGhSkillList ? " · gh data + scan" : " · scan only";
+        var srcSuffix = _snapshot.UsedGhSkillList ? " · merged inventory" : " · scan only";
         var sortLabel = _sort switch
         {
             SortMode.Package => "package",
@@ -380,7 +443,7 @@ internal sealed class InstalledTabView : FrameView
             _ => "name",
         };
         var pinSuffix = _pinFilter == PinFilter.All ? "" : $" · 📌 {DescribePin(_pinFilter)}";
-        _footer.Text = $"{counts}{pkgs} · sort: {sortLabel}{pinSuffix}{srcSuffix}";
+        _footer.Text = $"{counts}{pkgs} · sort {sortLabel}{pinSuffix}{srcSuffix}";
     }
 
     private void OnKeyDown(object? sender, Key key)
@@ -455,9 +518,7 @@ internal sealed class InstalledTabView : FrameView
 
     private static string RenderDetail(InstalledSkill skill)
     {
-        var detail = InstalledScreen.RenderDetail(skill);
-        var health = SkillHealthFormatter.RowBadge(skill.Validity, skill.IsSymlinked);
-        return $"**Health** : {health}\n\n{detail}";
+        return InstalledScreen.RenderDetail(skill);
     }
 
     private bool IsCurrentLoad(long loadGeneration) =>
@@ -481,4 +542,10 @@ internal sealed class InstalledTabView : FrameView
     internal IReadOnlyList<string> VisibleSkillNamesForTests => _rows.Select(s => s.Name).ToArray();
 
     internal void SetSelectedRowForTests(int row) => _table.SetSelectedRow(row);
+
+    internal void FocusFilterForTests() => _filterField.SetFocus();
+
+    internal bool FilterHasFocusForTests => _filterField.HasFocus;
+
+    internal bool TableHasFocusForTests => _table.HasFocus;
 }

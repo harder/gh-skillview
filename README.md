@@ -2,6 +2,29 @@
 
 `gh-skillview` is a Terminal UI and CLI for discovering, previewing, installing, updating, removing, and cleaning up AI agent skills built on top of [`gh skill`](https://cli.github.com/manual/gh_skill).
 
+## Download and run
+
+**Recommended: install it as a GitHub CLI extension**
+
+```bash
+gh extension install harder/gh-skillview
+gh skillview
+```
+
+**Or run it as a standalone binary**
+
+1. Download the right `skillview-<rid>[.exe]` asset from the [latest release](https://github.com/harder/gh-skillview/releases).
+2. On macOS or Linux, make it executable and put it on your `PATH`.
+3. Run `skillview`.
+
+```bash
+chmod +x skillview-osx-arm64
+mv skillview-osx-arm64 /usr/local/bin/skillview
+skillview
+```
+
+SkillView requires **GitHub CLI 2.92.0 or newer**. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
+
 It ships as both:
 
 1. a GitHub CLI extension: `gh skillview`
@@ -9,14 +32,18 @@ It ships as both:
 
 SkillView does **not** replace `gh skill`. It gives developers a faster full-screen workflow for the common cases, plus a scriptable CLI for inventory and maintenance tasks that are easier to reason about with SkillView's safety checks and JSON output.
 
-![SkillView screenshot](./screenshot.png)
+[![CI](https://github.com/harder/gh-skillview/actions/workflows/ci.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/ci.yml)
+[![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
+
+![SkillView screenshot](img/skillview.png)
 
 ## Why this exists
 
 `gh skill` is powerful, but once you start working with a lot of skills it helps to have:
 
 - a tabbed workspace where Discover, Installed, and Changes live side-by-side
-- a persistent detail pane showing metadata and rendered `SKILL.md`
+- a persistent right pane with a compact summary, rendered `SKILL.md`, and logs
 - guided install and update flows instead of memorizing flags
 - a unified view of installed skills across project, user, and custom roots
 - safe remove and cleanup workflows for duplicates, broken symlinks, residue, and malformed installs
@@ -28,7 +55,7 @@ SkillView complements `gh skill`; it does not try to replace every low-level com
 
 | If you need to... | Reach for... | Why |
 |---|---|---|
-| browse and compare skills quickly | **SkillView TUI** | tabbed Discover/Installed/Changes layout with a persistent detail pane, batch updates, and staged install/remove flows |
+| browse and compare skills quickly | **SkillView TUI** | tabbed Discover/Installed/Changes layout with a compact summary + preview pane, batch updates, and staged install/remove flows |
 | script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
 | experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
 | debug whether a feature is available in your installed GitHub CLI | **`skillview doctor`** | capability probing shows what the local `gh` actually supports |
@@ -116,7 +143,7 @@ skillview cleanup
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes uses a full-width table for the maintenance queue. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes uses a full-width table for the maintenance queue. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
@@ -137,7 +164,7 @@ Each tab preserves its own state (filter text, selection, sort, marks) when you 
 
 The main "discover and inspect" loop:
 
-1. Type a search query, and optionally narrow the next search with the **Owner**, **Agent**, and **Limit** fields.
+1. Type a search query, and optionally press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
 2. Browse results in the left table; selection drives the detail pane on the right.
 3. Press `S` to cycle a sort (stars ↓ → name ↑ → name ↓ → repo ↑ → off). The active sort column's header shows the direction.
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
@@ -166,12 +193,12 @@ Discover tab:
 |---|---|
 | `Enter` (or `Ctrl+J` in Warp) | Submit search from the query field, or preview from the results table |
 | `p`, `v`, `→` | Preview the selected result |
+| `f` | Open the Discover filters dialog (owner, agent, limit, hidden dirs) |
 | `S` | Cycle results sort |
 | `i` | Compact install for the selected result |
 | `I` | Advanced install wizard for the selected result |
 | `o` | Open the repo in a browser |
 | `e` | Toggle raw / rendered preview |
-| `h` | Toggle hidden-dir access for preview/install |
 | `l` | Toggle the right pane between preview and logs |
 
 Installed tab:

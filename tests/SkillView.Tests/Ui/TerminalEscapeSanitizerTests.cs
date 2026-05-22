@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SkillView.Bootstrapping;
 using SkillView.Inventory;
 using SkillView.Gh;
 using SkillView.Gh.Models;
@@ -32,9 +33,29 @@ public sealed class TerminalEscapeSanitizerTests
     }
 
     [Fact]
-    public void RenderSearchMetadata_StripsEscapeSequences_FromRemoteDescription()
+    public void DiscoverPreviewBody_StripsEscapeSequences_FromRemoteDescription()
     {
-        var metadata = SkillViewApp.RenderSearchMetadata(
+        var app = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            new AppOptions(
+                InvocationMode.Standalone,
+                DispatchMode.Tui,
+                Debug: false,
+                Theme: AppTheme.Default,
+                ScanRoots: Array.Empty<string>(),
+                SubcommandName: null,
+                SubcommandArgs: Array.Empty<string>()),
+            applicationFactory: static () =>
+            {
+                var created = Terminal.Gui.App.Application.Create();
+                created.Init("fake");
+                return created;
+            },
+            probeOnRun: false);
+        using var window = app.BuildUiForTests();
+
+        app.LoadSearchResultsForTests(
+        [
             new SearchResultSkill(
                 Description: "hello\x1b]8;;https://example.test\x07world",
                 Namespace: "ns",
@@ -42,11 +63,11 @@ public sealed class TerminalEscapeSanitizerTests
                 Repo: "owner/repo",
                 SkillName: "demo",
                 Stars: 5),
-            GhAuthStatus.Unknown);
+        ]);
 
-        Assert.DoesNotContain('\x1b', metadata);
-        Assert.DoesNotContain('\x07', metadata);
-        Assert.Contains("helloworld", metadata);
+        Assert.DoesNotContain('\x1b', app.PreviewTextForTests);
+        Assert.DoesNotContain('\x07', app.PreviewTextForTests);
+        Assert.Contains("helloworld", app.PreviewTextForTests);
     }
 
     [Fact]
