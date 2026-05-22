@@ -37,6 +37,8 @@ internal sealed class StatusStripView : View
         SetNeedsDraw();
     }
 
+    internal string LeftBadgesForTests => _leftBadges;
+
     protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;

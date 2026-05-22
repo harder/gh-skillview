@@ -28,7 +28,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
-    private readonly Action? _onFilterChange;
+    private readonly Action? _onStateChange;
 
     private readonly TextField _filterField;
     private readonly TableView _table;
@@ -55,14 +55,14 @@ internal sealed class InstalledTabView : FrameView
         Action<InstalledSkill, InventorySnapshot> onRemove,
         Action onLeaveTab,
         Action onGoToSearch,
-        Action? onFilterChange = null)
+        Action? onStateChange = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
         _onRemove = onRemove;
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
-        _onFilterChange = onFilterChange;
+        _onStateChange = onStateChange;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -120,6 +120,7 @@ internal sealed class InstalledTabView : FrameView
             if (row >= 0 && row < _rows.Count)
             {
                 _detail.Text = RenderDetail(_rows[row]);
+                _onStateChange?.Invoke();
             }
         };
         _table.FrameChanged += (_, _) =>
@@ -207,6 +208,7 @@ internal sealed class InstalledTabView : FrameView
         RefreshFooter();
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
         _table.SetFocus();
+        _onStateChange?.Invoke();
     }
 
     private void ApplyFilter()
@@ -356,7 +358,7 @@ internal sealed class InstalledTabView : FrameView
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
             : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
-        _onFilterChange?.Invoke();
+        _onStateChange?.Invoke();
     }
 
     private void RefreshFooter()
@@ -477,4 +479,6 @@ internal sealed class InstalledTabView : FrameView
     }
 
     internal IReadOnlyList<string> VisibleSkillNamesForTests => _rows.Select(s => s.Name).ToArray();
+
+    internal void SetSelectedRowForTests(int row) => _table.SetSelectedRow(row);
 }

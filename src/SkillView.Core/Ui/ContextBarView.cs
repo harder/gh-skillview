@@ -36,6 +36,8 @@ internal sealed class ContextBarView : View
         SetNeedsDraw();
     }
 
+    internal ContextBarState CurrentStateForTests => _state;
+
     protected override bool OnDrawingContent(DrawContext? context)
     {
         var text = FormatForTests(_state);

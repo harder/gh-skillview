@@ -251,6 +251,7 @@ public class CliDispatcherErrorTests : IDisposable
 
     private static async Task<(int ExitCode, string Stdout, string Stderr)> RunCliAsync(string processPath, params string[] args)
     {
+        await CliConsoleCapture.Gate.WaitAsync().ConfigureAwait(false);
         var originalOut = Console.Out;
         var originalErr = Console.Error;
         using var stdoutWriter = new StringWriter();
@@ -269,6 +270,7 @@ public class CliDispatcherErrorTests : IDisposable
         {
             Console.SetOut(originalOut);
             Console.SetError(originalErr);
+            CliConsoleCapture.Gate.Release();
         }
     }
 }

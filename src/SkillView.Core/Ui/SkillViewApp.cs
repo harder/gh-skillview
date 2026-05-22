@@ -352,7 +352,7 @@ public sealed class SkillViewApp
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
-            onFilterChange: UpdateContextBar)
+            onStateChange: RefreshShellChrome)
         {
             X = 0,
             Y = 2,
@@ -1368,6 +1368,12 @@ public sealed class SkillViewApp
         _contextBar.Update(state);
     }
 
+    private void RefreshShellChrome()
+    {
+        UpdateContextBar();
+        UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info);
+    }
+
     private void ToggleRightPane()
     {
         if (_previewPane is null || _rightFrame is null)
@@ -1819,7 +1825,11 @@ public sealed class SkillViewApp
 
     internal ContextBarView? ContextBarForTests => _contextBar;
 
+    internal StatusStripView? StatusStripForTests => _statusStrip;
+
     internal TabBarView? TabBarForTests => _tabBar;
+
+    internal SkillView.Ui.Tabs.InstalledTabView? InstalledTabForTests => _installedTab;
 
     internal void ForceActiveTabForTests(SkillViewTab tab)
     {

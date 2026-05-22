@@ -333,14 +333,14 @@ Program.cs
      -> TUI: SkillViewApp.RunAsync(...)
 ```
 
-The TUI is a single Terminal.Gui `Window` that hosts a persistent `TabBarView` header and four embedded view classes — `DiscoverTabView` logic lives inside `SkillViewApp` itself, `InstalledTabView`, `ChangesTabView`, and `DoctorTabView` in `src/SkillView.Core/Ui/Tabs/`. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
+The TUI is a single Terminal.Gui `Window` that hosts a persistent shell: `TabBarView`, `ContextBarView`, and `StatusStripView`. The primary workflows live in embedded `DiscoverTabView`, `InstalledTabView`, and `ChangesTabView` instances under `src/SkillView.Core/Ui/Tabs/`; `SkillViewApp` coordinates tab activation and shared shell state while those views own their workspace layouts. Temporary drill-in workspaces such as `UpdatesTabView` and `DoctorTabView` are still embedded views, but they are not part of the persistent three-tab shell. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
 
 ### Project layout
 
 | Path | Purpose |
 |---|---|
 | `src/SkillView.Core/` | Bootstrapping, CLI, `gh` adapters, inventory, logging, and Terminal.Gui views |
-| `src/SkillView.Core/Ui/Tabs/` | `DiscoverTabView` (inline), `InstalledTabView`, `ChangesTabView`, `DoctorTabView` |
+| `src/SkillView.Core/Ui/Tabs/` | `DiscoverTabView`, `InstalledTabView`, `ChangesTabView`, plus temporary drill-in views like `UpdatesTabView` and `DoctorTabView` |
 | `src/SkillView.Core/Ui/Theming/` | Color palette + `ColorScheme` factories |
 | `src/SkillView.App/` | Standalone `skillview` entrypoint |
 | `src/SkillView.GhExtension/` | `gh skillview` extension entrypoint |

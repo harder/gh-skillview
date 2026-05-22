@@ -120,6 +120,14 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void WelcomeHint_DocumentsAdvancedInstallAndTabNavigation()
+    {
+        Assert.Contains("I advanced install", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
+        Assert.Contains("1/2/3 tabs", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
+        Assert.DoesNotContain("I installed", TuiHelpers.WelcomeHint, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PreviewHint_DocumentsRenderedMarkdownCopySupport()
     {
         Assert.Contains("Ctrl+C", TuiHelpers.PreviewHint);

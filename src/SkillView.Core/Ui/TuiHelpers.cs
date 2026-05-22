@@ -275,7 +275,9 @@ internal static class TuiHelpers
         "Rendered markdown  Ctrl+A selects all, Ctrl+C copy selection, click links to open\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
-        "I  show installed skills\n" +
+        "I  open the advanced install wizard\n" +
+        "2  show installed skills\n" +
+        "3  show the Changes workspace\n" +
         "u  open Changes workspace\n" +
         "c  review cleanup candidates\n" +
         "   in Installed: / returns to Discover, f filters, x removes the selected skill\n" +
@@ -286,7 +288,7 @@ internal static class TuiHelpers
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
         (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · owner/agent filters · h hidden dirs · i install · o open · e raw/render · rendered preview Ctrl+C copy + links · l logs · d doctor · I installed (/ discover, f filter) · u changes · c cleanup · F1 help · q quit";
+        + " · owner/agent filters · h hidden dirs · i install · I advanced install · 1/2/3 tabs · o open · e raw/render · rendered preview Ctrl+C copy + links · l logs · d doctor · u changes · c cleanup · F1 help · q quit";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
         ? "Select a result and press Ctrl+J, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening."

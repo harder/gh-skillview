@@ -57,6 +57,7 @@ public class CliDispatcherHelpTests
 
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string processPath, params string[] args)
     {
+        await CliConsoleCapture.Gate.WaitAsync().ConfigureAwait(false);
         var originalOut = Console.Out;
         using var writer = new StringWriter();
         Console.SetOut(writer);
@@ -71,6 +72,7 @@ public class CliDispatcherHelpTests
         finally
         {
             Console.SetOut(originalOut);
+            CliConsoleCapture.Gate.Release();
         }
     }
 }

@@ -119,6 +119,38 @@ public sealed class UpdatesTabViewTests
         Assert.Equal(["newer"], view.VisibleSkillNamesForTests);
     }
 
+    [Fact]
+    public async Task InstalledTab_LoadAsync_NotifiesStateChangeAfterPopulate()
+    {
+        var callbackCount = 0;
+        IReadOnlyList<string>? visibleNamesAtCallback = null;
+        InstalledSkill? selectedSkillAtCallback = null;
+        InstalledTabView? view = null;
+        view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            snapshotLoader: () => Task.FromResult(SnapshotWithSkill("loaded")),
+            onRemove: static (_, _) => { },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { },
+            onStateChange: () =>
+            {
+                callbackCount++;
+                visibleNamesAtCallback = view!.VisibleSkillNamesForTests;
+                selectedSkillAtCallback = view.GetSelectedSkill();
+            });
+
+        await view.LoadAsync();
+
+        Assert.True(callbackCount >= 1);
+        Assert.Equal(["loaded"], visibleNamesAtCallback);
+        Assert.NotNull(selectedSkillAtCallback);
+        Assert.Equal("loaded", selectedSkillAtCallback!.Name);
+    }
+
     private static UpdatesTabView CreateUpdatesTab(
         Func<CapabilityProfile> capabilitiesProvider,
         Func<Task<InventorySnapshot>> snapshotLoader)

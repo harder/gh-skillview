@@ -106,6 +106,39 @@ public sealed class SkillViewAppTests
         }),
     };
 
+    private static InventorySnapshot SnapshotWithInstalledSkills() => InventorySnapshot.Empty with
+    {
+        Skills = ImmutableArray.Create(
+            new InstalledSkill
+            {
+                Name = "alpha",
+                ResolvedPath = "/skills/alpha",
+                ScanRoot = "/skills",
+                Scope = Scope.User,
+                Agents = ImmutableArray.Create(new AgentMembership("github-copilot", "/skills/alpha", false)),
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.FsScan,
+                Ignored = false,
+                IsSymlinked = false,
+                InstalledAt = null,
+            },
+            new InstalledSkill
+            {
+                Name = "beta",
+                ResolvedPath = "/project/skills/beta",
+                ScanRoot = "/project/skills",
+                Scope = Scope.Project,
+                Agents = ImmutableArray.Create(new AgentMembership("claude", "/project/skills/beta", false)),
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.MissingSkillMd,
+                Provenance = Provenance.CliList,
+                Ignored = false,
+                IsSymlinked = true,
+                InstalledAt = null,
+            }),
+    };
+
     [Fact]
     public void ShouldOpenInstalledOnStartup_ReturnsFalse_ForEmptyInventory()
     {
@@ -501,6 +534,25 @@ public sealed class SkillViewAppTests
         // Switch back to Discover should also update
         app.ForceActiveTabForTests(SkillViewTab.Discover);
         Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void InstalledSelectionChange_RefreshesShellChrome()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.InstalledTabForTests!.LoadSeeded(SnapshotWithInstalledSkills());
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+
+        app.InstalledTabForTests.SetSelectedRowForTests(1);
+
+        var contextBar = app.ContextBarForTests!.CurrentStateForTests;
+        Assert.Equal("Project", contextBar.LocationLabel);
+        Assert.Equal("List", contextBar.ProvenanceLabel);
+        Assert.Equal("Symlink", contextBar.HealthLabel);
+        Assert.Equal(
+            InstalledInventoryFormatter.DescribeAgents(app.InstalledTabForTests.GetSelectedSkill()!),
+            app.StatusStripForTests!.LeftBadgesForTests);
     }
 
     [Fact]
