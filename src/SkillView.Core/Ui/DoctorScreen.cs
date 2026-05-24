@@ -1,64 +1,15 @@
 using System.Text;
 using SkillView.Diagnostics;
 using SkillView.Gh;
-using Terminal.Gui.App;
-using Terminal.Gui.Drivers;
-using Terminal.Gui.Input;
-using Terminal.Gui.ViewBase;
-using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Full-screen Doctor view shown inside the TUI (bound to `d`). Renders
-/// the same `EnvironmentReport` as the CLI `doctor` subcommand in a
-/// Markdown view that fills the terminal so the main view doesn't bleed
-/// through. Esc/q returns to the main view.
+/// Static helper for rendering the Doctor report as Markdown. The
+/// interactive view is now <see cref="Tabs.DoctorTabView"/>; the modal
+/// Show() subloop was retired in Phase 8b. Render() stays on this type so
+/// the 3 DoctorScreenTests pass unchanged.
 public static class DoctorScreen
 {
-    public static void Show(IApplication app, EnvironmentReport report)
-    {
-        var body = Render(report);
-
-        using var window = new Window
-        {
-            Title = "Doctor",
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-        };
-
-        var text = new Markdown
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(1),
-            Text = body,
-        };
-        TuiHelpers.ConfigureMarkdownPane(text, SkillViewStyling.BaseSchemeName);
-
-        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-            new Shortcut { Title = "q", HelpText = "Quit" },
-        ]));
-
-        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, text, statusBar);
-
-        window.Add(text, statusBar);
-        window.KeyDown += (_, key) =>
-        {
-            if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
-            {
-                app.RequestStop();
-                key.Handled = true;
-            }
-        };
-
-        app.Run(window);
-    }
-
     public static string Render(EnvironmentReport r)
     {
         var sb = new StringBuilder();

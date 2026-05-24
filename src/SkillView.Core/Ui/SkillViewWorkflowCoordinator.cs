@@ -52,7 +52,12 @@ internal sealed class SkillViewWorkflowCoordinator
         _focusSearchFromInstalled = focusSearchFromInstalled;
     }
 
-    public void OpenInstallDialog(InstallRequest request)
+    /// Open the install flow. By default takes the compact one-screen modal
+    /// matching winget-tui's `i` shortcut — Scope radio + agents row + Install.
+    /// If the user picks "Advanced…" (or `forceAdvanced: true` is requested by
+    /// the caller for the `I` shortcut), escalates to the full multi-step
+    /// <see cref="InstallScreen"/> wizard.
+    public void OpenInstallDialog(InstallRequest request, bool forceAdvanced = false)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
@@ -60,6 +65,38 @@ internal sealed class SkillViewWorkflowCoordinator
         if (app is null || ghPath is null || report is null)
         {
             return;
+        }
+
+        if (!forceAdvanced)
+        {
+            var compact = new InstallConfirmModal(
+                app,
+                _services.InstallService,
+                _services.Logger,
+                ghPath,
+                report.Capabilities,
+                request);
+            var compactResult = compact.Show();
+            switch (compactResult.Outcome)
+            {
+                case InstallConfirmModal.Outcome.Installed when compactResult.Install is { Succeeded: true } r:
+                    _services.ListAdapter.Invalidate();
+                    _setStatusWithLevel(
+                        $"installed {r.Repo}{(r.SkillName is null ? "" : "/" + r.SkillName)} — rescanning…",
+                        TuiHelpers.NotificationLevel.Success);
+                    QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                    return;
+                case InstallConfirmModal.Outcome.Failed when compactResult.Install is { } f:
+                    _setStatusWithLevel(
+                        $"install failed (exit {f.ExitCode}) — see logs (l)",
+                        TuiHelpers.NotificationLevel.Error);
+                    return;
+                case InstallConfirmModal.Outcome.Cancelled:
+                    return;
+                case InstallConfirmModal.Outcome.EscalateToAdvanced:
+                    // Fall through to the advanced wizard below.
+                    break;
+            }
         }
 
         var installScreen = new InstallScreen(
@@ -86,71 +123,6 @@ internal sealed class SkillViewWorkflowCoordinator
         }
     }
 
-    public void ShowUpdateScreen()
-    {
-        var app = _getApp();
-        var ghPath = _getGhPath();
-        var report = _getLastReport();
-        if (app is null)
-        {
-            return;
-        }
-
-        if (ghPath is null || report is null)
-        {
-            _setStatus("gh not ready — press 'd' for Doctor");
-            return;
-        }
-
-        _setBusy("scanning inventory for update picker…");
-        _runBackground(async cancellationToken =>
-        {
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            _invoke(() =>
-            {
-                _clearBusy();
-                var screen = new UpdateScreen(
-                    app,
-                    _services.UpdateService,
-                    _services.Logger,
-                    ghPath,
-                    report.Capabilities,
-                    snapshot.Skills);
-                screen.Show();
-                if (screen.LastResult is { DryRun: false, Succeeded: true })
-                {
-                    _services.ListAdapter.Invalidate();
-                    _setStatusWithLevel("update succeeded — rescanning…", TuiHelpers.NotificationLevel.Success);
-                    QueueInventoryRescan(report, successStatus: "updated — inventory now {0} skill(s)");
-                }
-                else if (screen.LastResult is { Succeeded: false } failed)
-                {
-                    _setStatusWithLevel($"update failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
-                }
-            });
-        }, "update");
-    }
-
-    public void ShowInstalled()
-    {
-        if (_getApp() is null)
-        {
-            return;
-        }
-
-        _setBusy("scanning inventory…");
-        _runBackground(async cancellationToken =>
-        {
-            var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            _invoke(() =>
-            {
-                _clearBusy();
-                _setStatus($"{snapshot.Skills.Length} installed skill(s)");
-                OpenInstalledSnapshot(snapshot);
-            });
-        }, "installed");
-    }
 
     public void ShowCleanupScreen()
     {
@@ -187,7 +159,27 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "cleanup");
     }
 
-    public void ShowDoctor()
+
+
+    public Task<InventorySnapshot> CaptureInventorySnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        // Used by the embedded InstalledTabView / UpdatesTabView for their
+        // on-activate snapshot loads. Probes the environment lazily so the
+        // first tab activation doesn't hard-fail when gh hasn't been probed
+        // yet (mirrors the lazy-probe in ShowDoctor).
+        return CaptureForTabAsync(cancellationToken);
+    }
+
+    public void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot) =>
+        OpenRemoveDialogInternal(target, snapshot);
+
+    private async Task<InventorySnapshot> CaptureForTabAsync(CancellationToken cancellationToken)
+    {
+        var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
+        return await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void OpenRemoveDialogInternal(InstalledSkill target, InventorySnapshot snapshot)
     {
         var app = _getApp();
         if (app is null)
@@ -195,47 +187,46 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
-        var report = _getLastReport();
-        if (report is not null)
+        // Compact path: a single skill with no second-confirm warnings and no
+        // validation errors gets the winget-tui `[y] yes  [n] no` confirm.
+        // Anything more involved (package/repo group, incoming symlinks,
+        // errors) escalates to the full RemoveScreen wizard.
+        var targets = RemoveTargetResolver.BuildTargets(target, snapshot);
+        var primary = targets.IsEmpty ? null : (RemoveTarget?)targets[0];
+        if (primary is { } primaryTarget)
         {
-            DoctorScreen.Show(app, report);
-            return;
-        }
-
-        _setBusy("probing environment…");
-        _runBackground(async cancellationToken =>
-        {
-            var probed = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _rememberReport(probed);
-            _invoke(() =>
+            var evaluation = RemoveTargetResolver.Evaluate(primaryTarget, snapshot);
+            if (RemoveConfirmModal.CanRunCompact(evaluation))
             {
-                _clearBusy();
-                DoctorScreen.Show(app, probed);
-            });
-        }, "doctor");
-    }
-
-    public void OpenInstalledSnapshot(InventorySnapshot snapshot)
-    {
-        var app = _getApp();
-        if (app is null)
-        {
-            return;
-        }
-
-        InstalledScreen.Show(
-            app,
-            snapshot,
-            target => OpenRemoveDialog(target, snapshot),
-            _focusSearchFromInstalled);
-    }
-
-    private void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot)
-    {
-        var app = _getApp();
-        if (app is null)
-        {
-            return;
+                var modal = new RemoveConfirmModal(app, _services.RemoveService, _services.Logger, target, evaluation);
+                var compactResult = modal.Show();
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Removed
+                    && compactResult.Report is { Succeeded: true })
+                {
+                    _services.ListAdapter.Invalidate();
+                    _setStatusWithLevel(
+                        $"removed {target.Name} — rescanning…",
+                        TuiHelpers.NotificationLevel.Success);
+                    var envReportCompact = _getLastReport();
+                    if (envReportCompact is not null)
+                    {
+                        QueueInventoryRescan(envReportCompact, successStatus: "removed — inventory now {0} skill(s)");
+                    }
+                    return;
+                }
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Failed)
+                {
+                    _setStatusWithLevel(
+                        $"remove failed — {compactResult.Report?.Errors.FirstOrDefault() ?? "see logs (l)"}",
+                        TuiHelpers.NotificationLevel.Error);
+                    return;
+                }
+                if (compactResult.Outcome == RemoveConfirmModal.Outcome.Cancelled)
+                {
+                    return;
+                }
+                // Outcome.EscalateToWizard → fall through to the wizard below.
+            }
         }
 
         var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
@@ -301,5 +292,11 @@ internal sealed class SkillViewWorkflowCoordinator
                 ScanRoots: _options.ScanRoots,
                 AllowHiddenDirs: false),
             cancellationToken);
+
+    /// Drill into the Updates workspace from the Changes queue.
+    /// Calls <paramref name="activateUpdates"/> with <paramref name="hideChanges"/> so the caller
+    /// controls the concrete tab-view types; the coordinator stays decoupled from UI types.
+    internal void OpenUpdatesFromChanges(Action hideChanges, Action<Action> activateUpdates) =>
+        activateUpdates(hideChanges);
 
 }

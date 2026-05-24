@@ -1,8 +1,10 @@
 using System.Text;
 using SkillView.Bootstrapping;
 using SkillView.Inventory;
+using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.Text;
 using Terminal.Gui.ViewBase;
@@ -27,27 +29,32 @@ internal static class TuiHelpers
         Environment.GetEnvironmentVariable("TERM_PROGRAM")
             ?.Contains("Warp", StringComparison.OrdinalIgnoreCase) == true;
 
-    /// Compact Unicode badge for a known agent. Falls back to the first
-    /// letter (uppercased) for unknown agents so unfamiliar IDs still
-    /// render as a one-cell glyph in the Agents column.
+    /// Compact text badge for a known agent. Falls back to a derived
+    /// 3-character uppercase abbreviation for unknown agents so unfamiliar
+    /// IDs still render compactly in the Agents column.
     internal static string AgentIcon(string? agentId)
     {
         if (string.IsNullOrWhiteSpace(agentId)) return "?";
         var key = agentId.Trim().ToLowerInvariant();
         return key switch
         {
-            "claude" or "claude-code" or "claude_code" or "claudecode" => "⟁",
-            "copilot" or "github-copilot" => "C",
-            "cursor" => "◫",
-            "codex" or "openai-codex" => "◎",
-            "gemini" or "gemini-cli" => "✦",
-            "opencode" or "open-code" => "⬡",
-            _ => char.ToUpperInvariant(key[0]).ToString(),
+            "claude" or "claude-code" or "claude_code" or "claudecode" => "CLD",
+            "copilot" or "github-copilot" => "GHC",
+            "cursor" => "CSR",
+            "codex" or "openai-codex" => "CDX",
+            "gemini" or "gemini-cli" => "GMI",
+            "aider" => "AID",
+            "continue" => "CNT",
+            "cline" => "CLN",
+            "windsurf" => "WND",
+            "opencode" or "open-code" => "OPN",
+            "antigravity" => "ANT",
+            _ => DeriveAgentAbbreviation(key),
         };
     }
 
-    /// Concatenate one icon per distinct agent ID, preserving discovery
-    /// order. Returns "—" when the list is empty.
+    /// Concatenate one compact label per distinct agent ID, preserving
+    /// discovery order. Returns "—" when the list is empty.
     internal static string AgentBadges(IEnumerable<string> agentIds)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +69,27 @@ internal static class TuiHelpers
         return sb.Length == 0 ? "—" : sb.ToString();
     }
 
+    private static string DeriveAgentAbbreviation(string key)
+    {
+        Span<char> chars = stackalloc char[3];
+        var count = 0;
+        foreach (var c in key)
+        {
+            if (!char.IsLetterOrDigit(c))
+            {
+                continue;
+            }
+
+            chars[count++] = char.ToUpperInvariant(c);
+            if (count == chars.Length)
+            {
+                break;
+            }
+        }
+
+        return count == 0 ? "?" : new string(chars[..count]);
+    }
+
     /// Severity of a transient status message. Drives the color of the
     /// notification bar and is the only thing the caller has to decide.
     internal enum NotificationLevel
@@ -74,18 +102,22 @@ internal static class TuiHelpers
 
     /// Build a Scheme whose Normal attribute matches the requested
     /// notification level. Intended for the bottom status bar Label.
+    /// HighContrast theme uses StandardColor 16-color terminal codes for
+    /// fidelity on bare terminals; Default theme uses winget-tui's truecolor
+    /// palette via WingetTuiTheme.
     internal static Scheme CreateStatusScheme(NotificationLevel level)
     {
+        if (CurrentTheme != AppTheme.HighContrast)
+        {
+            return WingetTuiTheme.CreateStatusScheme(level);
+        }
+
         var (fg, bg) = level switch
         {
-            NotificationLevel.Success when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Green),
-            NotificationLevel.Warn when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.Yellow),
-            NotificationLevel.Error when CurrentTheme == AppTheme.HighContrast => (StandardColor.White, StandardColor.Red),
             NotificationLevel.Success => (StandardColor.Black, StandardColor.Green),
             NotificationLevel.Warn => (StandardColor.Black, StandardColor.Yellow),
             NotificationLevel.Error => (StandardColor.White, StandardColor.Red),
-            _ when CurrentTheme == AppTheme.HighContrast => (StandardColor.Black, StandardColor.White),
-            _ => (StandardColor.White, StandardColor.Black),
+            _ => (StandardColor.Black, StandardColor.White),
         };
         var normal = new Attribute(fg, bg);
         return new Scheme
@@ -218,7 +250,7 @@ internal static class TuiHelpers
         }
     }
 
-    internal static void ConfigureReadOnlyPane(TextView view, string schemeName, bool wordWrap = true)
+    internal static void ConfigureReadOnlyPane(Editor view, string schemeName, bool wordWrap = true)
     {
         view.ReadOnly = true;
         view.WordWrap = wordWrap;
@@ -261,30 +293,34 @@ internal static class TuiHelpers
         (IsWarpTerminal
             ? "Ctrl+J, →, p, v  preview when results are focused\n"
             : "Enter, →, p, v  preview when results are focused\n") +
-        "Owner / Agent / Limit  refine the next search before you submit it\n" +
-        "h  toggle hidden-dir access for preview/install\n" +
+        "f  open Discover filters (owner, agent, limit, hidden dirs)\n" +
         "i  install the selected search result\n" +
         "o  open the skill (GitHub URL or local folder)\n" +
         "e  toggle raw / rendered SKILL.md preview\n" +
         "Rendered markdown  Ctrl+A selects all, Ctrl+C copy selection, click links to open\n" +
         "l  show or hide logs\n" +
         "d  open Doctor\n" +
-        "I  show installed skills\n" +
-        "u  update installed skills\n" +
+        "I  open the advanced install wizard\n" +
+        "2  show installed skills\n" +
+        "3  show the Changes workspace\n" +
+        "u  open Changes workspace\n" +
         "c  review cleanup candidates\n" +
-        "   in Installed: / returns to Search, f filters, x removes the selected skill\n" +
+        "   in Installed: / returns to Discover, f filters, x removes the selected skill\n" +
         "F1 show this help\n" +
         "q  quit";
 
     /// Compact single-line hint shown in the welcome/preview pane. Same
     /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
     internal static string WelcomeHint { get; } =
-        (IsWarpTerminal ? "/ search · Ctrl+J/p/v preview" : "/ search · →/p/v preview")
-        + " · owner/agent filters · h hidden dirs · i install · o open · e raw/render · rendered preview Ctrl+C copy + links · l logs · d doctor · I installed (/ search, f filter) · u update · c cleanup · F1 help · q quit";
+        "Enter a query and press Enter to search.\n\n"
+        + "Press f to edit filters. Press ? for help and all keys.";
 
     internal static string PreviewHint { get; } = IsWarpTerminal
-        ? "Select a result and press Ctrl+J, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening."
-        : "Select a result and press Enter, →, p, or v to preview. Rendered markdown supports Ctrl+C copy and link opening.";
+        ? "Select a skill to preview.\n\nPress Ctrl+J, p, or v to load the selected SKILL.md."
+        : "Select a skill to preview.\n\nPress Enter, →, p, or v to load the selected SKILL.md.";
+
+    internal static string NoResultsHint { get; } =
+        "No results.\n\nTry a different query or press f to edit filters.";
 
     internal static Shortcut[] WithMarkdownShortcuts(IEnumerable<Shortcut> shortcuts, bool includeOpenLink = true)
     {
@@ -299,30 +335,19 @@ internal static class TuiHelpers
         return list.ToArray();
     }
 
-    /// Create an explicit scheme for editable text inputs using only basic
-    /// ANSI colors that render correctly on 16-, 256-, and true-color terminals.
+    /// Create an explicit scheme for editable text inputs. HighContrast keeps
+    /// 16-color StandardColor codes for terminal-default fidelity; the Default
+    /// theme uses winget-tui's truecolor palette via WingetTuiTheme.
     private static Scheme CreateEditableInputScheme()
     {
-        Attribute normal;
-        Attribute focus;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            return WingetTuiTheme.CreateEditableInputScheme();
         }
-        else
-        {
-            // Distinct background (DarkBlue) so unfocused text fields are
-            // visually separated from the surrounding FrameView's black fill.
-            // Disabled state uses Black bg so the field visually "blends out"
-            // — otherwise an empty disabled field is indistinguishable from an
-            // empty enabled one.
-            normal = new Attribute(StandardColor.White, StandardColor.DarkBlue);
-            focus = new Attribute(StandardColor.Black, StandardColor.Cyan);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         return new Scheme
         {
@@ -343,21 +368,14 @@ internal static class TuiHelpers
     /// Create an explicit scheme for read-only panes (preview, logs).
     private static Scheme CreateReadOnlyPaneScheme()
     {
-        Attribute normal;
-        Attribute focus;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            return WingetTuiTheme.CreateReadOnlyPaneScheme();
         }
-        else
-        {
-            normal = new Attribute(StandardColor.White, StandardColor.Black);
-            focus = new Attribute(StandardColor.White, StandardColor.Blue);
-            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var focus = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         return new Scheme
         {
@@ -418,9 +436,12 @@ internal static class TuiHelpers
 
         for (var i = 0; i < table.Table.Columns; i++)
         {
+            // Headers may now carry trailing sort glyphs ("Name ↓") — match
+            // on the leading token so glyphs don't break style assignment.
             var header = table.Table.ColumnNames[i];
+            var leading = header.Split(' ', 2)[0];
             var cs = style.GetOrCreateColumnStyle(i);
-            switch (header)
+            switch (leading)
             {
                 case "Skill":
                 case "Name":
@@ -443,24 +464,19 @@ internal static class TuiHelpers
     }
 
     /// Apply a high-contrast color scheme to a TableView so the selected
-    /// row is clearly visible (inverted colors for Focus state).
+    /// row is clearly visible (inverted colors for Focus state). Default theme
+    /// uses the winget-tui Accent gold; HighContrast keeps StandardColor codes.
     internal static void ConfigureTableScheme(TableView table)
     {
-        Attribute normal;
-        Attribute selected;
-        Attribute disabled;
-        if (CurrentTheme == AppTheme.HighContrast)
+        if (CurrentTheme != AppTheme.HighContrast)
         {
-            normal = new Attribute(StandardColor.Black, StandardColor.White);
-            selected = new Attribute(StandardColor.Black, StandardColor.Yellow);
-            disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
+            table.SetScheme(WingetTuiTheme.CreateTableScheme());
+            return;
         }
-        else
-        {
-            normal = new Attribute(StandardColor.White, StandardColor.Black);
-            selected = new Attribute(StandardColor.Black, StandardColor.Cyan);
-            disabled = new Attribute(StandardColor.Gray, StandardColor.Black);
-        }
+
+        var normal = new Attribute(StandardColor.Black, StandardColor.White);
+        var selected = new Attribute(StandardColor.Black, StandardColor.Yellow);
+        var disabled = new Attribute(StandardColor.DarkGray, StandardColor.White);
 
         table.SetScheme(new Scheme
         {
@@ -476,6 +492,26 @@ internal static class TuiHelpers
             Disabled = disabled,
             Code = normal,
         });
+    }
+
+    /// Return the three drawing attributes used by StatusStripView.
+    /// Default theme uses the winget-tui truecolor palette; HighContrast uses
+    /// 16-color StandardColor codes so bare terminals keep legible contrast.
+    internal static (Attribute Strip, Attribute StripText, Attribute StripAccent) GetStatusStripAttributes()
+    {
+        if (CurrentTheme != AppTheme.HighContrast)
+        {
+            return (
+                new Attribute(WingetTuiTheme.TextSecondary, WingetTuiTheme.Surface),
+                new Attribute(WingetTuiTheme.TextPrimary,   WingetTuiTheme.Surface),
+                new Attribute(WingetTuiTheme.Accent,        WingetTuiTheme.Surface)
+            );
+        }
+        return (
+            new Attribute(StandardColor.Gray,   StandardColor.Black),
+            new Attribute(StandardColor.White,  StandardColor.Black),
+            new Attribute(StandardColor.Yellow, StandardColor.Black)
+        );
     }
 
     internal static void ConfigureTableChrome(TableView table)
@@ -529,5 +565,15 @@ internal static class TuiHelpers
     {
         if (row < 0) return;
         table.SetSelection(0, row, false);
+    }
+
+    /// Apply a focused or unfocused border style to a FrameView. The focused
+    /// pane gets a Heavy border and the accent-colored Base scheme; unfocused
+    /// panes get a Rounded border and the default Base scheme. This makes the
+    /// currently active pane unmistakable without requiring an extra overlay.
+    internal static void ApplyFocusFrameStyle(FrameView frame, bool hasFocus)
+    {
+        frame.BorderStyle = hasFocus ? LineStyle.Heavy : LineStyle.Rounded;
+        frame.SchemeName = SchemeNames.Base;
     }
 }

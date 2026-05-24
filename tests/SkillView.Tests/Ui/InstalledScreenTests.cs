@@ -46,7 +46,7 @@ public sealed class InstalledScreenTests
     }
 
     [Fact]
-    public void RenderDetail_FormatsSummaryAndPackageMetadataAsMarkdownTables()
+    public void RenderDetail_FormatsSummaryAndPackageMetadataAsMarkdownLists()
     {
         var detail = InstalledScreen.RenderDetail(new InstalledSkill
         {
@@ -76,22 +76,24 @@ public sealed class InstalledScreenTests
                 InstalledAt: null,
                 UpdatedAt: null),
         });
-
         Assert.Contains("## Summary", detail);
-        Assert.Contains("| Field | Value |", detail);
-        Assert.Contains("| Path | `/skills/demo` |", detail);
-        Assert.Contains("| Scope | Global |", detail);
-        Assert.Contains("| Validity | ✅ Valid |", detail);
-        Assert.Contains("| Upstream | [https://example.test/upstream/demo](https://example.test/upstream/demo) |", detail);
+        Assert.Contains("- **Path:** `/skills/demo`", detail);
+        Assert.Contains("- **Location:** User", detail);
+        Assert.Contains("- **Source:** List", detail);
+        Assert.Contains("- **Health:** ✅ Valid", detail);
+        Assert.Contains("- **Upstream:** [https://example.test/upstream/demo](https://example.test/upstream/demo)", detail);
         Assert.Contains("## Package", detail);
-        Assert.Contains("| Source | `owner/repo` |", detail);
-        Assert.Contains("| Package URL | [https://example.test/owner/repo](https://example.test/owner/repo) |", detail);
+        Assert.Contains("- **Package source:** `owner/repo`", detail);
+        Assert.Contains("- **Package URL:** [https://example.test/owner/repo](https://example.test/owner/repo)", detail);
         Assert.Contains("## Description", detail);
         Assert.Contains("Example description", detail);
+        Assert.Contains("## Agents", detail);
+        Assert.Contains($"- {TuiHelpers.AgentIcon("copilot")} **copilot** — symlink", detail);
+        Assert.Contains("  Path: `/Users/test/.config/skills/demo`", detail);
     }
 
     [Fact]
-    public void RenderDetail_EscapesMarkdownTableCellsAndNormalizesNewlines()
+    public void RenderDetail_EscapesMarkdownListValuesAndNormalizesNewlines()
     {
         var detail = InstalledScreen.RenderDetail(new InstalledSkill
         {
@@ -121,16 +123,41 @@ public sealed class InstalledScreenTests
                 UpdatedAt: null),
         });
 
-        Assert.Contains("| Path | `` /skills/demo\\|`stable `` |", detail);
-        Assert.Contains("| Version | 1.2.3 beta |", detail);
+        Assert.Contains("- **Path:** `` /skills/demo\\|`stable ``", detail);
+        Assert.Contains("- **Version:** 1.2.3 beta", detail);
         Assert.Contains(
-            "| Upstream | [https://example.test/upstream\\|`demo](https://example.test/upstream%7C`demo) |",
+            "- **Upstream:** [https://example.test/upstream\\|`demo](https://example.test/upstream%7C`demo)",
             detail);
-        Assert.Contains("| Source | `` owner/repo\\|`fork `` |", detail);
+        Assert.Contains("- **Package source:** `` owner/repo\\|`fork ``", detail);
         Assert.Contains(
-            "| Package URL | [https://example.test/owner/repo\\|`fork](https://example.test/owner/repo%7C`fork) |",
+            "- **Package URL:** [https://example.test/owner/repo\\|`fork](https://example.test/owner/repo%7C`fork)",
             detail);
-        Assert.Contains("**copilot** | direct | `` /Users/test/.config/skills/demo` linked `` |", detail);
+        Assert.Contains($"- {TuiHelpers.AgentIcon("copilot")} **copilot** — direct", detail);
+        Assert.Contains("  Path: `` /Users/test/.config/skills/demo` linked ``", detail);
         Assert.DoesNotContain("1.2.3\nbeta", detail);
+    }
+
+    [Fact]
+    public void RenderDetail_OmitsUnsetOptionalMetadata()
+    {
+        var detail = InstalledScreen.RenderDetail(new InstalledSkill
+        {
+            Name = "demo",
+            ResolvedPath = "/skills/demo",
+            ScanRoot = "/skills",
+            Scope = Scope.User,
+            Agents = [],
+            FrontMatter = SkillFrontMatter.Empty,
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = false,
+            InstalledAt = null,
+            Package = null,
+        });
+
+        Assert.DoesNotContain("Tree SHA", detail);
+        Assert.DoesNotContain("Version", detail);
+        Assert.DoesNotContain("(unset)", detail);
     }
 }

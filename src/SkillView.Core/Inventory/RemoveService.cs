@@ -67,6 +67,28 @@ public sealed class RemoveService
         }
 
         var target = validation.ResolvedPath;
+        if (PathResolver.IsSymlink(target))
+        {
+            if (options.DryRun)
+            {
+                _logger.Info("remove.dryrun", $"would remove symlink {target}");
+                return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: true);
+            }
+
+            try
+            {
+                TryDeleteSymlink(target);
+                _logger.Info("remove", $"removed symlink {target}");
+                return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("remove", $"delete symlink {target} failed: {ex.Message}");
+                return new RemoveReport(false, target, 0, 0,
+                    ImmutableArray.Create($"{target}: {ex.Message}"), DryRun: false);
+            }
+        }
+
         if (!Directory.Exists(target))
         {
             _logger.Warn("remove", $"target missing at execute time: {target}");
@@ -174,6 +196,27 @@ public sealed class RemoveService
             DirectoriesDeleted: dirs,
             Errors: errors.ToImmutable(),
             DryRun: false);
+    }
+
+    private static void TryDeleteSymlink(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Directory.Delete(path, recursive: false);
+        }
+        catch (IOException)
+        {
+            Directory.Delete(path, recursive: false);
+        }
+
+        if (PathResolver.IsSymlink(path) || File.Exists(path) || Directory.Exists(path))
+        {
+            throw new IOException($"symlink '{path}' still exists after delete attempt");
+        }
     }
 
     public BatchRemoveReport RemoveMany(

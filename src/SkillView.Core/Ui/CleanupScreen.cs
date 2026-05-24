@@ -58,7 +58,7 @@ public sealed class CleanupScreen
         var header = new Label
         {
             X = 0, Y = 0,
-            Text = "Space toggles row.",
+            Text = BuildHeaderText(),
         };
 
         var table = new TableView
@@ -147,13 +147,8 @@ public sealed class CleanupScreen
         };
 
         var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Title = "Space", HelpText = "Toggle" },
-            new Shortcut { Title = "r", HelpText = "Remove" },
-            new Shortcut { Title = "i", HelpText = "Ignore" },
-            new Shortcut { Title = "x", HelpText = "Export" },
-            new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
-        ], includeOpenLink: false));
+            BuildShortcuts(),
+            includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, header, table, detail, status, statusBar);
 
@@ -200,17 +195,26 @@ public sealed class CleanupScreen
         {
             if (!checkedRows.Contains(i)) continue;
             var c = _candidates[i];
-            // For skill-backed candidates, run full validator. For empty dirs,
-            // build a synthetic `Allowed` validation (empty dir is safe when
-            // under a known scan root).
+            // For skill-backed candidates, run full validator. Non-skill cleanup
+            // candidates need synthetic validations because they don't look like
+            // install directories, but are still safe to remove when they stay
+            // inside known scan roots.
             RemoveValidator.RemoveValidation validation;
-            if (c.Skill is not null)
+            if (c.Kind == CleanupClassifier.CandidateKind.BrokenSymlink)
+            {
+                validation = ValidateBrokenSymlink(c.Path);
+            }
+            else if (c.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
+            {
+                validation = ValidateEmptyDir(c.Path);
+            }
+            else if (c.Skill is not null)
             {
                 validation = RemoveValidator.Validate(c.Skill, _scanRoots, _allSkills);
             }
             else
             {
-                validation = ValidateEmptyDir(c.Path);
+                validation = RefuseUnsupportedCandidate(c);
             }
             if (!validation.Allowed || validation.RequiresSecondConfirm)
             {
@@ -319,7 +323,7 @@ public sealed class CleanupScreen
     internal static string RenderDetail(CleanupClassifier.Candidate c)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("## Candidate");
+        sb.AppendLine("## Selected");
         sb.AppendLine();
         sb.AppendLine("| Field | Value |");
         sb.AppendLine("| --- | --- |");
@@ -329,12 +333,27 @@ public sealed class CleanupScreen
         if (c.Skill is { } s)
         {
             sb.AppendLine();
-            sb.AppendLine("## Installed skill");
+            sb.AppendLine("## Skill");
             sb.AppendLine();
             sb.AppendLine(InstalledScreen.RenderDetail(s));
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
+
+    internal static Shortcut[] BuildShortcutsForTests() => BuildShortcuts();
+
+    internal static string BuildHeaderTextForTests() => BuildHeaderText();
+
+    private static Shortcut[] BuildShortcuts() =>
+    [
+        new Shortcut { Title = "Space", HelpText = "Select" },
+        new Shortcut { Title = "r", HelpText = "Remove" },
+        new Shortcut { Title = "i", HelpText = "Ignore" },
+        new Shortcut { Title = "x", HelpText = "Export" },
+        new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+    ];
+
+    private static string BuildHeaderText() => "Select with Space.";
 
     private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)
     {
@@ -359,12 +378,86 @@ public sealed class CleanupScreen
                 RemoveValidator.ErrorKind.ContainsGitDirectory,
                 $"'{path}' contains .git"));
         }
+        if (PathResolver.IsSymlink(path))
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                $"'{path}' is now a symlink"));
+        }
+        if (!System.IO.Directory.Exists(path))
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                $"'{path}' is no longer a directory"));
+        }
+        else
+        {
+            try
+            {
+                if (System.IO.Directory.EnumerateFileSystemEntries(path).Any())
+                {
+                    errors.Add(new RemoveValidator.Error(
+                        RemoveValidator.ErrorKind.NotASkillDirectory,
+                        $"'{path}' is no longer empty"));
+                    }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add(new RemoveValidator.Error(
+                    RemoveValidator.ErrorKind.NotASkillDirectory,
+                    $"'{path}' could not be inspected: {ex.Message}"));
+            }
+        }
+
         return new RemoveValidator.RemoveValidation(
             errors.ToImmutable(),
             ImmutableArray<RemoveValidator.Warning>.Empty,
             path,
             ImmutableArray<string>.Empty);
     }
+
+    private RemoveValidator.RemoveValidation ValidateBrokenSymlink(string path)
+    {
+        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
+        var inside = false;
+        foreach (var root in _scanRoots)
+        {
+            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
+        }
+        if (!inside)
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.OutsideKnownRoots,
+                $"'{path}' not inside any scan root"));
+        }
+        if (!PathResolver.IsSymlink(path))
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                $"'{path}' is no longer a symlink"));
+        }
+        else if (PathResolver.Resolve(path) is not null)
+        {
+            errors.Add(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                $"'{path}' is no longer broken"));
+        }
+
+        return new RemoveValidator.RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            path,
+            ImmutableArray<string>.Empty);
+    }
+
+    private static RemoveValidator.RemoveValidation RefuseUnsupportedCandidate(CleanupClassifier.Candidate candidate) =>
+        new(
+            ImmutableArray.Create(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                $"cleanup candidate kind '{candidate.Kind}' requires installed-skill metadata")),
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            candidate.Path,
+            ImmutableArray<string>.Empty);
 
     private sealed class ColumnWidths
     {

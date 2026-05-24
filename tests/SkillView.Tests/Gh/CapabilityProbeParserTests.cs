@@ -92,10 +92,9 @@ public class CapabilityProbeParserTests
     [Fact]
     public void ProbedTokens_match_current_gh_skill()
     {
-        // Sanity-check the static table against the flags actually shipped in
-        // the current `gh skill` (2.92). When upstream adds --repo-path /
-        // --yes / --json / `gh skill list`, restore those probes in
-        // CapabilityProbeParser and add assertions here.
+        // Sanity-check the static table against the flags shipped in the
+        // current `gh skill`. The `list` subcommand is being added in
+        // cli/cli PR #13418 with --json / --agent / --scope / --dir.
         Assert.Contains("--allow-hidden-dirs", CapabilityProbeParser.ProbedTokens["install"]);
         Assert.Contains("--from-local", CapabilityProbeParser.ProbedTokens["install"]);
         Assert.Contains("--dry-run", CapabilityProbeParser.ProbedTokens["update"]);
@@ -103,8 +102,10 @@ public class CapabilityProbeParserTests
         Assert.Contains("--owner", CapabilityProbeParser.ProbedTokens["search"]);
         Assert.Contains("--limit", CapabilityProbeParser.ProbedTokens["search"]);
         Assert.Contains("--allow-hidden-dirs", CapabilityProbeParser.ProbedTokens["preview"]);
-        // Subcommand absent from gh 2.92 — no probe for it today.
-        Assert.False(CapabilityProbeParser.ProbedTokens.ContainsKey("list"));
+        Assert.Contains("--json", CapabilityProbeParser.ProbedTokens["list"]);
+        Assert.Contains("--agent", CapabilityProbeParser.ProbedTokens["list"]);
+        Assert.Contains("--scope", CapabilityProbeParser.ProbedTokens["list"]);
+        Assert.Contains("--dir", CapabilityProbeParser.ProbedTokens["list"]);
     }
 
     [Fact]

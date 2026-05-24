@@ -12,10 +12,10 @@ public class CliDispatcherParserTests
     // --- list ------------------------------------------------------------
 
     [Fact]
-    public void List_ParsesScopeAgentPathAndJson()
+    public void List_ParsesScopeAgentDirAndJson()
     {
         var opts = CliDispatcher.ParseListArgs(
-            new[] { "--scope=user", "--agent", "claude", "--path=/p", "--json" },
+            new[] { "--scope=user", "--agent", "claude", "--dir=/p", "--json" },
             out var json);
         Assert.True(json);
         Assert.Equal("user", opts.scope);

@@ -106,6 +106,39 @@ public sealed class SkillViewAppTests
         }),
     };
 
+    private static InventorySnapshot SnapshotWithInstalledSkills() => InventorySnapshot.Empty with
+    {
+        Skills = ImmutableArray.Create(
+            new InstalledSkill
+            {
+                Name = "alpha",
+                ResolvedPath = "/skills/alpha",
+                ScanRoot = "/skills",
+                Scope = Scope.User,
+                Agents = ImmutableArray.Create(new AgentMembership("github-copilot", "/skills/alpha", false)),
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.FsScan,
+                Ignored = false,
+                IsSymlinked = false,
+                InstalledAt = null,
+            },
+            new InstalledSkill
+            {
+                Name = "beta",
+                ResolvedPath = "/project/skills/beta",
+                ScanRoot = "/project/skills",
+                Scope = Scope.Project,
+                Agents = ImmutableArray.Create(new AgentMembership("claude", "/project/skills/beta", false)),
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.MissingSkillMd,
+                Provenance = Provenance.CliList,
+                Ignored = false,
+                IsSymlinked = true,
+                InstalledAt = null,
+            }),
+    };
+
     [Fact]
     public void ShouldOpenInstalledOnStartup_ReturnsFalse_ForEmptyInventory()
     {
@@ -207,26 +240,172 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void BuildUi_ExposesHiddenDirToggleOnSearchScreen()
+    public void BuildUi_HidesDefaultDiscoverFilterSummary()
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
-        Assert.Contains(
-            Descendants(window).OfType<CheckBox>(),
-            box => box.Text.ToString().Contains("hidden", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            Descendants(window).OfType<Label>(),
+            label => label.Text.ToString().Contains("Filters:", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BuildUi_ExposesAgentFilterOnSearchScreen()
+    public void BuildUi_HidesAdvancedDiscoverFiltersBehindSummary()
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
         Assert.NotNull(app.AgentFieldForTests);
-        Assert.Contains(
+        Assert.DoesNotContain(
             Descendants(window).OfType<Label>(),
             label => string.Equals(label.Text.ToString(), "Agent:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildUi_SeedsDiscoverDetailFeedback()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.Contains(
+            Descendants(window).OfType<Label>(),
+            label => label.Text.ToString().Contains("[f] Filters", StringComparison.Ordinal)
+                && label.Text.ToString().Contains("[?] Help", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            Descendants(window).OfType<Label>(),
+            label => label.Text.ToString().Contains("Remote preview", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildUi_DiscoverFooterAvoidsRepeatingDetailActions()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var hints = app.CurrentHintsForTests;
+
+        Assert.Equal(3, hints.Count);
+        Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filters");
+        Assert.Contains(hints, hint => hint.Key == "1/2/3" && hint.Label == "Tabs");
+        Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
+        Assert.DoesNotContain(hints, hint => hint.Key == "/" && hint.Label == "Search");
+        Assert.DoesNotContain(hints, hint => hint.Key == "Enter" && hint.Label == "Preview");
+        Assert.DoesNotContain(hints, hint => hint.Key == "i" && hint.Label == "Install");
+        Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
+        Assert.DoesNotContain(hints, hint => hint.Key == "q" && hint.Label == "Quit");
+    }
+
+    [Fact]
+    public void BuildUi_InstalledHints_ShowOnlyPrimaryActions()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        var hints = app.CurrentHintsForTests;
+
+        Assert.Equal(4, hints.Count);
+        Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filter");
+        Assert.Contains(hints, hint => hint.Key == "x" && hint.Label == "Remove");
+        Assert.Contains(hints, hint => hint.Key == "1/2/3" && hint.Label == "Tabs");
+        Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
+        Assert.DoesNotContain(hints, hint => hint.Key == "/" && hint.Label == "Search");
+        Assert.DoesNotContain(hints, hint => hint.Key == "s" && hint.Label == "Sort");
+        Assert.DoesNotContain(hints, hint => hint.Key == "P" && hint.Label == "Pins");
+        Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
+        Assert.DoesNotContain(hints, hint => hint.Key == "q" && hint.Label == "Quit");
+    }
+
+    [Fact]
+    public void BuildUi_HidesContextBarWhenItHasNoMeaningfulContent()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.False(app.ContextBarForTests!.Visible);
+    }
+
+    [Fact]
+    public void DiscoverSelectionChange_ClearsPreviewFailureAndRestoresSelectionPlaceholder()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.LoadSearchResultsForTests(
+        [
+            new SearchResultSkill("Claude Web Server LLM", null, null, "diegosouzapw/awesome-omni-skill", "claude-web-server-llm", null),
+            new SearchResultSkill("Web multi search", null, null, "MARUCIE/openclaw-foundry", "web-multi-search", null),
+        ]);
+        app.SetPreviewTextForTests("(preview failed)\n\nboom");
+
+        app.ResultsTableForTests!.SetSelectedRow(1);
+
+        Assert.DoesNotContain("preview failed", app.PreviewTextForTests, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Selected: MARUCIE/openclaw-foundry/web-multi-search", app.PreviewTextForTests);
+    }
+
+    [Fact]
+    public void DiscoverSelectionChange_ClearsLoadedPreviewAndRestoresSelectionPlaceholder()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.LoadSearchResultsForTests(
+        [
+            new SearchResultSkill("Claude Web Server LLM", null, null, "diegosouzapw/awesome-omni-skill", "claude-web-server-llm", null),
+            new SearchResultSkill("Web multi search", null, null, "MARUCIE/openclaw-foundry", "web-multi-search", null),
+        ]);
+        app.SetPreviewTextForTests("## Preview\n\nLoaded markdown for the first skill.");
+
+        app.ResultsTableForTests!.SetSelectedRow(1);
+
+        Assert.DoesNotContain("Loaded markdown for the first skill.", app.PreviewTextForTests, StringComparison.Ordinal);
+        Assert.Contains("Selected: MARUCIE/openclaw-foundry/web-multi-search", app.PreviewTextForTests);
+    }
+
+    [Fact]
+    public void RenderSearchMetadata_KeepsSummaryCompactByOmittingDescriptionParagraph()
+    {
+        var rendered = SkillViewApp.RenderSearchMetadata(
+            new SearchResultSkill(
+                Description: "FastAPI server for local Claude-powered search workflows.",
+                Namespace: null,
+                Path: null,
+                Repo: "owner/repo",
+                SkillName: "web-search",
+                Stars: 42),
+            LoggedInAuth());
+
+        Assert.Contains("- **Name:** web-search", rendered);
+        Assert.Contains("- **Repo:** [owner/repo]", rendered);
+        Assert.DoesNotContain("FastAPI server for local Claude-powered search workflows.", rendered);
+        Assert.DoesNotContain("**About:**", rendered, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildDiscoverPreviewBody_PlacesDescriptionAndPlaceholderInOneScrollableBody()
+    {
+        var rendered = SkillViewApp.BuildDiscoverPreviewBodyForTests(
+            description: "FastAPI server for local Claude-powered search workflows.",
+            previewText: "Selected: owner/repo/web-search\n\nSelect a skill to preview.",
+            includeDescription: true);
+
+        Assert.Contains("FastAPI server for local Claude-powered search workflows.", rendered);
+        Assert.Contains("Selected: owner/repo/web-search", rendered);
+        Assert.Contains("---", rendered);
+    }
+
+    [Fact]
+    public void BuildDiscoverPreviewBody_DoesNotRepeatDescriptionAfterPreviewLoads()
+    {
+        var rendered = SkillViewApp.BuildDiscoverPreviewBodyForTests(
+            description: "FastAPI server for local Claude-powered search workflows.",
+            previewText: "## Preview\n\nLoaded markdown body.",
+            includeDescription: false);
+
+        Assert.DoesNotContain("FastAPI server for local Claude-powered search workflows.", rendered);
+        Assert.Equal("## Preview\n\nLoaded markdown body.", rendered);
     }
 
     [Fact]
@@ -235,9 +414,37 @@ public sealed class SkillViewAppTests
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('/'));
 
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
         Assert.True(app.QueryFieldForTests!.HasFocus);
+    }
+
+    [Fact]
+    public void BuildUi_WindowArrowShortcutCyclesTabsEvenWhenQueryFieldHasFocus()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        _ = app.QueryFieldForTests!.SetFocus();
+        _ = window.NewKeyDownEvent(new Key(KeyCode.CursorRight));
+
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_ReturningToDiscover_RestoresLastFocusedControl()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        _ = app.ResultsTableForTests!.SetFocus();
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        _ = window.NewKeyDownEvent(new Key('1'));
+
+        Assert.True(app.ResultsTableForTests.HasFocus);
+        Assert.False(app.QueryFieldForTests!.HasFocus);
     }
 
     [Fact]
@@ -277,9 +484,25 @@ public sealed class SkillViewAppTests
                 Stars: 42),
             LoggedInAuth("ghe.example.com"));
 
-        Assert.Contains("**Repo**  : [owner/repo](https://ghe.example.com/owner/repo)", metadata);
+        Assert.Contains("- **Name:** demo", metadata);
+        Assert.Contains("- **Repo:** [owner/repo](https://ghe.example.com/owner/repo)", metadata);
+        Assert.Contains("- **Stars:** ★ 42", metadata);
+        Assert.DoesNotContain("desc", metadata);
+        Assert.DoesNotContain("**About:**", metadata, StringComparison.Ordinal);
         Assert.DoesNotContain("https://github.com/owner/repo", metadata);
         Assert.DoesNotContain("**URL**", metadata);
+    }
+
+    [Fact]
+    public void BuildUi_DiscoverContextBar_DoesNotRepeatFilterSummary()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var contextBar = app.ContextBarForTests!.CurrentStateForTests;
+
+        Assert.Equal("Discover", contextBar.Workspace);
+        Assert.Null(contextBar.FilterLabel);
     }
 
     [Theory]
@@ -426,5 +649,136 @@ public sealed class SkillViewAppTests
         {
             ConfigurationManager.Disable(resetToHardCodedDefaults: true);
         }
+    }
+
+    [Fact]
+    public void BuildUi_DefaultsToDiscoverTab()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_ExposesChangesTabHook()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        Assert.NotNull(app.ChangesTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_TabBarUsesWorkflowFirstLabels()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var tabBar = app.TabBarForTests;
+        Assert.NotNull(tabBar);
+        var labels = tabBar!.TabLabelsForTests;
+        Assert.Contains("Discover", labels);
+        Assert.Contains("Installed", labels);
+        Assert.Contains("Changes", labels);
+        Assert.DoesNotContain("Search", labels);
+        Assert.DoesNotContain("Updates", labels);
+    }
+
+    [Fact]
+    public void ContextBar_IsCreatedDuringBuildUi()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        var contextBar = app.ContextBarForTests;
+        Assert.NotNull(contextBar);
+    }
+
+    [Fact]
+    public void ContextBar_UpdatesWhenTabChanges()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        // Initially on Discover tab
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+
+        // Switch to Installed tab should update context bar
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+
+        // Switch back to Discover should also update
+        app.ForceActiveTabForTests(SkillViewTab.Discover);
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void InstalledSelectionChange_KeepsShellChromeFocusedOnFiltersInsteadOfRepeatingDetailMetadata()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.InstalledTabForTests!.LoadSeeded(SnapshotWithInstalledSkills());
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+
+        app.InstalledTabForTests.SetSelectedRowForTests(1);
+
+        var contextBar = app.ContextBarForTests!.CurrentStateForTests;
+        Assert.Null(contextBar.LocationLabel);
+        Assert.Null(contextBar.ProvenanceLabel);
+        Assert.Null(contextBar.HealthLabel);
+        Assert.Equal(
+            $"Agents {InstalledInventoryFormatter.DescribeAgents(app.InstalledTabForTests.GetSelectedSkill()!)}",
+            app.StatusStripForTests!.LeftBadgesForTests);
+    }
+
+    [Fact]
+    public void ContextBar_FormatOmitsWorkspaceOnlyCopy()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: null,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: null);
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.Equal(string.Empty, rendered);
+    }
+
+    [Fact]
+    public void ContextBar_FormatIncludesAgentLabelWhenPresent()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: "agent: copilot",
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: null);
+
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.NotEmpty(rendered);
+        Assert.Contains("agent: copilot", rendered);
+    }
+
+    [Fact]
+    public void ContextBar_FormatIncludesFilterLabelWhenPresent()
+    {
+        var state = new ContextBarState(
+            Workspace: "Discover",
+            AgentLabel: null,
+            LocationLabel: null,
+            ProvenanceLabel: null,
+            HealthLabel: null,
+            FilterLabel: "Filters: all owners · any agent · limit 30 · hidden dirs on");
+
+        var rendered = ContextBarView.FormatForTests(state);
+
+        Assert.NotEmpty(rendered);
+        Assert.Contains("Filters:", rendered);
+        Assert.Contains("hidden dirs on", rendered);
     }
 }

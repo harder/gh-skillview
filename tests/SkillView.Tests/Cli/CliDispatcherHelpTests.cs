@@ -20,6 +20,8 @@ public class CliDispatcherHelpTests
         Assert.Contains("## Usage", stdout);
         Assert.Contains("| Global flag | What it does |", stdout);
         Assert.Contains("| Subcommand | Purpose |", stdout);
+        Assert.Contains("| `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |", stdout);
+        Assert.DoesNotContain("`--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs`", stdout);
         Assert.Contains("Homebrew and WinGet scaffolding", stdout);
         Assert.Contains("automation-friendly", stdout);
     }
@@ -50,11 +52,12 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("Terminal.Gui", stdout, StringComparison.Ordinal);
-        Assert.Contains("2.1.0", stdout, StringComparison.Ordinal);
+        Assert.Contains("2.2.2", stdout, StringComparison.Ordinal);
     }
 
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string processPath, params string[] args)
     {
+        await CliConsoleCapture.Gate.WaitAsync().ConfigureAwait(false);
         var originalOut = Console.Out;
         using var writer = new StringWriter();
         Console.SetOut(writer);
@@ -69,6 +72,7 @@ public class CliDispatcherHelpTests
         finally
         {
             Console.SetOut(originalOut);
+            CliConsoleCapture.Gate.Release();
         }
     }
 }

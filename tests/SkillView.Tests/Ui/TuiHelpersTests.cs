@@ -1,8 +1,11 @@
 using SkillView.Inventory;
 using SkillView.Ui;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.Text;
+using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Xunit;
 
@@ -90,9 +93,10 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void HelpText_DocumentsHiddenDirToggle()
+    public void HelpText_DocumentsDiscoverFilters()
     {
-        Assert.Contains("hidden-dir", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Discover filters", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hidden dirs", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -110,17 +114,24 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void WelcomeHint_DocumentsRenderedMarkdownCopySupport()
+    public void WelcomeHint_DocumentsSearchAndFilters()
     {
-        Assert.Contains("Ctrl+C", TuiHelpers.WelcomeHint);
-        Assert.Contains("copy", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Enter", TuiHelpers.WelcomeHint);
+        Assert.Contains("filters", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void PreviewHint_DocumentsRenderedMarkdownCopySupport()
+    public void WelcomeHint_DocumentsHelpEntryPoint()
     {
-        Assert.Contains("Ctrl+C", TuiHelpers.PreviewHint);
-        Assert.Contains("copy", TuiHelpers.PreviewHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("?", TuiHelpers.WelcomeHint);
+        Assert.Contains("keys", TuiHelpers.WelcomeHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PreviewHint_ExplainsHowToLoadTheSelectedSkill()
+    {
+        Assert.Contains("Select a skill", TuiHelpers.PreviewHint);
+        Assert.Contains("SKILL.md", TuiHelpers.PreviewHint);
     }
 
     [Fact]
@@ -156,10 +167,12 @@ public sealed class TuiHelpersTests
     }
 
     [Theory]
-    [InlineData("copilot", "C")]
-    [InlineData("github-copilot", "C")]
-    [InlineData("claude-code", "⟁")]
-    [InlineData("gemini-cli", "✦")]
+    [InlineData("copilot", "GHC")]
+    [InlineData("github-copilot", "GHC")]
+    [InlineData("claude-code", "CLD")]
+    [InlineData("gemini-cli", "GMI")]
+    [InlineData("cursor", "CSR")]
+    [InlineData("codex", "CDX")]
     public void AgentIcon_SupportsCurrentAgentIds(string agentId, string expected)
     {
         Assert.Equal(expected, TuiHelpers.AgentIcon(agentId));
@@ -200,18 +213,78 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void SkillDetailPaneView_UsesEditorViews_ForRawPreviewAndLogs()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        Assert.IsType<Editor>(pane.PreviewRawPane);
+        Assert.IsType<Editor>(pane.LogPane);
+    }
+
+    [Fact]
+    public void SkillDetailPaneView_UsesSingleContinuousOuterPane()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        Assert.Equal(LineStyle.Single, pane.BorderStyle);
+        Assert.Equal(LineStyle.None, pane.MetadataFrame.BorderStyle);
+        Assert.Equal(LineStyle.None, pane.PreviewFrame.BorderStyle);
+        Assert.Equal(string.Empty, pane.MetadataFrame.Title.ToString());
+        Assert.Equal(string.Empty, pane.PreviewFrame.Title.ToString());
+    }
+
+    [Fact]
+    public void SetMetadataContent_UpdatesMetadataPaneText()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+        const string markdown = "**name**: my-skill\n\n**repo**: owner/repo";
+
+        pane.SetMetadataContent(markdown);
+
+        Assert.Equal(markdown, pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataContent_Null_ResetsToPlaceholder()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        pane.SetMetadataContent(null);
+
+        Assert.Equal("_Select a skill to preview._", pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataChips_RoutesThrough_SetMetadataContent()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+
+        pane.SetMetadataChips("Claude", "Copilot");
+
+        Assert.Equal("**Claude**  **Copilot**", pane.MetadataPane.Text);
+    }
+
+    [Fact]
+    public void SetMetadataChips_NoArgs_ResetsToPlaceholder()
+    {
+        var pane = new SkillDetailPaneView("actions", "welcome");
+        pane.SetMetadataChips("something");  // set first
+
+        pane.SetMetadataChips();  // then clear
+
+        Assert.Equal("_Select a skill to preview._", pane.MetadataPane.Text);
+    }
+
+    [Fact]
     public void ConfigureReadOnlyPane_SetsReadableDefaults()
     {
-        var view = new TextView
-        {
-            ReadOnly = false,
-            WordWrap = false,
-        };
+        var view = new Editor();
 
         TuiHelpers.ConfigureReadOnlyPane(view, SkillViewStyling.DialogSchemeName);
 
         Assert.True(view.ReadOnly);
         Assert.True(view.WordWrap);
+        Assert.True(view.ViewportSettings.HasFlag(ViewportSettingsFlags.HasVerticalScrollBar));
         Assert.Equal(SkillViewStyling.DialogSchemeName, view.SchemeName);
     }
 
@@ -326,6 +399,36 @@ public sealed class TuiHelpersTests
         TuiHelpers.ConfigureTableKeyBindings(table);
 
         Assert.Null(table.CollectionNavigator);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_SetsHeavyBorderWhenFocused()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: true);
+
+        Assert.Equal(LineStyle.Heavy, frame.BorderStyle);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_SetsRoundedBorderWhenUnfocused()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: false);
+
+        Assert.Equal(LineStyle.Rounded, frame.BorderStyle);
+    }
+
+    [Fact]
+    public void ApplyFocusFrameStyle_AlwaysSetsBaseSchemeName()
+    {
+        var frame = new FrameView();
+
+        TuiHelpers.ApplyFocusFrameStyle(frame, hasFocus: true);
+
+        Assert.Equal(SkillViewStyling.BaseSchemeName, frame.SchemeName);
     }
 
     private sealed class TestMarkdown : Markdown

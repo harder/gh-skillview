@@ -31,6 +31,7 @@ public sealed record CapabilityProfile
     public bool HasSkillList => ListSubcommandPresent && ListFlags.Contains("--json");
     public bool SupportsListAgent => ListFlags.Contains("--agent");
     public bool SupportsListScope => ListFlags.Contains("--scope");
+    public bool SupportsListDir => ListFlags.Contains("--dir");
     public bool SupportsSearchJson => SearchFlags.Contains("--json");
     public bool SupportsSearchOwner => SearchFlags.Contains("--owner");
     public bool SupportsSearchLimit => SearchFlags.Contains("--limit");
