@@ -146,7 +146,7 @@ public sealed class CleanupScreenTests
         var missingTarget = Path.Combine(root, "missing-target");
         var brokenLink = Path.Combine(root, "broken-link");
         Directory.CreateSymbolicLink(brokenLink, missingTarget);
-        File.Delete(brokenLink);
+        DeletePath(brokenLink);
         Directory.CreateDirectory(brokenLink);
         File.WriteAllText(Path.Combine(brokenLink, "added.txt"), "real directory now");
 
@@ -356,5 +356,17 @@ public sealed class CleanupScreenTests
         var method = typeof(CleanupScreen).GetMethod("DoRemove", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(screen, [new HashSet<int>(checkedRows), status]);
+    }
+
+    private static void DeletePath(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (UnauthorizedAccessException) when (PathResolver.IsSymlink(path))
+        {
+            Directory.Delete(path);
+        }
     }
 }
