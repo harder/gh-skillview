@@ -5,23 +5,15 @@ class Skillview < Formula
   license "MIT"
 
   on_macos do
-    if Hardware::CPU.arm?
-      url "{{URL_DARWIN_ARM64}}"
-      sha256 "{{SHA_DARWIN_ARM64}}"
-    else
-      url "{{URL_DARWIN_X64}}"
-      sha256 "{{SHA_DARWIN_X64}}"
-    end
+    odie "SkillView Homebrew packages currently support Apple Silicon only." unless Hardware::CPU.arm?
+    url "{{URL_DARWIN_ARM64}}"
+    sha256 "{{SHA_DARWIN_ARM64}}"
   end
 
   on_linux do
-    if Hardware::CPU.arm?
-      url "{{URL_LINUX_ARM64}}"
-      sha256 "{{SHA_LINUX_ARM64}}"
-    else
-      url "{{URL_LINUX_X64}}"
-      sha256 "{{SHA_LINUX_X64}}"
-    end
+    odie "SkillView Homebrew packages currently support x86_64 Linux only." unless Hardware::CPU.intel?
+    url "{{URL_LINUX_X64}}"
+    sha256 "{{SHA_LINUX_X64}}"
   end
 
   def install

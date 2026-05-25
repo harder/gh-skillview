@@ -105,8 +105,6 @@ Download the right asset from the [latest release](https://github.com/harder/gh-
 | Windows x64 | `skillview-win-x64.exe` |
 | Windows ARM64 | `skillview-win-arm64.exe` |
 | Linux x64 | `skillview-linux-x64` |
-| Linux ARM64 | `skillview-linux-arm64` |
-| macOS x64 | `skillview-osx-x64` |
 | macOS ARM64 | `skillview-osx-arm64` |
 
 Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.

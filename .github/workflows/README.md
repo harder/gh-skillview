@@ -23,10 +23,10 @@ Runs on pushes and pull requests targeting `main`.
 **Pipeline**
 
 ```text
-build (6 RIDs, restore/build/test/publish) -> release
-                                             -> publish-homebrew (dark-launch, stable tags only, opt-in)
-                                             -> publish-winget (dark-launch, stable tags only, opt-in)
-                                             -> notify-failure (on error)
+workflow-lint -> build (4 RIDs, restore/build/test/publish) -> release (tag pushes only)
+                                                             -> publish-homebrew (dark-launch, stable tags only, opt-in)
+                                                             -> publish-winget (dark-launch, stable tags only, opt-in)
+                                                             -> notify-failure (on error)
 ```
 
 **Build matrix**
@@ -34,8 +34,6 @@ build (6 RIDs, restore/build/test/publish) -> release
 - `win-x64`
 - `win-arm64`
 - `linux-x64`
-- `linux-arm64`
-- `osx-x64`
 - `osx-arm64`
 
 Each build leg now:
@@ -43,21 +41,21 @@ Each build leg now:
 1. restores
 2. builds in `Release`
 3. runs the full .NET test suite
-4. publishes both Native AOT binaries
+4. publishes the Native AOT standalone binary
 5. uploads staged assets as artifacts
 
 Release runs are serialized with a workflow-level concurrency lock so two publishes cannot overlap.
 
 **Artifacts**
 
-- GitHub CLI extension binaries: `gh-skillview-<go-os-arch>[.exe]`
 - Standalone binaries: `skillview-<rid>[.exe]`
+- Checksums: `SHA256SUMS-<rid>.txt`
 
-Artifacts are uploaded per RID and then merged by the final release job, which publishes via `cli/gh-extension-precompile@v2` and generates attestations.
+Artifacts are uploaded per RID and then merged by the final release job, which publishes a GitHub Release via `softprops/action-gh-release`. `workflow_dispatch` still exercises the build/package flow, but only tag pushes publish a release.
 
 **Package-manager dark launch**
 
-- `publish-homebrew` is gated behind `HOMEBREW_TAP_ENABLED == true` and generates a formula artifact from `packaging/homebrew/skillview.rb.tmpl`.
+- `publish-homebrew` is gated behind `HOMEBREW_TAP_ENABLED == true` and generates a formula artifact from `packaging/homebrew/skillview.rb.tmpl` for the shipped Unix targets (`osx-arm64`, `linux-x64`).
 - Recommended future tap target: `harder/homebrew-tap` via repo variable `HOMEBREW_TAP_REPO`.
 - `publish-winget` is gated behind `WINGET_ENABLED == true` and generates manifest artifacts from `packaging/winget/`.
 - Both jobs stop at generated artifacts today; they do **not** push to a tap repo or submit to `winget-pkgs` yet.
