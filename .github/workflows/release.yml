@@ -21,15 +21,19 @@ jobs:
       matrix:
         include:
           - rid: win-x64
+            asset_name: win-x64
             os: windows-latest
             ext: .exe
           - rid: win-arm64
+            asset_name: win-arm
             os: windows-11-arm
             ext: .exe
           - rid: linux-x64
+            asset_name: linux-x64
             os: ubuntu-latest
             ext: ''
           - rid: osx-arm64
+            asset_name: osx-arm
             os: macos-14
             ext: ''
     runs-on: ${{ matrix.os }}
@@ -70,14 +74,14 @@ jobs:
           set -euo pipefail
           mkdir -p dist/out
           cp "dist/app/skillview${{ matrix.ext }}" \
-             "dist/out/skillview-${{ matrix.rid }}${{ matrix.ext }}"
+             "dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}"
 
       - name: Record binary size and checksum
         shell: pwsh
         run: |
-          $binary = Get-Item "dist/out/skillview-${{ matrix.rid }}${{ matrix.ext }}"
+          $binary = Get-Item "dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}"
           $hash = (Get-FileHash $binary.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($binary.Name)" | Set-Content -Encoding ascii "dist/out/SHA256SUMS-${{ matrix.rid }}.txt"
+          "$hash  $($binary.Name)" | Set-Content -Encoding ascii "dist/out/SHA256SUMS-${{ matrix.asset_name }}.txt"
           Get-ChildItem dist/out | ForEach-Object {
             $sizeMb = [math]::Round($_.Length / 1MB, 2)
             Write-Host "$($_.Name)  ($sizeMb MB)"
@@ -118,16 +122,16 @@ jobs:
           | File | Target |
           |------|--------|
           | \`skillview-win-x64.exe\` | Windows x64 |
-          | \`skillview-win-arm64.exe\` | Windows ARM64 |
+          | \`skillview-win-arm.exe\` | Windows ARM64 |
           | \`skillview-linux-x64\` | Linux x64 |
-          | \`skillview-osx-arm64\` | macOS Apple Silicon |
+          | \`skillview-osx-arm\` | macOS Apple Silicon |
           | \`SHA256SUMS-*.txt\` | Per-platform checksums |
 
           ## Quick start
 
           \`\`\`bash
-          chmod +x skillview-osx-arm64
-          mv skillview-osx-arm64 /usr/local/bin/skillview
+          chmod +x skillview-osx-arm
+          mv skillview-osx-arm /usr/local/bin/skillview
           skillview
           \`\`\`
 
@@ -175,9 +179,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p generated/homebrew
-          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-osx-arm64"
+          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-osx-arm"
           LINUX_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-x64"
-          DARWIN_ARM64_SHA=$(awk '{print $1}' artifacts/SHA256SUMS-osx-arm64.txt)
+          DARWIN_ARM64_SHA=$(awk '{print $1}' artifacts/SHA256SUMS-osx-arm.txt)
           LINUX_X64_SHA=$(awk '{print $1}' artifacts/SHA256SUMS-linux-x64.txt)
           sed \
             -e "s|{{VERSION}}|${RELEASE_REF#v}|g" \
@@ -222,9 +226,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path generated/winget | Out-Null
           $version = $env:RELEASE_REF.Substring(1)
           $urlX64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-x64.exe"
-          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-arm64.exe"
+          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-arm.exe"
           $shaX64 = (Get-FileHash artifacts/skillview-win-x64.exe -Algorithm SHA256).Hash
-          $shaArm64 = (Get-FileHash artifacts/skillview-win-arm64.exe -Algorithm SHA256).Hash
+          $shaArm64 = (Get-FileHash artifacts/skillview-win-arm.exe -Algorithm SHA256).Hash
 
           (Get-Content packaging/winget/harder.SkillView.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
             Set-Content generated/winget/$env:WINGET_PACKAGE_ID.yaml

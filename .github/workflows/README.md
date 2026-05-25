@@ -48,14 +48,14 @@ Release runs are serialized with a workflow-level concurrency lock so two publis
 
 **Artifacts**
 
-- Standalone binaries: `skillview-<rid>[.exe]`
-- Checksums: `SHA256SUMS-<rid>.txt`
+- Standalone binaries: `skillview-win-x64.exe`, `skillview-win-arm.exe`, `skillview-linux-x64`, `skillview-osx-arm`
+- Checksums: `SHA256SUMS-<platform>.txt`
 
 Artifacts are uploaded per RID and then merged by the final release job, which publishes a GitHub Release via `softprops/action-gh-release`. `workflow_dispatch` still exercises the build/package flow, but only tag pushes publish a release.
 
 **Package-manager dark launch**
 
-- `publish-homebrew` is gated behind `HOMEBREW_TAP_ENABLED == true` and generates a formula artifact from `packaging/homebrew/skillview.rb.tmpl` for the shipped Unix targets (`osx-arm64`, `linux-x64`).
+- `publish-homebrew` is gated behind `HOMEBREW_TAP_ENABLED == true` and generates a formula artifact from `packaging/homebrew/skillview.rb.tmpl` for the shipped Unix targets (`osx-arm`, `linux-x64`).
 - Recommended future tap target: `harder/homebrew-tap` via repo variable `HOMEBREW_TAP_REPO`.
 - `publish-winget` is gated behind `WINGET_ENABLED == true` and generates manifest artifacts from `packaging/winget/`.
 - Both jobs stop at generated artifacts today; they do **not** push to a tap repo or submit to `winget-pkgs` yet.
