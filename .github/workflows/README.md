@@ -23,10 +23,10 @@ Runs on pushes and pull requests targeting `main`.
 **Pipeline**
 
 ```text
-workflow-lint -> build (4 RIDs, restore/build/test/publish) -> release (tag pushes only)
-                                                             -> publish-homebrew (dark-launch, stable tags only, opt-in)
-                                                             -> publish-winget (dark-launch, stable tags only, opt-in)
-                                                             -> notify-failure (on error)
+build (4 RIDs, restore/build/test/publish) -> release (tag pushes only)
+                                            -> publish-homebrew (dark-launch, stable tags only, opt-in)
+                                            -> publish-winget (dark-launch, stable tags only, opt-in)
+                                            -> notify-failure (on error)
 ```
 
 **Build matrix**
