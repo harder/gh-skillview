@@ -10,6 +10,7 @@ using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
+using Terminal.Gui.Views;
 
 namespace SkillView.Cli;
 
@@ -489,7 +490,7 @@ public static class CliDispatcher
         if (parsed.Repo is null)
         {
             Console.Error.WriteLine("skillview: preview requires a repo (OWNER/REPO)");
-            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--allow-hidden-dirs] [--json]");
+            Console.Error.WriteLine("usage: skillview preview <owner/repo> [<skill-name>] [--version <ref>] [--allow-hidden-dirs] [--rendered] [--json]");
             return ExitCodes.InvalidUsage;
         }
 
@@ -516,17 +517,18 @@ public static class CliDispatcher
         }
 
         if (parsed.Json) WritePreviewJson(preview);
-        else Console.Out.WriteLine(preview.Body);
+        else Console.Out.WriteLine(RenderPreviewText(preview, parsed.Rendered));
 
         return ExitCodes.Success;
     }
 
-    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool AllowHiddenDirs, bool Json);
+    internal record ParsedPreviewArgs(string? Repo, string? SkillName, string? Version, bool AllowHiddenDirs, bool Rendered, bool Json);
 
     internal static ParsedPreviewArgs ParsePreviewArgs(IReadOnlyList<string> args)
     {
         string? repo = null, skill = null, version = null;
         var allowHiddenDirs = false;
+        var rendered = false;
         var json = false;
         var positional = new List<string>();
         for (var i = 0; i < args.Count; i++)
@@ -534,6 +536,7 @@ public static class CliDispatcher
             var a = args[i];
             if (a == "--json") { json = true; continue; }
             if (a == "--allow-hidden-dirs") { allowHiddenDirs = true; continue; }
+            if (a == "--rendered") { rendered = true; continue; }
             if (a.StartsWith("--version=", StringComparison.Ordinal)) { version = a["--version=".Length..]; continue; }
             if (a == "--version" && i + 1 < args.Count) { version = args[++i]; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
@@ -551,11 +554,42 @@ public static class CliDispatcher
                 repo = repo[..at];
             }
         }
-        return new ParsedPreviewArgs(repo, skill, version, allowHiddenDirs, json);
+        return new ParsedPreviewArgs(repo, skill, version, allowHiddenDirs, rendered, json);
     }
 
     private static void WritePreviewJson(PreviewResult p)
         => Console.Out.WriteLine(RenderPreviewJson(p));
+
+    internal static string RenderPreviewText(PreviewResult preview, bool rendered)
+    {
+        if (!rendered)
+        {
+            return preview.Body.TrimEnd();
+        }
+
+        var markdown = new Markdown();
+        var body = markdown.RenderToAnsi(preview.MarkdownBody, 80).TrimEnd();
+        if (preview.AssociatedFiles.Length == 0)
+        {
+            return body;
+        }
+
+        var sb = new StringBuilder(body.Length + 64);
+        if (body.Length > 0)
+        {
+            sb.AppendLine(body);
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("Associated files:");
+        foreach (var file in preview.AssociatedFiles)
+        {
+            sb.Append("- ");
+            sb.AppendLine(file);
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 
     internal static string RenderPreviewJson(PreviewResult p)
     {
@@ -1638,7 +1672,7 @@ public static class CliDispatcher
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
-            | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--json` |
+            | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
             | `install OWNER/REPO [SKILL]` | Install a skill, then rescan inventory. | `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--repo-path`, `--from-local`, `--allow-hidden-dirs`, `--json` |
             | `update [SKILL...]` | Dry-run or apply updates for one or many installed skills. | `--all`, `--dry-run`, `--force`, `--unpin`, `--yes`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
@@ -1650,7 +1684,7 @@ public static class CliDispatcher
             {{command}} doctor --json
             {{command}} list --scope user --json
             {{command}} search prompt --owner github
-            {{command}} preview github/awesome-copilot documentation-writer
+            {{command}} preview github/awesome-copilot documentation-writer --rendered
             {{command}} install github/awesome-copilot git-commit --agent claude-code --scope user
             {{command}} update --all --dry-run
             {{command}} remove git-commit --yes

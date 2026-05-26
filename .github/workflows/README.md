@@ -10,6 +10,7 @@ Runs on pushes and pull requests targeting `main`.
 - Builds in `Release`
 - Runs the full .NET test suite
 - Runs three-RID AOT publish smoke coverage (`linux-x64`, `osx-arm64`, `win-x64`)
+- Promotes standalone-app AOT trim warnings (`IL2026`, `IL3050`, `IL3053`) to errors during CI smoke publishes
 
 ### `release.yml` — Build, verify, and publish tagged releases
 

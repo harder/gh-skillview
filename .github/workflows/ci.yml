@@ -57,6 +57,7 @@ jobs:
           dotnet publish src/SkillView.App/SkillView.App.csproj \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true \
+            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
             -o dist/app
       - name: AOT publish (extension)
         shell: bash

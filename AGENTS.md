@@ -47,10 +47,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   displayed agent labels match the `gh skill install --agent` accepted values.
   Re-check against `gh skill install --help`.
 - Current package compatibility: SkillView is pinned to Terminal.Gui
-  `2.2.2-develop.18` (develop branch build for fixes not yet in stable) and
-  Terminal.Gui.Editor `2.2.3` (latest stable, compatible with develop base).
-  This pairing is intentional: the develop build addresses prior hangs while
-  the stable editor is forward-compatible. Test projects use
+  `2.4.2-develop.53` (latest published develop build, currently ahead of stable
+  `2.4.1`) and Terminal.Gui.Editor `2.5.0` (NuGet package targeting
+  Terminal.Gui `2.4.0`+). This pairing is intentional: the develop build keeps
+  SkillView on the newest upstream fixes while the stable editor stays aligned
+  with the 2.4.x base line. Test projects use
   `Microsoft.NET.Test.Sdk` `18.5.1`, `xunit.v3` `3.2.2`, and
   `xunit.runner.visualstudio` `3.1.5`. If tests fail to compile on missing
   `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are replaced.
@@ -78,17 +79,20 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
-- Terminal.Gui `2.2.2-develop.18` remains compatible with the modern
+- Terminal.Gui `2.4.2-develop.53` remains compatible with the modern
   `Application.Create().Init()` lifecycle; the local
   `UnconditionalSuppressMessage` workaround and temporary App-level warning mask
   stay removed after a verification publish proved the App entrypoint no longer
   needs them.
+- CI's standalone AOT smoke publish now promotes `IL2026`, `IL3050`, and
+  `IL3053` to errors for `SkillView.App`; keep the gh extension's project-level
+  suppression local until that host gets its separate re-evaluation.
 - Prefer `KeyBindings` for view-local command remaps like table preview
   shortcuts. Keep the current window/table `KeyDown` routing where the app is
   intentionally centralizing whole-screen actions (search/install/open/logs,
   installed-screen filter/sort/remove, cleanup actions, etc.), not because of
   the old `TableView` type-to-search swallowing bug.
-- On Terminal.Gui `2.2.2-develop.18`, `TableView.CollectionNavigator = null` is the
+- On Terminal.Gui `2.4.2-develop.53`, `TableView.CollectionNavigator = null` is the
   supported way to disable type-to-search. Treat `#5232` as the fix for the old
   printable-key swallowing behavior and prefer this documented path over the old
   custom matcher workaround.
@@ -96,7 +100,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `TerminalEscapeSanitizer` is now the shared UI-layer guard for remote preview
   markdown, search metadata, installed-skill detail markdown, cleanup/remove
   summaries, and rendered log text.
-- Terminal.Gui `2.2.2-develop.18` enables bracketed-paste mode. SkillView does not need
+- Terminal.Gui `2.4.2-develop.53` enables bracketed-paste mode. SkillView does not need
   custom handling for it: editable `TextField` inputs accept terminal-native
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered

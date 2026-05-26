@@ -141,7 +141,7 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // SkillView pins the Terminal.Gui 2.2.2-develop.18 release; this startup path
+    // SkillView pins the Terminal.Gui 2.4.2-develop.53 release; this startup path
     // stays aligned with TG2 AOT guidance and the modern lifecycle.
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
@@ -1300,33 +1300,6 @@ public sealed class SkillViewApp
             : $"{shownCount} of {totalCount} result(s) for {normalizedAgent}";
     }
 
-    /// TG2 RC4's Markdown renderer collapses tight bullet lists into one
-    /// paragraph (consecutive `- foo` lines render inline). Normalizing to
-    /// a loose list — blank line before the list and between items — forces
-    /// per-item line breaks. Also handles `*` and `+` markers and numbered
-    /// lists.
-    private static string NormalizeMarkdownLists(string markdown)
-    {
-        if (string.IsNullOrEmpty(markdown)) return markdown;
-        var lines = markdown.Replace("\r\n", "\n").Split('\n');
-        var sb = new System.Text.StringBuilder(markdown.Length + 128);
-        var prevBlank = true;
-        foreach (var line in lines)
-        {
-            var trimmed = line.TrimStart();
-            var isList = trimmed.StartsWith("- ") || trimmed.StartsWith("* ") || trimmed.StartsWith("+ ")
-                || System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d+[\.\)]\s");
-            if (isList && !prevBlank)
-            {
-                sb.Append('\n');
-            }
-            sb.Append(line);
-            sb.Append('\n');
-            prevBlank = string.IsNullOrWhiteSpace(line);
-        }
-        return sb.ToString();
-    }
-
     internal static bool ShouldAllowHiddenDirPreview(SearchResultSkill skill)
     {
         if (string.IsNullOrWhiteSpace(skill.Path))
@@ -1604,7 +1577,7 @@ public sealed class SkillViewApp
         var includeDescription = selected is not null
             && !string.Equals(_loadedPreviewKey, BuildPreviewSelectionKey(selected), StringComparison.Ordinal);
         var body = BuildDiscoverPreviewBody(selected?.Description, sanitized, includeDescription);
-        if (_previewPane is not null) _previewPane.Text = NormalizeMarkdownLists(body);
+        if (_previewPane is not null) _previewPane.Text = body;
         if (_previewRawPane is not null) _previewRawPane.Text = body;
     }
 

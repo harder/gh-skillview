@@ -365,6 +365,22 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void SetPreviewText_PreservesTightMarkdownLists()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.LoadSearchResultsForTests(
+        [
+            new SearchResultSkill(null, null, null, "owner/repo", "demo", null),
+        ]);
+        app.SetPreviewTextForTests("- alpha\n- beta");
+
+        Assert.Contains("- alpha\n- beta", app.PreviewTextForTests, StringComparison.Ordinal);
+        Assert.DoesNotContain("- alpha\n\n- beta", app.PreviewTextForTests, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RenderSearchMetadata_KeepsSummaryCompactByOmittingDescriptionParagraph()
     {
         var rendered = SkillViewApp.RenderSearchMetadata(
@@ -431,6 +447,19 @@ public sealed class SkillViewAppTests
         _ = window.NewKeyDownEvent(new Key(KeyCode.CursorRight));
 
         Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void BuildUi_WindowPrintableShortcutStaysInQueryFieldWhenQueryHasFocus()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        _ = app.QueryFieldForTests!.SetFocus();
+        _ = window.NewKeyDownEvent(new Key('u'));
+
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+        Assert.True(app.QueryFieldForTests.HasFocus);
     }
 
     [Fact]

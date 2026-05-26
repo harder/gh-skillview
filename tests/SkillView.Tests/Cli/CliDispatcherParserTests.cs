@@ -76,8 +76,9 @@ public class CliDispatcherParserTests
     [Fact]
     public void Preview_AllowHiddenDirsAccepted()
     {
-        var p = CliDispatcher.ParsePreviewArgs(new[] { "acme/repo", "--allow-hidden-dirs", "--json" });
+        var p = CliDispatcher.ParsePreviewArgs(new[] { "acme/repo", "--allow-hidden-dirs", "--rendered", "--json" });
         Assert.True(p.AllowHiddenDirs);
+        Assert.True(p.Rendered);
         Assert.True(p.Json);
     }
 

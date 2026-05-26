@@ -8,6 +8,7 @@
 - Keep `workflow_dispatch` enabled so release packaging can be exercised without pushing a tag; only tag pushes publish a GitHub Release.
 - `release.yml` now serializes publishes with a workflow-level concurrency lock.
 - Each release build leg restores, builds in `Release`, and runs the full test suite before publishing AOT assets.
+- CI's standalone AOT smoke publish treats `IL2026`, `IL3050`, and `IL3053` as errors so the app entrypoint stays warning-clean even while the gh extension keeps its local suppression.
 - Release artifact uploads keep 30-day retention, and a failed release opens or reuses an issue with the run link for follow-up.
 - `.github/workflows/README.md` is the operator-facing overview for CI/release workflow behavior.
 - `docs/runbooks/release-rollback.md` is the rollback procedure for live GitHub Releases and the current dark-launch package-manager jobs.

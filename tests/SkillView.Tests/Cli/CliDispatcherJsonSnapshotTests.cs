@@ -187,6 +187,30 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Equal(2, doc.GetProperty("associatedFiles").GetArrayLength());
     }
 
+    [Fact]
+    public void Preview_RenderedTextEmitsAnsiAndAssociatedFiles()
+    {
+        var preview = new PreviewResult
+        {
+            Repo = "acme/render",
+            SkillName = "render-md",
+            Version = "v2",
+            Body = "# hello\nbody",
+            MarkdownBody = "# hello\n\nbody",
+            AssociatedFiles = ImmutableArray.Create("LICENSE", "README.md"),
+            Succeeded = true,
+            ExitCode = 0,
+            ErrorMessage = null,
+        };
+
+        var rendered = CliDispatcher.RenderPreviewText(preview, rendered: true);
+
+        Assert.Contains("\u001b[", rendered, StringComparison.Ordinal);
+        Assert.Contains("hello", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Associated files:", rendered, StringComparison.Ordinal);
+        Assert.Contains("- LICENSE", rendered, StringComparison.Ordinal);
+    }
+
     // --- install ---------------------------------------------------------
 
     [Fact]
