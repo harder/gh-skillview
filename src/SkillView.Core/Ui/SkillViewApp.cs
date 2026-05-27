@@ -335,6 +335,7 @@ public sealed class SkillViewApp
             Height = 1,
             Visible = false,
             AutoSpin = false,
+            Style = new SpinnerStyle.Dots(),
         };
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, _spinner);

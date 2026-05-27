@@ -137,6 +137,7 @@ internal sealed class UpdatesTabView : FrameView
             X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(3),
             Width = 1, Height = 1,
             Visible = false, AutoSpin = false,
+            Style = new SpinnerStyle.Dots(),
         };
 
         _dryRunButton = new Button

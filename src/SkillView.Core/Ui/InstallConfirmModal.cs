@@ -130,6 +130,7 @@ internal sealed class InstallConfirmModal
         {
             X = Pos.AnchorEnd(2), Y = Pos.AnchorEnd(3),
             Width = 1, Height = 1, Visible = false, AutoSpin = false,
+            Style = new SpinnerStyle.Dots(),
         };
 
         var installButton = new Button
