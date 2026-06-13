@@ -6,9 +6,10 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill search --json`. Owner and limit are applied
-/// only when the capability probe confirms the flags exist — older `gh`
-/// builds silently reject unknown flags.
+/// Wraps `gh skill search --json`. SkillView requires gh ≥ 2.94.0, which
+/// exposes `--json`, `--owner`, and `--page` (it paginates rather than the
+/// pre-2.94 `--limit`). `--owner`/`--page` emit unconditionally; `Limit` is
+/// applied client-side as a result cap.
 public sealed class GhSkillSearchService
 {
     public const int DefaultLimit = 30;
@@ -31,14 +32,13 @@ public sealed class GhSkillSearchService
     public async Task<SearchResponse> SearchAsync(
         string ghPath,
         string query,
-        CapabilityProfile capabilities,
         Options? options = null,
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
         var limit = Math.Clamp(options.Limit, 1, MaxLimit);
 
-        var args = BuildArgs(query, capabilities, options.Owner, limit, options.Page);
+        var args = BuildArgs(query, options.Owner, options.Page);
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
@@ -55,8 +55,11 @@ public sealed class GhSkillSearchService
         {
             var parsed = JsonSerializer.Deserialize(
                 result.StdOut,
-                GhJsonContext.Default.SearchResultSkillArray);
-            return new SearchResponse(parsed ?? Array.Empty<SearchResultSkill>(), 0, null);
+                GhJsonContext.Default.SearchResultSkillArray) ?? Array.Empty<SearchResultSkill>();
+            // gh 2.94 search has no result-count flag; cap client-side.
+            IReadOnlyList<SearchResultSkill> capped =
+                parsed.Length > limit ? parsed.Take(limit).ToArray() : parsed;
+            return new SearchResponse(capped, 0, null);
         }
         catch (JsonException ex)
         {
@@ -75,40 +78,26 @@ public sealed class GhSkillSearchService
         var response = await SearchAsync(
             ghPath,
             query,
-            CapabilityProfile.Empty with { SearchFlags = System.Collections.Immutable.ImmutableHashSet.Create("--json", "--limit") },
             new Options(Limit: limit),
             cancellationToken).ConfigureAwait(false);
         return response.Results;
     }
 
-    internal static IReadOnlyList<string> BuildArgs(
-        string query,
-        CapabilityProfile capabilities,
-        string? owner,
-        int limit,
-        int page)
+    internal static IReadOnlyList<string> BuildArgs(string query, string? owner, int page)
     {
-        var args = new List<string> { "skill", "search", query };
-
-        if (capabilities.SupportsSearchJson || capabilities.SearchFlags.IsEmpty)
+        var args = new List<string>
         {
-            args.Add("--json");
-            args.Add("description,namespace,path,repo,skillName,stars");
-        }
+            "skill", "search", query,
+            "--json", "description,namespace,path,repo,skillName,stars",
+        };
 
-        if (!string.IsNullOrWhiteSpace(owner) && capabilities.SupportsSearchOwner)
+        if (!string.IsNullOrWhiteSpace(owner))
         {
             args.Add("--owner");
             args.Add(owner);
         }
 
-        if (capabilities.SupportsSearchLimit || capabilities.SearchFlags.IsEmpty)
-        {
-            args.Add("--limit");
-            args.Add(limit.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (page > 1 && capabilities.SearchFlags.Contains("--page"))
+        if (page > 1)
         {
             args.Add("--page");
             args.Add(page.ToString(CultureInfo.InvariantCulture));

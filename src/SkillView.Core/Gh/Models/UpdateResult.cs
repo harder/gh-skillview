@@ -3,10 +3,10 @@ using System.Collections.Immutable;
 namespace SkillView.Gh.Models;
 
 /// Outcome of a `gh skill update` invocation. Captures the raw `StdOut`
-/// (`gh skill update` does not yet emit JSON as of v2.92.0; cli/cli#13215
-/// tracks `--json`). When `--dry-run` is set, the adapter parses the stdout
-/// into a best-effort list of `UpdateEntry` rows for UI preview; the raw
-/// body remains for direct rendering when the parse finds nothing.
+/// (`gh skill update` has no `--json` flag as of gh 2.94.0, so SkillView
+/// parses the text). The adapter parses the stdout into a best-effort list of
+/// `UpdateEntry` rows for UI preview and SkillView's own `--json` output; the
+/// raw body remains for direct rendering when the parse finds nothing.
 public sealed record UpdateResult
 {
     public required bool DryRun { get; init; }

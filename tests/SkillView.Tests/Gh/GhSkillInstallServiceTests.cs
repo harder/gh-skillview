@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using SkillView.Gh;
 using Xunit;
 
@@ -6,20 +5,14 @@ namespace SkillView.Tests.Gh;
 
 public class GhSkillInstallServiceTests
 {
-    private static CapabilityProfile CapsWith(params string[] installFlags)
-    {
-        return CapabilityProfile.Empty with
-        {
-            SkillSubcommandPresent = true,
-            InstallFlags = ImmutableHashSet.CreateRange(installFlags),
-        };
-    }
+    // gh ≥ 2.94 is required, so every flag emits unconditionally — there is no
+    // per-flag capability gating.
 
     [Fact]
     public void BuildArgs_MinimalRepoOnly()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "vercel-labs/skills", skillName: null, CapsWith(), new GhSkillInstallService.Options());
+            "vercel-labs/skills", skillName: null, new GhSkillInstallService.Options());
         Assert.Equal(new[] { "skill", "install", "vercel-labs/skills" }, args);
     }
 
@@ -27,7 +20,7 @@ public class GhSkillInstallServiceTests
     public void BuildArgs_AppendsSkillNameAsPositional()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "owner/repo", "render-md", CapsWith(), new GhSkillInstallService.Options());
+            "owner/repo", "render-md", new GhSkillInstallService.Options());
         Assert.Equal(new[] { "skill", "install", "owner/repo", "render-md" }, args);
     }
 
@@ -35,7 +28,7 @@ public class GhSkillInstallServiceTests
     public void BuildArgs_VersionIsConcatenatedWithAt()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "owner/repo", skillName: null, CapsWith(),
+            "owner/repo", skillName: null,
             new GhSkillInstallService.Options(Version: "v2.0.0"));
         Assert.Contains("owner/repo@v2.0.0", args);
         Assert.DoesNotContain("--version", args);
@@ -45,7 +38,7 @@ public class GhSkillInstallServiceTests
     public void BuildArgs_AgentsAreRepeatable()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--agent"),
+            "o/r", null,
             new GhSkillInstallService.Options(Agents: new[] { "claude", "copilot", "cursor" }));
         var list = args.ToList();
         Assert.Equal(3, list.Count(x => x == "--agent"));
@@ -58,93 +51,77 @@ public class GhSkillInstallServiceTests
     public void BuildArgs_ScopeAndPathPassthrough()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
+            "o/r", null,
             new GhSkillInstallService.Options(Scope: "custom", Path: "/tmp/skills"));
         var list = args.ToList();
         var scopeIdx = list.IndexOf("--scope");
-        var pathIdx = list.IndexOf("--path");
+        // A custom directory maps to gh's `--dir` (gh has no `--path`).
+        var dirIdx = list.IndexOf("--dir");
         Assert.True(scopeIdx >= 0);
         Assert.Equal("custom", list[scopeIdx + 1]);
-        Assert.True(pathIdx >= 0);
-        Assert.Equal("/tmp/skills", list[pathIdx + 1]);
+        Assert.True(dirIdx >= 0);
+        Assert.Equal("/tmp/skills", list[dirIdx + 1]);
+        Assert.DoesNotContain("--path", list);
     }
 
     [Fact]
     public void BuildArgs_PinAndForceAreFlags()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
+            "o/r", null,
             new GhSkillInstallService.Options(Pin: true, Overwrite: true));
         Assert.Contains("--pin", args);
         Assert.Contains("--force", args);
     }
 
     [Fact]
-    public void BuildArgs_UpstreamRequiresCapability()
+    public void BuildArgs_UpstreamEmittedWhenProvided()
     {
-        // Without the capability flag, --upstream must not be emitted.
-        var missing = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
+        var args = GhSkillInstallService.BuildArgs(
+            "o/r", null,
             new GhSkillInstallService.Options(Upstream: "https://x.test/upstream.git"));
-        Assert.DoesNotContain("--upstream", missing);
-
-        var present = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--upstream"),
-            new GhSkillInstallService.Options(Upstream: "https://x.test/upstream.git"));
-        Assert.Contains("--upstream", present);
-        var idx = present.ToList().IndexOf("--upstream");
-        Assert.Equal("https://x.test/upstream.git", present[idx + 1]);
+        Assert.Contains("--upstream", args);
+        var idx = args.ToList().IndexOf("--upstream");
+        Assert.Equal("https://x.test/upstream.git", args[idx + 1]);
     }
 
     [Fact]
-    public void BuildArgs_AllowHiddenDirsRequiresCapability()
+    public void BuildArgs_AllowHiddenDirsEmittedWhenSet()
     {
         var off = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
-            new GhSkillInstallService.Options(AllowHiddenDirs: true));
+            "o/r", null, new GhSkillInstallService.Options(AllowHiddenDirs: false));
         Assert.DoesNotContain("--allow-hidden-dirs", off);
 
         var on = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--allow-hidden-dirs"),
-            new GhSkillInstallService.Options(AllowHiddenDirs: true));
+            "o/r", null, new GhSkillInstallService.Options(AllowHiddenDirs: true));
         Assert.Contains("--allow-hidden-dirs", on);
     }
 
     [Fact]
-    public void BuildArgs_RepoPathRequiresCapability()
+    public void BuildArgs_FromLocalEmittedWhenSet()
     {
         var off = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
-            new GhSkillInstallService.Options(RepoPath: "subdir/skill"));
-        Assert.DoesNotContain("--repo-path", off);
-
-        var on = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--repo-path"),
-            new GhSkillInstallService.Options(RepoPath: "subdir/skill"));
-        Assert.Contains("--repo-path", on);
-        var idx = on.ToList().IndexOf("--repo-path");
-        Assert.Equal("subdir/skill", on[idx + 1]);
-    }
-
-    [Fact]
-    public void BuildArgs_FromLocalRequiresCapability()
-    {
-        var off = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith(),
-            new GhSkillInstallService.Options(FromLocal: true));
+            "o/r", null, new GhSkillInstallService.Options(FromLocal: false));
         Assert.DoesNotContain("--from-local", off);
 
         var on = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--from-local"),
-            new GhSkillInstallService.Options(FromLocal: true));
+            "o/r", null, new GhSkillInstallService.Options(FromLocal: true));
         Assert.Contains("--from-local", on);
+    }
+
+    [Fact]
+    public void BuildArgs_AllEmittedWithoutSkillName()
+    {
+        var args = GhSkillInstallService.BuildArgs(
+            "o/r", skillName: null, new GhSkillInstallService.Options(All: true));
+        Assert.Equal(new[] { "skill", "install", "o/r", "--all" }, args);
     }
 
     [Fact]
     public void BuildArgs_EmptyAgentEntriesAreSkipped()
     {
         var args = GhSkillInstallService.BuildArgs(
-            "o/r", null, CapsWith("--agent"),
+            "o/r", null,
             new GhSkillInstallService.Options(Agents: new[] { "", "  ", "claude" }));
         Assert.Single(args, x => x == "--agent");
     }

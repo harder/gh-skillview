@@ -41,7 +41,6 @@ public sealed class LocalInventoryService
 
     public async Task<InventorySnapshot> CaptureAsync(
         string? ghPath,
-        CapabilityProfile capabilities,
         Options options,
         CancellationToken cancellationToken = default)
     {
@@ -57,13 +56,16 @@ public sealed class LocalInventoryService
         fsSw.Stop();
         _logger.Info("inventory", $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
 
+        // `gh skill list` is the primary inventory source (gh ≥ 2.94 is
+        // required, so it's always available); the filesystem scan above
+        // supplements it with symlink/anomaly/package data gh doesn't emit.
         var usedGhList = false;
         ImmutableArray<GhSkillListRecord> ghRecords = ImmutableArray<GhSkillListRecord>.Empty;
         var ghSw = Stopwatch.StartNew();
-        if (ghPath is not null && capabilities.HasSkillList)
+        if (ghPath is not null)
         {
             ghRecords = await _listAdapter
-                .ListAsync(ghPath, capabilities, options.FilterScope, options.FilterAgent, cancellationToken)
+                .ListAsync(ghPath, options.FilterScope, options.FilterAgent, cancellationToken)
                 .ConfigureAwait(false);
             usedGhList = true;
             _logger.Info("inventory", $"gh skill list returned {ghRecords.Length} record(s)");

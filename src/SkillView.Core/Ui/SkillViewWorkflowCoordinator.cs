@@ -74,7 +74,6 @@ internal sealed class SkillViewWorkflowCoordinator
                 _services.InstallService,
                 _services.Logger,
                 ghPath,
-                report.Capabilities,
                 request);
             var compactResult = compact.Show();
             switch (compactResult.Outcome)
@@ -104,7 +103,6 @@ internal sealed class SkillViewWorkflowCoordinator
             _services.InstallService,
             _services.Logger,
             ghPath,
-            report.Capabilities,
             request);
         installScreen.Show();
         if (installScreen.LastResult is { Succeeded: true } result)
@@ -123,6 +121,47 @@ internal sealed class SkillViewWorkflowCoordinator
         }
     }
 
+
+    /// Open the "install every skill in a repo" flow (gh 2.94 `--all`,
+    /// cli/cli#13471). Reuses the compact modal's scope/agent pickers in
+    /// install-all mode; there is no advanced-wizard escalation because the
+    /// multi-step <see cref="InstallScreen"/> is single-skill.
+    public void OpenInstallAllDialog(InstallRequest request)
+    {
+        var app = _getApp();
+        var ghPath = _getGhPath();
+        var report = _getLastReport();
+        if (app is null || ghPath is null || report is null)
+        {
+            return;
+        }
+
+        var modal = new InstallConfirmModal(
+            app,
+            _services.InstallService,
+            _services.Logger,
+            ghPath,
+            request,
+            installAll: true);
+        var result = modal.Show();
+        switch (result.Outcome)
+        {
+            case InstallConfirmModal.Outcome.Installed when result.Install is { Succeeded: true } r:
+                _services.ListAdapter.Invalidate();
+                _setStatusWithLevel(
+                    $"installed all skills from {r.Repo} — rescanning…",
+                    TuiHelpers.NotificationLevel.Success);
+                QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                return;
+            case InstallConfirmModal.Outcome.Failed when result.Install is { } f:
+                _setStatusWithLevel(
+                    $"install-all failed (exit {f.ExitCode}) — see logs (l)",
+                    TuiHelpers.NotificationLevel.Error);
+                return;
+            default:
+                return;
+        }
+    }
 
     public void ShowCleanupScreen()
     {
@@ -167,16 +206,25 @@ internal sealed class SkillViewWorkflowCoordinator
         // on-activate snapshot loads. Probes the environment lazily so the
         // first tab activation doesn't hard-fail when gh hasn't been probed
         // yet (mirrors the lazy-probe in ShowDoctor).
-        return CaptureForTabAsync(cancellationToken);
+        return CaptureForTabAsync(null, cancellationToken);
+    }
+
+    /// Scope-filtered capture used by the Installed tab's scope cycle. When
+    /// `scopeFilter` is "user"/"project", `gh skill list --scope` does the
+    /// filtering server-side; null captures everything (the tab narrows
+    /// "custom" in-process, since gh's `--scope` only accepts project|user).
+    public Task<InventorySnapshot> CaptureInventorySnapshotAsync(string? scopeFilter, CancellationToken cancellationToken = default)
+    {
+        return CaptureForTabAsync(scopeFilter, cancellationToken);
     }
 
     public void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot) =>
         OpenRemoveDialogInternal(target, snapshot);
 
-    private async Task<InventorySnapshot> CaptureForTabAsync(CancellationToken cancellationToken)
+    private async Task<InventorySnapshot> CaptureForTabAsync(string? scopeFilter, CancellationToken cancellationToken)
     {
         var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-        return await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
+        return await CaptureInventoryAsync(report, cancellationToken, scopeFilter).ConfigureAwait(false);
     }
 
     private void OpenRemoveDialogInternal(InstalledSkill target, InventorySnapshot snapshot)
@@ -284,13 +332,14 @@ internal sealed class SkillViewWorkflowCoordinator
         return report;
     }
 
-    private Task<InventorySnapshot> CaptureInventoryAsync(EnvironmentReport report, CancellationToken cancellationToken) =>
+    private Task<InventorySnapshot> CaptureInventoryAsync(
+        EnvironmentReport report, CancellationToken cancellationToken, string? scopeFilter = null) =>
         _services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new LocalInventoryService.Options(
                 ScanRoots: _options.ScanRoots,
-                AllowHiddenDirs: false),
+                AllowHiddenDirs: false,
+                FilterScope: scopeFilter),
             cancellationToken);
 
     /// Drill into the Updates workspace from the Changes queue.

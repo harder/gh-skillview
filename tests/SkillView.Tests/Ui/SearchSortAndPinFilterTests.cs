@@ -84,6 +84,25 @@ public sealed class SearchSortAndPinFilterTests
     }
 
     [Fact]
+    public void CycleScope_RoundTrips()
+    {
+        var s = InstalledTabView.ScopeFilter.All;
+        s = InstalledTabView.CycleScope(s); Assert.Equal(InstalledTabView.ScopeFilter.User, s);
+        s = InstalledTabView.CycleScope(s); Assert.Equal(InstalledTabView.ScopeFilter.Project, s);
+        s = InstalledTabView.CycleScope(s); Assert.Equal(InstalledTabView.ScopeFilter.Custom, s);
+        s = InstalledTabView.CycleScope(s); Assert.Equal(InstalledTabView.ScopeFilter.All, s);
+    }
+
+    [Fact]
+    public void DescribeScope_ProducesHumanLabels()
+    {
+        Assert.Equal("all",     InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.All));
+        Assert.Equal("user",    InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.User));
+        Assert.Equal("project", InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.Project));
+        Assert.Equal("custom",  InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.Custom));
+    }
+
+    [Fact]
     public void DescribeSearchSort_LabelsIncludeDirectionGlyph()
     {
         Assert.Contains("stars",   SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.StarsDesc));

@@ -21,6 +21,10 @@ namespace SkillView.Ui;
 /// wizard, preserving the entered values via the original
 /// <see cref="InstallRequest"/>.
 ///
+/// In `installAll` mode the same screen drives `gh skill install <repo> --all`
+/// (gh 2.94): the skill name is dropped, the title/labels say "all skills",
+/// and Advanced… is hidden (there's no single-skill wizard to escalate to).
+///
 /// This modal renders as an overlay (app.Run(dialog) / app.RequestStop()),
 /// matching the new dialog pattern established by <see cref="HelpOverlay"/>.
 internal sealed class InstallConfirmModal
@@ -39,23 +43,23 @@ internal sealed class InstallConfirmModal
     private readonly GhSkillInstallService _install;
     private readonly Logger _logger;
     private readonly string _ghPath;
-    private readonly CapabilityProfile _capabilities;
     private readonly InstallRequest _request;
+    private readonly bool _installAll;
 
     internal InstallConfirmModal(
         IApplication app,
         GhSkillInstallService install,
         Logger logger,
         string ghPath,
-        CapabilityProfile capabilities,
-        InstallRequest request)
+        InstallRequest request,
+        bool installAll = false)
     {
         _app = app;
         _install = install;
         _logger = logger;
         _ghPath = ghPath;
-        _capabilities = capabilities;
         _request = request;
+        _installAll = installAll;
     }
 
     internal Result Show()
@@ -65,7 +69,9 @@ internal sealed class InstallConfirmModal
 
         var dialog = new Dialog
         {
-            Title = $" Install {_request.SkillName ?? _request.Repo} ",
+            Title = _installAll
+                ? $" Install all skills from {_request.Repo} "
+                : $" Install {_request.SkillName ?? _request.Repo} ",
             Width = Dim.Percent(60),
             Height = 18,
         };
@@ -74,7 +80,9 @@ internal sealed class InstallConfirmModal
         var repoLabel = new Label
         {
             X = 1, Y = 0,
-            Text = $"Repo:  {_request.Repo}{(string.IsNullOrEmpty(_request.SkillName) ? "" : " · " + _request.SkillName)}",
+            Text = _installAll
+                ? $"Repo:  {_request.Repo} · ALL skills in repo"
+                : $"Repo:  {_request.Repo}{(string.IsNullOrEmpty(_request.SkillName) ? "" : " · " + _request.SkillName)}",
         };
 
         var scopeLabel = new Label { X = 1, Y = 2, Text = "Scope:" };
@@ -143,6 +151,10 @@ internal sealed class InstallConfirmModal
         {
             X = Pos.Center() - 10, Y = Pos.AnchorEnd(1),
             Text = "Advanced…",
+            // The advanced wizard is single-skill; there's nothing to escalate
+            // to for an install-all, so hide it in that mode.
+            Visible = !_installAll,
+            Enabled = !_installAll,
         };
         var cancelButton = new Button
         {
@@ -180,12 +192,12 @@ internal sealed class InstallConfirmModal
                     scopeSelector.Value ?? 0,
                     customPathField.Text.ToString() ?? string.Empty,
                     agentBoxes,
-                    entries);
+                    entries,
+                    _installAll);
                 installResult = await _install.InstallAsync(
                     _ghPath,
                     _request.Repo,
                     _request.SkillName,
-                    _capabilities,
                     options).ConfigureAwait(false);
 
                 _app.Invoke(() =>
@@ -272,7 +284,8 @@ internal sealed class InstallConfirmModal
         int scopeIndex,
         string customPath,
         IReadOnlyList<CheckBox> agentBoxes,
-        ImmutableArray<InstallAgentCatalog.Entry> entries)
+        ImmutableArray<InstallAgentCatalog.Entry> entries,
+        bool installAll = false)
     {
         var selectedAgents = new List<string>();
         for (var i = 0; i < entries.Length; i++)
@@ -283,7 +296,7 @@ internal sealed class InstallConfirmModal
             }
         }
 
-        return BuildOptionsFromSelection(scopeIndex, customPath, selectedAgents);
+        return BuildOptionsFromSelection(scopeIndex, customPath, selectedAgents, installAll);
     }
 
     /// Pure mapping from compact-modal field state to a
@@ -295,7 +308,8 @@ internal sealed class InstallConfirmModal
     internal static GhSkillInstallService.Options BuildOptionsFromSelection(
         int scopeIndex,
         string customPath,
-        IReadOnlyList<string> selectedAgentIds)
+        IReadOnlyList<string> selectedAgentIds,
+        bool installAll = false)
     {
         var scope = scopeIndex switch
         {
@@ -311,7 +325,8 @@ internal sealed class InstallConfirmModal
         return new GhSkillInstallService.Options(
             Agents: selectedAgentIds.Count > 0 ? selectedAgentIds : null,
             Scope: scope,
-            Path: path);
+            Path: path,
+            All: installAll);
     }
 
     internal static string? ValidateSelection(int scopeIndex, string customPath) =>

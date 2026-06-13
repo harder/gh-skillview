@@ -92,7 +92,7 @@ public class CliDispatcherParserTests
             "acme/repo@v1", "render-md",
             "--agent=claude", "--agent", "cursor",
             "--scope", "user", "--pin", "--force", "--from-local",
-            "--upstream=https://git/example", "--repo-path=/skills",
+            "--upstream=https://git/example",
             "--allow-hidden-dirs", "--json",
         });
         Assert.Equal("acme/repo", p.Repo);
@@ -105,7 +105,6 @@ public class CliDispatcherParserTests
         Assert.True(p.FromLocal);
         Assert.True(p.AllowHiddenDirs);
         Assert.Equal("https://git/example", p.Upstream);
-        Assert.Equal("/skills", p.RepoPath);
         Assert.True(p.Json);
     }
 
@@ -116,6 +115,15 @@ public class CliDispatcherParserTests
         Assert.Null(p.Repo);
     }
 
+    [Fact]
+    public void Install_AllFlagParsedWithoutSkillName()
+    {
+        var p = CliDispatcher.ParseInstallArgs(new[] { "acme/repo", "--all" });
+        Assert.Equal("acme/repo", p.Repo);
+        Assert.Null(p.SkillName);
+        Assert.True(p.All);
+    }
+
     // --- update ----------------------------------------------------------
 
     [Fact]
@@ -124,16 +132,14 @@ public class CliDispatcherParserTests
         var p = CliDispatcher.ParseUpdateArgs(new[]
         {
             "render-md", "fetch-url",
-            "--all", "--dry-run", "--force", "--unpin",
-            "--non-interactive", "--json",
+            "--all", "--dry-run", "--force", "--unpin", "--json",
         });
         Assert.Equal(new[] { "render-md", "fetch-url" }, p.Skills);
         Assert.True(p.All);
         Assert.True(p.DryRun);
         Assert.True(p.Force);
         Assert.True(p.Unpin);
-        Assert.True(p.Yes); // --non-interactive maps to Yes
-        Assert.True(p.Json);
+        Assert.True(p.Json); // SkillView's own JSON output, not passed to gh
     }
 
     // --- remove ----------------------------------------------------------

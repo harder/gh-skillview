@@ -52,7 +52,7 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("Terminal.Gui", stdout, StringComparison.Ordinal);
-        Assert.Contains("2.4.2", stdout, StringComparison.Ordinal);
+        Assert.Contains("2.4.6", stdout, StringComparison.Ordinal);
     }
 
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string processPath, params string[] args)

@@ -43,42 +43,13 @@ public static class DoctorScreen
         }
         sb.AppendLine();
 
-        sb.AppendLine("## `gh skill` capabilities");
+        sb.AppendLine("## `gh skill`");
         sb.AppendLine();
-        var c = r.Capabilities;
-        if (!c.SkillSubcommandPresent)
-        {
-            sb.AppendLine("❌ `gh skill` subcommand not detected on this gh install.");
-        }
-        else
-        {
-            // Capability entries must correspond 1:1 to CapabilityProbeParser.ProbedTokens.
-            // Keep in sync when adding/removing flags. Only show flags in current gh release;
-            // omit future flags to avoid appearing as defects.
-            AppendCapabilitySection(
-                sb,
-                "install",
-                ("`--allow-hidden-dirs`", c.SupportsAllowHiddenDirs),
-                ("`--upstream`", c.SupportsUpstream),
-                ("`--from-local`", c.SupportsFromLocal));
-            AppendCapabilitySection(
-                sb,
-                "preview",
-                ("`--allow-hidden-dirs`", c.SupportsPreviewAllowHiddenDirs));
-            AppendCapabilitySection(
-                sb,
-                "update",
-                ("`--dry-run`", c.SupportsUpdateDryRun),
-                ("`--all`", c.SupportsUpdateAll),
-                ("`--force`", c.SupportsUpdateForce),
-                ("`--unpin`", c.SupportsUpdateUnpin));
-            AppendCapabilitySection(
-                sb,
-                "search",
-                ("`--json`", c.SupportsSearchJson),
-                ("`--owner`", c.SupportsSearchOwner),
-                ("`--limit`", c.SupportsSearchLimit));
-        }
+        sb.AppendLine(r.GhSkillAvailable
+            ? "✅ `gh skill` present. SkillView requires gh ≥ 2.94.0, so the full " +
+              "`skill` surface (`list`, `install --all`, `update --all`, nested-dir " +
+              "discovery) is available."
+            : "❌ `gh skill` subcommand not detected on this gh install.");
         sb.AppendLine();
 
         sb.AppendLine("## Detected agents");
@@ -109,23 +80,6 @@ public static class DoctorScreen
 
         return sb.ToString();
     }
-
-    private static void AppendCapabilitySection(StringBuilder sb, string name, params (string Flag, bool Supported)[] rows)
-    {
-        sb.AppendLine($"### {name}");
-        sb.AppendLine();
-        sb.AppendLine("| Flag | Supported |");
-        sb.AppendLine("| --- | --- |");
-        foreach (var (flag, supported) in rows)
-        {
-            sb.AppendLine(
-                $"| {MarkdownTableFormatter.FormatTableCell(flag)} | " +
-                $"{MarkdownTableFormatter.FormatTableCell(Mark(supported))} |");
-        }
-        sb.AppendLine();
-    }
-
-    private static string Mark(bool on) => on ? "✅" : "❌";
 
     /// Mirrors the heuristic in `InstallScreen.DetectInstalledAgents` so the
     /// Doctor view shows what the install dialog will pre-check by default.

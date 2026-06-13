@@ -23,7 +23,7 @@ mv skillview-osx-arm /usr/local/bin/skillview
 skillview
 ```
 
-SkillView requires **GitHub CLI 2.92.0 or newer**. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
+SkillView requires **GitHub CLI 2.94.0 or newer** — the release that ships the full `gh skill` surface (`skill list`, `install --all`, `update --all`, nested-directory discovery). Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
 
 It ships as both:
 
@@ -58,7 +58,7 @@ SkillView complements `gh skill`; it does not try to replace every low-level com
 | browse and compare skills quickly | **SkillView TUI** | tabbed Discover/Installed/Changes layout with a compact summary + preview pane, batch updates, and staged install/remove flows |
 | script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
 | experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
-| debug whether a feature is available in your installed GitHub CLI | **`skillview doctor`** | capability probing shows what the local `gh` actually supports |
+| check your environment is set up correctly | **`skillview doctor`** | verifies `gh` version, `gh skill`, auth, and scan roots |
 
 ## What SkillView wraps
 
@@ -73,7 +73,7 @@ SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to t
 
 ## Requirements
 
-- **GitHub CLI** `gh` **2.92.0 or newer**
+- **GitHub CLI** `gh` **2.94.0 or newer**
 - a working `gh` setup; `gh auth login` is recommended
 - a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 

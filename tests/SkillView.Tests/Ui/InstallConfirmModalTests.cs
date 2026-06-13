@@ -59,6 +59,31 @@ public sealed class InstallConfirmModalTests
     }
 
     [Fact]
+    public void BuildOptions_DefaultsAllToFalse()
+    {
+        var opts = InstallConfirmModal.BuildOptionsFromSelection(
+            scopeIndex: 1,
+            customPath: "",
+            selectedAgentIds: Array.Empty<string>());
+
+        Assert.False(opts.All);
+    }
+
+    [Fact]
+    public void BuildOptions_InstallAll_SetsAllFlagAndKeepsScopeAgents()
+    {
+        var opts = InstallConfirmModal.BuildOptionsFromSelection(
+            scopeIndex: 1,
+            customPath: "",
+            selectedAgentIds: new[] { "claude-code" },
+            installAll: true);
+
+        Assert.True(opts.All);
+        Assert.Equal("user", opts.Scope);
+        Assert.Equal(new[] { "claude-code" }, opts.Agents);
+    }
+
+    [Fact]
     public void ValidateSelection_Custom_EmptyPath_ReturnsError()
     {
         var error = InstallConfirmModal.ValidateSelection(scopeIndex: 2, customPath: "   ");

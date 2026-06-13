@@ -26,12 +26,14 @@ internal static class HelpOverlay
 - **/** — focus the Discover query box
 - **i** — install selected via compact confirm
 - **I** — install selected via advanced wizard
+- **A** — install *all* skills from the selected repo (gh 2.94+)
 - **o** — open the selected repo in the browser
 
 ## Installed
 
 - **x** — remove the selected installed skill
 - **o** — open the selected skill path
+- **G** — cycle scope filter (all / user / project / custom)
 
 ## Changes
 
@@ -42,6 +44,7 @@ internal static class HelpOverlay
 
 - **s / S** — cycle sort in Discover or Installed
 - **P** — cycle Installed pin filter
+- **G** — cycle Installed scope filter (pushes `--scope` to gh)
 - **e** — toggle raw / rendered preview
 - **l / r** — show / hide logs
 - **q / Esc** — quit at root · close modal otherwise

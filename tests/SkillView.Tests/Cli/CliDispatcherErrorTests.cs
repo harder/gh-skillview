@@ -120,7 +120,6 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(args.DryRun);
         Assert.False(args.Force);
         Assert.False(args.Unpin);
-        Assert.False(args.Yes);
         Assert.False(args.Json);
     }
 
@@ -135,11 +134,12 @@ public class CliDispatcherErrorTests : IDisposable
     }
 
     [Fact]
-    public void ParseUpdateArgs_AllWithYes()
+    public void ParseUpdateArgs_AllIsNonInteractive()
     {
+        // gh 2.94 `--all` updates without prompting; `--yes` is accepted but
+        // ignored (not forwarded to gh, which has no such flag).
         var args = CliDispatcher.ParseUpdateArgs(new[] { "--all", "--yes" });
         Assert.True(args.All);
-        Assert.True(args.Yes);
     }
 
     // --- search parser edge cases ----------------------------------------

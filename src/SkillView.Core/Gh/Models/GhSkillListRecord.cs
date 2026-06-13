@@ -3,19 +3,19 @@ using System.Collections.Immutable;
 namespace SkillView.Gh.Models;
 
 /// SkillView-internal projection of a `gh skill list --json` record. The
-/// upstream schema is defined by cli/cli PR #13418 (closing #13245) and the
-/// canonical field set is:
+/// schema shipped in gh 2.94.0 (cli/cli#13418, closing #13245) and the
+/// field set is:
 ///
-///   skillName · hosts[] · scope · sourceURL · version · pinned · path
+///   skillName · agentHosts[] · scope · sourceURL · version · pinned · path
 ///
-/// Where `scope` is "project" | "user" | "custom" and `hosts` is always an
-/// array of agent IDs (empty when `--dir` is used). `sourceURL` is a full URL
-/// for GitHub-installed skills, or a local filesystem path for local-source
-/// skills.
+/// Where `scope` is "project" | "user" | "custom" and `agentHosts` is always
+/// an array of agent IDs (empty when `--dir` is used). `sourceURL` is a full
+/// URL for GitHub-installed skills, or a local filesystem path for
+/// local-source skills.
 ///
 /// The adapter parses tolerantly (see <see cref="GhSkillListAdapter"/>) and
-/// keeps a small set of legacy/alternate JSON key names as fallbacks in case
-/// the upstream schema shifts before the PR merges.
+/// keeps a small set of legacy/alternate JSON key names (`hosts`, `agents`,
+/// etc.) as fallbacks against schema drift.
 public sealed record GhSkillListRecord
 {
     /// Skill name as reported by gh — read from JSON key `skillName` (or

@@ -5,16 +5,15 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill update`. Capability-gated flags
-/// (`--dry-run`, `--all`, `--force`, `--unpin`, `--yes`/`--non-interactive`,
-/// `--json`) attach only when the probe confirms them. Positional skill
-/// names are passed through unconditionally; v2.92.0 accepts them.
+/// Wraps `gh skill update`. SkillView requires gh ≥ 2.94.0, so `--dry-run`,
+/// `--all`, `--force`, and `--unpin` are all guaranteed; flags emit
+/// unconditionally and positional skill names pass straight through.
 ///
-/// `update --all` on v2.92.0 blocks on an interactive confirmation prompt
-/// when `--yes` is absent upstream. When the probe reports
-/// `SupportsUpdateYes`, the adapter appends the available flag so scripted
-/// callers don't hang. Until it lands, the caller can still pass specific
-/// skill names or `--dry-run`.
+/// `gh skill update --all` is non-interactive on its own — it updates without
+/// prompting and skips metadata-less skills with a notice, so no
+/// `--yes`/`--non-interactive` workaround is needed. `gh skill update` has no
+/// `--json` flag; SkillView's own `--json` output is rendered by the CLI layer
+/// from the parsed textual result.
 public sealed class GhSkillUpdateService
 {
     private readonly ProcessRunner _runner;
@@ -31,18 +30,15 @@ public sealed class GhSkillUpdateService
         bool All = false,
         bool DryRun = false,
         bool Force = false,
-        bool Unpin = false,
-        bool Yes = false,
-        bool Json = false);
+        bool Unpin = false);
 
     public async Task<UpdateResult> UpdateAsync(
         string ghPath,
-        CapabilityProfile capabilities,
         Options? options = null,
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
-        var args = BuildArgs(capabilities, options);
+        var args = BuildArgs(options);
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
@@ -63,45 +59,28 @@ public sealed class GhSkillUpdateService
         };
     }
 
-    internal static IReadOnlyList<string> BuildArgs(CapabilityProfile capabilities, Options options)
+    internal static IReadOnlyList<string> BuildArgs(Options options)
     {
         var args = new List<string> { "skill", "update" };
 
-        if (options.All && capabilities.SupportsUpdateAll)
+        if (options.All)
         {
             args.Add("--all");
         }
 
-        if (options.DryRun && capabilities.SupportsUpdateDryRun)
+        if (options.DryRun)
         {
             args.Add("--dry-run");
         }
 
-        if (options.Force && capabilities.SupportsUpdateForce)
+        if (options.Force)
         {
             args.Add("--force");
         }
 
-        if (options.Unpin && capabilities.SupportsUpdateUnpin)
+        if (options.Unpin)
         {
             args.Add("--unpin");
-        }
-
-        // When `--all` is requested but `--yes` has not landed upstream,
-        // `gh skill update --all` hangs on an interactive prompt. Attach
-        // `--yes` or `--non-interactive`, whichever the probe reports, only
-        // when available. The CLI path refuses `--all` without `--yes` or
-        // `--dry-run`; see `CliDispatcher.UpdateAsync`.
-        if (options.Yes && capabilities.SupportsUpdateYes)
-        {
-            // Prefer `--yes` when present, fall back to `--non-interactive`.
-            if (capabilities.UpdateFlags.Contains("--yes")) args.Add("--yes");
-            else args.Add("--non-interactive");
-        }
-
-        if (options.Json && capabilities.SupportsUpdateJson)
-        {
-            args.Add("--json");
         }
 
         if (options.Skills is { Count: > 0 } skills)

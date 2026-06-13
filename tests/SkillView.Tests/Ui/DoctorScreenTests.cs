@@ -9,52 +9,45 @@ namespace SkillView.Tests.Ui;
 public sealed class DoctorScreenTests
 {
     [Fact]
-    public void Render_ShowsPreviewHiddenDirCapability()
+    public void Render_ShowsGhSkillPresent()
     {
         var report = new EnvironmentReport
         {
             GhPath = "/usr/bin/gh",
-            GhVersionRaw = "gh version 2.91.0",
-            GhVersion = new SemVer(2, 91, 0),
+            GhVersionRaw = "gh version 2.94.0",
+            GhVersion = new SemVer(2, 94, 0),
             GhMeetsMinimum = true,
             Auth = GhAuthStatus.Unknown,
-            Capabilities = CapabilityProfile.Empty with
-            {
-                SkillSubcommandPresent = true,
-                PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
-            },
+            GhSkillAvailable = true,
             LogDirectory = "/tmp/skillview-logs",
         };
 
         var body = DoctorScreen.Render(report);
 
         Assert.Contains("## Environment", body);
-        Assert.Contains("| Item | Value |", body);
         Assert.Contains("| gh | `/usr/bin/gh` |", body);
-        Assert.Contains("| version | `gh version 2.91.0`", body);
-        Assert.Contains("### preview", body);
-        Assert.Contains("| Flag | Supported |", body);
-        Assert.Contains("| `--allow-hidden-dirs` | ✅ |", body);
+        Assert.Contains("| version | `gh version 2.94.0`", body);
+        Assert.Contains("## `gh skill`", body);
+        Assert.Contains("`gh skill` present", body);
     }
 
     [Fact]
-    public void Render_MarksPreviewHiddenDirCapabilityAbsent()
+    public void Render_MarksGhSkillAbsent()
     {
         var report = new EnvironmentReport
         {
             GhPath = "/usr/bin/gh",
-            GhVersionRaw = "gh version 2.91.0",
-            GhVersion = new SemVer(2, 91, 0),
+            GhVersionRaw = "gh version 2.94.0",
+            GhVersion = new SemVer(2, 94, 0),
             GhMeetsMinimum = true,
             Auth = GhAuthStatus.Unknown,
-            Capabilities = CapabilityProfile.Empty with { SkillSubcommandPresent = true },
+            GhSkillAvailable = false,
             LogDirectory = "/tmp/skillview-logs",
         };
 
         var body = DoctorScreen.Render(report);
 
-        Assert.Contains("### preview", body);
-        Assert.Contains("| `--allow-hidden-dirs` | ❌ |", body);
+        Assert.Contains("`gh skill` subcommand not detected", body);
     }
 
     [Fact]
@@ -74,7 +67,7 @@ public sealed class DoctorScreenTests
                 Hosts = ImmutableArray.Create("github.com|prod", "github-enterprise\ninternal"),
                 RawOutput = null,
             },
-            Capabilities = CapabilityProfile.Empty with { SkillSubcommandPresent = true },
+            GhSkillAvailable = true,
             LogDirectory = "/logs/main\nbranch|nightly",
         };
 

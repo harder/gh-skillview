@@ -358,7 +358,9 @@ public sealed class SkillViewApp
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
-            onStateChange: RefreshShellChrome)
+            onStateChange: RefreshShellChrome,
+            // Scope cycle (`G`) pushes `--scope` down to `gh skill list`.
+            scopedSnapshotLoader: scope => _workflows.CaptureInventorySnapshotAsync(scope, GetRunLifetimeToken()))
         {
             X = 0,
             Y = 2,
@@ -372,7 +374,6 @@ public sealed class SkillViewApp
             snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
             updateServiceFactory: () => _services.UpdateService,
             ghPathProvider: () => _ghPath,
-            capabilitiesProvider: () => _lastReport?.Capabilities ?? CapabilityProfile.Empty,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,
             onUpdateApplied: () => _services.ListAdapter.Invalidate())
@@ -526,6 +527,8 @@ public sealed class SkillViewApp
         // The Installed view is reached via `2` (jump-to-tab) or ←/→ cycling.
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
+        // A → install every skill in the selected result's repo (gh 2.94 --all).
+        if (rune.Value == 'A' && _activeTab == SkillViewTab.Discover) { StageInstallAll(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         // `u` jumps to the Changes tab (embedded). The actual single-row vs.
         // batch update keys live on the tab itself (u current row, U marked).
@@ -773,7 +776,6 @@ public sealed class SkillViewApp
 
             var snapshot = await _services.InventoryService.CaptureAsync(
                 report.GhPath,
-                report.Capabilities,
                 new LocalInventoryService.Options(
                     ScanRoots: _options.ScanRoots,
                     AllowHiddenDirs: false),
@@ -784,15 +786,10 @@ public sealed class SkillViewApp
             {
                 if (_hiddenDirsBox is not null)
                 {
-                    _hiddenDirsBox.Enabled = SupportsHiddenDirToggle(report.Capabilities);
-                    if (!_hiddenDirsBox.Enabled)
-                    {
-                        _hiddenDirsBox.Value = CheckState.UnChecked;
-                    }
+                    // gh ≥ 2.94 always supports --allow-hidden-dirs.
+                    _hiddenDirsBox.Enabled = true;
                     RefreshHiddenDirUi();
                 }
-
-                _updatesTab?.RefreshCapabilities();
 
                 if (ShouldAutoOpenInstalledOnStartup(snapshot))
                 {
@@ -820,7 +817,7 @@ public sealed class SkillViewApp
                 SetDefaultStatus($"gh {report.GhVersionRaw ?? "?"} below minimum {GhBinaryLocator.MinimumVersion} — press 'd' for Doctor");
                 return;
             }
-            if (!report.Capabilities.SkillSubcommandPresent)
+            if (!report.GhSkillAvailable)
             {
                 SetDefaultStatus("`gh skill` not detected — press 'd' for Doctor");
                 return;
@@ -848,12 +845,11 @@ public sealed class SkillViewApp
         var cancellationToken = GetRunLifetimeToken();
         try
         {
-            var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
             var options = new GhSkillSearchService.Options(
                 Owner: owner,
                 Limit: limit ?? GhSkillSearchService.DefaultLimit);
             var response = await _services.SearchService
-                .SearchAsync(_ghPath, query, capabilities, options, cancellationToken)
+                .SearchAsync(_ghPath, query, options, cancellationToken)
                 .ConfigureAwait(false);
             var results = response.Results;
             var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
@@ -920,7 +916,6 @@ public sealed class SkillViewApp
             return results;
         }
 
-        var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
         foreach (var result in results)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -940,7 +935,6 @@ public sealed class SkillViewApp
                 var preview = await _services.PreviewService
                     .PreviewAsync(
                         _ghPath,
-                        capabilities,
                         result.Repo,
                         result.SkillName,
                         allowHiddenDirs: ShouldAllowHiddenDirs(result, HiddenDirsEnabled),
@@ -997,11 +991,9 @@ public sealed class SkillViewApp
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(runCancellationToken);
             cts.CancelAfter(PreviewTimeout);
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
-            var capabilities = _lastReport?.Capabilities ?? CapabilityProfile.Empty;
             var preview = await _services.PreviewService
                 .PreviewAsync(
                     _ghPath,
-                    capabilities,
                     repo,
                     pick.SkillName,
                     allowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled),
@@ -1315,9 +1307,6 @@ public sealed class SkillViewApp
 
     internal static bool ShouldAllowHiddenDirs(SearchResultSkill skill, bool userEnabled) =>
         userEnabled || ShouldAllowHiddenDirPreview(skill);
-
-    internal static bool SupportsHiddenDirToggle(CapabilityProfile capabilities) =>
-        capabilities.SupportsAllowHiddenDirs || capabilities.SupportsPreviewAllowHiddenDirs;
 
     private static string? GetRepoLinkHost(GhAuthStatus? auth)
     {
@@ -1709,9 +1698,37 @@ public sealed class SkillViewApp
             new InstallRequest(
                 Repo: pick.Repo,
                 SkillName: pick.SkillName,
-                RepoPath: pick.Path,
                 AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
             forceAdvanced: forceAdvanced);
+    }
+
+    /// Stage an install of *every* skill in the selected result's repo
+    /// (`gh skill install <repo> --all`). gh ≥ 2.94 is required, so `--all`
+    /// is always available.
+    private void StageInstallAll()
+    {
+        if (_resultsTable is null || _results.Count == 0)
+        {
+            SetStatus("no results to install");
+            return;
+        }
+        var row = _resultsTable.GetSelectedRow();
+        if (row < 0 || row >= _results.Count)
+        {
+            SetStatus("no result selected");
+            return;
+        }
+        var pick = _results[row];
+        if (string.IsNullOrEmpty(pick.Repo))
+        {
+            SetStatus("no repo on selected row");
+            return;
+        }
+        _workflows.OpenInstallAllDialog(
+            new InstallRequest(
+                Repo: pick.Repo,
+                SkillName: null,
+                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
     }
 
     private void FocusSearchFromInstalled()
