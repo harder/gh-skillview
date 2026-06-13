@@ -24,21 +24,10 @@ namespace SkillView.Ui.Tabs;
 /// static helper on UpdateScreen so the 3 UpdateScreenTests stay green.
 internal sealed class UpdatesTabView : FrameView
 {
-    internal readonly record struct CapabilityUiState(
-        bool SupportsAll,
-        string AllLabel,
-        bool SupportsForce,
-        bool SupportsUnpin,
-        bool SupportsYes,
-        string YesLabel,
-        bool YesDefaultChecked,
-        bool SupportsDryRun);
-
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<GhSkillUpdateService> _updateServiceFactory;
     private readonly Func<string?> _ghPathProvider;
-    private readonly Func<CapabilityProfile> _capabilitiesProvider;
     private readonly Logger _logger;
     private readonly Action _onLeaveTab;
     private readonly Action _onUpdateApplied;
@@ -49,7 +38,6 @@ internal sealed class UpdatesTabView : FrameView
     private readonly CheckBox _allBox;
     private readonly CheckBox _forceBox;
     private readonly CheckBox _unpinBox;
-    private readonly CheckBox _yesBox;
     private readonly Label _status;
     private readonly SpinnerView _spinner;
     private readonly Button _dryRunButton;
@@ -66,7 +54,6 @@ internal sealed class UpdatesTabView : FrameView
         Func<Task<InventorySnapshot>> snapshotLoader,
         Func<GhSkillUpdateService> updateServiceFactory,
         Func<string?> ghPathProvider,
-        Func<CapabilityProfile> capabilitiesProvider,
         Logger logger,
         Action onLeaveTab,
         Action onUpdateApplied)
@@ -75,7 +62,6 @@ internal sealed class UpdatesTabView : FrameView
         _snapshotLoader = snapshotLoader;
         _updateServiceFactory = updateServiceFactory;
         _ghPathProvider = ghPathProvider;
-        _capabilitiesProvider = capabilitiesProvider;
         _logger = logger;
         _onLeaveTab = onLeaveTab;
         _onUpdateApplied = onUpdateApplied;
@@ -119,11 +105,6 @@ internal sealed class UpdatesTabView : FrameView
         _unpinBox = new CheckBox
         {
             X = 22, Y = Pos.AnchorEnd(4), Text = "_unpin",
-        };
-        _yesBox = new CheckBox
-        {
-            X = 34, Y = Pos.AnchorEnd(4),
-            Text = "_yes",
         };
 
         _status = new Label
@@ -177,15 +158,13 @@ internal sealed class UpdatesTabView : FrameView
 
         TuiHelpers.ApplyScheme(SchemeNames.Base,
             this, _tableLabel, _table, _preview,
-            _allBox, _forceBox, _unpinBox, _yesBox,
+            _allBox, _forceBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar);
-
-        ApplyCapabilities(_capabilitiesProvider());
 
         KeyDown += OnKeyDown;
 
         Add(_tableLabel, _table, _preview,
-            _allBox, _forceBox, _unpinBox, _yesBox,
+            _allBox, _forceBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar);
     }
 
@@ -193,7 +172,6 @@ internal sealed class UpdatesTabView : FrameView
     {
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         Visible = true;
-        RefreshCapabilities();
         _status.Text = " loading inventory…";
         try
         {
@@ -205,7 +183,6 @@ internal sealed class UpdatesTabView : FrameView
                     return;
                 }
 
-                RefreshCapabilities();
                 Populate(snapshot);
             }).ConfigureAwait(false);
         }
@@ -222,18 +199,6 @@ internal sealed class UpdatesTabView : FrameView
             }).ConfigureAwait(false);
         }
     }
-
-    internal void RefreshCapabilities() => ApplyCapabilities(_capabilitiesProvider());
-
-    internal static CapabilityUiState DescribeCapabilityState(CapabilityProfile caps) => new(
-        SupportsAll: caps.SupportsUpdateAll,
-        AllLabel: caps.SupportsUpdateAll ? "_all" : "_all (not supported)",
-        SupportsForce: caps.SupportsUpdateForce,
-        SupportsUnpin: caps.SupportsUpdateUnpin,
-        SupportsYes: caps.SupportsUpdateYes,
-        YesLabel: caps.SupportsUpdateYes ? "_yes" : "yes (needs gh --yes)",
-        YesDefaultChecked: caps.SupportsUpdateYes,
-        SupportsDryRun: caps.SupportsUpdateDryRun);
 
     private void Populate(InventorySnapshot snapshot)
     {
@@ -259,45 +224,6 @@ internal sealed class UpdatesTabView : FrameView
         _table.SetFocus();
     }
 
-    private void ApplyCapabilities(CapabilityProfile caps)
-    {
-        var state = DescribeCapabilityState(caps);
-
-        var allWasEnabled = _allBox.Enabled;
-        var forceWasEnabled = _forceBox.Enabled;
-        var unpinWasEnabled = _unpinBox.Enabled;
-        var yesWasEnabled = _yesBox.Enabled;
-        var keepAllChecked = _allBox.Enabled && _allBox.Value == CheckState.Checked;
-        var keepForceChecked = _forceBox.Enabled && _forceBox.Value == CheckState.Checked;
-        var keepUnpinChecked = _unpinBox.Enabled && _unpinBox.Value == CheckState.Checked;
-        var keepYesChecked = _yesBox.Enabled && _yesBox.Value == CheckState.Checked;
-
-        _allBox.Text = state.AllLabel;
-        _allBox.Enabled = state.SupportsAll;
-        _allBox.Value = state.SupportsAll && allWasEnabled && keepAllChecked
-            ? CheckState.Checked
-            : CheckState.UnChecked;
-
-        _forceBox.Enabled = state.SupportsForce;
-        _forceBox.Value = state.SupportsForce && forceWasEnabled && keepForceChecked
-            ? CheckState.Checked
-            : CheckState.UnChecked;
-
-        _unpinBox.Enabled = state.SupportsUnpin;
-        _unpinBox.Value = state.SupportsUnpin && unpinWasEnabled && keepUnpinChecked
-            ? CheckState.Checked
-            : CheckState.UnChecked;
-
-        _yesBox.Text = state.YesLabel;
-        _yesBox.Enabled = state.SupportsYes;
-        _yesBox.Value = state.SupportsYes
-            ? (yesWasEnabled
-                ? (keepYesChecked ? CheckState.Checked : CheckState.UnChecked)
-                : (state.YesDefaultChecked ? CheckState.Checked : CheckState.UnChecked))
-            : CheckState.UnChecked;
-
-        _dryRunButton.Enabled = state.SupportsDryRun;
-    }
 
     private bool IsCurrentLoad(long loadGeneration) =>
         Interlocked.Read(ref _loadGeneration) == loadGeneration;
@@ -419,9 +345,7 @@ internal sealed class UpdatesTabView : FrameView
             _status.Text = " gh not found — press 'd' for Doctor";
             return;
         }
-        var caps = _capabilitiesProvider();
         var allChecked = !batchOnly && _allBox.Value == CheckState.Checked;
-        var yesChecked = _yesBox.Value == CheckState.Checked;
         var marked = _wrapper is null
             ? new List<string>()
             : Enumerable.Range(0, _skills.Count)
@@ -436,11 +360,6 @@ internal sealed class UpdatesTabView : FrameView
                 : " pick at least one skill (Space to mark) or enable --all";
             return;
         }
-        if (allChecked && !dryRun && !yesChecked && !caps.SupportsUpdateYes)
-        {
-            _status.Text = " refusing --all without --yes (would hang on gh's prompt)";
-            return;
-        }
 
         _spinner.Visible = true;
         _spinner.AutoSpin = true;
@@ -453,14 +372,12 @@ internal sealed class UpdatesTabView : FrameView
             All: allChecked,
             DryRun: dryRun,
             Force: _forceBox.Value == CheckState.Checked,
-            Unpin: _unpinBox.Value == CheckState.Checked,
-            Yes: yesChecked,
-            Json: false);
+            Unpin: _unpinBox.Value == CheckState.Checked);
 
         try
         {
             var result = await _updateServiceFactory()
-                .UpdateAsync(ghPath, caps, options).ConfigureAwait(false);
+                .UpdateAsync(ghPath, options).ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 _spinner.AutoSpin = false;
@@ -476,7 +393,12 @@ internal sealed class UpdatesTabView : FrameView
                 }
                 else if (result.Succeeded)
                 {
-                    _status.Text = " update succeeded";
+                    // gh 2.94 skips metadata-less skills under --all; surface
+                    // the count so success isn't mistaken for "all updated".
+                    var skipped = result.Entries.Count(e => e.Status == "skipped");
+                    _status.Text = skipped > 0
+                        ? $" update succeeded · {skipped} skipped (no metadata)"
+                        : " update succeeded";
                     _onUpdateApplied();
                 }
                 else

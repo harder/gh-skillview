@@ -29,11 +29,11 @@ public class CliDispatcherJsonSnapshotTests
     private static EnvironmentReport SampleReport() => new()
     {
         GhPath = "/usr/bin/gh",
-        GhVersionRaw = "gh version 2.91.0",
-        GhVersion = new SemVer(2, 91, 0),
+        GhVersionRaw = "gh version 2.94.0",
+        GhVersion = new SemVer(2, 94, 0),
         GhMeetsMinimum = true,
         Auth = GhAuthStatus.Unknown,
-        Capabilities = CapabilityProfile.Empty with { SkillSubcommandPresent = true },
+        GhSkillAvailable = true,
         LogDirectory = "/tmp/skillview-logs",
     };
 
@@ -71,57 +71,27 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Equal("/usr/bin/gh", doc.GetProperty("ghPath").GetString());
         Assert.True(doc.GetProperty("ghMeetsMinimum").GetBoolean());
         Assert.True(doc.GetProperty("baselineOk").GetBoolean());
-        var caps = doc.GetProperty("capabilities");
-        Assert.False(caps.GetProperty("supportsPreviewAllowHiddenDirs").GetBoolean());
-        Assert.Equal(0, caps.GetProperty("previewFlags").GetArrayLength());
+        // gh ≥ 2.94 is required, so a single availability bool replaces the
+        // old per-flag capability block.
+        Assert.True(doc.GetProperty("ghSkillAvailable").GetBoolean());
         Assert.True(doc.TryGetProperty("auth", out _));
-        Assert.True(doc.TryGetProperty("capabilities", out _));
         Assert.True(doc.TryGetProperty("scanRoots", out _));
     }
 
     [Fact]
-    public void Doctor_JsonReportsPreviewHiddenDirCapability()
+    public void Doctor_JsonReportsGhSkillUnavailable()
     {
-        var report = SampleReport() with
-        {
-            Capabilities = CapabilityProfile.Empty with
-            {
-                SkillSubcommandPresent = true,
-                PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
-            },
-        };
-
+        var report = SampleReport() with { GhSkillAvailable = false };
         var doc = Parse(CliDispatcher.RenderDoctorJson(report, DefaultOptions()));
-        var caps = doc.GetProperty("capabilities");
-        Assert.True(caps.GetProperty("supportsPreviewAllowHiddenDirs").GetBoolean());
-        Assert.Equal(1, caps.GetProperty("previewFlags").GetArrayLength());
-        Assert.Equal("--allow-hidden-dirs", caps.GetProperty("previewFlags")[0].GetString());
+        Assert.False(doc.GetProperty("ghSkillAvailable").GetBoolean());
     }
 
     [Fact]
-    public void Doctor_TextReportsPreviewHiddenDirCapability()
-    {
-        var report = SampleReport() with
-        {
-            Capabilities = CapabilityProfile.Empty with
-            {
-                SkillSubcommandPresent = true,
-                PreviewFlags = ImmutableHashSet.Create("--allow-hidden-dirs"),
-            },
-        };
-
-        var body = CliDispatcher.RenderDoctorText(report, DefaultOptions());
-        Assert.Contains("gh skill preview : allow-hidden-dirs supported", body);
-        Assert.Contains("preview-allow-hidden-dirs", body);
-    }
-
-    [Fact]
-    public void Doctor_TextMarksPreviewHiddenDirCapabilityAbsent()
+    public void Doctor_TextReportsGhSkillPresent()
     {
         var body = CliDispatcher.RenderDoctorText(SampleReport(), DefaultOptions());
-
-        Assert.Contains("gh skill preview : (not detected)", body);
-        Assert.DoesNotContain("preview-allow-hidden-dirs", body);
+        Assert.Contains("gh skill", body);
+        Assert.Contains("present", body);
     }
 
     // --- list ------------------------------------------------------------
@@ -130,7 +100,7 @@ public class CliDispatcherJsonSnapshotTests
     public void List_JsonSerializesSkillsArray()
     {
         var snap = Snapshot(Skill("a"), Skill("b", "/p/b"));
-        var doc = Parse(CliDispatcher.RenderListJson(snap, CapabilityProfile.Empty));
+        var doc = Parse(CliDispatcher.RenderListJson(snap));
         Assert.True(doc.GetProperty("scannedRoots").GetArrayLength() == 1);
         var skills = doc.GetProperty("skills");
         Assert.Equal(2, skills.GetArrayLength());
@@ -238,10 +208,10 @@ public class CliDispatcherJsonSnapshotTests
             Pin: true,
             Force: false,
             Upstream: null,
-            RepoPath: null,
             FromLocal: false,
             AllowHiddenDirs: false,
-            Json: true);
+            Json: true,
+            All: false);
         var added = new[] { Skill("render-md") };
         var doc = Parse(CliDispatcher.RenderInstallJson(r, p, added));
         Assert.True(doc.GetProperty("succeeded").GetBoolean());
@@ -278,7 +248,6 @@ public class CliDispatcherJsonSnapshotTests
             DryRun: false,
             Force: false,
             Unpin: false,
-            Yes: true,
             Json: true);
         var changed = new[]
         {

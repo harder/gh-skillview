@@ -65,7 +65,7 @@ public static class CliDispatcher
         {
             return ExitCodes.EnvironmentError;
         }
-        if (!report.Capabilities.SkillSubcommandPresent)
+        if (!report.GhSkillAvailable)
         {
             return ExitCodes.EnvironmentError;
         }
@@ -83,10 +83,7 @@ public static class CliDispatcher
         sb.AppendLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
         sb.AppendLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
         sb.AppendLine($"gh auth       : {AuthSummary(r.Auth)}");
-        sb.AppendLine($"gh skill      : {(r.Capabilities.SkillSubcommandPresent ? "present" : "(not detected)")}");
-        sb.AppendLine($"gh skill list : {(r.Capabilities.HasSkillList ? "present (--json supported)" : "(not detected — filesystem fallback in use)")}");
-        sb.AppendLine($"gh skill preview : {(r.Capabilities.SupportsPreviewAllowHiddenDirs ? "allow-hidden-dirs supported" : "(not detected)")}");
-        sb.AppendLine($"capabilities  : {CapabilitiesSummary(r.Capabilities)}");
+        sb.AppendLine($"gh skill      : {(r.GhSkillAvailable ? "present (gh ≥ 2.94 — full skill surface)" : "(not detected)")}");
         sb.AppendLine($"debug         : {options.Debug}");
         sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
         sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
@@ -104,21 +101,6 @@ public static class CliDispatcher
         var acct = auth.Account ?? "?";
         var others = auth.Hosts.Length > 1 ? $" (+{auth.Hosts.Length - 1} other host{(auth.Hosts.Length == 2 ? "" : "s")})" : string.Empty;
         return $"{acct}@{host}{others}";
-    }
-
-    private static string CapabilitiesSummary(CapabilityProfile c)
-    {
-        if (!c.SkillSubcommandPresent) return "(gh skill not detected)";
-        var bits = new List<string>();
-        if (c.SupportsAllowHiddenDirs) bits.Add("allow-hidden-dirs");
-        if (c.SupportsPreviewAllowHiddenDirs) bits.Add("preview-allow-hidden-dirs");
-        if (c.SupportsUpstream) bits.Add("upstream");
-        if (c.SupportsRepoPath) bits.Add("repo-path");
-        if (c.SupportsFromLocal) bits.Add("from-local");
-        if (c.SupportsUpdateJson) bits.Add("update-json");
-        if (c.SupportsUpdateYes) bits.Add("update-yes");
-        if (c.HasSkillList) bits.Add("list-json");
-        return bits.Count == 0 ? "(no probed flags found)" : string.Join(", ", bits);
     }
 
     private static void WriteDoctorJson(EnvironmentReport r, AppOptions options)
@@ -149,23 +131,10 @@ public static class CliDispatcher
             writer.WriteEndArray();
             writer.WriteEndObject();
 
-            writer.WriteStartObject("capabilities");
-            writer.WriteBoolean("skillSubcommandPresent", r.Capabilities.SkillSubcommandPresent);
-            writer.WriteBoolean("listSubcommandPresent", r.Capabilities.ListSubcommandPresent);
-            writer.WriteBoolean("hasSkillList", r.Capabilities.HasSkillList);
-            writer.WriteBoolean("supportsAllowHiddenDirs", r.Capabilities.SupportsAllowHiddenDirs);
-            writer.WriteBoolean("supportsUpstream", r.Capabilities.SupportsUpstream);
-            writer.WriteBoolean("supportsRepoPath", r.Capabilities.SupportsRepoPath);
-            writer.WriteBoolean("supportsFromLocal", r.Capabilities.SupportsFromLocal);
-            writer.WriteBoolean("supportsPreviewAllowHiddenDirs", r.Capabilities.SupportsPreviewAllowHiddenDirs);
-            writer.WriteBoolean("supportsUpdateJson", r.Capabilities.SupportsUpdateJson);
-            writer.WriteBoolean("supportsUpdateYes", r.Capabilities.SupportsUpdateYes);
-            WriteFlagArray(writer, "installFlags", r.Capabilities.InstallFlags);
-            WriteFlagArray(writer, "previewFlags", r.Capabilities.PreviewFlags);
-            WriteFlagArray(writer, "updateFlags", r.Capabilities.UpdateFlags);
-            WriteFlagArray(writer, "listFlags", r.Capabilities.ListFlags);
-            WriteFlagArray(writer, "searchFlags", r.Capabilities.SearchFlags);
-            writer.WriteEndObject();
+            // gh ≥ 2.94 is required, so the full `gh skill` flag surface is
+            // guaranteed once the command is present — a single availability
+            // bool replaces the old per-flag capability probe.
+            writer.WriteBoolean("ghSkillAvailable", r.GhSkillAvailable);
 
             writer.WriteStartArray("scanRoots");
             foreach (var root in options.ScanRoots) writer.WriteStringValue(root);
@@ -176,15 +145,6 @@ public static class CliDispatcher
         return System.Text.Encoding.UTF8.GetString(ms.ToArray());
     }
 
-    private static void WriteFlagArray(Utf8JsonWriter writer, string name, IEnumerable<string> flags)
-    {
-        writer.WriteStartArray(name);
-        foreach (var f in flags.OrderBy(x => x, StringComparer.Ordinal))
-        {
-            writer.WriteStringValue(f);
-        }
-        writer.WriteEndArray();
-    }
 
     private static int ClearLogs(TuiServices services)
     {
@@ -201,7 +161,7 @@ public static class CliDispatcher
     private static async Task<int> RescanAsync(AppOptions options, TuiServices services)
     {
         services.ListAdapter.Invalidate();
-        var (snapshot, _) = await CaptureInventoryAsync(options, services).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(options, services).ConfigureAwait(false);
         var d = snapshot.Diagnostics;
         Console.Out.WriteLine($"rescan: {snapshot.Skills.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
                               (snapshot.UsedGhSkillList ? " (gh skill list used)" : " (filesystem only)"));
@@ -214,11 +174,11 @@ public static class CliDispatcher
     private static async Task<int> ListAsync(AppOptions options, TuiServices services)
     {
         var listOptions = ParseListArgs(options.SubcommandArgs, out var json);
-        var (snapshot, capabilities) = await CaptureInventoryAsync(options, services, listOptions).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(options, services, listOptions).ConfigureAwait(false);
 
         if (json)
         {
-            WriteListJson(snapshot, capabilities);
+            WriteListJson(snapshot);
         }
         else
         {
@@ -251,7 +211,7 @@ public static class CliDispatcher
         return (scope, agent, path, scanRoots);
     }
 
-    private static async Task<(Inventory.Models.InventorySnapshot Snapshot, CapabilityProfile Capabilities)>
+    private static async Task<Inventory.Models.InventorySnapshot>
         CaptureInventoryAsync(
             AppOptions options,
             TuiServices services,
@@ -270,16 +230,14 @@ public static class CliDispatcher
                 if (!scanRoots.Contains(extra)) scanRoots.Add(extra);
             }
         }
-        var snapshot = await services.InventoryService.CaptureAsync(
+        return await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 scanRoots,
                 allowHidden,
                 FilterScope: scope,
                 FilterAgent: agent)
         ).ConfigureAwait(false);
-        return (snapshot, report.Capabilities);
     }
 
     private static void WriteListText(Inventory.Models.InventorySnapshot snapshot)
@@ -310,14 +268,10 @@ public static class CliDispatcher
         return new string(flags);
     }
 
-    private static void WriteListJson(
-        Inventory.Models.InventorySnapshot snapshot,
-        CapabilityProfile capabilities)
-        => Console.Out.WriteLine(RenderListJson(snapshot, capabilities));
+    private static void WriteListJson(Inventory.Models.InventorySnapshot snapshot)
+        => Console.Out.WriteLine(RenderListJson(snapshot));
 
-    internal static string RenderListJson(
-        Inventory.Models.InventorySnapshot snapshot,
-        CapabilityProfile capabilities)
+    internal static string RenderListJson(Inventory.Models.InventorySnapshot snapshot)
     {
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
@@ -325,7 +279,6 @@ public static class CliDispatcher
             w.WriteStartObject();
             w.WriteString("capturedAt", snapshot.CapturedAt.ToString("O"));
             w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
-            w.WriteBoolean("ghSkillListAvailable", capabilities.HasSkillList);
 
             w.WriteStartArray("scannedRoots");
             foreach (var r in snapshot.ScannedRoots)
@@ -384,7 +337,7 @@ public static class CliDispatcher
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
-        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
             return ExitCodes.EnvironmentError;
@@ -393,7 +346,6 @@ public static class CliDispatcher
         var response = await services.SearchService.SearchAsync(
             report.GhPath!,
             parsed.Query,
-            report.Capabilities,
             new GhSkillSearchService.Options(
                 Owner: parsed.Owner,
                 Limit: parsed.Limit ?? GhSkillSearchService.DefaultLimit,
@@ -495,7 +447,7 @@ public static class CliDispatcher
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
-        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
             return ExitCodes.EnvironmentError;
@@ -503,7 +455,6 @@ public static class CliDispatcher
 
         var preview = await services.PreviewService.PreviewAsync(
             report.GhPath!,
-            report.Capabilities,
             parsed.Repo,
             parsed.SkillName,
             parsed.Version,
@@ -616,15 +567,15 @@ public static class CliDispatcher
         {
             Console.Error.WriteLine("skillview: install requires a repo (OWNER/REPO)");
             Console.Error.WriteLine(
-                "usage: skillview install <owner/repo>[@<ref>] [<skill>] [--agent <id>]..." +
+                "usage: skillview install <owner/repo>[@<ref>] [<skill>|--all] [--agent <id>]..." +
                 " [--scope project|user|custom] [--path <dir>] [--version <ref>] [--pin]" +
-                " [--force] [--upstream <url>] [--repo-path <p>] [--from-local]" +
+                " [--force] [--upstream <url>] [--from-local]" +
                 " [--allow-hidden-dirs] [--json]");
             return ExitCodes.InvalidUsage;
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
-        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
             return ExitCodes.EnvironmentError;
@@ -639,13 +590,12 @@ public static class CliDispatcher
             Overwrite: parsed.Force,
             Upstream: parsed.Upstream,
             AllowHiddenDirs: parsed.AllowHiddenDirs,
-            RepoPath: parsed.RepoPath,
-            FromLocal: parsed.FromLocal);
+            FromLocal: parsed.FromLocal,
+            All: parsed.All);
 
         // Snapshot pre-install so we can surface the post-install diff.
         var preSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
                 AllowHiddenDirs: parsed.AllowHiddenDirs)
@@ -655,7 +605,6 @@ public static class CliDispatcher
             report.GhPath!,
             parsed.Repo,
             parsed.SkillName,
-            report.Capabilities,
             installOptions
         ).ConfigureAwait(false);
 
@@ -673,7 +622,6 @@ public static class CliDispatcher
         services.ListAdapter.Invalidate();
         var postSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
                 AllowHiddenDirs: parsed.AllowHiddenDirs)
@@ -696,22 +644,23 @@ public static class CliDispatcher
         bool Pin,
         bool Force,
         string? Upstream,
-        string? RepoPath,
         bool FromLocal,
         bool AllowHiddenDirs,
-        bool Json);
+        bool Json,
+        bool All);
 
     internal static ParsedInstallArgs ParseInstallArgs(IReadOnlyList<string> args)
     {
-        string? version = null, scope = null, path = null, upstream = null, repoPath = null;
+        string? version = null, scope = null, path = null, upstream = null;
         var agents = new List<string>();
         var positional = new List<string>();
-        bool pin = false, force = false, fromLocal = false, allowHidden = false, json = false;
+        bool pin = false, force = false, fromLocal = false, allowHidden = false, json = false, all = false;
 
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
             if (a == "--json") { json = true; continue; }
+            if (a == "--all") { all = true; continue; }
             if (a == "--pin") { pin = true; continue; }
             if (a == "--force" || a == "--overwrite") { force = true; continue; }
             if (a == "--from-local") { fromLocal = true; continue; }
@@ -726,8 +675,6 @@ public static class CliDispatcher
             if (a == "--path" && i + 1 < args.Count) { path = args[++i]; continue; }
             if (a.StartsWith("--upstream=", StringComparison.Ordinal)) { upstream = a["--upstream=".Length..]; continue; }
             if (a == "--upstream" && i + 1 < args.Count) { upstream = args[++i]; continue; }
-            if (a.StartsWith("--repo-path=", StringComparison.Ordinal)) { repoPath = a["--repo-path=".Length..]; continue; }
-            if (a == "--repo-path" && i + 1 < args.Count) { repoPath = args[++i]; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
             positional.Add(a);
         }
@@ -748,14 +695,14 @@ public static class CliDispatcher
 
         return new ParsedInstallArgs(
             repo, skill, version, agents, scope, path, pin, force,
-            upstream, repoPath, fromLocal, allowHidden, json);
+            upstream, fromLocal, allowHidden, json, all);
     }
 
     private static async Task<int> UpdateAsync(AppOptions options, TuiServices services)
     {
         var parsed = ParseUpdateArgs(options.SubcommandArgs);
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
-        if (!report.GhFound || !report.GhMeetsMinimum || !report.Capabilities.SkillSubcommandPresent)
+        if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
             return ExitCodes.EnvironmentError;
@@ -766,25 +713,13 @@ public static class CliDispatcher
             Console.Error.WriteLine("skillview: update requires at least one skill, --all, or --dry-run");
             Console.Error.WriteLine(
                 "usage: skillview update [<skill>]... [--all] [--dry-run] [--force] [--unpin]" +
-                " [--yes] [--json]");
+                " [--json]");
             return ExitCodes.InvalidUsage;
-        }
-
-        // Refuse `--all` without `--yes` unless the probe has confirmed the
-        // current `gh` build accepts non-interactive updates, or the user has
-        // explicitly asked for a dry-run.
-        if (parsed.All && !parsed.DryRun && !parsed.Yes && !report.Capabilities.SupportsUpdateYes)
-        {
-            Console.Error.WriteLine(
-                "skillview: refusing `--all` without `--yes` because this `gh` build lacks --yes/--non-interactive");
-            Console.Error.WriteLine("hint: rerun with --dry-run, or name specific skills");
-            return ExitCodes.UserError;
         }
 
         // Pre-snapshot for diffing: additions + version changes.
         var preSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
                 AllowHiddenDirs: false)
@@ -795,13 +730,10 @@ public static class CliDispatcher
             All: parsed.All,
             DryRun: parsed.DryRun,
             Force: parsed.Force,
-            Unpin: parsed.Unpin,
-            Yes: parsed.Yes,
-            Json: parsed.Json && report.Capabilities.SupportsUpdateJson);
+            Unpin: parsed.Unpin);
 
         var result = await services.UpdateService.UpdateAsync(
             report.GhPath!,
-            report.Capabilities,
             updateOptions
         ).ConfigureAwait(false);
 
@@ -829,7 +761,6 @@ public static class CliDispatcher
             services.ListAdapter.Invalidate();
             var postSnapshot = await services.InventoryService.CaptureAsync(
                 report.GhPath,
-                report.Capabilities,
                 new Inventory.LocalInventoryService.Options(
                     ScanRoots: options.ScanRoots,
                     AllowHiddenDirs: false)
@@ -850,26 +781,26 @@ public static class CliDispatcher
         bool DryRun,
         bool Force,
         bool Unpin,
-        bool Yes,
         bool Json);
 
     internal static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
     {
         var skills = new List<string>();
-        bool all = false, dryRun = false, force = false, unpin = false, yes = false, json = false;
+        bool all = false, dryRun = false, force = false, unpin = false, json = false;
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
+            // `--json` selects SkillView's own machine-readable output; it is
+            // not passed to `gh skill update` (which has no --json flag).
             if (a == "--json") { json = true; continue; }
             if (a == "--all") { all = true; continue; }
             if (a == "--dry-run") { dryRun = true; continue; }
             if (a == "--force") { force = true; continue; }
             if (a == "--unpin") { unpin = true; continue; }
-            if (a == "--yes" || a == "--non-interactive") { yes = true; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
             skills.Add(a);
         }
-        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, yes, json);
+        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, json);
     }
 
     /// Per-skill TreeSha delta: skills present at the same ResolvedPath in
@@ -928,6 +859,16 @@ public static class CliDispatcher
             }
         }
 
+        // gh 2.94 skips skills without GitHub metadata under --all / non-
+        // interactive mode (cli/cli#13469). Surface the count so it's not
+        // mistaken for silent success.
+        var skipped = r.Entries.Count(e => e.Status == "skipped");
+        if (skipped > 0)
+        {
+            Console.Out.WriteLine();
+            Console.Out.WriteLine($"note: {skipped} skill(s) skipped (no GitHub metadata — install via gh to enable updates)");
+        }
+
         if (p.DryRun) return;
 
         if (added.Count > 0)
@@ -976,7 +917,6 @@ public static class CliDispatcher
             w.WriteBoolean("all", p.All);
             w.WriteBoolean("force", p.Force);
             w.WriteBoolean("unpin", p.Unpin);
-            w.WriteBoolean("yes", p.Yes);
 
             w.WriteStartArray("skills");
             foreach (var s in p.Skills) w.WriteStringValue(s);
@@ -1085,7 +1025,7 @@ public static class CliDispatcher
             w.WriteString("path", p.Path);
             w.WriteBoolean("pin", p.Pin);
             w.WriteBoolean("force", p.Force);
-            w.WriteString("repoPath", p.RepoPath);
+            w.WriteBoolean("all", p.All);
 
             w.WriteStartArray("commandLine");
             foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
@@ -1123,7 +1063,6 @@ public static class CliDispatcher
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
                 AllowHiddenDirs: false)
@@ -1311,7 +1250,6 @@ public static class CliDispatcher
         var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
-            report.Capabilities,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
                 AllowHiddenDirs: false)
@@ -1673,8 +1611,8 @@ public static class CliDispatcher
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
-            | `install OWNER/REPO [SKILL]` | Install a skill, then rescan inventory. | `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--repo-path`, `--from-local`, `--allow-hidden-dirs`, `--json` |
-            | `update [SKILL...]` | Dry-run or apply updates for one or many installed skills. | `--all`, `--dry-run`, `--force`, `--unpin`, `--yes`, `--json` |
+            | `install OWNER/REPO [SKILL]` | Install one skill, or every skill in the repo with `--all`, then rescan inventory. | `--all`, `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--from-local`, `--allow-hidden-dirs`, `--json` |
+            | `update [SKILL...]` | Dry-run or apply updates for one or many installed skills. `--all` is non-interactive and skips metadata-less skills. | `--all`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 

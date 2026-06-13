@@ -27,8 +27,14 @@ internal sealed class InstalledTabView : FrameView
     /// Maps to: All rows · only pinned · only unpinned.
     internal enum PinFilter { All, PinnedOnly, UnpinnedOnly }
 
+    /// Scope filter cycle. "user"/"project" push down to `gh skill list
+    /// --scope`; "custom" filters in-process (gh's --scope only accepts
+    /// project|user). "All" captures everything.
+    internal enum ScopeFilter { All, User, Project, Custom }
+
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
+    private readonly Func<string?, Task<InventorySnapshot>>? _scopedSnapshotLoader;
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
@@ -43,6 +49,7 @@ internal sealed class InstalledTabView : FrameView
     private IReadOnlyList<InstalledSkill> _all = Array.Empty<InstalledSkill>();
     private SortMode _sort = SortMode.Name;
     private PinFilter _pinFilter = PinFilter.All;
+    private ScopeFilter _scopeFilter = ScopeFilter.All;
     private bool _hasPackages;
     private int _packageCount;
     private int _lastWidth = -1;
@@ -58,10 +65,12 @@ internal sealed class InstalledTabView : FrameView
         Action<InstalledSkill, InventorySnapshot> onRemove,
         Action onLeaveTab,
         Action onGoToSearch,
-        Action? onStateChange = null)
+        Action? onStateChange = null,
+        Func<string?, Task<InventorySnapshot>>? scopedSnapshotLoader = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
+        _scopedSnapshotLoader = scopedSnapshotLoader;
         _onRemove = onRemove;
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
@@ -170,7 +179,7 @@ internal sealed class InstalledTabView : FrameView
         _footer.Text = " loading inventory…";
         try
         {
-            var snapshot = await _snapshotLoader().ConfigureAwait(false);
+            var snapshot = await CaptureSnapshotAsync().ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 if (!IsCurrentLoad(loadGeneration))
@@ -239,6 +248,12 @@ internal sealed class InstalledTabView : FrameView
                 || s.Agents.Any(a => a.AgentId.Contains(q, cmp))
                 || (s.Package?.Source.Contains(q, cmp) ?? false));
         }
+        // Scope filter is also applied here (not just server-side) so it's
+        // correct whether or not the gh push-down ran, and covers "custom".
+        if (ToScope(_scopeFilter) is { } wantedScope)
+        {
+            source = source.Where(s => s.Scope == wantedScope);
+        }
         source = _pinFilter switch
         {
             PinFilter.PinnedOnly   => source.Where(s => s.Pinned),
@@ -247,6 +262,15 @@ internal sealed class InstalledTabView : FrameView
         };
         _rows = ApplySort(source);
     }
+
+    /// Snapshot source for <see cref="LoadAsync"/>. When a scope-aware loader
+    /// is wired and the filter is user/project, the capture pushes `--scope`
+    /// down to `gh skill list`; otherwise it captures everything and the
+    /// in-process filter narrows the view.
+    private Task<InventorySnapshot> CaptureSnapshotAsync() =>
+        _scopedSnapshotLoader is not null
+            ? _scopedSnapshotLoader(ToGhScope(_scopeFilter))
+            : _snapshotLoader();
 
     internal static PinFilter CyclePin(PinFilter current) => current switch
     {
@@ -260,6 +284,39 @@ internal sealed class InstalledTabView : FrameView
         PinFilter.PinnedOnly   => "pinned only",
         PinFilter.UnpinnedOnly => "unpinned only",
         _                      => "all",
+    };
+
+    internal static ScopeFilter CycleScope(ScopeFilter current) => current switch
+    {
+        ScopeFilter.All     => ScopeFilter.User,
+        ScopeFilter.User    => ScopeFilter.Project,
+        ScopeFilter.Project => ScopeFilter.Custom,
+        _                   => ScopeFilter.All,
+    };
+
+    internal static string DescribeScope(ScopeFilter f) => f switch
+    {
+        ScopeFilter.User    => "user",
+        ScopeFilter.Project => "project",
+        ScopeFilter.Custom  => "custom",
+        _                   => "all",
+    };
+
+    private static Scope? ToScope(ScopeFilter f) => f switch
+    {
+        ScopeFilter.User    => Scope.User,
+        ScopeFilter.Project => Scope.Project,
+        ScopeFilter.Custom  => Scope.Custom,
+        _                   => null,
+    };
+
+    /// gh's `--scope` accepts only project|user, so "custom" and "all" map to
+    /// null (full capture) and are narrowed in-process.
+    private static string? ToGhScope(ScopeFilter f) => f switch
+    {
+        ScopeFilter.User    => "user",
+        ScopeFilter.Project => "project",
+        _                   => null,
     };
 
     private IReadOnlyList<InstalledSkill> ApplySort(IEnumerable<InstalledSkill> input) => _sort switch
@@ -373,7 +430,7 @@ internal sealed class InstalledTabView : FrameView
     }
 
     private static string BuildGuideText() =>
-        "Matches name/path/agent/package · USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
+        "Matches name/path/agent/package · P pin · G scope · USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -443,7 +500,8 @@ internal sealed class InstalledTabView : FrameView
             _ => "name",
         };
         var pinSuffix = _pinFilter == PinFilter.All ? "" : $" · 📌 {DescribePin(_pinFilter)}";
-        _footer.Text = $"{counts}{pkgs} · sort {sortLabel}{pinSuffix}{srcSuffix}";
+        var scopeSuffix = _scopeFilter == ScopeFilter.All ? "" : $" · scope:{DescribeScope(_scopeFilter)}";
+        _footer.Text = $"{counts}{pkgs} · sort {sortLabel}{pinSuffix}{scopeSuffix}{srcSuffix}";
     }
 
     private void OnKeyDown(object? sender, Key key)
@@ -457,6 +515,23 @@ internal sealed class InstalledTabView : FrameView
         {
             _pinFilter = CyclePin(_pinFilter);
             RefreshAll();
+            key.Handled = true;
+            return;
+        }
+        // `G` cycles the scope filter (all → user → project → custom). When a
+        // scope-aware loader is wired, user/project re-query `gh skill list
+        // --scope` server-side; otherwise it's an in-process narrow.
+        if (!_filterField.HasFocus && key.AsRune.Value == 'G')
+        {
+            _scopeFilter = CycleScope(_scopeFilter);
+            if (_scopedSnapshotLoader is not null && _scopeFilter is ScopeFilter.User or ScopeFilter.Project)
+            {
+                _ = LoadAsync();
+            }
+            else
+            {
+                RefreshAll();
+            }
             key.Handled = true;
             return;
         }

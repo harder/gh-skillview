@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using SkillView.Gh;
 using Xunit;
 
@@ -6,69 +5,55 @@ namespace SkillView.Tests.Gh;
 
 public class GhSkillSearchServiceTests
 {
-    private static CapabilityProfile CapsWith(params string[] searchFlags)
+    // gh ≥ 2.94 is required, so `--json`/`--owner`/`--page` are always
+    // available and emit unconditionally; there is no per-flag gating and no
+    // `--limit` (gh 2.94 paginates instead).
+
+    [Fact]
+    public void BuildArgs_AlwaysIncludesJsonFields()
     {
-        return CapabilityProfile.Empty with
-        {
-            SkillSubcommandPresent = true,
-            SearchFlags = ImmutableHashSet.CreateRange(searchFlags),
-        };
+        var args = GhSkillSearchService.BuildArgs("render-md", owner: null, page: 1);
+        Assert.Equal(
+            new[] { "skill", "search", "render-md", "--json", "description,namespace,path,repo,skillName,stars" },
+            args);
     }
 
     [Fact]
-    public void BuildArgs_AlwaysIncludesJsonAndLimitWhenCapabilitiesKnown()
+    public void BuildArgs_NeverEmitsLimit()
     {
-        var caps = CapsWith("--json", "--limit", "--owner");
-        var args = GhSkillSearchService.BuildArgs("render-md", caps, owner: null, limit: 30, page: 1);
-
-        Assert.Equal(new[] { "skill", "search", "render-md", "--json", "description,namespace,path,repo,skillName,stars", "--limit", "30" }, args);
+        var args = GhSkillSearchService.BuildArgs("q", owner: null, page: 1);
+        Assert.DoesNotContain("--limit", args);
     }
 
     [Fact]
-    public void BuildArgs_AddsOwnerOnlyWhenSupported()
+    public void BuildArgs_AddsOwnerWhenProvided()
     {
-        var caps = CapsWith("--json", "--limit"); // no --owner
-        var args = GhSkillSearchService.BuildArgs("q", caps, owner: "vercel-labs", limit: 50, page: 1);
-        Assert.DoesNotContain("--owner", args);
-    }
-
-    [Fact]
-    public void BuildArgs_AddsOwnerWhenSupported()
-    {
-        var caps = CapsWith("--json", "--limit", "--owner");
-        var args = GhSkillSearchService.BuildArgs("q", caps, owner: "vercel-labs", limit: 50, page: 1);
-
+        var args = GhSkillSearchService.BuildArgs("q", owner: "vercel-labs", page: 1);
         Assert.Contains("--owner", args);
         var ownerIdx = args.ToList().IndexOf("--owner");
         Assert.Equal("vercel-labs", args[ownerIdx + 1]);
     }
 
     [Fact]
-    public void BuildArgs_SkipsPageWhenProbeLacksFlagEvenIfPageGtOne()
+    public void BuildArgs_OmitsOwnerWhenAbsent()
     {
-        var caps = CapsWith("--json", "--limit"); // no --page
-        var args = GhSkillSearchService.BuildArgs("q", caps, owner: null, limit: 30, page: 3);
+        var args = GhSkillSearchService.BuildArgs("q", owner: null, page: 1);
+        Assert.DoesNotContain("--owner", args);
+    }
+
+    [Fact]
+    public void BuildArgs_SkipsPageForFirstPage()
+    {
+        var args = GhSkillSearchService.BuildArgs("q", owner: null, page: 1);
         Assert.DoesNotContain("--page", args);
     }
 
     [Fact]
-    public void BuildArgs_IncludesPageWhenSupportedAndRequested()
+    public void BuildArgs_IncludesPageWhenGreaterThanOne()
     {
-        var caps = CapsWith("--json", "--limit", "--page");
-        var args = GhSkillSearchService.BuildArgs("q", caps, owner: null, limit: 30, page: 2);
+        var args = GhSkillSearchService.BuildArgs("q", owner: null, page: 2);
         Assert.Contains("--page", args);
         var idx = args.ToList().IndexOf("--page");
         Assert.Equal("2", args[idx + 1]);
-    }
-
-    [Fact]
-    public void BuildArgs_FallbackWhenCapabilitiesUnknown_IncludesJsonAndLimit()
-    {
-        // Empty capabilities (e.g. probe not yet run) → still emit the core
-        // flags so the call works against v2.92.0 (which has --json + --limit).
-        var caps = CapabilityProfile.Empty;
-        var args = GhSkillSearchService.BuildArgs("q", caps, owner: null, limit: 30, page: 1);
-        Assert.Contains("--json", args);
-        Assert.Contains("--limit", args);
     }
 }

@@ -9,9 +9,11 @@ namespace SkillView.Gh;
 /// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
-    /// Minimum supported `gh` — the first release that includes the capability
-    /// probes SkillView depends on.
-    public static readonly SemVer MinimumVersion = new(2, 92, 0);
+    /// Minimum supported `gh` — 2.94.0 ships the full `gh skill` surface
+    /// SkillView relies on (`skill list`, `install --all`, `update --all`,
+    /// nested-dir discovery). Meeting this minimum guarantees the feature set,
+    /// so SkillView does not probe individual flags.
+    public static readonly SemVer MinimumVersion = new(2, 94, 0);
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;

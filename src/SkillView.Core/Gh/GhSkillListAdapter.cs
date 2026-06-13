@@ -6,14 +6,16 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill list --json` (cli/cli#13245, implemented in PR #13418).
-/// Only called when the capability probe reports `HasSkillList`. The
-/// upstream-canonical JSON fields are read first; legacy / alternate field
-/// names are kept as defensive fallbacks in case the schema shifts before
-/// the PR merges. All parsing goes through `JsonDocument` (AOT-safe).
+/// Wraps `gh skill list --json` (shipped in gh 2.94.0, cli/cli#13418, the
+/// required minimum). This is SkillView's primary inventory source; the
+/// filesystem scan supplements it (see <see cref="Inventory.LocalInventoryService"/>).
+/// `gh` requires an explicit comma-separated field list after `--json`; the
+/// shipped fields are read first and legacy / alternate names are kept as
+/// defensive fallbacks against schema drift. All parsing goes through
+/// `JsonDocument` (AOT-safe).
 ///
-/// Canonical upstream shape per the PR:
-///   { skillName, hosts:[], scope, sourceURL, version, pinned, path }
+/// Shipped shape (gh 2.94.0):
+///   { skillName, agentHosts:[], scope, sourceURL, version, pinned, path }
 public sealed class GhSkillListAdapter
 {
     private readonly ProcessRunner _runner;
@@ -29,29 +31,31 @@ public sealed class GhSkillListAdapter
 
     public async Task<ImmutableArray<GhSkillListRecord>> ListAsync(
         string ghPath,
-        CapabilityProfile capabilities,
         string? scope = null,
         string? agent = null,
         CancellationToken cancellationToken = default)
     {
-        if (!capabilities.HasSkillList)
-        {
-            return ImmutableArray<GhSkillListRecord>.Empty;
-        }
-
         if (_cache.TryGet(ghPath, scope, agent, out var cached))
         {
             _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={cached.Length}");
             return cached;
         }
 
-        var args = new List<string> { "skill", "list", "--json" };
-        if (!string.IsNullOrEmpty(scope) && capabilities.SupportsListScope)
+        // gh requires an explicit comma-separated field list after `--json`;
+        // bare `--json` errors out listing the available fields. These are the
+        // fields shipped by gh 2.94.0 (cli/cli#13418). The adapter's parser is
+        // tolerant of extra/missing keys, so widening this list later is safe.
+        var args = new List<string>
+        {
+            "skill", "list",
+            "--json", "skillName,agentHosts,path,pinned,scope,sourceURL,version",
+        };
+        if (!string.IsNullOrEmpty(scope))
         {
             args.Add("--scope");
             args.Add(scope);
         }
-        if (!string.IsNullOrEmpty(agent) && capabilities.SupportsListAgent)
+        if (!string.IsNullOrEmpty(agent))
         {
             args.Add("--agent");
             args.Add(agent);
@@ -135,10 +139,11 @@ public sealed class GhSkillListAdapter
 
     private static GhSkillListRecord ReadRecord(JsonElement obj)
     {
-        // Upstream emits the agent list under `hosts` (always an array, even
-        // for single-agent installs and empty for --dir scans). Older /
-        // alternate payloads used `agents`; read both, prefer `hosts`.
-        var hosts = ReadStringArray(obj, "hosts", "agents");
+        // gh 2.94.0 emits the agent list under `agentHosts` (always an array,
+        // even for single-agent installs and empty for --dir scans). Pre-release
+        // / alternate payloads used `hosts` or `agents`; read all three, prefer
+        // the shipped `agentHosts`.
+        var hosts = ReadStringArray(obj, "agentHosts", "hosts", "agents");
 
         var sourceUrl = GetString(obj, "sourceURL", "source_url");
         var repo = GetString(obj, "repo", "repository");

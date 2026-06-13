@@ -116,7 +116,7 @@ public class GhCliContractTests
     }
 
     [Fact]
-    public async Task CapabilityProbe_ParsesRealHelpOutput()
+    public async Task GhSkillListHelp_MentionsJsonFlag()
     {
         if (!ShouldRun) return;
         var path = GhPath();
@@ -124,33 +124,10 @@ public class GhCliContractTests
 
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
+        var result = await runner.RunAsync(path!, new[] { "skill", "list", "--help" }, cancellationToken: TestContext.Current.CancellationToken);
 
-        // Run the same help commands the capability probe uses.
-        var ct = TestContext.Current.CancellationToken;
-        var searchHelp = await runner.RunAsync(path!, new[] { "skill", "search", "--help" }, cancellationToken: ct);
-        var installHelp = await runner.RunAsync(path!, new[] { "skill", "install", "--help" }, cancellationToken: ct);
-        var updateHelp = await runner.RunAsync(path!, new[] { "skill", "update", "--help" }, cancellationToken: ct);
-
-        // All should succeed.
-        Assert.True(searchHelp.Succeeded);
-        Assert.True(installHelp.Succeeded);
-        Assert.True(updateHelp.Succeeded);
-
-        // Parse with the real parser — verify it doesn't crash or return empty.
-        var searchTokens = CapabilityProbeParser.ScanTokens(
-            searchHelp.StdOut, CapabilityProbeParser.ProbedTokens["search"]);
-        var installTokens = CapabilityProbeParser.ScanTokens(
-            installHelp.StdOut, CapabilityProbeParser.ProbedTokens["install"]);
-        var updateTokens = CapabilityProbeParser.ScanTokens(
-            updateHelp.StdOut, CapabilityProbeParser.ProbedTokens["update"]);
-
-        Assert.NotEmpty(searchTokens);
-        Assert.NotEmpty(installTokens);
-        Assert.NotEmpty(updateTokens);
-
-        // Key flags should appear as parsed tokens.
-        Assert.Contains("--json", searchTokens);
-        Assert.Contains("--agent", installTokens);
-        Assert.Contains("--all", updateTokens);
+        // gh ≥ 2.94 ships `gh skill list --json` — SkillView's primary inventory source.
+        Assert.True(result.Succeeded, $"gh skill list --help exited {result.ExitCode}");
+        Assert.Contains("--json", result.StdOut, StringComparison.OrdinalIgnoreCase);
     }
 }

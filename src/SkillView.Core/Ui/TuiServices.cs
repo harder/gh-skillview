@@ -14,7 +14,6 @@ public sealed class TuiServices
     public required ProcessRunner Runner { get; init; }
     public required GhBinaryLocator GhLocator { get; init; }
     public required GhAuthService AuthService { get; init; }
-    public required GhSkillCapabilityProbe CapabilityProbe { get; init; }
     public required EnvironmentProbe EnvironmentProbe { get; init; }
     public required GhSkillSearchService SearchService { get; init; }
     public required GhSkillPreviewService PreviewService { get; init; }
@@ -33,9 +32,8 @@ public sealed class TuiServices
         var runner = new ProcessRunner(logger);
         var locator = new GhBinaryLocator(runner, logger);
         var auth = new GhAuthService(runner, logger);
-        var caps = new GhSkillCapabilityProbe(runner, logger);
         var dir = logDirectory ?? LogPaths.Resolve();
-        var env = new EnvironmentProbe(locator, auth, caps, logger, dir);
+        var env = new EnvironmentProbe(locator, auth, runner, logger, dir);
         var list = new GhSkillListAdapter(runner, logger);
         var resolver = new ScanRootResolver();
         var scanner = new LocalSkillScanner(logger);
@@ -46,7 +44,6 @@ public sealed class TuiServices
             Runner = runner,
             GhLocator = locator,
             AuthService = auth,
-            CapabilityProbe = caps,
             EnvironmentProbe = env,
             SearchService = new GhSkillSearchService(runner, logger),
             PreviewService = new GhSkillPreviewService(runner, logger),

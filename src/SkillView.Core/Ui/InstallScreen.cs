@@ -12,20 +12,15 @@ namespace SkillView.Ui;
 
 /// Request to install a skill from a search result. Carries the
 /// minimum a user has selected in the results table: repo, optional
-/// skill name within the repo, and an optional repo-relative path
-/// (when the search produced a directory hit rather than a top-level
-/// repo). `InstallScreen` picks the rest of the flags interactively, but the
-/// parent screen can seed obvious toggles such as hidden-dir access.
-public sealed record InstallRequest(string Repo, string? SkillName, string? RepoPath, bool AllowHiddenDirs = false);
+/// skill name within the repo. `InstallScreen` picks the rest of the flags
+/// interactively, but the parent screen can seed obvious toggles such as
+/// hidden-dir access.
+public sealed record InstallRequest(string Repo, string? SkillName, bool AllowHiddenDirs = false);
 
-/// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill +
-/// repo-path) and runs `gh skill install` with the flags the user has
-/// chosen.
-///
-/// Capability-gated fields (`--repo-path`, `--upstream`, `--allow-hidden-dirs`,
-/// `--from-local`) are hidden entirely when the probe hasn't confirmed them.
-/// Since `gh skill` has no future-version preview we can hint at, leaving
-/// disabled-but-visible controls in the dialog would only confuse users.
+/// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill) and
+/// runs `gh skill install` with the flags the user has chosen. SkillView
+/// requires gh ≥ 2.94.0, so all flags (`--upstream`, `--allow-hidden-dirs`,
+/// `--from-local`, …) are always available and shown.
 public sealed class InstallScreen
 {
     // Known agent IDs for the multi-select checkboxes. This list is static
@@ -51,7 +46,6 @@ public sealed class InstallScreen
     private readonly GhSkillInstallService _install;
     private readonly Logger _logger;
     private readonly string _ghPath;
-    private readonly CapabilityProfile _capabilities;
     private readonly InstallRequest _request;
 
     public InstallResult? LastResult { get; private set; }
@@ -61,14 +55,12 @@ public sealed class InstallScreen
         GhSkillInstallService install,
         Logger logger,
         string ghPath,
-        CapabilityProfile capabilities,
         InstallRequest request)
     {
         _app = app;
         _install = install;
         _logger = logger;
         _ghPath = ghPath;
-        _capabilities = capabilities;
         _request = request;
     }
 
@@ -138,52 +130,23 @@ public sealed class InstallScreen
             Text = "→ blank uses the latest release",
         };
 
-        // RepoPath / Upstream are capability-gated. We *omit* them entirely
-        // when unsupported instead of disabling, because there's no future
-        // version of gh skill to direct the user toward (yet).
-        TextField? repoPathField = null;
-        Label? repoPathLabel = null;
-        Label? repoPathHint = null;
-        TextField? upstreamField = null;
-        Label? upstreamLabel = null;
-        Label? upstreamHint = null;
-        var nextRow = 3;
-        if (_capabilities.SupportsRepoPath)
+        // `--upstream` overrides the recorded source URL. gh ≥ 2.94 is
+        // required, so every flag here is guaranteed and always shown.
+        var upstreamLabel = new Label { Text = "Upstream   :", X = 0, Y = 3 };
+        var upstreamField = new TextField
         {
-            repoPathLabel = new Label { Text = "Subdir     :", X = 0, Y = nextRow };
-            repoPathField = new TextField
-            {
-                X = 13, Y = nextRow, Width = 32,
-                Text = _request.RepoPath ?? string.Empty,
-            };
-            TuiHelpers.ConfigureTextInput(repoPathField, SkillViewStyling.DialogSchemeName);
-            repoPathHint = new Label
-            {
-                X = Pos.Right(repoPathField) + 2, Y = nextRow,
-                Text = "(install a subdir as the skill)",
-            };
-            nextRow++;
-        }
-        if (_capabilities.SupportsUpstream)
+            X = 13, Y = 3, Width = 40, Text = string.Empty,
+        };
+        TuiHelpers.ConfigureTextInput(upstreamField, SkillViewStyling.DialogSchemeName);
+        var upstreamHint = new Label
         {
-            upstreamLabel = new Label { Text = "Upstream   :", X = 0, Y = nextRow };
-            upstreamField = new TextField
-            {
-                X = 13, Y = nextRow, Width = 40, Text = string.Empty,
-            };
-            TuiHelpers.ConfigureTextInput(upstreamField, SkillViewStyling.DialogSchemeName);
-            upstreamHint = new Label
-            {
-                X = Pos.Right(upstreamField) + 2, Y = nextRow,
-                Text = "(override recorded source URL)",
-            };
-            nextRow++;
-        }
+            X = Pos.Right(upstreamField) + 2, Y = 3,
+            Text = "(override recorded source URL)",
+        };
 
         sourceFrame.Add(skillLabel, skillField, skillHint,
-            versionLabel, versionField, pinBox, versionResolved);
-        if (repoPathLabel is not null) sourceFrame.Add(repoPathLabel, repoPathField!, repoPathHint!);
-        if (upstreamLabel is not null) sourceFrame.Add(upstreamLabel, upstreamField!, upstreamHint!);
+            versionLabel, versionField, pinBox, versionResolved,
+            upstreamLabel, upstreamField, upstreamHint);
 
         // ── WHERE ──────────────────────────────────────────────────────
         var whereFrame = new FrameView
@@ -258,26 +221,18 @@ public sealed class InstallScreen
         behaviorFrame.Add(forceBox);
         var behaviorRow = 1;
 
-        CheckBox? allowHiddenBox = null;
-        if (_capabilities.SupportsAllowHiddenDirs)
+        var allowHiddenBox = new CheckBox
         {
-            allowHiddenBox = new CheckBox
-            {
-                X = 0, Y = behaviorRow, Text = "_allow scanning .dot directories",
-                Value = _request.AllowHiddenDirs ? CheckState.Checked : CheckState.UnChecked,
-            };
-            behaviorFrame.Add(allowHiddenBox);
-            behaviorRow++;
-        }
-        CheckBox? fromLocalBox = null;
-        if (_capabilities.SupportsFromLocal)
+            X = 0, Y = behaviorRow, Text = "_allow scanning .dot directories",
+            Value = _request.AllowHiddenDirs ? CheckState.Checked : CheckState.UnChecked,
+        };
+        behaviorFrame.Add(allowHiddenBox);
+        behaviorRow++;
+        var fromLocalBox = new CheckBox
         {
-            fromLocalBox = new CheckBox
-            {
-                X = 0, Y = behaviorRow, Text = "install from _local clone",
-            };
-            behaviorFrame.Add(fromLocalBox);
-        }
+            X = 0, Y = behaviorRow, Text = "install from _local clone",
+        };
+        behaviorFrame.Add(fromLocalBox);
 
         // ── PREVIEW + STATUS ───────────────────────────────────────────
         var previewLabel = new Label
@@ -335,10 +290,9 @@ public sealed class InstallScreen
                 Version: NullIfEmpty(versionField.Text),
                 Pin: pinBox.Value == CheckState.Checked,
                 Overwrite: forceBox.Value == CheckState.Checked,
-                Upstream: upstreamField is null ? null : NullIfEmpty(upstreamField.Text),
-                AllowHiddenDirs: allowHiddenBox?.Value == CheckState.Checked,
-                RepoPath: repoPathField is null ? null : NullIfEmpty(repoPathField.Text),
-                FromLocal: fromLocalBox?.Value == CheckState.Checked);
+                Upstream: NullIfEmpty(upstreamField.Text),
+                AllowHiddenDirs: allowHiddenBox.Value == CheckState.Checked,
+                FromLocal: fromLocalBox.Value == CheckState.Checked);
         }
 
         void Refresh()
@@ -364,20 +318,19 @@ public sealed class InstallScreen
             else if (!spinner.Visible) status.Text = " ready — review the options, then press Install";
 
             // Command preview
-            var args = GhSkillInstallService.BuildArgs(_request.Repo, NullIfEmpty(skillField.Text), _capabilities, BuildOptions());
+            var args = GhSkillInstallService.BuildArgs(_request.Repo, NullIfEmpty(skillField.Text), BuildOptions());
             previewLabel.Text = "$ gh " + string.Join(' ', args);
         }
 
         versionField.TextChanged += (_, _) => Refresh();
         pinBox.ValueChanged += (_, _) => Refresh();
         skillField.TextChanged += (_, _) => Refresh();
-        if (repoPathField is not null) repoPathField.TextChanged += (_, _) => Refresh();
-        if (upstreamField is not null) upstreamField.TextChanged += (_, _) => Refresh();
+        upstreamField.TextChanged += (_, _) => Refresh();
         pathField.TextChanged += (_, _) => Refresh();
         scopeSelector.ValueChanged += (_, _) => Refresh();
         forceBox.ValueChanged += (_, _) => Refresh();
-        if (allowHiddenBox is not null) allowHiddenBox.ValueChanged += (_, _) => Refresh();
-        if (fromLocalBox is not null) fromLocalBox.ValueChanged += (_, _) => Refresh();
+        allowHiddenBox.ValueChanged += (_, _) => Refresh();
+        fromLocalBox.ValueChanged += (_, _) => Refresh();
         foreach (var cb in agentBoxes) cb.ValueChanged += (_, _) => Refresh();
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
@@ -388,11 +341,9 @@ public sealed class InstallScreen
             pathLabel, pathField,
             agentsLabel, agentsHint,
             forceBox,
-            previewLabel, status, spinner);
-        if (repoPathLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, repoPathLabel, repoPathField!, repoPathHint!);
-        if (upstreamLabel is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, upstreamLabel, upstreamField!, upstreamHint!);
-        if (allowHiddenBox is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, allowHiddenBox);
-        if (fromLocalBox is not null) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, fromLocalBox);
+            previewLabel, status, spinner,
+            upstreamLabel, upstreamField, upstreamHint,
+            allowHiddenBox, fromLocalBox);
         foreach (var cb in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, cb);
 
         installButton.Accepting += async (_, ev) =>
@@ -412,7 +363,6 @@ public sealed class InstallScreen
                     _ghPath,
                     _request.Repo,
                     skillName,
-                    _capabilities,
                     options,
                     lifetime.Token).ConfigureAwait(false);
                 InvokeIfActive(() =>
@@ -488,21 +438,16 @@ public sealed class InstallScreen
         }
     }
 
-    private int SourceFrameHeight()
+    private static int SourceFrameHeight()
     {
-        // 2 frame borders + skill row + version row + version-hint row
-        var rows = 3;
-        if (_capabilities.SupportsRepoPath) rows++;
-        if (_capabilities.SupportsUpstream) rows++;
-        return rows + 2;
+        // 2 frame borders + skill row + version row + version-hint row + upstream
+        return 3 + 1 + 2;
     }
 
-    private int BehaviorFrameHeight()
+    private static int BehaviorFrameHeight()
     {
-        var rows = 1; // force
-        if (_capabilities.SupportsAllowHiddenDirs) rows++;
-        if (_capabilities.SupportsFromLocal) rows++;
-        return rows + 2;
+        // force + allow-hidden + from-local, plus 2 frame borders
+        return 3 + 2;
     }
 
     private int DefaultScopeIndex()

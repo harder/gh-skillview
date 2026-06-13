@@ -37,6 +37,52 @@ public class GhSkillListAdapterTests
         Assert.Equal("/home/m/.claude/skills/code-review", r.Path);
     }
 
+    // Shipped gh 2.94.0 emits the agent list under `agentHosts`, not `hosts`.
+    // This is the exact shape of `gh skill list --json
+    // skillName,agentHosts,path,pinned,scope,sourceURL,version`.
+    [Fact]
+    public void Parses_shipped_2940_agentHosts_field()
+    {
+        const string json = """
+            [{
+              "agentHosts": ["cline", "warp"],
+              "path": "/home/m/.agents/skills/git-commit",
+              "pinned": false,
+              "scope": "user",
+              "skillName": "git-commit",
+              "sourceURL": "https://github.com/monalisa/skills-repo",
+              "version": "v1.0.0"
+            }]
+            """;
+
+        var records = GhSkillListAdapter.Parse(json);
+
+        Assert.Single(records);
+        Assert.Equal("git-commit", records[0].Name);
+        Assert.Equal(new[] { "cline", "warp" }, records[0].Hosts);
+        Assert.Equal("user", records[0].Scope);
+        Assert.Equal("v1.0.0", records[0].Version);
+    }
+
+    // `agentHosts` (shipped) wins over the pre-release `hosts`/`agents` keys
+    // if a transitional payload carries more than one.
+    [Fact]
+    public void AgentHosts_wins_over_legacy_keys_when_multiple_present()
+    {
+        const string json = """
+            [{
+              "skillName": "x",
+              "agentHosts": ["claude-code"],
+              "hosts": ["pre-release"],
+              "agents": ["legacy"]
+            }]
+            """;
+
+        var records = GhSkillListAdapter.Parse(json);
+
+        Assert.Equal(new[] { "claude-code" }, records[0].Hosts);
+    }
+
     // Shared-install directories like `.agents/skills` are deduped by upstream
     // into a single record with multiple `hosts`.
     [Fact]
