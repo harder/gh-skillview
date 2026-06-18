@@ -230,6 +230,12 @@ internal sealed class SkillViewWorkflowCoordinator
                         $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
                         TuiHelpers.NotificationLevel.Error);
                 }
+                else
+                {
+                    // Cancelled (or nothing selected): clear the lingering
+                    // "discovering skills in …" busy status the spinner left.
+                    _setStatus($"{request.Repo}: no skills installed");
+                }
             });
         }, "discover");
     }

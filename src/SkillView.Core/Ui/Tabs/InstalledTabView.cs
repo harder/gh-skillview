@@ -141,6 +141,18 @@ internal sealed class InstalledTabView : FrameView
         };
 
         _filterField.TextChanged += (_, _) => RefreshAll();
+        _filterField.KeyDown += (_, key) =>
+        {
+            // Esc on a non-empty filter clears it (the list is live-filtered, so
+            // stray text otherwise leaves it stuck at "(no matches)"); the
+            // TextChanged handler then restores the full list. An Esc on an
+            // already-empty filter is left to the normal "Back" shortcut.
+            if (key.KeyCode == KeyCode.Esc && _filterField.Text.Length > 0)
+            {
+                key.Handled = true;
+                _filterField.Text = string.Empty;
+            }
+        };
         _table.ValueChanged += (_, _) =>
         {
             var row = _table.GetSelectedRow();
@@ -453,6 +465,15 @@ internal sealed class InstalledTabView : FrameView
                 QueueDeferredWidthStabilization(remainingPasses - 1);
             }
         });
+    }
+
+    /// Force focus onto the skill list. Used after the tab is activated so the
+    /// browse-first list (not the filter text field) holds focus — otherwise
+    /// global hotkeys like `?`, `d`, and `x` get typed into the filter.
+    internal void FocusList()
+    {
+        _lastFocusedTarget = FocusTarget.Table;
+        _table.SetFocus();
     }
 
     private void RestoreFocus()
