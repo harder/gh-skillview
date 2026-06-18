@@ -1,4 +1,6 @@
+using System.Linq;
 using SkillView.Gh;
+using SkillView.Gh.Models;
 using Xunit;
 
 namespace SkillView.Tests.Gh;
@@ -124,5 +126,94 @@ public class GhSkillInstallServiceTests
             "o/r", null,
             new GhSkillInstallService.Options(Agents: new[] { "", "  ", "claude" }));
         Assert.Single(args, x => x == "--agent");
+    }
+
+    // --- discovery listing (gh ≥ 2.95, cli/cli#13548) --------------------
+
+    [Fact]
+    public void BuildListArgs_HasNoSkillNameAndNoAll()
+    {
+        // The bare repo (no skill, no --all) is what triggers gh's
+        // non-interactive listing path.
+        var args = GhSkillInstallService.BuildListArgs("owner/repo", version: null, allowHiddenDirs: false);
+        Assert.Equal(new[] { "skill", "install", "owner/repo" }, args);
+    }
+
+    [Fact]
+    public void BuildListArgs_VersionConcatenatedAndHiddenDirsFlag()
+    {
+        var args = GhSkillInstallService.BuildListArgs("owner/repo", "v1.2.0", allowHiddenDirs: true);
+        Assert.Equal(new[] { "skill", "install", "owner/repo@v1.2.0", "--allow-hidden-dirs" }, args);
+        Assert.DoesNotContain("--all", args);
+    }
+
+    [Fact]
+    public void ParseRepoSkillListing_ParsesTabSeparatedRows()
+    {
+        var stdout = "code-review\tReviews pull requests\ngit-commit\tWrites commit messages\n";
+        var skills = GhSkillInstallService.ParseRepoSkillListing(stdout);
+
+        Assert.Equal(2, skills.Length);
+        Assert.Equal("code-review", skills[0].Name);
+        Assert.Equal("Reviews pull requests", skills[0].Description);
+        Assert.Equal("git-commit", skills[1].Name);
+        Assert.Equal("Writes commit messages", skills[1].Description);
+    }
+
+    [Fact]
+    public void ParseRepoSkillListing_ToleratesBlankLinesNameOnlyHeaderAndCrlf()
+    {
+        var stdout = "SKILL\tDESCRIPTION\r\n\r\nlonely-skill\r\ncode-review\tReviews PRs\r\n";
+        var skills = GhSkillInstallService.ParseRepoSkillListing(stdout);
+
+        // Header dropped, blank line skipped, name-only line kept with empty desc.
+        Assert.Equal(2, skills.Length);
+        Assert.Equal("lonely-skill", skills[0].Name);
+        Assert.Equal("", skills[0].Description);
+        Assert.Equal("code-review", skills[1].Name);
+    }
+
+    [Fact]
+    public void ParseRepoSkillListing_DeduplicatesByNameAndHandlesEmpty()
+    {
+        Assert.Empty(GhSkillInstallService.ParseRepoSkillListing(null));
+        Assert.Empty(GhSkillInstallService.ParseRepoSkillListing("   \n  \n"));
+
+        var dup = GhSkillInstallService.ParseRepoSkillListing("a\tone\na\ttwo\nb\tthree");
+        Assert.Equal(2, dup.Length);
+        Assert.Equal("one", dup.Single(s => s.Name == "a").Description);
+    }
+
+    [Fact]
+    public void BuildInstallPlan_AllSelectedCollapsesToAll()
+    {
+        var discovered = new[] { new RepoSkill("a", ""), new RepoSkill("b", "") };
+        var plan = GhSkillInstallService.BuildInstallPlan(
+            discovered, new HashSet<string> { "a", "b" });
+
+        Assert.True(plan.UseAll);
+        Assert.True(plan.SkillNames.IsDefaultOrEmpty);
+        Assert.False(plan.IsEmpty);
+    }
+
+    [Fact]
+    public void BuildInstallPlan_SubsetInstallsByName()
+    {
+        var discovered = new[] { new RepoSkill("a", ""), new RepoSkill("b", ""), new RepoSkill("c", "") };
+        var plan = GhSkillInstallService.BuildInstallPlan(
+            discovered, new HashSet<string> { "a", "c" });
+
+        Assert.False(plan.UseAll);
+        Assert.Equal(new[] { "a", "c" }, plan.SkillNames);
+    }
+
+    [Fact]
+    public void BuildInstallPlan_NoneSelectedIsEmpty()
+    {
+        var discovered = new[] { new RepoSkill("a", "") };
+        var plan = GhSkillInstallService.BuildInstallPlan(discovered, new HashSet<string>());
+
+        Assert.False(plan.UseAll);
+        Assert.True(plan.IsEmpty);
     }
 }

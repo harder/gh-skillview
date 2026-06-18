@@ -29,8 +29,8 @@ public class CliDispatcherJsonSnapshotTests
     private static EnvironmentReport SampleReport() => new()
     {
         GhPath = "/usr/bin/gh",
-        GhVersionRaw = "gh version 2.94.0",
-        GhVersion = new SemVer(2, 94, 0),
+        GhVersionRaw = "gh version 2.95.0",
+        GhVersion = new SemVer(2, 95, 0),
         GhMeetsMinimum = true,
         Auth = GhAuthStatus.Unknown,
         GhSkillAvailable = true,

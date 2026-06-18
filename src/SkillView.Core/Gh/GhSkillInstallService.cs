@@ -1,10 +1,11 @@
+using System.Collections.Immutable;
 using SkillView.Gh.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill install`. SkillView requires gh ≥ 2.94.0, so every flag it
+/// Wraps `gh skill install`. SkillView requires gh ≥ 2.95.0, so every flag it
 /// emits (`--all`, `--allow-hidden-dirs`, `--upstream`, `--agent` repeatable,
 /// `--from-local`, `--scope`, `--dir`, `--pin`, `--force`) is guaranteed to
 /// exist — there is no per-flag capability gating. A custom directory maps to
@@ -60,6 +61,133 @@ public sealed class GhSkillInstallService
             ErrorMessage = null,
             CommandLine = args,
         };
+    }
+
+    /// Discover the skills a repository offers without installing anything.
+    /// Runs `gh skill install <repo>` with no skill name and no `--all`; in a
+    /// non-interactive context (stdout is captured, so gh sees a non-TTY) gh
+    /// ≥ 2.95.0 lists the discovered skills as tab-separated rows instead of
+    /// erroring (cli/cli#13548). The repo is the only thing installed-from, but
+    /// nothing is written to disk — this is a read-only discovery call.
+    public async Task<RepoSkillListing> ListRepoSkillsAsync(
+        string ghPath,
+        string repo,
+        string? version = null,
+        bool allowHiddenDirs = false,
+        CancellationToken cancellationToken = default)
+    {
+        var args = BuildListArgs(repo, version, allowHiddenDirs);
+        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            _logger.Warn("gh.skill.install.list", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
+            return RepoSkillListing.Failure(repo, version, result.ExitCode, result.StdErr.Trim(), args);
+        }
+
+        var skills = ParseRepoSkillListing(result.StdOut);
+        _logger.Info("gh.skill.install.list", $"{repo} → {skills.Length} skill(s) discovered");
+        return new RepoSkillListing
+        {
+            Repo = repo,
+            Version = version,
+            Skills = skills,
+            Succeeded = true,
+            ExitCode = 0,
+            ErrorMessage = null,
+            CommandLine = args,
+        };
+    }
+
+    internal static IReadOnlyList<string> BuildListArgs(
+        string repo,
+        string? version,
+        bool allowHiddenDirs)
+    {
+        // Deliberately no skill name and no `--all`: that combination triggers
+        // gh's non-interactive "list available skills" path (cli/cli#13548).
+        var args = new List<string> { "skill", "install" };
+        args.Add(string.IsNullOrEmpty(version) ? repo : $"{repo}@{version}");
+        if (allowHiddenDirs)
+        {
+            args.Add("--allow-hidden-dirs");
+        }
+        return args;
+    }
+
+    /// Parse the tab-separated `SKILL\tDESCRIPTION` rows gh emits when the
+    /// install picker is rendered to a pipe (cli/cli#13548). Tolerant by
+    /// design: blank lines are skipped, a `name`-only line (no tab) keeps an
+    /// empty description, and an optional `SKILL`/`NAME` header row is dropped.
+    internal static ImmutableArray<RepoSkill> ParseRepoSkillListing(string? stdout)
+    {
+        if (string.IsNullOrWhiteSpace(stdout))
+        {
+            return ImmutableArray<RepoSkill>.Empty;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<RepoSkill>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var lines = stdout.Replace("\r\n", "\n").Split('\n');
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            var tab = line.IndexOf('\t');
+            var name = (tab >= 0 ? line[..tab] : line).Trim();
+            var description = tab >= 0 ? line[(tab + 1)..].Trim() : string.Empty;
+            if (name.Length == 0)
+            {
+                continue;
+            }
+
+            // Drop a header row if gh ever emits one in TTY-table mode.
+            if (description.Length > 0
+                && (name.Equals("SKILL", StringComparison.OrdinalIgnoreCase)
+                    || name.Equals("NAME", StringComparison.OrdinalIgnoreCase))
+                && (description.Equals("DESCRIPTION", StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (seen.Add(name))
+            {
+                builder.Add(new RepoSkill(name, description));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    /// How to install a chosen subset of a repo's discovered skills. When the
+    /// user keeps every discovered skill checked, a single `--all` install is
+    /// cheaper and matches the existing install-all path; otherwise each
+    /// selected skill is installed by name.
+    public readonly record struct InstallPlan(bool UseAll, ImmutableArray<string> SkillNames)
+    {
+        public bool IsEmpty => !UseAll && SkillNames.IsDefaultOrEmpty;
+    }
+
+    /// Pure: map (all discovered skills, set of checked names) to an
+    /// <see cref="InstallPlan"/>. Selecting every skill collapses to `--all`.
+    public static InstallPlan BuildInstallPlan(
+        IReadOnlyList<RepoSkill> discovered,
+        IReadOnlyCollection<string> selectedNames)
+    {
+        var selected = discovered
+            .Where(s => selectedNames.Contains(s.Name))
+            .Select(s => s.Name)
+            .ToImmutableArray();
+
+        if (selected.Length > 0 && selected.Length == discovered.Count)
+        {
+            return new InstallPlan(UseAll: true, ImmutableArray<string>.Empty);
+        }
+
+        return new InstallPlan(UseAll: false, selected);
     }
 
     internal static IReadOnlyList<string> BuildArgs(

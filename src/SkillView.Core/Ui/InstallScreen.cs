@@ -19,7 +19,7 @@ public sealed record InstallRequest(string Repo, string? SkillName, bool AllowHi
 
 /// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill) and
 /// runs `gh skill install` with the flags the user has chosen. SkillView
-/// requires gh ≥ 2.94.0, so all flags (`--upstream`, `--allow-hidden-dirs`,
+/// requires gh ≥ 2.95.0, so all flags (`--upstream`, `--allow-hidden-dirs`,
 /// `--from-local`, …) are always available and shown.
 public sealed class InstallScreen
 {
@@ -130,7 +130,7 @@ public sealed class InstallScreen
             Text = "→ blank uses the latest release",
         };
 
-        // `--upstream` overrides the recorded source URL. gh ≥ 2.94 is
+        // `--upstream` overrides the recorded source URL. gh ≥ 2.95 is
         // required, so every flag here is guaranteed and always shown.
         var upstreamLabel = new Label { Text = "Upstream   :", X = 0, Y = 3 };
         var upstreamField = new TextField

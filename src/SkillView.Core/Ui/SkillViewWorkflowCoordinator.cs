@@ -21,6 +21,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Action<Action> _invoke;
     private readonly Action<Func<CancellationToken, Task>, string> _runBackground;
     private readonly Action _focusSearchFromInstalled;
+    private readonly Action _refreshActiveTab;
 
     public SkillViewWorkflowCoordinator(
         TuiServices services,
@@ -35,7 +36,8 @@ internal sealed class SkillViewWorkflowCoordinator
         Action<string, TuiHelpers.NotificationLevel> setStatusWithLevel,
         Action<Action> invoke,
         Action<Func<CancellationToken, Task>, string> runBackground,
-        Action focusSearchFromInstalled)
+        Action focusSearchFromInstalled,
+        Action refreshActiveTab)
     {
         _services = services;
         _options = options;
@@ -50,6 +52,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _invoke = invoke;
         _runBackground = runBackground;
         _focusSearchFromInstalled = focusSearchFromInstalled;
+        _refreshActiveTab = refreshActiveTab;
     }
 
     /// Open the install flow. By default takes the compact one-screen modal
@@ -163,6 +166,74 @@ internal sealed class SkillViewWorkflowCoordinator
         }
     }
 
+    /// Discover the skills a repo offers (gh ≥ 2.95.0, cli/cli#13548) and let
+    /// the user pick a subset to install via <see cref="RepoSkillPickerModal"/>.
+    /// Discovery is a read-only `gh skill install <repo>` (no skill, no --all)
+    /// run off the UI thread; on success the populated picker opens. If
+    /// discovery fails or the repo lists no skills, falls back to the blunt
+    /// install-all modal so the `A` shortcut never dead-ends.
+    public void OpenRepoDiscoveryDialog(InstallRequest request)
+    {
+        var app = _getApp();
+        var ghPath = _getGhPath();
+        var report = _getLastReport();
+        if (app is null || ghPath is null || report is null)
+        {
+            return;
+        }
+
+        _setBusy($"discovering skills in {request.Repo}…");
+        _runBackground(async cancellationToken =>
+        {
+            var listing = await _services.InstallService
+                .ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, cancellationToken)
+                .ConfigureAwait(false);
+            _invoke(() =>
+            {
+                _clearBusy();
+                if (!listing.Succeeded)
+                {
+                    _setStatusWithLevel(
+                        $"could not list skills in {request.Repo} (exit {listing.ExitCode}) — opening install-all",
+                        TuiHelpers.NotificationLevel.Warn);
+                    OpenInstallAllDialog(request);
+                    return;
+                }
+                if (listing.Skills.IsDefaultOrEmpty)
+                {
+                    _setStatusWithLevel(
+                        $"no skills discovered in {request.Repo}",
+                        TuiHelpers.NotificationLevel.Warn);
+                    return;
+                }
+
+                var picker = new RepoSkillPickerModal(
+                    app,
+                    _services.InstallService,
+                    _services.Logger,
+                    ghPath,
+                    request,
+                    listing.Skills);
+                var result = picker.Show();
+                if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
+                {
+                    _services.ListAdapter.Invalidate();
+                    var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
+                    _setStatusWithLevel(
+                        $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
+                        result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
+                    QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                }
+                else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
+                {
+                    _setStatusWithLevel(
+                        $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
+                        TuiHelpers.NotificationLevel.Error);
+                }
+            });
+        }, "discover");
+    }
+
     public void ShowCleanupScreen()
     {
         var app = _getApp();
@@ -188,9 +259,15 @@ internal sealed class SkillViewWorkflowCoordinator
                     snapshot.ScannedRoots,
                     snapshot.Skills);
                 screen.Show();
-                if (screen.RemovedCount > 0)
+                if (screen.RemovedCount > 0 || screen.IgnoredCount > 0)
                 {
                     _services.ListAdapter.Invalidate();
+                    // Cleanup can remove or ignore skills while the user is
+                    // sitting on the Installed/Updates list. The screen runs as
+                    // a modal overlay (not a tab switch), so nothing reloads the
+                    // underlying tab on its own — refresh it here so the list
+                    // reflects what cleanup just changed.
+                    _refreshActiveTab();
                 }
 
                 _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");

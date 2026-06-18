@@ -14,8 +14,8 @@ public sealed class DoctorScreenTests
         var report = new EnvironmentReport
         {
             GhPath = "/usr/bin/gh",
-            GhVersionRaw = "gh version 2.94.0",
-            GhVersion = new SemVer(2, 94, 0),
+            GhVersionRaw = "gh version 2.95.0",
+            GhVersion = new SemVer(2, 95, 0),
             GhMeetsMinimum = true,
             Auth = GhAuthStatus.Unknown,
             GhSkillAvailable = true,
@@ -26,7 +26,7 @@ public sealed class DoctorScreenTests
 
         Assert.Contains("## Environment", body);
         Assert.Contains("| gh | `/usr/bin/gh` |", body);
-        Assert.Contains("| version | `gh version 2.94.0`", body);
+        Assert.Contains("| version | `gh version 2.95.0`", body);
         Assert.Contains("## `gh skill`", body);
         Assert.Contains("`gh skill` present", body);
     }
@@ -37,8 +37,8 @@ public sealed class DoctorScreenTests
         var report = new EnvironmentReport
         {
             GhPath = "/usr/bin/gh",
-            GhVersionRaw = "gh version 2.94.0",
-            GhVersion = new SemVer(2, 94, 0),
+            GhVersionRaw = "gh version 2.95.0",
+            GhVersion = new SemVer(2, 95, 0),
             GhMeetsMinimum = true,
             Auth = GhAuthStatus.Unknown,
             GhSkillAvailable = false,
