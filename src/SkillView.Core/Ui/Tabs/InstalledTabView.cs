@@ -570,6 +570,11 @@ internal sealed class InstalledTabView : FrameView
                 if (i >= 0 && i < _rows.Count && _snapshot is not null)
                 {
                     _onRemove(_rows[i], _snapshot);
+                    // The remove flow runs modally and invalidates the list
+                    // cache on success, but nothing reloads this tab — so the
+                    // removed row lingers until the tab is re-activated. Reload
+                    // now to reflect the post-remove inventory.
+                    _ = LoadAsync();
                 }
                 break;
             }

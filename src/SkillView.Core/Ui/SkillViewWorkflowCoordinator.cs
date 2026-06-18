@@ -21,6 +21,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Action<Action> _invoke;
     private readonly Action<Func<CancellationToken, Task>, string> _runBackground;
     private readonly Action _focusSearchFromInstalled;
+    private readonly Action _refreshActiveTab;
 
     public SkillViewWorkflowCoordinator(
         TuiServices services,
@@ -35,7 +36,8 @@ internal sealed class SkillViewWorkflowCoordinator
         Action<string, TuiHelpers.NotificationLevel> setStatusWithLevel,
         Action<Action> invoke,
         Action<Func<CancellationToken, Task>, string> runBackground,
-        Action focusSearchFromInstalled)
+        Action focusSearchFromInstalled,
+        Action refreshActiveTab)
     {
         _services = services;
         _options = options;
@@ -50,6 +52,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _invoke = invoke;
         _runBackground = runBackground;
         _focusSearchFromInstalled = focusSearchFromInstalled;
+        _refreshActiveTab = refreshActiveTab;
     }
 
     /// Open the install flow. By default takes the compact one-screen modal
@@ -188,9 +191,15 @@ internal sealed class SkillViewWorkflowCoordinator
                     snapshot.ScannedRoots,
                     snapshot.Skills);
                 screen.Show();
-                if (screen.RemovedCount > 0)
+                if (screen.RemovedCount > 0 || screen.IgnoredCount > 0)
                 {
                     _services.ListAdapter.Invalidate();
+                    // Cleanup can remove or ignore skills while the user is
+                    // sitting on the Installed/Updates list. The screen runs as
+                    // a modal overlay (not a tab switch), so nothing reloads the
+                    // underlying tab on its own — refresh it here so the list
+                    // reflects what cleanup just changed.
+                    _refreshActiveTab();
                 }
 
                 _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");

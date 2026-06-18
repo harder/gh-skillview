@@ -68,6 +68,16 @@ public sealed class RemoveScreen
         using var wizard = new Wizard
         {
             Title = $"Remove — {_target.Name}",
+            // Wizard inherits Dialog's Dim.Auto sizing, which collapses to each
+            // step's *natural* content size. Every step here lays its content
+            // out with Dim.Fill()/Pos.AnchorEnd(), which contribute nothing to
+            // an Auto measurement, so without an explicit size the wizard
+            // shrinks to the lone fixed label and hides the radio list and the
+            // Review/Confirm markdown. Pin a percentage size (matching the
+            // explicit-size pattern in InstallConfirmModal) so the Fill content
+            // gets real space; the 25-col help padding still fits comfortably.
+            Width = Dim.Percent(80),
+            Height = Dim.Percent(70),
         };
 
         var chooseStep = new WizardStep
@@ -162,6 +172,20 @@ public sealed class RemoveScreen
 
         void RefreshEvaluation()
         {
+            // The radio the user *sees* is the source of truth. The
+            // OptionSelector builds its checkbox subviews lazily during layout
+            // and can raise a transient ValueChanged that leaves both the cached
+            // selectedIndex and the selector's own Value out of sync with the
+            // checkbox that is visually selected (so the default lands on the
+            // first executable option visually, but the evaluation stays on the
+            // blocked first option). Read the checked checkbox directly so
+            // Review/Confirm always match what's on screen.
+            var checkedIndex = CurrentSelection(choicePicker, selectedIndex);
+            if (checkedIndex >= 0 && checkedIndex < targets.Length)
+            {
+                selectedIndex = checkedIndex;
+            }
+
             var target = targets[selectedIndex];
             currentEvaluation = Evaluate(target);
             choiceDescription.Text = target.Description;
@@ -193,6 +217,33 @@ public sealed class RemoveScreen
             {
                 selectedIndex = value;
                 RefreshEvaluation();
+            }
+        };
+
+        // Re-sync the evaluation from the live selection whenever the wizard
+        // moves between steps. This guarantees the Review and Confirm steps are
+        // rebuilt from whatever the radio currently shows, even if an init-time
+        // ValueChanged left selectedIndex stale before the user advanced.
+        wizard.StepChanged += (_, _) => RefreshEvaluation();
+
+        // The OptionSelector opens with keyboard focus on its first checkbox,
+        // which may differ from the checked default (FindInitialSelection picks
+        // the first *executable* option, often not the first one). Pressing
+        // Enter to advance would then "activate" the focused-but-unchecked
+        // checkbox and silently change the selection (e.g. from Unlink back to a
+        // blocked full remove). Align the focused item with the checked value so
+        // Enter advances without mutating the choice.
+        choicePicker.HasFocusChanged += (_, _) =>
+        {
+            if (!choicePicker.HasFocus)
+            {
+                return;
+            }
+
+            var checkedIndex = CurrentSelection(choicePicker, selectedIndex);
+            if (checkedIndex >= 0 && checkedIndex < targets.Length && choicePicker.FocusedItem != checkedIndex)
+            {
+                choicePicker.FocusedItem = checkedIndex;
             }
         };
 
@@ -289,6 +340,27 @@ public sealed class RemoveScreen
         }
 
         return _remove.RemoveMany(evaluation.Items.Select(item => item.Validation));
+    }
+
+    /// Returns the index of the checkbox the <see cref="OptionSelector"/> is
+    /// currently showing as checked. The selector's own <c>Value</c> can desync
+    /// from its visual state during lazy subview layout, so the checked subview
+    /// is the reliable read of what the user actually sees selected. Falls back
+    /// to <paramref name="fallback"/> when no checkbox is checked yet.
+    private static int CurrentSelection(OptionSelector picker, int fallback)
+    {
+        var index = 0;
+        foreach (var box in picker.SubViews.OfType<CheckBox>())
+        {
+            if (box.Value == CheckState.Checked)
+            {
+                return index;
+            }
+
+            index++;
+        }
+
+        return fallback;
     }
 
     private int FindInitialSelection(ImmutableArray<RemoveTarget> targets)

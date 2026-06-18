@@ -128,7 +128,8 @@ public sealed class SkillViewApp
             SetStatus,
             Invoke,
             RunBackground,
-            FocusSearchFromInstalled);
+            FocusSearchFromInstalled,
+            RefreshActiveTab);
     }
 
     internal static bool ShouldOpenInstalledOnStartup(InventorySnapshot snapshot) => snapshot.Skills.Length > 0;
@@ -518,7 +519,8 @@ public sealed class SkillViewApp
             return true;
         }
         if (rune.Value == 'q' || rune.Value == 'Q') { _app?.RequestStop(); return true; }
-        if (rune.Value == 'l' || rune.Value == 'L' || rune.Value == 'r' || rune.Value == 'R') { ToggleRightPane(); return true; }
+        if (rune.Value == 'l' || rune.Value == 'L') { ToggleRightPane(); return true; }
+        if (rune.Value == 'r' || rune.Value == 'R') { RefreshActiveTab(); return true; }
         if (rune.Value == 'e' || rune.Value == 'E') { TogglePreviewMode(); return true; }
         if (rune.Value == 'd' || rune.Value == 'D') { EnterDoctor(); return true; }
         // winget-tui keybindings:
@@ -1530,6 +1532,32 @@ public sealed class SkillViewApp
     {
         UpdateContextBar();
         UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info);
+    }
+
+    /// Reload the active tab's data. Invalidates the shared `gh skill list`
+    /// cache first so the reload reflects on-disk changes (e.g. a removal made
+    /// outside this process). Discover re-runs the current query if one is set.
+    private void RefreshActiveTab()
+    {
+        _services.ListAdapter.Invalidate();
+        switch (_activeTab)
+        {
+            case SkillViewTab.Installed when _installedTab is not null:
+                SetStatus("refreshing inventory…");
+                _ = _installedTab.LoadAsync();
+                break;
+            case SkillViewTab.Changes when _changesTab is not null:
+                SetStatus("refreshing updates…");
+                _ = _changesTab.LoadAsync();
+                break;
+            case SkillViewTab.Discover:
+                if (!string.IsNullOrEmpty(_queryField?.Text.Trim()))
+                {
+                    SetStatus("refreshing results…");
+                    SubmitSearch();
+                }
+                break;
+        }
     }
 
     private void ToggleRightPane()

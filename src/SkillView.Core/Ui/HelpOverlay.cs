@@ -46,7 +46,8 @@ internal static class HelpOverlay
 - **P** — cycle Installed pin filter
 - **G** — cycle Installed scope filter (pushes `--scope` to gh)
 - **e** — toggle raw / rendered preview
-- **l / r** — show / hide logs
+- **l** — show / hide logs
+- **r** — refresh the active tab
 - **q / Esc** — quit at root · close modal otherwise
 
 _Press **Esc**, **Enter**, or **?** to close._
