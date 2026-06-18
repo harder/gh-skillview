@@ -137,7 +137,7 @@ public sealed class GhSkillInstallService
             }
 
             var tab = line.IndexOf('\t');
-            var name = (tab >= 0 ? line[..tab] : line).Trim();
+            var name = NormalizeSkillName((tab >= 0 ? line[..tab] : line).Trim());
             var description = tab >= 0 ? line[(tab + 1)..].Trim() : string.Empty;
             if (name.Length == 0)
             {
@@ -160,6 +160,37 @@ public sealed class GhSkillInstallService
         }
 
         return builder.ToImmutable();
+    }
+
+    /// gh prefixes each listed skill with its namespace in brackets, e.g.
+    /// `[root] code-review` or `[monalisa] code-review`. The bracket tag is
+    /// display decoration, not part of the installable argument: root-namespace
+    /// skills install by bare name, others as `namespace/name`. Strip the tag so
+    /// the picker shows clean names and per-name (subset) installs actually
+    /// resolve. Input without a leading `[ns] ` tag is returned unchanged.
+    internal static string NormalizeSkillName(string raw)
+    {
+        if (raw.Length < 2 || raw[0] != '[')
+        {
+            return raw;
+        }
+
+        var close = raw.IndexOf(']');
+        if (close < 1)
+        {
+            return raw;
+        }
+
+        var ns = raw[1..close].Trim();
+        var rest = raw[(close + 1)..].Trim();
+        if (rest.Length == 0)
+        {
+            return raw;
+        }
+
+        return ns.Length == 0 || ns.Equals("root", StringComparison.OrdinalIgnoreCase)
+            ? rest
+            : $"{ns}/{rest}";
     }
 
     /// How to install a chosen subset of a repo's discovered skills. When the

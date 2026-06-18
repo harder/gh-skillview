@@ -173,6 +173,30 @@ public class GhSkillInstallServiceTests
         Assert.Equal("code-review", skills[1].Name);
     }
 
+    [Theory]
+    [InlineData("[root] code-review", "code-review")]          // root namespace → bare name
+    [InlineData("[monalisa] code-review", "monalisa/code-review")] // other namespace → ns/name
+    [InlineData("[ROOT] x", "x")]                                // case-insensitive root
+    [InlineData("plain-name", "plain-name")]                    // no tag → unchanged
+    [InlineData("[root] a/b", "a/b")]                            // already-pathed name kept
+    [InlineData("[unterminated name", "[unterminated name")]    // malformed → unchanged
+    [InlineData("[root] ", "[root] ")]                          // empty rest → unchanged
+    public void NormalizeSkillName_StripsNamespaceTag(string raw, string expected)
+    {
+        Assert.Equal(expected, GhSkillInstallService.NormalizeSkillName(raw));
+    }
+
+    [Fact]
+    public void ParseRepoSkillListing_StripsRootNamespaceFromNames()
+    {
+        // gh emits "[root] name<TAB>desc"; the picker/install must use bare name.
+        var stdout = "[root] code-review\tReviews PRs\n[root] git-commit\t\n";
+        var skills = GhSkillInstallService.ParseRepoSkillListing(stdout);
+
+        Assert.Equal(new[] { "code-review", "git-commit" }, skills.Select(s => s.Name));
+        Assert.Equal("Reviews PRs", skills[0].Description);
+    }
+
     [Fact]
     public void ParseRepoSkillListing_DeduplicatesByNameAndHandlesEmpty()
     {

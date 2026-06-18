@@ -498,6 +498,18 @@ public sealed class SkillViewApp
             return false;
         }
 
+        // Esc at the root of a primary tab would otherwise fall through to
+        // Terminal.Gui's default quit-on-Esc and exit the app with no
+        // confirmation. Swallow it and hint how to quit instead. Modals,
+        // Doctor, Updates, and the search field all handle Esc themselves
+        // (setting Handled before this runs), so this only fires at the
+        // top-level list where Esc previously meant "lose your session".
+        if (key.KeyCode == KeyCode.Esc)
+        {
+            SetStatus("Press q to quit");
+            return true;
+        }
+
         var rune = key.AsRune;
         if (rune.Value == '/')
         {
@@ -603,6 +615,8 @@ public sealed class SkillViewApp
                 {
                     _installedTab.Visible = true;
                     _ = _installedTab.LoadAsync();
+                    var installed = _installedTab;
+                    Invoke(() => installed.FocusList());
                 }
                 break;
             case SkillViewTab.Changes:
@@ -806,6 +820,12 @@ public sealed class SkillViewApp
                         _activeTab = SkillViewTab.Installed;
                         _tabBar?.SetActiveTab(SkillViewTab.Installed);
                         _installedTab.LoadSeeded(snapshot);
+                        // Defer to the next loop tick so the list focus wins
+                        // over Terminal.Gui's post-reflow default that would
+                        // otherwise land on the filter field and swallow the
+                        // advertised global hotkeys (?, d, x).
+                        var tab = _installedTab;
+                        Invoke(() => tab.FocusList());
                     }
                 }
             });

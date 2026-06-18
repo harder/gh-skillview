@@ -88,23 +88,30 @@ internal sealed class RepoSkillPickerModal
         listFrame.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
 
         var skillBoxes = new CheckBox[_skills.Length];
+        var contentWidth = 20;
         for (var i = 0; i < _skills.Length; i++)
         {
             var skill = _skills[i];
-            var label = string.IsNullOrEmpty(skill.Description)
-                ? skill.Name
-                : $"{skill.Name} — {skill.Description}";
+            // Keep labels bounded so the (non-horizontally-scrolling) content
+            // region stays readable; the full description lives in the repo.
+            var desc = skill.Description.Length > 70
+                ? skill.Description[..70].TrimEnd() + "…"
+                : skill.Description;
+            var label = string.IsNullOrEmpty(desc) ? skill.Name : $"{skill.Name} — {desc}";
+            contentWidth = Math.Max(contentWidth, label.Length + 4);
             var box = new CheckBox
             {
                 X = 0, Y = i,
-                Width = Dim.Fill(),
                 Text = label,
                 Value = CheckState.Checked,
             };
             skillBoxes[i] = box;
             listFrame.Add(box);
         }
-        listFrame.SetContentSize(new Size(1, Math.Max(_skills.Length, 1)));
+        // Content size drives the vertical scrollbar; the width must be wide
+        // enough for the labels (a width of 1 would clip every label to the
+        // checkbox glyph). Height is the row count so all skills scroll.
+        listFrame.SetContentSize(new Size(contentWidth, Math.Max(_skills.Length, 1)));
 
         var scopeLabel = new Label { X = 1, Y = Pos.AnchorEnd(9), Text = "Scope:" };
         var scopeSelector = new OptionSelector
@@ -193,6 +200,12 @@ internal sealed class RepoSkillPickerModal
             RefreshValidity();
         };
         customPathField.TextChanged += (_, _) => RefreshValidity();
+        // Update the "N/M selected" count + Install-enabled state when a row is
+        // toggled with Space (the CheckBox change event is ValueChanged here).
+        foreach (var box in skillBoxes)
+        {
+            box.ValueChanged += (_, _) => RefreshValidity();
+        }
 
         void SetAll(CheckState state)
         {
