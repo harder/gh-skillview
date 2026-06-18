@@ -23,7 +23,7 @@ mv skillview-osx-arm /usr/local/bin/skillview
 skillview
 ```
 
-SkillView requires **GitHub CLI 2.94.0 or newer** — the release that ships the full `gh skill` surface (`skill list`, `install --all`, `update --all`, nested-directory discovery). Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
+SkillView requires **GitHub CLI 2.95.0 or newer** — 2.94.0 first shipped the full `gh skill` surface (`skill list`, `install --all`, `update --all`, nested-directory discovery), and 2.95.0 made `gh skill update` atomic and in-place ([cli/cli#13449](https://github.com/cli/cli/pull/13449)), which SkillView's Updates tab relies on. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
 
 It ships as both:
 
@@ -73,7 +73,7 @@ SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to t
 
 ## Requirements
 
-- **GitHub CLI** `gh` **2.94.0 or newer**
+- **GitHub CLI** `gh` **2.95.0 or newer**
 - a working `gh` setup; `gh auth login` is recommended
 - a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 

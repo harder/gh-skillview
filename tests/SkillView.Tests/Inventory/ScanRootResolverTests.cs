@@ -60,6 +60,70 @@ public class ScanRootResolverTests
     }
 
     [Fact]
+    public void Resolves_claude_user_scope_from_CLAUDE_CONFIG_DIR_when_set()
+    {
+        // gh ≥ 2.95 (cli/cli#13523) writes Claude user-scope skills to
+        // $CLAUDE_CONFIG_DIR/skills; the scanner must look there too.
+        using var temp = new TempHome();
+        var configDir = Path.Combine(temp.Home, "xdg-claude");
+        var configSkills = Path.Combine(configDir, "skills");
+        Directory.CreateDirectory(configSkills);
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>(),
+            ClaudeUserConfigDir: configDir));
+
+        Assert.Contains(roots, r =>
+            r.AgentHint == "claude"
+            && r.Scope == Scope.User
+            && ScanRootResolver.NormalizeKey(r.Path) == ScanRootResolver.NormalizeKey(configSkills));
+    }
+
+    [Fact]
+    public void Scans_both_default_and_CLAUDE_CONFIG_DIR_claude_roots()
+    {
+        // The override is additive: a leftover ~/.claude/skills still surfaces.
+        using var temp = new TempHome();
+        Directory.CreateDirectory(Path.Combine(temp.Home, ".claude", "skills"));
+        var configDir = Path.Combine(temp.Home, "xdg-claude");
+        Directory.CreateDirectory(Path.Combine(configDir, "skills"));
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>(),
+            ClaudeUserConfigDir: configDir));
+
+        var claudeUserRoots = roots
+            .Where(r => r.AgentHint == "claude" && r.Scope == Scope.User)
+            .ToArray();
+        Assert.Equal(2, claudeUserRoots.Length);
+    }
+
+    [Fact]
+    public void Ignores_CLAUDE_CONFIG_DIR_when_unset_or_missing()
+    {
+        using var temp = new TempHome();
+        Directory.CreateDirectory(Path.Combine(temp.Home, ".claude", "skills"));
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>(),
+            ClaudeUserConfigDir: null));
+
+        var claudeUserRoots = roots
+            .Where(r => r.AgentHint == "claude" && r.Scope == Scope.User)
+            .ToArray();
+        Assert.Single(claudeUserRoots);
+    }
+
+    [Fact]
     public void Adds_custom_roots_when_they_exist()
     {
         using var temp = new TempHome();

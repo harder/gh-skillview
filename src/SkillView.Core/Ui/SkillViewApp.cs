@@ -529,7 +529,8 @@ public sealed class SkillViewApp
         // The Installed view is reached via `2` (jump-to-tab) or ←/→ cycling.
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
-        // A → install every skill in the selected result's repo (gh 2.94 --all).
+        // A → discover the skills in the selected result's repo and pick which
+        // to install (gh ≥ 2.95 non-interactive listing, cli/cli#13548).
         if (rune.Value == 'A' && _activeTab == SkillViewTab.Discover) { StageInstallAll(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         // `u` jumps to the Changes tab (embedded). The actual single-row vs.
@@ -1730,9 +1731,9 @@ public sealed class SkillViewApp
             forceAdvanced: forceAdvanced);
     }
 
-    /// Stage an install of *every* skill in the selected result's repo
-    /// (`gh skill install <repo> --all`). gh ≥ 2.94 is required, so `--all`
-    /// is always available.
+    /// Discover the skills in the selected result's repo and open the picker
+    /// so the user installs a chosen subset (gh ≥ 2.95 non-interactive
+    /// listing, cli/cli#13548). Falls back to install-all if discovery fails.
     private void StageInstallAll()
     {
         if (_resultsTable is null || _results.Count == 0)
@@ -1752,7 +1753,7 @@ public sealed class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
-        _workflows.OpenInstallAllDialog(
+        _workflows.OpenRepoDiscoveryDialog(
             new InstallRequest(
                 Repo: pick.Repo,
                 SkillName: null,

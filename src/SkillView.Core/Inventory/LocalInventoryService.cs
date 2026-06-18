@@ -47,7 +47,8 @@ public sealed class LocalInventoryService
         var roots = _resolver.Resolve(new ScanRootResolver.Options(
             CurrentDirectory: Environment.CurrentDirectory,
             HomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            CustomRoots: options.ScanRoots));
+            CustomRoots: options.ScanRoots,
+            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")));
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
 
@@ -56,7 +57,7 @@ public sealed class LocalInventoryService
         fsSw.Stop();
         _logger.Info("inventory", $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
 
-        // `gh skill list` is the primary inventory source (gh ≥ 2.94 is
+        // `gh skill list` is the primary inventory source (gh ≥ 2.95 is
         // required, so it's always available); the filesystem scan above
         // supplements it with symlink/anomaly/package data gh doesn't emit.
         var usedGhList = false;

@@ -26,7 +26,7 @@ internal static class HelpOverlay
 - **/** — focus the Discover query box
 - **i** — install selected via compact confirm
 - **I** — install selected via advanced wizard
-- **A** — install *all* skills from the selected repo (gh 2.94+)
+- **A** — discover & pick which skills to install from the selected repo (gh 2.95+)
 - **o** — open the selected repo in the browser
 
 ## Installed

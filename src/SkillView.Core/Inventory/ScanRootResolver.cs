@@ -28,7 +28,8 @@ public sealed class ScanRootResolver
     public sealed record Options(
         string CurrentDirectory,
         string HomeDirectory,
-        IReadOnlyList<string> CustomRoots);
+        IReadOnlyList<string> CustomRoots,
+        string? ClaudeUserConfigDir = null);
 
     /// Emits scan roots that actually exist on disk. `Options.CurrentDirectory`
     /// is used to probe for a git working tree.
@@ -51,6 +52,19 @@ public sealed class ScanRootResolver
         {
             var path = Path.Combine(opts.HomeDirectory, rel);
             TryAdd(builder, seen, path, Scope.User, agent);
+        }
+
+        // gh ≥ 2.95 (cli/cli#13523) writes Claude Code user-scope skills to
+        // `$CLAUDE_CONFIG_DIR/skills` when that env var is set, instead of the
+        // default `~/.claude/skills`. Mirror that here so the filesystem scan
+        // corroborates whatever `gh skill list` reports. We add it alongside
+        // the default location (rather than replacing it) so any leftover
+        // skills in `~/.claude/skills` still surface as orphans. TryAdd dedupes
+        // when CLAUDE_CONFIG_DIR happens to point back at `~/.claude`.
+        if (!string.IsNullOrWhiteSpace(opts.ClaudeUserConfigDir))
+        {
+            var claudeConfigSkills = Path.Combine(opts.ClaudeUserConfigDir, "skills");
+            TryAdd(builder, seen, claudeConfigSkills, Scope.User, "claude");
         }
 
         foreach (var custom in opts.CustomRoots)

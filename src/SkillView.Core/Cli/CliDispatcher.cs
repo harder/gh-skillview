@@ -83,7 +83,7 @@ public static class CliDispatcher
         sb.AppendLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
         sb.AppendLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
         sb.AppendLine($"gh auth       : {AuthSummary(r.Auth)}");
-        sb.AppendLine($"gh skill      : {(r.GhSkillAvailable ? "present (gh ≥ 2.94 — full skill surface)" : "(not detected)")}");
+        sb.AppendLine($"gh skill      : {(r.GhSkillAvailable ? "present (gh ≥ 2.95 — full skill surface)" : "(not detected)")}");
         sb.AppendLine($"debug         : {options.Debug}");
         sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
         sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
@@ -131,7 +131,7 @@ public static class CliDispatcher
             writer.WriteEndArray();
             writer.WriteEndObject();
 
-            // gh ≥ 2.94 is required, so the full `gh skill` flag surface is
+            // gh ≥ 2.95 is required, so the full `gh skill` flag surface is
             // guaranteed once the command is present — a single availability
             // bool replaces the old per-flag capability probe.
             writer.WriteBoolean("ghSkillAvailable", r.GhSkillAvailable);

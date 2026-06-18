@@ -6,7 +6,7 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill search --json`. SkillView requires gh ≥ 2.94.0, which
+/// Wraps `gh skill search --json`. SkillView requires gh ≥ 2.95.0, which
 /// exposes `--json`, `--owner`, and `--page` (it paginates rather than the
 /// pre-2.94 `--limit`). `--owner`/`--page` emit unconditionally; `Limit` is
 /// applied client-side as a result cap.
