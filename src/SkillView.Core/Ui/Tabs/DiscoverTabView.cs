@@ -48,29 +48,19 @@ internal sealed class DiscoverTabView : FrameView
         };
         TuiHelpers.ConfigureTextInput(QueryField, SkillViewStyling.BaseSchemeName);
 
-        var ownerLabel = new Label { Text = "Owner:", X = 0, Y = 1 };
-        OwnerField = new TextField { X = 8, Y = 1, Width = 22, Text = string.Empty };
-        TuiHelpers.ConfigureTextInput(OwnerField, SkillViewStyling.BaseSchemeName);
-
-        var limitLabel = new Label { Text = "Limit:", X = 32, Y = 1 };
+        // Owner, Agent, Limit, and HiddenDirs are filter state holders surfaced
+        // through the [f] dialog rather than rendered inline. They are not added
+        // to LeftFrame so they don't appear in the UI, but SkillViewApp reads and
+        // writes them directly, and their events (ValueChanged, HasFocusChanged,
+        // KeyDown) are wired for interaction-tracking and post-dialog refresh.
+        OwnerField = new TextField { Text = string.Empty };
         LimitUpDown = new NumericUpDown<int>
         {
-            X = 39,
-            Y = 1,
             Value = GhSkillSearchService.DefaultLimit,
             Increment = 10,
         };
-
-        var agentLabel = new Label { Text = "Agent:", X = 0, Y = 2 };
-        AgentField = new TextField { X = 8, Y = 2, Width = 22, Text = string.Empty };
-        TuiHelpers.ConfigureTextInput(AgentField, SkillViewStyling.BaseSchemeName);
-
-        HiddenDirsBox = new CheckBox
-        {
-            X = 0,
-            Y = 3,
-            Text = "_show hidden dirs",
-        };
+        AgentField = new TextField { Text = string.Empty };
+        HiddenDirsBox = new CheckBox();
 
         FilterSummaryLabel = new Label
         {
@@ -115,10 +105,6 @@ internal sealed class DiscoverTabView : FrameView
             LeftFrame,
             queryLabel, QueryField,
             FilterSummaryLabel,
-            ownerLabel, OwnerField,
-            limitLabel, LimitUpDown,
-            agentLabel, AgentField,
-            HiddenDirsBox,
             ResultsTable,
             DetailPane,
             DetailPane.MetadataPane, DetailPane.PreviewPane,
