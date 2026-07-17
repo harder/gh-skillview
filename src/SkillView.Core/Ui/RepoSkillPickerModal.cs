@@ -33,6 +33,11 @@ internal sealed class RepoSkillPickerModal
 
     internal sealed record Result(Outcome Outcome, int InstalledCount, int FailedCount, string? FirstError);
 
+    // Fixed visible height of the scrollable agent-checkbox grid — matches
+    // the 3-row budget the previous fixed AnchorEnd(6)..(4) layout had before
+    // colliding with the status row at AnchorEnd(3).
+    private const int AgentsVisibleRows = 3;
+
     private readonly IApplication _app;
     private readonly GhSkillInstallService _install;
     private readonly Logger _logger;
@@ -134,20 +139,15 @@ internal sealed class RepoSkillPickerModal
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var preChecked = InstallAgentCatalog.DetectInstalledGhIds(home ?? string.Empty);
         var entries = InstallAgentCatalog.Entries;
-        var agentBoxes = new CheckBox[entries.Length];
-        const int colWidth = 14;
-        const int perRow = 4;
-        for (var i = 0; i < entries.Length; i++)
+        var agentsView = new View
         {
-            var entry = entries[i];
-            agentBoxes[i] = new CheckBox
-            {
-                X = 9 + (i % perRow) * colWidth,
-                Y = Pos.AnchorEnd(6) + (i / perRow),
-                Text = entry.Label,
-                Value = preChecked.Contains(entry.GhId) ? CheckState.Checked : CheckState.UnChecked,
-            };
-        }
+            X = 9, Y = Pos.AnchorEnd(6), Width = Dim.Fill(2), Height = AgentsVisibleRows,
+        };
+        agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
+        var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 4);
+        var agentBoxes = agentGrid.Boxes;
+        foreach (var box in agentBoxes) agentsView.Add(box);
+        agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
 
         var status = new Label
         {
@@ -353,13 +353,13 @@ internal sealed class RepoSkillPickerModal
             }
         };
 
-        dialog.Add(header, listFrame, scopeLabel, scopeSelector, customPathLabel, customPathField, agentsLabel);
-        foreach (var box in agentBoxes) dialog.Add(box);
+        dialog.Add(header, listFrame, scopeLabel, scopeSelector, customPathLabel, customPathField,
+            agentsLabel, agentsView);
         dialog.Add(status, spinner, installButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, header, listFrame, scopeLabel, scopeSelector,
-            customPathLabel, customPathField, agentsLabel, status, spinner,
+            customPathLabel, customPathField, agentsLabel, agentsView, status, spinner,
             installButton, cancelButton);
         foreach (var box in skillBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, box);
         foreach (var box in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, box);

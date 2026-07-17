@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Drawing;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Logging;
@@ -152,7 +153,7 @@ public sealed class InstallScreen
         var whereFrame = new FrameView
         {
             Title = "Where",
-            X = 0, Y = Pos.Bottom(sourceFrame), Width = Dim.Fill(), Height = 6,
+            X = 0, Y = Pos.Bottom(sourceFrame), Width = Dim.Fill(), Height = WhereFrameHeight(),
         };
 
         var scopeLabel = new Label { Text = "Scope      :", X = 0, Y = 0 };
@@ -179,32 +180,28 @@ public sealed class InstallScreen
         TuiHelpers.ConfigureTextInput(pathField, SkillViewStyling.DialogSchemeName);
 
         var agentsLabel = new Label { Text = "Agents     :", X = 0, Y = 3 };
-        var agentBoxes = new CheckBox[KnownAgentEntries.Length];
         var installedAgents = DetectInstalledAgents();
         var anyInstalled = installedAgents.Count > 0;
-        var agentX = 13;
-        for (var i = 0; i < KnownAgentEntries.Length; i++)
+        var agentsView = new View
         {
-            var agent = KnownAgentEntries[i];
-            agentBoxes[i] = new CheckBox
-            {
-                X = agentX, Y = 3, Text = agent.Label,
-                Value = installedAgents.Contains(agent.GhId) ? CheckState.Checked : CheckState.UnChecked,
-            };
-            agentX += agent.Label.Length + 6;
-        }
+            X = 13, Y = 3, Width = Dim.Fill(2), Height = AgentsVisibleRows,
+        };
+        agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
+        var agentGrid = AgentCheckboxGrid.Build(KnownAgentEntries, installedAgents, perRow: 4);
+        var agentBoxes = agentGrid.Boxes;
+        foreach (var cb in agentBoxes) agentsView.Add(cb);
+        agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
         var agentsHint = new Label
         {
-            X = 13, Y = 4, Width = Dim.Fill(2),
+            X = 13, Y = 3 + AgentsVisibleRows, Width = Dim.Fill(2),
             Text = anyInstalled
                 ? "(pre-checked from detected agents — adjust as needed)"
-                : "(blank = let gh skill register all agents)",
+                : "(blank = universal — shared .agents/skills, not agent-specific)",
         };
 
         whereFrame.Add(scopeLabel, scopeSelector, scopeHint,
             pathLabel, pathField,
-            agentsLabel, agentsHint);
-        foreach (var cb in agentBoxes) whereFrame.Add(cb);
+            agentsLabel, agentsView, agentsHint);
 
         // ── BEHAVIOR ───────────────────────────────────────────────────
         var behaviorFrame = new FrameView
@@ -283,10 +280,17 @@ public sealed class InstallScreen
             }
             var scopeIdx = scopeSelector.Value ?? 0;
             var scopeValue = ScopeChoices[Math.Clamp(scopeIdx, 0, ScopeChoices.Length - 1)].Value;
+            var path = scopeValue == "custom" ? NullIfEmpty(pathField.Text) : null;
+            // Default to `universal` (gh 2.96's shared, agent-agnostic target)
+            // when nothing was explicitly checked, unless a custom --dir path
+            // is set — gh's --dir overrides --agent, so a default is moot there.
+            IReadOnlyList<string>? resolvedAgents = agents.Count > 0
+                ? agents
+                : path is null ? InstallConfirmModal.DefaultAgents : null;
             return new GhSkillInstallService.Options(
-                Agents: agents,
+                Agents: resolvedAgents,
                 Scope: scopeValue,
-                Path: scopeValue == "custom" ? NullIfEmpty(pathField.Text) : null,
+                Path: path,
                 Version: NullIfEmpty(versionField.Text),
                 Pin: pinBox.Value == CheckState.Checked,
                 Overwrite: forceBox.Value == CheckState.Checked,
@@ -339,7 +343,7 @@ public sealed class InstallScreen
             versionLabel, versionField, pinBox, versionResolved,
             scopeLabel, scopeSelector, scopeHint,
             pathLabel, pathField,
-            agentsLabel, agentsHint,
+            agentsLabel, agentsView, agentsHint,
             forceBox,
             previewLabel, status, spinner,
             upstreamLabel, upstreamField, upstreamHint,
@@ -448,6 +452,18 @@ public sealed class InstallScreen
     {
         // force + allow-hidden + from-local, plus 2 frame borders
         return 3 + 2;
+    }
+
+    // Fixed visible height of the scrollable agent-checkbox grid; the
+    // catalog is long enough now (gh skill install --agent lists ~47) that
+    // it must scroll rather than grow the dialog.
+    private const int AgentsVisibleRows = 4;
+
+    private static int WhereFrameHeight()
+    {
+        // 2 frame borders + scope row + scope-hint row + path row +
+        // agents grid (scrollable, fixed height) + agents hint row
+        return 2 + 1 + 1 + 1 + AgentsVisibleRows + 1;
     }
 
     private int DefaultScopeIndex()

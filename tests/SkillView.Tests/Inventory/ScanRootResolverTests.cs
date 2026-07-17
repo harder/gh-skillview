@@ -27,6 +27,26 @@ public class ScanRootResolverTests
     }
 
     [Fact]
+    public void Resolves_user_scope_agents_skills_seed()
+    {
+        // gh 2.96.0: `gh skill install --agent universal --scope user` writes
+        // to ~/.agents/skills, distinct from any per-agent home directory.
+        using var temp = new TempHome();
+        Directory.CreateDirectory(Path.Combine(temp.Home, ".agents", "skills"));
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>()));
+
+        Assert.Contains(roots, r =>
+            r.Scope == Scope.User
+            && r.AgentHint == "agents"
+            && r.Path == Path.Combine(temp.Home, ".agents", "skills"));
+    }
+
+    [Fact]
     public void Resolves_project_seeds_when_inside_git()
     {
         using var temp = new TempHome();

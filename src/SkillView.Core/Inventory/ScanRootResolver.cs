@@ -22,7 +22,14 @@ public sealed class ScanRootResolver
         (".cursor/skills", "cursor"),
         (".codex/skills", "codex"),
         (".gemini/skills", "gemini"),
-        (".gemini/antigravity/skills", "antigravity")
+        (".gemini/antigravity/skills", "antigravity"),
+        // `gh skill install --agent universal --scope user` (gh 2.96.0) writes
+        // here — verified: `gh skill install <repo> --agent universal --scope
+        // user` reports "Installed ... in ~/.agents/skills", distinct from the
+        // default (no --agent) copilot install at ~/.copilot/skills. Mirrors
+        // ProjectSeeds' `.agents/skills` entry, which is already shared by
+        // several agents at project scope.
+        (".agents/skills", "agents")
     );
 
     public sealed record Options(

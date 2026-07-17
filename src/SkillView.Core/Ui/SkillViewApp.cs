@@ -24,6 +24,11 @@ namespace SkillView.Ui;
 /// phases extend this with inventory, updates, cleanup, and other workflows.
 public sealed class SkillViewApp
 {
+    // Shared MEC app-config name across both host entrypoints (`skillview`
+    // and `gh-skillview`) so they resolve the same app-specific config file
+    // location rather than one keyed off each binary's own assembly name.
+    private const string SkillViewAppName = "SkillView";
+
     private readonly TuiServices _services;
     private readonly AppOptions _options;
     private readonly Func<IApplication> _applicationFactory;
@@ -142,14 +147,19 @@ public sealed class SkillViewApp
         && !userInteractedSinceLaunch
         && ShouldOpenInstalledOnStartup(snapshot);
 
-    // SkillView pins the Terminal.Gui 2.4.2-develop.53 release; this startup path
-    // stays aligned with TG2 AOT guidance and the modern lifecycle.
+    // This startup path stays aligned with TG2 AOT guidance and the modern
+    // lifecycle (Terminal.Gui 2.4.17+).
     public int Run() => RunAsync().GetAwaiter().GetResult();
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         TuiHelpers.SetTheme(_options.Theme);
-        ConfigurationManager.Enable(ConfigLocations.All);
+        // MEC-based replacement for the legacy `ConfigurationManager.Enable
+        // (ConfigLocations.All)`: loads library defaults → user files →
+        // environment variables → runtime config (same precedence as
+        // ConfigLocations.All) and pushes them onto the static scheme/theme
+        // facades WingetTuiTheme.Register below still targets.
+        new TuiConfigurationBuilder(SkillViewAppName).ApplyToStaticFacades();
         SkillView.Ui.Theming.WingetTuiTheme.Register(_options.Theme);
         if (cancellationToken.IsCancellationRequested)
         {

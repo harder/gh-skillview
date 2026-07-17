@@ -643,41 +643,42 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void Run_EnablesConfigurationManager_BeforeCreatingApplication()
+    public void Run_RegistersCustomScheme_BeforeCreatingApplication()
     {
-        ConfigurationManager.Disable(resetToHardCodedDefaults: true);
-        var enabledAtFactory = false;
+        // SkillViewApp.RunAsync applies MEC config (TuiConfigurationBuilder)
+        // and then WingetTuiTheme.Register before ever creating the
+        // Application instance. "Base" is a built-in Terminal.Gui scheme name
+        // (always present, can't be removed) that WingetTuiTheme.Register
+        // overwrites with its own colors — so the observable signal that
+        // Register already ran in time is the *content* of the scheme, not
+        // merely its presence.
+        var wingetTuiForeground = SkillView.Ui.Theming.WingetTuiTheme.TextPrimary;
+        var registeredAtFactory = false;
 
-        try
+        var services = TuiServices.Build(new Logger(LogLevel.Debug));
+        var options = new AppOptions(
+            InvocationMode.Standalone,
+            DispatchMode.Tui,
+            Debug: false,
+            Theme: AppTheme.Default,
+            ScanRoots: Array.Empty<string>(),
+            SubcommandName: null,
+            SubcommandArgs: Array.Empty<string>());
+
+        var app = new SkillViewApp(services, options, () =>
         {
-            var services = TuiServices.Build(new Logger(LogLevel.Debug));
-            var options = new AppOptions(
-                InvocationMode.Standalone,
-                DispatchMode.Tui,
-                Debug: false,
-                Theme: AppTheme.Default,
-                ScanRoots: Array.Empty<string>(),
-                SubcommandName: null,
-                SubcommandArgs: Array.Empty<string>());
+            registeredAtFactory = SchemeManager.TryGetScheme(SkillView.Ui.Theming.SchemeNames.Base, out var scheme)
+                && scheme.Normal.Foreground == wingetTuiForeground;
+            var created = Application.Create();
+            created.Init("ansi");
+            created.StopAfterFirstIteration = true;
+            return created;
+        }, probeOnRun: false);
 
-            var app = new SkillViewApp(services, options, () =>
-            {
-                enabledAtFactory = ConfigurationManager.IsEnabled;
-                var created = Application.Create();
-                created.Init("ansi");
-                created.StopAfterFirstIteration = true;
-                return created;
-            }, probeOnRun: false);
+        var exitCode = app.Run();
 
-            var exitCode = app.Run();
-
-            Assert.Equal(ExitCodes.Success, exitCode);
-            Assert.True(enabledAtFactory);
-        }
-        finally
-        {
-            ConfigurationManager.Disable(resetToHardCodedDefaults: true);
-        }
+        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.True(registeredAtFactory);
     }
 
     [Fact]

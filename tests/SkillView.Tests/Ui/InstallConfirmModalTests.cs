@@ -29,6 +29,32 @@ public sealed class InstallConfirmModalTests
 
         Assert.Equal("user", opts.Scope);
         Assert.Null(opts.Path);
+        Assert.Equal(new[] { "universal" }, opts.Agents);
+    }
+
+    [Fact]
+    public void BuildOptions_NoAgentsSelected_NoCustomPath_DefaultsToUniversal()
+    {
+        var opts = InstallConfirmModal.BuildOptionsFromSelection(
+            scopeIndex: 0,
+            customPath: "",
+            selectedAgentIds: Array.Empty<string>());
+
+        Assert.Equal(new[] { "universal" }, opts.Agents);
+    }
+
+    [Fact]
+    public void BuildOptions_NoAgentsSelected_WithCustomPath_LeavesAgentsNull()
+    {
+        // --dir overrides --agent entirely, so a default agent would be
+        // meaningless (and misleading in the command preview) once a custom
+        // install path is set.
+        var opts = InstallConfirmModal.BuildOptionsFromSelection(
+            scopeIndex: 2,
+            customPath: "/opt/skills",
+            selectedAgentIds: Array.Empty<string>());
+
+        Assert.Equal("/opt/skills", opts.Path);
         Assert.Null(opts.Agents);
     }
 
@@ -55,7 +81,9 @@ public sealed class InstallConfirmModalTests
 
         Assert.Null(opts.Scope);
         Assert.Null(opts.Path);
-        Assert.Null(opts.Agents);
+        // Path never resolved (blank), so the universal-agent default still
+        // applies — same as any other no-path, no-selection case.
+        Assert.Equal(new[] { "universal" }, opts.Agents);
     }
 
     [Fact]

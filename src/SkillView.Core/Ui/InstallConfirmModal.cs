@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Drawing;
 using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
@@ -38,6 +39,11 @@ internal sealed class InstallConfirmModal
     }
 
     internal sealed record Result(Outcome Outcome, InstallResult? Install);
+
+    // Fixed visible height of the scrollable agent-checkbox grid; the
+    // catalog is long enough now (gh skill install --agent lists ~47) that
+    // it must scroll rather than grow the dialog.
+    private const int AgentsVisibleRows = 4;
 
     private readonly IApplication _app;
     private readonly GhSkillInstallService _install;
@@ -110,23 +116,15 @@ internal sealed class InstallConfirmModal
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var preChecked = InstallAgentCatalog.DetectInstalledGhIds(home ?? string.Empty);
         var entries = InstallAgentCatalog.Entries;
-        var agentBoxes = new CheckBox[entries.Length];
-        var col = 9;
-        var row = 6;
-        const int colWidth = 14;
-        var perRow = 4;
-        for (var i = 0; i < entries.Length; i++)
+        var agentsView = new View
         {
-            var entry = entries[i];
-            var box = new CheckBox
-            {
-                X = col + (i % perRow) * colWidth,
-                Y = row + (i / perRow),
-                Text = entry.Label,
-                Value = preChecked.Contains(entry.GhId) ? CheckState.Checked : CheckState.UnChecked,
-            };
-            agentBoxes[i] = box;
-        }
+            X = 9, Y = 6, Width = Dim.Fill(2), Height = AgentsVisibleRows,
+        };
+        agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
+        var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 3);
+        var agentBoxes = agentGrid.Boxes;
+        foreach (var box in agentBoxes) agentsView.Add(box);
+        agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
 
         var status = new Label
         {
@@ -260,14 +258,13 @@ internal sealed class InstallConfirmModal
         };
 
         dialog.Add(repoLabel, scopeLabel, scopeSelector, customPathLabel, customPathField,
-                   agentsLabel);
-        foreach (var box in agentBoxes) dialog.Add(box);
+                   agentsLabel, agentsView);
         dialog.Add(status, spinner, installButton, advancedButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, repoLabel, scopeLabel, scopeSelector,
             customPathLabel, customPathField,
-            agentsLabel, status, spinner,
+            agentsLabel, agentsView, status, spinner,
             installButton, advancedButton, cancelButton);
         foreach (var box in agentBoxes)
         {
@@ -303,8 +300,13 @@ internal sealed class InstallConfirmModal
     /// <see cref="GhSkillInstallService.Options"/>. Extracted so callers and
     /// tests don't need to construct Terminal.Gui CheckBox views.
     /// scopeIndex: 0=Project, 1=User, 2=Custom; for index 2, customPath
-    /// becomes the install path. Empty agent list yields null (no --agent
-    /// flags emitted at all).
+    /// becomes the install path. An empty agent list defaults to `universal`
+    /// (gh 2.96's shared, agent-agnostic target — installs to `.agents/skills`
+    /// rather than a specific agent's home dir) — unless a custom `--dir` path
+    /// is set, since gh's `--dir` overrides `--agent` entirely and a default
+    /// there would be meaningless.
+    internal static readonly string[] DefaultAgents = ["universal"];
+
     internal static GhSkillInstallService.Options BuildOptionsFromSelection(
         int scopeIndex,
         string customPath,
@@ -322,8 +324,12 @@ internal sealed class InstallConfirmModal
             ? customPath.Trim()
             : null;
 
+        var agents = selectedAgentIds.Count > 0
+            ? selectedAgentIds
+            : path is null ? DefaultAgents : null;
+
         return new GhSkillInstallService.Options(
-            Agents: selectedAgentIds.Count > 0 ? selectedAgentIds : null,
+            Agents: agents,
             Scope: scope,
             Path: path,
             All: installAll);
