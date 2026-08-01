@@ -14,14 +14,14 @@ public sealed class ChangesQueueBuilderTests
             diagnostics: ["Doctor"]);
 
         Assert.Equal(4, rows.Count);
-        Assert.Equal("Update",      rows[0].Kind);
-        Assert.Equal("skillA",      rows[0].Title);
-        Assert.Equal("Update",      rows[1].Kind);
-        Assert.Equal("skillB",      rows[1].Title);
-        Assert.Equal("Cleanup",     rows[2].Kind);
+        Assert.Equal("Update", rows[0].Kind);
+        Assert.Equal("skillA", rows[0].Title);
+        Assert.Equal("Update", rows[1].Kind);
+        Assert.Equal("skillB", rows[1].Title);
+        Assert.Equal("Cleanup", rows[2].Kind);
         Assert.Equal("orphaned.md", rows[2].Title);
         Assert.Equal("Diagnostics", rows[3].Kind);
-        Assert.Equal("Doctor",      rows[3].Title);
+        Assert.Equal("Doctor", rows[3].Title);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class ChangesQueueBuilderTests
 
         Assert.Single(rows);
         Assert.Equal("Diagnostics", rows[0].Kind);
-        Assert.Equal("Run Doctor",  rows[0].Title);
+        Assert.Equal("Run Doctor", rows[0].Title);
     }
 
     [Fact]

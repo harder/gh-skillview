@@ -30,7 +30,8 @@ internal sealed class DoctorTabView : FrameView
 
         _body = new Markdown
         {
-            X = 0, Y = 0,
+            X = 0,
+            Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             Text = "_(loading…)_",

@@ -63,7 +63,10 @@ internal sealed class SkillDetailPaneView : FrameView
         };
         MetadataPane = new Markdown
         {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
             Text = "_Select a skill to preview._",
         };
         TuiHelpers.ConfigureMarkdownPane(MetadataPane, SchemeNames.Base);
@@ -80,14 +83,20 @@ internal sealed class SkillDetailPaneView : FrameView
         };
         PreviewPane = new Markdown
         {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
             Text = welcomeText,
         };
         TuiHelpers.ConfigureMarkdownPane(PreviewPane, SchemeNames.Base);
 
         PreviewRawPane = new Editor
         {
-            X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
             CanFocus = false,
             Text = welcomeText,
             Visible = false,

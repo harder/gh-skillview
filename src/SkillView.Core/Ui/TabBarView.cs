@@ -11,9 +11,9 @@ namespace SkillView.Ui;
 /// matches the visual left-to-right order and the numeric jump keys (1/2/3).
 internal enum SkillViewTab
 {
-    Discover  = 0,
+    Discover = 0,
     Installed = 1,
-    Changes   = 2,
+    Changes = 2,
 }
 
 /// Top header strip showing the three primary tabs (Discover / Installed /
@@ -64,7 +64,7 @@ internal sealed class TabBarView : View
     /// to verify the workflow-first labelling without parsing drawn output.
     internal IReadOnlyList<string> TabLabelsForTests => Tabs.Select(t => t.Label).ToArray();
 
-    protected override bool OnDrawingContent (DrawContext? context)
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var viewport = Viewport;
         var width = viewport.Width;
@@ -74,7 +74,7 @@ internal sealed class TabBarView : View
         // Logo on the left, tabs flush right with a 2-cell gap between pills.
         const string logo = "  Skill View";
         var inactiveFg = WingetTuiTheme.TextSecondary;
-        var activeFg   = WingetTuiTheme.Accent;
+        var activeFg = WingetTuiTheme.Accent;
         var background = WingetTuiTheme.Background;
 
         // Clear row with background fill.
@@ -111,7 +111,7 @@ internal sealed class TabBarView : View
         return true;
     }
 
-    protected override bool OnMouseEvent (Mouse mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
         if (!mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
         {

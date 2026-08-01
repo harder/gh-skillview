@@ -90,7 +90,8 @@ internal sealed class InstalledTabView : FrameView
         };
         _filterField = new TextField
         {
-            X = 8, Y = 0,
+            X = 8,
+            Y = 0,
             Width = Dim.Percent(60) - 8,
             Text = string.Empty,
         };
@@ -268,9 +269,9 @@ internal sealed class InstalledTabView : FrameView
         }
         source = _pinFilter switch
         {
-            PinFilter.PinnedOnly   => source.Where(s => s.Pinned),
+            PinFilter.PinnedOnly => source.Where(s => s.Pinned),
             PinFilter.UnpinnedOnly => source.Where(s => !s.Pinned),
-            _                      => source,
+            _ => source,
         };
         _rows = ApplySort(source);
     }
@@ -286,49 +287,49 @@ internal sealed class InstalledTabView : FrameView
 
     internal static PinFilter CyclePin(PinFilter current) => current switch
     {
-        PinFilter.All          => PinFilter.PinnedOnly,
-        PinFilter.PinnedOnly   => PinFilter.UnpinnedOnly,
-        _                      => PinFilter.All,
+        PinFilter.All => PinFilter.PinnedOnly,
+        PinFilter.PinnedOnly => PinFilter.UnpinnedOnly,
+        _ => PinFilter.All,
     };
 
     internal static string DescribePin(PinFilter f) => f switch
     {
-        PinFilter.PinnedOnly   => "pinned only",
+        PinFilter.PinnedOnly => "pinned only",
         PinFilter.UnpinnedOnly => "unpinned only",
-        _                      => "all",
+        _ => "all",
     };
 
     internal static ScopeFilter CycleScope(ScopeFilter current) => current switch
     {
-        ScopeFilter.All     => ScopeFilter.User,
-        ScopeFilter.User    => ScopeFilter.Project,
+        ScopeFilter.All => ScopeFilter.User,
+        ScopeFilter.User => ScopeFilter.Project,
         ScopeFilter.Project => ScopeFilter.Custom,
-        _                   => ScopeFilter.All,
+        _ => ScopeFilter.All,
     };
 
     internal static string DescribeScope(ScopeFilter f) => f switch
     {
-        ScopeFilter.User    => "user",
+        ScopeFilter.User => "user",
         ScopeFilter.Project => "project",
-        ScopeFilter.Custom  => "custom",
-        _                   => "all",
+        ScopeFilter.Custom => "custom",
+        _ => "all",
     };
 
     private static Scope? ToScope(ScopeFilter f) => f switch
     {
-        ScopeFilter.User    => Scope.User,
+        ScopeFilter.User => Scope.User,
         ScopeFilter.Project => Scope.Project,
-        ScopeFilter.Custom  => Scope.Custom,
-        _                   => null,
+        ScopeFilter.Custom => Scope.Custom,
+        _ => null,
     };
 
     /// gh's `--scope` accepts only project|user, so "custom" and "all" map to
     /// null (full capture) and are narrowed in-process.
     private static string? ToGhScope(ScopeFilter f) => f switch
     {
-        ScopeFilter.User    => "user",
+        ScopeFilter.User => "user",
         ScopeFilter.Project => "project",
-        _                   => null,
+        _ => null,
     };
 
     private IReadOnlyList<InstalledSkill> ApplySort(IEnumerable<InstalledSkill> input) => _sort switch
@@ -586,28 +587,28 @@ internal sealed class InstalledTabView : FrameView
                 RefreshAll();
                 break;
             case InstalledScreen.ShortcutCommand.Remove:
-            {
-                var i = _table.GetSelectedRow();
-                if (i >= 0 && i < _rows.Count && _snapshot is not null)
                 {
-                    _onRemove(_rows[i], _snapshot);
-                    // The remove flow runs modally and invalidates the list
-                    // cache on success, but nothing reloads this tab — so the
-                    // removed row lingers until the tab is re-activated. Reload
-                    // now to reflect the post-remove inventory.
-                    _ = LoadAsync();
+                    var i = _table.GetSelectedRow();
+                    if (i >= 0 && i < _rows.Count && _snapshot is not null)
+                    {
+                        _onRemove(_rows[i], _snapshot);
+                        // The remove flow runs modally and invalidates the list
+                        // cache on success, but nothing reloads this tab — so the
+                        // removed row lingers until the tab is re-activated. Reload
+                        // now to reflect the post-remove inventory.
+                        _ = LoadAsync();
+                    }
+                    break;
                 }
-                break;
-            }
             case InstalledScreen.ShortcutCommand.Open:
-            {
-                var i = _table.GetSelectedRow();
-                if (i >= 0 && i < _rows.Count)
                 {
-                    TuiHelpers.OpenInDefaultHandler(_rows[i].ResolvedPath);
+                    var i = _table.GetSelectedRow();
+                    if (i >= 0 && i < _rows.Count)
+                    {
+                        TuiHelpers.OpenInDefaultHandler(_rows[i].ResolvedPath);
+                    }
+                    break;
                 }
-                break;
-            }
         }
     }
 
@@ -629,9 +630,9 @@ internal sealed class InstalledTabView : FrameView
 
     internal string? GetPinFilterState() => _pinFilter switch
     {
-        PinFilter.PinnedOnly   => "pinned only",
+        PinFilter.PinnedOnly => "pinned only",
         PinFilter.UnpinnedOnly => "unpinned only",
-        _                      => null
+        _ => null
     };
 
     internal InstalledSkill? GetSelectedSkill()

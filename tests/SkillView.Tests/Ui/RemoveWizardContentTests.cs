@@ -45,7 +45,7 @@ public sealed class RemoveWizardContentTests
         CapturedAt = DateTimeOffset.UtcNow,
     };
 
-    private static InstalledSkill CreateSkill(string root, bool withGit) 
+    private static InstalledSkill CreateSkill(string root, bool withGit)
     {
         Directory.CreateDirectory(root);
         var dir = Path.Combine(root, "demo");
@@ -57,18 +57,18 @@ public sealed class RemoveWizardContentTests
         }
 
         return new()
-    {
-        Name = "demo",
-        ResolvedPath = dir,
-        ScanRoot = root,
-        Scope = Scope.User,
-        Agents = ImmutableArray<AgentMembership>.Empty,
-        FrontMatter = new SkillFrontMatter { Name = "demo" },
-        Validity = ValidityState.Valid,
-        Provenance = Provenance.FsScan,
-        Ignored = false,
-        IsSymlinked = false,
-        InstalledAt = null,
-    };
+        {
+            Name = "demo",
+            ResolvedPath = dir,
+            ScanRoot = root,
+            Scope = Scope.User,
+            Agents = ImmutableArray<AgentMembership>.Empty,
+            FrontMatter = new SkillFrontMatter { Name = "demo" },
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = false,
+            InstalledAt = null,
+        };
     }
 }

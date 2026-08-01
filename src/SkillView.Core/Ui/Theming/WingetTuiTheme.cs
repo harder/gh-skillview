@@ -14,41 +14,41 @@ namespace SkillView.Ui.Theming;
 internal static class WingetTuiTheme
 {
     // Palette — see plan §"Theme — exact winget-tui palette"
-    internal static readonly Color Accent          = new(0xEE, 0xC9, 0x8D); // gold
-    internal static readonly Color TextPrimary     = new(0xE8, 0xDC, 0xB7); // warm beige
-    internal static readonly Color TextSecondary   = new(0x9E, 0x9E, 0x9E); // dim gray
-    internal static readonly Color Surface         = new(0x2D, 0x2D, 0x2D); // panel
-    internal static readonly Color Background      = new(0x1E, 0x1E, 0x1E); // app base
-    internal static readonly Color Success         = new(0x56, 0xB9, 0x7F); // mint green
-    internal static readonly Color Danger          = new(0xE7, 0x48, 0x56); // red
-    internal static readonly Color Info            = new(0x61, 0xAF, 0xEF); // blue
-    internal static readonly Color Selection       = new(0xC6, 0x78, 0xDD); // purple
-    internal static readonly Color Black           = new(0, 0, 0);
-    internal static readonly Color DarkGray        = new(0x44, 0x44, 0x44);
+    internal static readonly Color Accent = new(0xEE, 0xC9, 0x8D); // gold
+    internal static readonly Color TextPrimary = new(0xE8, 0xDC, 0xB7); // warm beige
+    internal static readonly Color TextSecondary = new(0x9E, 0x9E, 0x9E); // dim gray
+    internal static readonly Color Surface = new(0x2D, 0x2D, 0x2D); // panel
+    internal static readonly Color Background = new(0x1E, 0x1E, 0x1E); // app base
+    internal static readonly Color Success = new(0x56, 0xB9, 0x7F); // mint green
+    internal static readonly Color Danger = new(0xE7, 0x48, 0x56); // red
+    internal static readonly Color Info = new(0x61, 0xAF, 0xEF); // blue
+    internal static readonly Color Selection = new(0xC6, 0x78, 0xDD); // purple
+    internal static readonly Color Black = new(0, 0, 0);
+    internal static readonly Color DarkGray = new(0x44, 0x44, 0x44);
 
     /// Base scheme: dim background, warm primary text, gold accent on selection.
     /// Mirrors winget-tui's `Style::default()` + `theme::selected_row()` pairing.
     internal static Scheme CreateBaseScheme()
     {
-        var normal  = new Attribute(TextPrimary, Background);
-        var focus   = new Attribute(Black, Accent, TextStyle.Bold);   // selected_row()
-        var active  = focus;
+        var normal = new Attribute(TextPrimary, Background);
+        var focus = new Attribute(Black, Accent, TextStyle.Bold);   // selected_row()
+        var active = focus;
         var disabled = new Attribute(TextSecondary, Background);
-        var hot     = new Attribute(Accent, Background);             // dimmed accent for hotkey hints
+        var hot = new Attribute(Accent, Background);             // dimmed accent for hotkey hints
 
         return new Scheme
         {
-            Normal    = normal,
+            Normal = normal,
             HotNormal = hot,
-            Focus     = focus,
-            HotFocus  = new Attribute(Accent, Accent, TextStyle.Bold), // matches selected bg
-            Active    = active,
+            Focus = focus,
+            HotFocus = new Attribute(Accent, Accent, TextStyle.Bold), // matches selected bg
+            Active = active,
             HotActive = hot,
             Highlight = focus,
-            Editable  = normal,
-            ReadOnly  = normal,
-            Disabled  = disabled,
-            Code      = new Attribute(Info, Background),
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = new Attribute(Info, Background),
         };
     }
 
@@ -56,24 +56,24 @@ internal static class WingetTuiTheme
     /// visually above the base background.
     internal static Scheme CreateDialogScheme()
     {
-        var normal  = new Attribute(TextPrimary, Surface);
-        var focus   = new Attribute(Black, Accent, TextStyle.Bold);
+        var normal = new Attribute(TextPrimary, Surface);
+        var focus = new Attribute(Black, Accent, TextStyle.Bold);
         var disabled = new Attribute(TextSecondary, Surface);
-        var hot     = new Attribute(Accent, Surface);
+        var hot = new Attribute(Accent, Surface);
 
         return new Scheme
         {
-            Normal    = normal,
+            Normal = normal,
             HotNormal = hot,
-            Focus     = focus,
-            HotFocus  = focus,
-            Active    = focus,
+            Focus = focus,
+            HotFocus = focus,
+            Active = focus,
             HotActive = hot,
             Highlight = focus,
-            Editable  = normal,
-            ReadOnly  = normal,
-            Disabled  = disabled,
-            Code      = new Attribute(Info, Surface),
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = new Attribute(Info, Surface),
         };
     }
 
@@ -83,10 +83,10 @@ internal static class WingetTuiTheme
     {
         var (fg, bg) = level switch
         {
-            TuiHelpers.NotificationLevel.Success => (Black,       Success),
-            TuiHelpers.NotificationLevel.Warn    => (Black,       Accent),
-            TuiHelpers.NotificationLevel.Error   => (TextPrimary, Danger),
-            _                                    => (TextPrimary, Surface),
+            TuiHelpers.NotificationLevel.Success => (Black, Success),
+            TuiHelpers.NotificationLevel.Warn => (Black, Accent),
+            TuiHelpers.NotificationLevel.Error => (TextPrimary, Danger),
+            _ => (TextPrimary, Surface),
         };
         var normal = new Attribute(fg, bg);
         return AllSame(normal);
@@ -95,23 +95,23 @@ internal static class WingetTuiTheme
     /// Read-only pane (preview, logs, detail metadata).
     internal static Scheme CreateReadOnlyPaneScheme()
     {
-        var normal   = new Attribute(TextPrimary, Background);
-        var focus    = new Attribute(TextPrimary, Surface);
+        var normal = new Attribute(TextPrimary, Background);
+        var focus = new Attribute(TextPrimary, Surface);
         var disabled = new Attribute(TextSecondary, Background);
 
         return new Scheme
         {
-            Normal    = normal,
+            Normal = normal,
             HotNormal = normal,
-            Focus     = focus,
-            HotFocus  = focus,
-            Active    = normal,
+            Focus = focus,
+            HotFocus = focus,
+            Active = normal,
             HotActive = focus,
             Highlight = focus,
-            Editable  = normal,
-            ReadOnly  = normal,
-            Disabled  = disabled,
-            Code      = new Attribute(Info, Background),
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = new Attribute(Info, Background),
         };
     }
 
@@ -119,23 +119,23 @@ internal static class WingetTuiTheme
     /// against panel fills, accent on focus.
     internal static Scheme CreateEditableInputScheme()
     {
-        var normal   = new Attribute(TextPrimary, Surface);
-        var focus    = new Attribute(Black, Accent);
+        var normal = new Attribute(TextPrimary, Surface);
+        var focus = new Attribute(Black, Accent);
         var disabled = new Attribute(TextSecondary, Background);
 
         return new Scheme
         {
-            Normal    = normal,
+            Normal = normal,
             HotNormal = normal,
-            Focus     = focus,
-            HotFocus  = focus,
-            Active    = focus,
+            Focus = focus,
+            HotFocus = focus,
+            Active = focus,
             HotActive = focus,
             Highlight = focus,
-            Editable  = normal,
-            ReadOnly  = normal,
-            Disabled  = disabled,
-            Code      = normal,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = normal,
         };
     }
 
@@ -144,23 +144,23 @@ internal static class WingetTuiTheme
     /// level by individual table renderers, not via Scheme.
     internal static Scheme CreateTableScheme()
     {
-        var normal   = new Attribute(TextPrimary, Background);
+        var normal = new Attribute(TextPrimary, Background);
         var selected = new Attribute(Black, Accent, TextStyle.Bold);
         var disabled = new Attribute(TextSecondary, Background);
 
         return new Scheme
         {
-            Normal    = normal,
+            Normal = normal,
             HotNormal = normal,
-            Focus     = selected,
-            HotFocus  = selected,
-            Active    = selected,
+            Focus = selected,
+            HotFocus = selected,
+            Active = selected,
             HotActive = selected,
             Highlight = selected,
-            Editable  = normal,
-            ReadOnly  = normal,
-            Disabled  = disabled,
-            Code      = normal,
+            Editable = normal,
+            ReadOnly = normal,
+            Disabled = disabled,
+            Code = normal,
         };
     }
 
@@ -177,23 +177,23 @@ internal static class WingetTuiTheme
             return;
         }
 
-        SchemeManager.AddScheme(SchemeNames.Base,   CreateBaseScheme());
+        SchemeManager.AddScheme(SchemeNames.Base, CreateBaseScheme());
         SchemeManager.AddScheme(SchemeNames.Dialog, CreateDialogScheme());
     }
 
     private static Scheme AllSame(Attribute attr) => new()
     {
-        Normal    = attr,
+        Normal = attr,
         HotNormal = attr,
-        Focus     = attr,
-        HotFocus  = attr,
-        Active    = attr,
+        Focus = attr,
+        HotFocus = attr,
+        Active = attr,
         HotActive = attr,
         Highlight = attr,
-        Editable  = attr,
-        ReadOnly  = attr,
-        Disabled  = attr,
-        Code      = attr,
+        Editable = attr,
+        ReadOnly = attr,
+        Disabled = attr,
+        Code = attr,
     };
 }
 
@@ -202,6 +202,6 @@ internal static class WingetTuiTheme
 /// version after Register() runs.
 internal static class SchemeNames
 {
-    internal const string Base   = "Base";
+    internal const string Base = "Base";
     internal const string Dialog = "Dialog";
 }

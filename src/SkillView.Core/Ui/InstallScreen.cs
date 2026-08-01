@@ -97,37 +97,49 @@ public sealed class InstallScreen
         var sourceFrame = new FrameView
         {
             Title = "Source",
-            X = 0, Y = 0, Width = Dim.Fill(), Height = SourceFrameHeight(),
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = SourceFrameHeight(),
         };
 
         var skillLabel = new Label { Text = "Skill name :", X = 0, Y = 0 };
         var skillField = new TextField
         {
-            X = 13, Y = 0, Width = 32,
+            X = 13,
+            Y = 0,
+            Width = 32,
             Text = _request.SkillName ?? string.Empty,
         };
         TuiHelpers.ConfigureTextInput(skillField, SkillViewStyling.DialogSchemeName);
         var skillHint = new Label
         {
-            X = Pos.Right(skillField) + 2, Y = 0,
+            X = Pos.Right(skillField) + 2,
+            Y = 0,
             Text = "(blank = repo's default skill)",
         };
 
         var versionLabel = new Label { Text = "Version    :", X = 0, Y = 1 };
         var versionField = new TextField
         {
-            X = 13, Y = 1, Width = 20, Text = string.Empty,
+            X = 13,
+            Y = 1,
+            Width = 20,
+            Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(versionField, SkillViewStyling.DialogSchemeName);
         var pinBox = new CheckBox
         {
-            X = Pos.Right(versionField) + 2, Y = 1,
+            X = Pos.Right(versionField) + 2,
+            Y = 1,
             Text = "_pin to version",
             Enabled = false,
         };
         var versionResolved = new Label
         {
-            X = 13, Y = 2, Width = Dim.Fill(2),
+            X = 13,
+            Y = 2,
+            Width = Dim.Fill(2),
             Text = "→ blank uses the latest release",
         };
 
@@ -136,12 +148,16 @@ public sealed class InstallScreen
         var upstreamLabel = new Label { Text = "Upstream   :", X = 0, Y = 3 };
         var upstreamField = new TextField
         {
-            X = 13, Y = 3, Width = 40, Text = string.Empty,
+            X = 13,
+            Y = 3,
+            Width = 40,
+            Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(upstreamField, SkillViewStyling.DialogSchemeName);
         var upstreamHint = new Label
         {
-            X = Pos.Right(upstreamField) + 2, Y = 3,
+            X = Pos.Right(upstreamField) + 2,
+            Y = 3,
             Text = "(override recorded source URL)",
         };
 
@@ -153,27 +169,35 @@ public sealed class InstallScreen
         var whereFrame = new FrameView
         {
             Title = "Where",
-            X = 0, Y = Pos.Bottom(sourceFrame), Width = Dim.Fill(), Height = WhereFrameHeight(),
+            X = 0,
+            Y = Pos.Bottom(sourceFrame),
+            Width = Dim.Fill(),
+            Height = WhereFrameHeight(),
         };
 
         var scopeLabel = new Label { Text = "Scope      :", X = 0, Y = 0 };
         var scopeSelector = new OptionSelector
         {
-            X = 13, Y = 0,
+            X = 13,
+            Y = 0,
             Orientation = Orientation.Horizontal,
             Labels = ScopeChoices.Select(s => s.Label).ToList(),
             Value = DefaultScopeIndex(),
         };
         var scopeHint = new Label
         {
-            X = 13, Y = 1, Width = Dim.Fill(2),
+            X = 13,
+            Y = 1,
+            Width = Dim.Fill(2),
             Text = "Project = repo skill dir · Global = home skill dir (everywhere)",
         };
 
         var pathLabel = new Label { Text = "Custom path:", X = 0, Y = 2 };
         var pathField = new TextField
         {
-            X = 13, Y = 2, Width = Dim.Fill(2),
+            X = 13,
+            Y = 2,
+            Width = Dim.Fill(2),
             Text = string.Empty,
             Enabled = false,
         };
@@ -184,7 +208,10 @@ public sealed class InstallScreen
         var anyInstalled = installedAgents.Count > 0;
         var agentsView = new View
         {
-            X = 13, Y = 3, Width = Dim.Fill(2), Height = AgentsVisibleRows,
+            X = 13,
+            Y = 3,
+            Width = Dim.Fill(2),
+            Height = AgentsVisibleRows,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         var agentGrid = AgentCheckboxGrid.Build(KnownAgentEntries, installedAgents, perRow: 4);
@@ -193,7 +220,9 @@ public sealed class InstallScreen
         agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
         var agentsHint = new Label
         {
-            X = 13, Y = 3 + AgentsVisibleRows, Width = Dim.Fill(2),
+            X = 13,
+            Y = 3 + AgentsVisibleRows,
+            Width = Dim.Fill(2),
             Text = anyInstalled
                 ? "(pre-checked from detected agents — adjust as needed)"
                 : "(blank = universal — shared .agents/skills, not agent-specific)",
@@ -207,48 +236,60 @@ public sealed class InstallScreen
         var behaviorFrame = new FrameView
         {
             Title = "Behavior",
-            X = 0, Y = Pos.Bottom(whereFrame), Width = Dim.Fill(),
+            X = 0,
+            Y = Pos.Bottom(whereFrame),
+            Width = Dim.Fill(),
             Height = BehaviorFrameHeight(),
         };
 
         var forceBox = new CheckBox
         {
-            X = 0, Y = 0, Text = "_force overwrite existing install",
+            X = 0,
+            Y = 0,
+            Text = "_force overwrite existing install",
         };
         behaviorFrame.Add(forceBox);
         var behaviorRow = 1;
 
         var allowHiddenBox = new CheckBox
         {
-            X = 0, Y = behaviorRow, Text = "_allow scanning .dot directories",
+            X = 0,
+            Y = behaviorRow,
+            Text = "_allow scanning .dot directories",
             Value = _request.AllowHiddenDirs ? CheckState.Checked : CheckState.UnChecked,
         };
         behaviorFrame.Add(allowHiddenBox);
         behaviorRow++;
         var fromLocalBox = new CheckBox
         {
-            X = 0, Y = behaviorRow, Text = "install from _local clone",
+            X = 0,
+            Y = behaviorRow,
+            Text = "install from _local clone",
         };
         behaviorFrame.Add(fromLocalBox);
 
         // ── PREVIEW + STATUS ───────────────────────────────────────────
         var previewLabel = new Label
         {
-            X = 0, Y = Pos.Bottom(behaviorFrame),
+            X = 0,
+            Y = Pos.Bottom(behaviorFrame),
             Width = Dim.Fill(2),
             Text = string.Empty,
         };
 
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(3),
+            X = 0,
+            Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(10),
             Text = " ready — review the options, then press Install",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(3),
-            Width = 1, Height = 1,
+            X = Pos.AnchorEnd(10),
+            Y = Pos.AnchorEnd(3),
+            Width = 1,
+            Height = 1,
             Visible = false,
             AutoSpin = false,
             Style = new SpinnerStyle.Dots(),

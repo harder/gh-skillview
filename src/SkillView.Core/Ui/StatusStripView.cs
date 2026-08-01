@@ -32,7 +32,7 @@ internal sealed class StatusStripView : View
     internal void Update(string statusText, IEnumerable<StatusHint> hints, string leftBadges = "")
     {
         _statusText = statusText ?? string.Empty;
-        _hints = [..hints];
+        _hints = [.. hints];
         _leftBadges = leftBadges ?? string.Empty;
         SetNeedsDraw();
     }

@@ -10,27 +10,27 @@ internal static class InstalledInventoryFormatter
     /// Returns a short human-readable label for the install location (scope).
     internal static string DescribeLocation(InstalledSkill skill) => skill.Scope switch
     {
-        Scope.User    => "User",
+        Scope.User => "User",
         Scope.Project => "Project",
-        _             => "Custom",
+        _ => "Custom",
     };
 
     /// Compact location code used by the Installed table to keep the package
     /// column visible without sacrificing scanability.
     internal static string DescribeTableLocation(InstalledSkill skill) => skill.Scope switch
     {
-        Scope.User    => "USR",
+        Scope.User => "USR",
         Scope.Project => "PRJ",
-        _             => "CUS",
+        _ => "CUS",
     };
 
     /// Returns a short human-readable label for the provenance.
     internal static string DescribeProvenance(InstalledSkill skill) => skill.Provenance switch
     {
-        Provenance.FsScan  => "Disk",
+        Provenance.FsScan => "Disk",
         Provenance.CliList => "List",
-        Provenance.Both    => "Disk+List",
-        _                  => "Unknown",
+        Provenance.Both => "Disk+List",
+        _ => "Unknown",
     };
 
     /// Compact package source label used in the Installed table. Keeps the

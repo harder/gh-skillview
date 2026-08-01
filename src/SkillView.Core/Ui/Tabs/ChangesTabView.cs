@@ -57,7 +57,8 @@ internal sealed class ChangesTabView : FrameView
 
         _table = new TableView
         {
-            X = 0, Y = 0,
+            X = 0,
+            Y = 0,
             Width = Dim.Percent(48),
             Height = Dim.Fill(1),
             FullRowSelect = true,
@@ -79,7 +80,8 @@ internal sealed class ChangesTabView : FrameView
 
         _status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(1),
+            X = 0,
+            Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
             Text = " loading…",
         };
@@ -152,7 +154,7 @@ internal sealed class ChangesTabView : FrameView
             _rows,
             new Dictionary<string, Func<ChangesQueueRow, object>>
             {
-                ["Kind"]  = r => r.Kind,
+                ["Kind"] = r => r.Kind,
                 ["Title"] = r => r.Title,
             });
         _table.Table = source;
@@ -195,9 +197,9 @@ internal sealed class ChangesTabView : FrameView
         var kind = _rows[row].Kind;
         switch (kind)
         {
-            case "Update":      _onActivateUpdates(); break;
-            case "Cleanup":     _onActivateCleanup(); break;
-            case "Diagnostics": _onActivateDoctor();  break;
+            case "Update": _onActivateUpdates(); break;
+            case "Cleanup": _onActivateCleanup(); break;
+            case "Diagnostics": _onActivateDoctor(); break;
         }
     }
 

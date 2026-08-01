@@ -87,17 +87,17 @@ public sealed class InstalledInventoryFormatterTests
         Scope scope = Scope.User,
         string path = "/skills/my-skill",
         ImmutableArray<AgentMembership>? agents = null) => new()
-    {
-        Name = "my-skill",
-        ResolvedPath = path,
-        ScanRoot = "/skills",
-        Scope = scope,
-        Agents = agents ?? ImmutableArray<AgentMembership>.Empty,
-        FrontMatter = SkillFrontMatter.Empty,
-        Validity = ValidityState.Valid,
-        Provenance = Provenance.FsScan,
-        Ignored = false,
-        IsSymlinked = false,
-        InstalledAt = null,
-    };
+        {
+            Name = "my-skill",
+            ResolvedPath = path,
+            ScanRoot = "/skills",
+            Scope = scope,
+            Agents = agents ?? ImmutableArray<AgentMembership>.Empty,
+            FrontMatter = SkillFrontMatter.Empty,
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = false,
+            InstalledAt = null,
+        };
 }

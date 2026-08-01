@@ -78,7 +78,8 @@ internal sealed class RepoSkillPickerModal
 
         var header = new Label
         {
-            X = 1, Y = 0,
+            X = 1,
+            Y = 0,
             Text = $"Select skills to install — {_skills.Length} found (Space toggles · A all · N none):",
         };
 
@@ -86,7 +87,8 @@ internal sealed class RepoSkillPickerModal
         // leaves the bottom rows for scope/agents/status/buttons.
         var listFrame = new FrameView
         {
-            X = 1, Y = 1,
+            X = 1,
+            Y = 1,
             Width = Dim.Fill(1),
             Height = Dim.Fill(10),
         };
@@ -106,7 +108,8 @@ internal sealed class RepoSkillPickerModal
             contentWidth = Math.Max(contentWidth, label.Length + 4);
             var box = new CheckBox
             {
-                X = 0, Y = i,
+                X = 0,
+                Y = i,
                 Text = label,
                 Value = CheckState.Checked,
             };
@@ -121,7 +124,8 @@ internal sealed class RepoSkillPickerModal
         var scopeLabel = new Label { X = 1, Y = Pos.AnchorEnd(9), Text = "Scope:" };
         var scopeSelector = new OptionSelector
         {
-            X = 9, Y = Pos.AnchorEnd(9),
+            X = 9,
+            Y = Pos.AnchorEnd(9),
             Orientation = Orientation.Horizontal,
             Labels = new List<string> { "Project", "User (global)", "Custom path" },
             Value = InstallAgentCatalog.HasProjectScopeCandidate(Environment.CurrentDirectory) ? 0 : 1,
@@ -129,8 +133,11 @@ internal sealed class RepoSkillPickerModal
         var customPathLabel = new Label { X = 1, Y = Pos.AnchorEnd(8), Text = "Path:", Visible = false };
         var customPathField = new TextField
         {
-            X = 9, Y = Pos.AnchorEnd(8), Width = Dim.Fill(2),
-            Text = string.Empty, Visible = false,
+            X = 9,
+            Y = Pos.AnchorEnd(8),
+            Width = Dim.Fill(2),
+            Text = string.Empty,
+            Visible = false,
         };
         TuiHelpers.ConfigureTextInput(customPathField, SkillViewStyling.DialogSchemeName);
 
@@ -141,7 +148,10 @@ internal sealed class RepoSkillPickerModal
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {
-            X = 9, Y = Pos.AnchorEnd(6), Width = Dim.Fill(2), Height = AgentsVisibleRows,
+            X = 9,
+            Y = Pos.AnchorEnd(6),
+            Width = Dim.Fill(2),
+            Height = AgentsVisibleRows,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 4);
@@ -151,22 +161,34 @@ internal sealed class RepoSkillPickerModal
 
         var status = new Label
         {
-            X = 1, Y = Pos.AnchorEnd(3), Width = Dim.Fill(2), Text = " ready",
+            X = 1,
+            Y = Pos.AnchorEnd(3),
+            Width = Dim.Fill(2),
+            Text = " ready",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(2), Y = Pos.AnchorEnd(3),
-            Width = 1, Height = 1, Visible = false, AutoSpin = false,
+            X = Pos.AnchorEnd(2),
+            Y = Pos.AnchorEnd(3),
+            Width = 1,
+            Height = 1,
+            Visible = false,
+            AutoSpin = false,
             Style = new SpinnerStyle.Dots(),
         };
 
         var installButton = new Button
         {
-            X = Pos.Center() - 14, Y = Pos.AnchorEnd(1), Text = "Install", IsDefault = true,
+            X = Pos.Center() - 14,
+            Y = Pos.AnchorEnd(1),
+            Text = "Install",
+            IsDefault = true,
         };
         var cancelButton = new Button
         {
-            X = Pos.Center() + 4, Y = Pos.AnchorEnd(1), Text = "Cancel",
+            X = Pos.Center() + 4,
+            Y = Pos.AnchorEnd(1),
+            Text = "Cancel",
         };
 
         int CheckedCount() => skillBoxes.Count(b => b.Value == CheckState.Checked);

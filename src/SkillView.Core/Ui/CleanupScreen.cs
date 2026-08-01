@@ -50,20 +50,23 @@ public sealed class CleanupScreen
         using var window = new Window
         {
             Title = $"Cleanup — {_candidates.Length} candidate(s)",
-            X = 0, Y = 0,
+            X = 0,
+            Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
         };
 
         var header = new Label
         {
-            X = 0, Y = 0,
+            X = 0,
+            Y = 0,
             Text = BuildHeaderText(),
         };
 
         var table = new TableView
         {
-            X = 0, Y = 1,
+            X = 0,
+            Y = 1,
             Width = Dim.Percent(55),
             Height = Dim.Fill(3),
             FullRowSelect = true,
@@ -125,8 +128,10 @@ public sealed class CleanupScreen
 
         var detail = new Markdown
         {
-            X = Pos.Right(table) + 1, Y = 1,
-            Width = Dim.Fill(), Height = Dim.Fill(3),
+            X = Pos.Right(table) + 1,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(3),
             Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
         };
         TuiHelpers.ConfigureMarkdownPane(detail, SkillViewStyling.BaseSchemeName);
@@ -139,7 +144,8 @@ public sealed class CleanupScreen
 
         var status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(2),
+            X = 0,
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
             Text = _candidates.Length == 0
                 ? " no cleanup candidates"
@@ -399,7 +405,7 @@ public sealed class CleanupScreen
                     errors.Add(new RemoveValidator.Error(
                         RemoveValidator.ErrorKind.NotASkillDirectory,
                         $"'{path}' is no longer empty"));
-                    }
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

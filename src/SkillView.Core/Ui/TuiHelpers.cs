@@ -503,13 +503,13 @@ internal static class TuiHelpers
         {
             return (
                 new Attribute(WingetTuiTheme.TextSecondary, WingetTuiTheme.Surface),
-                new Attribute(WingetTuiTheme.TextPrimary,   WingetTuiTheme.Surface),
-                new Attribute(WingetTuiTheme.Accent,        WingetTuiTheme.Surface)
+                new Attribute(WingetTuiTheme.TextPrimary, WingetTuiTheme.Surface),
+                new Attribute(WingetTuiTheme.Accent, WingetTuiTheme.Surface)
             );
         }
         return (
-            new Attribute(StandardColor.Gray,   StandardColor.Black),
-            new Attribute(StandardColor.White,  StandardColor.Black),
+            new Attribute(StandardColor.Gray, StandardColor.Black),
+            new Attribute(StandardColor.White, StandardColor.Black),
             new Attribute(StandardColor.Yellow, StandardColor.Black)
         );
     }

@@ -78,9 +78,9 @@ public sealed class SearchSortAndPinFilterTests
     [Fact]
     public void DescribePin_ProducesHumanLabels()
     {
-        Assert.Equal("all",            InstalledTabView.DescribePin(InstalledTabView.PinFilter.All));
-        Assert.Equal("pinned only",    InstalledTabView.DescribePin(InstalledTabView.PinFilter.PinnedOnly));
-        Assert.Equal("unpinned only",  InstalledTabView.DescribePin(InstalledTabView.PinFilter.UnpinnedOnly));
+        Assert.Equal("all", InstalledTabView.DescribePin(InstalledTabView.PinFilter.All));
+        Assert.Equal("pinned only", InstalledTabView.DescribePin(InstalledTabView.PinFilter.PinnedOnly));
+        Assert.Equal("unpinned only", InstalledTabView.DescribePin(InstalledTabView.PinFilter.UnpinnedOnly));
     }
 
     [Fact]
@@ -96,20 +96,20 @@ public sealed class SearchSortAndPinFilterTests
     [Fact]
     public void DescribeScope_ProducesHumanLabels()
     {
-        Assert.Equal("all",     InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.All));
-        Assert.Equal("user",    InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.User));
+        Assert.Equal("all", InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.All));
+        Assert.Equal("user", InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.User));
         Assert.Equal("project", InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.Project));
-        Assert.Equal("custom",  InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.Custom));
+        Assert.Equal("custom", InstalledTabView.DescribeScope(InstalledTabView.ScopeFilter.Custom));
     }
 
     [Fact]
     public void DescribeSearchSort_LabelsIncludeDirectionGlyph()
     {
-        Assert.Contains("stars",   SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.StarsDesc));
-        Assert.Contains("↓",       SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.StarsDesc));
-        Assert.Contains("name",    SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.NameAsc));
-        Assert.Contains("↑",       SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.NameAsc));
-        Assert.Contains("off",     SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.Off));
+        Assert.Contains("stars", SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.StarsDesc));
+        Assert.Contains("↓", SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.StarsDesc));
+        Assert.Contains("name", SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.NameAsc));
+        Assert.Contains("↑", SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.NameAsc));
+        Assert.Contains("off", SkillViewApp.DescribeSearchSort(SkillViewApp.SearchSort.Off));
     }
 
     private static SearchResultSkill Result(string name, string repo, int? stars = 0) =>

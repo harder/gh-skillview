@@ -103,22 +103,22 @@ public sealed class RemoveTargetResolverTests : IDisposable
         ImmutableArray<AgentMembership>? agents = null,
         SkillPackage? package = null,
         string? upstream = null) => new()
-    {
-        Name = name,
-        ResolvedPath = dir,
-        ScanRoot = _tempRoot,
-        Scope = Scope.User,
-        Agents = agents ?? ImmutableArray<AgentMembership>.Empty,
-        FrontMatter = new SkillFrontMatter
         {
             Name = name,
-            Upstream = upstream,
-        },
-        Validity = ValidityState.Valid,
-        Provenance = Provenance.FsScan,
-        Ignored = false,
-        IsSymlinked = agents?.Any(a => a.IsSymlink) == true,
-        InstalledAt = null,
-        Package = package,
-    };
+            ResolvedPath = dir,
+            ScanRoot = _tempRoot,
+            Scope = Scope.User,
+            Agents = agents ?? ImmutableArray<AgentMembership>.Empty,
+            FrontMatter = new SkillFrontMatter
+            {
+                Name = name,
+                Upstream = upstream,
+            },
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = agents?.Any(a => a.IsSymlink) == true,
+            InstalledAt = null,
+            Package = package,
+        };
 }

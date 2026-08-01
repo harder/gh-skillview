@@ -85,7 +85,8 @@ internal sealed class InstallConfirmModal
 
         var repoLabel = new Label
         {
-            X = 1, Y = 0,
+            X = 1,
+            Y = 0,
             Text = _installAll
                 ? $"Repo:  {_request.Repo} · ALL skills in repo"
                 : $"Repo:  {_request.Repo}{(string.IsNullOrEmpty(_request.SkillName) ? "" : " · " + _request.SkillName)}",
@@ -94,7 +95,8 @@ internal sealed class InstallConfirmModal
         var scopeLabel = new Label { X = 1, Y = 2, Text = "Scope:" };
         var scopeSelector = new OptionSelector
         {
-            X = 9, Y = 2,
+            X = 9,
+            Y = 2,
             Orientation = Orientation.Horizontal,
             Labels = new List<string> { "Project", "User (global)", "Custom path" },
             // Pick a sensible default: Project if cwd has a known agent seed,
@@ -103,12 +105,18 @@ internal sealed class InstallConfirmModal
         };
         var customPathLabel = new Label
         {
-            X = 1, Y = 4, Text = "Path:", Visible = false,
+            X = 1,
+            Y = 4,
+            Text = "Path:",
+            Visible = false,
         };
         var customPathField = new TextField
         {
-            X = 9, Y = 4, Width = Dim.Fill(2),
-            Text = string.Empty, Visible = false,
+            X = 9,
+            Y = 4,
+            Width = Dim.Fill(2),
+            Text = string.Empty,
+            Visible = false,
         };
         TuiHelpers.ConfigureTextInput(customPathField, SkillViewStyling.DialogSchemeName);
         var agentsLabel = new Label { X = 1, Y = 6, Text = "Agents:" };
@@ -118,7 +126,10 @@ internal sealed class InstallConfirmModal
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {
-            X = 9, Y = 6, Width = Dim.Fill(2), Height = AgentsVisibleRows,
+            X = 9,
+            Y = 6,
+            Width = Dim.Fill(2),
+            Height = AgentsVisibleRows,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 3);
@@ -128,26 +139,33 @@ internal sealed class InstallConfirmModal
 
         var status = new Label
         {
-            X = 1, Y = Pos.AnchorEnd(3),
+            X = 1,
+            Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(2),
             Text = " ready",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(2), Y = Pos.AnchorEnd(3),
-            Width = 1, Height = 1, Visible = false, AutoSpin = false,
+            X = Pos.AnchorEnd(2),
+            Y = Pos.AnchorEnd(3),
+            Width = 1,
+            Height = 1,
+            Visible = false,
+            AutoSpin = false,
             Style = new SpinnerStyle.Dots(),
         };
 
         var installButton = new Button
         {
-            X = Pos.Center() - 22, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() - 22,
+            Y = Pos.AnchorEnd(1),
             Text = "Install",
             IsDefault = true,
         };
         var advancedButton = new Button
         {
-            X = Pos.Center() - 10, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() - 10,
+            Y = Pos.AnchorEnd(1),
             Text = "Advanced…",
             // The advanced wizard is single-skill; there's nothing to escalate
             // to for an install-all, so hide it in that mode.
@@ -156,7 +174,8 @@ internal sealed class InstallConfirmModal
         };
         var cancelButton = new Button
         {
-            X = Pos.Center() + 4, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() + 4,
+            Y = Pos.AnchorEnd(1),
             Text = "Cancel",
         };
 

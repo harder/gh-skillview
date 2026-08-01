@@ -44,7 +44,10 @@ internal sealed class DiscoverTabView : FrameView
         var queryLabel = new Label { Text = "Search:", X = 0, Y = 0 };
         QueryField = new TextField
         {
-            X = 8, Y = 0, Width = Dim.Fill(), Text = string.Empty,
+            X = 8,
+            Y = 0,
+            Width = Dim.Fill(),
+            Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(QueryField, SkillViewStyling.BaseSchemeName);
 

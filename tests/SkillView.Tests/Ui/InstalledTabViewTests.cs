@@ -163,8 +163,8 @@ public sealed class InstalledTabViewTests
         string name,
         string? packageSource,
         params string[] agentIds) => InventorySnapshot.Empty with
-    {
-        Skills =
+        {
+            Skills =
         [
             new InstalledSkill
             {
@@ -191,5 +191,5 @@ public sealed class InstalledTabViewTests
                         UpdatedAt: null),
             },
         ],
-    };
+        };
 }

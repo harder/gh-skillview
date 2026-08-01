@@ -15,8 +15,8 @@ internal static class ChangesQueueBuilder
         IEnumerable<string> diagnostics)
     {
         var rows = new List<ChangesQueueRow>();
-        foreach (var u in updates)     rows.Add(new ChangesQueueRow("Update",      u));
-        foreach (var c in cleanup)     rows.Add(new ChangesQueueRow("Cleanup",     c));
+        foreach (var u in updates) rows.Add(new ChangesQueueRow("Update", u));
+        foreach (var c in cleanup) rows.Add(new ChangesQueueRow("Cleanup", c));
         foreach (var d in diagnostics) rows.Add(new ChangesQueueRow("Diagnostics", d));
         return rows;
     }

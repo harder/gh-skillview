@@ -267,21 +267,21 @@ public sealed class SkillViewApp
 
         // Pull control references from the workspace so the rest of BuildUi
         // and all existing call sites continue to work unchanged.
-        _leftFrame       = _discoverTab.LeftFrame;
-        _queryField      = _discoverTab.QueryField;
-        _ownerField      = _discoverTab.OwnerField;
-        _limitUpDown     = _discoverTab.LimitUpDown;
-        _agentField      = _discoverTab.AgentField;
-        _hiddenDirsBox   = _discoverTab.HiddenDirsBox;
-        _resultsTable    = _discoverTab.ResultsTable;
-        _detailPane      = _discoverTab.DetailPane;
-        _rightFrame      = _discoverTab.DetailPane;
+        _leftFrame = _discoverTab.LeftFrame;
+        _queryField = _discoverTab.QueryField;
+        _ownerField = _discoverTab.OwnerField;
+        _limitUpDown = _discoverTab.LimitUpDown;
+        _agentField = _discoverTab.AgentField;
+        _hiddenDirsBox = _discoverTab.HiddenDirsBox;
+        _resultsTable = _discoverTab.ResultsTable;
+        _detailPane = _discoverTab.DetailPane;
+        _rightFrame = _discoverTab.DetailPane;
         _itemActionsLabel = _discoverTab.DetailPane.ItemActionsLabel;
-        _metadataFrame   = _discoverTab.DetailPane.MetadataFrame;
-        _previewFrame    = _discoverTab.DetailPane.PreviewFrame;
-        _previewPane     = _discoverTab.DetailPane.PreviewPane;
-        _previewRawPane  = _discoverTab.DetailPane.PreviewRawPane;
-        _logPane         = _discoverTab.DetailPane.LogPane;
+        _metadataFrame = _discoverTab.DetailPane.MetadataFrame;
+        _previewFrame = _discoverTab.DetailPane.PreviewFrame;
+        _previewPane = _discoverTab.DetailPane.PreviewPane;
+        _previewRawPane = _discoverTab.DetailPane.PreviewRawPane;
+        _logPane = _discoverTab.DetailPane.LogPane;
 
         // Wire event handlers that require SkillViewApp state.
         _queryField.KeyDown += OnQueryFieldKey;
@@ -574,7 +574,7 @@ public sealed class SkillViewApp
         if (rune.Value == '1') { ActivateTab(SkillViewTab.Discover); return true; }
         if (rune.Value == '2') { ActivateTab(SkillViewTab.Installed); return true; }
         if (rune.Value == '3') { ActivateTab(SkillViewTab.Changes); return true; }
-        if (key.KeyCode == KeyCode.CursorLeft)  { CycleTab(-1); return true; }
+        if (key.KeyCode == KeyCode.CursorLeft) { CycleTab(-1); return true; }
         if (key.KeyCode == KeyCode.CursorRight) { CycleTab(+1); return true; }
         return false;
     }
@@ -610,8 +610,8 @@ public sealed class SkillViewApp
         // Hide every non-Discover tab by default; the requested one is then
         // revealed below.
         if (_installedTab is not null) _installedTab.Visible = false;
-        if (_updatesTab   is not null) _updatesTab.Visible   = false;
-        if (_changesTab   is not null) _changesTab.Visible   = false;
+        if (_updatesTab is not null) _updatesTab.Visible = false;
+        if (_changesTab is not null) _changesTab.Visible = false;
 
         switch (tab)
         {
@@ -671,8 +671,8 @@ public sealed class SkillViewApp
         _inDoctor = true;
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
-        if (_updatesTab   is not null) _updatesTab.Visible   = false;
-        if (_changesTab   is not null) _changesTab.Visible   = false;
+        if (_updatesTab is not null) _updatesTab.Visible = false;
+        if (_changesTab is not null) _changesTab.Visible = false;
         RefreshShellChrome();
 
         // Make sure the report is fresh — probe lazily if we never have.
@@ -1099,39 +1099,39 @@ public sealed class SkillViewApp
     internal static List<SearchResultSkill> ApplySearchSort(
         IReadOnlyList<SearchResultSkill> source,
         SearchSort sort) => sort switch
-    {
-        SearchSort.StarsDesc => source
-            .OrderByDescending(s => s.Stars ?? -1)
-            .ThenBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-        SearchSort.NameAsc => source
-            .OrderBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-        SearchSort.NameDesc => source
-            .OrderByDescending(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-        SearchSort.RepoAsc => source
-            .OrderBy(s => s.Repo, StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-        _ => source.ToList(),
-    };
+        {
+            SearchSort.StarsDesc => source
+                .OrderByDescending(s => s.Stars ?? -1)
+                .ThenBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            SearchSort.NameAsc => source
+                .OrderBy(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            SearchSort.NameDesc => source
+                .OrderByDescending(s => s.SkillName, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            SearchSort.RepoAsc => source
+                .OrderBy(s => s.Repo, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            _ => source.ToList(),
+        };
 
     internal static SearchSort CycleSearchSort(SearchSort current) => current switch
     {
-        SearchSort.Off       => SearchSort.StarsDesc,
+        SearchSort.Off => SearchSort.StarsDesc,
         SearchSort.StarsDesc => SearchSort.NameAsc,
-        SearchSort.NameAsc   => SearchSort.NameDesc,
-        SearchSort.NameDesc  => SearchSort.RepoAsc,
-        _                    => SearchSort.Off,
+        SearchSort.NameAsc => SearchSort.NameDesc,
+        SearchSort.NameDesc => SearchSort.RepoAsc,
+        _ => SearchSort.Off,
     };
 
     internal static string DescribeSearchSort(SearchSort sort) => sort switch
     {
         SearchSort.StarsDesc => "sort: stars ↓",
-        SearchSort.NameAsc   => "sort: name ↑",
-        SearchSort.NameDesc  => "sort: name ↓",
-        SearchSort.RepoAsc   => "sort: repo ↑",
-        _                    => "sort: off (gh order)",
+        SearchSort.NameAsc => "sort: name ↑",
+        SearchSort.NameDesc => "sort: name ↓",
+        SearchSort.RepoAsc => "sort: repo ↑",
+        _ => "sort: off (gh order)",
     };
 
     private void HandleSearchSortKey()
@@ -1172,20 +1172,20 @@ public sealed class SkillViewApp
         // Suffix the active sort column with a direction glyph so the user
         // can see at a glance what `S` last did. Inactive columns stay clean.
         var starsHeader = _searchSort == SearchSort.StarsDesc ? "★ ↓" : "★";
-        var nameHeader  = _searchSort switch
+        var nameHeader = _searchSort switch
         {
-            SearchSort.NameAsc  => "Name ↑",
+            SearchSort.NameAsc => "Name ↑",
             SearchSort.NameDesc => "Name ↓",
-            _                   => "Name",
+            _ => "Name",
         };
-        var repoHeader  = _searchSort == SearchSort.RepoAsc ? "Repo ↑" : "Repo";
+        var repoHeader = _searchSort == SearchSort.RepoAsc ? "Repo ↑" : "Repo";
         var source = new EnumerableTableSource<SearchResultSkill>(
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
                 [starsHeader] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-                [nameHeader]  = s => TuiHelpers.Truncate(s.SkillName, nameW),
-                [repoHeader]  = s => TuiHelpers.Truncate(s.Repo, repoW),
+                [nameHeader] = s => TuiHelpers.Truncate(s.SkillName, nameW),
+                [repoHeader] = s => TuiHelpers.Truncate(s.Repo, repoW),
             });
         _resultsTable.Table = source;
         TuiHelpers.ApplyColumnStyles(_resultsTable, nameW, repoW, starsW, 0);
@@ -1861,10 +1861,10 @@ public sealed class SkillViewApp
             ];
         }
 
-        return         _activeTab switch
+        return _activeTab switch
         {
-        SkillViewTab.Discover => [
-            new StatusHint("f", "Filters"),
+            SkillViewTab.Discover => [
+                new StatusHint("f", "Filters"),
             new StatusHint("1/2/3", "Tabs"),
             new StatusHint("?", "Help"),
             ],

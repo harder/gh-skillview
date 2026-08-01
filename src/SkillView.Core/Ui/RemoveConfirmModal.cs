@@ -78,13 +78,15 @@ internal sealed class RemoveConfirmModal
 
         var prompt = new Label
         {
-            X = 1, Y = 0,
+            X = 1,
+            Y = 0,
             Width = Dim.Fill(2),
             Text = $"Remove {_skill.Name}?",
         };
         var path = new Label
         {
-            X = 1, Y = 1,
+            X = 1,
+            Y = 1,
             Width = Dim.Fill(2),
             Text = $"  {TuiHelpers.ShortenPath(_skill.ResolvedPath, segments: 4)}",
         };
@@ -93,7 +95,8 @@ internal sealed class RemoveConfirmModal
             : string.Empty;
         var warnings = new Label
         {
-            X = 1, Y = 3,
+            X = 1,
+            Y = 3,
             Width = Dim.Fill(2),
             Text = warningsText,
             Visible = warningsText.Length > 0,
@@ -101,26 +104,30 @@ internal sealed class RemoveConfirmModal
 
         var status = new Label
         {
-            X = 1, Y = Pos.AnchorEnd(3),
+            X = 1,
+            Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(2),
             Text = " [y] yes   [n] no   [a] advanced…",
         };
 
         var yesButton = new Button
         {
-            X = Pos.Center() - 16, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() - 16,
+            Y = Pos.AnchorEnd(1),
             Text = "Yes",
             IsDefault = false,
         };
         var noButton = new Button
         {
-            X = Pos.Center() - 6, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() - 6,
+            Y = Pos.AnchorEnd(1),
             Text = "No",
             IsDefault = true,
         };
         var advancedButton = new Button
         {
-            X = Pos.Center() + 4, Y = Pos.AnchorEnd(1),
+            X = Pos.Center() + 4,
+            Y = Pos.AnchorEnd(1),
             Text = "Advanced…",
         };
 

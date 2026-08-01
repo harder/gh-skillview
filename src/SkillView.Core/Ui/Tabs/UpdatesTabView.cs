@@ -73,11 +73,13 @@ internal sealed class UpdatesTabView : FrameView
         _tableLabel = new Label
         {
             Text = "Select skills to update. Space toggles · a marks all · u updates current · U updates all marked",
-            X = 0, Y = 0,
+            X = 0,
+            Y = 0,
         };
         _table = new TableView
         {
-            X = 0, Y = 1,
+            X = 0,
+            Y = 1,
             Width = Dim.Percent(45),
             Height = Dim.Fill(5),
             FullRowSelect = true,
@@ -87,37 +89,48 @@ internal sealed class UpdatesTabView : FrameView
 
         _preview = new Markdown
         {
-            X = Pos.Right(_table) + 1, Y = 1,
-            Width = Dim.Fill(), Height = Dim.Fill(5),
+            X = Pos.Right(_table) + 1,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(5),
             Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
 
         _allBox = new CheckBox
         {
-            X = 0, Y = Pos.AnchorEnd(4),
+            X = 0,
+            Y = Pos.AnchorEnd(4),
             Text = "_all",
         };
         _forceBox = new CheckBox
         {
-            X = 10, Y = Pos.AnchorEnd(4), Text = "_force",
+            X = 10,
+            Y = Pos.AnchorEnd(4),
+            Text = "_force",
         };
         _unpinBox = new CheckBox
         {
-            X = 22, Y = Pos.AnchorEnd(4), Text = "_unpin",
+            X = 22,
+            Y = Pos.AnchorEnd(4),
+            Text = "_unpin",
         };
 
         _status = new Label
         {
-            X = 0, Y = Pos.AnchorEnd(3),
+            X = 0,
+            Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(10),
             Text = " loading inventory…",
         };
         _spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(10), Y = Pos.AnchorEnd(3),
-            Width = 1, Height = 1,
-            Visible = false, AutoSpin = false,
+            X = Pos.AnchorEnd(10),
+            Y = Pos.AnchorEnd(3),
+            Width = 1,
+            Height = 1,
+            Visible = false,
+            AutoSpin = false,
             Style = new SpinnerStyle.Dots(),
         };
 
