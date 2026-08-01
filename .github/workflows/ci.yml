@@ -17,14 +17,17 @@ jobs:
         os: [ubuntu-latest, macos-14, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: Restore
         run: dotnet restore
       - name: Build
         run: dotnet build --configuration Release --no-restore
+      - name: Verify code style — dotnet format
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet format SkillView.sln --no-restore --verify-no-changes
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
 
@@ -42,13 +45,13 @@ jobs:
           - rid: win-x64
             os: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux AOT toolchain
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: AOT publish (standalone)

@@ -37,9 +37,13 @@ jobs:
             os: macos-14
             ext: ''
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux AOT toolchain
         if: runner.os == 'Linux'
@@ -47,7 +51,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -87,7 +91,12 @@ jobs:
             Write-Host "$($_.Name)  ($sizeMb MB)"
           }
 
-      - uses: actions/upload-artifact@v4
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}
+
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.rid }}
           path: dist/out/*
@@ -98,10 +107,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
           merge-multiple: true
@@ -144,7 +153,7 @@ jobs:
           EOF
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/skillview-*
@@ -165,10 +174,10 @@ jobs:
       RELEASE_REPO: ${{ github.repository }}
       HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           path: artifacts/
@@ -194,7 +203,7 @@ jobs:
           printf 'Dark-launch only: generated formula for %s (target tap: %s)\n' "${RELEASE_REF}" "${HOMEBREW_TAP_REPO:-harder/homebrew-tap}"
 
       - name: Upload generated formula
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: homebrew-formula-${{ github.ref_name }}
           path: generated/homebrew/skillview.rb
@@ -211,10 +220,10 @@ jobs:
       RELEASE_REPO: ${{ github.repository }}
       WINGET_PACKAGE_ID: harder.SkillView
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download Windows release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dist-win-*
           path: artifacts/
@@ -247,7 +256,7 @@ jobs:
           Write-Host "Dark-launch only: generated WinGet manifests for $env:WINGET_PACKAGE_ID $version"
 
       - name: Upload generated WinGet manifests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: winget-manifests-${{ github.ref_name }}
           path: generated/winget/*
@@ -261,7 +270,7 @@ jobs:
       RELEASE_REF: ${{ github.ref_name }}
     steps:
       - name: Create failure issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const title = `Release workflow failed on ${process.env.RELEASE_REF}`;

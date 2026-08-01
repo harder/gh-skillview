@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: ${{ !matrix.required }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -49,7 +49,7 @@ jobs:
               && sudo apt install gh -y
           else
             # Install pinned version from GitHub release tarball
-            ARCH="amd64"
+            ARCH="$(dpkg --print-architecture)"
             URL="https://github.com/cli/cli/releases/download/v${VERSION}/gh_${VERSION}_linux_${ARCH}.tar.gz"
             curl -fsSL "$URL" -o /tmp/gh.tar.gz
             tar -xzf /tmp/gh.tar.gz -C /tmp
