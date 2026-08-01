@@ -12,7 +12,7 @@ internal static class InstallAgentCatalog
     // or wrong path is cosmetic, not a correctness or safety issue.
     internal sealed record Entry(string GhId, string Label, string AgentHint, string? HomeRelativePath);
 
-    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.96.0).
+    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.97.0).
     // Update this array when new agents are added to the gh skill ecosystem —
     // re-diff against `gh skill install --help` when bumping the gh minimum.
     internal static readonly ImmutableArray<Entry> Entries =
@@ -36,9 +36,11 @@ internal static class InstallAgentCatalog
         new("cortex", "Cortex Code", "cortex", null),
         new("crush", "Crush", "crush", null),
         new("deepagents", "Deep Agents", "deepagents", null),
+        new("devin", "Devin", "devin", null),
         new("droid", "Droid", "droid", ".factory"),
         new("firebender", "Firebender", "firebender", null),
         new("goose", "Goose", "goose", Path.Combine(".config", "goose")),
+        new("grok", "Grok", "grok", null),
         new("iflow-cli", "iFlow CLI", "iflow", ".iflow"),
         new("junie", "Junie", "junie", null),
         new("kilo", "Kilo Code", "kilo", null),
@@ -62,7 +64,6 @@ internal static class InstallAgentCatalog
         new("trae-cn", "Trae CN", "trae-cn", null),
         new("universal", "Universal", "universal", null),
         new("warp", "Warp", "warp", null),
-        new("windsurf", "Windsurf", "windsurf", null),
         new("zencoder", "Zencoder", "zencoder", null),
     ];
 

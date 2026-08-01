@@ -46,7 +46,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   there is no per-flag capability probe — only a single `gh skill --help`
   smoke check.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.96.0 (47 entries). `HomeRelativePath` is best-effort and
+  list as of `gh` 2.97.0 (48 entries — gh 2.97.0 replaced `windsurf` with
+  `devin` and added `grok`, cli/cli#13987 and cli/cli#13864).
+  `HomeRelativePath` is best-effort and
   nullable — only set when the on-disk config-dir convention was
   independently verified; a null path just means that agent is never
   pre-checked or shown in the Doctor "detected agents" table (cosmetic only,
