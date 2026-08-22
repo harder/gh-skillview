@@ -13,13 +13,13 @@ gh skillview
 
 **Or run it as a standalone binary**
 
-1. Download the right `skillview-<rid>[.exe]` asset from the [latest release](https://github.com/harder/gh-skillview/releases).
+1. Download the right `skillview-<os>-<arch>[.exe]` asset from the [latest release](https://github.com/harder/gh-skillview/releases).
 2. On macOS or Linux, make it executable and put it on your `PATH`.
 3. Run `skillview`.
 
 ```bash
-chmod +x skillview-osx-arm
-mv skillview-osx-arm /usr/local/bin/skillview
+chmod +x skillview-darwin-arm64
+mv skillview-darwin-arm64 /usr/local/bin/skillview
 skillview
 ```
 
@@ -102,10 +102,10 @@ Download the right asset from the [latest release](https://github.com/harder/gh-
 
 | Platform | Asset |
 |---|---|
-| Windows x64 | `skillview-win-x64.exe` |
-| Windows ARM64 | `skillview-win-arm.exe` |
-| Linux x64 | `skillview-linux-x64` |
-| macOS ARM64 | `skillview-osx-arm` |
+| Windows x64 | `skillview-windows-amd64.exe` |
+| Windows ARM64 | `skillview-windows-arm64.exe` |
+| Linux x64 | `skillview-linux-amd64` |
+| macOS ARM64 | `skillview-darwin-arm64` |
 
 Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.
 

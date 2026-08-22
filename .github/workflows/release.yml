@@ -21,19 +21,19 @@ jobs:
       matrix:
         include:
           - rid: win-x64
-            asset_name: win-x64
+            asset_name: windows-amd64
             os: windows-latest
             ext: .exe
           - rid: win-arm64
-            asset_name: win-arm
+            asset_name: windows-arm64
             os: windows-11-arm
             ext: .exe
           - rid: linux-x64
-            asset_name: linux-x64
+            asset_name: linux-amd64
             os: ubuntu-latest
             ext: ''
           - rid: osx-arm64
-            asset_name: osx-arm
+            asset_name: darwin-arm64
             os: macos-14
             ext: ''
     runs-on: ${{ matrix.os }}
@@ -72,6 +72,14 @@ jobs:
             -p:PublishAot=true -p:StripSymbols=true \
             -o dist/app
 
+      - name: Publish AOT gh extension binary
+        shell: bash
+        run: |
+          dotnet publish src/SkillView.GhExtension/SkillView.GhExtension.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true \
+            -o dist/ext
+
       - name: Stage release assets
         shell: bash
         run: |
@@ -79,14 +87,17 @@ jobs:
           mkdir -p dist/out
           cp "dist/app/skillview${{ matrix.ext }}" \
              "dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}"
+          cp "dist/ext/gh-skillview${{ matrix.ext }}" \
+             "dist/out/gh-skillview-${{ matrix.asset_name }}${{ matrix.ext }}"
 
       - name: Record binary size and checksum
         shell: pwsh
         run: |
-          $binary = Get-Item "dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}"
-          $hash = (Get-FileHash $binary.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($binary.Name)" | Set-Content -Encoding ascii "dist/out/SHA256SUMS-${{ matrix.asset_name }}.txt"
-          Get-ChildItem dist/out | ForEach-Object {
+          $sumsFile = "dist/out/SHA256SUMS-${{ matrix.asset_name }}.txt"
+          Remove-Item -ErrorAction SilentlyContinue $sumsFile
+          Get-ChildItem dist/out -File | Where-Object { $_.Name -notmatch '^SHA256SUMS' } | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Add-Content -Encoding ascii $sumsFile
             $sizeMb = [math]::Round($_.Length / 1MB, 2)
             Write-Host "$($_.Name)  ($sizeMb MB)"
           }
@@ -94,7 +105,9 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
         with:
-          subject-path: dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}
+          subject-path: |
+            dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}
+            dist/out/gh-skillview-${{ matrix.asset_name }}${{ matrix.ext }}
 
       - uses: actions/upload-artifact@v7
         with:
@@ -125,26 +138,29 @@ jobs:
         run: |
           cat > release-notes.md <<EOF
           > SkillView is a Native AOT standalone build. Download the binary for your machine, mark it executable on macOS/Linux, and run \`skillview\`.
+          >
+          > Asset names use Go's OS/arch vocabulary (\`windows\`/\`linux\`/\`darwin\`, \`amd64\`/\`arm64\`) for both the standalone binary and the \`gh\` extension binary, matching the naming \`gh extension install\` requires.
 
           ## Downloads
 
           | File | Target |
           |------|--------|
-          | \`skillview-win-x64.exe\` | Windows x64 |
-          | \`skillview-win-arm.exe\` | Windows ARM64 |
-          | \`skillview-linux-x64\` | Linux x64 |
-          | \`skillview-osx-arm\` | macOS Apple Silicon |
-          | \`SHA256SUMS-*.txt\` | Per-platform checksums |
+          | \`skillview-windows-amd64.exe\` | Windows x64 standalone |
+          | \`skillview-windows-arm64.exe\` | Windows ARM64 standalone |
+          | \`skillview-linux-amd64\` | Linux x64 standalone |
+          | \`skillview-darwin-arm64\` | macOS Apple Silicon standalone |
+          | \`gh-skillview-*\` | \`gh\` extension binaries (same platform set) — installed automatically by \`gh extension install\`, not downloaded directly |
+          | \`SHA256SUMS-*.txt\` | Per-platform checksums (standalone + extension binary) |
 
           ## Quick start
 
           \`\`\`bash
-          chmod +x skillview-osx-arm
-          mv skillview-osx-arm /usr/local/bin/skillview
+          chmod +x skillview-darwin-arm64
+          mv skillview-darwin-arm64 /usr/local/bin/skillview
           skillview
           \`\`\`
 
-          GitHub CLI extension installs still work directly from the repository:
+          ## GitHub CLI extension
 
           \`\`\`bash
           gh extension install harder/gh-skillview
@@ -157,6 +173,7 @@ jobs:
         with:
           files: |
             artifacts/skillview-*
+            artifacts/gh-skillview-*
             artifacts/SHA256SUMS-*.txt
           body_path: release-notes.md
           generate_release_notes: true
@@ -188,10 +205,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p generated/homebrew
-          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-osx-arm"
-          LINUX_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-x64"
-          DARWIN_ARM64_SHA=$(awk '{print $1}' artifacts/SHA256SUMS-osx-arm.txt)
-          LINUX_X64_SHA=$(awk '{print $1}' artifacts/SHA256SUMS-linux-x64.txt)
+          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-darwin-arm64"
+          LINUX_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-amd64"
+          DARWIN_ARM64_SHA=$(awk '$2 == "skillview-darwin-arm64" {print $1}' artifacts/SHA256SUMS-darwin-arm64.txt)
+          LINUX_X64_SHA=$(awk '$2 == "skillview-linux-amd64" {print $1}' artifacts/SHA256SUMS-linux-amd64.txt)
           sed \
             -e "s|{{VERSION}}|${RELEASE_REF#v}|g" \
             -e "s|{{URL_DARWIN_ARM64}}|${DARWIN_ARM64_URL}|g" \
@@ -234,10 +251,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path generated/winget | Out-Null
           $version = $env:RELEASE_REF.Substring(1)
-          $urlX64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-x64.exe"
-          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-win-arm.exe"
-          $shaX64 = (Get-FileHash artifacts/skillview-win-x64.exe -Algorithm SHA256).Hash
-          $shaArm64 = (Get-FileHash artifacts/skillview-win-arm.exe -Algorithm SHA256).Hash
+          $urlX64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-windows-amd64.exe"
+          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-windows-arm64.exe"
+          $shaX64 = (Get-FileHash artifacts/skillview-windows-amd64.exe -Algorithm SHA256).Hash
+          $shaArm64 = (Get-FileHash artifacts/skillview-windows-arm64.exe -Algorithm SHA256).Hash
 
           (Get-Content packaging/winget/harder.SkillView.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
             Set-Content generated/winget/$env:WINGET_PACKAGE_ID.yaml
