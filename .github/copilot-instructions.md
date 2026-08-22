@@ -31,8 +31,13 @@ agent-facing workflow notes now live in `AGENTS.md` and focused files under
 dotnet restore
 dotnet build
 dotnet test                         # full suite
-dotnet test --filter "FullyQualifiedName~RedactorTests"   # single test class
-dotnet test --filter "FullyQualifiedName~RedactorTests.RedactsGhTokens"  # single test
+
+# Filtered runs: use xunit's MTP-native --filter-* flags directly (no `--`
+# separator, and NOT xunit's old single-dash console-runner flags). Scope to
+# --project SkillView.Tests — filtering the whole solution fails the run when
+# the *other* test project legitimately matches zero tests (xunit/xunit#3077).
+dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-class "SkillView.Tests.Logging.RedactorTests"      # single test class
+dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-method "*RedactorTests.RedactsGhTokens"            # single test
 
 # AOT publish (Linux needs clang + zlib1g-dev):
 dotnet publish src/SkillView.App -c Release -r osx-arm64 \

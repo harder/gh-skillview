@@ -25,7 +25,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 - Build/style verification: `dotnet build`
 - Full tests: `dotnet test --no-build`
-- Integration tests only: `dotnet test tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj`
+- Integration tests only: `dotnet test --project tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj` (a bare project path no longer works under the .NET 10 SDK's `dotnet test` runner)
 - Launch TUI: `src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview`
 - For CLI global flags such as `--scan-root`, pass them **before** the
   subcommand: `skillview --scan-root /tmp/root list --json`
@@ -80,12 +80,26 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   skills installed there — keep both in sync if this default ever changes.
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.4.17`
   and Terminal.Gui.Editor `2.5.7`, the latest stable releases of each as of
-  2026-07. Test projects use `Microsoft.NET.Test.Sdk` `18.8.1`, `xunit.v3`
-  `3.2.2`, and `xunit.runner.visualstudio` `3.1.5`. If tests fail to compile on
+  2026-08. Test projects use `Microsoft.NET.Test.Sdk` `18.9.0`, `xunit.v3`
+  `4.0.0`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
   exact Terminal.Gui version string — update both alongside any bump.
+- xunit was bumped 3.x → 4.0.0 (2026-08); the project didn't use any of the
+  now-obsolete parallelization APIs (`ParallelizeTestCollections`,
+  `[CollectionBehavior]`) so no test-code migration was needed. That bump also
+  triggered a required `global.json` change: `.NET 10 SDK` removed the legacy
+  VSTest-bridge `dotnet test` path entirely, so `global.json` now sets
+  `"test": {"runner": "Microsoft.Testing.Platform"}` to opt into the new MTP
+  `dotnet test` mode. See `agent_docs/running-tests.md` for the resulting
+  command-syntax changes: `--project` is now required (bare/positional project
+  paths no longer work), and filtered runs need xunit's MTP-native
+  `--filter-namespace`/`--filter-class`/`--filter-method`/`--filter-trait`/
+  `--filter-query` flags passed straight to `dotnet test` — xunit's older
+  single-dash console-runner flags (`-namespace`, `-trait`, ...) and the
+  platform's own `--treenode-filter` are silently rejected by `dotnet test`'s
+  MTP handshake here and report "Zero tests ran" instead of erroring loudly.
 - `src/SkillView.Core/SkillView.Core.csproj` owns the default
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
