@@ -179,6 +179,7 @@ jobs:
           generate_release_notes: true
           append_body: true
           fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
   # Dark-launch scaffold only. Generates a formula from the currently shipped
   # Unix release assets but does not commit or push to a tap yet.
