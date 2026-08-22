@@ -50,14 +50,14 @@ public sealed class ScanRootResolver
         {
             foreach (var (rel, agent) in ProjectSeeds)
             {
-                var path = Path.Combine(gitRoot, rel);
+                var path = Path.Combine(gitRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 TryAdd(builder, seen, path, Scope.Project, agent);
             }
         }
 
         foreach (var (rel, agent) in UserSeeds)
         {
-            var path = Path.Combine(opts.HomeDirectory, rel);
+            var path = Path.Combine(opts.HomeDirectory, rel.Replace('/', Path.DirectorySeparatorChar));
             TryAdd(builder, seen, path, Scope.User, agent);
         }
 
