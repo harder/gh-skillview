@@ -55,6 +55,17 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-dev"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Restore
         run: dotnet restore
 
@@ -70,6 +81,7 @@ jobs:
           dotnet publish src/SkillView.App/SkillView.App.csproj \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true \
+            -p:Version=${{ steps.version.outputs.version }} \
             -o dist/app
 
       - name: Publish AOT gh extension binary
@@ -78,6 +90,7 @@ jobs:
           dotnet publish src/SkillView.GhExtension/SkillView.GhExtension.csproj \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true \
+            -p:Version=${{ steps.version.outputs.version }} \
             -o dist/ext
 
       - name: Stage release assets
@@ -94,13 +107,17 @@ jobs:
         shell: pwsh
         run: |
           $sumsFile = "dist/out/SHA256SUMS-${{ matrix.asset_name }}.txt"
-          Remove-Item -ErrorAction SilentlyContinue $sumsFile
+          $lines = @()
           Get-ChildItem dist/out -File | Where-Object { $_.Name -notmatch '^SHA256SUMS' } | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)" | Add-Content -Encoding ascii $sumsFile
+            $lines += "$hash  $($_.Name)"
             $sizeMb = [math]::Round($_.Length / 1MB, 2)
             Write-Host "$($_.Name)  ($sizeMb MB)"
           }
+          # Write with explicit LF endings (not Add-Content's OS-default CRLF on Windows
+          # runners) so `sha256sum -c` works when checked out on Linux/macOS too.
+          $content = ($lines -join "`n") + "`n"
+          [System.IO.File]::WriteAllText($sumsFile, $content, [System.Text.Encoding]::ASCII)
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
