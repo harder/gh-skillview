@@ -279,14 +279,14 @@ public sealed class InstallScreen
 
         var status = new Label
         {
-            X = 0,
+            X = 2,
             Y = Pos.AnchorEnd(3),
-            Width = Dim.Fill(10),
+            Width = Dim.Fill(2),
             Text = " ready — review the options, then press Install",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(10),
+            X = 0,
             Y = Pos.AnchorEnd(3),
             Width = 1,
             Height = 1,

@@ -14,7 +14,7 @@ namespace SkillView.Ui.Tabs;
 /// so the 3 DoctorScreenTests stay green unchanged.
 ///
 /// Doctor isn't a primary tab (no pill in TabBarView). It's reached via
-/// `d` and dismissed via Esc / q — which restores the previously-active
+/// `d` and dismissed via Esc — which restores the previously-active
 /// primary tab through onLeaveTab.
 internal sealed class DoctorTabView : FrameView
 {
@@ -43,7 +43,7 @@ internal sealed class DoctorTabView : FrameView
         KeyDown += (_, key) =>
         {
             if (key.Handled) return;
-            if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
+            if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
                 _onLeaveTab();

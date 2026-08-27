@@ -13,9 +13,9 @@ internal readonly record struct ContextBarState(
     string? HealthLabel,
     string? FilterLabel);
 
-/// One-line bar rendered directly below the tab strip that surfaces the active
-/// agent, location, provenance, health, and quick-filter state as compact
-/// labelled chips.
+/// One-line bar rendered directly below the tab strip. It starts with the
+/// active workspace title, then surfaces agent, location, provenance, health,
+/// and quick-filter state as compact labelled chips.
 ///
 /// Rendering uses "Location" / "Install location" wording (never "roots").
 /// "roots" is reserved for doctor-grade diagnostics only (§ spec §50).
@@ -52,6 +52,7 @@ internal sealed class ContextBarView : View
     {
         var sb = new StringBuilder();
 
+        AppendChip(sb, state.Workspace);
         AppendChip(sb, state.AgentLabel);
         AppendLabeledValue(sb, "Location", state.LocationLabel);
         AppendLabeledValue(sb, "Source", state.ProvenanceLabel);

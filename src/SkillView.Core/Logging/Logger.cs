@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 
 namespace SkillView.Logging;
@@ -8,9 +7,11 @@ namespace SkillView.Logging;
 public sealed class Logger
 {
     private readonly object _gate = new();
+    private readonly object _observerGate = new();
     private readonly LinkedList<LogEntry> _ring = new();
     private readonly int _capacity;
-    private readonly ConcurrentBag<Action<LogEntry>> _observers = new();
+    private readonly Dictionary<long, Action<LogEntry>> _observers = new();
+    private long _nextObserverId;
 
     public Logger(LogLevel minimumLevel = LogLevel.Info, int capacity = 2048)
     {
@@ -20,7 +21,16 @@ public sealed class Logger
 
     public LogLevel MinimumLevel { get; set; }
 
-    public void Subscribe(Action<LogEntry> observer) => _observers.Add(observer);
+    public IDisposable Subscribe(Action<LogEntry> observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        lock (_observerGate)
+        {
+            var id = ++_nextObserverId;
+            _observers.Add(id, observer);
+            return new Subscription(this, id);
+        }
+    }
 
     public void Log(LogLevel level, string category, string message)
     {
@@ -44,7 +54,12 @@ public sealed class Logger
             }
         }
 
-        foreach (var observer in _observers)
+        Action<LogEntry>[] observers;
+        lock (_observerGate)
+        {
+            observers = _observers.Values.ToArray();
+        }
+        foreach (var observer in observers)
         {
             try { observer(entry); }
             catch { /* observer faults must not kill the logger */ }
@@ -73,5 +88,27 @@ public sealed class Logger
             entry.Level,
             entry.Category,
             entry.Message);
+    }
+
+    private void Unsubscribe(long id)
+    {
+        lock (_observerGate)
+        {
+            _observers.Remove(id);
+        }
+    }
+
+    private sealed class Subscription : IDisposable
+    {
+        private Logger? _owner;
+        private readonly long _id;
+
+        internal Subscription(Logger owner, long id)
+        {
+            _owner = owner;
+            _id = id;
+        }
+
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unsubscribe(_id);
     }
 }

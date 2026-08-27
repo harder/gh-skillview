@@ -25,12 +25,13 @@ namespace SkillView.Ui.Tabs;
 internal sealed class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
-    private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
+    private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<GhSkillUpdateService> _updateServiceFactory;
     private readonly Func<string?> _ghPathProvider;
     private readonly Logger _logger;
     private readonly Action _onLeaveTab;
     private readonly Action _onUpdateApplied;
+    private readonly CancellationToken _lifetimeToken;
 
     private readonly Label _tableLabel;
     private readonly TableView _table;
@@ -48,15 +49,18 @@ internal sealed class UpdatesTabView : FrameView
     private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
     private int _nameW = 12;
     private long _loadGeneration;
+    private CancellationTokenSource? _loadCancellation;
+    private CancellationTokenSource? _operationCancellation;
 
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
-        Func<Task<InventorySnapshot>> snapshotLoader,
+        Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
         Func<GhSkillUpdateService> updateServiceFactory,
         Func<string?> ghPathProvider,
         Logger logger,
         Action onLeaveTab,
-        Action onUpdateApplied)
+        Action onUpdateApplied,
+        CancellationToken lifetimeToken = default)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -65,6 +69,7 @@ internal sealed class UpdatesTabView : FrameView
         _logger = logger;
         _onLeaveTab = onLeaveTab;
         _onUpdateApplied = onUpdateApplied;
+        _lifetimeToken = lifetimeToken;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -118,14 +123,14 @@ internal sealed class UpdatesTabView : FrameView
 
         _status = new Label
         {
-            X = 0,
+            X = 2,
             Y = Pos.AnchorEnd(3),
-            Width = Dim.Fill(10),
+            Width = Dim.Fill(2),
             Text = " loading inventory…",
         };
         _spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(10),
+            X = 0,
             Y = Pos.AnchorEnd(3),
             Width = 1,
             Height = 1,
@@ -179,16 +184,19 @@ internal sealed class UpdatesTabView : FrameView
         Add(_tableLabel, _table, _preview,
             _allBox, _forceBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar);
+        Disposing += (_, _) => CancelPendingWork();
     }
 
     internal async Task LoadAsync()
     {
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
+        using var loadCancellation = ReplaceLoadCancellation();
         Visible = true;
+        SetBusy(true);
         _status.Text = " loading inventory…";
         try
         {
-            var snapshot = await _snapshotLoader().ConfigureAwait(false);
+            var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 if (!IsCurrentLoad(loadGeneration))
@@ -198,6 +206,10 @@ internal sealed class UpdatesTabView : FrameView
 
                 Populate(snapshot);
             }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            // A newer load or teardown superseded this one.
         }
         catch (Exception ex)
         {
@@ -209,7 +221,12 @@ internal sealed class UpdatesTabView : FrameView
                 }
 
                 _status.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                SetBusy(false);
             }).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);
         }
     }
 
@@ -235,6 +252,7 @@ internal sealed class UpdatesTabView : FrameView
         _status.Text = $" {_skills.Count} installed skill(s) — Space to toggle, U to update marked";
         _preview.Text = "## Updates\n\n_Press **Dry-run** to preview, or mark rows and **U** to update all marked._";
         _table.SetFocus();
+        SetBusy(false);
     }
 
 
@@ -351,7 +369,7 @@ internal sealed class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_spinner.Visible) return;
+        if (_operationCancellation is not null || _loadCancellation is not null) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -374,8 +392,14 @@ internal sealed class UpdatesTabView : FrameView
             return;
         }
 
-        _spinner.Visible = true;
-        _spinner.AutoSpin = true;
+        var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
+        if (Interlocked.CompareExchange(ref _operationCancellation, operationCancellation, null) is not null)
+        {
+            operationCancellation.Dispose();
+            return;
+        }
+        SetBusy(true);
+        SetOperationControlsEnabled(false);
         _status.Text = dryRun
             ? $" dry-running {(allChecked ? "all" : marked.Count + " skill(s)")}…"
             : $" updating {(allChecked ? "all" : marked.Count + " skill(s)")}…";
@@ -390,11 +414,11 @@ internal sealed class UpdatesTabView : FrameView
         try
         {
             var result = await _updateServiceFactory()
-                .UpdateAsync(ghPath, options).ConfigureAwait(false);
+                .UpdateAsync(ghPath, options, operationCancellation.Token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
-                _spinner.AutoSpin = false;
-                _spinner.Visible = false;
+                SetBusy(false);
+                SetOperationControlsEnabled(true);
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, allChecked, marked);
                 if (dryRun)
                 {
@@ -423,15 +447,63 @@ internal sealed class UpdatesTabView : FrameView
                 }
             }).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
+        {
+            _logger.Debug("update.tab", "update canceled during teardown");
+        }
         catch (Exception ex)
         {
             _logger.Error("update.tab", ex.Message);
             await _runOnUi(() =>
             {
-                _spinner.AutoSpin = false;
-                _spinner.Visible = false;
+                SetBusy(false);
+                SetOperationControlsEnabled(true);
                 _status.Text = $" update failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
             }).ConfigureAwait(false);
         }
+        finally
+        {
+            Interlocked.CompareExchange(ref _operationCancellation, null, operationCancellation);
+            operationCancellation.Dispose();
+        }
+    }
+
+    internal void CancelPendingLoad()
+    {
+        Interlocked.Increment(ref _loadGeneration);
+        Interlocked.Exchange(ref _loadCancellation, null)?.Cancel();
+        if (_operationCancellation is null)
+        {
+            SetBusy(false);
+        }
+    }
+
+    private CancellationTokenSource ReplaceLoadCancellation()
+    {
+        var next = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
+        Interlocked.Exchange(ref _loadCancellation, next)?.Cancel();
+        return next;
+    }
+
+    private void CancelPendingWork()
+    {
+        CancelPendingLoad();
+        Interlocked.Exchange(ref _operationCancellation, null)?.Cancel();
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _spinner.Visible = busy;
+        _spinner.AutoSpin = busy;
+    }
+
+    private void SetOperationControlsEnabled(bool enabled)
+    {
+        _dryRunButton.Enabled = enabled;
+        _updateButton.Enabled = enabled;
+        _allBox.Enabled = enabled;
+        _forceBox.Enabled = enabled;
+        _unpinBox.Enabled = enabled;
+        _table.Enabled = enabled;
     }
 }

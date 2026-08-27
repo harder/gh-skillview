@@ -82,6 +82,24 @@ public sealed class SearchAgentMetadataCacheTests
             only => Assert.Equal("alpha", only.SkillName));
     }
 
+    [Fact]
+    public void Store_EvictsLeastRecentlyUsedMetadataAtCapacity()
+    {
+        var cache = new SearchAgentMetadataCache(capacity: 2);
+        var first = Skill("owner/one", "alpha");
+        var second = Skill("owner/two", "beta");
+        var third = Skill("owner/three", "gamma");
+
+        cache.Store(first, ImmutableArray.Create("claude-code"));
+        cache.Store(second, ImmutableArray.Create("github-copilot"));
+        cache.Store(third, ImmutableArray.Create("gemini-cli"));
+
+        Assert.Equal(2, cache.CountForTests);
+        Assert.False(cache.Has(first));
+        Assert.True(cache.Has(second));
+        Assert.True(cache.Has(third));
+    }
+
     private static SearchResultSkill Skill(string repo, string skillName) =>
         new(
             Description: null,

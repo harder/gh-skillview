@@ -307,6 +307,16 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
+    public void ConfigureMarkdownPane_HidesLiteralHeadingPrefixes()
+    {
+        var view = new Markdown();
+
+        TuiHelpers.ConfigureMarkdownPane(view, SkillViewStyling.DialogSchemeName);
+
+        Assert.False(view.ShowHeadingPrefix);
+    }
+
+    [Fact]
     public void ConfigureMarkdownPane_MarksNonAnchorLinksHandledWhenProvidedOpenerFails()
     {
         var openedTargets = new List<string>();

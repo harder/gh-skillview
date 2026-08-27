@@ -88,7 +88,7 @@ public sealed class ContextBarViewTests
     }
 
     [Fact]
-    public void FormatForTests_WorkspaceOnly_OmitsLowSignalChrome()
+    public void FormatForTests_WorkspaceOnly_RendersContextTitle()
     {
         var state = new ContextBarState(
             Workspace: "Installed",
@@ -100,6 +100,6 @@ public sealed class ContextBarViewTests
 
         var text = ContextBarView.FormatForTests(state);
 
-        Assert.Equal(string.Empty, text);
+        Assert.Equal("Installed", text);
     }
 }

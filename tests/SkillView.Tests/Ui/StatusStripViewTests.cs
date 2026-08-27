@@ -10,6 +10,18 @@ namespace SkillView.Tests.Ui;
 public sealed class StatusStripViewTests
 {
     [Fact]
+    public void SetBusy_ControlsInlineSpinnerState()
+    {
+        var view = new StatusStripView();
+
+        view.SetBusy(true);
+        Assert.True(view.IsBusyForTests);
+
+        view.SetBusy(false);
+        Assert.False(view.IsBusyForTests);
+    }
+
+    [Fact]
     public void TruncateHintsForTests_PreservesRightmostPairs_WhenSpaceIsTight()
     {
         var hints = new[]

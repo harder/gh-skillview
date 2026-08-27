@@ -22,6 +22,7 @@ public sealed class FileLogSink : IDisposable
     private DateOnly _currentDay;
     private bool _disposed;
     private bool _trimPending;
+    private IDisposable? _subscription;
 
     public FileLogSink(string directory, Func<DateTimeOffset>? clock = null)
     {
@@ -33,12 +34,14 @@ public sealed class FileLogSink : IDisposable
 
     public void Attach(Logger logger)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _subscription?.Dispose();
         // Emit the ring-buffer snapshot first so the file reflects pre-attach entries too.
         foreach (var entry in logger.Snapshot())
         {
             Append(entry);
         }
-        logger.Subscribe(Append);
+        _subscription = logger.Subscribe(Append);
     }
 
     public void Append(LogEntry entry)
@@ -197,6 +200,8 @@ public sealed class FileLogSink : IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            _subscription?.Dispose();
+            _subscription = null;
             CloseWriterLocked();
         }
     }

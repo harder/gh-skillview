@@ -33,17 +33,19 @@ internal sealed class InstalledTabView : FrameView
     internal enum ScopeFilter { All, User, Project, Custom }
 
     private readonly Func<Action, Task> _runOnUi;
-    private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
-    private readonly Func<string?, Task<InventorySnapshot>>? _scopedSnapshotLoader;
+    private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
+    private readonly Func<string?, CancellationToken, Task<InventorySnapshot>>? _scopedSnapshotLoader;
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
+    private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
+    private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
     private IReadOnlyList<InstalledSkill> _rows = Array.Empty<InstalledSkill>();
     private IReadOnlyList<InstalledSkill> _all = Array.Empty<InstalledSkill>();
@@ -58,15 +60,17 @@ internal sealed class InstalledTabView : FrameView
     private int _agentsW = 8;
     private FocusTarget _lastFocusedTarget = FocusTarget.Table;
     private long _loadGeneration;
+    private CancellationTokenSource? _loadCancellation;
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
-        Func<Task<InventorySnapshot>> snapshotLoader,
+        Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
         Action<InstalledSkill, InventorySnapshot> onRemove,
         Action onLeaveTab,
         Action onGoToSearch,
         Action? onStateChange = null,
-        Func<string?, Task<InventorySnapshot>>? scopedSnapshotLoader = null)
+        Func<string?, CancellationToken, Task<InventorySnapshot>>? scopedSnapshotLoader = null,
+        CancellationToken lifetimeToken = default)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -75,25 +79,35 @@ internal sealed class InstalledTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
+        _lifetimeToken = lifetimeToken;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
 
         var filterLabel = new Label { Text = "Filter:", X = 0, Y = 0 };
-        var guideLabel = new Label
-        {
-            X = 0,
-            Y = 1,
-            Width = Dim.Fill(),
-            Text = BuildGuideText(),
-        };
         _filterField = new TextField
         {
             X = 8,
             Y = 0,
             Width = Dim.Percent(60) - 8,
             Text = string.Empty,
+        };
+        var searchScopeLabel = new Label
+        {
+            X = Pos.Right(_filterField) + 1,
+            Y = 0,
+            Width = Dim.Fill(),
+            Text = BuildSearchScopeText(),
+            Enabled = false,
+        };
+        var legendLabel = new Label
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Text = BuildLegendText(),
+            Enabled = false,
         };
         TuiHelpers.ConfigureTextInput(_filterField, SchemeNames.Base);
         _filterField.HasFocusChanged += (_, _) =>
@@ -135,10 +149,20 @@ internal sealed class InstalledTabView : FrameView
 
         _footer = new Label
         {
+            X = 2,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(2),
+            Text = " loading inventory…",
+        };
+        _spinner = new SpinnerView
+        {
             X = 0,
             Y = Pos.AnchorEnd(1),
-            Width = Dim.Fill(),
-            Text = " loading inventory…",
+            Width = 1,
+            Height = 1,
+            Visible = true,
+            AutoSpin = true,
+            Style = new SpinnerStyle.Dots(),
         };
 
         _filterField.TextChanged += (_, _) => RefreshAll();
@@ -178,9 +202,10 @@ internal sealed class InstalledTabView : FrameView
         KeyDown += OnKeyDown;
 
         TuiHelpers.ApplyScheme(SchemeNames.Base,
-            this, filterLabel, guideLabel, _filterField, _table, _detail, _footer);
+            this, filterLabel, searchScopeLabel, legendLabel, _filterField, _table, _detail, _footer, _spinner);
 
-        Add(filterLabel, guideLabel, _filterField, _table, _detail, _footer);
+        Add(filterLabel, searchScopeLabel, legendLabel, _filterField, _table, _detail, _spinner, _footer);
+        Disposing += (_, _) => CancelPendingLoad();
     }
 
     /// Kick off a snapshot load and reveal the tab. Safe to call repeatedly —
@@ -188,11 +213,13 @@ internal sealed class InstalledTabView : FrameView
     internal async Task LoadAsync()
     {
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
+        using var loadCancellation = ReplaceLoadCancellation();
         Visible = true;
+        SetLoading(true);
         _footer.Text = " loading inventory…";
         try
         {
-            var snapshot = await CaptureSnapshotAsync().ConfigureAwait(false);
+            var snapshot = await CaptureSnapshotAsync(loadCancellation.Token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 if (!IsCurrentLoad(loadGeneration))
@@ -202,6 +229,10 @@ internal sealed class InstalledTabView : FrameView
 
                 Populate(snapshot);
             }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            // A newer load or tab deactivation superseded this one.
         }
         catch (Exception ex)
         {
@@ -213,7 +244,12 @@ internal sealed class InstalledTabView : FrameView
                 }
 
                 _footer.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                SetLoading(false);
             }).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);
         }
     }
 
@@ -221,6 +257,7 @@ internal sealed class InstalledTabView : FrameView
     /// another async load. Used by startup auto-open so we don't double-scan.
     internal void LoadSeeded(InventorySnapshot snapshot)
     {
+        CancelPendingLoad();
         Interlocked.Increment(ref _loadGeneration);
         Visible = true;
         Populate(snapshot);
@@ -246,6 +283,7 @@ internal sealed class InstalledTabView : FrameView
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
         RestoreFocus();
         _onStateChange?.Invoke();
+        SetLoading(false);
     }
 
     private void ApplyFilter()
@@ -280,10 +318,10 @@ internal sealed class InstalledTabView : FrameView
     /// is wired and the filter is user/project, the capture pushes `--scope`
     /// down to `gh skill list`; otherwise it captures everything and the
     /// in-process filter narrows the view.
-    private Task<InventorySnapshot> CaptureSnapshotAsync() =>
+    private Task<InventorySnapshot> CaptureSnapshotAsync(CancellationToken cancellationToken) =>
         _scopedSnapshotLoader is not null
-            ? _scopedSnapshotLoader(ToGhScope(_scopeFilter))
-            : _snapshotLoader();
+            ? _scopedSnapshotLoader(ToGhScope(_scopeFilter), cancellationToken)
+            : _snapshotLoader(cancellationToken);
 
     internal static PinFilter CyclePin(PinFilter current) => current switch
     {
@@ -442,8 +480,10 @@ internal sealed class InstalledTabView : FrameView
         return fallbackWidth;
     }
 
-    private static string BuildGuideText() =>
-        "Matches name/path/agent/package · P pin · G scope · USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
+    internal static string BuildSearchScopeText() => "name · path · agent · package";
+
+    internal static string BuildLegendText() =>
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -626,6 +666,32 @@ internal sealed class InstalledTabView : FrameView
     private bool IsCurrentLoad(long loadGeneration) =>
         Interlocked.Read(ref _loadGeneration) == loadGeneration;
 
+    internal void CancelPendingLoad()
+    {
+        Interlocked.Increment(ref _loadGeneration);
+        var cancellation = Interlocked.Exchange(ref _loadCancellation, null);
+        if (cancellation is null) return;
+        cancellation.Cancel();
+        SetLoading(false);
+    }
+
+    private CancellationTokenSource ReplaceLoadCancellation()
+    {
+        var next = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
+        var previous = Interlocked.Exchange(ref _loadCancellation, next);
+        if (previous is not null)
+        {
+            previous.Cancel();
+        }
+        return next;
+    }
+
+    private void SetLoading(bool loading)
+    {
+        _spinner.Visible = loading;
+        _spinner.AutoSpin = loading;
+    }
+
     internal string GetFilterText() => _filterField.Text.Trim();
 
     internal string? GetPinFilterState() => _pinFilter switch
@@ -647,7 +713,9 @@ internal sealed class InstalledTabView : FrameView
 
     internal void FocusFilterForTests() => _filterField.SetFocus();
 
-    internal bool FilterHasFocusForTests => _filterField.HasFocus;
+    internal bool FilterHasFocus => _filterField.HasFocus;
+
+    internal bool FilterHasFocusForTests => FilterHasFocus;
 
     internal bool TableHasFocusForTests => _table.HasFocus;
 }

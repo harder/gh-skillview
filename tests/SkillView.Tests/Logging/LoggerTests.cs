@@ -49,4 +49,19 @@ public class LoggerTests
         Assert.Single(received);
         Assert.Equal("hello", received[0].Message);
     }
+
+    [Fact]
+    public void DisposedSubscriptionStopsReceivingEntries()
+    {
+        var logger = new Logger();
+        var received = new List<LogEntry>();
+        var subscription = logger.Subscribe(received.Add);
+
+        logger.Info("cat", "before");
+        subscription.Dispose();
+        logger.Info("cat", "after");
+
+        var entry = Assert.Single(received);
+        Assert.Equal("before", entry.Message);
+    }
 }

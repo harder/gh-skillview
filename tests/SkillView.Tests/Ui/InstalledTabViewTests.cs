@@ -97,7 +97,7 @@ public sealed class InstalledTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: static () => Task.FromResult(InventorySnapshot.Empty),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
             onGoToSearch: static () => { });
@@ -146,6 +146,8 @@ public sealed class InstalledTabViewTests
             && text.Contains("PRJ", StringComparison.Ordinal)
             && text.Contains("OK", StringComparison.Ordinal)
             && text.Contains("REV", StringComparison.Ordinal));
+        Assert.DoesNotContain(labels, text => text.Contains("P pin", StringComparison.Ordinal)
+            || text.Contains("G scope", StringComparison.Ordinal));
     }
 
     private static InstalledTabView CreateSubject() => new(
@@ -154,7 +156,7 @@ public sealed class InstalledTabViewTests
             action();
             return Task.CompletedTask;
         },
-        snapshotLoader: static () => Task.FromResult(InventorySnapshot.Empty),
+        snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
         onRemove: static (_, _) => { },
         onLeaveTab: static () => { },
         onGoToSearch: static () => { });

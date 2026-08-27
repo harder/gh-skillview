@@ -48,7 +48,9 @@ internal static class HelpOverlay
 - **e** — toggle raw / rendered preview
 - **l** — show / hide logs
 - **r** — refresh the active tab
-- **q / Esc** — quit at root · close modal otherwise
+- **Ctrl+Q** — quit from anywhere, including text fields
+- **q** — quit from a top-level list or preview
+- **Esc** — leave a field, go back, or close a modal
 
 _Press **Esc**, **Enter**, or **?** to close._
 """;

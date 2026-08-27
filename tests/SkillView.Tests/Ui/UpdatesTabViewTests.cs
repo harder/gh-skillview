@@ -55,7 +55,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: () => ++loadCount == 1 ? first.Task : second.Task,
+            snapshotLoader: _ => ++loadCount == 1 ? first.Task : second.Task,
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
             onGoToSearch: static () => { });
@@ -73,6 +73,42 @@ public sealed class UpdatesTabViewTests
     }
 
     [Fact]
+    public async Task InstalledTab_LoadAsync_CancelsSupersededInventoryScan()
+    {
+        var loadCount = 0;
+        CancellationToken firstToken = default;
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            snapshotLoader: async token =>
+            {
+                if (Interlocked.Increment(ref loadCount) == 1)
+                {
+                    firstToken = token;
+                    firstStarted.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                }
+                return SnapshotWithSkill("newer");
+            },
+            onRemove: static (_, _) => { },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+
+        var firstLoad = view.LoadAsync();
+        await firstStarted.Task;
+        var replacementLoad = view.LoadAsync();
+
+        await Task.WhenAll(firstLoad, replacementLoad);
+
+        Assert.True(firstToken.IsCancellationRequested);
+        Assert.Equal(["newer"], view.VisibleSkillNamesForTests);
+    }
+
+    [Fact]
     public async Task InstalledTab_LoadAsync_NotifiesStateChangeAfterPopulate()
     {
         var callbackCount = 0;
@@ -85,7 +121,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: () => Task.FromResult(SnapshotWithSkill("loaded")),
+            snapshotLoader: _ => Task.FromResult(SnapshotWithSkill("loaded")),
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
             onGoToSearch: static () => { },
@@ -114,7 +150,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: snapshotLoader,
+            snapshotLoader: _ => snapshotLoader(),
             updateServiceFactory: static () => throw new NotSupportedException(),
             ghPathProvider: static () => "/usr/bin/gh",
             logger: logger,

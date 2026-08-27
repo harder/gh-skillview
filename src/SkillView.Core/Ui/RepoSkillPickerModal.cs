@@ -63,6 +63,7 @@ internal sealed class RepoSkillPickerModal
 
     internal Result Show()
     {
+        using var lifetime = new CancellationTokenSource();
         var outcome = Outcome.Cancelled;
         var installedCount = 0;
         var failedCount = 0;
@@ -161,14 +162,14 @@ internal sealed class RepoSkillPickerModal
 
         var status = new Label
         {
-            X = 1,
+            X = 3,
             Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(2),
             Text = " ready",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(2),
+            X = 1,
             Y = Pos.AnchorEnd(3),
             Width = 1,
             Height = 1,
@@ -235,6 +236,16 @@ internal sealed class RepoSkillPickerModal
             RefreshValidity();
         }
 
+        void SetOperationControlsEnabled(bool enabled)
+        {
+            installButton.Enabled = enabled && CurrentValidationError() is null;
+            cancelButton.Enabled = enabled;
+            scopeSelector.Enabled = enabled;
+            customPathField.Enabled = enabled;
+            listFrame.Enabled = enabled;
+            agentsView.Enabled = enabled;
+        }
+
         installButton.Accepting += async (_, ev) =>
         {
             ev.Handled = true;
@@ -265,7 +276,7 @@ internal sealed class RepoSkillPickerModal
 
             spinner.Visible = true;
             spinner.AutoSpin = true;
-            installButton.Enabled = false;
+            SetOperationControlsEnabled(false);
 
             var selectedAgentIds = new List<string>();
             for (var i = 0; i < entries.Length; i++)
@@ -290,7 +301,8 @@ internal sealed class RepoSkillPickerModal
                 if (plan.UseAll)
                 {
                     status.Text = $" installing all {_skills.Length} skills…";
-                    var r = await _install.InstallAsync(_ghPath, _request.Repo, null, baseOptions).ConfigureAwait(false);
+                    var r = await _install.InstallAsync(
+                        _ghPath, _request.Repo, null, baseOptions, lifetime.Token).ConfigureAwait(false);
                     if (r.Succeeded) installedCount = _skills.Length;
                     else { failedCount = _skills.Length; firstError ??= r.ErrorMessage; }
                 }
@@ -298,15 +310,22 @@ internal sealed class RepoSkillPickerModal
                 {
                     for (var i = 0; i < plan.SkillNames.Length; i++)
                     {
+                        lifetime.Token.ThrowIfCancellationRequested();
                         var name = plan.SkillNames[i];
                         var idx = i;
-                        _app.Invoke(() => status.Text = $" installing {idx + 1}/{plan.SkillNames.Length}: {name}…");
-                        var r = await _install.InstallAsync(_ghPath, _request.Repo, name, baseOptions).ConfigureAwait(false);
+                        _app.Invoke(() =>
+                        {
+                            if (!lifetime.IsCancellationRequested)
+                                status.Text = $" installing {idx + 1}/{plan.SkillNames.Length}: {name}…";
+                        });
+                        var r = await _install.InstallAsync(
+                            _ghPath, _request.Repo, name, baseOptions, lifetime.Token).ConfigureAwait(false);
                         if (r.Succeeded) installedCount++;
                         else { failedCount++; firstError ??= r.ErrorMessage; }
                     }
                 }
 
+                lifetime.Token.ThrowIfCancellationRequested();
                 _app.Invoke(() =>
                 {
                     spinner.AutoSpin = false;
@@ -322,6 +341,7 @@ internal sealed class RepoSkillPickerModal
                         outcome = Outcome.Installed;
                         status.Text = $" installed {installedCount}, {failedCount} failed — see logs (l)";
                         installButton.Enabled = false;
+                        cancelButton.Enabled = true;
                     }
                     else
                     {
@@ -331,8 +351,13 @@ internal sealed class RepoSkillPickerModal
                             ? $" install failed: {snippet}"
                             : " install failed — see logs (l)";
                         RefreshValidity();
+                        SetOperationControlsEnabled(true);
                     }
                 });
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+                _logger.Debug("install.picker", "install canceled because the dialog closed");
             }
             catch (Exception ex)
             {
@@ -344,6 +369,7 @@ internal sealed class RepoSkillPickerModal
                     outcome = installedCount > 0 ? Outcome.Installed : Outcome.Failed;
                     status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                     RefreshValidity();
+                    SetOperationControlsEnabled(true);
                 });
             }
         };
@@ -351,6 +377,8 @@ internal sealed class RepoSkillPickerModal
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            if (spinner.Visible) return;
+            lifetime.Cancel();
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
@@ -360,15 +388,21 @@ internal sealed class RepoSkillPickerModal
             if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
+                if (spinner.Visible)
+                {
+                    status.Text = " install in progress — wait for completion";
+                    return;
+                }
+                lifetime.Cancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
-            else if (!customPathField.HasFocus && key.AsRune.Value is 'a' or 'A')
+            else if (!spinner.Visible && !customPathField.HasFocus && key.AsRune.Value is 'a' or 'A')
             {
                 key.Handled = true;
                 SetAll(CheckState.Checked);
             }
-            else if (!customPathField.HasFocus && key.AsRune.Value is 'n' or 'N')
+            else if (!spinner.Visible && !customPathField.HasFocus && key.AsRune.Value is 'n' or 'N')
             {
                 key.Handled = true;
                 SetAll(CheckState.UnChecked);
@@ -387,8 +421,15 @@ internal sealed class RepoSkillPickerModal
         foreach (var box in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, box);
 
         RefreshValidity();
-        _app.Run(dialog);
-        dialog.Dispose();
+        try
+        {
+            _app.Run(dialog);
+        }
+        finally
+        {
+            lifetime.Cancel();
+            dialog.Dispose();
+        }
 
         return new Result(outcome, installedCount, failedCount, firstError);
     }

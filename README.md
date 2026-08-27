@@ -182,8 +182,9 @@ Navigation:
 | `Tab` / `Shift+Tab` | Move focus between list and detail |
 | `/` | Jump to Discover and focus the search box |
 | `?` or `F1` | Open the help overlay |
-| `Esc` | Back out of the current sub-view / modal |
-| `q` | Quit |
+| `Esc` | Leave a field or back out of the current sub-view / modal |
+| `q` | Quit from a top-level list or preview |
+| `Ctrl+Q` | Quit from anywhere, including while typing |
 
 Discover tab:
 

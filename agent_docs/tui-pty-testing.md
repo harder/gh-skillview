@@ -92,8 +92,10 @@ immediately.
 
 ### 1. Startup focus is in the query field
 
-At startup, plain letters go into the query field. If you want global shortcuts
-like `d`, `u`, `c`, `I`, or `q`, first send `Esc`.
+At startup, plain letters go into the query field. If you want single-letter
+global shortcuts like `d`, `u`, `c`, or `I`, first send `Esc`. `Ctrl+Q` is the
+unconditional quit path and works without leaving the field; plain `q` quits
+only when a top-level read-only view has focus.
 
 ### 2. Search works even when naive detectors say it failed
 
@@ -213,7 +215,7 @@ These are current repo-specific pitfalls, not generic PTY problems:
 2. Create a temp sandbox (`HOME_DIR`, `WORK_DIR`, `SCAN_ROOT`).
 3. Pick a query and row index from `gh skill search <query> --json ...`.
 4. Launch the built `skillview` binary in a PTY with `SKILLVIEW_LOG=debug`.
-5. Send `Esc` before global shortcuts.
+5. Send `Esc` before single-letter global shortcuts; use `Ctrl+Q` to quit from any focus state.
 6. Wait on log conditions for search/preview milestones.
 7. Verify install/remove with CLI shell scripts after each mutation.
 8. Save cleaned PTY snapshots for UX review.

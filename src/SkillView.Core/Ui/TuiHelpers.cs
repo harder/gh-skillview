@@ -264,6 +264,9 @@ internal static class TuiHelpers
     /// blocks, tables, links, and lists with a built-in vertical scrollbar.
     internal static void ConfigureMarkdownPane(Markdown view, string schemeName, Func<string, bool>? openTarget = null)
     {
+        // Preserve semantic heading levels and styling without showing literal
+        // Markdown prefixes ("#", "##") in the rendered UI.
+        view.ShowHeadingPrefix = false;
         view.SchemeName = schemeName;
         view.SetScheme(CreateReadOnlyPaneScheme());
         openTarget ??= OpenInDefaultHandler;
