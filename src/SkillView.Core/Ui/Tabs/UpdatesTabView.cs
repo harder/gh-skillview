@@ -26,7 +26,7 @@ internal sealed class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
-    private readonly Func<GhSkillUpdateService> _updateServiceFactory;
+    private readonly Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> _updateRunner;
     private readonly Func<string?> _ghPathProvider;
     private readonly Logger _logger;
     private readonly Action _onLeaveTab;
@@ -55,7 +55,7 @@ internal sealed class UpdatesTabView : FrameView
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
         Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
-        Func<GhSkillUpdateService> updateServiceFactory,
+        Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> updateRunner,
         Func<string?> ghPathProvider,
         Logger logger,
         Action onLeaveTab,
@@ -64,7 +64,7 @@ internal sealed class UpdatesTabView : FrameView
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
-        _updateServiceFactory = updateServiceFactory;
+        _updateRunner = updateRunner;
         _ghPathProvider = ghPathProvider;
         _logger = logger;
         _onLeaveTab = onLeaveTab;
@@ -259,6 +259,8 @@ internal sealed class UpdatesTabView : FrameView
     internal Button DryRunButtonForTests => _dryRunButton;
     internal string StatusTextForTests => _status.Text.ToString();
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
+    internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
+    internal Task RunForTestsAsync(bool dryRun, bool batchOnly) => RunAsync(dryRun, batchOnly);
 
     /// Activate this view as a drill-in from the Changes workspace.
     /// Hides the Changes tab via <paramref name="hideChanges"/>, then shows and loads this view.
@@ -408,10 +410,14 @@ internal sealed class UpdatesTabView : FrameView
 
         try
         {
-            var result = await _updateServiceFactory()
-                .UpdateAsync(ghPath, options, operationCancellation.Token).ConfigureAwait(false);
+            var result = await _updateRunner(ghPath, options, operationCancellation.Token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
+                if (operationCancellation.Token.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 SetBusy(false);
                 SetOperationControlsEnabled(true);
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, allChecked, marked);
@@ -444,13 +450,18 @@ internal sealed class UpdatesTabView : FrameView
         }
         catch (OperationCanceledException) when (operationCancellation.Token.IsCancellationRequested)
         {
-            _logger.Debug("update.tab", "update canceled during teardown");
+            _logger.Debug("update.tab", "update canceled during deactivation or teardown");
         }
         catch (Exception ex)
         {
             _logger.Error("update.tab", ex.Message);
             await _runOnUi(() =>
             {
+                if (operationCancellation.Token.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 SetBusy(false);
                 SetOperationControlsEnabled(true);
                 _status.Text = $" update failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
@@ -468,10 +479,12 @@ internal sealed class UpdatesTabView : FrameView
         }
     }
 
-    private void CancelPendingWork()
+    internal void CancelPendingWork()
     {
         CancelPendingLoad();
         _operationCancellations.Cancel();
+        SetBusy(false);
+        SetOperationControlsEnabled(true);
     }
 
     private void SetBusy(bool busy)

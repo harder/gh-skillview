@@ -410,7 +410,7 @@ public sealed class SkillViewApp
         _updatesTab = new SkillView.Ui.Tabs.UpdatesTabView(
             runOnUi: runOnUi,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            updateServiceFactory: () => _services.UpdateService,
+            updateRunner: (ghPath, options, token) => _services.UpdateService.UpdateAsync(ghPath, options, token),
             ghPathProvider: () => _ghPath,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,
@@ -700,9 +700,7 @@ public sealed class SkillViewApp
     private void ActivateTab(SkillViewTab tab)
     {
         if (tab == _activeTab) return;
-        _installedTab?.CancelPendingLoad();
-        _changesTab?.CancelPendingLoad();
-        _updatesTab?.CancelPendingLoad();
+        CancelPendingTabWork();
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
 
@@ -768,6 +766,7 @@ public sealed class SkillViewApp
         if (_inDoctor || _doctorTab is null) return;
         _tabBeforeDoctor = _activeTab;
         _inDoctor = true;
+        CancelPendingTabWork();
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab is not null) _updatesTab.Visible = false;
@@ -798,6 +797,13 @@ public sealed class SkillViewApp
                 _doctorTab.SetFocus();
             });
         }, "doctor");
+    }
+
+    private void CancelPendingTabWork()
+    {
+        _installedTab?.CancelPendingLoad();
+        _changesTab?.CancelPendingLoad();
+        _updatesTab?.CancelPendingWork();
     }
 
     private void LeaveDoctor()

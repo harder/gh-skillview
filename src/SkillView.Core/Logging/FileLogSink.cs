@@ -23,11 +23,21 @@ public sealed class FileLogSink : IDisposable
     private bool _disposed;
     private bool _trimPending;
     private IDisposable? _subscription;
+    private readonly Action? _beforeAppendLockForTests;
 
     public FileLogSink(string directory, Func<DateTimeOffset>? clock = null)
+        : this(directory, clock, beforeAppendLockForTests: null)
+    {
+    }
+
+    internal FileLogSink(
+        string directory,
+        Func<DateTimeOffset>? clock,
+        Action? beforeAppendLockForTests)
     {
         _directory = directory;
         _clock = clock ?? (() => DateTimeOffset.Now);
+        _beforeAppendLockForTests = beforeAppendLockForTests;
     }
 
     public string Directory => _directory;
@@ -46,9 +56,10 @@ public sealed class FileLogSink : IDisposable
 
     public void Append(LogEntry entry)
     {
-        if (_disposed) return;
+        _beforeAppendLockForTests?.Invoke();
         lock (_gate)
         {
+            if (_disposed) return;
             try
             {
                 var today = DateOnly.FromDateTime(entry.Timestamp.ToLocalTime().DateTime);
@@ -196,13 +207,26 @@ public sealed class FileLogSink : IDisposable
 
     public void Dispose()
     {
+        IDisposable? subscription;
         lock (_gate)
         {
             if (_disposed) return;
             _disposed = true;
-            _subscription?.Dispose();
+            subscription = _subscription;
             _subscription = null;
+        }
+
+        // Logger subscription disposal waits for an in-flight callback to
+        // finish. Never wait while holding _gate: Append takes the logger's
+        // registration lock first and then this lock, so the reverse order
+        // here would deadlock shutdown.
+        subscription?.Dispose();
+
+        lock (_gate)
+        {
             CloseWriterLocked();
         }
     }
+
+    internal bool IsDisposedForTests => Volatile.Read(ref _disposed);
 }
