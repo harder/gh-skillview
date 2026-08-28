@@ -9,14 +9,14 @@ Hardening branch: `fix/adversarial-hardening`
 Second hardening branch: `fix/resource-lifecycle-hardening-2`
 Third hardening branch: `fix/removal-lifecycle-hardening`
 Fourth hardening branch: `fix/search-metadata-hardening`
-Status: Active remediation. PRs #12, #13, and #14 are merged. Aggregate log retention,
-callback-safe cancellation ownership, bounded/cancellable inventory I/O, and
-portable asynchronous removal are implemented. The fourth batch adds bounded,
-timed metadata-preview scheduling and closes the compact-removal queued-
-completion race from PR #14's final review. Native handle-relative deletion for
-hostile same-user mutation remains a separate security design; install-modal
-ownership, root CLI cancellation, path identity, Esc coverage, and the lower-
-risk remainder stay scheduled.
+Fifth hardening branch: `fix/final-adversarial-hardening`
+Status: Portable remediation complete. PRs #12, #13, #14, and #15 are merged.
+The fifth batch completes install-modal ownership, root CLI cancellation and
+deadlines, bounded post-kill waiting, volume-aware path identity, Esc focus
+behavior, streaming CLI JSON, serialized static-UI tests, and bounded-resource
+stress coverage. Native handle-relative deletion for hostile same-user
+mutation remains a separate security design rather than part of this portable
+backlog.
 
 ## Executive summary
 
@@ -812,11 +812,7 @@ also verifies that updating an existing value refreshes recency.
 
 Severity: **Medium**
 
-Implementation status: **Install flows remain open. The removal modal/wizard
-now demonstrate the target lifecycle on `fix/removal-lifecycle-hardening`:
-stable token capture, an explicitly retained operation task, inner queued-
-callback lifetime checks, cancellation, and task drain before control
-disposal.**
+Implementation status: **Completed on `fix/final-adversarial-hardening`.**
 
 Locations:
 
@@ -866,9 +862,22 @@ addition to owning and awaiting the operation task.
   untracked event tasks.
 - Add Ctrl+Q, Esc, completion-vs-close, and exception-vs-dispose race tests.
 
+### Remediation
+
+All three install flows now use `ModalOperationTracker`: one stable token and
+one explicitly owned worker for the entire synchronous dialog lifetime. Event
+handlers launch owned `Task` work instead of becoming `async void`; queued UI
+commits recheck the dialog lifetime inside the callback; dispatch failures are
+contained; and disposal cancels and drains the worker before controls are
+disposed. Ownership remains non-null through both the worker-complete/UI-
+pending window and the smaller UI-commit/worker-return window, so retry,
+cancel, close, and escalation shortcuts cannot race a finishing install.
+
 ## Finding 9: CLI cancellation and process termination are incomplete
 
 Severity: **Medium**
+
+Implementation status: **Completed on `fix/final-adversarial-hardening`.**
 
 Locations:
 
@@ -906,6 +915,18 @@ is the notable exception.
 - Apply operation-specific timeouts.
 - After `Kill`, perform a bounded wait for parent exit and log/report failures.
 - Add cross-platform Ctrl+C and child-process cancellation tests.
+
+### Remediation
+
+`EntryPoint` now owns a linked root token, translates Ctrl+C into cooperative
+cancellation, unregisters the process-wide handler during teardown, and
+returns conventional exit code 130. `CliDispatcher` passes that token through
+every probe, inventory, search, preview, install, update, remove, and cleanup
+operation. Read-oriented commands have 30-second or two-minute deadlines;
+mutating commands have ten-minute deadlines. On cancellation `ProcessRunner`
+requests whole-tree termination, waits at most five seconds for the parent,
+observes both bounded output drains, and logs kill or wait failure without
+hanging shutdown.
 
 ## Finding 10: removal materializes full trees and runs on the UI thread
 
@@ -989,6 +1010,8 @@ unchanged lines. It was independently reassessed and accepted:
 
 Severity: **Medium**
 
+Implementation status: **Completed on `fix/final-adversarial-hardening`.**
+
 Locations:
 
 - `src/SkillView.Core/Inventory/PathResolver.cs`, containment around lines 69-79.
@@ -1023,6 +1046,18 @@ ignore-case comparer is also not a complete solution.
   independently revalidated containment rather than string equality alone.
 - Add Windows mixed-case, macOS case-insensitive-volume, Linux case-sensitive,
   and Windows case-sensitive-directory tests.
+
+### Remediation
+
+`PathIdentity` is now the single normalization, equality, keying, and
+containment boundary. It detects case behavior from an existing filesystem
+entry instead of assuming every macOS or Windows volume is insensitive, while
+preserving case conservatively when probing is impossible. Inventory merge and
+deduplication, cleanup/removal indexes, CLI inventory diffs, scan-root
+deduplication, lock-file tracking, and active log-file exclusion use the same
+keys or equality rule. Probes use targeted case-sensitive enumeration rather
+than materializing parent directories, and root paths retain their separator
+so `/` and `C:/` containment remain correct.
 
 ## Finding 12: Discover and Doctor operations outlive workspace ownership
 
@@ -1159,6 +1194,8 @@ startup assumption is not expressed or enforced by the API.
 
 Severity: **Medium usability/reliability**
 
+Implementation status: **Completed on `fix/final-adversarial-hardening`.**
+
 Location:
 
 - `src/SkillView.Core/Ui/SkillViewApp.cs`, root Esc handling around lines 598-607.
@@ -1182,6 +1219,15 @@ but the UI message and expected two-step Esc then q behavior are wrong.
 - Keep the application-level Ctrl+Q test because focused editors are precisely
   where global quit routing tends to regress.
 
+### Remediation
+
+The main shell now routes Esc through one `LeaveTextInput` action: Discover
+query focus returns to results and Installed filter focus returns to the skill
+list without clearing text. Owner, agent, and limit moved into the compact
+Discover filters dialog in the intervening UI redesign; Esc in each editor now
+moves focus to Cancel and explicitly advertises that a second Esc closes the
+dialog. `Ctrl+Q` remains unconditional.
+
 ## Test gap: the LRU test previously proved only FIFO eviction
 
 Status: **Closed on `fix/search-metadata-hardening`.**
@@ -1196,12 +1242,14 @@ metadata.
 These should be included while the related components are being changed:
 
 1. [x] Validate that `Logger` capacity is non-negative; completed in PR #12.
-2. Serialize tests that mutate `TuiHelpers.CurrentTheme`, Terminal.Gui scheme
-   facades, or other static UI configuration.
-3. Stream CLI JSON directly to `Console.Out` rather than creating a
+2. [x] Serialize tests that mutate `TuiHelpers.CurrentTheme`, Terminal.Gui
+   scheme facades, or other static UI configuration; completed on
+   `fix/final-adversarial-hardening` with a nonparallel static-state collection.
+3. [x] Stream CLI JSON directly to `Console.Out` rather than creating a
    `MemoryStream`, copying it to a byte array, decoding to UTF-16, and encoding
-   it again for output.
-4. Add explicit concurrency coverage for:
+   it again for output. Completed with a non-owning UTF-8 `TextWriter` stream;
+   snapshot-only render helpers retain their in-memory path.
+4. [x] Add explicit concurrency coverage for:
    - Cache get/store/invalidate.
    - Logger sink append/dispose.
    - Logger replay/subscribe without gaps or duplicates.
@@ -1209,8 +1257,11 @@ These should be included while the related components are being changed:
    - Every workspace exit with pending load/operation/UI dispatch.
    - Modal shutdown with active installs.
    - Same-day log growth and active-file rotation.
-5. Add stress tests with bounded memory assertions for noisy subprocess errors,
-   oversized local files, large inventories, and large removal trees.
+   Existing suites already covered the logger, cache, workspace, and shutdown
+   interleavings; this batch adds install ownership and metadata-cache
+   contention tests.
+5. [x] Add stress tests with bounded memory assertions for noisy subprocess
+   errors, oversized local files, large inventories, and large removal trees.
 
 ## Existing hardening that held up
 
@@ -1253,18 +1304,58 @@ coordinated within their current scope:
 9. [x] Finish metadata-preview deadlines and bounded scheduling. Search
    supersession, the whole-request deadline, a per-preview deadline, and a
    global four-process ceiling are complete.
-10. [~] Make modal operation lifetimes awaitable and disposal-safe, including
-    stable token capture before the first await. Removal modals are complete,
-    including the compact worker-complete/UI-pending shortcut boundary; the
-    three install flows remain.
-11. [ ] Wire root CLI cancellation and bounded post-kill waiting.
-12. [ ] Centralize cross-platform path identity semantics.
-13. [~] Correct Esc focus behavior and strengthen the LRU contract test. The
-    LRU contract is complete; Esc focus behavior remains.
-14. [ ] Finish the lower-risk hardening and stress coverage.
+10. [x] Make modal operation lifetimes awaitable and disposal-safe, including
+    stable token capture before the first await and both queued-completion
+    ownership boundaries.
+11. [x] Wire root CLI cancellation, operation-specific deadlines, exit code
+    130, and bounded post-kill waiting.
+12. [x] Centralize volume-aware cross-platform path identity semantics.
+13. [x] Correct Esc focus behavior and strengthen the LRU contract test.
+14. [x] Finish the lower-risk hardening and stress coverage.
 
 `FileLogSink` lock ordering, Doctor-to-tab cancellation, and Updates operation
 deactivation were completed in `df62a22` and are not in the remaining order.
+
+### Final portable-hardening checkpoint
+
+Local verification for `fix/final-adversarial-hardening` completed with a
+zero-error build, all 679 unit and ANSI-driver integration tests, and native
+macOS ARM64 AOT publishes for both the standalone app and gh extension. New
+tests cover install worker/UI ownership boundaries, cancellation propagation,
+bounded child-process termination, volume-observed path semantics and root
+containment, Discover/Installed Esc behavior, split UTF-8 streaming, concurrent
+metadata-cache use, and allocation bounds for noisy output, oversized skills,
+500-skill inventories, and 2,000-file removals.
+
+### PR #16 Copilot review disposition
+
+The Balanced review generated four comments. All four were independently
+reassessed and accepted:
+
+1. **Compact-install cancellation stranded ownership — correct and fixed.**
+   The cancellation catch logged and returned without a terminal UI commit,
+   leaving the completed worker owned forever. It now queues the same guarded
+   spinner reset, canceled outcome, and modal close used by the other install
+   flows.
+2. **Terminal UI-dispatch failure stranded ownership — correct and fixed.**
+   Logging a dispatch/callback exception was insufficient when the callback
+   was responsible for release or close. Terminal commits now use a distinct
+   tracker API that requests release on either failure path, but interim picker
+   progress deliberately retains ownership if its callback fails.
+3. **CLI cleanup classification ignored cancellation — correct and fixed.**
+   Inventory capture received the root/deadline token, but the immediately
+   following classifier used its non-cancellable wrapper. CLI cleanup now calls
+   `ClassifyWithCancellation` with the same token.
+4. **Missing-path probing measured the wrong Windows directory — correct and
+   fixed.** For a missing child, climbing upward and flipping the existing
+   parent's name measured the grandparent's lookup behavior even though
+   Windows case sensitivity is per directory. Missing direct children now
+   probe another entry in their actual containing directory; missing parents,
+   empty directories, and failed probes fall back conservatively to preserving
+   case rather than collapsing potentially distinct paths.
+
+Follow-up validation passed all 683 unit and ANSI-driver integration tests and
+both macOS ARM64 native AOT publishes.
 
 ## Terminal.Gui upstream assessment
 

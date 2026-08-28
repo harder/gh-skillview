@@ -288,13 +288,14 @@ skillview --scan-root /path/one --scan-root /path/two list --json
 | `2` | Invalid usage |
 | `10` | Environment error |
 | `20` | No matches |
+| `130` | Canceled by the caller or Ctrl+C |
 
 ### Automation and AI-agent usage
 
 SkillView's CLI is designed to be automation-friendly when you want higher-level safety than raw `gh skill`.
 
 - Prefer `--json` on commands that support it: `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
-- Use exit codes as the control surface for scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches.
+- Use exit codes as the control surface for scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches, `130` canceled.
 - Put global flags like `--scan-root` and `--theme` **before** the subcommand; only `--debug` is accepted after the subcommand.
 - `skillview doctor --json` is the fastest way for an agent or script to confirm `gh` version, auth state, capability probes, and log location before attempting an install/update flow.
 

@@ -332,6 +332,7 @@ public sealed class SkillViewApp
         _queryField.KeyDown += OnQueryFieldKey;
         _ownerField.KeyDown += OnFilterFieldKey;
         _agentField.KeyDown += OnFilterFieldKey;
+        _limitUpDown.KeyDown += OnFilterFieldKey;
         _limitUpDown.ValueChanging += (_, e) =>
         {
             NoteUserInteraction();
@@ -634,8 +635,9 @@ public sealed class SkillViewApp
         // top-level list where Esc previously meant "lose your session".
         if (key.KeyCode == KeyCode.Esc)
         {
-            SetStatus(TextInputHasFocus()
-                ? "Esc leaves the field · Ctrl+Q quits"
+            var leftInput = LeaveTextInput();
+            SetStatus(leftInput
+                ? "Left the field · q or Ctrl+Q quits"
                 : "Press q or Ctrl+Q to quit");
             return true;
         }
@@ -712,6 +714,23 @@ public sealed class SkillViewApp
                 || _ownerField?.HasFocus == true
                 || _agentField?.HasFocus == true
                 || _limitUpDown?.HasFocus == true);
+    }
+
+    private bool LeaveTextInput()
+    {
+        if (!TextInputHasFocus())
+        {
+            return false;
+        }
+
+        if (_activeTab == SkillViewTab.Installed)
+        {
+            _installedTab?.FocusList();
+            return true;
+        }
+
+        _resultsTable?.SetFocus();
+        return true;
     }
 
     private static bool IsPrintableTextInputKey(Key key)
@@ -1042,7 +1061,7 @@ public sealed class SkillViewApp
         else if (key.KeyCode == KeyCode.Esc)
         {
             key.Handled = true;
-            _resultsTable?.SetFocus();
+            LeaveTextInput();
         }
     }
 
@@ -1056,6 +1075,11 @@ public sealed class SkillViewApp
         {
             key.Handled = true;
             SubmitSearch();
+        }
+        else if (key.KeyCode == KeyCode.Esc)
+        {
+            key.Handled = true;
+            LeaveTextInput();
         }
     }
 

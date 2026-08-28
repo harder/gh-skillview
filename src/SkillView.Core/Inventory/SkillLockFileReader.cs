@@ -91,7 +91,7 @@ public sealed class SkillLockFileReader
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!seen.Add(path)) return;
+        if (!seen.Add(PathIdentity.NormalizeKey(path))) return;
         if (!File.Exists(path)) return;
 
         try

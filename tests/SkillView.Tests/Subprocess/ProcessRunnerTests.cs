@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using SkillView.Logging;
 using SkillView.Subprocess;
 using Xunit;
@@ -34,6 +35,22 @@ public sealed class ProcessRunnerTests
         Assert.InRange(result.StdOut.Length, limit, limit + 80);
         Assert.Contains("output truncated after 128 characters", result.StdErr);
         Assert.InRange(result.StdErr.Length, limit, limit + 80);
+    }
+
+    [Fact]
+    public async Task RunAsync_CancellationTerminatesWithinBoundedWait()
+    {
+        var runner = new ProcessRunner(
+            new Logger(LogLevel.Debug),
+            terminationWait: TimeSpan.FromSeconds(2));
+        var (executable, arguments) = CreateLongRunningCommand();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        var stopwatch = Stopwatch.StartNew();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            runner.RunAsync(executable, arguments, cancellationToken: cancellation.Token));
+
+        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(4));
     }
 
     private static (string Executable, string[] Arguments) CreateWaitForEofCommand()
@@ -72,5 +89,20 @@ public sealed class ProcessRunnerTests
             "-c",
             "i=0; while [ $i -lt 512 ]; do printf 0123456789; printf abcdefghij >&2; i=$((i+1)); done"
         });
+    }
+
+    private static (string Executable, string[] Arguments) CreateLongRunningCommand()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return ("pwsh", new[]
+            {
+                "-NoProfile",
+                "-Command",
+                "Start-Sleep -Seconds 30"
+            });
+        }
+
+        return ("/bin/sh", new[] { "-c", "sleep 30" });
     }
 }

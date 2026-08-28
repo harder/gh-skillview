@@ -7,4 +7,5 @@ public static class ExitCodes
     public const int InvalidUsage = 2;
     public const int EnvironmentError = 10;
     public const int NoMatches = 20;
+    public const int Cancelled = 130;
 }

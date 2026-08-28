@@ -21,6 +21,7 @@ flags instead.
 
 - **Default verification:** `dotnet build` then `dotnet test --no-build` (from repo root; runs both test projects).
 - **UI-focused tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-namespace "SkillView.Tests.Ui"`
+- **Resource stress tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-class "SkillView.Tests.Ui.ResourceStressTests"`. These allocation/process tests are serialized through the `ResourceStress` collection.
 - **Contract tests:** require a real `gh` binary plus auth. CI runs them with `SKILLVIEW_CONTRACT_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --configuration Release --no-build --filter-trait "Category=Contract"` via `.github/workflows/contract-tests.yml`.
 - **PTY startup smoke:** opt-in only. Run `dotnet build`, then `SKILLVIEW_PTY_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-trait "Category=PTY"`. The test uses the built `src/SkillView.App/bin/Debug/net10.0/<rid>/skillview` host under `/usr/bin/script` and expects either `GH_TOKEN` or a working `gh auth token`.
 - The contract-test workflow runs nightly and on `workflow_dispatch` against a pinned `gh` lane (kept in step with the latest adopted release — see `.github/workflows/contract-tests.yml`) that must pass plus a `latest` lane allowed to fail. Keep the pinned lane at or above `GhBinaryLocator.MinimumVersion` — pinning below SkillView's own hard minimum tests a `gh` version the app refuses to run against.

@@ -120,6 +120,31 @@ public sealed class SearchAgentMetadataCacheTests
         Assert.Single(cache.Filter([first], "gemini-cli"));
     }
 
+    [Fact]
+    public async Task ConcurrentGetStoreAndFilter_RemainBoundedAndConsistent()
+    {
+        const int capacity = 32;
+        var cache = new SearchAgentMetadataCache(capacity);
+        var skills = Enumerable.Range(0, 128)
+            .Select(index => Skill($"owner/repo-{index}", $"skill-{index}"))
+            .ToArray();
+
+        var workers = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
+        {
+            for (var index = 0; index < 2_000; index++)
+            {
+                var skill = skills[(index + worker) % skills.Length];
+                cache.Store(skill, [index % 2 == 0 ? "claude-code" : "github-copilot"]);
+                cache.Has(skill);
+                cache.Filter(skills, index % 2 == 0 ? "claude-code" : "github-copilot");
+            }
+        }, TestContext.Current.CancellationToken));
+
+        await Task.WhenAll(workers);
+
+        Assert.InRange(cache.CountForTests, 1, capacity);
+    }
+
     private static SearchResultSkill Skill(string repo, string skillName) =>
         new(
             Description: null,

@@ -52,11 +52,12 @@ public sealed class LocalSkillScanner
     {
         options ??= new Options();
         var byResolved = new Dictionary<string, Builder>(StringComparer.Ordinal);
+        var caseSensitivityByParent = new Dictionary<string, bool>(StringComparer.Ordinal);
 
         foreach (var root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ScanRoot(root, options, byResolved, cancellationToken);
+            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken);
         }
 
         var builder = ImmutableArray.CreateBuilder<InstalledSkill>(byResolved.Count);
@@ -80,6 +81,7 @@ public sealed class LocalSkillScanner
         ScanRoot root,
         Options opts,
         Dictionary<string, Builder> acc,
+        Dictionary<string, bool> caseSensitivityByParent,
         CancellationToken cancellationToken)
     {
         // `EnumerateFileSystemEntries` includes broken symlinks, which
@@ -126,7 +128,7 @@ public sealed class LocalSkillScanner
                 // Ignore plain files at the scan root: skills are directories.
                 var isSymlink = PathResolver.IsSymlink(child);
                 if (!Directory.Exists(child) && !isSymlink) continue;
-                ConsiderCandidate(root, child, acc, cancellationToken);
+                ConsiderCandidate(root, child, acc, caseSensitivityByParent, cancellationToken);
             }
         }
         finally
@@ -139,6 +141,7 @@ public sealed class LocalSkillScanner
         ScanRoot root,
         string candidatePath,
         Dictionary<string, Builder> acc,
+        Dictionary<string, bool> caseSensitivityByParent,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -149,7 +152,7 @@ public sealed class LocalSkillScanner
             // Broken symlink or vanished path.
             if (isSymlink)
             {
-                RegisterBroken(root, candidatePath, acc);
+                RegisterBroken(root, candidatePath, acc, caseSensitivityByParent);
             }
             return;
         }
@@ -188,7 +191,7 @@ public sealed class LocalSkillScanner
         }
 
         var ignored = File.Exists(Path.Combine(resolved, IgnoreMarkerName));
-        var resolvedKey = PathResolver.Normalize(resolved);
+        var resolvedKey = NormalizeKey(resolved, caseSensitivityByParent);
 
         if (!acc.TryGetValue(resolvedKey, out var entry))
         {
@@ -266,9 +269,13 @@ public sealed class LocalSkillScanner
         }
     }
 
-    private static void RegisterBroken(ScanRoot root, string candidatePath, Dictionary<string, Builder> acc)
+    private static void RegisterBroken(
+        ScanRoot root,
+        string candidatePath,
+        Dictionary<string, Builder> acc,
+        Dictionary<string, bool> caseSensitivityByParent)
     {
-        var key = PathResolver.Normalize(candidatePath);
+        var key = NormalizeKey(candidatePath, caseSensitivityByParent);
         if (acc.ContainsKey(key)) return;
         acc[key] = new Builder
         {
@@ -283,6 +290,22 @@ public sealed class LocalSkillScanner
             IsSymlinked = true,
             AgentMemberships = { new AgentMembership(root.AgentHint ?? "unknown", candidatePath, true) },
         };
+    }
+
+    private static string NormalizeKey(
+        string path,
+        Dictionary<string, bool> caseSensitivityByParent)
+    {
+        var normalized = PathIdentity.Normalize(path);
+        var parent = Path.GetDirectoryName(normalized) ?? normalized;
+        var parentKey = PathIdentity.Normalize(parent);
+        if (!caseSensitivityByParent.TryGetValue(parentKey, out var caseSensitive))
+        {
+            caseSensitive = PathIdentity.IsCaseSensitive(normalized);
+            caseSensitivityByParent[parentKey] = caseSensitive;
+        }
+
+        return PathIdentity.NormalizeKey(normalized, caseSensitive);
     }
 
     private sealed class Builder

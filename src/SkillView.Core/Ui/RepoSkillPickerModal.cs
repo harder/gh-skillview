@@ -63,19 +63,19 @@ internal sealed class RepoSkillPickerModal
 
     internal Result Show()
     {
-        using var lifetime = new CancellationTokenSource();
         var outcome = Outcome.Cancelled;
         var installedCount = 0;
         var failedCount = 0;
         string? firstError = null;
 
-        var dialog = new Dialog
+        using var dialog = new Dialog
         {
             Title = $" Install skills from {_request.Repo} ",
             Width = Dim.Percent(70),
             Height = Dim.Percent(85),
         };
         dialog.SchemeName = SchemeNames.Dialog;
+        using var operation = new ModalOperationTracker(_app, _logger, "install.picker.ui");
 
         var header = new Label
         {
@@ -246,10 +246,99 @@ internal sealed class RepoSkillPickerModal
             agentsView.Enabled = enabled;
         }
 
-        installButton.Accepting += async (_, ev) =>
+        async Task RunInstallAsync(
+            GhSkillInstallService.InstallPlan plan,
+            GhSkillInstallService.Options baseOptions,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (plan.UseAll)
+                {
+                    var r = await _install.InstallAsync(
+                        _ghPath, _request.Repo, null, baseOptions, cancellationToken).ConfigureAwait(false);
+                    if (r.Succeeded) installedCount = _skills.Length;
+                    else { failedCount = _skills.Length; firstError ??= r.ErrorMessage; }
+                }
+                else
+                {
+                    for (var i = 0; i < plan.SkillNames.Length; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var name = plan.SkillNames[i];
+                        var idx = i;
+                        operation.InvokeIfActive(() =>
+                            status.Text = $" installing {idx + 1}/{plan.SkillNames.Length}: {name}…");
+                        var r = await _install.InstallAsync(
+                            _ghPath, _request.Repo, name, baseOptions, cancellationToken).ConfigureAwait(false);
+                        if (r.Succeeded) installedCount++;
+                        else { failedCount++; firstError ??= r.ErrorMessage; }
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    if (failedCount == 0)
+                    {
+                        outcome = Outcome.Installed;
+                        _app.RequestStop();
+                    }
+                    else if (installedCount > 0)
+                    {
+                        // Partial success — report and let the user close.
+                        operation.Release();
+                        outcome = Outcome.Installed;
+                        status.Text = $" installed {installedCount}, {failedCount} failed — see logs (l)";
+                        installButton.Enabled = false;
+                        cancelButton.Enabled = true;
+                    }
+                    else
+                    {
+                        operation.Release();
+                        outcome = Outcome.Failed;
+                        var snippet = TuiHelpers.ErrorSnippet(firstError);
+                        status.Text = snippet.Length > 0
+                            ? $" install failed: {snippet}"
+                            : " install failed — see logs (l)";
+                        RefreshValidity();
+                        SetOperationControlsEnabled(true);
+                    }
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger.Debug("install.picker", "install canceled because the dialog closed");
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    outcome = installedCount > 0 ? Outcome.Installed : Outcome.Cancelled;
+                    _app.RequestStop();
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("install.picker", ex.Message);
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    operation.Release();
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    outcome = installedCount > 0 ? Outcome.Installed : Outcome.Failed;
+                    status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                    RefreshValidity();
+                    SetOperationControlsEnabled(true);
+                });
+            }
+        }
+
+        installButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            if (spinner.Visible) return;
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
 
             var error = CurrentValidationError();
             if (error is not null)
@@ -274,10 +363,6 @@ internal sealed class RepoSkillPickerModal
                 return;
             }
 
-            spinner.Visible = true;
-            spinner.AutoSpin = true;
-            SetOperationControlsEnabled(false);
-
             var selectedAgentIds = new List<string>();
             for (var i = 0; i < entries.Length; i++)
             {
@@ -296,89 +381,31 @@ internal sealed class RepoSkillPickerModal
                 AllowHiddenDirs = _request.AllowHiddenDirs,
             };
 
-            try
-            {
-                if (plan.UseAll)
-                {
-                    status.Text = $" installing all {_skills.Length} skills…";
-                    var r = await _install.InstallAsync(
-                        _ghPath, _request.Repo, null, baseOptions, lifetime.Token).ConfigureAwait(false);
-                    if (r.Succeeded) installedCount = _skills.Length;
-                    else { failedCount = _skills.Length; firstError ??= r.ErrorMessage; }
-                }
-                else
-                {
-                    for (var i = 0; i < plan.SkillNames.Length; i++)
-                    {
-                        lifetime.Token.ThrowIfCancellationRequested();
-                        var name = plan.SkillNames[i];
-                        var idx = i;
-                        _app.Invoke(() =>
-                        {
-                            if (!lifetime.IsCancellationRequested)
-                                status.Text = $" installing {idx + 1}/{plan.SkillNames.Length}: {name}…";
-                        });
-                        var r = await _install.InstallAsync(
-                            _ghPath, _request.Repo, name, baseOptions, lifetime.Token).ConfigureAwait(false);
-                        if (r.Succeeded) installedCount++;
-                        else { failedCount++; firstError ??= r.ErrorMessage; }
-                    }
-                }
-
-                lifetime.Token.ThrowIfCancellationRequested();
-                _app.Invoke(() =>
-                {
-                    spinner.AutoSpin = false;
-                    spinner.Visible = false;
-                    if (failedCount == 0)
-                    {
-                        outcome = Outcome.Installed;
-                        _app.RequestStop();
-                    }
-                    else if (installedCount > 0)
-                    {
-                        // Partial success — report and let the user close.
-                        outcome = Outcome.Installed;
-                        status.Text = $" installed {installedCount}, {failedCount} failed — see logs (l)";
-                        installButton.Enabled = false;
-                        cancelButton.Enabled = true;
-                    }
-                    else
-                    {
-                        outcome = Outcome.Failed;
-                        var snippet = TuiHelpers.ErrorSnippet(firstError);
-                        status.Text = snippet.Length > 0
-                            ? $" install failed: {snippet}"
-                            : " install failed — see logs (l)";
-                        RefreshValidity();
-                        SetOperationControlsEnabled(true);
-                    }
-                });
-            }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
-            {
-                _logger.Debug("install.picker", "install canceled because the dialog closed");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("install.picker", ex.Message);
-                _app.Invoke(() =>
-                {
-                    spinner.AutoSpin = false;
-                    spinner.Visible = false;
-                    outcome = installedCount > 0 ? Outcome.Installed : Outcome.Failed;
-                    status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
-                    RefreshValidity();
-                    SetOperationControlsEnabled(true);
-                });
-            }
+            spinner.Visible = true;
+            spinner.AutoSpin = true;
+            SetOperationControlsEnabled(false);
+            status.Text = plan.UseAll
+                ? $" installing all {_skills.Length} skills…"
+                : $" installing 1/{plan.SkillNames.Length}: {plan.SkillNames[0]}…";
+            operation.TryStart(token => RunInstallAsync(plan, baseOptions, token));
         };
 
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            if (spinner.Visible) return;
-            lifetime.Cancel();
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+            {
+                if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                {
+                    operation.Cancel();
+                    status.Text = " canceling install…";
+                }
+                else
+                {
+                    status.Text = " finishing install…";
+                }
+                return;
+            }
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
@@ -388,21 +415,30 @@ internal sealed class RepoSkillPickerModal
             if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (spinner.Visible)
+                if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
                 {
-                    status.Text = " install in progress — wait for completion";
+                    if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                    {
+                        operation.Cancel();
+                        status.Text = " canceling install…";
+                    }
+                    else
+                    {
+                        status.Text = " finishing install…";
+                    }
                     return;
                 }
-                lifetime.Cancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
-            else if (!spinner.Visible && !customPathField.HasFocus && key.AsRune.Value is 'a' or 'A')
+            else if (operation.CurrentOwnership == ModalOperationTracker.Ownership.None
+                     && !customPathField.HasFocus && key.AsRune.Value is 'a' or 'A')
             {
                 key.Handled = true;
                 SetAll(CheckState.Checked);
             }
-            else if (!spinner.Visible && !customPathField.HasFocus && key.AsRune.Value is 'n' or 'N')
+            else if (operation.CurrentOwnership == ModalOperationTracker.Ownership.None
+                     && !customPathField.HasFocus && key.AsRune.Value is 'n' or 'N')
             {
                 key.Handled = true;
                 SetAll(CheckState.UnChecked);
@@ -427,8 +463,7 @@ internal sealed class RepoSkillPickerModal
         }
         finally
         {
-            lifetime.Cancel();
-            dialog.Dispose();
+            operation.Cancel();
         }
 
         return new Result(outcome, installedCount, failedCount, firstError);

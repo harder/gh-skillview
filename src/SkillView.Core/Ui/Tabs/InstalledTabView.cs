@@ -171,14 +171,10 @@ internal sealed class InstalledTabView : FrameView
         _filterField.TextChanged += (_, _) => RefreshAll();
         _filterField.KeyDown += (_, key) =>
         {
-            // Esc on a non-empty filter clears it (the list is live-filtered, so
-            // stray text otherwise leaves it stuck at "(no matches)"); the
-            // TextChanged handler then restores the full list. An Esc on an
-            // already-empty filter is left to the normal "Back" shortcut.
-            if (key.KeyCode == KeyCode.Esc && _filterField.Text.Length > 0)
+            if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                _filterField.Text = string.Empty;
+                FocusList();
             }
         };
         _table.ValueChanged += (_, _) =>
@@ -719,4 +715,6 @@ internal sealed class InstalledTabView : FrameView
     internal bool FilterHasFocusForTests => FilterHasFocus;
 
     internal bool TableHasFocusForTests => _table.HasFocus;
+
+    internal void SendFilterKeyForTests(Key key) => _filterField.NewKeyDownEvent(key);
 }

@@ -70,11 +70,10 @@ internal sealed class InstallConfirmModal
 
     internal Result Show()
     {
-        using var lifetime = new CancellationTokenSource();
         var outcome = Outcome.Cancelled;
         InstallResult? installResult = null;
 
-        var dialog = new Dialog
+        using var dialog = new Dialog
         {
             Title = _installAll
                 ? $" Install all skills from {_request.Repo} "
@@ -83,6 +82,7 @@ internal sealed class InstallConfirmModal
             Height = 18,
         };
         dialog.SchemeName = SchemeNames.Dialog;
+        using var operation = new ModalOperationTracker(_app, _logger, "install.compact.ui");
 
         var repoLabel = new Label
         {
@@ -186,42 +186,21 @@ internal sealed class InstallConfirmModal
 
         WireValidation(scopeSelector, customPathLabel, customPathField, installButton, status, spinner);
 
-        installButton.Accepting += async (_, ev) =>
+        async Task RunInstallAsync(
+            GhSkillInstallService.Options options,
+            CancellationToken cancellationToken)
         {
-            ev.Handled = true;
-            if (spinner.Visible) return;
-
-            var validationError = CurrentValidationError();
-            if (validationError is not null)
-            {
-                status.Text = $" {validationError}";
-                return;
-            }
-
-            spinner.Visible = true;
-            spinner.AutoSpin = true;
-            installButton.Enabled = false;
-            advancedButton.Enabled = false;
-            cancelButton.Enabled = false;
-            status.Text = $" installing {_request.Repo}…";
-
             try
             {
-                var options = BuildOptions(
-                    scopeSelector.Value ?? 0,
-                    customPathField.Text.ToString() ?? string.Empty,
-                    agentBoxes,
-                    entries,
-                    _installAll);
                 installResult = await _install.InstallAsync(
                     _ghPath,
                     _request.Repo,
                     _request.SkillName,
                     options,
-                    lifetime.Token).ConfigureAwait(false);
+                    cancellationToken).ConfigureAwait(false);
 
-                lifetime.Token.ThrowIfCancellationRequested();
-                _app.Invoke(() =>
+                cancellationToken.ThrowIfCancellationRequested();
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -232,6 +211,7 @@ internal sealed class InstallConfirmModal
                     }
                     else
                     {
+                        operation.Release();
                         outcome = Outcome.Failed;
                         var snippet = TuiHelpers.ErrorSnippet(installResult.ErrorMessage);
                         status.Text = snippet.Length > 0
@@ -243,15 +223,23 @@ internal sealed class InstallConfirmModal
                     }
                 });
             }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install.compact", "install canceled because the dialog closed");
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    outcome = Outcome.Cancelled;
+                    _app.RequestStop();
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error("install.compact", ex.Message);
-                _app.Invoke(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
+                    operation.Release();
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     outcome = Outcome.Failed;
@@ -261,19 +249,64 @@ internal sealed class InstallConfirmModal
                     cancelButton.Enabled = true;
                 });
             }
+        }
+
+        installButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
+
+            var validationError = CurrentValidationError();
+            if (validationError is not null)
+            {
+                status.Text = $" {validationError}";
+                return;
+            }
+
+            var options = BuildOptions(
+                scopeSelector.Value ?? 0,
+                customPathField.Text.ToString() ?? string.Empty,
+                agentBoxes,
+                entries,
+                _installAll);
+            spinner.Visible = true;
+            spinner.AutoSpin = true;
+            installButton.Enabled = false;
+            advancedButton.Enabled = false;
+            cancelButton.Enabled = false;
+            status.Text = $" installing {_request.Repo}…";
+            operation.TryStart(token => RunInstallAsync(options, token));
         };
 
         advancedButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            lifetime.Cancel();
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+            {
+                status.Text = operation.CurrentOwnership == ModalOperationTracker.Ownership.Running
+                    ? " install in progress — Esc cancels"
+                    : " finishing install…";
+                return;
+            }
             outcome = Outcome.EscalateToAdvanced;
             _app.RequestStop();
         };
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            lifetime.Cancel();
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+            {
+                if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                {
+                    operation.Cancel();
+                    status.Text = " canceling install…";
+                }
+                else
+                {
+                    status.Text = " finishing install…";
+                }
+                return;
+            }
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
@@ -283,12 +316,19 @@ internal sealed class InstallConfirmModal
             if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (spinner.Visible)
+                if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
                 {
-                    status.Text = " install in progress — wait for completion";
+                    if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                    {
+                        operation.Cancel();
+                        status.Text = " canceling install…";
+                    }
+                    else
+                    {
+                        status.Text = " finishing install…";
+                    }
                     return;
                 }
-                lifetime.Cancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
@@ -314,8 +354,7 @@ internal sealed class InstallConfirmModal
         }
         finally
         {
-            lifetime.Cancel();
-            dialog.Dispose();
+            operation.Cancel();
         }
 
         return new Result(outcome, installResult);

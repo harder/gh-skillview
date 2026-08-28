@@ -9,8 +9,11 @@ namespace SkillView.Bootstrapping;
 /// Entrypoint projects wrap this with a two-line Program.cs.
 public static class EntryPoint
 {
-    public static async Task<int> RunAsync(string[] args)
+    public static async Task<int> RunAsync(
+        string[] args,
+        CancellationToken cancellationToken = default)
     {
+        using var rootCancellation = new RootCancellation(cancellationToken);
         var startupStopwatch = Stopwatch.StartNew();
         string processPath;
         try
@@ -63,14 +66,24 @@ public static class EntryPoint
         {
             if (options.DispatchMode == DispatchMode.Cli)
             {
-                var rc = await CliDispatcher.RunAsync(options, services).ConfigureAwait(false);
+                var rc = await CliDispatcher
+                    .RunAsync(options, services, rootCancellation.Token)
+                    .ConfigureAwait(false);
                 logger.Debug("startup", $"CLI dispatch completed in {startupStopwatch.ElapsedMilliseconds}ms (exit {rc})");
                 return rc;
             }
 
             var ui = new SkillViewApp(services, options);
             logger.Debug("startup", $"TUI boot time {startupStopwatch.ElapsedMilliseconds}ms");
-            return await ui.RunAsync().ConfigureAwait(false);
+            var exitCode = await ui.RunAsync(rootCancellation.Token).ConfigureAwait(false);
+            return rootCancellation.Token.IsCancellationRequested
+                ? ExitCodes.Cancelled
+                : exitCode;
+        }
+        catch (OperationCanceledException) when (rootCancellation.Token.IsCancellationRequested)
+        {
+            logger.Info("startup", "operation canceled");
+            return ExitCodes.Cancelled;
         }
         finally
         {

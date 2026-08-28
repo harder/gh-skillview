@@ -67,15 +67,10 @@ public static class PathResolver
     /// as `root` or lies inside it. Used by removal guards, but also for
     /// inventory scope classification.
     public static bool IsInside(string candidate, string root)
-    {
-        var cKey = Normalize(candidate);
-        var rKey = Normalize(root);
-        if (cKey == rKey) return true;
-        return cKey.StartsWith(rKey + "/", StringComparison.Ordinal);
-    }
+        => PathIdentity.IsInside(candidate, root);
 
     internal static string Normalize(string path)
     {
-        return Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/');
+        return PathIdentity.Normalize(path);
     }
 }

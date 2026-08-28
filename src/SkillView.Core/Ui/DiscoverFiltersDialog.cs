@@ -139,6 +139,16 @@ internal sealed class DiscoverFiltersDialog
             _app.RequestStop();
         };
 
+        void LeaveEditableField(object? sender, Key key) =>
+            HandleEditableEscape(
+                key,
+                () => cancelButton.SetFocus(),
+                text => hint.Text = text);
+
+        ownerField.KeyDown += LeaveEditableField;
+        agentField.KeyDown += LeaveEditableField;
+        limitField.KeyDown += LeaveEditableField;
+
         dialog.KeyDown += (_, key) =>
         {
             if (key.KeyCode != KeyCode.Esc)
@@ -172,5 +182,21 @@ internal sealed class DiscoverFiltersDialog
         dialog.Dispose();
 
         return result;
+    }
+
+    internal static bool HandleEditableEscape(
+        Key key,
+        Action leaveField,
+        Action<string> setHint)
+    {
+        if (key.KeyCode != KeyCode.Esc)
+        {
+            return false;
+        }
+
+        key.Handled = true;
+        leaveField();
+        setHint("Press Esc again to cancel, or Save to apply filters.");
+        return true;
     }
 }

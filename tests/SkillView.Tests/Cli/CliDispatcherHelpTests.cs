@@ -24,6 +24,19 @@ public class CliDispatcherHelpTests
         Assert.DoesNotContain("`--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs`", stdout);
         Assert.Contains("Homebrew and WinGet scaffolding", stdout);
         Assert.Contains("automation-friendly", stdout);
+        Assert.Contains("| `130` | Canceled by the caller or Ctrl+C |", stdout);
+    }
+
+    [Theory]
+    [InlineData("doctor", 30)]
+    [InlineData("preview", 30)]
+    [InlineData("list", 120)]
+    [InlineData("search", 120)]
+    [InlineData("install", 600)]
+    [InlineData("cleanup", 600)]
+    public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
+    {
+        Assert.Equal(TimeSpan.FromSeconds(seconds), CliDispatcher.TimeoutFor(subcommand));
     }
 
     [Fact]

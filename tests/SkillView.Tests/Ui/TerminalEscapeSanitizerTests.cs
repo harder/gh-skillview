@@ -10,6 +10,7 @@ using Xunit;
 
 namespace SkillView.Tests.Ui;
 
+[Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class TerminalEscapeSanitizerTests
 {
     [Fact]

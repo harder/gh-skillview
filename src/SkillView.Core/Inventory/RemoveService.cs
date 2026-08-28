@@ -609,7 +609,7 @@ public sealed class RemoveService
             foreach (var validation in validations)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var key = PathResolver.Normalize(validation.ResolvedPath);
+                var key = PathIdentity.NormalizeKey(validation.ResolvedPath);
                 if (!seen.Add(key))
                 {
                     continue;
