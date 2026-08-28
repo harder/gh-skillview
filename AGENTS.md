@@ -132,10 +132,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   mount point, or broken link) as a leaf, revalidate containment immediately
   before deletion, and keep cancellation/depth bounds explicit. Keep traversal
   lazy with per-depth enumerator frames so cancellation runs between entries
-  and retained state stays O(depth). Do not claim the path checks are atomic
-  against a hostile same-user process: supported .NET 10 deletion APIs remain
-  path-based on Windows and Unix; native handle-relative deletion is separate
-  follow-up work.
+  and retained state stays O(depth). TUI removal must use `RemoveAsync` /
+  `RemoveManyAsync`, whose progress is throttled to 10 updates/second; keep the
+  modal alive until cancellation quiesces and rescan when cancellation made
+  any partial filesystem change. Runtime reports retain at most 128 individual
+  errors plus an omission summary while preserving the exact error count. Do
+  not claim the path checks are atomic against a hostile same-user process:
+  supported .NET 10 deletion APIs remain path-based on Windows and Unix;
+  native handle-relative deletion is separate follow-up work.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

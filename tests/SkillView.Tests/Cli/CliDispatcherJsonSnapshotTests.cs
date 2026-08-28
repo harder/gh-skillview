@@ -288,6 +288,7 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Equal("ContainsGitDirectory",
             doc.GetProperty("errors")[0].GetProperty("kind").GetString());
         Assert.Equal(0, doc.GetProperty("warnings").GetArrayLength());
+        Assert.Equal(0, doc.GetProperty("runtimeErrorCount").GetInt32());
     }
 
     // --- cleanup ---------------------------------------------------------

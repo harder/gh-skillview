@@ -61,9 +61,13 @@ public sealed class RemoveScreen
 
     public void Show()
     {
+        using var lifetime = new CancellationTokenSource();
         var targets = RemoveTargetResolver.BuildTargets(_target, _snapshot);
         var selectedIndex = FindInitialSelection(targets);
         var currentEvaluation = Evaluate(targets[selectedIndex]);
+        RemoveService.RemoveProgress? lastProgress = null;
+        Task? activeOperation = null;
+        var wizardActive = 1;
 
         using var wizard = new Wizard
         {
@@ -148,12 +152,19 @@ public sealed class RemoveScreen
         };
         var status = new Label
         {
-            X = 0,
+            X = 2,
             Y = Pos.AnchorEnd(1),
-            Width = Dim.Fill(),
+            Width = Dim.Fill(2),
             Text = string.Empty,
         };
-        confirmStep.Add(confirmText, secondConfirm, status);
+        var spinner = new SpinnerView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Visible = false,
+            AutoSpin = false,
+        };
+        confirmStep.Add(confirmText, secondConfirm, spinner, status);
 
         TuiHelpers.ApplyScheme(
             SkillViewStyling.BaseSchemeName,
@@ -164,6 +175,7 @@ public sealed class RemoveScreen
             review,
             confirmText,
             secondConfirm,
+            spinner,
             status);
 
         wizard.AddStep(chooseStep);
@@ -251,6 +263,11 @@ public sealed class RemoveScreen
         {
             e.Handled = true;
 
+            if (activeOperation is not null)
+            {
+                return;
+            }
+
             if (wizard.CurrentStep != confirmStep)
             {
                 _app.RequestStop();
@@ -263,27 +280,14 @@ public sealed class RemoveScreen
                 return;
             }
 
-            status.Text = " removing…";
-
-            try
-            {
-                var report = Execute(currentEvaluation);
-                LastReport = report;
-                if (report.Succeeded || report.TargetsDeleted > 0)
-                {
-                    Confirmed = true;
-                    _app.RequestStop();
-                }
-                else
-                {
-                    status.Text = $" remove failed — {report.Errors.Length} error(s); see logs";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("remove", ex.Message);
-                status.Text = " remove failed — see logs";
-            }
+            spinner.Visible = true;
+            spinner.AutoSpin = true;
+            secondConfirm.Enabled = false;
+            lastProgress = null;
+            status.Text = " removing…  Esc cancels";
+            var evaluation = currentEvaluation;
+            var cancellationToken = lifetime.Token;
+            activeOperation = RunRemovalAsync(evaluation, cancellationToken);
         };
 
         wizard.KeyDown += (_, key) =>
@@ -293,12 +297,120 @@ public sealed class RemoveScreen
                 return;
             }
 
-            _app.RequestStop();
             key.Handled = true;
+            if (activeOperation is { IsCompleted: false })
+            {
+                lifetime.Cancel();
+                status.Text = " canceling removal…";
+                return;
+            }
+
+            lifetime.Cancel();
+            _app.RequestStop();
         };
 
+        void InvokeIfActive(Action action)
+        {
+            if (Volatile.Read(ref wizardActive) == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _app.Invoke(() =>
+                {
+                    if (Volatile.Read(ref wizardActive) == 0)
+                    {
+                        return;
+                    }
+
+                    try { action(); }
+                    catch (Exception ex) { _logger.Error("remove.ui", ex.Message); }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("remove.ui", ex.Message);
+            }
+        }
+
+        async Task RunRemovalAsync(
+            RemoveTargetEvaluation evaluation,
+            CancellationToken cancellationToken)
+        {
+            var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
+            {
+                lastProgress = value;
+                InvokeIfActive(() => status.Text = FormatProgress(value));
+            });
+
+            try
+            {
+                var report = await ExecuteAsync(evaluation, cancellationToken, progress)
+                    .ConfigureAwait(false);
+                LastReport = report;
+                InvokeIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    secondConfirm.Enabled = true;
+                    if (report.Succeeded || report.TargetsDeleted > 0)
+                    {
+                        Confirmed = true;
+                        _app.RequestStop();
+                    }
+                    else
+                    {
+                        activeOperation = null;
+                        status.Text = $" remove failed — {report.ErrorCount} error(s); see logs";
+                    }
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                var progressAtCancellation = lastProgress;
+                LastReport = new RemoveService.BatchRemoveReport(
+                    Succeeded: false,
+                    TargetsDeleted: progressAtCancellation?.TargetsProcessed ?? 0,
+                    FilesDeleted: progressAtCancellation?.FilesProcessed ?? 0,
+                    DirectoriesDeleted: progressAtCancellation?.DirectoriesProcessed ?? 0,
+                    Errors: ImmutableArray.Create("removal canceled"),
+                    DryRun: false);
+                _logger.Debug("remove", "removal canceled");
+                InvokeIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    status.Text = " removal canceled";
+                    _app.RequestStop();
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("remove", ex.Message);
+                InvokeIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    secondConfirm.Enabled = true;
+                    activeOperation = null;
+                    status.Text = " remove failed — see logs";
+                });
+            }
+        }
+
         RefreshEvaluation();
-        _app.Run(wizard);
+        try
+        {
+            _app.Run(wizard);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref wizardActive, 0);
+            lifetime.Cancel();
+            activeOperation?.GetAwaiter().GetResult();
+        }
     }
 
     internal string BuildSummary()
@@ -324,22 +436,34 @@ public sealed class RemoveScreen
         return RemoveTargetResolver.Evaluate(target, _snapshot);
     }
 
-    private RemoveService.BatchRemoveReport Execute(RemoveTargetEvaluation evaluation)
+    private async Task<RemoveService.BatchRemoveReport> ExecuteAsync(
+        RemoveTargetEvaluation evaluation,
+        CancellationToken cancellationToken,
+        IProgress<RemoveService.RemoveProgress> progress)
     {
         if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
         {
-            System.IO.File.Delete(agent.Path);
-            _logger.Info("remove.agent", $"unlinked {agent.AgentId}: {agent.Path}");
-            return new RemoveService.BatchRemoveReport(
-                Succeeded: true,
-                TargetsDeleted: 1,
-                FilesDeleted: 1,
-                DirectoriesDeleted: 0,
-                Errors: ImmutableArray<string>.Empty,
-                DryRun: false);
+            var report = await _remove.RemoveLinkAsync(agent.Path, cancellationToken, progress)
+                .ConfigureAwait(false);
+            return RemoveService.BatchRemoveReport.FromSingle(
+                report,
+                targetsDeleted: report.Succeeded ? 1 : 0);
         }
 
-        return _remove.RemoveMany(evaluation.Items.Select(item => item.Validation));
+        return await _remove.RemoveManyAsync(
+            evaluation.Items.Select(item => item.Validation),
+            cancellationToken: cancellationToken,
+            progress: progress).ConfigureAwait(false);
+    }
+
+    private static string FormatProgress(RemoveService.RemoveProgress progress)
+    {
+        var targets = progress.TargetsProcessed > 0
+            ? $"{progress.TargetsProcessed} target(s), "
+            : string.Empty;
+        return progress.IsCanceled
+            ? $" canceling… {targets}{progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)"
+            : $" removing… {targets}{progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
     }
 
     /// Returns the index of the checkbox the <see cref="OptionSelector"/> is

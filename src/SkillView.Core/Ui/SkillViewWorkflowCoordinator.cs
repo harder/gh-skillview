@@ -269,7 +269,10 @@ internal sealed class SkillViewWorkflowCoordinator
                     snapshot.ScannedRoots,
                     snapshot.Skills);
                 screen.Show();
-                if (screen.RemovedCount > 0 || screen.IgnoredCount > 0)
+                if (screen.RemovedCount > 0
+                    || screen.RemovedFileCount > 0
+                    || screen.RemovedDirectoryCount > 0
+                    || screen.IgnoredCount > 0)
                 {
                     _services.ListAdapter.Invalidate();
                     // Cleanup can remove or ignore skills while the user is
@@ -358,6 +361,21 @@ internal sealed class SkillViewWorkflowCoordinator
                 }
                 if (compactResult.Outcome == RemoveConfirmModal.Outcome.Cancelled)
                 {
+                    if (compactResult.Report is { } canceledReport
+                        && HasFilesystemChanges(canceledReport))
+                    {
+                        _services.ListAdapter.Invalidate();
+                        _setStatusWithLevel(
+                            $"remove canceled after {canceledReport.FilesDeleted} file(s) — rescanning…",
+                            TuiHelpers.NotificationLevel.Warn);
+                        var envReportCanceled = _getLastReport();
+                        if (envReportCanceled is not null)
+                        {
+                            QueueInventoryRescan(
+                                envReportCanceled,
+                                successStatus: "partial remove — inventory now {0} skill(s)");
+                        }
+                    }
                     return;
                 }
                 // Outcome.EscalateToWizard → fall through to the wizard below.
@@ -366,13 +384,13 @@ internal sealed class SkillViewWorkflowCoordinator
 
         var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
         screen.Show();
-        if (screen.LastReport is { TargetsDeleted: > 0 } report)
+        if (screen.LastReport is { } report && HasFilesystemChanges(report))
         {
             _services.ListAdapter.Invalidate();
             _setStatusWithLevel(
                 report.Succeeded
                     ? $"removed {report.TargetsDeleted} skill(s) ({report.FilesDeleted} file(s)) — rescanning…"
-                    : $"partially removed {report.TargetsDeleted} skill(s); {report.Errors.Length} error(s) — rescanning…",
+                    : $"partially removed {report.TargetsDeleted} skill(s), {report.FilesDeleted} file(s); {report.ErrorCount} error(s) — rescanning…",
                 report.Succeeded
                     ? TuiHelpers.NotificationLevel.Success
                     : TuiHelpers.NotificationLevel.Warn);
@@ -389,10 +407,16 @@ internal sealed class SkillViewWorkflowCoordinator
         else if (screen.LastReport is { Errors.Length: > 0 } failedReport)
         {
             _setStatusWithLevel(
-                $"remove failed — {failedReport.Errors.Length} error(s); no files removed",
+                $"remove failed — {failedReport.ErrorCount} error(s); no files removed",
                 TuiHelpers.NotificationLevel.Error);
         }
     }
+
+    private static bool HasFilesystemChanges(RemoveService.RemoveReport report) =>
+        report.FilesDeleted > 0 || report.DirectoriesDeleted > 0;
+
+    private static bool HasFilesystemChanges(RemoveService.BatchRemoveReport report) =>
+        report.TargetsDeleted > 0 || report.FilesDeleted > 0 || report.DirectoriesDeleted > 0;
 
     private void QueueInventoryRescan(EnvironmentReport report, string successStatus)
     {

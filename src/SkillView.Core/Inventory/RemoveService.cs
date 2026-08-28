@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -12,6 +13,8 @@ namespace SkillView.Inventory;
 public sealed class RemoveService
 {
     private const int MaxTraversalDepth = 256;
+    internal const int MaxRetainedErrors = 128;
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
     private readonly Logger _logger;
     private readonly Action<string>? _entryObservedForTests;
 
@@ -25,6 +28,15 @@ public sealed class RemoveService
 
     public sealed record Options(bool DryRun = false);
 
+    public sealed record RemoveProgress(
+        int TargetsProcessed,
+        int FilesProcessed,
+        int DirectoriesProcessed,
+        int Errors,
+        string CurrentPath,
+        bool IsCompleted,
+        bool IsCanceled);
+
     public sealed record RemoveReport(
         bool Succeeded,
         string ResolvedPath,
@@ -33,6 +45,8 @@ public sealed class RemoveService
         ImmutableArray<string> Errors,
         bool DryRun)
     {
+        public int ErrorCount { get; init; } = Errors.Length;
+
         public static RemoveReport Refused(string resolved, string reason) => new(
             Succeeded: false,
             ResolvedPath: resolved,
@@ -50,13 +64,18 @@ public sealed class RemoveService
         ImmutableArray<string> Errors,
         bool DryRun)
     {
+        public int ErrorCount { get; init; } = Errors.Length;
+
         public static BatchRemoveReport FromSingle(RemoveReport report, int targetsDeleted) => new(
             Succeeded: report.Succeeded,
             TargetsDeleted: targetsDeleted,
             FilesDeleted: report.FilesDeleted,
             DirectoriesDeleted: report.DirectoriesDeleted,
             Errors: report.Errors,
-            DryRun: report.DryRun);
+            DryRun: report.DryRun)
+        {
+            ErrorCount = report.ErrorCount,
+        };
     }
 
     /// Removes a previously-validated skill directory. Callers MUST run
@@ -70,10 +89,23 @@ public sealed class RemoveService
     public RemoveReport Remove(
         RemoveValidator.RemoveValidation validation,
         Options? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<RemoveProgress>? progress = null)
     {
         options ??= new Options();
-        cancellationToken.ThrowIfCancellationRequested();
+        var target = Path.GetFullPath(validation.ResolvedPath);
+        var progressTracker = new ProgressTracker(progress, _logger);
+        progressTracker.Publish(0, 0, 0, 0, target, force: true);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException)
+        {
+            progressTracker.Publish(0, 0, 0, 0, target, force: true, isCanceled: true);
+            throw;
+        }
+
         if (!validation.Allowed)
         {
             var reason = string.Join("; ", validation.Errors.Select(e => $"{e.Kind}: {e.Detail}"));
@@ -81,12 +113,12 @@ public sealed class RemoveService
             return RemoveReport.Refused(validation.ResolvedPath, reason);
         }
 
-        var target = Path.GetFullPath(validation.ResolvedPath);
         if (PathResolver.IsSymlink(target))
         {
             if (options.DryRun)
             {
                 _logger.Info("remove.dryrun", $"would remove symlink {target}");
+                progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: true);
             }
 
@@ -94,11 +126,13 @@ public sealed class RemoveService
             {
                 TryDeleteSymlink(target);
                 _logger.Info("remove", $"removed symlink {target}");
+                progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
             }
             catch (Exception ex)
             {
                 _logger.Error("remove", $"delete symlink {target} failed: {ex.Message}");
+                progressTracker.Publish(1, 0, 0, 1, target, force: true, isCompleted: true);
                 return new RemoveReport(false, target, 0, 0,
                     ImmutableArray.Create($"{target}: {ex.Message}"), DryRun: false);
             }
@@ -107,10 +141,11 @@ public sealed class RemoveService
         if (!Directory.Exists(target))
         {
             _logger.Warn("remove", $"target missing at execute time: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target, force: true, isCompleted: true);
             return RemoveReport.Refused(target, $"target '{target}' no longer exists");
         }
 
-        var errors = ImmutableArray.CreateBuilder<string>();
+        var errors = new FailureCollector();
         int files = 0, dirs = 0;
         var pending = new Stack<TraversalFrame>();
         pending.Push(new TraversalFrame(target, depth: 0));
@@ -128,6 +163,7 @@ public sealed class RemoveService
                             out var attributes, out var validationError))
                     {
                         RecordFailure(frame.Path, validationError!, errors);
+                        progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
                     }
@@ -143,6 +179,7 @@ public sealed class RemoveService
                     {
                         DeleteLeaf(frame.Path, expectedReparsePoint: true, options.DryRun,
                             target, ref files, errors);
+                        progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
                     }
@@ -151,6 +188,7 @@ public sealed class RemoveService
                     {
                         DeleteLeaf(frame.Path, expectedReparsePoint: false, options.DryRun,
                             target, ref files, errors);
+                        progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
                     }
@@ -159,6 +197,7 @@ public sealed class RemoveService
                     {
                         RecordFailure(frame.Path,
                             $"directory nesting exceeds the safety limit of {MaxTraversalDepth}", errors);
+                        progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
                     }
@@ -175,6 +214,7 @@ public sealed class RemoveService
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         RecordFailure(frame.Path, $"enumerate failed: {ex.Message}", errors);
+                        progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                     }
                     continue;
@@ -190,6 +230,7 @@ public sealed class RemoveService
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     RecordFailure(frame.Path, $"enumerate failed: {ex.Message}", errors);
+                    progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                     PopAndDispose(pending);
                     continue;
                 }
@@ -199,6 +240,7 @@ public sealed class RemoveService
                     var child = frame.Current;
                     _entryObservedForTests?.Invoke(child);
                     cancellationToken.ThrowIfCancellationRequested();
+                    progressTracker.Publish(0, files, dirs, errors.Count, child);
                     pending.Push(new TraversalFrame(child, frame.Depth + 1));
                     continue;
                 }
@@ -206,7 +248,14 @@ public sealed class RemoveService
                 var completedPath = frame.Path;
                 PopAndDispose(pending);
                 DeleteDirectory(completedPath, options.DryRun, target, ref dirs, errors);
+                progressTracker.Publish(0, files, dirs, errors.Count, completedPath);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            progressTracker.Publish(0, files, dirs, errors.Count, target,
+                force: true, isCanceled: true);
+            throw;
         }
         finally
         {
@@ -219,8 +268,13 @@ public sealed class RemoveService
         if (options.DryRun)
         {
             _logger.Info("remove.dryrun", $"would remove {target}: {files} file(s), {dirs} dir(s)");
+            progressTracker.Publish(1, files, dirs, errors.Count, target,
+                force: true, isCompleted: true);
             return new RemoveReport(errors.Count == 0, target, files, dirs,
-                errors.ToImmutable(), DryRun: true);
+                errors.ToImmutable(), DryRun: true)
+            {
+                ErrorCount = errors.Count,
+            };
         }
 
         if (errors.Count == 0)
@@ -232,14 +286,94 @@ public sealed class RemoveService
             _logger.Error("remove", $"remove {target} completed with {errors.Count} error(s)");
         }
 
+        progressTracker.Publish(1, files, dirs, errors.Count, target,
+            force: true, isCompleted: true);
+
         return new RemoveReport(
             Succeeded: errors.Count == 0,
             ResolvedPath: target,
             FilesDeleted: files,
             DirectoriesDeleted: dirs,
             Errors: errors.ToImmutable(),
-            DryRun: false);
+            DryRun: false)
+        {
+            ErrorCount = errors.Count,
+        };
     }
+
+    /// Runs filesystem-bound removal work on the thread pool so TUI callers do
+    /// not block Terminal.Gui's event loop. The delegate deliberately observes
+    /// cancellation inside the traversal rather than passing the token to
+    /// Task.Run, which guarantees already-canceled calls still publish their
+    /// terminal progress state.
+    public Task<RemoveReport> RemoveAsync(
+        RemoveValidator.RemoveValidation validation,
+        Options? options = null,
+        CancellationToken cancellationToken = default,
+        IProgress<RemoveProgress>? progress = null) =>
+        Task.Run(() => Remove(validation, options, cancellationToken, progress));
+
+    /// Removes one inventory-observed symlink without following its target.
+    /// This is used for the wizard's "unlink from agent" action, which has no
+    /// skill-directory validation object because it intentionally leaves the
+    /// canonical installation in place.
+    public Task<RemoveReport> RemoveLinkAsync(
+        string path,
+        CancellationToken cancellationToken = default,
+        IProgress<RemoveProgress>? progress = null) =>
+        Task.Run(() =>
+        {
+            var fullPath = Path.GetFullPath(path);
+            var progressTracker = new ProgressTracker(progress, _logger);
+            progressTracker.Publish(0, 0, 0, 0, fullPath, force: true);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!PathResolver.IsSymlink(fullPath))
+            {
+                const string detail = "path is no longer a symlink";
+                _logger.Warn("remove.agent", $"{fullPath}: {detail}");
+                progressTracker.Publish(1, 0, 0, 1, fullPath, force: true, isCompleted: true);
+                return new RemoveReport(
+                    Succeeded: false,
+                    ResolvedPath: fullPath,
+                    FilesDeleted: 0,
+                    DirectoriesDeleted: 0,
+                    Errors: ImmutableArray.Create($"{fullPath}: {detail}"),
+                    DryRun: false);
+            }
+
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                TryDeleteSymlink(fullPath);
+                _logger.Info("remove.agent", $"unlinked {fullPath}");
+                progressTracker.Publish(1, 1, 0, 0, fullPath, force: true, isCompleted: true);
+                return new RemoveReport(
+                    Succeeded: true,
+                    ResolvedPath: fullPath,
+                    FilesDeleted: 1,
+                    DirectoriesDeleted: 0,
+                    Errors: ImmutableArray<string>.Empty,
+                    DryRun: false);
+            }
+            catch (OperationCanceledException)
+            {
+                progressTracker.Publish(0, 0, 0, 0, fullPath, force: true, isCanceled: true);
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.Warn("remove.agent", $"{fullPath}: {ex.Message}");
+                progressTracker.Publish(1, 0, 0, 1, fullPath, force: true, isCompleted: true);
+                return new RemoveReport(
+                    Succeeded: false,
+                    ResolvedPath: fullPath,
+                    FilesDeleted: 0,
+                    DirectoriesDeleted: 0,
+                    Errors: ImmutableArray.Create($"{fullPath}: {ex.Message}"),
+                    DryRun: false);
+            }
+        });
 
     private static void PopAndDispose(Stack<TraversalFrame> frames) =>
         frames.Pop().Dispose();
@@ -277,7 +411,7 @@ public sealed class RemoveService
         bool dryRun,
         string target,
         ref int files,
-        ImmutableArray<string>.Builder errors)
+        FailureCollector errors)
     {
         if (!TryValidateEntry(target, path, allowLeafReparsePoint: true,
                 out var attributes, out var validationError))
@@ -322,7 +456,7 @@ public sealed class RemoveService
         bool dryRun,
         string target,
         ref int dirs,
-        ImmutableArray<string>.Builder errors)
+        FailureCollector errors)
     {
         if (!TryValidateEntry(target, path, allowLeafReparsePoint: false,
                 out var attributes, out var validationError))
@@ -357,7 +491,7 @@ public sealed class RemoveService
     private void RecordFailure(
         string path,
         string detail,
-        ImmutableArray<string>.Builder errors)
+        FailureCollector errors)
     {
         _logger.Warn("remove", $"{path}: {detail}");
         errors.Add($"{path}: {detail}");
@@ -443,38 +577,54 @@ public sealed class RemoveService
     public BatchRemoveReport RemoveMany(
         IEnumerable<RemoveValidator.RemoveValidation> validations,
         Options? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<RemoveProgress>? progress = null)
     {
         options ??= new Options();
 
-        var errors = ImmutableArray.CreateBuilder<string>();
+        var errors = new FailureCollector();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var targetsDeleted = 0;
         var filesDeleted = 0;
         var directoriesDeleted = 0;
+        var progressAdapter = new BatchProgressAdapter(progress, _logger);
 
-        foreach (var validation in validations)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var key = PathResolver.Normalize(validation.ResolvedPath);
-            if (!seen.Add(key))
+            foreach (var validation in validations)
             {
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                var key = PathResolver.Normalize(validation.ResolvedPath);
+                if (!seen.Add(key))
+                {
+                    continue;
+                }
 
-            var report = Remove(validation, options, cancellationToken);
-            filesDeleted += report.FilesDeleted;
-            directoriesDeleted += report.DirectoriesDeleted;
-            if (report.Succeeded)
-            {
-                targetsDeleted++;
-            }
+                var report = Remove(validation, options, cancellationToken, progressAdapter);
+                filesDeleted += report.FilesDeleted;
+                directoriesDeleted += report.DirectoriesDeleted;
+                if (report.Succeeded)
+                {
+                    targetsDeleted++;
+                }
 
-            foreach (var error in report.Errors)
-            {
-                errors.Add($"{validation.ResolvedPath}: {error}");
+                errors.AddRange(
+                    report.Errors.Select(error => $"{validation.ResolvedPath}: {error}"),
+                    report.ErrorCount);
+                progressAdapter.CompleteTarget(
+                    filesDeleted,
+                    directoriesDeleted,
+                    errors.Count,
+                    validation.ResolvedPath);
             }
         }
+        catch (OperationCanceledException)
+        {
+            progressAdapter.CancelBatch(filesDeleted, directoriesDeleted, errors.Count);
+            throw;
+        }
+
+        progressAdapter.CompleteBatch(filesDeleted, directoriesDeleted, errors.Count);
 
         return new BatchRemoveReport(
             Succeeded: errors.Count == 0,
@@ -482,6 +632,199 @@ public sealed class RemoveService
             FilesDeleted: filesDeleted,
             DirectoriesDeleted: directoriesDeleted,
             Errors: errors.ToImmutable(),
-            DryRun: options.DryRun);
+            DryRun: options.DryRun)
+        {
+            ErrorCount = errors.Count,
+        };
+    }
+
+    public Task<BatchRemoveReport> RemoveManyAsync(
+        IEnumerable<RemoveValidator.RemoveValidation> validations,
+        Options? options = null,
+        CancellationToken cancellationToken = default,
+        IProgress<RemoveProgress>? progress = null) =>
+        Task.Run(() => RemoveMany(validations, options, cancellationToken, progress));
+
+    private sealed class ProgressTracker(IProgress<RemoveProgress>? progress, Logger logger)
+    {
+        private long _lastPublished;
+        private bool _disabled;
+
+        internal void Publish(
+            int targets,
+            int files,
+            int directories,
+            int errors,
+            string currentPath,
+            bool force = false,
+            bool isCompleted = false,
+            bool isCanceled = false)
+        {
+            if (_disabled || progress is null)
+            {
+                return;
+            }
+
+            var now = Stopwatch.GetTimestamp();
+            if (!force && _lastPublished != 0
+                && Stopwatch.GetElapsedTime(_lastPublished, now) < ProgressInterval)
+            {
+                return;
+            }
+
+            _lastPublished = now;
+            try
+            {
+                progress.Report(new RemoveProgress(
+                    targets,
+                    files,
+                    directories,
+                    errors,
+                    currentPath,
+                    isCompleted,
+                    isCanceled));
+            }
+            catch (Exception ex)
+            {
+                _disabled = true;
+                logger.Warn("remove.progress", $"progress observer disabled: {ex.Message}");
+            }
+        }
+    }
+
+    internal sealed class FailureCollector
+    {
+        private readonly ImmutableArray<string>.Builder _retained =
+            ImmutableArray.CreateBuilder<string>(MaxRetainedErrors);
+
+        internal int Count { get; private set; }
+
+        internal void Add(string detail)
+        {
+            Count++;
+            if (_retained.Count < MaxRetainedErrors)
+            {
+                _retained.Add(detail);
+            }
+        }
+
+        internal void AddRange(IEnumerable<string> details, int totalCount)
+        {
+            Count += totalCount;
+            if (_retained.Count >= MaxRetainedErrors)
+            {
+                return;
+            }
+
+            foreach (var detail in details)
+            {
+                if (_retained.Count >= MaxRetainedErrors)
+                {
+                    break;
+                }
+                _retained.Add(detail);
+            }
+        }
+
+        internal ImmutableArray<string> ToImmutable()
+        {
+            var retained = _retained.ToImmutable();
+            var omitted = Count - retained.Length;
+            return omitted > 0
+                ? retained.Add($"… {omitted} additional error(s) omitted")
+                : retained;
+        }
+    }
+
+    private sealed class BatchProgressAdapter(IProgress<RemoveProgress>? progress, Logger logger)
+        : IProgress<RemoveProgress>
+    {
+        private int _targetsProcessed;
+        private int _filesBeforeTarget;
+        private int _directoriesBeforeTarget;
+        private int _errorsBeforeTarget;
+        private string _currentPath = string.Empty;
+        private long _lastPublished;
+        private bool _disabled;
+
+        public void Report(RemoveProgress value)
+        {
+            _currentPath = value.CurrentPath;
+            Publish(value with
+            {
+                TargetsProcessed = _targetsProcessed + value.TargetsProcessed,
+                FilesProcessed = _filesBeforeTarget + value.FilesProcessed,
+                DirectoriesProcessed = _directoriesBeforeTarget + value.DirectoriesProcessed,
+                Errors = _errorsBeforeTarget + value.Errors,
+                IsCompleted = false,
+            }, force: value.IsCanceled);
+        }
+
+        internal void CompleteTarget(
+            int files,
+            int directories,
+            int errors,
+            string currentPath)
+        {
+            _targetsProcessed++;
+            _filesBeforeTarget = files;
+            _directoriesBeforeTarget = directories;
+            _errorsBeforeTarget = errors;
+            _currentPath = currentPath;
+            Publish(new RemoveProgress(
+                _targetsProcessed,
+                files,
+                directories,
+                errors,
+                currentPath,
+                IsCompleted: false,
+                IsCanceled: false), force: false);
+        }
+
+        internal void CompleteBatch(int files, int directories, int errors) =>
+            Publish(new RemoveProgress(
+                _targetsProcessed,
+                files,
+                directories,
+                errors,
+                _currentPath,
+                IsCompleted: true,
+                IsCanceled: false), force: true);
+
+        internal void CancelBatch(int files, int directories, int errors) =>
+            Publish(new RemoveProgress(
+                _targetsProcessed,
+                files,
+                directories,
+                errors,
+                _currentPath,
+                IsCompleted: false,
+                IsCanceled: true), force: true);
+
+        private void Publish(RemoveProgress value, bool force)
+        {
+            if (_disabled || progress is null)
+            {
+                return;
+            }
+
+            var now = Stopwatch.GetTimestamp();
+            if (!force && _lastPublished != 0
+                && Stopwatch.GetElapsedTime(_lastPublished, now) < ProgressInterval)
+            {
+                return;
+            }
+
+            _lastPublished = now;
+            try
+            {
+                progress.Report(value);
+            }
+            catch (Exception ex)
+            {
+                _disabled = true;
+                logger.Warn("remove.progress", $"batch progress observer disabled: {ex.Message}");
+            }
+        }
     }
 }

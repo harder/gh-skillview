@@ -1188,7 +1188,7 @@ public static class CliDispatcher
         }
         else
         {
-            Console.Error.WriteLine($"  remove failed with {r.Errors.Length} error(s)");
+            Console.Error.WriteLine($"  remove failed with {r.ErrorCount} error(s)");
             foreach (var e in r.Errors) Console.Error.WriteLine($"  · {e}");
         }
     }
@@ -1218,6 +1218,7 @@ public static class CliDispatcher
             w.WriteString("scope", target.Scope.ToString());
             w.WriteNumber("filesDeleted", r.FilesDeleted);
             w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
+            w.WriteNumber("runtimeErrorCount", r.ErrorCount);
             w.WriteStartArray("errors");
             foreach (var e in validation.Errors)
             {

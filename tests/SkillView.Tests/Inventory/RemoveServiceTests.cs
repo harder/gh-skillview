@@ -283,6 +283,144 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RemoveAsync_CancellationPublishesTerminalProgress()
+    {
+        var (skill, dir) = MakeSkill("cancel-async", extraFiles: 2_000);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        using var cancellation = new CancellationTokenSource();
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+        var service = new RemoveService(_logger, _ => cancellation.Cancel());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.RemoveAsync(validation, cancellationToken: cancellation.Token, progress: progress));
+
+        Assert.NotEmpty(updates);
+        Assert.True(updates[^1].IsCanceled);
+        Assert.False(updates[^1].IsCompleted);
+        Assert.True(Directory.Exists(dir));
+    }
+
+    [Fact]
+    public async Task RemoveAsync_ThrottlesProgressAndPublishesCompletion()
+    {
+        var (skill, dir) = MakeSkill("progress", extraFiles: 2_000);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        var report = await new RemoveService(_logger).RemoveAsync(
+            validation,
+            new RemoveService.Options(DryRun: true),
+            TestContext.Current.CancellationToken,
+            progress);
+
+        Assert.True(report.Succeeded);
+        Assert.True(Directory.Exists(dir));
+        Assert.InRange(updates.Count, 2, 999);
+        Assert.True(updates[^1].IsCompleted);
+        Assert.False(updates[^1].IsCanceled);
+        Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(report.FilesDeleted, updates[^1].FilesProcessed);
+        Assert.Equal(report.DirectoriesDeleted, updates[^1].DirectoriesProcessed);
+    }
+
+    [Fact]
+    public async Task RemoveManyAsync_ReportsAggregateMonotonicProgress()
+    {
+        var (first, _) = MakeSkill("progress-one", extraFiles: 2);
+        var (second, _) = MakeSkill("progress-two", extraFiles: 2);
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        var report = await new RemoveService(_logger).RemoveManyAsync(
+            [firstValidation, secondValidation],
+            cancellationToken: TestContext.Current.CancellationToken,
+            progress: progress);
+
+        Assert.True(report.Succeeded);
+        Assert.NotEmpty(updates);
+        Assert.True(updates[^1].IsCompleted);
+        Assert.Equal(2, updates[^1].TargetsProcessed);
+        Assert.Equal(report.FilesDeleted, updates[^1].FilesProcessed);
+        Assert.Equal(report.DirectoriesDeleted, updates[^1].DirectoriesProcessed);
+        Assert.True(updates.Zip(updates.Skip(1), (left, right) =>
+            left.FilesProcessed <= right.FilesProcessed
+            && left.DirectoriesProcessed <= right.DirectoriesProcessed
+            && left.TargetsProcessed <= right.TargetsProcessed).All(value => value));
+    }
+
+    [Fact]
+    public async Task RemoveManyAsync_CancellationBetweenTargetsPublishesExactAggregate()
+    {
+        var (first, firstDir) = MakeSkill("cancel-after-one", extraFiles: 2);
+        var (second, secondDir) = MakeSkill("must-remain", extraFiles: 2);
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        using var cancellation = new CancellationTokenSource();
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        IEnumerable<RemoveValidator.RemoveValidation> CancelBeforeSecond()
+        {
+            yield return firstValidation;
+            cancellation.Cancel();
+            yield return secondValidation;
+        }
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new RemoveService(_logger).RemoveManyAsync(
+                CancelBeforeSecond(),
+                cancellationToken: cancellation.Token,
+                progress: progress));
+
+        Assert.False(Directory.Exists(firstDir));
+        Assert.True(Directory.Exists(secondDir));
+        Assert.True(updates[^1].IsCanceled);
+        Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(3, updates[^1].FilesProcessed);
+        Assert.Equal(1, updates[^1].DirectoriesProcessed);
+    }
+
+    [Fact]
+    public async Task RemoveLinkAsync_DeletesOnlyObservedLink()
+    {
+        var externalFile = Path.Combine(_tempRoot, "keep.txt");
+        File.WriteAllText(externalFile, "keep");
+        var link = Path.Combine(_tempRoot, "agent-link.txt");
+        if (!TryCreateFileLink(link, externalFile)) return;
+
+        var report = await new RemoveService(_logger).RemoveLinkAsync(
+            link,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.False(PathResolver.IsSymlink(link));
+        Assert.True(File.Exists(externalFile));
+        Assert.Equal("keep", File.ReadAllText(externalFile));
+    }
+
+    [Fact]
+    public void FailureCollector_RetainsBoundedDetailsAndExactCount()
+    {
+        var failures = new RemoveService.FailureCollector();
+        var total = RemoveService.MaxRetainedErrors + 50;
+
+        for (var i = 0; i < total; i++)
+        {
+            failures.Add($"failure {i}");
+        }
+
+        var retained = failures.ToImmutable();
+        Assert.Equal(total, failures.Count);
+        Assert.Equal(RemoveService.MaxRetainedErrors + 1, retained.Length);
+        Assert.Equal("failure 0", retained[0]);
+        Assert.Contains("50 additional error(s) omitted", retained[^1]);
+    }
+
+    [Fact]
     public void Remove_WindowsDirectoryJunction_DeletesOnlyJunction()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -363,5 +501,10 @@ public class RemoveServiceTests : IDisposable
         info.ArgumentList.Add(link);
         info.ArgumentList.Add(target);
         return info;
+    }
+
+    private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
     }
 }
