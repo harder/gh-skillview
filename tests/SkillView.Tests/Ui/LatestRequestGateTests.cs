@@ -45,7 +45,7 @@ public sealed class LatestRequestGateTests
                 {
                     using var replacement = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
                     gate.Cancel();
-            });
+                });
         }
     }
 
