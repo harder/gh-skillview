@@ -938,6 +938,29 @@ public sealed class SkillViewApp
         }
     }
 
+    internal static bool TryCaptureActiveLifetimeToken(
+        CancellationTokenSource? lifetime,
+        out CancellationToken cancellationToken)
+    {
+        if (lifetime is null)
+        {
+            cancellationToken = new CancellationToken(canceled: true);
+            return false;
+        }
+
+        try
+        {
+            cancellationToken = lifetime.Token;
+        }
+        catch (ObjectDisposedException)
+        {
+            cancellationToken = new CancellationToken(canceled: true);
+            return false;
+        }
+
+        return !cancellationToken.IsCancellationRequested;
+    }
+
     private void ActivateDoctorWorkspace()
     {
         DeactivateDoctorWorkspace(clearBusy: false);
@@ -1147,14 +1170,13 @@ public sealed class SkillViewApp
             SetStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
             return;
         }
-        var discoverLifetime = _discoverLifetime;
-        if (discoverLifetime is null || discoverLifetime.IsCancellationRequested)
+        if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var discoverToken))
         {
             return;
         }
 
         CancelCurrentPreview();
-        using var request = _searchRequests.Begin(discoverLifetime.Token, TimeSpan.FromMinutes(2));
+        using var request = _searchRequests.Begin(discoverToken, TimeSpan.FromMinutes(2));
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
         var busyOperation = BeginBusyOperation($"searching {query}…");
@@ -1193,7 +1215,7 @@ public sealed class SkillViewApp
                     _previewFrame.Title = "Preview";
                 }
                 SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
-            }, discoverLifetime.Token).ConfigureAwait(false);
+            }, discoverToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1206,7 +1228,7 @@ public sealed class SkillViewApp
                     {
                         SetStatus("search timed out", TuiHelpers.NotificationLevel.Error);
                     }
-                }, discoverLifetime.Token).ConfigureAwait(false);
+                }, discoverToken).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -1220,7 +1242,7 @@ public sealed class SkillViewApp
                     ? $"search failed: {snippet}"
                     : "search failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
-            }, discoverLifetime.Token).ConfigureAwait(false);
+            }, discoverToken).ConfigureAwait(false);
         }
         finally
         {
@@ -1324,13 +1346,12 @@ public sealed class SkillViewApp
             return;
         }
 
-        var discoverLifetime = _discoverLifetime;
-        if (discoverLifetime is null || discoverLifetime.IsCancellationRequested)
+        if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var discoverToken))
         {
             return;
         }
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
-        using var request = _previewRequests.Begin(discoverLifetime.Token, PreviewTimeout);
+        using var request = _previewRequests.Begin(discoverToken, PreviewTimeout);
         var busyOperation = BeginPreviewBusyOperation(
             request,
             $"preview {repo}/{pick.SkillName}…");
@@ -1369,9 +1390,9 @@ public sealed class SkillViewApp
                 {
                     SetStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
                 }
-            }, discoverLifetime.Token).ConfigureAwait(false);
+            }, discoverToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (discoverLifetime.IsCancellationRequested)
+        catch (OperationCanceledException) when (discoverToken.IsCancellationRequested)
         {
             _services.Logger.Debug("preview", "preview canceled during workspace deactivation");
         }
@@ -1389,7 +1410,7 @@ public sealed class SkillViewApp
                 _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
-            }, discoverLifetime.Token).ConfigureAwait(false);
+            }, discoverToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -1407,7 +1428,7 @@ public sealed class SkillViewApp
                     ? $"preview failed: {snippet}"
                     : "preview failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
-            }, discoverLifetime.Token).ConfigureAwait(false);
+            }, discoverToken).ConfigureAwait(false);
         }
         finally
         {
@@ -2631,7 +2652,9 @@ public sealed class SkillViewApp
     internal SkillViewTab ActiveTabForTests => _activeTab;
 
     internal CancellationToken DiscoverLifetimeForTests =>
-        _discoverLifetime?.Token ?? new CancellationToken(canceled: true);
+        TryCaptureActiveLifetimeToken(_discoverLifetime, out var token)
+            ? token
+            : new CancellationToken(canceled: true);
 
     internal CancellationToken DoctorLifetimeForTests =>
         _doctorLifetime?.Token ?? new CancellationToken(canceled: true);

@@ -230,12 +230,11 @@ public class LoggerTests
     }
 
     [Fact]
-    public async Task Subscriber_IndirectRecursiveWriteAcrossLoggersIsRejectedWithoutDeadlock()
+    public async Task Subscriber_WriteToAnotherLoggerIsRejectedWithoutMutatingEitherNestedRing()
     {
         var first = new Logger();
         var second = new Logger();
         using var firstSubscription = first.Subscribe(_ => second.Info("test", "from-first"));
-        using var secondSubscription = second.Subscribe(_ => first.Info("test", "from-second"));
 
         var write = Task.Run(
             () => first.Info("test", "outer"),
@@ -245,9 +244,40 @@ public class LoggerTests
             TestContext.Current.CancellationToken);
 
         var firstEntry = Assert.Single(first.Snapshot());
-        var secondEntry = Assert.Single(second.Snapshot());
         Assert.Equal("outer", firstEntry.Message);
-        Assert.Equal("from-first", secondEntry.Message);
+        Assert.Empty(second.Snapshot());
+    }
+
+    [Fact]
+    public async Task Subscribers_ConcurrentCrossLoggerWritesAreRejectedWithoutDeadlock()
+    {
+        var first = new Logger();
+        var second = new Logger();
+        using var callbacksReady = new Barrier(participantCount: 2);
+        using var firstSubscription = first.Subscribe(_ =>
+        {
+            callbacksReady.SignalAndWait(TestContext.Current.CancellationToken);
+            second.Info("test", "from-first");
+        });
+        using var secondSubscription = second.Subscribe(_ =>
+        {
+            callbacksReady.SignalAndWait(TestContext.Current.CancellationToken);
+            first.Info("test", "from-second");
+        });
+
+        var writes = Task.WhenAll(
+            Task.Run(
+                () => first.Info("test", "first-outer"),
+                TestContext.Current.CancellationToken),
+            Task.Run(
+                () => second.Info("test", "second-outer"),
+                TestContext.Current.CancellationToken));
+        await writes.WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("first-outer", Assert.Single(first.Snapshot()).Message);
+        Assert.Equal("second-outer", Assert.Single(second.Snapshot()).Message);
     }
 
     [Fact]

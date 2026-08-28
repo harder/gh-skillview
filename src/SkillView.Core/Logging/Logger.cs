@@ -23,7 +23,7 @@ public sealed class Logger
     private readonly Action<long>? _observerBackpressureForTests;
 
     [ThreadStatic]
-    private static List<Logger>? s_observerCallbackLoggers;
+    private static int s_observerCallbackDepth;
 
     public Logger(
         LogLevel minimumLevel = LogLevel.Info,
@@ -63,7 +63,7 @@ public sealed class Logger
 
     /// <summary>
     /// Subscribes to future entries. Callbacks are synchronously ordered and
-    /// must not write recursively through a cycle that reaches this logger.
+    /// must not write to any logger while the callback is active.
     /// </summary>
     public IDisposable Subscribe(Action<LogEntry> observer)
     {
@@ -72,7 +72,6 @@ public sealed class Logger
         {
             var id = ++_nextObserverId;
             var registration = new ObserverRegistration(
-                this,
                 observer,
                 nextSequence: _nextSequence + 1,
                 replaying: false,
@@ -88,8 +87,7 @@ public sealed class Logger
     /// entries before live delivery. Concurrent producers are held behind
     /// synchronous sequence backpressure until replay completes, preventing
     /// gaps, duplicates, out-of-order callbacks, and an unbounded handoff
-    /// buffer. Callbacks must not write recursively through a cycle that
-    /// reaches this logger.
+    /// buffer. Callbacks must not write to any logger while active.
     /// </summary>
     public IDisposable SubscribeWithReplay(Action<LogEntry> observer)
     {
@@ -106,7 +104,6 @@ public sealed class Logger
                 ? replay[0].Sequence
                 : _nextSequence + 1;
             registration = new ObserverRegistration(
-                this,
                 observer,
                 nextSequence,
                 replaying: true,
@@ -126,14 +123,14 @@ public sealed class Logger
             return;
         }
 
-        // Ordered observer delivery applies synchronous backpressure. Logging
-        // recursively from one of this logger's callbacks would wait on the
-        // callback that is currently executing, so reject it before assigning
-        // a sequence or mutating the retained ring.
-        if (s_observerCallbackLoggers?.Contains(this) == true)
+        // Ordered observer delivery applies synchronous backpressure while
+        // holding a registration lock. Any logger write from a callback can
+        // create a cross-logger, cross-thread lock cycle, so reject all such
+        // writes before assigning a sequence or mutating a retained ring.
+        if (s_observerCallbackDepth > 0)
         {
             throw new InvalidOperationException(
-                "A logger observer cannot write through a recursive Logger callback cycle.");
+                "A logger observer cannot write to a Logger while its callback is active.");
         }
 
         var entry = new LogEntry(
@@ -243,7 +240,6 @@ public sealed class Logger
     private sealed class ObserverRegistration
     {
         private readonly object _gate = new();
-        private readonly Logger _owner;
         private readonly Action<LogEntry> _observer;
         private readonly Action<long>? _beforeInvokeForTests;
         private readonly Action<long>? _backpressureForTests;
@@ -252,14 +248,12 @@ public sealed class Logger
         private bool _active = true;
 
         internal ObserverRegistration(
-            Logger owner,
             Action<LogEntry> observer,
             long nextSequence,
             bool replaying,
             Action<long>? beforeInvokeForTests,
             Action<long>? backpressureForTests)
         {
-            _owner = owner;
             _observer = observer;
             _nextSequence = nextSequence;
             _replaying = replaying;
@@ -318,14 +312,10 @@ public sealed class Logger
 
         private void Deliver(LogEntry entry)
         {
-            var activeLoggers = s_observerCallbackLoggers ??= [];
-            activeLoggers.Add(_owner);
+            s_observerCallbackDepth++;
             try { _observer(entry); }
             catch { /* observer faults must not kill logging or later delivery */ }
-            finally
-            {
-                activeLoggers.RemoveAt(activeLoggers.Count - 1);
-            }
+            finally { s_observerCallbackDepth--; }
         }
     }
 

@@ -155,7 +155,7 @@ The first natural implementation checkpoint completes remediation-order items
 Local verification at this checkpoint:
 
 - `dotnet build --no-restore`: passed with zero warnings.
-- `dotnet test --no-build`: 611 of 611 tests passed, including the ANSI-driver
+- `dotnet test --no-build`: 613 of 613 tests passed, including the ANSI-driver
   integration suite.
 - New deterministic tests cover removal escapes/cycles/retargeting,
   cancellation between entries in a 2,000-file directory, 100,000-operation
@@ -265,6 +265,33 @@ independently reassessed and accepted:
    a nonblank JSON string. Numeric, null, Boolean, and canonical-invalid plus
    legacy-valid records are rejected as schema-incompatible and remain
    retryable instead of entering the cache.
+
+The fifth Copilot review generated one inline finding and two suppressed
+findings. All three were independently reassessed and accepted:
+
+1. **Cross-thread logger cycles bypass a thread-local logger stack — correct
+   and fixed.** With concurrent outer writes, thread 1 could hold logger A's
+   registration lock and enter B while thread 2 held B's registration lock and
+   entered A. Each thread's local stack contained only its own path, so neither
+   detected the opposing lock cycle. Logger observers are production sinks,
+   not producers, and none of SkillView's observers log. The contract now
+   rejects every logger write made while any observer callback is active on
+   that thread, before assigning a sequence or mutating a ring. A scalar
+   thread-local depth counter avoids per-entry allocation. A synchronized
+   two-producer regression reaches both callbacks concurrently and proves both
+   outer writes finish without nested entries or deadlock.
+2. **Search continuation dereferences a disposed Discover lifetime — correct
+   and fixed.** Discover navigation exchanges, cancels, and disposes the
+   workspace source. Search now safely captures a usable token value before
+   its first await and uses only that struct for its request and every success,
+   timeout, and error dispatch. A source disposed before capture is rejected.
+3. **Preview has the same disposed-source race — correct and fixed.** Preview
+   uses the same capture helper and stable token for request creation,
+   cancellation classification, and all UI dispatches. The repository-wide
+   source audit found no equivalent externally-disposed source dereference in
+   the tab cancellation-slot paths; their leases retain source ownership until
+   completion. Modal lifetime ownership remains separately tracked by Finding
+   8/9 and is not conflated with this workspace-source race.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 

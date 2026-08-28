@@ -135,8 +135,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   the logger's message/total-character budgets and the file sink's date+size
   rotation and active-file exclusion when changing logging. Observer delivery
   uses synchronous sequence backpressure rather than retaining out-of-order
-  entries; the recursion guard must retain the full per-thread stack of active
-  logger callbacks so direct and indirect cycles (A → B → A) are rejected.
+  entries; observer callbacks must never write to any `Logger`. Rejecting all
+  callback-originated logging before ring mutation prevents both same-thread
+  recursion and cross-thread, cross-logger lock cycles (A → B and B → A).
 - A successful `gh skill list` process result is cacheable only when its JSON
   parses as the expected inventory schema. Preserve the distinction between a
   valid empty `[]` payload and malformed, truncated, or schema-incompatible
@@ -149,6 +150,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - A queued UI dispatch canceled by its owning app/view lifetime is expected
   teardown. Consume that owned `OperationCanceledException` before it reaches
   `BackgroundTaskTracker`; unrelated cancellation and faults must still report.
+- When an async operation depends on a replaceable/disposable workspace
+  `CancellationTokenSource`, capture its `CancellationToken` before the first
+  await and use only that value afterward. Never dereference the source from a
+  continuation after navigation can cancel and dispose it.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

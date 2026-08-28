@@ -291,6 +291,20 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void CapturedWorkspaceToken_RemainsUsableAfterSourceDisposal()
+    {
+        var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+
+        Assert.True(SkillViewApp.TryCaptureActiveLifetimeToken(lifetime, out var captured));
+        lifetime.Dispose();
+
+        Assert.False(captured.IsCancellationRequested);
+        Assert.False(SkillViewApp.TryCaptureActiveLifetimeToken(lifetime, out var rejected));
+        Assert.True(rejected.IsCancellationRequested);
+    }
+
+    [Fact]
     public void LeavingDoctor_CancelsItsWorkspaceLifetime_AndReactivatesDiscover()
     {
         var app = CreateApp();
