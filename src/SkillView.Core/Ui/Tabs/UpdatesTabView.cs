@@ -25,6 +25,7 @@ namespace SkillView.Ui.Tabs;
 internal sealed class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
+    private readonly Action<Func<Task>, string> _runTask;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> _updateRunner;
     private readonly Func<string?> _ghPathProvider;
@@ -54,6 +55,7 @@ internal sealed class UpdatesTabView : FrameView
 
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
+        Action<Func<Task>, string> runTask,
         Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> updateRunner,
         Func<string?> ghPathProvider,
@@ -63,6 +65,7 @@ internal sealed class UpdatesTabView : FrameView
         CancellationToken lifetimeToken = default)
     {
         _runOnUi = runOnUi;
+        _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _updateRunner = updateRunner;
         _ghPathProvider = ghPathProvider;
@@ -156,12 +159,12 @@ internal sealed class UpdatesTabView : FrameView
         _dryRunButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            _ = RunAsync(dryRun: true, batchOnly: false);
+            _runTask(() => RunAsync(dryRun: true, batchOnly: false), "updates.dry-run");
         };
         _updateButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            _ = RunAsync(dryRun: false, batchOnly: false);
+            _runTask(() => RunAsync(dryRun: false, batchOnly: false), "updates.run");
         };
 
         _statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
@@ -268,7 +271,7 @@ internal sealed class UpdatesTabView : FrameView
     {
         hideChanges();
         Visible = true;
-        _ = LoadAsync();
+        _runTask(LoadAsync, "updates.load");
     }
 
     private void RecomputeColumnWidths()
@@ -313,12 +316,12 @@ internal sealed class UpdatesTabView : FrameView
         else if (rune == 'U')
         {
             key.Handled = true;
-            _ = RunAsync(dryRun: false, batchOnly: true);
+            _runTask(() => RunAsync(dryRun: false, batchOnly: true), "updates.batch");
         }
         else if (rune == 'd' || rune == 'D')
         {
             key.Handled = true;
-            _ = RunAsync(dryRun: true, batchOnly: false);
+            _runTask(() => RunAsync(dryRun: true, batchOnly: false), "updates.dry-run");
         }
     }
 
@@ -362,7 +365,7 @@ internal sealed class UpdatesTabView : FrameView
         // Mark just the current row and run a one-skill update.
         _wrapper.CheckedRows.Clear();
         _wrapper.CheckedRows.Add(row);
-        _ = RunAsync(dryRun: false, batchOnly: true);
+        _runTask(() => RunAsync(dryRun: false, batchOnly: true), "updates.current");
     }
 
     private async Task RunAsync(bool dryRun, bool batchOnly)

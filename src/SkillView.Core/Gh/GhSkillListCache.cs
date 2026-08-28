@@ -5,9 +5,12 @@ namespace SkillView.Gh;
 
 internal sealed class GhSkillListCache
 {
+    private readonly object _gate = new();
     private readonly Func<DateTimeOffset> _now;
     private readonly TimeSpan _ttl;
     private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, InflightLoad> _inflight = new(StringComparer.Ordinal);
+    private long _generation;
 
     internal GhSkillListCache(Func<DateTimeOffset>? now = null, TimeSpan? ttl = null)
     {
@@ -22,6 +25,66 @@ internal sealed class GhSkillListCache
         out ImmutableArray<GhSkillListRecord> records)
     {
         var key = BuildKey(ghPath, scope, agent);
+        lock (_gate)
+        {
+            return TryGetLocked(key, out records);
+        }
+    }
+
+    internal async Task<LookupResult> GetOrLoadAsync(
+        string ghPath,
+        string? scope,
+        string? agent,
+        Func<CancellationToken, Task<LoadResult>> loader,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(loader);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var key = BuildKey(ghPath, scope, agent);
+        InflightLoad flight;
+        var startsLoad = false;
+
+        lock (_gate)
+        {
+            if (TryGetLocked(key, out var cached))
+            {
+                return new LookupResult(cached, FromCache: true);
+            }
+
+            if (!_inflight.TryGetValue(key, out flight!))
+            {
+                flight = new InflightLoad(_generation);
+                _inflight.Add(key, flight);
+                startsLoad = true;
+            }
+            flight.WaiterCount++;
+        }
+
+        if (startsLoad)
+        {
+            flight.Execution = CompleteLoadAsync(key, flight, loader);
+        }
+
+        try
+        {
+            var loaded = await flight.Completion.Task
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return new LookupResult(loaded.Records, FromCache: false);
+        }
+        finally
+        {
+            var finalLoader = ReleaseWaiter(key, flight);
+            if (finalLoader is not null)
+            {
+                await finalLoader.ConfigureAwait(false);
+            }
+        }
+    }
+
+    private bool TryGetLocked(string key, out ImmutableArray<GhSkillListRecord> records)
+    {
         if (_entries.TryGetValue(key, out var entry) && _now() - entry.CapturedAt <= _ttl)
         {
             records = entry.Records;
@@ -39,10 +102,155 @@ internal sealed class GhSkillListCache
         string? agent,
         ImmutableArray<GhSkillListRecord> records)
     {
-        _entries[BuildKey(ghPath, scope, agent)] = new CacheEntry(_now(), records);
+        lock (_gate)
+        {
+            _entries[BuildKey(ghPath, scope, agent)] = new CacheEntry(_now(), records);
+        }
     }
 
-    internal void Invalidate() => _entries.Clear();
+    internal void Invalidate()
+    {
+        InflightLoad[] invalidated;
+        lock (_gate)
+        {
+            _generation++;
+            _entries.Clear();
+            invalidated = _inflight.Values.ToArray();
+            _inflight.Clear();
+            foreach (var flight in invalidated)
+            {
+                // Do not complete waiters here. The loader may still be
+                // killing and draining a child process. CompleteLoadAsync
+                // publishes cancellation only after that cleanup returns.
+                flight.Invalidated = true;
+            }
+        }
+
+        foreach (var flight in invalidated)
+        {
+            TryCancel(flight.Cancellation);
+        }
+    }
+
+    private async Task CompleteLoadAsync(
+        string key,
+        InflightLoad flight,
+        Func<CancellationToken, Task<LoadResult>> loader)
+    {
+        LoadResult loaded = default;
+        Exception? failure = null;
+        CancellationToken cancellationToken = default;
+        var canceled = false;
+        try
+        {
+            loaded = await loader(flight.Cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            canceled = true;
+            cancellationToken = ex.CancellationToken;
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+
+        bool invalidated;
+        bool dispose;
+        CancellationToken sharedCancellationToken;
+        lock (_gate)
+        {
+            invalidated = flight.Invalidated;
+            if (!invalidated
+                && !canceled
+                && failure is null
+                && _inflight.TryGetValue(key, out var current)
+                && ReferenceEquals(current, flight)
+                && flight.Generation == _generation)
+            {
+                if (loaded.ShouldCache)
+                {
+                    _entries[key] = new CacheEntry(_now(), loaded.Records);
+                }
+            }
+
+            RemoveCurrentFlightLocked(key, flight);
+            flight.LoaderFinished = true;
+            dispose = flight.WaiterCount == 0;
+            sharedCancellationToken = flight.Cancellation.Token;
+        }
+
+        if (dispose)
+        {
+            flight.Cancellation.Dispose();
+        }
+
+        // Publish the outcome only after the loader and shared-flight cleanup
+        // above have finished. Invalidation therefore cannot release an
+        // application-owned waiter while its gh process is still draining.
+        if (invalidated)
+        {
+            flight.Completion.TrySetCanceled(sharedCancellationToken);
+        }
+        else if (canceled)
+        {
+            flight.Completion.TrySetCanceled(cancellationToken);
+        }
+        else if (failure is not null)
+        {
+            flight.Completion.TrySetException(failure);
+        }
+        else
+        {
+            flight.Completion.TrySetResult(loaded);
+        }
+    }
+
+    private Task? ReleaseWaiter(string key, InflightLoad flight)
+    {
+        var cancel = false;
+        var dispose = false;
+        Task? finalLoader = null;
+        lock (_gate)
+        {
+            flight.WaiterCount--;
+            if (flight.WaiterCount == 0)
+            {
+                dispose = flight.LoaderFinished;
+                if (!flight.Completion.Task.IsCompleted)
+                {
+                    RemoveCurrentFlightLocked(key, flight);
+                    flight.Completion.TrySetCanceled(flight.Cancellation.Token);
+                    cancel = true;
+                    finalLoader = flight.Execution;
+                }
+            }
+        }
+
+        if (cancel)
+        {
+            TryCancel(flight.Cancellation);
+        }
+        if (dispose)
+        {
+            flight.Cancellation.Dispose();
+        }
+        return finalLoader;
+    }
+
+    private void RemoveCurrentFlightLocked(string key, InflightLoad flight)
+    {
+        if (_inflight.TryGetValue(key, out var current) && ReferenceEquals(current, flight))
+        {
+            _inflight.Remove(key);
+        }
+    }
+
+    private static void TryCancel(CancellationTokenSource cancellation)
+    {
+        try { cancellation.Cancel(); }
+        catch (ObjectDisposedException) { }
+    }
 
     private static string BuildKey(string ghPath, string? scope, string? agent) =>
         $"{ghPath}\n{scope ?? string.Empty}\n{agent ?? string.Empty}";
@@ -50,4 +258,24 @@ internal sealed class GhSkillListCache
     private sealed record CacheEntry(
         DateTimeOffset CapturedAt,
         ImmutableArray<GhSkillListRecord> Records);
+
+    internal readonly record struct LoadResult(
+        ImmutableArray<GhSkillListRecord> Records,
+        bool ShouldCache = true);
+
+    internal readonly record struct LookupResult(
+        ImmutableArray<GhSkillListRecord> Records,
+        bool FromCache);
+
+    private sealed class InflightLoad(long generation)
+    {
+        internal CancellationTokenSource Cancellation { get; } = new();
+        internal TaskCompletionSource<LoadResult> Completion { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        internal long Generation { get; } = generation;
+        internal int WaiterCount { get; set; }
+        internal bool LoaderFinished { get; set; }
+        internal bool Invalidated { get; set; }
+        internal Task? Execution { get; set; }
+    }
 }

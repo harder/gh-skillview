@@ -112,10 +112,48 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `CancellationToken`, and only update UI through `app.Invoke()` while that
   lifetime is still active. Do not fall back to direct UI mutation after
   teardown.
+- Route application-owned fire-and-forget work through `BackgroundTaskTracker`
+  (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
+  tied to their activation lifetimes and put generation/ownership checks inside
+  queued UI callbacks. When a callback still depends on a request lease, await
+  `SkillViewApp.InvokeAsync` so the lease cannot be disposed before the UI loop
+  executes it. Shared spinner updates must retain an operation owner; ending a
+  preview must not clear or hide a still-running search. Shutdown must stop task
+  admission, cancel lifetimes, and drain owned work before disposing
+  Terminal.Gui or logging resources.
+- Removal traversal must never use recursive filesystem enumeration. Treat
+  every `FileAttributes.ReparsePoint` child (Unix symlink, Windows junction,
+  mount point, or broken link) as a leaf, revalidate containment immediately
+  before deletion, and keep cancellation/depth bounds explicit. Keep traversal
+  lazy with per-depth enumerator frames so cancellation runs between entries
+  and retained state stays O(depth). Do not claim the path checks are atomic
+  against a hostile same-user process: supported .NET 10 deletion APIs remain
+  path-based on Windows and Unix; native handle-relative deletion is separate
+  follow-up work.
+- Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
+  plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
+  the logger's message/total-character budgets and the file sink's date+size
+  rotation and active-file exclusion when changing logging. Observer delivery
+  uses synchronous sequence backpressure rather than retaining out-of-order
+  entries; observer callbacks must never write to any `Logger`. Rejecting all
+  callback-originated logging before ring mutation prevents both same-thread
+  recursion and cross-thread, cross-logger lock cycles (A → B and B → A).
+- A successful `gh skill list` process result is cacheable only when its JSON
+  parses as the expected inventory schema. Preserve the distinction between a
+  valid empty `[]` payload and malformed, truncated, or schema-incompatible
+  output, which must remain retryable. The canonical/legacy skill-name field
+  is required to be a nonblank JSON string; do not coerce numbers into names.
 - The main TUI host path now runs through `SkillViewApp.RunAsync(ct)`, and
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via
   `IApplication.RunAsync(..., ct, ...)`.
+- A queued UI dispatch canceled by its owning app/view lifetime is expected
+  teardown. Consume that owned `OperationCanceledException` before it reaches
+  `BackgroundTaskTracker`; unrelated cancellation and faults must still report.
+- When an async operation depends on a replaceable/disposable workspace
+  `CancellationTokenSource`, capture its `CancellationToken` before the first
+  await and use only that value afterward. Never dereference the source from a
+  continuation after navigation can cancel and dispose it.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

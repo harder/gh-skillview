@@ -97,6 +97,7 @@ public sealed class InstalledTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
@@ -108,6 +109,31 @@ public sealed class InstalledTabViewTests
             agentIds: ["claude", "gemini"]));
 
         Assert.Equal(3, deferredPasses);
+    }
+
+    [Fact]
+    public async Task LoadSeeded_TreatsLifetimeCanceledDeferredUiPassAsExpectedTeardown()
+    {
+        using var lifetime = new CancellationTokenSource();
+        lifetime.Cancel();
+        Task? deferredPass = null;
+        var view = new InstalledTabView(
+            runOnUi: _ => Task.FromCanceled(lifetime.Token),
+            runTask: (operation, _) => deferredPass = operation(),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
+            onRemove: static (_, _) => { },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { },
+            lifetimeToken: lifetime.Token);
+
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        Assert.NotNull(deferredPass);
+        await deferredPass;
+        Assert.True(deferredPass.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -156,6 +182,7 @@ public sealed class InstalledTabViewTests
             action();
             return Task.CompletedTask;
         },
+        runTask: (operation, _) => operation().GetAwaiter().GetResult(),
         snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
         onRemove: static (_, _) => { },
         onLeaveTab: static () => { },

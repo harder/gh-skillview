@@ -35,12 +35,26 @@ public sealed class GhSkillListAdapter
         string? agent = null,
         CancellationToken cancellationToken = default)
     {
-        if (_cache.TryGet(ghPath, scope, agent, out var cached))
+        var lookup = await _cache.GetOrLoadAsync(
+                ghPath,
+                scope,
+                agent,
+                token => LoadAsync(ghPath, scope, agent, token),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (lookup.FromCache)
         {
-            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={cached.Length}");
-            return cached;
+            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={lookup.Records.Length}");
         }
+        return lookup.Records;
+    }
 
+    private async Task<GhSkillListCache.LoadResult> LoadAsync(
+        string ghPath,
+        string? scope,
+        string? agent,
+        CancellationToken cancellationToken)
+    {
         // gh requires an explicit comma-separated field list after `--json`;
         // bare `--json` errors out listing the available fields. These are the
         // fields shipped by gh 2.94.0 (cli/cli#13418). The adapter's parser is
@@ -64,19 +78,13 @@ public sealed class GhSkillListAdapter
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.list", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
-            return ImmutableArray<GhSkillListRecord>.Empty;
+            _logger.Warn("gh.skill.list", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
+            return new GhSkillListCache.LoadResult(
+                ImmutableArray<GhSkillListRecord>.Empty,
+                ShouldCache: false);
         }
 
-        if (string.IsNullOrWhiteSpace(result.StdOut))
-        {
-            _cache.Store(ghPath, scope, agent, ImmutableArray<GhSkillListRecord>.Empty);
-            return ImmutableArray<GhSkillListRecord>.Empty;
-        }
-
-        var parsed = Parse(result.StdOut, _logger);
-        _cache.Store(ghPath, scope, agent, parsed);
-        return parsed;
+        return ParseLoadResult(result.StdOut, _logger);
     }
 
     public void Invalidate() => _cache.Invalidate();
@@ -85,6 +93,21 @@ public sealed class GhSkillListAdapter
     /// level array or a top-level object with a records array under one of
     /// several common field names.
     public static ImmutableArray<GhSkillListRecord> Parse(string json, Logger? logger = null)
+    {
+        _ = TryParse(json, out var records, logger);
+        return records;
+    }
+
+    internal static GhSkillListCache.LoadResult ParseLoadResult(string json, Logger? logger = null)
+    {
+        var succeeded = TryParse(json, out var records, logger);
+        return new GhSkillListCache.LoadResult(records, ShouldCache: succeeded);
+    }
+
+    internal static bool TryParse(
+        string json,
+        out ImmutableArray<GhSkillListRecord> records,
+        Logger? logger = null)
     {
         try
         {
@@ -105,21 +128,41 @@ public sealed class GhSkillListAdapter
             else
             {
                 logger?.Warn("gh.skill.list", $"unexpected JSON root kind {root.ValueKind}");
-                return ImmutableArray<GhSkillListRecord>.Empty;
+                records = ImmutableArray<GhSkillListRecord>.Empty;
+                return false;
             }
 
             var builder = ImmutableArray.CreateBuilder<GhSkillListRecord>();
             foreach (var el in array.EnumerateArray())
             {
-                if (el.ValueKind != JsonValueKind.Object) continue;
-                builder.Add(ReadRecord(el));
+                if (el.ValueKind != JsonValueKind.Object)
+                {
+                    logger?.Warn("gh.skill.list", "unexpected non-object inventory record");
+                    records = ImmutableArray<GhSkillListRecord>.Empty;
+                    return false;
+                }
+
+                if (!TryGetRequiredString(
+                        el,
+                        out var skillName,
+                        "skillName", "name", "skill_name"))
+                {
+                    logger?.Warn(
+                        "gh.skill.list",
+                        "inventory record has a missing or non-string skillName");
+                    records = ImmutableArray<GhSkillListRecord>.Empty;
+                    return false;
+                }
+                builder.Add(ReadRecord(el, skillName));
             }
-            return builder.ToImmutable();
+            records = builder.ToImmutable();
+            return true;
         }
         catch (JsonException ex)
         {
             logger?.Error("gh.skill.list", $"JSON parse failed: {ex.Message}");
-            return ImmutableArray<GhSkillListRecord>.Empty;
+            records = ImmutableArray<GhSkillListRecord>.Empty;
+            return false;
         }
     }
 
@@ -137,7 +180,34 @@ public sealed class GhSkillListAdapter
         return false;
     }
 
-    private static GhSkillListRecord ReadRecord(JsonElement obj)
+    private static bool TryGetRequiredString(
+        JsonElement obj,
+        out string value,
+        params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!obj.TryGetProperty(name, out var element))
+            {
+                continue;
+            }
+
+            if (element.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(element.GetString()))
+            {
+                value = element.GetString()!;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    private static GhSkillListRecord ReadRecord(JsonElement obj, string skillName)
     {
         // gh 2.94.0 emits the agent list under `agentHosts` (always an array,
         // even for single-agent installs and empty for --dir scans). Pre-release
@@ -152,7 +222,7 @@ public sealed class GhSkillListAdapter
         {
             // skillName is the upstream-canonical field; legacy `name` /
             // `skill_name` payloads still parse.
-            Name = GetString(obj, "skillName", "name", "skill_name"),
+            Name = skillName,
             // path is upstream-canonical; the older keys stay as fallbacks
             // (some early SkillView log fixtures used installPath).
             Path = GetString(obj, "path", "installPath", "install_path"),

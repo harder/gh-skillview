@@ -54,4 +54,11 @@ public static class LogPaths
     public static string FileNameForDate(DateOnly date) =>
         string.Format(System.Globalization.CultureInfo.InvariantCulture,
             "skillview-{0:yyyy-MM-dd}.log", date);
+
+    public static string FileNameForDate(DateOnly date, int part)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(part, 1);
+        return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+            "skillview-{0:yyyy-MM-dd}-{1:D3}.log", date, part);
+    }
 }

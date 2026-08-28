@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Bootstrapping;
+using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
@@ -34,6 +35,17 @@ public sealed class SkillViewAppTests
         Account = null,
         Hosts = activeHost is null ? ImmutableArray<string>.Empty : ImmutableArray.Create(activeHost),
         RawOutput = string.Empty,
+    };
+
+    private static EnvironmentReport CreateEnvironmentReport() => new()
+    {
+        GhPath = "/usr/bin/gh",
+        GhVersionRaw = "gh version 2.95.0",
+        GhVersion = new SemVer(2, 95, 0),
+        GhMeetsMinimum = true,
+        Auth = GhAuthStatus.Unknown,
+        GhSkillAvailable = true,
+        LogDirectory = "/tmp/skillview-logs",
     };
 
     private static SkillViewApp CreateApp()
@@ -262,6 +274,74 @@ public sealed class SkillViewAppTests
             label => string.Equals(label.Text.ToString(), "Agent:", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void LeavingDiscover_CancelsItsWorkspaceLifetime(int destinationValue)
+    {
+        var destination = (SkillViewTab)destinationValue;
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var discoverLifetime = app.DiscoverLifetimeForTests;
+
+        app.ActivateTabForTests(destination);
+
+        Assert.True(discoverLifetime.IsCancellationRequested);
+        Assert.Equal(destination, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void CapturedWorkspaceToken_RemainsUsableAfterSourceDisposal()
+    {
+        var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+
+        Assert.True(SkillViewApp.TryCaptureActiveLifetimeToken(lifetime, out var captured));
+        lifetime.Dispose();
+
+        Assert.False(captured.IsCancellationRequested);
+        Assert.False(SkillViewApp.TryCaptureActiveLifetimeToken(lifetime, out var rejected));
+        Assert.True(rejected.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void LeavingDoctor_CancelsItsWorkspaceLifetime_AndReactivatesDiscover()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var firstDiscoverLifetime = app.DiscoverLifetimeForTests;
+        app.EnterDoctorForTests(CreateEnvironmentReport());
+        var doctorLifetime = app.DoctorLifetimeForTests;
+
+        Assert.True(firstDiscoverLifetime.IsCancellationRequested);
+        Assert.False(doctorLifetime.IsCancellationRequested);
+
+        app.LeaveDoctorForTests();
+
+        Assert.True(doctorLifetime.IsCancellationRequested);
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+        Assert.False(app.DiscoverLifetimeForTests.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void VisibleLogQueue_IsBoundedByTotalCharactersWhileHidden()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var app = new SkillViewApp(
+            TuiServices.Build(logger),
+            CreateOptions(),
+            static () => Application.Create().Init(),
+            probeOnRun: false);
+        using var window = app.BuildUiForTests();
+
+        for (var index = 0; index < 40; index++)
+        {
+            logger.Info("large", $"entry-{index}-" + new string('x', 20_000));
+        }
+
+        Assert.InRange(app.VisibleLogCharacterCountForTests, 1, 256 * 1024);
+    }
+
     [Fact]
     public void BuildUi_SeedsDiscoverDetailFeedback()
     {
@@ -347,6 +427,88 @@ public sealed class SkillViewAppTests
 
         Assert.DoesNotContain("preview failed", app.PreviewTextForTests, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Selected: MARUCIE/openclaw-foundry/web-multi-search", app.PreviewTextForTests);
+    }
+
+    [Fact]
+    public void SearchResultCommit_CancelsPreviewStartedAgainstSupersededTable()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        using var preview = app.BeginPreviewRequestForTests();
+
+        app.LoadSearchResultsForTests(
+        [
+            new SearchResultSkill(null, null, null, "owner/repo", "new-result", null),
+        ]);
+
+        Assert.True(preview.Token.IsCancellationRequested);
+        Assert.False(preview.IsCurrent);
+    }
+
+    [Fact]
+    public async Task AwaitDispatchAsync_KeepsRequestLeaseCurrentUntilQueuedCallbackRuns()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        using var gate = new LatestRequestGate();
+        using var request = gate.Begin(lifetime.Token, TimeSpan.FromMinutes(1));
+        Action? queued = null;
+        var callbackObservedCurrentLease = false;
+
+        var dispatch = SkillViewApp.AwaitDispatchAsync(
+            callback => queued = callback,
+            () => callbackObservedCurrentLease = request.IsCurrent,
+            lifetime.Token);
+
+        Assert.False(dispatch.IsCompleted);
+        Assert.True(request.IsCurrent);
+        Assert.NotNull(queued);
+
+        queued();
+
+        Assert.True(await dispatch);
+        Assert.True(callbackObservedCurrentLease);
+    }
+
+    [Fact]
+    public async Task AwaitDispatchAsync_CanceledLifetimeRejectsDelayedCallback()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        Action? queued = null;
+        var callbackRan = false;
+
+        var dispatch = SkillViewApp.AwaitDispatchAsync(
+            callback => queued = callback,
+            () => callbackRan = true,
+            lifetime.Token);
+        Assert.NotNull(queued);
+
+        lifetime.Cancel();
+
+        Assert.False(await dispatch);
+        queued();
+        Assert.False(callbackRan);
+    }
+
+    [Fact]
+    public void CancelingPreview_RestoresStillRunningSearchBusyState()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var searchBusy = app.BeginBusyOperationForTests("searching retained-query…");
+        using var preview = app.BeginPreviewRequestForTests();
+
+        Assert.True(app.StatusStripForTests!.IsBusyForTests);
+        Assert.Equal("preview test…", app.StatusTextForTests);
+
+        app.ShowLogPaneForTests();
+
+        Assert.True(app.StatusStripForTests.IsBusyForTests);
+        Assert.Equal("searching retained-query…", app.StatusTextForTests);
+
+        app.EndBusyOperationForTests(searchBusy);
+        Assert.False(app.StatusStripForTests.IsBusyForTests);
     }
 
     [Fact]
@@ -644,6 +806,74 @@ public sealed class SkillViewAppTests
             Application.InstanceCreated -= HandleCreated;
             Application.InstanceDisposed -= HandleDisposed;
         }
+    }
+
+    [Fact]
+    public async Task RunAsync_WaitsForOwnedBackgroundWorkBeforeReturning()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workFinished = false;
+        SkillViewApp? subject = null;
+
+        subject = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            CreateOptions(),
+            () =>
+            {
+                subject!.RunBackgroundForTests(async cancellationToken =>
+                {
+                    started.SetResult();
+                    try
+                    {
+                        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        cancellationObserved.SetResult();
+                        await release.Task.WaitAsync(TestContext.Current.CancellationToken);
+                        workFinished = true;
+                    }
+                }, "held-work");
+
+                var application = Application.Create().Init();
+                application.StopAfterFirstIteration = true;
+                return application;
+            },
+            probeOnRun: false);
+
+        var run = subject.RunAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(run.IsCompleted);
+        Assert.False(workFinished);
+
+        release.SetResult();
+        Assert.Equal(ExitCodes.Success, await run.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.True(workFinished);
+    }
+
+    [Fact]
+    public async Task Invoke_DoesNotUseDirectFallbackAfterRunHasEnded()
+    {
+        var app = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            CreateOptions(),
+            static () =>
+            {
+                var application = Application.Create().Init();
+                application.StopAfterFirstIteration = true;
+                return application;
+            },
+            probeOnRun: false);
+        var original = app.DefaultStatusForTests;
+
+        await app.RunAsync(TestContext.Current.CancellationToken);
+        app.SetDefaultStatusForTests("late callback must be ignored");
+
+        Assert.Equal(original, app.DefaultStatusForTests);
     }
 
     [Fact]

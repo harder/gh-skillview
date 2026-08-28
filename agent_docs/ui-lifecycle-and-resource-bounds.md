@@ -23,7 +23,18 @@ logging, or subprocess adapters.
 
 - `LatestRequestGate` owns Discover preview cancellation. A new preview cancels
   the previous request, and every completion checks `Lease.IsCurrent` before
-  updating UI.
+  updating UI. Search cancels previews both when the search starts and when its
+  new result set is committed; the second boundary catches previews launched
+  from the old table while the search was in flight. Search and preview await
+  their queued UI dispatches before disposing the request lease; a fire-and-
+  forget `Invoke` must not capture `Lease.IsCurrent`.
+- Discover search and preview capture the workspace `CancellationToken` before
+  their first await. Navigation exchanges, cancels, and disposes the owning
+  source, so no continuation may read `.Token` from that source afterward.
+- The shared status spinner uses operation IDs. Ending or canceling one owner
+  reveals the newest remaining operation instead of clearing the spinner
+  globally. In particular, canceling an old-table preview while search remains
+  active must restore the search text and spinner.
 - Installed, Changes, and Updates cancel superseded inventory loads. Pass their
   cancellation token through to inventory capture; do not add generation-only
   refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`
@@ -41,8 +52,16 @@ logging, or subprocess adapters.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
-  begin after disposal returns. The visible log pane retains at most 512
-  formatted lines and coalesces burst refreshes without lost wakeups.
+  begin after disposal returns. Out-of-order concurrent delivery waits for the
+  missing sequence instead of retaining pending log entries. Observer callbacks
+  must not write to any logger: the thread-local callback-depth guard rejects
+  the write before ring mutation, preventing direct recursion, same-thread
+  A → B → A cycles, and concurrent A → B / B → A lock inversion without
+  allocating per-entry tracking collections. The visible log pane retains at
+  most 512 formatted lines and coalesces burst refreshes without lost wakeups.
+- Fire-and-forget UI work must consume `OperationCanceledException` only when
+  its own app/view lifetime is canceled. Normal shutdown must not become a
+  false `CRASH`, while unrelated cancellation and real faults remain visible.
 
 ## Focused verification
 

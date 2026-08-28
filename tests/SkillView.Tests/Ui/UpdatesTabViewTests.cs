@@ -118,6 +118,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => ++loadCount == 1 ? first.Task : second.Task,
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
@@ -147,6 +148,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: async token =>
             {
                 if (Interlocked.Increment(ref loadCount) == 1)
@@ -184,6 +186,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => Task.FromResult(SnapshotWithSkill("loaded")),
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
@@ -214,6 +217,7 @@ public sealed class UpdatesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => snapshotLoader(),
             updateRunner: updateRunner ?? ((_, _, _) => throw new NotSupportedException()),
             ghPathProvider: static () => "/usr/bin/gh",
