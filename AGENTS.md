@@ -186,14 +186,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   describes the worker; it is not permission for keyboard shortcuts to cancel,
   close, retry, or escalate against controls whose completion is still queued.
   Synchronous install dialogs use `ModalOperationTracker`; its release request
-  also waits for the worker itself to return before clearing ownership.
+  also waits for the worker itself to return before clearing ownership. Use
+  `InvokeTerminalIfActive` for the completion that releases or closes a modal,
+  so dispatch/callback failure cannot strand ownership; keep nonterminal
+  progress on `InvokeIfActive` so a cosmetic failure cannot release a running
+  worker.
 - CLI entrypoints translate Ctrl+C/external cancellation to exit code 130 and
   apply bounded per-command deadlines. Propagate the root token through every
   adapter. After process-tree termination, retain the bounded parent-exit wait
   and observe both output drains.
 - Use `PathIdentity` for path normalization, keys, equality, and containment.
   Do not substitute a global Windows/macOS ignore-case rule: Windows supports
-  case-sensitive directories and macOS supports case-sensitive volumes.
+  case-sensitive directories and macOS supports case-sensitive volumes. A
+  missing direct child must probe its containing directory, not the containing
+  directory's name in its parent. Preserve case conservatively when that
+  directory is missing, empty, or cannot be probed.
 - Tests that mutate Terminal.Gui static configuration belong to the serialized
   `TerminalGuiStaticState` collection. Allocation and process stress tests
   belong to the serialized `ResourceStress` collection.

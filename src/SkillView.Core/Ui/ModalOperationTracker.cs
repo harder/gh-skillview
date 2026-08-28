@@ -101,6 +101,17 @@ internal sealed class ModalOperationTracker : IDisposable
     }
 
     internal void InvokeIfActive(Action action)
+        => InvokeIfActive(action, releaseOnFailure: false);
+
+    /// <summary>
+    /// Dispatches the operation's terminal UI commit. If dispatch or the
+    /// callback fails, ownership is released after the worker returns so the
+    /// modal cannot remain permanently stuck in AwaitingUiCompletion.
+    /// </summary>
+    internal void InvokeTerminalIfActive(Action action)
+        => InvokeIfActive(action, releaseOnFailure: true);
+
+    private void InvokeIfActive(Action action, bool releaseOnFailure)
     {
         ArgumentNullException.ThrowIfNull(action);
         if (Volatile.Read(ref _active) == 0)
@@ -118,12 +129,17 @@ internal sealed class ModalOperationTracker : IDisposable
                 }
 
                 try { action(); }
-                catch (Exception ex) { _logger.Error(_logCategory, ex.Message); }
+                catch (Exception ex)
+                {
+                    _logger.Error(_logCategory, ex.Message);
+                    if (releaseOnFailure) Release();
+                }
             });
         }
         catch (Exception ex)
         {
             _logger.Error(_logCategory, ex.Message);
+            if (releaseOnFailure) Release();
         }
     }
 

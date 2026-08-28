@@ -1052,7 +1052,7 @@ ignore-case comparer is also not a complete solution.
 `PathIdentity` is now the single normalization, equality, keying, and
 containment boundary. It detects case behavior from an existing filesystem
 entry instead of assuming every macOS or Windows volume is insensitive, while
-retaining a platform fallback when probing is impossible. Inventory merge and
+preserving case conservatively when probing is impossible. Inventory merge and
 deduplication, cleanup/removal indexes, CLI inventory diffs, scan-root
 deduplication, lock-file tracking, and active log-file exclusion use the same
 keys or equality rule. Probes use targeted case-sensitive enumeration rather
@@ -1326,6 +1326,36 @@ bounded child-process termination, volume-observed path semantics and root
 containment, Discover/Installed Esc behavior, split UTF-8 streaming, concurrent
 metadata-cache use, and allocation bounds for noisy output, oversized skills,
 500-skill inventories, and 2,000-file removals.
+
+### PR #16 Copilot review disposition
+
+The Balanced review generated four comments. All four were independently
+reassessed and accepted:
+
+1. **Compact-install cancellation stranded ownership — correct and fixed.**
+   The cancellation catch logged and returned without a terminal UI commit,
+   leaving the completed worker owned forever. It now queues the same guarded
+   spinner reset, canceled outcome, and modal close used by the other install
+   flows.
+2. **Terminal UI-dispatch failure stranded ownership — correct and fixed.**
+   Logging a dispatch/callback exception was insufficient when the callback
+   was responsible for release or close. Terminal commits now use a distinct
+   tracker API that requests release on either failure path, but interim picker
+   progress deliberately retains ownership if its callback fails.
+3. **CLI cleanup classification ignored cancellation — correct and fixed.**
+   Inventory capture received the root/deadline token, but the immediately
+   following classifier used its non-cancellable wrapper. CLI cleanup now calls
+   `ClassifyWithCancellation` with the same token.
+4. **Missing-path probing measured the wrong Windows directory — correct and
+   fixed.** For a missing child, climbing upward and flipping the existing
+   parent's name measured the grandparent's lookup behavior even though
+   Windows case sensitivity is per directory. Missing direct children now
+   probe another entry in their actual containing directory; missing parents,
+   empty directories, and failed probes fall back conservatively to preserving
+   case rather than collapsing potentially distinct paths.
+
+Follow-up validation passed all 683 unit and ANSI-driver integration tests and
+both macOS ARM64 native AOT publishes.
 
 ## Terminal.Gui upstream assessment
 

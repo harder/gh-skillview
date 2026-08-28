@@ -200,7 +200,7 @@ internal sealed class InstallConfirmModal
                     cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -226,11 +226,18 @@ internal sealed class InstallConfirmModal
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install.compact", "install canceled because the dialog closed");
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    outcome = Outcome.Cancelled;
+                    _app.RequestStop();
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error("install.compact", ex.Message);
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     operation.Release();
                     spinner.AutoSpin = false;

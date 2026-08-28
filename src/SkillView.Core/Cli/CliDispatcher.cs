@@ -1335,7 +1335,11 @@ public static class CliDispatcher
             cancellationToken
         ).ConfigureAwait(false);
 
-        var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
+        var candidates = CleanupClassifier.ClassifyWithCancellation(
+            snapshot,
+            snapshot.ScannedRoots,
+            options: null,
+            cancellationToken);
         if (parsed.KindFilter is { Count: > 0 })
         {
             candidates = candidates.Where(c => parsed.KindFilter.Contains(c.Kind.ToString(), StringComparer.OrdinalIgnoreCase)).ToImmutableArray();

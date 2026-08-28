@@ -47,8 +47,11 @@ logging, or subprocess adapters.
   Continue to pass cancellation into subprocess-backed services. Synchronous
   install dialogs use `ModalOperationTracker`: capture its stable token, retain
   non-null ownership until the UI commit and worker return are both complete,
-  gate every queued callback through `InvokeIfActive`, and let disposal cancel
-  and drain before any controls are disposed.
+  gate progress through `InvokeIfActive`, terminal commits through
+  `InvokeTerminalIfActive`, and let disposal cancel and drain before any
+  controls are disposed. The terminal form releases ownership if dispatch or
+  the callback throws; the progress form must not release a worker that is
+  still active.
 - CLI and TUI hosts share `EntryPoint` root cancellation. CLI operations must
   propagate it through every adapter and retain a bounded command deadline.
   `ProcessRunner` whole-tree termination is followed by a five-second bounded

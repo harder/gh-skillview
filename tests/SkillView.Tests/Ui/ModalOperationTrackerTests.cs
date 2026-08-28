@@ -95,6 +95,42 @@ public sealed class ModalOperationTrackerTests
         Assert.Equal(0, invokeCount);
     }
 
+    [Fact]
+    public async Task TerminalCallbackFailure_ReleasesOwnershipAfterWorkerReturns()
+    {
+        using var tracker = NewTracker();
+
+        Assert.True(tracker.TryStart(_ =>
+        {
+            tracker.InvokeTerminalIfActive(() =>
+                throw new InvalidOperationException("terminal callback failed"));
+            return Task.CompletedTask;
+        }));
+
+        await WaitUntilAsync(
+            () => tracker.CurrentOwnership == ModalOperationTracker.Ownership.None,
+            TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task TerminalDispatchFailure_ReleasesOwnershipAfterWorkerReturns()
+    {
+        using var tracker = new ModalOperationTracker(
+            _ => throw new InvalidOperationException("dispatch failed"),
+            new Logger(),
+            "test.ui");
+
+        Assert.True(tracker.TryStart(_ =>
+        {
+            tracker.InvokeTerminalIfActive(() => { });
+            return Task.CompletedTask;
+        }));
+
+        await WaitUntilAsync(
+            () => tracker.CurrentOwnership == ModalOperationTracker.Ownership.None,
+            TestContext.Current.CancellationToken);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
         while (!condition())

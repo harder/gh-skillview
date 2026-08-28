@@ -66,6 +66,46 @@ public sealed class PathIdentityTests
     }
 
     [Fact]
+    public void MissingChild_UsesContainingDirectorySemantics()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-path-missing-" + Guid.NewGuid().ToString("N"));
+        var probe = Path.Combine(root, "ProbeEntry");
+        var alternateProbe = Path.Combine(root, "probeEntry");
+        var missingLower = Path.Combine(root, "missingSkill");
+        var missingUpper = Path.Combine(root, "MissingSkill");
+        try
+        {
+            Directory.CreateDirectory(probe);
+            var observedCaseSensitive = !Directory.Exists(alternateProbe);
+
+            Assert.Equal(observedCaseSensitive, PathIdentity.IsCaseSensitive(missingLower));
+            Assert.Equal(
+                !observedCaseSensitive,
+                PathIdentity.NormalizeKey(missingLower) == PathIdentity.NormalizeKey(missingUpper));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void MissingChildUnderEmptyDirectory_IsConservativelyCaseSensitive()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skillview-path-empty-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+
+            Assert.True(PathIdentity.IsCaseSensitive(Path.Combine(root, "missingSkill")));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public void IsInside_UsesContainingRootFilesystemSemantics()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-path-root-" + Guid.NewGuid().ToString("N"));

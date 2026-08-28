@@ -56,30 +56,75 @@ public static class PathIdentity
     {
         string full;
         try { full = Path.GetFullPath(path); }
-        catch { return PlatformDefaultIsCaseSensitive(); }
+        catch { return true; }
 
-        var cursor = full;
-        while (!string.IsNullOrEmpty(cursor))
+        if (EntryExists(full))
         {
-            if (EntryExists(cursor) && TryProbeExistingEntry(cursor, out var caseSensitive))
+            if (TryProbeExistingEntry(full, out var caseSensitive))
             {
                 return caseSensitive;
             }
 
-            var parent = Path.GetDirectoryName(cursor);
-            if (parent is null || string.Equals(parent, cursor, StringComparison.Ordinal))
+            // A root has no parent/name to flip, and a non-ASCII leaf may not
+            // have a flippable spelling. Probe another entry in the same
+            // containing directory rather than climbing and measuring the
+            // wrong directory's lookup semantics.
+            var containingDirectory = Path.GetDirectoryName(full);
+            if (containingDirectory is null && Directory.Exists(full))
             {
-                break;
+                containingDirectory = full;
             }
-            cursor = parent;
+            if (containingDirectory is not null
+                && TryProbeDirectory(containingDirectory, out caseSensitive))
+            {
+                return caseSensitive;
+            }
+
+            return true;
         }
 
-        return PlatformDefaultIsCaseSensitive();
+        // For a missing direct child, only its containing directory determines
+        // whether case variants can be distinct. Never probe that directory's
+        // name in its parent: Windows case sensitivity is configurable per
+        // directory. If the parent itself is missing or empty/unprobeable,
+        // preserve spellings conservatively instead of collapsing distinct
+        // paths into one key.
+        var parent = Path.GetDirectoryName(full);
+        return parent is null
+            || !Directory.Exists(parent)
+            || !TryProbeDirectory(parent, out var parentCaseSensitive)
+            || parentCaseSensitive;
+    }
+
+    private static bool TryProbeDirectory(string directory, out bool caseSensitive)
+    {
+        caseSensitive = true;
+        IEnumerator<string>? entries = null;
+        try
+        {
+            entries = Directory.EnumerateFileSystemEntries(directory).GetEnumerator();
+            while (entries.MoveNext())
+            {
+                if (TryProbeExistingEntry(entries.Current, out caseSensitive))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+        finally
+        {
+            entries?.Dispose();
+        }
+
+        return false;
     }
 
     private static bool TryProbeExistingEntry(string path, out bool caseSensitive)
     {
-        caseSensitive = PlatformDefaultIsCaseSensitive();
+        caseSensitive = true;
         var parent = Path.GetDirectoryName(path);
         var name = Path.GetFileName(path);
         if (string.IsNullOrEmpty(parent) || string.IsNullOrEmpty(name))
@@ -160,7 +205,4 @@ public static class PathIdentity
 
         return null;
     }
-
-    private static bool PlatformDefaultIsCaseSensitive() =>
-        !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS();
 }

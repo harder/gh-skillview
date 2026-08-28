@@ -387,7 +387,7 @@ public sealed class InstallScreen
                     options,
                     cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     LastResult = result;
                     spinner.AutoSpin = false;
@@ -411,7 +411,7 @@ public sealed class InstallScreen
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install", "install canceled because the dialog closed");
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -422,7 +422,7 @@ public sealed class InstallScreen
             catch (Exception ex)
             {
                 _logger.Error("install", ex.Message);
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     operation.Release();
                     spinner.AutoSpin = false;

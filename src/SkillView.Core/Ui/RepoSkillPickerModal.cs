@@ -277,7 +277,7 @@ internal sealed class RepoSkillPickerModal
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -311,7 +311,7 @@ internal sealed class RepoSkillPickerModal
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install.picker", "install canceled because the dialog closed");
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -322,7 +322,7 @@ internal sealed class RepoSkillPickerModal
             catch (Exception ex)
             {
                 _logger.Error("install.picker", ex.Message);
-                operation.InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     operation.Release();
                     spinner.AutoSpin = false;
