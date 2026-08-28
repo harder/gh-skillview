@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -64,11 +63,15 @@ internal sealed class RemoveConfirmModal
 
     internal Result Show()
     {
+        using var lifetime = new CancellationTokenSource();
         var validation = _evaluation.Items[0].Validation;
         var outcome = Outcome.Cancelled;
         RemoveService.RemoveReport? report = null;
+        RemoveService.RemoveProgress? lastProgress = null;
+        Task? activeOperation = null;
+        var dialogActive = 1;
 
-        var dialog = new Dialog
+        using var dialog = new Dialog
         {
             Title = " Remove skill ",
             Width = Dim.Percent(50),
@@ -104,10 +107,17 @@ internal sealed class RemoveConfirmModal
 
         var status = new Label
         {
+            X = 3,
+            Y = Pos.AnchorEnd(3),
+            Width = Dim.Fill(4),
+            Text = " [y] yes   [n] no   [a] advanced…",
+        };
+        var spinner = new SpinnerView
+        {
             X = 1,
             Y = Pos.AnchorEnd(3),
-            Width = Dim.Fill(2),
-            Text = " [y] yes   [n] no   [a] advanced…",
+            Visible = false,
+            AutoSpin = false,
         };
 
         var yesButton = new Button
@@ -131,36 +141,137 @@ internal sealed class RemoveConfirmModal
             Text = "Advanced…",
         };
 
-        yesButton.Accepting += (_, ev) =>
+        void InvokeIfActive(Action action)
         {
-            ev.Handled = true;
+            if (Volatile.Read(ref dialogActive) == 0)
+            {
+                return;
+            }
+
             try
             {
-                report = _remove.Remove(validation, new RemoveService.Options(DryRun: false));
-                outcome = report.Succeeded ? Outcome.Removed : Outcome.Failed;
-                if (!report.Succeeded)
+                _app.Invoke(() =>
                 {
-                    status.Text = $" remove failed: {report.Errors.FirstOrDefault() ?? "(no detail)"}";
-                    return;
-                }
-                _app.RequestStop();
+                    if (Volatile.Read(ref dialogActive) == 0)
+                    {
+                        return;
+                    }
+
+                    try { action(); }
+                    catch (Exception ex) { _logger.Error("remove.compact.ui", ex.Message); }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("remove.compact.ui", ex.Message);
+            }
+        }
+
+        void SetRunning(bool running)
+        {
+            spinner.AutoSpin = running;
+            spinner.Visible = running;
+            yesButton.Enabled = !running;
+            noButton.Enabled = !running;
+            advancedButton.Enabled = !running;
+        }
+
+        async Task RunRemovalAsync(CancellationToken cancellationToken)
+        {
+            var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
+            {
+                lastProgress = value;
+                InvokeIfActive(() => status.Text = FormatProgress(value));
+            });
+
+            try
+            {
+                var completed = await _remove.RemoveAsync(
+                    validation,
+                    new RemoveService.Options(DryRun: false),
+                    cancellationToken,
+                    progress).ConfigureAwait(false);
+                report = RemovalReportState.Accumulate(report, completed);
+                outcome = completed.Succeeded ? Outcome.Removed : Outcome.Failed;
+                InvokeIfActive(() =>
+                {
+                    SetRunning(false);
+                    if (completed.Succeeded)
+                    {
+                        status.Text = " removed — closing";
+                        _app.RequestStop();
+                    }
+                    else
+                    {
+                        activeOperation = null;
+                        var detail = TuiHelpers.ErrorSnippet(completed.Errors.FirstOrDefault());
+                        status.Text = detail.Length > 0
+                            ? $" remove failed: {detail}"
+                            : " remove failed — see logs";
+                    }
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                report = RemovalReportState.Accumulate(
+                    report,
+                    RemovalReportState.Canceled(validation.ResolvedPath, lastProgress));
+                outcome = Outcome.Cancelled;
+                _logger.Debug("remove.compact", "removal canceled");
+                InvokeIfActive(() =>
+                {
+                    SetRunning(false);
+                    status.Text = " removal canceled";
+                    _app.RequestStop();
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error("remove.compact", ex.Message);
+                report = RemovalReportState.Accumulate(
+                    report,
+                    RemovalReportState.Failed(
+                        validation.ResolvedPath,
+                        lastProgress,
+                        ex.Message));
                 outcome = Outcome.Failed;
-                status.Text = $" remove failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                InvokeIfActive(() =>
+                {
+                    SetRunning(false);
+                    activeOperation = null;
+                    var detail = TuiHelpers.ErrorSnippet(ex.Message);
+                    status.Text = detail.Length > 0
+                        ? $" remove failed: {detail}"
+                        : " remove failed — see logs";
+                });
             }
+        }
+
+        yesButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (activeOperation is not null)
+            {
+                return;
+            }
+
+            SetRunning(true);
+            lastProgress = null;
+            status.Text = $" removing {_skill.Name}…  Esc cancels";
+            var cancellationToken = lifetime.Token;
+            activeOperation = RunRemovalAsync(cancellationToken);
         };
         noButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
         advancedButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             outcome = Outcome.EscalateToWizard;
             _app.RequestStop();
         };
@@ -176,25 +287,55 @@ internal sealed class RemoveConfirmModal
             else if (ch == 'n' || ch == 'N' || key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
+                if (activeOperation is { IsCompleted: false })
+                {
+                    lifetime.Cancel();
+                    status.Text = " canceling removal…";
+                    return;
+                }
+                lifetime.Cancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
             else if (ch == 'a' || ch == 'A')
             {
                 key.Handled = true;
+                if (activeOperation is { IsCompleted: false })
+                {
+                    status.Text = " removal in progress — Esc cancels";
+                    return;
+                }
                 outcome = Outcome.EscalateToWizard;
                 _app.RequestStop();
             }
         };
 
-        dialog.Add(prompt, path, warnings, status, yesButton, noButton, advancedButton);
+        dialog.Add(prompt, path, warnings, spinner, status, yesButton, noButton, advancedButton);
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
-            dialog, prompt, path, warnings, status,
+            dialog, prompt, path, warnings, spinner, status,
             yesButton, noButton, advancedButton);
 
-        _app.Run(dialog);
-        dialog.Dispose();
+        try
+        {
+            _app.Run(dialog);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref dialogActive, 0);
+            lifetime.Cancel();
+            activeOperation?.GetAwaiter().GetResult();
+        }
 
         return new Result(outcome, report);
+    }
+
+    private static string FormatProgress(RemoveService.RemoveProgress progress)
+    {
+        if (progress.IsCanceled)
+        {
+            return $" canceling… {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)";
+        }
+
+        return $" removing… {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
     }
 }

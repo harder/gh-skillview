@@ -60,6 +60,26 @@ logging, or subprocess adapters.
   lazy-enumerator `MoveNext` calls inside the I/O exception boundary because
   disconnects, ACL changes, and disappearing directories fail there rather
   than when the enumerable is created.
+- Removal uses the same thread-pool boundary: compact remove, the advanced
+  wizard, cleanup batches, and agent-link unlinking call the asynchronous
+  `RemoveService` APIs. Progress callbacks are throttled to 10 per second and
+  immediately handed to `IApplication.Invoke`; they must not use `Progress<T>`
+  and add another implicit queue. Esc cancels the active traversal, and each
+  removal window cancels and drains its owned task before disposing controls.
+  Partial cancellation counts still trigger inventory invalidation/rescan.
+  `BatchProgressAdapter` retains the latest aggregate snapshot so the outer
+  cancellation boundary cannot replace mid-target file/directory counts with
+  completed-target-only totals. Progress tracks processed targets separately
+  from successfully deleted targets; cancellation summaries must never treat a
+  failed-but-processed target as removed. Each async removal entry point emits
+  a final `IsCanceled` update for already-canceled tokens as well as in-flight
+  work. Retryable remove dialogs retain cumulative file/directory mutation
+  totals across attempts and across compact-to-wizard escalation, while the
+  displayed progress remains per-attempt. Synthetic cancellation reports mark
+  cancellation explicitly and retain the exact runtime-error count even when
+  the individual logged details are unavailable.
+  Traversal retains O(depth) enumerator state and no more than 128 detailed
+  runtime errors plus one omission summary.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
@@ -83,5 +103,6 @@ logging, or subprocess adapters.
 Run `dotnet build`, then `dotnet test --no-build`. Resource-focused coverage
 includes large subprocess output, LRU eviction, subscription disposal,
 callback-safe cancellation gates, bounded inventory files, iteration failures,
-overlapping preview cancellation, superseded inventory scans, inline busy
-state, and layout guards at 80×24, 100×30, and 140×42.
+overlapping preview cancellation, superseded inventory scans, asynchronous
+removal cancellation/progress/error bounds, inline busy state, and layout
+guards at 80×24, 100×30, and 140×42.

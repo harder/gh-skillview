@@ -7,10 +7,13 @@ PR follow-up reviewed: `df62a22` (`fix: close remaining lifecycle review gaps`),
 merged by PR #11 as `40bbf0b`
 Hardening branch: `fix/adversarial-hardening`
 Second hardening branch: `fix/resource-lifecycle-hardening-2`
-Status: Active remediation. PR #12 is merged. Its final disk-budget follow-up,
-the analogous cancellation-callback lock hazard, and bounded/cancellable local
-inventory I/O are implemented on the second hardening branch. Removal UI work,
-hostile same-user path replacement, and findings 7-11 and 14 remain scheduled.
+Third hardening branch: `fix/removal-lifecycle-hardening`
+Status: Active remediation. PRs #12 and #13 are merged. Aggregate log retention,
+callback-safe cancellation ownership, bounded/cancellable inventory I/O, and
+portable asynchronous removal are implemented. Native handle-relative deletion
+for hostile same-user mutation remains a separate security design; metadata
+scheduling, install-modal ownership, root CLI cancellation, path identity, Esc/
+LRU coverage, and the lower-risk remainder stay scheduled.
 
 ## Executive summary
 
@@ -788,6 +791,12 @@ rejected rather than canceling and superseding the stale request.
 
 Severity: **Medium**
 
+Implementation status: **Install flows remain open. The removal modal/wizard
+now demonstrate the target lifecycle on `fix/removal-lifecycle-hardening`:
+stable token capture, an explicitly retained operation task, inner queued-
+callback lifetime checks, cancellation, and task drain before control
+disposal.**
+
 Locations:
 
 - `src/SkillView.Core/Ui/InstallConfirmModal.cs`, async accepting handler around lines 189-264.
@@ -881,6 +890,10 @@ is the notable exception.
 
 Severity: **Medium**
 
+Implementation status: **Completed on `fix/removal-lifecycle-hardening`. The
+portable path remains non-atomic against hostile same-user path replacement,
+as documented under Finding 1.**
+
 Locations:
 
 - `src/SkillView.Core/Inventory/RemoveService.cs`, `.ToList()` traversal around lines 106-121.
@@ -890,9 +903,35 @@ Locations:
 
 ### Current behavior
 
-`RemoveService` materializes every file path and every directory path before
-deleting anything. The UI calls it synchronously from Terminal.Gui event
-handlers. There is no cancellation token or progress reporting.
+The original implementation materialized every file path and directory path
+before deletion and ran synchronously from Terminal.Gui event handlers. The
+earlier branch replaced that traversal with O(depth) enumerator frames. This
+branch completes the remediation: compact remove, advanced remove, cleanup
+batches, cleanup validation, and agent-link unlinking run off the UI thread;
+Esc cancels active work; progress is throttled to 10 updates per second; and
+each owning window cancels and drains its task before disposing controls.
+
+Cancellation publishes exact aggregate progress, including cancellation
+between batch targets. The workflow invalidates and rescans inventory whenever
+even a partial target deleted files or directories. Runtime failure detail is
+bounded to 128 messages plus an omission summary while `ErrorCount` preserves
+the exact total. PR #14's first Copilot review found two terminal-progress
+gaps: already-canceled link removal omitted its final canceled event, and the
+outer batch catch could overwrite exact mid-target counts with completed-target
+totals. Both are fixed by explicit early-cancellation publication and by making
+the batch adapter retain and republish its latest aggregate snapshot.
+
+PR #14's Balanced follow-up review surfaced six suppressed accounting issues
+in the same change set. All were accepted and fixed in the PR: progress now
+distinguishes processed targets from successfully deleted targets; compact and
+advanced removal flows retain mutation totals across retries and escalation;
+cancellation reports preserve the exact observed runtime-error count while
+marking cancellation separately; and remove JSON only emits runtime-error
+fields after validation and confirmation permit an actual removal or dry run.
+The subsequent Balanced review also found that a refused direct removal
+returned after its initial progress event. Refusals now publish a forced
+terminal completed snapshot with one processed target, zero deleted targets,
+and the refusal error count.
 
 ### Impact
 
@@ -1169,14 +1208,17 @@ coordinated within their current scope:
 6. [x] Add log character/byte budgets and correct disk rotation.
 7. [x] Enforce aggregate disk retention during active-file growth and remove
    cancellation-callback execution from request/slot ownership locks.
-8. [~] Move inventory and removal I/O off the UI thread with cancellation, and
+8. [x] Move inventory and removal I/O off the UI thread with cancellation, and
    evaluate native handle-relative deletion for hostile same-user mutation.
-   Inventory scanning and cleanup classification are complete; asynchronous
-   removal/progress and native deletion evaluation remain.
+   The portable inventory/removal work is complete. The native evaluation
+   confirmed that supported .NET 10 APIs cannot make path validation and
+   deletion atomic; an audited Unix/Windows native implementation remains a
+   separate Finding 1 security follow-up rather than an implicit portable fix.
 9. [ ] Finish metadata-preview deadlines and bounded scheduling (search
    supersession and a whole-request deadline are complete).
-10. [ ] Make modal operation lifetimes awaitable and disposal-safe, including
-    stable token capture before the first await.
+10. [~] Make modal operation lifetimes awaitable and disposal-safe, including
+    stable token capture before the first await. Removal modals are complete;
+    the three install flows remain.
 11. [ ] Wire root CLI cancellation and bounded post-kill waiting.
 12. [ ] Centralize cross-platform path identity semantics.
 13. [ ] Correct Esc focus behavior and strengthen the LRU contract test.

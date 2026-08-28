@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Reflection;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -12,7 +11,7 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
-    public void DoRemove_RemovesEmptyDirectoryCandidateInsideScanRoot()
+    public async Task RemoveSelectedAsync_RemovesEmptyDirectoryCandidateInsideScanRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -27,13 +26,14 @@ public sealed class CleanupScreenTests
                 "empty directory under scan root",
                 Skill: null);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.False(Directory.Exists(emptyDir));
             Assert.Equal(1, screen.RemovedCount);
-            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+            Assert.Equal(0, screen.RemovedFileCount);
+            Assert.Equal(1, screen.RemovedDirectoryCount);
+            Assert.Equal(new CleanupScreen.RemovalSummary(1, 0, Confirmed: true), summary);
         }
         finally
         {
@@ -42,7 +42,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void DoRemove_RemovesBrokenSymlinkCandidateInsideScanRoot()
+    public async Task RemoveSelectedAsync_RemovesBrokenSymlinkCandidateInsideScanRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -58,13 +58,14 @@ public sealed class CleanupScreenTests
                 "broken symlink",
                 Skill: null);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.False(File.Exists(brokenLink) || Directory.Exists(brokenLink) || PathResolver.IsSymlink(brokenLink));
             Assert.Equal(1, screen.RemovedCount);
-            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+            Assert.Equal(1, screen.RemovedFileCount);
+            Assert.Equal(0, screen.RemovedDirectoryCount);
+            Assert.Equal(new CleanupScreen.RemovalSummary(1, 0, Confirmed: true), summary);
         }
         finally
         {
@@ -73,7 +74,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void DoRemove_RemovesBrokenSymlinkCandidateWhenCandidateCarriesSkill()
+    public async Task RemoveSelectedAsync_RemovesBrokenSymlinkCandidateWhenCandidateCarriesSkill()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -93,13 +94,12 @@ public sealed class CleanupScreenTests
                 "broken symlink",
                 Skill: skill);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)], [skill]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.False(File.Exists(brokenLink) || Directory.Exists(brokenLink) || PathResolver.IsSymlink(brokenLink));
             Assert.Equal(1, screen.RemovedCount);
-            Assert.Equal(" removed 1, skipped/failed 0", status.Text.ToString());
+            Assert.Equal(new CleanupScreen.RemovalSummary(1, 0, Confirmed: true), summary);
         }
         finally
         {
@@ -108,7 +108,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void DoRemove_SkipsEmptyDirectoryCandidateWhenDirectoryBecomesNonEmpty()
+    public async Task RemoveSelectedAsync_SkipsEmptyDirectoryCandidateWhenDirectoryBecomesNonEmpty()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -124,13 +124,12 @@ public sealed class CleanupScreenTests
                 "empty directory under scan root",
                 Skill: null);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.True(Directory.Exists(emptyDir));
             Assert.Equal(0, screen.RemovedCount);
-            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+            Assert.Equal(new CleanupScreen.RemovalSummary(0, 1, Confirmed: true), summary);
         }
         finally
         {
@@ -139,7 +138,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void DoRemove_SkipsBrokenSymlinkCandidateWhenPathBecomesDirectory()
+    public async Task RemoveSelectedAsync_SkipsBrokenSymlinkCandidateWhenPathBecomesDirectory()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -162,13 +161,12 @@ public sealed class CleanupScreenTests
                 "broken symlink",
                 Skill: skill);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)], [skill]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.True(Directory.Exists(brokenLink));
             Assert.Equal(0, screen.RemovedCount);
-            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+            Assert.Equal(new CleanupScreen.RemovalSummary(0, 1, Confirmed: true), summary);
         }
         finally
         {
@@ -177,7 +175,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void DoRemove_SkipsEmptyDirectoryCandidateWhenPathBecomesSymlink()
+    public async Task RemoveSelectedAsync_SkipsEmptyDirectoryCandidateWhenPathBecomesSymlink()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -196,13 +194,12 @@ public sealed class CleanupScreenTests
                 "empty directory under scan root",
                 Skill: null);
             var screen = CreateScreen([candidate], [new ScanRoot(root, Scope.User, null)]);
-            var status = new Label();
-
-            InvokeDoRemove(screen, [0], status);
+            var summary = await screen.RemoveSelectedAsync(
+                [0], TestContext.Current.CancellationToken);
 
             Assert.True(PathResolver.IsSymlink(target));
             Assert.Equal(0, screen.RemovedCount);
-            Assert.Equal(" removed 0, skipped/failed 1", status.Text.ToString());
+            Assert.Equal(new CleanupScreen.RemovalSummary(0, 1, Confirmed: true), summary);
         }
         finally
         {
@@ -350,13 +347,6 @@ public sealed class CleanupScreenTests
             scanRoots,
             allSkills: allSkills ?? Array.Empty<InstalledSkill>(),
             confirmBatchRemoval: _ => 1);
-
-    private static void InvokeDoRemove(CleanupScreen screen, IEnumerable<int> checkedRows, Label status)
-    {
-        var method = typeof(CleanupScreen).GetMethod("DoRemove", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-        method!.Invoke(screen, [new HashSet<int>(checkedRows), status]);
-    }
 
     private static void DeletePath(string path)
     {

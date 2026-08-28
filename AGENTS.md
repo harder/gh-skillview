@@ -132,10 +132,26 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   mount point, or broken link) as a leaf, revalidate containment immediately
   before deletion, and keep cancellation/depth bounds explicit. Keep traversal
   lazy with per-depth enumerator frames so cancellation runs between entries
-  and retained state stays O(depth). Do not claim the path checks are atomic
-  against a hostile same-user process: supported .NET 10 deletion APIs remain
-  path-based on Windows and Unix; native handle-relative deletion is separate
-  follow-up work.
+  and retained state stays O(depth). TUI removal must use `RemoveAsync` /
+  `RemoveManyAsync`, whose progress is throttled to 10 updates/second; keep the
+  modal alive until cancellation quiesces and rescan when cancellation made
+  any partial filesystem change. Runtime reports retain at most 128 individual
+  errors plus an omission summary while preserving the exact error count. Do
+  not overwrite a mid-target cancellation snapshot with completed-target-only
+  totals: the batch progress adapter owns the latest aggregate state and keeps
+  processed-target and successfully-deleted-target counts distinct. Retryable
+  remove dialogs accumulate filesystem mutation totals across attempts and
+  compact-to-wizard escalation so later failures cannot hide a required rescan.
+  Every async removal entry point must publish a terminal canceled update even
+  when its token was already canceled; synthetic cancellation reports retain
+  the exact observed runtime-error count and mark cancellation explicitly.
+  All non-canceled return paths, including validation refusals, must publish a
+  terminal completed progress update with exact processed/deleted/error counts.
+  CLI JSON must not duplicate validation refusals or unaccepted warnings into
+  `runtimeErrors`. Do not claim the path checks are atomic
+  against a hostile same-user process:
+  supported .NET 10 deletion APIs remain path-based on Windows and Unix;
+  native handle-relative deletion is separate follow-up work.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
