@@ -1,0 +1,1055 @@
+# Adversarial concurrency, resource, cancellation, and cross-platform audit
+
+Date: 2026-08-28
+Branch reviewed: `feat/tui-usability-hardening`
+Reviewed commit: `7d43336` (`fix: address concurrency review findings`)
+PR follow-up reviewed: `df62a22` (`fix: close remaining lifecycle review gaps`),
+merged by PR #11 as `40bbf0b`
+Hardening branch: `fix/adversarial-hardening`
+Status: Active remediation. The first six recommended remediations are
+implemented and locally verified; findings 6-11 and 14 remain scheduled.
+
+## Executive summary
+
+The original repository-wide audit found 11 actionable issues: one critical,
+four high, and six medium. The critical removal-boundary defect and the
+shared-cache race were reproduced against the actual production classes rather
+than inferred only from source inspection.
+
+The PR follow-up exposed two misses in the original audit's UI-lifecycle model:
+entering Doctor bypassed tab-load cancellation, and leaving Updates did not
+cancel the active update operation. Both were fixed in `df62a22`. A targeted
+reassessment then found three additional deferred production issues and one
+test-coverage weakness: Discover and Doctor work still lacks workspace-scoped
+ownership, log initialization/replay has two snapshot races, Esc does not leave
+all advertised filter inputs, and the LRU test proves only FIFO eviction. These
+are documented after Finding 11.
+
+The critical and high findings should be treated as release blockers. The
+medium findings should be addressed in the same hardening cycle because they
+share lifecycle, cancellation, and bounded-resource concerns with the
+release-blocking work.
+
+The original audit made no production changes. Remediation is now in progress
+on `fix/adversarial-hardening`; completed work and current verification are
+recorded below.
+
+## Scope and method
+
+The review covered:
+
+- All TUI shells, tabs, screens, dialogs, event handlers, and UI-dispatch paths.
+- Application initialization, run-loop shutdown, cancellation, and disposal.
+- Every asynchronous workflow and fire-and-forget call site.
+- Cancellation source ownership and replacement/supersession helpers.
+- `gh` process creation, output draining, cancellation, and termination.
+- Inventory scanning, path normalization, symlink handling, cleanup, and removal.
+- Logger retention, subscribers, disk sinks, rotation, and disposal.
+- In-memory caches and shared mutable state.
+- CLI cancellation and resource ownership.
+- Windows, macOS, and Linux path, reparse-point, process, and file-sharing behavior.
+- Existing unit/integration coverage and gaps around timing and high-volume inputs.
+
+The following verification was performed:
+
+- `dotnet build SkillView.sln --no-restore`: passed with zero warnings.
+- The repository's configured analyzer/build gate passed with zero warnings.
+  A later verification with the broader, non-configured `AnalysisLevel=latest-all`
+  ruleset reported 190 warnings-as-errors across changed and unchanged code;
+  that ruleset needs a separate baseline and triage before it can be treated as
+  a meaningful regression gate.
+- `dotnet test --no-build`: 556 of 556 tests passed.
+- macOS ARM64 AOT publish: passed.
+- Removal escape reproduction: confirmed with the real validator and removal service.
+- Shared-cache stress reproduction: confirmed with 1,761 concurrent-operation exceptions.
+- Repository working tree after the audit: clean.
+
+Foreign Windows and Linux runtime packs were not restored locally, so this
+audit does not claim live Windows/Linux runtime execution. Cross-platform
+findings come from shared production code, the repository's platform CI
+configuration, documented .NET 10 behavior, and a live macOS reproduction where
+noted.
+
+## Post-PR reassessment: why two lifecycle defects were missed
+
+The original audit correctly examined the cancellation-slot implementation and
+shutdown lifetime, but it did not model the complete UI as a transition graph.
+That distinction matters because a view can stop owning the screen without
+being disposed:
+
+- `ActivateTab` performed tab cancellation, while `EnterDoctor` hid the same
+  tabs through a different route.
+- Updates canceled work on disposal, but Esc only hid the persistent embedded
+  view; disposal never occurred.
+
+The audit also overclaimed that the Updates operation slot prevented stale
+operation results. It prevented two update operations from starting at the
+same time while the view stayed active, but it did not tie the operation to
+view deactivation. That statement has been corrected in the "Existing
+hardening" section.
+
+Future lifecycle reviews should require a transition matrix for every
+workspace and modal. For each exit path, record:
+
+1. Which view becomes hidden, stopped, or disposed.
+2. Which load, operation, timer, subscription, and queued UI callback it owns.
+3. Which token is canceled and which task is awaited.
+4. Which generation or ownership check protects a late completion.
+5. Which global UI state the completion can change: focus, status, spinner,
+   preview, visibility, or enabled controls.
+
+Deterministic tests should exercise each transition while the operation is held
+at three boundaries: before cancellation, after background completion but
+before UI dispatch, and after UI dispatch is queued but before it runs.
+
+### PR #11 follow-up disposition
+
+- **File sink lock inversion:** confirmed and fixed. Subscription deactivation
+  now occurs outside the sink lock, with a deterministic deadlock regression
+  test.
+- **Doctor bypassed tab cancellation:** confirmed and fixed through the shared
+  `CancelPendingTabWork` path.
+- **Updates operation survived Esc/deactivation:** confirmed and fixed. Leaving
+  the view now cancels the update, restores controls, and rejects a canceled
+  operation's late success or error UI callback.
+
+The focused follow-up passed all 559 local tests plus Linux, macOS, and Windows
+tests, AOT smoke publishing on all three platforms, and CodeQL.
+
+### Post-merge hardening checkpoint
+
+The first natural implementation checkpoint completes remediation-order items
+1-6:
+
+1. Removal now uses an explicit, depth-bounded, cancellation-aware traversal.
+   Nested symbolic links, junctions, mount-point reparse points, broken links,
+   and cycles are deleted only as leaf links; containment and ancestor link
+   state are revalidated immediately before each destructive operation.
+2. `GhSkillListCache` serializes all state and shares one cancellable load per
+   key. Invalidation cancels in-flight loads, rejects stale completion, and the
+   final canceled waiter waits for subprocess cleanup.
+3. `BackgroundTaskTracker` owns application fire-and-forget work. Shutdown
+   closes admission, cancels app/workspace lifetimes, drains admitted work,
+   and only then clears/disposes Terminal.Gui state. Direct UI dispatch remains
+   available before the first real run for unit helpers but is permanently
+   disabled after lifecycle entry.
+4. Discover and Doctor now have activation lifetimes and generation checks.
+   Search and preview are canceled on Discover exit, Doctor probes are canceled
+   on Doctor exit, searches supersede earlier searches, opening logs cancels a
+   preview that could close them, and environment probes are single-flight.
+5. `Logger.SubscribeWithReplay` establishes an atomic, sequence-numbered
+   replay/live boundary. Both the file sink and TUI use it, so concurrent
+   entries cannot fall into a snapshot gap or appear twice.
+6. Logs now have per-message and total-retained-character budgets, compact
+   stderr excerpts, a character-bounded TUI queue, same-day size rotation,
+   numbered file parts, active-file exclusion from trimming, and delete-share
+   compatibility on Windows.
+
+Local verification at this checkpoint:
+
+- `dotnet build --no-restore`: passed with zero warnings.
+- `dotnet test --no-build`: 592 of 592 tests passed, including the ANSI-driver
+  integration suite.
+- New deterministic tests cover removal escapes/cycles/retargeting,
+  100,000-operation cache contention, cancellation cleanup, shutdown drain,
+  workspace exits, replay/live interleavings, message budgets, same-day file
+  rotation, restart with an oversized active file, and active-file retention.
+- Windows junction behavior has a Windows-only test and will be exercised when
+  the branch is pushed to the repository's Windows CI runner. Linux/Windows CI,
+  AOT, and CodeQL have not yet run for this unpushed checkpoint.
+
+## Finding 1: recursive removal can delete outside the selected skill
+
+Severity: **Critical**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Inventory/RemoveService.cs`, recursive enumeration around lines 106-121.
+- `src/SkillView.Core/Inventory/RemoveValidator.cs`, ancestor-link validation around lines 78-87.
+
+### Current behavior
+
+`RemoveService` recursively enumerates files and directories with:
+
+```csharp
+new EnumerationOptions
+{
+    RecurseSubdirectories = true,
+    AttributesToSkip = 0,
+    IgnoreInaccessible = true,
+}
+```
+
+Setting `AttributesToSkip` to zero means reparse points are included. Recursive
+.NET searches include symbolic links, junctions, and mounted-drive reparse
+points. `RemoveService` then deletes every file returned by that traversal.
+
+`RemoveValidator` checks whether an ancestor between the known scan root and
+the selected target is a link that escapes the root. It does not inspect links
+inside the selected skill. A skill can therefore pass every validation rule
+and still contain a child link to arbitrary external content.
+
+### Reproduction
+
+An isolated tree was created with:
+
+- A scan root containing a normal skill directory.
+- A valid `SKILL.md` inside the skill.
+- A nested directory symlink inside the skill pointing to an external directory.
+- One file in the external directory.
+
+The real `RemoveValidator.Validate` returned:
+
+```text
+allowed=True errors=0
+```
+
+The real `RemoveService.Remove` dry run returned:
+
+```text
+files=2 dirs=2
+```
+
+There was only one physical file owned by the skill (`SKILL.md`). The second
+file counted for deletion was the external file reached through the nested
+link. A non-dry run would call `File.Delete` on that external file.
+
+### Impact
+
+- A user-confirmed removal can cross the displayed and validated target boundary.
+- A malicious or accidentally packaged skill can cause unrelated user data to be deleted.
+- A link to an ancestor can create excessive recursive traversal, path growth,
+  latency, and allocation before enumeration fails.
+- Windows junctions and mounted paths are in scope in addition to POSIX links.
+
+### Required remediation
+
+- Never recurse into entries with `FileAttributes.ReparsePoint`.
+- Treat every nested link as a leaf and delete only the link itself.
+- Revalidate canonical containment immediately before each destructive operation.
+- Use an explicit bounded traversal so link handling and cancellation are visible.
+- Add regression tests for:
+  - External directory links.
+  - External file links.
+  - Broken links.
+  - Links to ancestors/cycles.
+  - Links whose targets change after validation.
+  - Windows directory junctions.
+
+## Finding 2: `FileLogSink.Dispose` can deadlock
+
+Severity: **High**
+
+Status: **Fixed in `df62a22` / PR #11.** The replay/attach race described in
+Finding 13 remains deferred.
+
+Locations:
+
+- `src/SkillView.Core/Logging/FileLogSink.cs`, `Append` around lines 47-70.
+- `src/SkillView.Core/Logging/FileLogSink.cs`, `Dispose` around lines 197-206.
+- `src/SkillView.Core/Logging/Logger.cs`, observer invocation and deactivation around lines 107-135.
+
+### Current behavior
+
+`Logger.ObserverRegistration.Invoke` holds the registration lock while invoking
+the sink callback. `FileLogSink.Append` then acquires the sink lock.
+
+`FileLogSink.Dispose` acquires the sink lock first and disposes the logger
+subscription while still holding it. Subscription disposal waits for any
+in-flight observer invocation by acquiring the registration lock.
+
+The resulting lock cycle is:
+
+1. Logging thread acquires the logger registration lock.
+2. Logging thread enters `Append` and waits for the sink lock.
+3. Disposal thread holds the sink lock.
+4. Disposal thread calls subscription disposal and waits for the registration lock.
+
+Neither thread can proceed.
+
+### Secondary disposed-state race
+
+`Append` checks `_disposed` before entering the sink lock and does not recheck it
+inside the lock. A direct call that observes `false`, pauses, and resumes after
+disposal can call `EnsureWriter` and reopen the file after disposal completed.
+The field is also neither volatile nor accessed exclusively under the lock.
+
+### Impact
+
+- Application shutdown can freeze indefinitely.
+- CLI completion can hang in `EntryPoint` while disposing the file sink.
+- A writer can be recreated after the sink is logically disposed.
+
+### Required remediation
+
+- Atomically detach/capture the subscription before acquiring the sink lock.
+- Dispose the subscription without holding the sink lock.
+- Mark the sink disposed under the sink lock.
+- Recheck disposed state inside `Append` after acquiring the lock.
+- Add deterministic tests that coordinate an in-flight append with disposal.
+- Add a test proving no file is created or reopened after disposal returns.
+
+## Finding 3: late background callbacks can mutate disposed UI
+
+Severity: **High**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `RunAsync` teardown around lines 214-227.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `Invoke` around lines 2114-2142.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `RunBackground` around lines 2253-2283.
+
+### Current behavior
+
+`RunBackground` starts discarded `Task.Run` tasks. The application does not
+keep a registry of those tasks and does not await them during shutdown.
+
+`RunAsync` cancels the lifetime and then resets:
+
+```csharp
+_hasRunLifetime = false;
+_runLifetime = null;
+_app = null;
+```
+
+It then disposes the window and application. `Invoke` executes its action
+directly whenever `_app` is null and `_hasRunLifetime` is false. That fallback
+is useful for pre-run unit helpers but becomes unsafe after a real run.
+
+Late startup probes, inventory scans, rescans, discovery work, search `finally`
+blocks, and error handlers can therefore invoke UI actions directly from worker
+threads after teardown began or completed.
+
+### Impact
+
+- Off-UI-thread Terminal.Gui mutation.
+- Access to disposed controls.
+- Timing-dependent `NotInitializedException`, `ObjectDisposedException`, or
+  native terminal-driver failures.
+- Post-shutdown tasks can continue using services while `EntryPoint` disposes
+  the file logger.
+
+### Required remediation
+
+- Track every application-owned background task.
+- Stop accepting new tasks once shutdown begins.
+- Cancel the lifetime and await all tracked tasks before clearing `_app` or
+  disposing the window/application.
+- Make the direct `Invoke` fallback valid only before the first real run, never
+  after the application has entered its lifecycle.
+- Add tests that hold startup/search/rescan work across cancellation and verify
+  no callback touches UI after teardown.
+
+## Finding 4: the shared `gh skill list` cache is not thread-safe
+
+Severity: **High**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Gh/GhSkillListCache.cs`, all operations around lines 10-45.
+- `src/SkillView.Core/Gh/GhSkillListAdapter.cs`, shared adapter/cache ownership.
+- `src/SkillView.Core/Ui/TuiServices.cs`, singleton service composition.
+
+### Current behavior
+
+The cache uses a normal `Dictionary<string, CacheEntry>` with no lock.
+`TryGet`, `Store`, and `Invalidate` all mutate or read it directly.
+
+One adapter instance is shared across the application. Overlapping startup
+inventory capture, tab loads, scope changes, update/install rescans, cleanup,
+and explicit invalidation can access the dictionary concurrently.
+
+### Reproduction
+
+The actual internal cache was exercised with 250,000 mixed parallel `TryGet`,
+`Store`, and `Invalidate` calls. It produced 1,761 exceptions. The first was:
+
+```text
+System.ArgumentException: Destination array was not long enough. Check the
+destination index, length, and the array's lower bounds.
+```
+
+### Impact
+
+- Normal overlapping TUI activity can crash the application.
+- Cache state can be corrupted or entries can be lost.
+- Simultaneous misses also spawn duplicate `gh skill list` processes.
+
+### Required remediation
+
+- Protect the complete cache state with one lock or use a concurrency-safe
+  cache implementation with equivalent atomic expiry behavior.
+- Add per-key single-flight loading so concurrent misses share one process.
+- Keep invalidation atomic with respect to reads and stores.
+- Add high-contention tests for get/store/invalidate and simultaneous expiry.
+
+## Finding 5: log retention can consume multi-gigabyte memory and unbounded disk
+
+Severity: **High**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Logging/Logger.cs`, entry retention around lines 36-55.
+- `src/SkillView.Core/Subprocess/ProcessRunner.cs`, per-stream cap around lines 10 and 121-165.
+- `src/SkillView.Core/Gh/GhSkillListAdapter.cs` and other `gh` adapters that log full stderr.
+- `src/SkillView.Core/Logging/FileLogSink.cs`, trim scheduling around lines 104-158.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, visible log queue around lines 1904-1953.
+
+### Memory behavior
+
+The logger limits only the number of entries. It does not limit message length
+or total retained characters. `ProcessRunner` allows 1,048,576 characters per
+captured stream, and multiple `gh` services interpolate the full stderr string
+into warning entries.
+
+At the default 2,048 entries, repeated noisy failures can retain approximately
+4 GiB of UTF-16 character storage before accounting for:
+
+- String and linked-list overhead.
+- Regex redaction copies.
+- Interpolated-string copies.
+- Process-result strings.
+- File formatting.
+- The 512-entry visible log queue, which can retain roughly another 1 GiB of
+  formatted copies while the log pane is open.
+
+### Disk behavior
+
+The documented 50 MB budget is checked only when a writer is first opened or
+rotated. A long-running same-day process can grow the active file without any
+further budget check.
+
+If the application restarts on the same day with an already oversized current
+file, trimming can select the active file:
+
+- Unix can unlink it while the writer continues writing to an invisible open file.
+- Windows deletion fails because the file was opened with `FileShare.Read`, not
+  delete sharing.
+
+### Impact
+
+- Sustained failing commands can cause out-of-memory termination.
+- The log pane magnifies retained memory.
+- Logs can consume disk beyond the advertised budget.
+- Unix and Windows behave differently when trimming the current file.
+
+### Required remediation
+
+- Apply a strict per-message character limit before inserting into the ring.
+- Bound the ring by total retained characters/bytes in addition to entry count.
+- Log concise stderr snippets rather than full captured streams.
+- Bound visible-log text by both line count and total characters.
+- Rotate files by size as well as date.
+- Exclude the active file from deletion and rotate/close it before enforcing budget.
+- Add same-day growth, restart, Windows sharing, and large-message tests.
+
+## Finding 6: inventory scanning blocks the UI and largely ignores cancellation
+
+Severity: **Medium**
+
+Locations:
+
+- `src/SkillView.Core/Inventory/LocalInventoryService.cs`, `CaptureAsync` around lines 42-81.
+- `src/SkillView.Core/Inventory/LocalSkillScanner.cs`, enumeration and reads around lines 48-124.
+- `src/SkillView.Core/Inventory/SkillLockFileReader.cs`, full-file read around line 84.
+
+### Current behavior
+
+`LocalInventoryService.CaptureAsync` performs root resolution and the full
+filesystem scan before reaching its first `await`. When an environment report
+is already cached, tab activation reaches this scan synchronously on the UI
+thread before the returned task can yield.
+
+The scanner does not accept a cancellation token. It reads every `SKILL.md`
+completely, even though inventory needs only front matter. `SkillLockFileReader`
+also reads complete files into byte arrays without a size limit.
+
+`Directory.EnumerateFileSystemEntries` is lazy. The code catches exceptions
+around creation of the enumerable but performs `foreach` outside that catch.
+ACL changes, directory removal, disconnection, or other errors raised during
+iteration can escape and abort the scan.
+
+### Impact
+
+- Frozen TUI during installed/changes/updates refreshes.
+- Cancellation does not stop local I/O promptly.
+- A huge third-party `SKILL.md` or lock file can cause large allocations.
+- Network mounts, removable media, and Windows ACL behavior increase latency
+  and failure likelihood.
+
+### Required remediation
+
+- Execute filesystem scanning away from the UI thread.
+- Pass a cancellation token through resolver/scanner/lock-reader operations.
+- Check cancellation per root and candidate.
+- Read a bounded front-matter prefix rather than the complete Markdown file.
+- Establish and enforce a lock-file size limit.
+- Catch errors around actual enumeration/move-next operations.
+- Add cancellation, oversized-file, disappearing-directory, ACL, and network-like
+  slow-I/O tests.
+
+## Finding 7: agent-filtered search can launch 200 sequential processes without timeout
+
+Severity: **Medium**
+
+Implementation status: **Partially completed.** New searches now supersede the
+previous request and the whole search has a two-minute deadline. Per-metadata
+preview deadlines and bounded scheduling remain in remediation item 8.
+
+Locations:
+
+- `src/SkillView.Core/Gh/GhSkillSearchService.cs`, maximum result limit around lines 15-16.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, search state around lines 961-1035.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, metadata filtering around lines 1040-1092.
+
+### Current behavior
+
+When an agent filter is supplied, SkillView previews each uncached search result
+to read front-matter agent metadata. The configured maximum is 200 results, so
+one search can execute 200 sequential `gh skill preview` processes.
+
+Selected-item preview has a 30-second timeout, but metadata previews use only
+the application lifetime token. One stuck command prevents the search from
+completing indefinitely. While `_searching` is true, a later user search is
+rejected rather than canceling and superseding the stale request.
+
+### Impact
+
+- Very high search latency and process churn.
+- A single hung preview blocks search until application shutdown.
+- Users cannot correct/refine a slow search without quitting.
+
+### Required remediation
+
+- Give search its own latest-request gate and deadline.
+- Cancel and supersede the previous search when a new one is submitted.
+- Apply a timeout to every metadata preview.
+- Prefer bulk metadata from `gh` if/when available; otherwise use tightly
+  bounded concurrency and rate-aware scheduling.
+- Preserve the bounded LRU metadata cache.
+- Add timeout, supersession, partial-failure, and 200-result tests.
+
+## Finding 8: install modal async handlers can outlive disposed dialogs
+
+Severity: **Medium**
+
+Locations:
+
+- `src/SkillView.Core/Ui/InstallConfirmModal.cs`, async accepting handler around lines 189-264.
+- `src/SkillView.Core/Ui/RepoSkillPickerModal.cs`, async accepting handler around lines 249-375.
+- `src/SkillView.Core/Ui/InstallScreen.cs`, async accepting handler around lines 394-451.
+
+### Current behavior
+
+The Terminal.Gui accepting events use `async void` handlers whose tasks are not
+owned or awaited by the modal. `Ctrl+Q` can request stop for both the top modal
+and the main window while an install is active.
+
+The compact and picker handlers check cancellation before calling
+`IApplication.Invoke`, but the invocation is queued when called from a worker
+thread. They do not recheck the dialog lifetime inside the queued callback.
+The dialog can close and be disposed between the check and callback execution.
+
+An exception thrown by a UI invocation from inside a catch block is outside the
+original try/catch and can escape the `async void` handler.
+
+`InstallScreen` has an inner cancellation check and is safer, but still does not
+own/await the operation and can encounter application-disposal races.
+
+### Impact
+
+- Queued callbacks can update disposed controls.
+- Async-void exceptions can reach the application/thread exception path.
+- Shutdown may return while install code still owns process and UI references.
+
+### Required remediation
+
+- Track the modal's active operation task explicitly.
+- Recheck lifetime inside every queued UI action.
+- Observe and contain all UI-dispatch exceptions.
+- Cancel and await the operation before disposing the dialog.
+- Consider an asynchronous modal lifecycle rather than synchronous `Run` plus
+  untracked event tasks.
+- Add Ctrl+Q, Esc, completion-vs-close, and exception-vs-dispose race tests.
+
+## Finding 9: CLI cancellation and process termination are incomplete
+
+Severity: **Medium**
+
+Locations:
+
+- `src/SkillView.Core/Bootstrapping/EntryPoint.cs`, `RunAsync` around line 12.
+- `src/SkillView.Core/Cli/CliDispatcher.cs`, `RunAsync` around line 23 and service calls throughout.
+- `src/SkillView.Core/Subprocess/ProcessRunner.cs`, cancellation handling around lines 68-80.
+
+### Current behavior
+
+Neither the shared entrypoint nor CLI dispatcher accepts an application
+cancellation token. CLI service calls therefore use default tokens and rely on
+abrupt process termination when Ctrl+C is pressed.
+
+The TUI process runner calls `Kill(entireProcessTree: true)` after cancellation,
+but does not wait for the process after issuing the kill. `.NET` process kill
+is asynchronous, and parent exit status does not prove all descendants have
+exited.
+
+Most `gh` operations also lack operation-specific deadlines; selected preview
+is the notable exception.
+
+### Impact
+
+- CLI commands cannot perform cooperative cleanup.
+- Long-running/hung `gh` calls have no uniform deadline.
+- Cancellation can return before the child process has actually exited.
+- Descendants can survive best-effort tree termination.
+
+### Required remediation
+
+- Create a root cancellation source in `EntryPoint`.
+- Translate `Console.CancelKeyPress` into cancellation and restore/unsubscribe
+  the handler during teardown.
+- Propagate the token through `CliDispatcher` and every service call.
+- Apply operation-specific timeouts.
+- After `Kill`, perform a bounded wait for parent exit and log/report failures.
+- Add cross-platform Ctrl+C and child-process cancellation tests.
+
+## Finding 10: removal materializes full trees and runs on the UI thread
+
+Severity: **Medium**
+
+Locations:
+
+- `src/SkillView.Core/Inventory/RemoveService.cs`, `.ToList()` traversal around lines 106-121.
+- `src/SkillView.Core/Ui/RemoveConfirmModal.cs`, synchronous remove around line 139.
+- `src/SkillView.Core/Ui/RemoveScreen.cs`, synchronous execute around lines 268-287.
+- `src/SkillView.Core/Ui/CleanupScreen.cs`, synchronous batch removal around lines 179-241.
+
+### Current behavior
+
+`RemoveService` materializes every file path and every directory path before
+deleting anything. The UI calls it synchronously from Terminal.Gui event
+handlers. There is no cancellation token or progress reporting.
+
+### Impact
+
+- Large trees allocate proportional path lists before deletion begins.
+- Slow local disks, antivirus, network mounts, or large packages freeze the UI.
+- Users cannot cancel after confirming.
+- Link cycles amplify both traversal time and memory until failure.
+
+### Required remediation
+
+- First apply the critical reparse-point fix.
+- Replace complete file/dir materialization with an explicit bounded traversal.
+- Make removal asynchronous and cancellation-aware.
+- Report progress through throttled UI dispatch.
+- Preserve bottom-up directory deletion without retaining every file path.
+- Add large-tree, slow-I/O, cancellation, and partial-failure tests.
+
+## Finding 11: path identity is wrong on case-insensitive filesystems
+
+Severity: **Medium**
+
+Locations:
+
+- `src/SkillView.Core/Inventory/PathResolver.cs`, containment around lines 69-79.
+- `src/SkillView.Core/Inventory/ScanRootResolver.cs`, root deduplication around lines 43-46.
+- `src/SkillView.Core/Inventory/LocalInventoryService.cs`, merge indexes.
+- Other cleanup and removal sets keyed by normalized path with `StringComparer.Ordinal`.
+
+### Current behavior
+
+Path normalization changes separators and trims trailing separators, but it
+does not canonicalize case. Path equality, containment, deduplication, and merge
+keys use ordinal case-sensitive comparisons.
+
+On normal Windows filesystems, `C:\Users\X` and `c:\users\x` identify the same
+path but SkillView treats them as unrelated. Case-insensitive macOS volumes have
+the same class of problem. Linux filesystems are normally case-sensitive, and
+Windows can enable case sensitivity per directory, so an unconditional global
+ignore-case comparer is also not a complete solution.
+
+### Impact
+
+- Legitimate containment validation can fail.
+- The same physical root or skill can appear more than once.
+- `gh skill list` records may not merge with filesystem records.
+- Cleanup classification can report false duplicates or anomalies.
+
+### Required remediation
+
+- Centralize path identity rather than selecting comparers independently.
+- At minimum use OS-appropriate ordinal comparison consistently.
+- Where destructive identity matters, prefer canonical filesystem identity or
+  independently revalidated containment rather than string equality alone.
+- Add Windows mixed-case, macOS case-insensitive-volume, Linux case-sensitive,
+  and Windows case-sensitive-directory tests.
+
+## Finding 12: Discover and Doctor operations outlive workspace ownership
+
+Severity: **High**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `ActivateTab` and `EnterDoctor`.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `RunSearchAsync` around lines 967-1044.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `PreviewSelectedAsync` around lines 1100-1223.
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, Doctor probing around lines 764-800.
+
+### Current behavior
+
+The post-PR shared cancellation helper covers Installed, Changes, and Updates.
+It does not cancel work owned by Discover or Doctor:
+
+- Discover search uses only the application lifetime. Switching to Installed,
+  Changes, or Doctor leaves the search and up to 200 agent-metadata preview
+  subprocesses running. A late success replaces hidden Discover state, calls
+  `SetFocus` on the results table, changes the global status, and clears the
+  shared spinner.
+- Selected preview has its own latest-request gate, but leaving Discover does
+  not cancel it. Its success callback calls `ShowPreviewPane`, which can close
+  a log pane the user opened while preview was in flight and changes global
+  status/spinner state after another workspace became active.
+- Starting a new search does not cancel an in-flight selected preview for the
+  old result set. The old preview can therefore overwrite the preview/title
+  after the new search results have been installed.
+- Doctor probing uses the application lifetime and `RunBackground`. Leaving
+  Doctor before the probe completes does not cancel or supersede it. The late
+  callback updates the hidden Doctor view and clears the shared spinner.
+- Startup, Doctor, and coordinator paths can all observe `_lastReport == null`
+  and launch duplicate environment probes rather than sharing one in-flight
+  task.
+
+Terminal.Gui currently rejects `SetFocus()` when a view or ancestor is hidden,
+so the hidden-focus calls are less damaging than they appear. The remaining
+status, spinner, preview-mode, process, and hidden-state mutations are still
+real application-level lifecycle defects.
+
+### Impact
+
+- Hidden work consumes `gh` processes, filesystem I/O, and memory after the
+  user has left the feature.
+- One workspace can clear or overwrite another workspace's progress and status.
+- A selected preview from the old result set can be displayed beside new search
+  results.
+- Returning from logs or another tab can reveal state chosen by a stale
+  completion rather than the user's latest action.
+
+### Required remediation
+
+- Give every workspace an explicit activation lifetime, separate from the
+  application lifetime.
+- Cancel Discover search and selected preview when Discover deactivates.
+- Cancel or generation-gate Doctor probing when Doctor deactivates.
+- Include workspace/generation checks inside the queued UI callback, not only
+  before calling `Invoke`.
+- Separate progress ownership so one operation cannot clear another operation's
+  spinner/status.
+- Store and share one in-flight environment-probe task.
+- Add transition tests for Discover to every primary tab, Discover to Doctor,
+  preview to logs, new-search versus old-preview completion, and Doctor leave
+  versus probe completion.
+
+## Finding 13: log snapshot/replay initialization can lose or duplicate entries
+
+Severity: **Medium**
+
+Implementation status: **Completed on `fix/adversarial-hardening`.**
+
+Locations:
+
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, `OnLogEntry` and
+  `InitializeVisibleLogLines` around lines 1909-1941.
+- `src/SkillView.Core/Logging/FileLogSink.cs`, `Attach` around lines 44-55.
+- `src/SkillView.Core/Logging/Logger.cs`, separate ring and observer locks.
+
+### New Copilot "needs a closer look" comment
+
+Copilot's
+[post-fix review](https://github.com/harder/gh-skillview/pull/11#pullrequestreview-5052520853)
+correctly identified this visible-log loss interleaving:
+
+1. `InitializeVisibleLogLines` takes `Logger.Snapshot()`.
+2. A new log entry is added and `OnLogEntry` enqueues it.
+3. Initialization acquires `_visibleLogGate`, clears the queue, and replaces it
+   with the older snapshot.
+
+The new entry is permanently absent from the visible log pane until the pane is
+closed and initialized again.
+
+The suggested minimal change—hold `_visibleLogGate` while taking the logger
+snapshot—prevents that loss but needs closer design. `Logger.Log` commits the
+ring entry before it invokes observers. A log thread can add an entry, block in
+`OnLogEntry` on `_visibleLogGate`, and then have initialization include that
+same entry in the snapshot. When the gate is released, the callback enqueues it
+again, producing a duplicate.
+
+`_showingLogs` is also written on the UI thread and read by logger-callback
+threads without a lock or volatile access. The callback can observe stale pane
+visibility while deciding whether to retain and schedule an entry.
+
+### Analogous file-sink race found during reassessment
+
+`FileLogSink.Attach` replays `logger.Snapshot()` and subscribes afterward. A log
+emitted between those calls is in neither the replay nor the new subscription,
+so it is absent from the disk log. Reversing the order to subscribe first and
+snapshot second creates a duplicate window instead of closing the race.
+
+The public `Attach` method can also race re-attach or disposal; its one-shot
+startup assumption is not expressed or enforced by the API.
+
+### Required remediation
+
+- Define a logger sequence number or an atomic replay-subscribe operation.
+- Commit ring insertion and observer membership against one ordering boundary,
+  then deliver replay/live entries with a watermark so each sequence appears
+  exactly once.
+- Use the same primitive for the file sink and visible log pane rather than
+  maintaining two subtly different replay protocols.
+- Synchronize pane visibility with queue state, or enqueue all bounded entries
+  regardless of visibility and only coalesce drawing while visible.
+- Make file-sink attachment one-shot and startup-only, or fully synchronize
+  attach/re-attach/dispose.
+- Add deterministic tests for logs emitted before snapshot, between snapshot
+  and subscription/replacement, and after subscription, asserting no gaps and
+  no duplicates.
+
+## Finding 14: Esc does not leave all Discover filter inputs as advertised
+
+Severity: **Medium usability/reliability**
+
+Location:
+
+- `src/SkillView.Core/Ui/SkillViewApp.cs`, root Esc handling around lines 598-607.
+
+### Current behavior
+
+Copilot also recorded this in the
+[preceding review's suppressed follow-ups](https://github.com/harder/gh-skillview/pull/11#pullrequestreview-5052291512).
+The query field handles Esc locally by returning focus to the results table.
+The owner field, agent field, and numeric limit control do not. Their Esc key
+reaches the root handler, which consumes it and displays "Esc leaves the field"
+without actually changing focus. The next plain `q` is consequently typed into
+the field rather than quitting. `Ctrl+Q` remains the unconditional escape hatch,
+but the UI message and expected two-step Esc then q behavior are wrong.
+
+### Required remediation
+
+- Centralize `LeaveTextInput` and call it for every editable Discover/Installed
+  control before consuming Esc.
+- Test query, owner, agent, numeric limit, and Installed filter focus separately.
+- Keep the application-level Ctrl+Q test because focused editors are precisely
+  where global quit routing tends to regress.
+
+## Test gap: the LRU test currently proves only FIFO eviction
+
+`Store_EvictsLeastRecentlyUsedMetadataAtCapacity` inserts first, second, and
+third without touching an older entry before eviction. A FIFO cache would pass
+the same test. The implementation's `Has` method does call `Touch`, so this is
+not evidence of a production defect, but the contract is unprotected. Touch
+`first` before storing `third` and assert that `second` was evicted. Also test
+that updating an existing value refreshes recency.
+
+## Lower-risk hardening opportunities
+
+These should be included while the related components are being changed:
+
+1. Validate that `Logger` capacity is non-negative; a negative value eventually
+   calls `RemoveFirst` on an empty ring.
+2. Serialize tests that mutate `TuiHelpers.CurrentTheme`, Terminal.Gui scheme
+   facades, or other static UI configuration.
+3. Stream CLI JSON directly to `Console.Out` rather than creating a
+   `MemoryStream`, copying it to a byte array, decoding to UTF-16, and encoding
+   it again for output.
+4. Add explicit concurrency coverage for:
+   - Cache get/store/invalidate.
+   - Logger sink append/dispose.
+   - Logger replay/subscribe without gaps or duplicates.
+   - UI shutdown with pending startup/search/rescan tasks.
+   - Every workspace exit with pending load/operation/UI dispatch.
+   - Modal shutdown with active installs.
+   - Same-day log growth and active-file rotation.
+5. Add stress tests with bounded memory assertions for noisy subprocess errors,
+   oversized local files, large inventories, and large removal trees.
+
+## Existing hardening that held up
+
+The following areas were reviewed and found to be appropriately bounded or
+coordinated within their current scope:
+
+- `LatestRequestGate` correctly supersedes selected previews and applies their timeout.
+- Installed and Changes cancellation slots prevent stale loads from replacing
+  newer state. Updates now does the same for both loads and operations after
+  `df62a22`; this was not true at the original audit commit.
+- `ProcessRunner` drains stdout and stderr concurrently and bounds each captured stream.
+- Search agent metadata uses a locked, capacity-limited LRU.
+- Visible-log redraws are coalesced; this branch adds both line-count and total
+  character budgets while retaining entries regardless of pane visibility.
+- Terminal escape sanitization is stateless and applied to remote/untrusted
+  rendered content.
+- The application uses Terminal.Gui's modern `Application.Create().Init()` and
+  `IApplication.Dispose()` lifecycle.
+- External TUI cancellation is connected to `IApplication.RunAsync`; this
+  branch adds ownership and shutdown quiescence for subordinate application
+  tasks, while modal-specific lifetimes remain remediation item 9.
+
+## Recommended remediation order
+
+1. [x] Fix nested-link traversal before any further release or removal testing.
+2. [x] Make `GhSkillListCache` thread-safe and single-flight.
+3. [x] Add tracked background-task ownership and shutdown quiescence.
+4. [x] Add workspace activation lifetimes for Discover and Doctor, including
+   search/preview/probe cancellation and generation checks.
+5. [x] Replace log snapshot-plus-subscribe/replacement with exact-once replay.
+6. [x] Add log character/byte budgets and correct disk rotation.
+7. [ ] Move inventory and removal I/O off the UI thread with cancellation.
+8. [ ] Finish metadata-preview deadlines and bounded scheduling (search
+   supersession and a whole-request deadline are complete).
+9. [ ] Make modal operation lifetimes awaitable and disposal-safe.
+10. [ ] Wire root CLI cancellation and bounded post-kill waiting.
+11. [ ] Centralize cross-platform path identity semantics.
+12. [ ] Correct Esc focus behavior and strengthen the LRU contract test.
+13. [ ] Finish the lower-risk hardening and stress coverage.
+
+`FileLogSink` lock ordering, Doctor-to-tab cancellation, and Updates operation
+deactivation were completed in `df62a22` and are not in the remaining order.
+
+## Terminal.Gui upstream assessment
+
+Most SkillView findings belong in SkillView rather than Terminal.Gui. The
+library cannot know that hiding Discover should cancel a `gh` process, and it
+does not own SkillView's logger, filesystem traversal, path identity, cache,
+or process-output policy. Terminal.Gui already rejects `SetFocus()` when a view
+or an ancestor is hidden, removes `SpinnerView` timers during disposal, exposes
+application-level keyboard routing, and provides `Markdown.ShowHeadingPrefix`.
+
+The audit did identify the following upstream defects or worthwhile platform
+improvements. They were checked against the current `develop` source at
+`48efa0c5` and stable `v2.4.17`.
+
+### TG-1: `TimedEvents.RunTimers` still executes callbacks under its queue lock
+
+Priority: **High; new upstream issue recommended**
+
+`TimedEvents.RunTimers` takes `_timeoutsLockToken` and calls `RunTimersImpl`.
+`RunTimersImpl` takes the same re-entrant lock, removes one timeout, exits only
+the inner lock, and invokes the user callback. Despite its comment saying the
+callback executes outside the lock, the outer `RunTimers` lock remains held.
+This exists in both stable `v2.4.17` and current `develop`.
+
+A timeout callback that waits for background work which calls `AddTimeout`,
+`RemoveTimeout`, or `IApplication.Invoke` can deadlock: the UI callback waits
+for the worker, while the worker waits for the timeout lock held by the UI
+callback. Long callbacks also block all cross-thread UI dispatch and timer
+cancellation.
+
+Do not simply remove all serialization because `RunTimers` is public and two
+callers could then execute callbacks concurrently. Use a separate runner gate
+or interlocked single-runner guard, while retaining the short queue lock only
+for selecting/removing/reinserting entries. Add a deterministic test whose
+callback waits for a background `Add`/`Remove`; it must complete without either
+operation running concurrently with another timer callback.
+
+No existing issue located by `TimedEvents`, `RunTimers`, lock, or deadlock
+search describes this exact retained outer-lock problem.
+
+### TG-2: complete the synchronization-context session fix before v2.5
+
+Priority: **High; already tracked**
+
+Stable `v2.4.17` installs a plain `SynchronizationContext`, so `await` in an
+event handler resumes on the thread pool. The current multitasking guide says
+the continuation automatically returns to the main thread, which is not true
+for the latest stable release. Issue
+[tui-cs/Terminal.Gui#5579](https://github.com/tui-cs/Terminal.Gui/issues/5579)
+and PR
+[tui-cs/Terminal.Gui#5588](https://github.com/tui-cs/Terminal.Gui/pull/5588)
+introduced a real `MainLoopSyncContext` on `develop`.
+
+That change created the startup/session deadlock tracked by
+[tui-cs/Terminal.Gui#5636](https://github.com/tui-cs/Terminal.Gui/issues/5636).
+PR
+[tui-cs/Terminal.Gui#5641](https://github.com/tui-cs/Terminal.Gui/pull/5641)
+contains the session-scoping and after-session fallback, but it was merged into
+a stacked feature branch rather than current `develop`; the issue remains open.
+Treat integration of that fix, including nested-session tests, as a v2.5
+release gate. Version the multitasking documentation or clearly describe the
+different stable and upcoming behavior until then.
+
+### TG-3: the deeper `IApplication.Invoke` lifecycle race remains unresolved
+
+Priority: **High; new or reopened upstream issue recommended**
+
+[Issue #5163](https://github.com/tui-cs/Terminal.Gui/issues/5163) identified
+that the fast path reads `TopRunnableView` and `MainThreadId` without
+synchronizing against shutdown. PR
+[#5185](https://github.com/tui-cs/Terminal.Gui/pull/5185) added a useful
+pre-init/post-dispose `Initialized` guard, but explicitly left the deeper race
+out of scope while closing the issue. The current implementation still permits
+state to change after the guard or fast-path check and before action invocation
+or timeout enqueue.
+
+Re-open the concurrency portion as its own issue. Define whether a concurrent
+shutdown causes the action to run, be canceled, or throw, then make the
+decision atomic. Cover both the immediate UI-thread path and queued worker path
+with deterministic lifecycle hooks rather than timing-only stress tests.
+
+### TG-4: add awaitable, cancellable, session-aware UI dispatch
+
+Priority: **Medium API improvement**
+
+`IApplication.Invoke` returns `void`; callers cannot await execution, attach a
+cancellation token, distinguish "queued" from "ran", or bind the callback to
+the `IRunnable`/modal that owns the referenced views. SkillView had to build a
+`TaskCompletionSource` wrapper and still implement all view-lifetime checks
+itself.
+
+Consider an `InvokeAsync(Action, CancellationToken)` API and a runnable/session
+lifetime token that is canceled when that session ends. The callback should
+recheck the token on the UI thread immediately before invoking user code.
+Document how it behaves after session end and application disposal. This would
+not automatically cancel application business operations, but it would make
+safe modal/workspace dispatch a standard pattern.
+
+The current multitasking guide and UICatalog threading scenario rely heavily on
+`async void` event handlers and show cancellation without tying it to
+`Disposing` or `IRunnable.IsRunningChanged`. Add an explicit async-modal example
+that cancels and observes work before disposing referenced views. Longer term,
+an async command/event abstraction could observe handler tasks and route their
+exceptions through the application error handler.
+
+### TG-5: add debug-time UI-thread/lifetime diagnostics
+
+Priority: **Medium diagnostic improvement**
+
+Terminal.Gui documents off-thread view mutation as undefined behavior, but most
+view property mutations do not assert thread affinity. An opt-in debug guard or
+an analyzer could flag mutation when `View.App.MainThreadId` differs, and warn
+when an async event handler captures a view without cancellation on disposal.
+This would have surfaced several SkillView audit findings much earlier without
+adding release-build overhead.
+
+## Primary platform references
+
+- .NET recursive search and reparse points:
+  <https://learn.microsoft.com/en-us/dotnet/api/system.io.searchoption?view=net-10.0>
+- .NET directory enumeration:
+  <https://learn.microsoft.com/en-us/dotnet/api/system.io.directory.enumeratefiles?view=net-10.0>
+- .NET process termination:
+  <https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.kill?view=net-10.0>
+- .NET console cancellation:
+  <https://learn.microsoft.com/en-us/dotnet/api/system.console.cancelkeypress?view=net-10.0>
+- Windows file-sharing/delete behavior:
+  <https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams>
+- Windows/Linux case sensitivity:
+  <https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity>

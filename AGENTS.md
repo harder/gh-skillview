@@ -112,6 +112,19 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `CancellationToken`, and only update UI through `app.Invoke()` while that
   lifetime is still active. Do not fall back to direct UI mutation after
   teardown.
+- Route application-owned fire-and-forget work through `BackgroundTaskTracker`
+  (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
+  tied to their activation lifetimes and put generation/ownership checks inside
+  queued UI callbacks. Shutdown must stop task admission, cancel lifetimes, and
+  drain owned work before disposing Terminal.Gui or logging resources.
+- Removal traversal must never use recursive filesystem enumeration. Treat
+  every `FileAttributes.ReparsePoint` child (Unix symlink, Windows junction,
+  mount point, or broken link) as a leaf, revalidate containment immediately
+  before deletion, and keep cancellation/depth bounds explicit.
+- Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
+  plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
+  the logger's message/total-character budgets and the file sink's date+size
+  rotation and active-file exclusion when changing logging.
 - The main TUI host path now runs through `SkillViewApp.RunAsync(ct)`, and
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via

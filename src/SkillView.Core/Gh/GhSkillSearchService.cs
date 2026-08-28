@@ -42,7 +42,7 @@ public sealed class GhSkillSearchService
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.search", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
+            _logger.Warn("gh.skill.search", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
             return new SearchResponse(Array.Empty<SearchResultSkill>(), result.ExitCode, result.StdErr.Trim());
         }
 

@@ -35,14 +35,22 @@ public sealed class SkillViewApp
     private readonly bool _probeOnRun;
     private readonly SearchAgentMetadataCache _searchAgentMetadata = new();
     private readonly SkillViewWorkflowCoordinator _workflows;
+    private readonly BackgroundTaskTracker _backgroundTasks;
     private const int MaxVisibleLogLines = 512;
+    private const int MaxVisibleLogCharacters = 256 * 1024;
 
     private IApplication? _app;
     private Window? _mainWindow;
     private IDisposable? _logSubscription;
     private CancellationTokenSource? _runLifetime;
     private readonly LatestRequestGate _previewRequests = new();
-    private bool _hasRunLifetime;
+    private readonly LatestRequestGate _searchRequests = new();
+    private readonly SharedAsyncOperation<EnvironmentReport> _environmentProbe = new();
+    private CancellationTokenSource? _discoverLifetime;
+    private CancellationTokenSource? _doctorLifetime;
+    private long _discoverGeneration;
+    private long _doctorGeneration;
+    private bool _hasEnteredRunLifecycle;
     private TextField? _queryField;
     private TextField? _ownerField;
     private TextField? _agentField;
@@ -82,11 +90,10 @@ public sealed class SkillViewApp
     // on each fresh fetch.
     private List<SearchResultSkill> _resultsNaturalOrder = new();
     private SearchSort _searchSort = SearchSort.Off;
-    private string? _ghPath;
-    private bool _showingLogs;
+    private volatile string? _ghPath;
+    private volatile bool _showingLogs;
     private bool _showingRawPreview;
     private EnvironmentReport? _lastReport;
-    private volatile bool _searching;
     // Monotonic generation counter — bumped on each RunSearchAsync invocation
     // and captured at submit time. Result painting checks for stale generation
     // and silently drops out-of-band completions. Mirrors winget-tui's
@@ -100,6 +107,7 @@ public sealed class SkillViewApp
     private string? _loadedPreviewKey;
     private readonly object _visibleLogGate = new();
     private readonly Queue<string> _visibleLogLines = new(MaxVisibleLogLines);
+    private int _visibleLogCharacters;
     private int _logRefreshQueued;
 
     /// Sort modes for the Search tab results table. Mirrors winget-tui's
@@ -127,13 +135,14 @@ public sealed class SkillViewApp
         _options = options;
         _applicationFactory = applicationFactory;
         _probeOnRun = probeOnRun;
+        _backgroundTasks = new BackgroundTaskTracker(LogUnhandledException);
         _workflows = new SkillViewWorkflowCoordinator(
             services,
             options,
             () => _app,
             () => _ghPath,
-            () => _lastReport,
-            report => _lastReport = report,
+            () => Volatile.Read(ref _lastReport),
+            GetOrProbeEnvironmentAsync,
             SetBusy,
             ClearBusy,
             SetStatus,
@@ -176,7 +185,7 @@ public sealed class SkillViewApp
         IApplication? app = null;
         Window? window = null;
         using var runLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _hasRunLifetime = true;
+        _hasEnteredRunLifecycle = true;
         _runLifetime = runLifetime;
 
         UnhandledExceptionEventHandler onUnhandledException = (_, args) =>
@@ -197,6 +206,7 @@ public sealed class SkillViewApp
             }
 
             _app = app;
+            ActivateDiscoverWorkspace();
             window = BuildUi();
 
             // TableView routes Enter (View base default), p/v/CursorRight (rebound in
@@ -215,11 +225,16 @@ public sealed class SkillViewApp
         {
             AppDomain.CurrentDomain.UnhandledException -= onUnhandledException;
             CancelStatusAutoClear();
+            // Close task admission before cancellation so no event racing the
+            // run-loop exit can add unowned work after the drain snapshot.
+            _backgroundTasks.StopAccepting();
+            DeactivateDoctorWorkspace(clearBusy: false);
+            DeactivateDiscoverWorkspace(clearBusy: false);
             runLifetime.Cancel();
             CancelCurrentPreview();
+            await _backgroundTasks.DrainAsync().ConfigureAwait(false);
             DisposeLogSubscription();
             DetachApplicationKeyHandler();
-            _hasRunLifetime = false;
             _runLifetime = null;
             _app = null;
             window?.Dispose();
@@ -241,6 +256,11 @@ public sealed class SkillViewApp
 
     private Window BuildUi()
     {
+        if (_activeTab == SkillViewTab.Discover && !_inDoctor)
+        {
+            ActivateDiscoverWorkspace();
+        }
+
         var invocationHint = _options.InvocationMode == InvocationMode.GhExtension
             ? "gh skillview"
             : "skillview";
@@ -323,7 +343,7 @@ public sealed class SkillViewApp
         _resultsTable.Accepted += (_, _) =>
         {
             _services.Logger.Info("preview", "Accepted → calling PreviewSelectedAsync");
-            _ = PreviewSelectedAsync();
+            RunOwnedTask(PreviewSelectedAsync, "preview");
         };
         _resultsTable.ValueChanged += (_, _) =>
         {
@@ -391,6 +411,7 @@ public sealed class SkillViewApp
 
         _installedTab = new SkillView.Ui.Tabs.InstalledTabView(
             runOnUi: runOnUi,
+            runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
@@ -409,6 +430,7 @@ public sealed class SkillViewApp
 
         _updatesTab = new SkillView.Ui.Tabs.UpdatesTabView(
             runOnUi: runOnUi,
+            runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             updateRunner: (ghPath, options, token) => _services.UpdateService.UpdateAsync(ghPath, options, token),
             ghPathProvider: () => _ghPath,
@@ -485,9 +507,16 @@ public sealed class SkillViewApp
 
         RefreshResultsTable();
         DisposeLogSubscription();
-        _logSubscription = _services.Logger.Subscribe(OnLogEntry);
+        lock (_visibleLogGate)
+        {
+            _visibleLogLines.Clear();
+            _visibleLogCharacters = 0;
+        }
+        _logSubscription = _services.Logger.SubscribeWithReplay(OnLogEntry);
         window.Disposing += (_, _) =>
         {
+            DeactivateDoctorWorkspace(clearBusy: false);
+            DeactivateDiscoverWorkspace(clearBusy: false);
             DisposeLogSubscription();
             DetachApplicationKeyHandler();
         };
@@ -699,7 +728,26 @@ public sealed class SkillViewApp
     /// without re-running the app loop.
     private void ActivateTab(SkillViewTab tab)
     {
+        var leftDoctor = false;
+        if (_inDoctor)
+        {
+            _inDoctor = false;
+            if (_doctorTab is not null) _doctorTab.Visible = false;
+            DeactivateDoctorWorkspace(clearBusy: true);
+            leftDoctor = true;
+        }
+        if (leftDoctor && tab == _activeTab)
+        {
+            _activeTab = tab == SkillViewTab.Discover
+                ? SkillViewTab.Installed
+                : SkillViewTab.Discover;
+        }
         if (tab == _activeTab) return;
+
+        if (_activeTab == SkillViewTab.Discover)
+        {
+            DeactivateDiscoverWorkspace(clearBusy: true);
+        }
         CancelPendingTabWork();
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
@@ -713,6 +761,7 @@ public sealed class SkillViewApp
         switch (tab)
         {
             case SkillViewTab.Discover:
+                ActivateDiscoverWorkspace();
                 ShowSearchPanes(true);
                 RestoreDiscoverFocus();
                 break;
@@ -721,7 +770,7 @@ public sealed class SkillViewApp
                 if (_installedTab is not null)
                 {
                     _installedTab.Visible = true;
-                    _ = _installedTab.LoadAsync();
+                    RunOwnedTask(_installedTab.LoadAsync, "installed.load");
                     var installed = _installedTab;
                     Invoke(() => installed.FocusList());
                 }
@@ -731,7 +780,7 @@ public sealed class SkillViewApp
                 if (_changesTab is not null)
                 {
                     _changesTab.Visible = true;
-                    _ = _changesTab.LoadAsync();
+                    RunOwnedTask(_changesTab.LoadAsync, "changes.load");
                 }
                 break;
         }
@@ -766,6 +815,11 @@ public sealed class SkillViewApp
         if (_inDoctor || _doctorTab is null) return;
         _tabBeforeDoctor = _activeTab;
         _inDoctor = true;
+        if (_activeTab == SkillViewTab.Discover)
+        {
+            DeactivateDiscoverWorkspace(clearBusy: true);
+        }
+        ActivateDoctorWorkspace();
         CancelPendingTabWork();
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
@@ -774,9 +828,9 @@ public sealed class SkillViewApp
         RefreshShellChrome();
 
         // Make sure the report is fresh — probe lazily if we never have.
-        if (_lastReport is not null)
+        if (Volatile.Read(ref _lastReport) is { } cachedReport)
         {
-            _doctorTab.SetReport(_lastReport);
+            _doctorTab.SetReport(cachedReport);
             _doctorTab.Visible = true;
             _doctorTab.SetFocus();
             return;
@@ -786,17 +840,11 @@ public sealed class SkillViewApp
         // the user sees the screen flip even before the report lands.
         _doctorTab.Visible = true;
         SetBusy("probing environment for Doctor…");
-        RunBackground(async cancellationToken =>
-        {
-            var probed = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _lastReport = probed;
-            Invoke(() =>
-            {
-                ClearBusy();
-                _doctorTab.SetReport(probed);
-                _doctorTab.SetFocus();
-            });
-        }, "doctor");
+        var doctorGeneration = Interlocked.Read(ref _doctorGeneration);
+        var doctorToken = _doctorLifetime?.Token ?? new CancellationToken(canceled: true);
+        RunOwnedTask(
+            () => ProbeDoctorAsync(doctorGeneration, doctorToken),
+            "doctor");
     }
 
     private void CancelPendingTabWork()
@@ -811,6 +859,7 @@ public sealed class SkillViewApp
         if (!_inDoctor || _doctorTab is null) return;
         _inDoctor = false;
         _doctorTab.Visible = false;
+        DeactivateDoctorWorkspace(clearBusy: true);
         // Re-enter the previously-active primary tab. We force-set _activeTab
         // to something different first so ActivateTab's no-op guard doesn't
         // suppress the re-show.
@@ -819,6 +868,94 @@ public sealed class SkillViewApp
         _activeTab = restore == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
         ActivateTab(restore);
     }
+
+    private async Task ProbeDoctorAsync(long doctorGeneration, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var probed = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
+            Invoke(() =>
+            {
+                if (!IsDoctorWorkspaceActive(doctorGeneration)) return;
+                ClearBusy();
+                _doctorTab?.SetReport(probed);
+                _doctorTab?.SetFocus();
+            });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _services.Logger.Debug("doctor", "Doctor probe canceled during deactivation");
+        }
+        catch (Exception ex)
+        {
+            _services.Logger.Error("doctor", ex.Message);
+            Invoke(() =>
+            {
+                if (!IsDoctorWorkspaceActive(doctorGeneration)) return;
+                ClearBusy();
+                SetStatus($"doctor failed: {TuiHelpers.ErrorSnippet(ex.Message)}",
+                    TuiHelpers.NotificationLevel.Error);
+            });
+        }
+    }
+
+    private void ActivateDiscoverWorkspace()
+    {
+        if (_discoverLifetime is { IsCancellationRequested: false }) return;
+        _discoverLifetime?.Dispose();
+        _discoverLifetime = CancellationTokenSource.CreateLinkedTokenSource(GetRunLifetimeToken());
+        Interlocked.Increment(ref _discoverGeneration);
+    }
+
+    private void DeactivateDiscoverWorkspace(bool clearBusy)
+    {
+        Interlocked.Increment(ref _discoverGeneration);
+        _searchRequests.Cancel();
+        CancelCurrentPreview(clearBusy: false);
+        var lifetime = Interlocked.Exchange(ref _discoverLifetime, null);
+        if (lifetime is not null)
+        {
+            try { lifetime.Cancel(); }
+            finally { lifetime.Dispose(); }
+        }
+        if (clearBusy)
+        {
+            ClearBusy();
+        }
+    }
+
+    private void ActivateDoctorWorkspace()
+    {
+        DeactivateDoctorWorkspace(clearBusy: false);
+        _doctorLifetime = CancellationTokenSource.CreateLinkedTokenSource(GetRunLifetimeToken());
+        Interlocked.Increment(ref _doctorGeneration);
+    }
+
+    private void DeactivateDoctorWorkspace(bool clearBusy)
+    {
+        Interlocked.Increment(ref _doctorGeneration);
+        var lifetime = Interlocked.Exchange(ref _doctorLifetime, null);
+        if (lifetime is not null)
+        {
+            try { lifetime.Cancel(); }
+            finally { lifetime.Dispose(); }
+        }
+        if (clearBusy)
+        {
+            ClearBusy();
+        }
+    }
+
+    private bool IsDiscoverWorkspaceActive(long generation) =>
+        !_inDoctor
+        && _activeTab == SkillViewTab.Discover
+        && Interlocked.Read(ref _discoverGeneration) == generation
+        && _discoverLifetime is { IsCancellationRequested: false };
+
+    private bool IsDoctorWorkspaceActive(long generation) =>
+        _inDoctor
+        && Interlocked.Read(ref _doctorGeneration) == generation
+        && _doctorLifetime is { IsCancellationRequested: false };
 
     /// Esc handler for the Updates view. When drilled in from Changes, returns
     /// to Changes; otherwise falls back to Discover. Mirrors LeaveDoctor's
@@ -891,19 +1028,20 @@ public sealed class SkillViewApp
         var agent = _agentField?.Text.Trim();
         var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
         UpdateContextBar();
-        _ = RunSearchAsync(
-            query,
-            string.IsNullOrEmpty(owner) ? null : owner,
-            limit,
-            string.IsNullOrEmpty(agent) ? null : agent);
+        RunOwnedTask(
+            () => RunSearchAsync(
+                query,
+                string.IsNullOrEmpty(owner) ? null : owner,
+                limit,
+                string.IsNullOrEmpty(agent) ? null : agent),
+            "search");
     }
 
     private void ProbeGhAsync()
     {
         RunBackground(async cancellationToken =>
         {
-            var report = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-            _lastReport = report;
+            var report = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
             _ghPath = report.GhPath;
 
             var snapshot = await _services.InventoryService.CaptureAsync(
@@ -964,6 +1102,30 @@ public sealed class SkillViewApp
         }, "probe");
     }
 
+    private async Task<EnvironmentReport> GetOrProbeEnvironmentAsync(CancellationToken cancellationToken)
+    {
+        var cached = Volatile.Read(ref _lastReport);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        return await _environmentProbe.GetAsync(async sharedCancellationToken =>
+        {
+            cached = Volatile.Read(ref _lastReport);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
+            var report = await _services.EnvironmentProbe
+                .ProbeAsync(sharedCancellationToken)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _lastReport, report);
+            return report;
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task RunSearchAsync(string query, string? owner = null, int? limit = null, string? agent = null)
     {
         if (_ghPath is null)
@@ -971,16 +1133,18 @@ public sealed class SkillViewApp
             SetStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
             return;
         }
-        if (_searching)
+        var discoverLifetime = _discoverLifetime;
+        if (discoverLifetime is null || discoverLifetime.IsCancellationRequested)
         {
-            _services.Logger.Debug("search", "skipping — search already in progress");
             return;
         }
 
-        _searching = true;
+        CancelCurrentPreview(clearBusy: false);
+        using var request = _searchRequests.Begin(discoverLifetime.Token, TimeSpan.FromMinutes(2));
+        var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
         SetBusy($"searching {query}…");
-        var cancellationToken = GetRunLifetimeToken();
+        var cancellationToken = request.Token;
         try
         {
             var options = new GhSkillSearchService.Options(
@@ -993,7 +1157,9 @@ public sealed class SkillViewApp
             var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
             Invoke(() =>
             {
-                if (System.Threading.Interlocked.Read(ref _searchGeneration) != generation)
+                if (!request.IsCurrent
+                    || !IsDiscoverWorkspaceActive(discoverGeneration)
+                    || System.Threading.Interlocked.Read(ref _searchGeneration) != generation)
                 {
                     // A newer search has already taken effect — drop these
                     // results silently so we never paint stale data.
@@ -1023,21 +1189,43 @@ public sealed class SkillViewApp
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _services.Logger.Debug("search", "search canceled during shutdown");
+            _services.Logger.Debug("search", "search canceled or superseded");
+            if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+            {
+                Invoke(() =>
+                {
+                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+                    {
+                        SetStatus("search timed out", TuiHelpers.NotificationLevel.Error);
+                    }
+                });
+            }
         }
         catch (Exception ex)
         {
             _services.Logger.Error("search", ex.Message);
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
-            SetStatus(snippet.Length > 0
-                ? $"search failed: {snippet}"
-                : "search failed — see logs (l)",
-                TuiHelpers.NotificationLevel.Error);
+            Invoke(() =>
+            {
+                if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
+                SetStatus(snippet.Length > 0
+                    ? $"search failed: {snippet}"
+                    : "search failed — see logs (l)",
+                    TuiHelpers.NotificationLevel.Error);
+            });
         }
         finally
         {
-            _searching = false;
-            Invoke(ClearBusy);
+            if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+            {
+                Invoke(() =>
+                {
+                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+                    {
+                        ClearBusy();
+                    }
+                });
+            }
         }
     }
 
@@ -1122,8 +1310,13 @@ public sealed class SkillViewApp
             return;
         }
 
-        var runCancellationToken = GetRunLifetimeToken();
-        using var request = _previewRequests.Begin(runCancellationToken, PreviewTimeout);
+        var discoverLifetime = _discoverLifetime;
+        if (discoverLifetime is null || discoverLifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
+        using var request = _previewRequests.Begin(discoverLifetime.Token, PreviewTimeout);
         SetBusy($"preview {repo}/{pick.SkillName}…");
         try
         {
@@ -1139,7 +1332,7 @@ public sealed class SkillViewApp
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
-                if (!request.IsCurrent) return;
+                if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = preview.Succeeded ? BuildPreviewSelectionKey(pick) : null;
                 SetPreviewText(preview.Succeeded
                     ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
@@ -1162,9 +1355,9 @@ public sealed class SkillViewApp
                 }
             });
         }
-        catch (OperationCanceledException) when (runCancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (discoverLifetime.IsCancellationRequested)
         {
-            _services.Logger.Debug("preview", "preview canceled during shutdown");
+            _services.Logger.Debug("preview", "preview canceled during workspace deactivation");
         }
         catch (OperationCanceledException)
         {
@@ -1176,7 +1369,7 @@ public sealed class SkillViewApp
             _services.Logger.Warn("preview", "preview timed out");
             Invoke(() =>
             {
-                if (!request.IsCurrent) return;
+                if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
@@ -1188,7 +1381,7 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             Invoke(() =>
             {
-                if (!request.IsCurrent) return;
+                if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = null;
                 SetPreviewText(snippet.Length > 0
                     ? $"(preview failed)\n\n{snippet}"
@@ -1202,9 +1395,15 @@ public sealed class SkillViewApp
         }
         finally
         {
-            if (request.IsCurrent)
+            if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
             {
-                Invoke(ClearBusy);
+                Invoke(() =>
+                {
+                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+                    {
+                        ClearBusy();
+                    }
+                });
             }
         }
     }
@@ -1690,11 +1889,11 @@ public sealed class SkillViewApp
         {
             case SkillViewTab.Installed when _installedTab is not null:
                 SetStatus("refreshing inventory…");
-                _ = _installedTab.LoadAsync();
+                RunOwnedTask(_installedTab.LoadAsync, "installed.refresh");
                 break;
             case SkillViewTab.Changes when _changesTab is not null:
                 SetStatus("refreshing updates…");
-                _ = _changesTab.LoadAsync();
+                RunOwnedTask(_changesTab.LoadAsync, "changes.refresh");
                 break;
             case SkillViewTab.Discover:
                 if (!string.IsNullOrEmpty(_queryField?.Text.Trim()))
@@ -1722,7 +1921,6 @@ public sealed class SkillViewApp
         else
         {
             ShowLogPane();
-            InitializeVisibleLogLines();
             FlushVisibleLogLines();
         }
     }
@@ -1783,6 +1981,9 @@ public sealed class SkillViewApp
 
     private void ShowLogPane()
     {
+        // Logs are an explicit user choice. A preview already in flight must
+        // not be allowed to close the log pane when it completes.
+        CancelCurrentPreview(clearBusy: true);
         _showingLogs = true;
         if (_previewPane is not null) _previewPane.CanFocus = false;
         if (_previewPane is not null) _previewPane.Visible = false;
@@ -1909,34 +2110,28 @@ public sealed class SkillViewApp
 
     private void OnLogEntry(LogEntry entry)
     {
-        if (!_showingLogs) return;
         var line = TerminalEscapeSanitizer.Sanitize(Logger.Format(entry)) ?? string.Empty;
         lock (_visibleLogGate)
         {
             _visibleLogLines.Enqueue(line);
-            while (_visibleLogLines.Count > MaxVisibleLogLines)
+            _visibleLogCharacters += line.Length + 1;
+            while (_visibleLogLines.Count > MaxVisibleLogLines
+                   || _visibleLogCharacters > MaxVisibleLogCharacters)
             {
-                _visibleLogLines.Dequeue();
+                _visibleLogCharacters -= _visibleLogLines.Dequeue().Length + 1;
             }
         }
+
+        // Retain the bounded entry stream even while hidden. Visibility only
+        // controls drawing, so opening the pane never needs a racy snapshot
+        // replacement.
+        if (!_showingLogs) return;
 
         // Coalesce bursts into one UI refresh. This avoids rebuilding and
         // redrawing the whole log pane once per individual entry.
         if (Interlocked.Exchange(ref _logRefreshQueued, 1) == 0)
         {
             Invoke(FlushVisibleLogLines);
-        }
-    }
-
-    private void InitializeVisibleLogLines()
-    {
-        var lines = _services.Logger.Snapshot()
-            .TakeLast(MaxVisibleLogLines)
-            .Select(entry => TerminalEscapeSanitizer.Sanitize(Logger.Format(entry)) ?? string.Empty);
-        lock (_visibleLogGate)
-        {
-            _visibleLogLines.Clear();
-            foreach (var line in lines) _visibleLogLines.Enqueue(line);
         }
     }
 
@@ -1959,9 +2154,9 @@ public sealed class SkillViewApp
         }
     }
 
-    private void CancelCurrentPreview()
+    private void CancelCurrentPreview(bool clearBusy = true)
     {
-        if (_previewRequests.Cancel())
+        if (_previewRequests.Cancel() && clearBusy)
         {
             Invoke(ClearBusy);
         }
@@ -2141,7 +2336,10 @@ public sealed class SkillViewApp
             return;
         }
 
-        if (!_hasRunLifetime)
+        // Unit helpers build the view before a real run and intentionally use
+        // direct dispatch. Once lifecycle entry has happened, a missing app
+        // always means teardown or post-teardown and must be a no-op.
+        if (!_hasEnteredRunLifecycle)
         {
             action();
         }
@@ -2230,6 +2428,12 @@ public sealed class SkillViewApp
 
     internal SkillViewTab ActiveTabForTests => _activeTab;
 
+    internal CancellationToken DiscoverLifetimeForTests =>
+        _discoverLifetime?.Token ?? new CancellationToken(canceled: true);
+
+    internal CancellationToken DoctorLifetimeForTests =>
+        _doctorLifetime?.Token ?? new CancellationToken(canceled: true);
+
     internal SkillView.Ui.Tabs.ChangesTabView? ChangesTabForTests => _changesTab;
 
     internal ContextBarView? ContextBarForTests => _contextBar;
@@ -2239,6 +2443,17 @@ public sealed class SkillViewApp
     internal IReadOnlyList<StatusHint> CurrentHintsForTests => GetCurrentHints();
 
     internal string PreviewTextForTests => _previewPane?.Text.ToString() ?? string.Empty;
+
+    internal int VisibleLogCharacterCountForTests
+    {
+        get
+        {
+            lock (_visibleLogGate)
+            {
+                return _visibleLogCharacters;
+            }
+        }
+    }
 
     internal TabBarView? TabBarForTests => _tabBar;
 
@@ -2256,13 +2471,23 @@ public sealed class SkillViewApp
         UpdateContextBar();
     }
 
+    internal void ActivateTabForTests(SkillViewTab tab) => ActivateTab(tab);
+
+    internal void EnterDoctorForTests(EnvironmentReport report)
+    {
+        Volatile.Write(ref _lastReport, report);
+        EnterDoctor();
+    }
+
+    internal void LeaveDoctorForTests() => LeaveDoctor();
+
     /// Fire-and-forget background work with exception guard. Catches any
     /// unhandled exception, logs it, and shows a status bar message so
     /// failures are never silently swallowed.
     private void RunBackground(Func<CancellationToken, Task> work, string operation)
     {
         var cancellationToken = GetRunLifetimeToken();
-        _ = Task.Run(async () =>
+        RunOwnedTask(async () =>
         {
             try
             {
@@ -2285,8 +2510,22 @@ public sealed class SkillViewApp
                         TuiHelpers.NotificationLevel.Error);
                 });
             }
-        }, cancellationToken);
+        }, operation, runOnThreadPool: true);
     }
+
+    private void RunOwnedTask(Func<Task> work, string operation) =>
+        RunOwnedTask(work, operation, runOnThreadPool: false);
+
+    private void RunOwnedTask(Func<Task> work, string operation, bool runOnThreadPool)
+    {
+        if (!_backgroundTasks.TryRun(work, runOnThreadPool))
+        {
+            _services.Logger.Debug(operation, $"{operation} skipped during shutdown");
+        }
+    }
+
+    internal void RunBackgroundForTests(Func<CancellationToken, Task> work, string operation) =>
+        RunBackground(work, operation);
 
     private CancellationToken GetRunLifetimeToken() => _runLifetime?.Token ?? CancellationToken.None;
 }

@@ -45,7 +45,7 @@ public sealed class GhSkillInstallService
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
+            _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
             return InstallResult.Failure(repo, skillName, options.Version, result.ExitCode, result.StdErr.Trim(), args);
         }
 
@@ -80,7 +80,7 @@ public sealed class GhSkillInstallService
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.install.list", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
+            _logger.Warn("gh.skill.install.list", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
             return RepoSkillListing.Failure(repo, version, result.ExitCode, result.StdErr.Trim(), args);
         }
 

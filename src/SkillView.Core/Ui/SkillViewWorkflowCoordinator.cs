@@ -13,7 +13,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Func<IApplication?> _getApp;
     private readonly Func<string?> _getGhPath;
     private readonly Func<EnvironmentReport?> _getLastReport;
-    private readonly Action<EnvironmentReport> _rememberReport;
+    private readonly Func<CancellationToken, Task<EnvironmentReport>> _getOrProbeReport;
     private readonly Action<string> _setBusy;
     private readonly Action _clearBusy;
     private readonly Action<string> _setStatus;
@@ -29,7 +29,7 @@ internal sealed class SkillViewWorkflowCoordinator
         Func<IApplication?> getApp,
         Func<string?> getGhPath,
         Func<EnvironmentReport?> getLastReport,
-        Action<EnvironmentReport> rememberReport,
+        Func<CancellationToken, Task<EnvironmentReport>> getOrProbeReport,
         Action<string> setBusy,
         Action clearBusy,
         Action<string> setStatus,
@@ -44,7 +44,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _getApp = getApp;
         _getGhPath = getGhPath;
         _getLastReport = getLastReport;
-        _rememberReport = rememberReport;
+        _getOrProbeReport = getOrProbeReport;
         _setBusy = setBusy;
         _clearBusy = clearBusy;
         _setStatus = setStatus;
@@ -404,15 +404,7 @@ internal sealed class SkillViewWorkflowCoordinator
 
     private async Task<EnvironmentReport> GetOrProbeReportAsync(CancellationToken cancellationToken)
     {
-        var report = _getLastReport();
-        if (report is not null)
-        {
-            return report;
-        }
-
-        report = await _services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
-        _rememberReport(report);
-        return report;
+        return await _getOrProbeReport(cancellationToken).ConfigureAwait(false);
     }
 
     private Task<InventorySnapshot> CaptureInventoryAsync(

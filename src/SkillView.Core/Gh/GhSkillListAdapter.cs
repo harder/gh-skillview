@@ -35,12 +35,26 @@ public sealed class GhSkillListAdapter
         string? agent = null,
         CancellationToken cancellationToken = default)
     {
-        if (_cache.TryGet(ghPath, scope, agent, out var cached))
+        var lookup = await _cache.GetOrLoadAsync(
+                ghPath,
+                scope,
+                agent,
+                token => LoadAsync(ghPath, scope, agent, token),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (lookup.FromCache)
         {
-            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={cached.Length}");
-            return cached;
+            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={lookup.Records.Length}");
         }
+        return lookup.Records;
+    }
 
+    private async Task<GhSkillListCache.LoadResult> LoadAsync(
+        string ghPath,
+        string? scope,
+        string? agent,
+        CancellationToken cancellationToken)
+    {
         // gh requires an explicit comma-separated field list after `--json`;
         // bare `--json` errors out listing the available fields. These are the
         // fields shipped by gh 2.94.0 (cli/cli#13418). The adapter's parser is
@@ -64,19 +78,19 @@ public sealed class GhSkillListAdapter
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.list", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
-            return ImmutableArray<GhSkillListRecord>.Empty;
+            _logger.Warn("gh.skill.list", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
+            return new GhSkillListCache.LoadResult(
+                ImmutableArray<GhSkillListRecord>.Empty,
+                ShouldCache: false);
         }
 
         if (string.IsNullOrWhiteSpace(result.StdOut))
         {
-            _cache.Store(ghPath, scope, agent, ImmutableArray<GhSkillListRecord>.Empty);
-            return ImmutableArray<GhSkillListRecord>.Empty;
+            return new GhSkillListCache.LoadResult(ImmutableArray<GhSkillListRecord>.Empty);
         }
 
         var parsed = Parse(result.StdOut, _logger);
-        _cache.Store(ghPath, scope, agent, parsed);
-        return parsed;
+        return new GhSkillListCache.LoadResult(parsed);
     }
 
     public void Invalidate() => _cache.Invalidate();

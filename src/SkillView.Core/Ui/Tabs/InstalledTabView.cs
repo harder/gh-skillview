@@ -33,6 +33,7 @@ internal sealed class InstalledTabView : FrameView
     internal enum ScopeFilter { All, User, Project, Custom }
 
     private readonly Func<Action, Task> _runOnUi;
+    private readonly Action<Func<Task>, string> _runTask;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<string?, CancellationToken, Task<InventorySnapshot>>? _scopedSnapshotLoader;
     private readonly Action<InstalledSkill, InventorySnapshot> _onRemove;
@@ -64,6 +65,7 @@ internal sealed class InstalledTabView : FrameView
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
+        Action<Func<Task>, string> runTask,
         Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
         Action<InstalledSkill, InventorySnapshot> onRemove,
         Action onLeaveTab,
@@ -73,6 +75,7 @@ internal sealed class InstalledTabView : FrameView
         CancellationToken lifetimeToken = default)
     {
         _runOnUi = runOnUi;
+        _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _scopedSnapshotLoader = scopedSnapshotLoader;
         _onRemove = onRemove;
@@ -488,7 +491,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void QueueDeferredWidthStabilization(int remainingPasses)
     {
-        _ = _runOnUi(() =>
+        _runTask(() => _runOnUi(() =>
         {
             if (!Visible || _table.Table is null)
             {
@@ -501,7 +504,7 @@ internal sealed class InstalledTabView : FrameView
             {
                 QueueDeferredWidthStabilization(remainingPasses - 1);
             }
-        });
+        }), "installed.layout");
     }
 
     /// Force focus onto the skill list. Used after the tab is activated so the
@@ -584,7 +587,7 @@ internal sealed class InstalledTabView : FrameView
             _scopeFilter = CycleScope(_scopeFilter);
             if (_scopedSnapshotLoader is not null && _scopeFilter is ScopeFilter.User or ScopeFilter.Project)
             {
-                _ = LoadAsync();
+                _runTask(LoadAsync, "installed.scope");
             }
             else
             {
@@ -632,7 +635,7 @@ internal sealed class InstalledTabView : FrameView
                         // cache on success, but nothing reloads this tab — so the
                         // removed row lingers until the tab is re-activated. Reload
                         // now to reflect the post-remove inventory.
-                        _ = LoadAsync();
+                        _runTask(LoadAsync, "installed.remove-refresh");
                     }
                     break;
                 }

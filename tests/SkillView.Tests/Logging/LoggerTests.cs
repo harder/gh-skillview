@@ -40,6 +40,48 @@ public class LoggerTests
     }
 
     [Fact]
+    public void Constructor_RejectsNegativeCapacity()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Logger(capacity: -1));
+    }
+
+    [Fact]
+    public void Log_TruncatesIndividualMessagesBeforeRetention()
+    {
+        var logger = new Logger(maxMessageChars: 32, maxRetainedChars: 128);
+
+        logger.Info("test", new string('x', 1_000_000));
+
+        var entry = Assert.Single(logger.Snapshot());
+        Assert.Equal(32, entry.Message.Length);
+        Assert.EndsWith("… truncated", entry.Message);
+    }
+
+    [Fact]
+    public void RingBuffer_AlsoHonorsTotalCharacterBudget()
+    {
+        var logger = new Logger(capacity: 10, maxMessageChars: 100, maxRetainedChars: 150);
+
+        logger.Info("test", "first-" + new string('a', 74));
+        logger.Info("test", "second-" + new string('b', 73));
+        logger.Info("test", "third-" + new string('c', 74));
+
+        var entry = Assert.Single(logger.Snapshot());
+        Assert.StartsWith("third-", entry.Message);
+    }
+
+    [Fact]
+    public void ErrorSnippet_IsSingleLineAndBounded()
+    {
+        var snippet = Logger.ErrorSnippet("  first line\r\nsecond\tline " + new string('x', 1000), 40);
+
+        Assert.True(snippet.Length <= 40);
+        Assert.DoesNotContain('\r', snippet);
+        Assert.DoesNotContain('\n', snippet);
+        Assert.DoesNotContain('\t', snippet);
+    }
+
+    [Fact]
     public void SubscriberReceivesEntries()
     {
         var logger = new Logger();
@@ -94,5 +136,56 @@ public class LoggerTests
         await logTask;
 
         Assert.Equal(0, targetCallCount);
+    }
+
+    [Fact]
+    public async Task SubscribeWithReplay_DeliversConcurrentHandoffExactlyOnceInOrder()
+    {
+        var logger = new Logger(capacity: 16);
+        logger.Info("test", "before-1");
+        logger.Info("test", "before-2");
+        var received = new List<string>();
+        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseReplay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        IDisposable? subscription = null;
+        var subscribe = Task.Run(() =>
+        {
+            subscription = logger.SubscribeWithReplay(entry =>
+            {
+                received.Add(entry.Message);
+                if (entry.Message == "before-1")
+                {
+                    replayStarted.SetResult();
+                    releaseReplay.Task.GetAwaiter().GetResult();
+                }
+            });
+        }, TestContext.Current.CancellationToken);
+
+        await replayStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var concurrentLog = Task.Run(
+            () => logger.Info("test", "during-handoff"),
+            TestContext.Current.CancellationToken);
+        releaseReplay.SetResult();
+        await Task.WhenAll(subscribe, concurrentLog);
+        logger.Info("test", "after");
+        subscription!.Dispose();
+
+        Assert.Equal(["before-1", "before-2", "during-handoff", "after"], received);
+    }
+
+    [Fact]
+    public void SubscribeWithReplay_UsesOnlyRetainedRingEntries()
+    {
+        var logger = new Logger(capacity: 2);
+        logger.Info("test", "evicted");
+        logger.Info("test", "retained-1");
+        logger.Info("test", "retained-2");
+        var received = new List<string>();
+
+        using var subscription = logger.SubscribeWithReplay(entry => received.Add(entry.Message));
+        logger.Info("test", "live");
+
+        Assert.Equal(["retained-1", "retained-2", "live"], received);
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Bootstrapping;
+using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
@@ -34,6 +35,17 @@ public sealed class SkillViewAppTests
         Account = null,
         Hosts = activeHost is null ? ImmutableArray<string>.Empty : ImmutableArray.Create(activeHost),
         RawOutput = string.Empty,
+    };
+
+    private static EnvironmentReport CreateEnvironmentReport() => new()
+    {
+        GhPath = "/usr/bin/gh",
+        GhVersionRaw = "gh version 2.95.0",
+        GhVersion = new SemVer(2, 95, 0),
+        GhMeetsMinimum = true,
+        Auth = GhAuthStatus.Unknown,
+        GhSkillAvailable = true,
+        LogDirectory = "/tmp/skillview-logs",
     };
 
     private static SkillViewApp CreateApp()
@@ -260,6 +272,60 @@ public sealed class SkillViewAppTests
         Assert.DoesNotContain(
             Descendants(window).OfType<Label>(),
             label => string.Equals(label.Text.ToString(), "Agent:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void LeavingDiscover_CancelsItsWorkspaceLifetime(int destinationValue)
+    {
+        var destination = (SkillViewTab)destinationValue;
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var discoverLifetime = app.DiscoverLifetimeForTests;
+
+        app.ActivateTabForTests(destination);
+
+        Assert.True(discoverLifetime.IsCancellationRequested);
+        Assert.Equal(destination, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void LeavingDoctor_CancelsItsWorkspaceLifetime_AndReactivatesDiscover()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var firstDiscoverLifetime = app.DiscoverLifetimeForTests;
+        app.EnterDoctorForTests(CreateEnvironmentReport());
+        var doctorLifetime = app.DoctorLifetimeForTests;
+
+        Assert.True(firstDiscoverLifetime.IsCancellationRequested);
+        Assert.False(doctorLifetime.IsCancellationRequested);
+
+        app.LeaveDoctorForTests();
+
+        Assert.True(doctorLifetime.IsCancellationRequested);
+        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+        Assert.False(app.DiscoverLifetimeForTests.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void VisibleLogQueue_IsBoundedByTotalCharactersWhileHidden()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var app = new SkillViewApp(
+            TuiServices.Build(logger),
+            CreateOptions(),
+            static () => Application.Create().Init(),
+            probeOnRun: false);
+        using var window = app.BuildUiForTests();
+
+        for (var index = 0; index < 40; index++)
+        {
+            logger.Info("large", $"entry-{index}-" + new string('x', 20_000));
+        }
+
+        Assert.InRange(app.VisibleLogCharacterCountForTests, 1, 256 * 1024);
     }
 
     [Fact]
@@ -644,6 +710,74 @@ public sealed class SkillViewAppTests
             Application.InstanceCreated -= HandleCreated;
             Application.InstanceDisposed -= HandleDisposed;
         }
+    }
+
+    [Fact]
+    public async Task RunAsync_WaitsForOwnedBackgroundWorkBeforeReturning()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workFinished = false;
+        SkillViewApp? subject = null;
+
+        subject = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            CreateOptions(),
+            () =>
+            {
+                subject!.RunBackgroundForTests(async cancellationToken =>
+                {
+                    started.SetResult();
+                    try
+                    {
+                        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        cancellationObserved.SetResult();
+                        await release.Task.WaitAsync(TestContext.Current.CancellationToken);
+                        workFinished = true;
+                    }
+                }, "held-work");
+
+                var application = Application.Create().Init();
+                application.StopAfterFirstIteration = true;
+                return application;
+            },
+            probeOnRun: false);
+
+        var run = subject.RunAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(run.IsCompleted);
+        Assert.False(workFinished);
+
+        release.SetResult();
+        Assert.Equal(ExitCodes.Success, await run.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.True(workFinished);
+    }
+
+    [Fact]
+    public async Task Invoke_DoesNotUseDirectFallbackAfterRunHasEnded()
+    {
+        var app = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            CreateOptions(),
+            static () =>
+            {
+                var application = Application.Create().Init();
+                application.StopAfterFirstIteration = true;
+                return application;
+            },
+            probeOnRun: false);
+        var original = app.DefaultStatusForTests;
+
+        await app.RunAsync(TestContext.Current.CancellationToken);
+        app.SetDefaultStatusForTests("late callback must be ignored");
+
+        Assert.Equal(original, app.DefaultStatusForTests);
     }
 
     [Fact]

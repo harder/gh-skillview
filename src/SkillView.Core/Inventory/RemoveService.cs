@@ -11,6 +11,7 @@ namespace SkillView.Inventory;
 /// first one.
 public sealed class RemoveService
 {
+    private const int MaxTraversalDepth = 256;
     private readonly Logger _logger;
 
     public RemoveService(Logger logger) { _logger = logger; }
@@ -53,12 +54,16 @@ public sealed class RemoveService
 
     /// Removes a previously-validated skill directory. Callers MUST run
     /// `RemoveValidator.Validate` first and honor its errors and warnings;
-    /// this method does NOT re-run the safety rules.
+    /// this method does NOT re-run the policy rules. Execution still rechecks
+    /// that every entry is inside the selected target and that no ancestor
+    /// introduced after validation is a reparse point.
     public RemoveReport Remove(
         RemoveValidator.RemoveValidation validation,
-        Options? options = null)
+        Options? options = null,
+        CancellationToken cancellationToken = default)
     {
         options ??= new Options();
+        cancellationToken.ThrowIfCancellationRequested();
         if (!validation.Allowed)
         {
             var reason = string.Join("; ", validation.Errors.Select(e => $"{e.Kind}: {e.Detail}"));
@@ -66,7 +71,7 @@ public sealed class RemoveService
             return RemoveReport.Refused(validation.ResolvedPath, reason);
         }
 
-        var target = validation.ResolvedPath;
+        var target = Path.GetFullPath(validation.ResolvedPath);
         if (PathResolver.IsSymlink(target))
         {
             if (options.DryRun)
@@ -97,96 +102,95 @@ public sealed class RemoveService
 
         var errors = ImmutableArray.CreateBuilder<string>();
         int files = 0, dirs = 0;
+        var pending = new Stack<TraversalEntry>();
+        pending.Push(new TraversalEntry(target, Depth: 0, DeleteAfterChildren: false));
 
-        // Walk files bottom-up so we can remove directories after their
-        // contents have been cleared. `EnumerateFiles` recursive is fine —
-        // we already refused on ancestor-symlink escapes in validation, and
-        // `Directory.Delete(..., recursive: true)` would let a single bad
-        // file abort the whole op.
-        IEnumerable<string> allFiles;
-        IEnumerable<string> allDirs;
-        try
+        while (pending.TryPop(out var entry))
         {
-            allFiles = Directory.EnumerateFiles(target, "*", new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                AttributesToSkip = 0,
-                IgnoreInaccessible = true,
-            }).ToList();
-            allDirs = Directory.EnumerateDirectories(target, "*", new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                AttributesToSkip = 0,
-                IgnoreInaccessible = true,
-            }).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("remove", $"enumerate {target} failed: {ex.Message}");
-            return new RemoveReport(false, target, 0, 0,
-                ImmutableArray.Create($"enumerate failed: {ex.Message}"), options.DryRun);
-        }
+            cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var file in allFiles)
-        {
-            if (options.DryRun)
+            if (!TryValidateEntry(target, entry.Path, allowLeafReparsePoint: entry.Path != target,
+                    out var attributes, out var validationError))
             {
-                files++;
-                _logger.Debug("remove.dryrun", $"file: {file}");
+                RecordFailure(entry.Path, validationError!, errors);
                 continue;
             }
-            try
-            {
-                File.Delete(file);
-                files++;
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn("remove", $"delete {file} failed: {ex.Message}");
-                errors.Add($"{file}: {ex.Message}");
-            }
-        }
 
-        // Deepest directories first so parents are empty by the time we reach
-        // them. Longest path key wins.
-        foreach (var dir in allDirs.OrderByDescending(p => p.Length))
-        {
-            if (options.DryRun)
+            var isReparsePoint = attributes.HasFlag(FileAttributes.ReparsePoint);
+            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+
+            // A child link is always a leaf. Never enumerate its target, even
+            // when its directory bit is set (Unix symlink, Windows junction,
+            // mount-point reparse point, or another link-like filesystem entry).
+            if (isReparsePoint)
             {
-                dirs++;
-                _logger.Debug("remove.dryrun", $"dir: {dir}");
+                DeleteLeaf(entry.Path, expectedReparsePoint: true, options.DryRun,
+                    target, ref files, errors);
                 continue;
             }
+
+            if (!isDirectory)
+            {
+                if (entry.DeleteAfterChildren)
+                {
+                    RecordFailure(entry.Path, "directory changed into a file during removal", errors);
+                    continue;
+                }
+
+                DeleteLeaf(entry.Path, expectedReparsePoint: false, options.DryRun,
+                    target, ref files, errors);
+                continue;
+            }
+
+            if (entry.DeleteAfterChildren)
+            {
+                DeleteDirectory(entry.Path, options.DryRun, target, ref dirs, errors);
+                continue;
+            }
+
+            if (entry.Depth >= MaxTraversalDepth)
+            {
+                RecordFailure(entry.Path,
+                    $"directory nesting exceeds the safety limit of {MaxTraversalDepth}", errors);
+                continue;
+            }
+
+            IReadOnlyList<string> children;
             try
             {
-                if (!Directory.Exists(dir)) continue;
-                Directory.Delete(dir, recursive: false);
-                dirs++;
+                // Enumerate one directory at a time. This avoids recursive API
+                // link traversal and bounds retained path memory to the widest
+                // single directory plus the current traversal depth.
+                children = Directory.EnumerateFileSystemEntries(entry.Path).ToArray();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                _logger.Warn("remove", $"rmdir {dir} failed: {ex.Message}");
-                errors.Add($"{dir}: {ex.Message}");
+                RecordFailure(entry.Path, $"enumerate failed: {ex.Message}", errors);
+                continue;
+            }
+
+            pending.Push(entry with { DeleteAfterChildren = true });
+            for (var index = children.Count - 1; index >= 0; index--)
+            {
+                pending.Push(new TraversalEntry(children[index], entry.Depth + 1,
+                    DeleteAfterChildren: false));
             }
         }
 
         if (options.DryRun)
         {
-            dirs++;
             _logger.Info("remove.dryrun", $"would remove {target}: {files} file(s), {dirs} dir(s)");
-            return new RemoveReport(true, target, files, dirs, errors.ToImmutable(), DryRun: true);
+            return new RemoveReport(errors.Count == 0, target, files, dirs,
+                errors.ToImmutable(), DryRun: true);
         }
 
-        try
+        if (errors.Count == 0)
         {
-            Directory.Delete(target, recursive: false);
-            dirs++;
             _logger.Info("remove", $"removed {target}: {files} file(s), {dirs} dir(s)");
         }
-        catch (Exception ex)
+        else
         {
-            _logger.Error("remove", $"rmdir {target} failed: {ex.Message}");
-            errors.Add($"{target}: {ex.Message}");
+            _logger.Error("remove", $"remove {target} completed with {errors.Count} error(s)");
         }
 
         return new RemoveReport(
@@ -196,6 +200,156 @@ public sealed class RemoveService
             DirectoriesDeleted: dirs,
             Errors: errors.ToImmutable(),
             DryRun: false);
+    }
+
+    private readonly record struct TraversalEntry(string Path, int Depth, bool DeleteAfterChildren);
+
+    private void DeleteLeaf(
+        string path,
+        bool expectedReparsePoint,
+        bool dryRun,
+        string target,
+        ref int files,
+        ImmutableArray<string>.Builder errors)
+    {
+        if (!TryValidateEntry(target, path, allowLeafReparsePoint: true,
+                out var attributes, out var validationError))
+        {
+            RecordFailure(path, validationError!, errors);
+            return;
+        }
+
+        var isReparsePoint = attributes.HasFlag(FileAttributes.ReparsePoint);
+        if (expectedReparsePoint != isReparsePoint)
+        {
+            RecordFailure(path, "entry type changed during removal", errors);
+            return;
+        }
+        if (!isReparsePoint && attributes.HasFlag(FileAttributes.Directory))
+        {
+            RecordFailure(path, "file changed into a directory during removal", errors);
+            return;
+        }
+
+        if (dryRun)
+        {
+            files++;
+            _logger.Debug("remove.dryrun", $"leaf: {path}");
+            return;
+        }
+
+        try
+        {
+            if (isReparsePoint) TryDeleteSymlink(path);
+            else File.Delete(path);
+            files++;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RecordFailure(path, ex.Message, errors);
+        }
+    }
+
+    private void DeleteDirectory(
+        string path,
+        bool dryRun,
+        string target,
+        ref int dirs,
+        ImmutableArray<string>.Builder errors)
+    {
+        if (!TryValidateEntry(target, path, allowLeafReparsePoint: false,
+                out var attributes, out var validationError))
+        {
+            RecordFailure(path, validationError!, errors);
+            return;
+        }
+        if (!attributes.HasFlag(FileAttributes.Directory))
+        {
+            RecordFailure(path, "directory changed into a file during removal", errors);
+            return;
+        }
+
+        if (dryRun)
+        {
+            dirs++;
+            _logger.Debug("remove.dryrun", $"dir: {path}");
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(path, recursive: false);
+            dirs++;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RecordFailure(path, ex.Message, errors);
+        }
+    }
+
+    private void RecordFailure(
+        string path,
+        string detail,
+        ImmutableArray<string>.Builder errors)
+    {
+        _logger.Warn("remove", $"{path}: {detail}");
+        errors.Add($"{path}: {detail}");
+    }
+
+    private static bool TryValidateEntry(
+        string target,
+        string candidate,
+        bool allowLeafReparsePoint,
+        out FileAttributes attributes,
+        out string? error)
+    {
+        attributes = default;
+        error = null;
+
+        var targetFull = Path.GetFullPath(target);
+        var candidateFull = Path.GetFullPath(candidate);
+        if (!PathResolver.IsInside(candidateFull, targetFull))
+        {
+            error = $"refused path outside selected target '{targetFull}'";
+            return false;
+        }
+
+        var relative = Path.GetRelativePath(targetFull, candidateFull);
+        var components = relative == "."
+            ? Array.Empty<string>()
+            : relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries);
+
+        var cursor = targetFull;
+        try
+        {
+            attributes = File.GetAttributes(cursor);
+            if (attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                error = $"selected target '{targetFull}' became a reparse point";
+                return false;
+            }
+
+            for (var index = 0; index < components.Length; index++)
+            {
+                cursor = Path.Combine(cursor, components[index]);
+                attributes = File.GetAttributes(cursor);
+                var isLeaf = index == components.Length - 1;
+                if (attributes.HasFlag(FileAttributes.ReparsePoint)
+                    && !(allowLeafReparsePoint && isLeaf))
+                {
+                    error = $"ancestor '{cursor}' is a reparse point";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = $"filesystem state could not be revalidated: {ex.Message}";
+            return false;
+        }
     }
 
     private static void TryDeleteSymlink(string path)
@@ -221,7 +375,8 @@ public sealed class RemoveService
 
     public BatchRemoveReport RemoveMany(
         IEnumerable<RemoveValidator.RemoveValidation> validations,
-        Options? options = null)
+        Options? options = null,
+        CancellationToken cancellationToken = default)
     {
         options ??= new Options();
 
@@ -233,13 +388,14 @@ public sealed class RemoveService
 
         foreach (var validation in validations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var key = PathResolver.Normalize(validation.ResolvedPath);
             if (!seen.Add(key))
             {
                 continue;
             }
 
-            var report = Remove(validation, options);
+            var report = Remove(validation, options, cancellationToken);
             filesDeleted += report.FilesDeleted;
             directoriesDeleted += report.DirectoriesDeleted;
             if (report.Succeeded)

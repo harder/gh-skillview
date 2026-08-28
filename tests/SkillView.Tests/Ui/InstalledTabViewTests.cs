@@ -97,6 +97,7 @@ public sealed class InstalledTabViewTests
                 action();
                 return Task.CompletedTask;
             },
+            runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onRemove: static (_, _) => { },
             onLeaveTab: static () => { },
@@ -156,6 +157,7 @@ public sealed class InstalledTabViewTests
             action();
             return Task.CompletedTask;
         },
+        runTask: (operation, _) => operation().GetAwaiter().GetResult(),
         snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
         onRemove: static (_, _) => { },
         onLeaveTab: static () => { },

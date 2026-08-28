@@ -42,7 +42,7 @@ public sealed class GhSkillUpdateService
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={result.StdErr.Trim()}");
+            _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
             return UpdateResult.Failure(options.DryRun, result.ExitCode, result.StdErr.Trim(), args);
         }
 
