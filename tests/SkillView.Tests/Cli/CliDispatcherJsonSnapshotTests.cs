@@ -278,7 +278,7 @@ public class CliDispatcherJsonSnapshotTests
             ResolvedPath: "/p/a",
             FilesDeleted: 0,
             DirectoriesDeleted: 0,
-            Errors: ImmutableArray<string>.Empty,
+            Errors: ImmutableArray.Create("ContainsGitDirectory: .git found"),
             DryRun: false);
         var p = new CliDispatcher.ParsedRemoveArgs("a", null, Yes: false, Json: true);
         var doc = Parse(CliDispatcher.RenderRemoveJson(report, Skill("a"), p, validation));
@@ -289,6 +289,69 @@ public class CliDispatcherJsonSnapshotTests
             doc.GetProperty("errors")[0].GetProperty("kind").GetString());
         Assert.Equal(0, doc.GetProperty("warnings").GetArrayLength());
         Assert.Equal(0, doc.GetProperty("runtimeErrorCount").GetInt32());
+        Assert.Equal(0, doc.GetProperty("runtimeErrors").GetArrayLength());
+    }
+
+    [Fact]
+    public void Remove_JsonDoesNotMislabelUnacceptedWarningsAsRuntimeErrors()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray<RemoveValidator.Error>.Empty,
+            Warnings: ImmutableArray.Create(new RemoveValidator.Warning(
+                RemoveValidator.WarningKind.HasIncomingSymlinks,
+                "incoming link found")),
+            ResolvedPath: "/p/a",
+            IncomingSymlinkPaths: ImmutableArray.Create("/p/link"));
+        var report = new RemoveService.RemoveReport(
+            Succeeded: false,
+            ResolvedPath: "/p/a",
+            FilesDeleted: 0,
+            DirectoriesDeleted: 0,
+            Errors: ImmutableArray.Create(
+                "warning HasIncomingSymlinks: incoming link found (pass --yes to accept)"),
+            DryRun: false);
+        var parsed = new CliDispatcher.ParsedRemoveArgs("a", null, Yes: false, Json: true);
+
+        var doc = Parse(CliDispatcher.RenderRemoveJson(
+            report,
+            Skill("a"),
+            parsed,
+            validation));
+
+        Assert.True(doc.GetProperty("allowed").GetBoolean());
+        Assert.Equal(1, doc.GetProperty("warnings").GetArrayLength());
+        Assert.Equal(0, doc.GetProperty("runtimeErrorCount").GetInt32());
+        Assert.Equal(0, doc.GetProperty("runtimeErrors").GetArrayLength());
+    }
+
+    [Fact]
+    public void Remove_JsonPreservesRuntimeErrorsWhenRemovalWasAttempted()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray<RemoveValidator.Error>.Empty,
+            Warnings: ImmutableArray<RemoveValidator.Warning>.Empty,
+            ResolvedPath: "/p/a",
+            IncomingSymlinkPaths: ImmutableArray<string>.Empty);
+        var report = new RemoveService.RemoveReport(
+            Succeeded: false,
+            ResolvedPath: "/p/a",
+            FilesDeleted: 1,
+            DirectoriesDeleted: 0,
+            Errors: ImmutableArray.Create("delete failed", "… 3 additional error(s) omitted"),
+            DryRun: false)
+        {
+            ErrorCount = 4,
+        };
+        var parsed = new CliDispatcher.ParsedRemoveArgs("a", null, Yes: true, Json: true);
+
+        var doc = Parse(CliDispatcher.RenderRemoveJson(
+            report,
+            Skill("a"),
+            parsed,
+            validation));
+
+        Assert.Equal(4, doc.GetProperty("runtimeErrorCount").GetInt32());
+        Assert.Equal(2, doc.GetProperty("runtimeErrors").GetArrayLength());
     }
 
     // --- cleanup ---------------------------------------------------------

@@ -138,9 +138,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   any partial filesystem change. Runtime reports retain at most 128 individual
   errors plus an omission summary while preserving the exact error count. Do
   not overwrite a mid-target cancellation snapshot with completed-target-only
-  totals: the batch progress adapter owns the latest aggregate state, and every
-  async removal entry point must publish a terminal canceled update even when
-  its token was already canceled. Do not claim the path checks are atomic
+  totals: the batch progress adapter owns the latest aggregate state and keeps
+  processed-target and successfully-deleted-target counts distinct. Retryable
+  remove dialogs accumulate filesystem mutation totals across attempts and
+  compact-to-wizard escalation so later failures cannot hide a required rescan.
+  Every async removal entry point must publish a terminal canceled update even
+  when its token was already canceled; synthetic cancellation reports retain
+  the exact observed runtime-error count and mark cancellation explicitly.
+  CLI JSON must not duplicate validation refusals or unaccepted warnings into
+  `runtimeErrors`. Do not claim the path checks are atomic
   against a hostile same-user process:
   supported .NET 10 deletion APIs remain path-based on Windows and Unix;
   native handle-relative deletion is separate follow-up work.

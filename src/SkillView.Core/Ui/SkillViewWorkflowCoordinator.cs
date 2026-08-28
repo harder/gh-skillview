@@ -325,6 +325,8 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
+        RemoveService.RemoveReport? compactAttemptReport = null;
+
         // Compact path: a single skill with no second-confirm warnings and no
         // validation errors gets the winget-tui `[y] yes  [n] no` confirm.
         // Anything more involved (package/repo group, incoming symlinks,
@@ -354,9 +356,28 @@ internal sealed class SkillViewWorkflowCoordinator
                 }
                 if (compactResult.Outcome == RemoveConfirmModal.Outcome.Failed)
                 {
-                    _setStatusWithLevel(
-                        $"remove failed — {compactResult.Report?.Errors.FirstOrDefault() ?? "see logs (l)"}",
-                        TuiHelpers.NotificationLevel.Error);
+                    if (compactResult.Report is { } failedCompactReport
+                        && HasFilesystemChanges(failedCompactReport))
+                    {
+                        _services.ListAdapter.Invalidate();
+                        _setStatusWithLevel(
+                            $"partially removed {failedCompactReport.FilesDeleted} file(s); "
+                            + $"{failedCompactReport.ErrorCount} error(s) — rescanning…",
+                            TuiHelpers.NotificationLevel.Warn);
+                        var envReportFailed = _getLastReport();
+                        if (envReportFailed is not null)
+                        {
+                            QueueInventoryRescan(
+                                envReportFailed,
+                                successStatus: "partial remove — inventory now {0} skill(s)");
+                        }
+                    }
+                    else
+                    {
+                        _setStatusWithLevel(
+                            $"remove failed — {compactResult.Report?.Errors.FirstOrDefault() ?? "see logs (l)"}",
+                            TuiHelpers.NotificationLevel.Error);
+                    }
                     return;
                 }
                 if (compactResult.Outcome == RemoveConfirmModal.Outcome.Cancelled)
@@ -379,19 +400,36 @@ internal sealed class SkillViewWorkflowCoordinator
                     return;
                 }
                 // Outcome.EscalateToWizard → fall through to the wizard below.
+                // Preserve any mutations made by failed compact attempts so
+                // closing or failing the wizard cannot suppress the rescan.
+                compactAttemptReport = compactResult.Report;
             }
         }
 
         var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
         screen.Show();
-        if (screen.LastReport is { } report && HasFilesystemChanges(report))
+        var report = screen.LastReport;
+        if (compactAttemptReport is { } compactReport)
+        {
+            var compactBatch = RemoveService.BatchRemoveReport.FromSingle(
+                compactReport,
+                targetsDeleted: compactReport.Succeeded ? 1 : 0);
+            report = report is null
+                ? compactBatch
+                : RemovalReportState.Accumulate(compactBatch, report);
+        }
+
+        if (report is { } completedReport && HasFilesystemChanges(completedReport))
         {
             _services.ListAdapter.Invalidate();
             _setStatusWithLevel(
-                report.Succeeded
-                    ? $"removed {report.TargetsDeleted} skill(s) ({report.FilesDeleted} file(s)) — rescanning…"
-                    : $"partially removed {report.TargetsDeleted} skill(s), {report.FilesDeleted} file(s); {report.ErrorCount} error(s) — rescanning…",
-                report.Succeeded
+                completedReport.IsCanceled
+                    ? $"remove canceled after {completedReport.FilesDeleted} file(s); "
+                        + $"{completedReport.ErrorCount} error(s) — rescanning…"
+                    : completedReport.Succeeded
+                    ? $"removed {completedReport.TargetsDeleted} skill(s) ({completedReport.FilesDeleted} file(s)) — rescanning…"
+                    : $"partially removed {completedReport.TargetsDeleted} skill(s), {completedReport.FilesDeleted} file(s); {completedReport.ErrorCount} error(s) — rescanning…",
+                completedReport.Succeeded && !completedReport.IsCanceled
                     ? TuiHelpers.NotificationLevel.Success
                     : TuiHelpers.NotificationLevel.Warn);
             var envReport = _getLastReport();
@@ -399,12 +437,16 @@ internal sealed class SkillViewWorkflowCoordinator
             {
                 QueueInventoryRescan(
                     envReport,
-                    successStatus: report.Succeeded
+                    successStatus: completedReport.Succeeded && !completedReport.IsCanceled
                         ? "removed — inventory now {0} skill(s)"
                         : "partial remove — inventory now {0} skill(s)");
             }
         }
-        else if (screen.LastReport is { Errors.Length: > 0 } failedReport)
+        else if (report is { IsCanceled: true })
+        {
+            _setStatusWithLevel("remove canceled", TuiHelpers.NotificationLevel.Warn);
+        }
+        else if (report is { Errors.Length: > 0 } failedReport)
         {
             _setStatusWithLevel(
                 $"remove failed — {failedReport.ErrorCount} error(s); no files removed",

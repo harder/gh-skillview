@@ -321,6 +321,7 @@ public class RemoveServiceTests : IDisposable
         Assert.True(updates[^1].IsCompleted);
         Assert.False(updates[^1].IsCanceled);
         Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(1, updates[^1].TargetsDeleted);
         Assert.Equal(report.FilesDeleted, updates[^1].FilesProcessed);
         Assert.Equal(report.DirectoriesDeleted, updates[^1].DirectoriesProcessed);
     }
@@ -344,12 +345,14 @@ public class RemoveServiceTests : IDisposable
         Assert.NotEmpty(updates);
         Assert.True(updates[^1].IsCompleted);
         Assert.Equal(2, updates[^1].TargetsProcessed);
+        Assert.Equal(2, updates[^1].TargetsDeleted);
         Assert.Equal(report.FilesDeleted, updates[^1].FilesProcessed);
         Assert.Equal(report.DirectoriesDeleted, updates[^1].DirectoriesProcessed);
         Assert.True(updates.Zip(updates.Skip(1), (left, right) =>
             left.FilesProcessed <= right.FilesProcessed
             && left.DirectoriesProcessed <= right.DirectoriesProcessed
-            && left.TargetsProcessed <= right.TargetsProcessed).All(value => value));
+            && left.TargetsProcessed <= right.TargetsProcessed
+            && left.TargetsDeleted <= right.TargetsDeleted).All(value => value));
     }
 
     [Fact]
@@ -380,8 +383,49 @@ public class RemoveServiceTests : IDisposable
         Assert.True(Directory.Exists(secondDir));
         Assert.True(updates[^1].IsCanceled);
         Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(1, updates[^1].TargetsDeleted);
         Assert.Equal(3, updates[^1].FilesProcessed);
         Assert.Equal(1, updates[^1].DirectoriesProcessed);
+    }
+
+    [Fact]
+    public async Task RemoveManyAsync_FailedTargetThenCancellationDoesNotReportTargetDeleted()
+    {
+        var refused = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray.Create(new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.NotASkillDirectory,
+                "not a skill")),
+            Warnings: ImmutableArray<RemoveValidator.Warning>.Empty,
+            ResolvedPath: Path.Combine(_tempRoot, "refused"),
+            IncomingSymlinkPaths: ImmutableArray<string>.Empty);
+        var (second, _) = MakeSkill("must-not-run");
+        var secondValidation = RemoveValidator.Validate(
+            second,
+            new[] { Root() },
+            new[] { second });
+        using var cancellation = new CancellationTokenSource();
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        IEnumerable<RemoveValidator.RemoveValidation> CancelBeforeSecond()
+        {
+            yield return refused;
+            cancellation.Cancel();
+            yield return secondValidation;
+        }
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new RemoveService(_logger).RemoveManyAsync(
+                CancelBeforeSecond(),
+                cancellationToken: cancellation.Token,
+                progress: progress));
+
+        Assert.True(updates[^1].IsCanceled);
+        Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(0, updates[^1].TargetsDeleted);
+        Assert.Equal(0, updates[^1].FilesProcessed);
+        Assert.Equal(0, updates[^1].DirectoriesProcessed);
+        Assert.Equal(1, updates[^1].Errors);
     }
 
     [Fact]
@@ -410,6 +454,7 @@ public class RemoveServiceTests : IDisposable
         Assert.True(Directory.Exists(dir));
         Assert.True(updates[^1].IsCanceled);
         Assert.Equal(0, updates[^1].TargetsProcessed);
+        Assert.Equal(0, updates[^1].TargetsDeleted);
         Assert.Equal(1, updates[^1].FilesProcessed);
         Assert.Equal(0, updates[^1].DirectoriesProcessed);
     }

@@ -349,7 +349,7 @@ public sealed class RemoveScreen
             {
                 var report = await ExecuteAsync(evaluation, cancellationToken, progress)
                     .ConfigureAwait(false);
-                LastReport = report;
+                LastReport = RemovalReportState.Accumulate(LastReport, report);
                 InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
@@ -369,14 +369,9 @@ public sealed class RemoveScreen
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                var progressAtCancellation = lastProgress;
-                LastReport = new RemoveService.BatchRemoveReport(
-                    Succeeded: false,
-                    TargetsDeleted: progressAtCancellation?.TargetsProcessed ?? 0,
-                    FilesDeleted: progressAtCancellation?.FilesProcessed ?? 0,
-                    DirectoriesDeleted: progressAtCancellation?.DirectoriesProcessed ?? 0,
-                    Errors: ImmutableArray.Create("removal canceled"),
-                    DryRun: false);
+                LastReport = RemovalReportState.Accumulate(
+                    LastReport,
+                    RemovalReportState.Canceled(lastProgress));
                 _logger.Debug("remove", "removal canceled");
                 InvokeIfActive(() =>
                 {
@@ -389,6 +384,9 @@ public sealed class RemoveScreen
             catch (Exception ex)
             {
                 _logger.Error("remove", ex.Message);
+                LastReport = RemovalReportState.Accumulate(
+                    LastReport,
+                    RemovalReportState.Failed(lastProgress, ex.Message));
                 InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
@@ -458,8 +456,11 @@ public sealed class RemoveScreen
 
     private static string FormatProgress(RemoveService.RemoveProgress progress)
     {
-        var targets = progress.TargetsProcessed > 0
-            ? $"{progress.TargetsProcessed} target(s), "
+        var targetCount = progress.IsCanceled
+            ? progress.TargetsDeleted
+            : progress.TargetsProcessed;
+        var targets = targetCount > 0
+            ? $"{targetCount} target(s), "
             : string.Empty;
         return progress.IsCanceled
             ? $" canceling… {targets}{progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)"

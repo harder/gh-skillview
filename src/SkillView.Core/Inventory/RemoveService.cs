@@ -30,6 +30,7 @@ public sealed class RemoveService
 
     public sealed record RemoveProgress(
         int TargetsProcessed,
+        int TargetsDeleted,
         int FilesProcessed,
         int DirectoriesProcessed,
         int Errors,
@@ -46,6 +47,7 @@ public sealed class RemoveService
         bool DryRun)
     {
         public int ErrorCount { get; init; } = Errors.Length;
+        public bool IsCanceled { get; init; }
 
         public static RemoveReport Refused(string resolved, string reason) => new(
             Succeeded: false,
@@ -65,6 +67,7 @@ public sealed class RemoveService
         bool DryRun)
     {
         public int ErrorCount { get; init; } = Errors.Length;
+        public bool IsCanceled { get; init; }
 
         public static BatchRemoveReport FromSingle(RemoveReport report, int targetsDeleted) => new(
             Succeeded: report.Succeeded,
@@ -75,6 +78,7 @@ public sealed class RemoveService
             DryRun: report.DryRun)
         {
             ErrorCount = report.ErrorCount,
+            IsCanceled = report.IsCanceled,
         };
     }
 
@@ -621,6 +625,7 @@ public sealed class RemoveService
                     report.Errors.Select(error => $"{validation.ResolvedPath}: {error}"),
                     report.ErrorCount);
                 progressAdapter.CompleteTarget(
+                    targetsDeleted,
                     filesDeleted,
                     directoriesDeleted,
                     errors.Count,
@@ -633,7 +638,11 @@ public sealed class RemoveService
             throw;
         }
 
-        progressAdapter.CompleteBatch(filesDeleted, directoriesDeleted, errors.Count);
+        progressAdapter.CompleteBatch(
+            targetsDeleted,
+            filesDeleted,
+            directoriesDeleted,
+            errors.Count);
 
         return new BatchRemoveReport(
             Succeeded: errors.Count == 0,
@@ -667,7 +676,8 @@ public sealed class RemoveService
             string currentPath,
             bool force = false,
             bool isCompleted = false,
-            bool isCanceled = false)
+            bool isCanceled = false,
+            int? targetsDeleted = null)
         {
             if (_disabled || progress is null)
             {
@@ -686,6 +696,7 @@ public sealed class RemoveService
             {
                 progress.Report(new RemoveProgress(
                     targets,
+                    targetsDeleted ?? (isCompleted && errors == 0 ? targets : 0),
                     files,
                     directories,
                     errors,
@@ -749,10 +760,12 @@ public sealed class RemoveService
         : IProgress<RemoveProgress>
     {
         private int _targetsProcessed;
+        private int _targetsDeleted;
         private int _filesBeforeTarget;
         private int _directoriesBeforeTarget;
         private int _errorsBeforeTarget;
         private int _latestTargets;
+        private int _latestTargetsDeleted;
         private int _latestFiles;
         private int _latestDirectories;
         private int _latestErrors;
@@ -766,6 +779,7 @@ public sealed class RemoveService
             var aggregate = value with
             {
                 TargetsProcessed = _targetsProcessed + value.TargetsProcessed,
+                TargetsDeleted = _targetsDeleted + value.TargetsDeleted,
                 FilesProcessed = _filesBeforeTarget + value.FilesProcessed,
                 DirectoriesProcessed = _directoriesBeforeTarget + value.DirectoriesProcessed,
                 Errors = _errorsBeforeTarget + value.Errors,
@@ -776,18 +790,21 @@ public sealed class RemoveService
         }
 
         internal void CompleteTarget(
+            int targetsDeleted,
             int files,
             int directories,
             int errors,
             string currentPath)
         {
             _targetsProcessed++;
+            _targetsDeleted = targetsDeleted;
             _filesBeforeTarget = files;
             _directoriesBeforeTarget = directories;
             _errorsBeforeTarget = errors;
             _currentPath = currentPath;
             var aggregate = new RemoveProgress(
                 _targetsProcessed,
+                _targetsDeleted,
                 files,
                 directories,
                 errors,
@@ -798,10 +815,16 @@ public sealed class RemoveService
             Publish(aggregate, force: false);
         }
 
-        internal void CompleteBatch(int files, int directories, int errors)
+        internal void CompleteBatch(
+            int targetsDeleted,
+            int files,
+            int directories,
+            int errors)
         {
+            _targetsDeleted = targetsDeleted;
             var aggregate = new RemoveProgress(
                 _targetsProcessed,
+                _targetsDeleted,
                 files,
                 directories,
                 errors,
@@ -815,6 +838,7 @@ public sealed class RemoveService
         internal void CancelBatch() =>
             Publish(new RemoveProgress(
                 _latestTargets,
+                _latestTargetsDeleted,
                 _latestFiles,
                 _latestDirectories,
                 _latestErrors,
@@ -825,6 +849,7 @@ public sealed class RemoveService
         private void Remember(RemoveProgress value)
         {
             _latestTargets = value.TargetsProcessed;
+            _latestTargetsDeleted = value.TargetsDeleted;
             _latestFiles = value.FilesProcessed;
             _latestDirectories = value.DirectoriesProcessed;
             _latestErrors = value.Errors;

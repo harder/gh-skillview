@@ -921,6 +921,14 @@ outer batch catch could overwrite exact mid-target counts with completed-target
 totals. Both are fixed by explicit early-cancellation publication and by making
 the batch adapter retain and republish its latest aggregate snapshot.
 
+PR #14's Balanced follow-up review surfaced six suppressed accounting issues
+in the same change set. All were accepted and fixed in the PR: progress now
+distinguishes processed targets from successfully deleted targets; compact and
+advanced removal flows retain mutation totals across retries and escalation;
+cancellation reports preserve the exact observed runtime-error count while
+marking cancellation separately; and remove JSON only emits runtime-error
+fields after validation and confirmation permit an actual removal or dry run.
+
 ### Impact
 
 - Large trees allocate proportional path lists before deletion begins.

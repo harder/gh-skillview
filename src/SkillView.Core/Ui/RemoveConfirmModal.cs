@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -192,7 +191,7 @@ internal sealed class RemoveConfirmModal
                     new RemoveService.Options(DryRun: false),
                     cancellationToken,
                     progress).ConfigureAwait(false);
-                report = completed;
+                report = RemovalReportState.Accumulate(report, completed);
                 outcome = completed.Succeeded ? Outcome.Removed : Outcome.Failed;
                 InvokeIfActive(() =>
                 {
@@ -214,14 +213,9 @@ internal sealed class RemoveConfirmModal
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                var progressAtCancellation = lastProgress;
-                report = new RemoveService.RemoveReport(
-                    Succeeded: false,
-                    ResolvedPath: validation.ResolvedPath,
-                    FilesDeleted: progressAtCancellation?.FilesProcessed ?? 0,
-                    DirectoriesDeleted: progressAtCancellation?.DirectoriesProcessed ?? 0,
-                    Errors: ImmutableArray.Create("removal canceled"),
-                    DryRun: false);
+                report = RemovalReportState.Accumulate(
+                    report,
+                    RemovalReportState.Canceled(validation.ResolvedPath, lastProgress));
                 outcome = Outcome.Cancelled;
                 _logger.Debug("remove.compact", "removal canceled");
                 InvokeIfActive(() =>
@@ -234,6 +228,12 @@ internal sealed class RemoveConfirmModal
             catch (Exception ex)
             {
                 _logger.Error("remove.compact", ex.Message);
+                report = RemovalReportState.Accumulate(
+                    report,
+                    RemovalReportState.Failed(
+                        validation.ResolvedPath,
+                        lastProgress,
+                        ex.Message));
                 outcome = Outcome.Failed;
                 InvokeIfActive(() =>
                 {

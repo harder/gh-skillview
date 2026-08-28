@@ -1206,6 +1206,8 @@ public static class CliDispatcher
         ParsedRemoveArgs p,
         RemoveValidator.RemoveValidation validation)
     {
+        var removalAttempted = validation.Allowed
+            && (!validation.RequiresSecondConfirm || p.Yes);
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
         {
@@ -1218,7 +1220,7 @@ public static class CliDispatcher
             w.WriteString("scope", target.Scope.ToString());
             w.WriteNumber("filesDeleted", r.FilesDeleted);
             w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
-            w.WriteNumber("runtimeErrorCount", r.ErrorCount);
+            w.WriteNumber("runtimeErrorCount", removalAttempted ? r.ErrorCount : 0);
             w.WriteStartArray("errors");
             foreach (var e in validation.Errors)
             {
@@ -1238,7 +1240,10 @@ public static class CliDispatcher
             }
             w.WriteEndArray();
             w.WriteStartArray("runtimeErrors");
-            foreach (var e in r.Errors) w.WriteStringValue(e);
+            if (removalAttempted)
+            {
+                foreach (var e in r.Errors) w.WriteStringValue(e);
+            }
             w.WriteEndArray();
             w.WriteEndObject();
         }

@@ -227,7 +227,7 @@ public sealed class CleanupScreen
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                var removed = lastProgress?.TargetsProcessed ?? 0;
+                var removed = lastProgress?.TargetsDeleted ?? 0;
                 RemovedCount += removed;
                 RemovedFileCount += lastProgress?.FilesProcessed ?? 0;
                 RemovedDirectoryCount += lastProgress?.DirectoriesProcessed ?? 0;
@@ -398,7 +398,7 @@ public sealed class CleanupScreen
 
     private static string FormatProgress(RemoveService.RemoveProgress progress) =>
         progress.IsCanceled
-            ? $" canceling… removed {progress.TargetsProcessed} target(s)"
+            ? $" canceling… removed {progress.TargetsDeleted} target(s)"
             : $" removing… {progress.TargetsProcessed} target(s), {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
 
     internal static string BuildRemoveConfirmationText(
