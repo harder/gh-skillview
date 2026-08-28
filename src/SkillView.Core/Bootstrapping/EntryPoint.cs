@@ -51,9 +51,10 @@ public static class EntryPoint
 
         // In CLI mode, `--debug` streams structured log lines to stderr for
         // immediate visibility.
+        IDisposable? consoleSubscription = null;
         if (options.Debug && options.DispatchMode == DispatchMode.Cli)
         {
-            logger.Subscribe(entry => Console.Error.WriteLine(Logger.Format(entry)));
+            consoleSubscription = logger.Subscribe(entry => Console.Error.WriteLine(Logger.Format(entry)));
         }
 
         var services = TuiServices.Build(logger, fileSink, logDir);
@@ -73,6 +74,7 @@ public static class EntryPoint
         }
         finally
         {
+            consoleSubscription?.Dispose();
             fileSink?.Dispose();
         }
     }

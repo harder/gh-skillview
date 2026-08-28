@@ -7,11 +7,15 @@ namespace SkillView.Subprocess;
 /// argv-array subprocess invoker — never shell composition.
 public sealed class ProcessRunner
 {
+    public const int DefaultMaxCapturedCharsPerStream = 1024 * 1024;
     private readonly Logger _logger;
+    private readonly int _maxCapturedCharsPerStream;
 
-    public ProcessRunner(Logger logger)
+    public ProcessRunner(Logger logger, int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxCapturedCharsPerStream, 1);
         _logger = logger;
+        _maxCapturedCharsPerStream = maxCapturedCharsPerStream;
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -38,11 +42,8 @@ public sealed class ProcessRunner
         _logger.Debug("subprocess", $"exec: {executable} {string.Join(' ', arguments)}");
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        var stdout = new StringBuilder();
-        var stderr = new StringBuilder();
-
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdout.AppendLine(e.Data); };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
+        var stdout = new BoundedTextBuffer(_maxCapturedCharsPerStream);
+        var stderr = new BoundedTextBuffer(_maxCapturedCharsPerStream);
 
         var sw = Stopwatch.StartNew();
         try
@@ -55,18 +56,27 @@ public sealed class ProcessRunner
             return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed);
         }
 
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
         process.StandardInput.Close();
+        var stdoutDrain = DrainAsync(process.StandardOutput, stdout, cancellationToken);
+        var stderrDrain = DrainAsync(process.StandardError, stderr, cancellationToken);
 
         try
         {
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             try { process.Kill(entireProcessTree: true); }
             catch { /* best-effort */ }
+
+            // Observe both readers. They use the same cancellation token, so
+            // cancellation cannot leave background reads attached to a process
+            // that this method is about to dispose.
+            try { await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch (IOException) { }
             throw;
         }
 
@@ -83,5 +93,75 @@ public sealed class ProcessRunner
         _logger.Debug("subprocess",
             $"exit={result.ExitCode} dur={result.Duration.TotalMilliseconds:F0}ms {executable}");
         return result;
+    }
+
+    private static async Task DrainAsync(
+        StreamReader reader,
+        BoundedTextBuffer destination,
+        CancellationToken cancellationToken)
+    {
+        // StreamReader's line-oriented APIs retain a whole unterminated line.
+        // Fixed-size reads keep memory bounded even for a child that never
+        // emits a newline, while continuing to drain bytes after capture fills.
+        var chunk = new char[4096];
+        while (true)
+        {
+            var read = await reader
+                .ReadAsync(chunk.AsMemory(), cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0)
+            {
+                return;
+            }
+
+            destination.Append(chunk.AsSpan(0, read));
+        }
+    }
+
+    /// Retains only the leading portion of a stream. Process output is
+    /// untrusted and can be arbitrarily large, so callers get a clear marker
+    /// instead of allowing a noisy child process to grow the app indefinitely.
+    private sealed class BoundedTextBuffer
+    {
+        private readonly object _gate = new();
+        private readonly int _limit;
+        private readonly StringBuilder _buffer;
+        private bool _truncated;
+
+        internal BoundedTextBuffer(int limit)
+        {
+            _limit = limit;
+            _buffer = new StringBuilder(Math.Min(limit, 16 * 1024));
+        }
+
+        internal void Append(ReadOnlySpan<char> text)
+        {
+            lock (_gate)
+            {
+                if (_truncated) return;
+                var remaining = _limit - _buffer.Length;
+                if (remaining <= 0)
+                {
+                    _truncated = true;
+                    return;
+                }
+
+                var take = Math.Min(text.Length, remaining);
+                _buffer.Append(text[..take]);
+                if (take < text.Length)
+                {
+                    _truncated = true;
+                }
+            }
+        }
+
+        public override string ToString()
+        {
+            lock (_gate)
+            {
+                if (!_truncated) return _buffer.ToString();
+                return $"{_buffer}\n… output truncated after {_limit} characters …\n";
+            }
+        }
     }
 }

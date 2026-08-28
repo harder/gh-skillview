@@ -99,4 +99,44 @@ public class FileLogSinkTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public async Task Dispose_does_not_deadlock_with_callback_waiting_for_sink_lock()
+    {
+        var dir = NewTempDir();
+        var appendReached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAppend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            var logger = new Logger(LogLevel.Info);
+            var sink = new FileLogSink(
+                dir,
+                clock: null,
+                beforeAppendLockForTests: () =>
+                {
+                    appendReached.TrySetResult();
+                    releaseAppend.Task.GetAwaiter().GetResult();
+                });
+            sink.Attach(logger);
+
+            var logTask = Task.Run(() => logger.Info("test", "concurrent append"), TestContext.Current.CancellationToken);
+            await appendReached.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+            var disposeTask = Task.Run(sink.Dispose, TestContext.Current.CancellationToken);
+            Assert.True(SpinWait.SpinUntil(
+                () => sink.IsDisposedForTests,
+                TimeSpan.FromSeconds(2)));
+
+            releaseAppend.TrySetResult();
+            await Task.WhenAll(logTask, disposeTask)
+                .WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+            Assert.True(sink.IsDisposedForTests);
+        }
+        finally
+        {
+            releaseAppend.TrySetResult();
+            Directory.Delete(dir, true);
+        }
+    }
 }

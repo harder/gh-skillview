@@ -70,9 +70,8 @@ internal sealed class TabBarView : View
         var width = viewport.Width;
         if (width <= 0) return true;
 
-        // Build right-anchored tabs: "  Skill View          ◇ Discover   ▣ Installed   △ Changes  "
-        // Logo on the left, tabs flush right with a 2-cell gap between pills.
-        const string logo = "  Skill View";
+        // Branding already lives in the window title. Keep this row focused on
+        // navigation and leave the line below it for the active workspace title.
         var inactiveFg = WingetTuiTheme.TextSecondary;
         var activeFg = WingetTuiTheme.Accent;
         var background = WingetTuiTheme.Background;
@@ -82,16 +81,12 @@ internal sealed class TabBarView : View
         SetAttribute(new Attribute(WingetTuiTheme.TextPrimary, background));
         AddStr(new string(' ', width));
 
-        Move(0, 0);
-        SetAttribute(new Attribute(WingetTuiTheme.Accent, background, TextStyle.Bold));
-        AddStr(logo);
-
         // Compute pill total width so we can right-align.
         const int gap = 3;
         var pillWidths = Tabs.Select(t => Pill(t.Icon, t.Label).Length).ToArray();
         var pillsTotal = pillWidths.Sum() + gap * (Tabs.Length - 1);
 
-        var x = Math.Max(logo.Length + 4, width - pillsTotal - 2);
+        var x = Math.Max(0, width - pillsTotal - 2);
         _tabRegions.Clear();
         for (var i = 0; i < Tabs.Length; i++)
         {

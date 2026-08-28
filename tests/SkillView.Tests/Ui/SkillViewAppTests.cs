@@ -285,10 +285,11 @@ public sealed class SkillViewAppTests
 
         var hints = app.CurrentHintsForTests;
 
-        Assert.Equal(3, hints.Count);
+        Assert.Equal(4, hints.Count);
         Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filters");
         Assert.Contains(hints, hint => hint.Key == "1/2/3" && hint.Label == "Tabs");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
+        Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
         Assert.DoesNotContain(hints, hint => hint.Key == "/" && hint.Label == "Search");
         Assert.DoesNotContain(hints, hint => hint.Key == "Enter" && hint.Label == "Preview");
         Assert.DoesNotContain(hints, hint => hint.Key == "i" && hint.Label == "Install");
@@ -305,25 +306,28 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         var hints = app.CurrentHintsForTests;
 
-        Assert.Equal(4, hints.Count);
+        Assert.Equal(7, hints.Count);
         Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filter");
+        Assert.Contains(hints, hint => hint.Key == "s" && hint.Label == "Sort");
+        Assert.Contains(hints, hint => hint.Key == "P" && hint.Label == "Pins");
+        Assert.Contains(hints, hint => hint.Key == "G" && hint.Label == "Scope");
         Assert.Contains(hints, hint => hint.Key == "x" && hint.Label == "Remove");
-        Assert.Contains(hints, hint => hint.Key == "1/2/3" && hint.Label == "Tabs");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
+        Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
         Assert.DoesNotContain(hints, hint => hint.Key == "/" && hint.Label == "Search");
-        Assert.DoesNotContain(hints, hint => hint.Key == "s" && hint.Label == "Sort");
-        Assert.DoesNotContain(hints, hint => hint.Key == "P" && hint.Label == "Pins");
         Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
         Assert.DoesNotContain(hints, hint => hint.Key == "q" && hint.Label == "Quit");
     }
 
     [Fact]
-    public void BuildUi_HidesContextBarWhenItHasNoMeaningfulContent()
+    public void BuildUi_ShowsContextualWorkspaceTitle()
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
-        Assert.False(app.ContextBarForTests!.Visible);
+        Assert.True(app.ContextBarForTests!.Visible);
+        Assert.Contains("Discover skills", ContextBarView.FormatForTests(
+            app.ContextBarForTests.CurrentStateForTests));
     }
 
     [Fact]
@@ -530,7 +534,7 @@ public sealed class SkillViewAppTests
 
         var contextBar = app.ContextBarForTests!.CurrentStateForTests;
 
-        Assert.Equal("Discover", contextBar.Workspace);
+        Assert.Equal("Discover skills", contextBar.Workspace);
         Assert.Null(contextBar.FilterLabel);
     }
 
@@ -763,7 +767,7 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void ContextBar_FormatOmitsWorkspaceOnlyCopy()
+    public void ContextBar_FormatIncludesWorkspaceTitle()
     {
         var state = new ContextBarState(
             Workspace: "Discover",
@@ -774,7 +778,7 @@ public sealed class SkillViewAppTests
             FilterLabel: null);
         var rendered = ContextBarView.FormatForTests(state);
 
-        Assert.Equal(string.Empty, rendered);
+        Assert.Equal("Discover", rendered);
     }
 
     [Fact]
@@ -810,5 +814,13 @@ public sealed class SkillViewAppTests
         Assert.NotEmpty(rendered);
         Assert.Contains("Filters:", rendered);
         Assert.Contains("hidden dirs on", rendered);
+    }
+
+    [Fact]
+    public void CtrlQ_IsAnUnconditionalQuitKey()
+    {
+        Assert.True(SkillViewApp.IsUnconditionalQuitKey(
+            new Key(KeyCode.Q | KeyCode.CtrlMask)));
+        Assert.False(SkillViewApp.IsUnconditionalQuitKey(new Key('q')));
     }
 }

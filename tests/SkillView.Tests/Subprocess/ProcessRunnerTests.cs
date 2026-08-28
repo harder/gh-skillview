@@ -20,6 +20,22 @@ public sealed class ProcessRunnerTests
         Assert.Contains("done", result.StdOut);
     }
 
+    [Fact]
+    public async Task RunAsync_BoundsCapturedOutputAndMarksTruncation()
+    {
+        const int limit = 128;
+        var runner = new ProcessRunner(new Logger(LogLevel.Debug), limit);
+        var (executable, arguments) = CreateLargeOutputCommand();
+
+        var result = await runner.RunAsync(executable, arguments, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("output truncated after 128 characters", result.StdOut);
+        Assert.InRange(result.StdOut.Length, limit, limit + 80);
+        Assert.Contains("output truncated after 128 characters", result.StdErr);
+        Assert.InRange(result.StdErr.Length, limit, limit + 80);
+    }
+
     private static (string Executable, string[] Arguments) CreateWaitForEofCommand()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -36,6 +52,25 @@ public sealed class ProcessRunnerTests
         {
             "-c",
             "cat >/dev/null; printf done"
+        });
+    }
+
+    private static (string Executable, string[] Arguments) CreateLargeOutputCommand()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return ("pwsh", new[]
+            {
+                "-NoProfile",
+                "-Command",
+                "[Console]::Out.Write('x' * 4096); [Console]::Error.Write('e' * 4096)"
+            });
+        }
+
+        return ("/bin/sh", new[]
+        {
+            "-c",
+            "i=0; while [ $i -lt 512 ]; do printf 0123456789; printf abcdefghij >&2; i=$((i+1)); done"
         });
     }
 }

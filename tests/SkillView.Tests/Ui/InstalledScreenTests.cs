@@ -46,6 +46,15 @@ public sealed class InstalledScreenTests
     }
 
     [Fact]
+    public void DecideShortcut_QIsLeftForTheGlobalQuitHandler()
+    {
+        var decision = InstalledScreen.DecideShortcut(new Key('q'), filterHasFocus: false, canRemove: true);
+
+        Assert.Equal(InstalledScreen.ShortcutCommand.None, decision.Command);
+        Assert.False(decision.RequestStop);
+    }
+
+    [Fact]
     public void RenderDetail_FormatsSummaryAndPackageMetadataAsMarkdownLists()
     {
         var detail = InstalledScreen.RenderDetail(new InstalledSkill

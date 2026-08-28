@@ -70,6 +70,7 @@ internal sealed class InstallConfirmModal
 
     internal Result Show()
     {
+        using var lifetime = new CancellationTokenSource();
         var outcome = Outcome.Cancelled;
         InstallResult? installResult = null;
 
@@ -139,14 +140,14 @@ internal sealed class InstallConfirmModal
 
         var status = new Label
         {
-            X = 1,
+            X = 3,
             Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(2),
             Text = " ready",
         };
         var spinner = new SpinnerView
         {
-            X = Pos.AnchorEnd(2),
+            X = 1,
             Y = Pos.AnchorEnd(3),
             Width = 1,
             Height = 1,
@@ -201,6 +202,7 @@ internal sealed class InstallConfirmModal
             spinner.AutoSpin = true;
             installButton.Enabled = false;
             advancedButton.Enabled = false;
+            cancelButton.Enabled = false;
             status.Text = $" installing {_request.Repo}…";
 
             try
@@ -215,8 +217,10 @@ internal sealed class InstallConfirmModal
                     _ghPath,
                     _request.Repo,
                     _request.SkillName,
-                    options).ConfigureAwait(false);
+                    options,
+                    lifetime.Token).ConfigureAwait(false);
 
+                lifetime.Token.ThrowIfCancellationRequested();
                 _app.Invoke(() =>
                 {
                     spinner.AutoSpin = false;
@@ -235,8 +239,13 @@ internal sealed class InstallConfirmModal
                             : $" install failed (exit {installResult.ExitCode}) — see logs";
                         installButton.Enabled = CurrentValidationError() is null;
                         advancedButton.Enabled = true;
+                        cancelButton.Enabled = true;
                     }
                 });
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+                _logger.Debug("install.compact", "install canceled because the dialog closed");
             }
             catch (Exception ex)
             {
@@ -249,6 +258,7 @@ internal sealed class InstallConfirmModal
                     status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                     installButton.Enabled = CurrentValidationError() is null;
                     advancedButton.Enabled = true;
+                    cancelButton.Enabled = true;
                 });
             }
         };
@@ -256,12 +266,14 @@ internal sealed class InstallConfirmModal
         advancedButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             outcome = Outcome.EscalateToAdvanced;
             _app.RequestStop();
         };
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
+            lifetime.Cancel();
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
@@ -271,6 +283,12 @@ internal sealed class InstallConfirmModal
             if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
+                if (spinner.Visible)
+                {
+                    status.Text = " install in progress — wait for completion";
+                    return;
+                }
+                lifetime.Cancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
@@ -290,8 +308,15 @@ internal sealed class InstallConfirmModal
             TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, box);
         }
 
-        _app.Run(dialog);
-        dialog.Dispose();
+        try
+        {
+            _app.Run(dialog);
+        }
+        finally
+        {
+            lifetime.Cancel();
+            dialog.Dispose();
+        }
 
         return new Result(outcome, installResult);
     }

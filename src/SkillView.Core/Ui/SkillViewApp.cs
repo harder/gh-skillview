@@ -35,9 +35,13 @@ public sealed class SkillViewApp
     private readonly bool _probeOnRun;
     private readonly SearchAgentMetadataCache _searchAgentMetadata = new();
     private readonly SkillViewWorkflowCoordinator _workflows;
+    private const int MaxVisibleLogLines = 512;
 
     private IApplication? _app;
+    private Window? _mainWindow;
+    private IDisposable? _logSubscription;
     private CancellationTokenSource? _runLifetime;
+    private readonly LatestRequestGate _previewRequests = new();
     private bool _hasRunLifetime;
     private TextField? _queryField;
     private TextField? _ownerField;
@@ -50,8 +54,8 @@ public sealed class SkillViewApp
     private Editor? _logPane;
     private ContextBarView? _contextBar;
     private StatusStripView? _statusStrip;
-    private SpinnerView? _spinner;
     private TabBarView? _tabBar;
+    private TerminalSizeGuardView? _sizeGuard;
     private SkillViewTab _activeTab = SkillViewTab.Discover;
     private FrameView? _leftFrame;
     private SkillDetailPaneView? _detailPane;
@@ -94,6 +98,9 @@ public sealed class SkillViewApp
     private bool _contextBarShown = true;
     private View? _lastDiscoverFocus;
     private string? _loadedPreviewKey;
+    private readonly object _visibleLogGate = new();
+    private readonly Queue<string> _visibleLogLines = new(MaxVisibleLogLines);
+    private int _logRefreshQueued;
 
     /// Sort modes for the Search tab results table. Mirrors winget-tui's
     /// app.sort_field cycle in src/app.rs. Off restores the natural ordering
@@ -209,6 +216,9 @@ public sealed class SkillViewApp
             AppDomain.CurrentDomain.UnhandledException -= onUnhandledException;
             CancelStatusAutoClear();
             runLifetime.Cancel();
+            CancelCurrentPreview();
+            DisposeLogSubscription();
+            DetachApplicationKeyHandler();
             _hasRunLifetime = false;
             _runLifetime = null;
             _app = null;
@@ -242,6 +252,14 @@ public sealed class SkillViewApp
             Width = Dim.Fill(),
             Height = Dim.Fill(),
         };
+        _mainWindow = window;
+        if (_app is not null)
+        {
+            // Keyboard.KeyDown is raised before focused views. That makes it
+            // the reliable place for app-wide quit keys even when TableView or
+            // a text editor would otherwise consume the key first.
+            _app.Keyboard.KeyDown += OnApplicationKeyDown;
+        }
 
         // Top header strip: tabs on the right, "Skill View" wordmark on the
         // left. Stays present across all tab views, mirroring winget-tui's
@@ -309,6 +327,7 @@ public sealed class SkillViewApp
         };
         _resultsTable.ValueChanged += (_, _) =>
         {
+            CancelCurrentPreview();
             UpdatePreviewPlaceholder();
             UpdateMetadataPane();
         };
@@ -338,40 +357,48 @@ public sealed class SkillViewApp
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
         };
-        _spinner = new SpinnerView
-        {
-            X = Pos.AnchorEnd(10),
-            Y = Pos.AnchorEnd(2),
-            Width = 1,
-            Height = 1,
-            Visible = false,
-            AutoSpin = false,
-            Style = new SpinnerStyle.Dots(),
-        };
-
-        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName, window, _spinner);
+        _sizeGuard = new TerminalSizeGuardView();
         RefreshHiddenDirUi();
 
-        Func<Action, Task> runOnUi = action =>
+        Func<Action, Task> runOnUi = async action =>
         {
-            var tcs = new TaskCompletionSource();
-            Invoke(() =>
+            var cancellationToken = GetRunLifetimeToken();
+            if (cancellationToken.IsCancellationRequested) return;
+            var app = _app;
+            if (app is null) return;
+
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+            try
             {
-                try { action(); tcs.TrySetResult(); }
-                catch (Exception ex) { tcs.TrySetException(ex); }
-            });
-            return tcs.Task;
+                app.Invoke(() =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        tcs.TrySetCanceled(cancellationToken);
+                        return;
+                    }
+                    try { action(); tcs.TrySetResult(); }
+                    catch (Exception ex) { tcs.TrySetException(ex); }
+                });
+            }
+            catch when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            await tcs.Task.ConfigureAwait(false);
         };
 
         _installedTab = new SkillView.Ui.Tabs.InstalledTabView(
             runOnUi: runOnUi,
-            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
+            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
             // Scope cycle (`G`) pushes `--scope` down to `gh skill list`.
-            scopedSnapshotLoader: scope => _workflows.CaptureInventorySnapshotAsync(scope, GetRunLifetimeToken()))
+            scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
+            lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,
             Y = 2,
@@ -382,12 +409,13 @@ public sealed class SkillViewApp
 
         _updatesTab = new SkillView.Ui.Tabs.UpdatesTabView(
             runOnUi: runOnUi,
-            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
-            updateServiceFactory: () => _services.UpdateService,
+            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
+            updateRunner: (ghPath, options, token) => _services.UpdateService.UpdateAsync(ghPath, options, token),
             ghPathProvider: () => _ghPath,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,
-            onUpdateApplied: () => _services.ListAdapter.Invalidate())
+            onUpdateApplied: () => _services.ListAdapter.Invalidate(),
+            lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,
             Y = 2,
@@ -408,10 +436,11 @@ public sealed class SkillViewApp
 
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
-            snapshotLoader: () => _workflows.CaptureInventorySnapshotAsync(GetRunLifetimeToken()),
+            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onActivateUpdates: () =>
             {
                 _openedUpdatesFromChanges = true;
+                _changesTab?.CancelPendingLoad();
                 _workflows.OpenUpdatesFromChanges(
                     hideChanges: () => _changesTab!.Visible = false,
                     activateUpdates: hideChanges => _updatesTab!.ActivateFromChanges(hideChanges));
@@ -421,7 +450,8 @@ public sealed class SkillViewApp
                 hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
                 enterDoctor: EnterDoctor),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
-            onStateChange: UpdateContextBar)
+            onStateChange: UpdateContextBar,
+            lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,
             Y = 2,
@@ -431,7 +461,9 @@ public sealed class SkillViewApp
 
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
                    _changesTab,
-                   _spinner, _statusStrip);
+                   _statusStrip, _sizeGuard);
+        window.FrameChanged += (_, _) =>
+            _sizeGuard.UpdateForSize(window.Frame.Width, window.Frame.Height);
         window.KeyDown += OnWindowKeyDown;
         AttachStartupPointerAndKeyTracking(
             window,
@@ -452,7 +484,13 @@ public sealed class SkillViewApp
             _resultsTable);
 
         RefreshResultsTable();
-        _services.Logger.Subscribe(OnLogEntry);
+        DisposeLogSubscription();
+        _logSubscription = _services.Logger.Subscribe(OnLogEntry);
+        window.Disposing += (_, _) =>
+        {
+            DisposeLogSubscription();
+            DetachApplicationKeyHandler();
+        };
         UpdateContextBar();
 
         if (TuiHelpers.IsWarpTerminal)
@@ -469,6 +507,42 @@ public sealed class SkillViewApp
         NoteUserInteraction();
         if (OnWindowShortcut(key))
         {
+            key.Handled = true;
+        }
+    }
+
+    private void OnApplicationKeyDown(object? sender, Key key)
+    {
+        if (key.Handled) return;
+        var app = _app;
+        var mainWindow = _mainWindow;
+        if (app is null || mainWindow is null) return;
+
+        if (IsUnconditionalQuitKey(key))
+        {
+            var top = app.TopRunnable;
+            if (top is not null && !ReferenceEquals(top, mainWindow))
+            {
+                app.RequestStop(top);
+            }
+            app.RequestStop(mainWindow);
+            key.Handled = true;
+            return;
+        }
+
+        if (_sizeGuard?.Visible == true)
+        {
+            // Do not let hidden controls mutate state while the resize guard
+            // is covering them. Ctrl+Q above remains available.
+            key.Handled = true;
+            return;
+        }
+
+        if (ReferenceEquals(app.TopRunnableView, mainWindow)
+            && !TextInputHasFocus()
+            && key.AsRune.Value is 'q' or 'Q')
+        {
+            app.RequestStop(mainWindow);
             key.Handled = true;
         }
     }
@@ -501,6 +575,14 @@ public sealed class SkillViewApp
     /// Returns true if the key was consumed.
     private bool OnWindowShortcut(Key key)
     {
+        // Ctrl+Q is the unconditional escape hatch. Handle it before the
+        // printable-input guard so quitting still works while typing.
+        if (IsUnconditionalQuitKey(key))
+        {
+            _app?.RequestStop();
+            return true;
+        }
+
         // Let printable text keep going to the focused input, but keep global
         // navigation (tab arrows, help, slash, etc.) available everywhere.
         if (TextInputHasFocus() && IsPrintableTextInputKey(key))
@@ -516,7 +598,9 @@ public sealed class SkillViewApp
         // top-level list where Esc previously meant "lose your session".
         if (key.KeyCode == KeyCode.Esc)
         {
-            SetStatus("Press q to quit");
+            SetStatus(TextInputHasFocus()
+                ? "Esc leaves the field · Ctrl+Q quits"
+                : "Press q or Ctrl+Q to quit");
             return true;
         }
 
@@ -579,11 +663,20 @@ public sealed class SkillViewApp
         return false;
     }
 
-    private bool TextInputHasFocus() =>
-        _queryField?.HasFocus == true
-        || _ownerField?.HasFocus == true
-        || _agentField?.HasFocus == true
-        || _limitUpDown?.HasFocus == true;
+    private bool TextInputHasFocus()
+    {
+        if (_inDoctor) return false;
+        if (_activeTab == SkillViewTab.Installed)
+        {
+            return _installedTab?.FilterHasFocus == true;
+        }
+        return _activeTab == SkillViewTab.Discover
+            && _discoverTab?.Visible == true
+            && (_queryField?.HasFocus == true
+                || _ownerField?.HasFocus == true
+                || _agentField?.HasFocus == true
+                || _limitUpDown?.HasFocus == true);
+    }
 
     private static bool IsPrintableTextInputKey(Key key)
     {
@@ -598,12 +691,16 @@ public sealed class SkillViewApp
             && key.KeyCode != KeyCode.CursorRight;
     }
 
+    internal static bool IsUnconditionalQuitKey(Key key) =>
+        key.KeyCode == (KeyCode.Q | KeyCode.CtrlMask);
+
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
     private void ActivateTab(SkillViewTab tab)
     {
         if (tab == _activeTab) return;
+        CancelPendingTabWork();
         _activeTab = tab;
         _tabBar?.SetActiveTab(tab);
 
@@ -669,6 +766,7 @@ public sealed class SkillViewApp
         if (_inDoctor || _doctorTab is null) return;
         _tabBeforeDoctor = _activeTab;
         _inDoctor = true;
+        CancelPendingTabWork();
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_updatesTab is not null) _updatesTab.Visible = false;
@@ -699,6 +797,13 @@ public sealed class SkillViewApp
                 _doctorTab.SetFocus();
             });
         }, "doctor");
+    }
+
+    private void CancelPendingTabWork()
+    {
+        _installedTab?.CancelPendingLoad();
+        _changesTab?.CancelPendingLoad();
+        _updatesTab?.CancelPendingWork();
     }
 
     private void LeaveDoctor()
@@ -1017,12 +1122,11 @@ public sealed class SkillViewApp
             return;
         }
 
-        SetBusy($"preview {repo}/{pick.SkillName}…");
         var runCancellationToken = GetRunLifetimeToken();
+        using var request = _previewRequests.Begin(runCancellationToken, PreviewTimeout);
+        SetBusy($"preview {repo}/{pick.SkillName}…");
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(runCancellationToken);
-            cts.CancelAfter(PreviewTimeout);
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
             var preview = await _services.PreviewService
                 .PreviewAsync(
@@ -1030,11 +1134,12 @@ public sealed class SkillViewApp
                     repo,
                     pick.SkillName,
                     allowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled),
-                    cancellationToken: cts.Token)
+                    cancellationToken: request.Token)
                 .ConfigureAwait(false);
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
             Invoke(() =>
             {
+                if (!request.IsCurrent) return;
                 _loadedPreviewKey = preview.Succeeded ? BuildPreviewSelectionKey(pick) : null;
                 SetPreviewText(preview.Succeeded
                     ? preview.MarkdownBody ?? preview.Body ?? "(empty preview)"
@@ -1063,9 +1168,15 @@ public sealed class SkillViewApp
         }
         catch (OperationCanceledException)
         {
+            if (!request.IsCurrent)
+            {
+                _services.Logger.Debug("preview", "preview superseded by a newer selection");
+                return;
+            }
             _services.Logger.Warn("preview", "preview timed out");
             Invoke(() =>
             {
+                if (!request.IsCurrent) return;
                 _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
@@ -1077,6 +1188,7 @@ public sealed class SkillViewApp
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
             Invoke(() =>
             {
+                if (!request.IsCurrent) return;
                 _loadedPreviewKey = null;
                 SetPreviewText(snippet.Length > 0
                     ? $"(preview failed)\n\n{snippet}"
@@ -1090,7 +1202,10 @@ public sealed class SkillViewApp
         }
         finally
         {
-            Invoke(ClearBusy);
+            if (request.IsCurrent)
+            {
+                Invoke(ClearBusy);
+            }
         }
     }
 
@@ -1454,10 +1569,10 @@ public sealed class SkillViewApp
 
         var workspaceName = _activeTab switch
         {
-            _ when _inDoctor => "Doctor",
-            SkillViewTab.Discover => "Discover",
-            SkillViewTab.Installed => "Installed",
-            SkillViewTab.Changes => "Changes",
+            _ when _inDoctor => "Doctor — Environment diagnostics",
+            SkillViewTab.Discover => "Discover skills",
+            SkillViewTab.Installed => "Installed skills",
+            SkillViewTab.Changes => "Review changes",
             _ => null
         };
 
@@ -1607,13 +1722,8 @@ public sealed class SkillViewApp
         else
         {
             ShowLogPane();
-            var log = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
-            if (_logPane is not null)
-            {
-                _logPane.Text = log.Length > 0
-                    ? TerminalEscapeSanitizer.Sanitize(log) ?? string.Empty
-                    : "(no log entries yet)";
-            }
+            InitializeVisibleLogLines();
+            FlushVisibleLogLines();
         }
     }
 
@@ -1797,16 +1907,78 @@ public sealed class SkillViewApp
         RestoreDefaultStatus();
     }
 
-    private void OnLogEntry(LogEntry _)
+    private void OnLogEntry(LogEntry entry)
     {
         if (!_showingLogs) return;
-        Invoke(() =>
+        var line = TerminalEscapeSanitizer.Sanitize(Logger.Format(entry)) ?? string.Empty;
+        lock (_visibleLogGate)
         {
-            if (_logPane is not null)
+            _visibleLogLines.Enqueue(line);
+            while (_visibleLogLines.Count > MaxVisibleLogLines)
             {
-                _logPane.Text = string.Join('\n', _services.Logger.Snapshot().Select(Logger.Format));
+                _visibleLogLines.Dequeue();
             }
-        });
+        }
+
+        // Coalesce bursts into one UI refresh. This avoids rebuilding and
+        // redrawing the whole log pane once per individual entry.
+        if (Interlocked.Exchange(ref _logRefreshQueued, 1) == 0)
+        {
+            Invoke(FlushVisibleLogLines);
+        }
+    }
+
+    private void InitializeVisibleLogLines()
+    {
+        var lines = _services.Logger.Snapshot()
+            .TakeLast(MaxVisibleLogLines)
+            .Select(entry => TerminalEscapeSanitizer.Sanitize(Logger.Format(entry)) ?? string.Empty);
+        lock (_visibleLogGate)
+        {
+            _visibleLogLines.Clear();
+            foreach (var line in lines) _visibleLogLines.Enqueue(line);
+        }
+    }
+
+    private void FlushVisibleLogLines()
+    {
+        string text;
+        lock (_visibleLogGate)
+        {
+            text = _visibleLogLines.Count == 0
+                ? "(no log entries yet)"
+                : string.Join('\n', _visibleLogLines);
+
+            // Reset while the queue snapshot is protected. An entry enqueued
+            // after this point must observe zero and schedule another flush.
+            Interlocked.Exchange(ref _logRefreshQueued, 0);
+        }
+        if (_showingLogs && _logPane is not null)
+        {
+            _logPane.Text = text;
+        }
+    }
+
+    private void CancelCurrentPreview()
+    {
+        if (_previewRequests.Cancel())
+        {
+            Invoke(ClearBusy);
+        }
+    }
+
+    private void DisposeLogSubscription()
+    {
+        Interlocked.Exchange(ref _logSubscription, null)?.Dispose();
+    }
+
+    private void DetachApplicationKeyHandler()
+    {
+        if (_app is not null)
+        {
+            _app.Keyboard.KeyDown -= OnApplicationKeyDown;
+        }
+        _mainWindow = null;
     }
 
     private void SetStatus(string text) => SetStatus(text, TuiHelpers.NotificationLevel.Info);
@@ -1850,6 +2022,7 @@ public sealed class SkillViewApp
             return [
                 new StatusHint("l", "Preview"),
                 new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ];
         }
 
@@ -1858,6 +2031,7 @@ public sealed class SkillViewApp
             return [
                 new StatusHint("Esc", "Back"),
                 new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ];
         }
 
@@ -1865,23 +2039,29 @@ public sealed class SkillViewApp
         {
             SkillViewTab.Discover => [
                 new StatusHint("f", "Filters"),
-            new StatusHint("1/2/3", "Tabs"),
-            new StatusHint("?", "Help"),
+                new StatusHint("1/2/3", "Tabs"),
+                new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ],
             SkillViewTab.Installed => [
                 new StatusHint("f", "Filter"),
+                new StatusHint("s", "Sort"),
+                new StatusHint("P", "Pins"),
+                new StatusHint("G", "Scope"),
                 new StatusHint("x", "Remove"),
-                new StatusHint("1/2/3", "Tabs"),
                 new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ],
             SkillViewTab.Changes => [
                 new StatusHint("Enter", "Open"),
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ],
             _ => [
                 new StatusHint("?", "Help"),
+                new StatusHint("Ctrl+Q", "Quit"),
             ],
         };
     }
@@ -1928,21 +2108,13 @@ public sealed class SkillViewApp
 
     private void SetBusy(string text) => Invoke(() =>
     {
-        if (_spinner is not null)
-        {
-            _spinner.Visible = true;
-            _spinner.AutoSpin = true;
-        }
+        _statusStrip?.SetBusy(true);
         UpdateStatusStrip(text, TuiHelpers.NotificationLevel.Info);
     });
 
     private void ClearBusy()
     {
-        if (_spinner is not null)
-        {
-            _spinner.AutoSpin = false;
-            _spinner.Visible = false;
-        }
+        _statusStrip?.SetBusy(false);
     }
 
     private void Invoke(Action action)

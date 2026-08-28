@@ -6,8 +6,19 @@ namespace SkillView.Ui;
 
 internal sealed class SearchAgentMetadataCache
 {
-    private readonly Dictionary<string, ImmutableArray<string>> _agentsByResult =
+    internal const int DefaultCapacity = 512;
+
+    private readonly object _gate = new();
+    private readonly int _capacity;
+    private readonly Dictionary<string, LinkedListNode<CacheEntry>> _agentsByResult =
         new(StringComparer.Ordinal);
+    private readonly LinkedList<CacheEntry> _lru = new();
+
+    internal SearchAgentMetadataCache(int capacity = DefaultCapacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
+        _capacity = capacity;
+    }
 
     internal static string? NormalizeAgent(string? value)
     {
@@ -54,10 +65,37 @@ internal sealed class SearchAgentMetadataCache
         return builder.ToImmutable();
     }
 
-    internal bool Has(SearchResultSkill result) => _agentsByResult.ContainsKey(BuildKey(result));
+    internal bool Has(SearchResultSkill result)
+    {
+        lock (_gate)
+        {
+            if (!_agentsByResult.TryGetValue(BuildKey(result), out var node)) return false;
+            Touch(node);
+            return true;
+        }
+    }
 
-    internal void Store(SearchResultSkill result, ImmutableArray<string> agents) =>
-        _agentsByResult[BuildKey(result)] = agents;
+    internal void Store(SearchResultSkill result, ImmutableArray<string> agents)
+    {
+        var key = BuildKey(result);
+        lock (_gate)
+        {
+            if (_agentsByResult.TryGetValue(key, out var existing))
+            {
+                existing.Value = existing.Value with { Agents = agents };
+                Touch(existing);
+                return;
+            }
+
+            var node = _lru.AddFirst(new CacheEntry(key, agents));
+            _agentsByResult.Add(key, node);
+            if (_agentsByResult.Count <= _capacity) return;
+
+            var expired = _lru.Last!;
+            _lru.RemoveLast();
+            _agentsByResult.Remove(expired.Value.Key);
+        }
+    }
 
     internal IReadOnlyList<SearchResultSkill> Filter(
         IReadOnlyList<SearchResultSkill> results,
@@ -69,13 +107,29 @@ internal sealed class SearchAgentMetadataCache
             return results;
         }
 
-        return results
-            .Where(result =>
-                _agentsByResult.TryGetValue(BuildKey(result), out var agents)
-                && agents.Any(agent => string.Equals(agent, normalized, StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
+        lock (_gate)
+        {
+            return results
+                .Where(result =>
+                    _agentsByResult.TryGetValue(BuildKey(result), out var node)
+                    && node.Value.Agents.Any(agent => string.Equals(agent, normalized, StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+        }
+    }
+
+    internal int CountForTests
+    {
+        get { lock (_gate) return _agentsByResult.Count; }
+    }
+
+    private void Touch(LinkedListNode<CacheEntry> node)
+    {
+        _lru.Remove(node);
+        _lru.AddFirst(node);
     }
 
     private static string BuildKey(SearchResultSkill result) =>
         $"{result.Repo ?? string.Empty}\n{result.SkillName ?? string.Empty}\n{result.Path ?? string.Empty}";
+
+    private sealed record CacheEntry(string Key, ImmutableArray<string> Agents);
 }

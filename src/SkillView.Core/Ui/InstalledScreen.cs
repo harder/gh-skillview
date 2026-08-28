@@ -49,7 +49,7 @@ public static class InstalledScreen
                 : default;
         }
 
-        if (key.KeyCode == KeyCode.Esc || key.AsRune.Value == 'q' || key.AsRune.Value == 'Q')
+        if (key.KeyCode == KeyCode.Esc)
         {
             return new ShortcutDecision(ShortcutCommand.Close, RequestStop: true);
         }

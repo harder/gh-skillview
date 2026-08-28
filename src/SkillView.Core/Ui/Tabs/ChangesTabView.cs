@@ -21,27 +21,31 @@ internal sealed class ChangesTabView : FrameView
 {
     private const int KindColumnWidth = 11;
     private readonly Func<Action, Task> _runOnUi;
-    private readonly Func<Task<InventorySnapshot>> _snapshotLoader;
+    private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Action _onActivateUpdates;
     private readonly Action _onActivateCleanup;
     private readonly Action _onActivateDoctor;
     private readonly Action _onLeaveTab;
     private readonly Action? _onStateChange;
+    private readonly CancellationToken _lifetimeToken;
 
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _status;
+    private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private long _loadGeneration;
+    private readonly CancellationTokenSourceSlot _loadCancellations = new();
 
     internal ChangesTabView(
         Func<Action, Task> runOnUi,
-        Func<Task<InventorySnapshot>> snapshotLoader,
+        Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
         Action onActivateUpdates,
         Action onActivateCleanup,
         Action onActivateDoctor,
         Action onLeaveTab,
-        Action? onStateChange = null)
+        Action? onStateChange = null,
+        CancellationToken lifetimeToken = default)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -50,6 +54,7 @@ internal sealed class ChangesTabView : FrameView
         _onActivateDoctor = onActivateDoctor;
         _onLeaveTab = onLeaveTab;
         _onStateChange = onStateChange;
+        _lifetimeToken = lifetimeToken;
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -80,29 +85,42 @@ internal sealed class ChangesTabView : FrameView
 
         _status = new Label
         {
-            X = 0,
+            X = 2,
             Y = Pos.AnchorEnd(1),
-            Width = Dim.Fill(),
+            Width = Dim.Fill(2),
             Text = " loading…",
         };
+        _spinner = new SpinnerView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Width = 1,
+            Height = 1,
+            Visible = true,
+            AutoSpin = true,
+            Style = new SpinnerStyle.Dots(),
+        };
 
-        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _detail, _status);
+        TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _detail, _spinner, _status);
 
         _table.KeyDown += OnTableKeyDown;
 
-        Add(_table, _detail, _status);
+        Add(_table, _detail, _spinner, _status);
+        Disposing += (_, _) => CancelPendingLoad();
     }
 
     /// Load the maintenance queue from the inventory snapshot.
     internal async Task LoadAsync()
     {
         var gen = Interlocked.Increment(ref _loadGeneration);
+        using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
+        SetLoading(true);
         _status.Text = " loading inventory…";
 
         try
         {
-            var snapshot = await _snapshotLoader().ConfigureAwait(false);
+            var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
             // Only queue items backed by real pending state.
             // Update availability is unknown until the user runs a dry-run; Doctor
             // is always accessible via 'd'. Neither belongs in the pending queue.
@@ -125,12 +143,17 @@ internal sealed class ChangesTabView : FrameView
                 summary);
             }).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
+        {
+            // A newer load or tab deactivation superseded this one.
+        }
         catch (Exception ex)
         {
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen) return;
                 _status.Text = $" load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                SetLoading(false);
             }).ConfigureAwait(false);
         }
     }
@@ -177,6 +200,7 @@ internal sealed class ChangesTabView : FrameView
         }
 
         _onStateChange?.Invoke();
+        SetLoading(false);
     }
 
     // Tests only -----------------------------------------------------------
@@ -312,5 +336,18 @@ internal sealed class ChangesTabView : FrameView
         }
 
         return "No cleanup items";
+    }
+
+    internal void CancelPendingLoad()
+    {
+        Interlocked.Increment(ref _loadGeneration);
+        _loadCancellations.Cancel();
+        SetLoading(false);
+    }
+
+    private void SetLoading(bool loading)
+    {
+        _spinner.Visible = loading;
+        _spinner.AutoSpin = loading;
     }
 }

@@ -150,6 +150,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
   remote content and is separate from Terminal.Gui's pasted-input sanitization.
+- Keep the main shell's contextual header, inline busy indicators, quit routing,
+  cancellation ownership, and memory bounds aligned with
+  `agent_docs/ui-lifecycle-and-resource-bounds.md`. In particular, `Ctrl+Q`
+  must quit from text fields, subprocess capture and caches must stay bounded,
+  and superseded preview/inventory work must be canceled.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.
@@ -164,3 +169,5 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and the current Homebrew / WinGet dark-launch artifacts.
 - `agent_docs/tui-pty-testing.md` — sandboxed PTY workflow, synchronization
   strategy, verification scripts, and known pitfalls for terminal UI testing.
+- `agent_docs/ui-lifecycle-and-resource-bounds.md` — shell conventions,
+  cancellation ownership, and subprocess/cache/log memory limits.

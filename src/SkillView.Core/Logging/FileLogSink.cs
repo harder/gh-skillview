@@ -22,30 +22,44 @@ public sealed class FileLogSink : IDisposable
     private DateOnly _currentDay;
     private bool _disposed;
     private bool _trimPending;
+    private IDisposable? _subscription;
+    private readonly Action? _beforeAppendLockForTests;
 
     public FileLogSink(string directory, Func<DateTimeOffset>? clock = null)
+        : this(directory, clock, beforeAppendLockForTests: null)
+    {
+    }
+
+    internal FileLogSink(
+        string directory,
+        Func<DateTimeOffset>? clock,
+        Action? beforeAppendLockForTests)
     {
         _directory = directory;
         _clock = clock ?? (() => DateTimeOffset.Now);
+        _beforeAppendLockForTests = beforeAppendLockForTests;
     }
 
     public string Directory => _directory;
 
     public void Attach(Logger logger)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _subscription?.Dispose();
         // Emit the ring-buffer snapshot first so the file reflects pre-attach entries too.
         foreach (var entry in logger.Snapshot())
         {
             Append(entry);
         }
-        logger.Subscribe(Append);
+        _subscription = logger.Subscribe(Append);
     }
 
     public void Append(LogEntry entry)
     {
-        if (_disposed) return;
+        _beforeAppendLockForTests?.Invoke();
         lock (_gate)
         {
+            if (_disposed) return;
             try
             {
                 var today = DateOnly.FromDateTime(entry.Timestamp.ToLocalTime().DateTime);
@@ -193,11 +207,26 @@ public sealed class FileLogSink : IDisposable
 
     public void Dispose()
     {
+        IDisposable? subscription;
         lock (_gate)
         {
             if (_disposed) return;
             _disposed = true;
+            subscription = _subscription;
+            _subscription = null;
+        }
+
+        // Logger subscription disposal waits for an in-flight callback to
+        // finish. Never wait while holding _gate: Append takes the logger's
+        // registration lock first and then this lock, so the reverse order
+        // here would deadlock shutdown.
+        subscription?.Dispose();
+
+        lock (_gate)
+        {
             CloseWriterLocked();
         }
     }
+
+    internal bool IsDisposedForTests => Volatile.Read(ref _disposed);
 }

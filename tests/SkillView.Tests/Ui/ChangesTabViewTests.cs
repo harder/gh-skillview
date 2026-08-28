@@ -18,7 +18,7 @@ public sealed class ChangesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: static () => Task.FromResult(InventorySnapshot.Empty),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onActivateUpdates: static () => { },
             onActivateCleanup: static () => { },
             onActivateDoctor: static () => { },
@@ -45,7 +45,7 @@ public sealed class ChangesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: static () => Task.FromResult(InventorySnapshot.Empty),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onActivateUpdates: static () => { },
             onActivateCleanup: static () => { },
             onActivateDoctor: static () => { },
@@ -75,7 +75,7 @@ public sealed class ChangesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: static () => Task.FromResult(SnapshotWithMalformedSkill()),
+            snapshotLoader: static _ => Task.FromResult(SnapshotWithMalformedSkill()),
             onActivateUpdates: static () => { },
             onActivateCleanup: static () => { },
             onActivateDoctor: static () => { },
@@ -100,7 +100,7 @@ public sealed class ChangesTabViewTests
                 action();
                 return Task.CompletedTask;
             },
-            snapshotLoader: static () => Task.FromResult(SnapshotWithMalformedSkill()),
+            snapshotLoader: static _ => Task.FromResult(SnapshotWithMalformedSkill()),
             onActivateUpdates: static () => { },
             onActivateCleanup: static () => { },
             onActivateDoctor: static () => { },

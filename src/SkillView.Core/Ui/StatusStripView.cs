@@ -3,6 +3,7 @@ using System.Text;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
@@ -20,6 +21,8 @@ internal sealed class StatusStripView : View
     private string _statusText = string.Empty;
     private ImmutableArray<StatusHint> _hints = [];
     private string _leftBadges = string.Empty;
+    private readonly SpinnerView _spinner;
+    private bool _isBusy;
 
     internal StatusStripView()
     {
@@ -27,6 +30,19 @@ internal sealed class StatusStripView : View
         Height = 1;
         Width = Dim.Fill();
         SchemeName = SchemeNames.Base;
+
+        _spinner = new SpinnerView
+        {
+            X = 0,
+            Y = 0,
+            Width = 1,
+            Height = 1,
+            Visible = false,
+            AutoSpin = false,
+            Style = new SpinnerStyle.Dots(),
+        };
+        _spinner.SetScheme(TuiHelpers.CreateStatusScheme(TuiHelpers.NotificationLevel.Info));
+        Add(_spinner);
     }
 
     internal void Update(string statusText, IEnumerable<StatusHint> hints, string leftBadges = "")
@@ -36,6 +52,16 @@ internal sealed class StatusStripView : View
         _leftBadges = leftBadges ?? string.Empty;
         SetNeedsDraw();
     }
+
+    internal void SetBusy(bool isBusy)
+    {
+        _isBusy = isBusy;
+        _spinner.Visible = isBusy;
+        _spinner.AutoSpin = isBusy;
+        SetNeedsDraw();
+    }
+
+    internal bool IsBusyForTests => _isBusy;
 
     internal string LeftBadgesForTests => _leftBadges;
 
@@ -64,14 +90,17 @@ internal sealed class StatusStripView : View
         if (_statusText.Length > 0)
         {
             var centerX = Math.Max(x, width / 4);
-            Move(centerX, 0);
+            _spinner.X = centerX;
+            var textX = centerX + (_isBusy ? 2 : 0);
+            Move(textX, 0);
             SetAttribute(statusText);
-            AddStr(TuiHelpers.Truncate(_statusText, width / 2));
+            AddStr(TuiHelpers.Truncate(_statusText, Math.Max(0, width / 2 - (_isBusy ? 2 : 0))));
         }
 
         // Right hints — budget excludes left badges AND the center-status
         // region so hints can never overwrite the status text (Bug 1).
-        var leftEdge = ComputeHintLeftEdge(width, x, _statusText);
+        var measuredStatus = _isBusy ? "  " + _statusText : _statusText;
+        var leftEdge = ComputeHintLeftEdge(width, x, measuredStatus);
         var visibleHints = TruncateHintsForTests(_hints, width - leftEdge);
         if (visibleHints.Count > 0)
         {
