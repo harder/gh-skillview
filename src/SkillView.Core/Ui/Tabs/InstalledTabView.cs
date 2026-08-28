@@ -491,20 +491,33 @@ internal sealed class InstalledTabView : FrameView
 
     private void QueueDeferredWidthStabilization(int remainingPasses)
     {
-        _runTask(() => _runOnUi(() =>
+        _runTask(() => RunDeferredWidthStabilizationAsync(remainingPasses), "installed.layout");
+    }
+
+    private async Task RunDeferredWidthStabilizationAsync(int remainingPasses)
+    {
+        try
         {
-            if (!Visible || _table.Table is null)
+            await _runOnUi(() =>
             {
-                return;
-            }
+                if (!Visible || _table.Table is null)
+                {
+                    return;
+                }
 
-            RecomputeColumnWidths();
+                RecomputeColumnWidths();
 
-            if (remainingPasses > 1)
-            {
-                QueueDeferredWidthStabilization(remainingPasses - 1);
-            }
-        }), "installed.layout");
+                if (remainingPasses > 1)
+                {
+                    QueueDeferredWidthStabilization(remainingPasses - 1);
+                }
+            }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_lifetimeToken.IsCancellationRequested)
+        {
+            // The application can stop before a queued stabilization callback
+            // reaches the UI loop. That is expected teardown, not a crash.
+        }
     }
 
     /// Force focus onto the skill list. Used after the tab is activated so the

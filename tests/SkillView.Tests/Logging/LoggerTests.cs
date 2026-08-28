@@ -230,6 +230,27 @@ public class LoggerTests
     }
 
     [Fact]
+    public async Task Subscriber_IndirectRecursiveWriteAcrossLoggersIsRejectedWithoutDeadlock()
+    {
+        var first = new Logger();
+        var second = new Logger();
+        using var firstSubscription = first.Subscribe(_ => second.Info("test", "from-first"));
+        using var secondSubscription = second.Subscribe(_ => first.Info("test", "from-second"));
+
+        var write = Task.Run(
+            () => first.Info("test", "outer"),
+            TestContext.Current.CancellationToken);
+        await write.WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        var firstEntry = Assert.Single(first.Snapshot());
+        var secondEntry = Assert.Single(second.Snapshot());
+        Assert.Equal("outer", firstEntry.Message);
+        Assert.Equal("from-first", secondEntry.Message);
+    }
+
+    [Fact]
     public void SubscribeWithReplay_UsesOnlyRetainedRingEntries()
     {
         var logger = new Logger(capacity: 2);

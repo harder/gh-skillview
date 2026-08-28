@@ -142,14 +142,18 @@ public sealed class GhSkillListAdapter
                     return false;
                 }
 
-                var record = ReadRecord(el);
-                if (string.IsNullOrWhiteSpace(record.Name))
+                if (!TryGetRequiredString(
+                        el,
+                        out var skillName,
+                        "skillName", "name", "skill_name"))
                 {
-                    logger?.Warn("gh.skill.list", "inventory record is missing skillName");
+                    logger?.Warn(
+                        "gh.skill.list",
+                        "inventory record has a missing or non-string skillName");
                     records = ImmutableArray<GhSkillListRecord>.Empty;
                     return false;
                 }
-                builder.Add(record);
+                builder.Add(ReadRecord(el, skillName));
             }
             records = builder.ToImmutable();
             return true;
@@ -176,7 +180,34 @@ public sealed class GhSkillListAdapter
         return false;
     }
 
-    private static GhSkillListRecord ReadRecord(JsonElement obj)
+    private static bool TryGetRequiredString(
+        JsonElement obj,
+        out string value,
+        params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!obj.TryGetProperty(name, out var element))
+            {
+                continue;
+            }
+
+            if (element.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(element.GetString()))
+            {
+                value = element.GetString()!;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    private static GhSkillListRecord ReadRecord(JsonElement obj, string skillName)
     {
         // gh 2.94.0 emits the agent list under `agentHosts` (always an array,
         // even for single-agent installs and empty for --dir scans). Pre-release
@@ -191,7 +222,7 @@ public sealed class GhSkillListAdapter
         {
             // skillName is the upstream-canonical field; legacy `name` /
             // `skill_name` payloads still parse.
-            Name = GetString(obj, "skillName", "name", "skill_name"),
+            Name = skillName,
             // path is upstream-canonical; the older keys stay as fallbacks
             // (some early SkillView log fixtures used installPath).
             Path = GetString(obj, "path", "installPath", "install_path"),

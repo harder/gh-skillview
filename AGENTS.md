@@ -135,15 +135,20 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   the logger's message/total-character budgets and the file sink's date+size
   rotation and active-file exclusion when changing logging. Observer delivery
   uses synchronous sequence backpressure rather than retaining out-of-order
-  entries; observer callbacks must not write recursively to the same `Logger`.
+  entries; the recursion guard must retain the full per-thread stack of active
+  logger callbacks so direct and indirect cycles (A → B → A) are rejected.
 - A successful `gh skill list` process result is cacheable only when its JSON
   parses as the expected inventory schema. Preserve the distinction between a
   valid empty `[]` payload and malformed, truncated, or schema-incompatible
-  output, which must remain retryable.
+  output, which must remain retryable. The canonical/legacy skill-name field
+  is required to be a nonblank JSON string; do not coerce numbers into names.
 - The main TUI host path now runs through `SkillViewApp.RunAsync(ct)`, and
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via
   `IApplication.RunAsync(..., ct, ...)`.
+- A queued UI dispatch canceled by its owning app/view lifetime is expected
+  teardown. Consume that owned `OperationCanceledException` before it reaches
+  `BackgroundTaskTracker`; unrelated cancellation and faults must still report.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

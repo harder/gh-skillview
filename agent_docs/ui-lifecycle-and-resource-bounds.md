@@ -50,10 +50,14 @@ logging, or subprocess adapters.
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
   begin after disposal returns. Out-of-order concurrent delivery waits for the
-  missing sequence instead of retaining pending log entries. Callbacks must not
-  log recursively to the same `Logger`; that is rejected before the ring is
-  mutated. The visible log pane retains at most 512 formatted lines and
+  missing sequence instead of retaining pending log entries. The per-thread
+  callback stack retains every logger with an active callback, so both direct
+  recursion and indirect A → B → A cycles are rejected before either affected
+  ring is mutated. The visible log pane retains at most 512 formatted lines and
   coalesces burst refreshes without lost wakeups.
+- Fire-and-forget UI work must consume `OperationCanceledException` only when
+  its own app/view lifetime is canceled. Normal shutdown must not become a
+  false `CRASH`, while unrelated cancellation and real faults remain visible.
 
 ## Focused verification
 

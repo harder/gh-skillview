@@ -193,6 +193,10 @@ public class GhSkillListAdapterTests
     [InlineData("42")]
     [InlineData("[1, 2]")]
     [InlineData("[{}]")]
+    [InlineData("[{\"skillName\":42}]")]
+    [InlineData("[{\"skillName\":null}]")]
+    [InlineData("[{\"skillName\":false}]")]
+    [InlineData("[{\"skillName\":42,\"name\":\"legacy\"}]")]
     public void Malformed_or_schema_incompatible_payload_is_not_cacheable(string json)
     {
         var result = GhSkillListAdapter.ParseLoadResult(json);

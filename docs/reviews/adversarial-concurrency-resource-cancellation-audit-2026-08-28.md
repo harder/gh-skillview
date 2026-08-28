@@ -155,7 +155,7 @@ The first natural implementation checkpoint completes remediation-order items
 Local verification at this checkpoint:
 
 - `dotnet build --no-restore`: passed with zero warnings.
-- `dotnet test --no-build`: 605 of 605 tests passed, including the ANSI-driver
+- `dotnet test --no-build`: 611 of 611 tests passed, including the ANSI-driver
   integration suite.
 - New deterministic tests cover removal escapes/cycles/retargeting,
   cancellation between entries in a 2,000-file directory, 100,000-operation
@@ -237,6 +237,34 @@ Deterministic coverage holds an awaitable dispatch callback outside the UI
 loop and proves the request remains current until execution, then exercises the
 real log-pane action while search and preview busy owners overlap and verifies
 that search remains visible after preview cancellation.
+
+The fourth Copilot review generated three inline findings. All three were
+independently reassessed and accepted:
+
+1. **Indirect logger recursion can deadlock A → B → A — correct and fixed.**
+   A single thread-static logger identity detected only direct recursion. A
+   callback on logger A could write to logger B, whose callback could then
+   write back to A and wait forever on A's in-flight sequence. Observer
+   delivery now maintains a reusable per-thread stack of every active logger,
+   rejecting any direct or indirect callback cycle before assigning another
+   sequence or mutating a ring. The stack avoids a per-entry hash-set
+   allocation, and a bounded regression test proves the two-logger cycle
+   returns without deadlock or an extra A entry.
+2. **Canceled deferred Installed layout can be reported as `CRASH` — correct
+   and fixed.** The three post-population width-stabilization passes are
+   tracked background tasks. If app teardown canceled their queued UI dispatch,
+   the cancellation previously escaped into `BackgroundTaskTracker` and was
+   reported as an unhandled fault. The deferred operation now consumes
+   `OperationCanceledException` only when its own view/app lifetime token is
+   canceled; unrelated cancellation and faults still propagate. The other tab
+   dispatch paths were rechecked and already catch cancellation through their
+   linked load/operation lifetime tokens.
+3. **Numeric `skillName` accepted and cached — correct and fixed.** The generic
+   optional-field reader intentionally tolerates numeric versions, but it must
+   not define record identity. The canonical or legacy name field must now be
+   a nonblank JSON string. Numeric, null, Boolean, and canonical-invalid plus
+   legacy-valid records are rejected as schema-incompatible and remain
+   retryable instead of entering the cache.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 

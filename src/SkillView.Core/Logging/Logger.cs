@@ -23,7 +23,7 @@ public sealed class Logger
     private readonly Action<long>? _observerBackpressureForTests;
 
     [ThreadStatic]
-    private static Logger? s_observerCallbackLogger;
+    private static List<Logger>? s_observerCallbackLoggers;
 
     public Logger(
         LogLevel minimumLevel = LogLevel.Info,
@@ -63,7 +63,7 @@ public sealed class Logger
 
     /// <summary>
     /// Subscribes to future entries. Callbacks are synchronously ordered and
-    /// must not write recursively to this same logger instance.
+    /// must not write recursively through a cycle that reaches this logger.
     /// </summary>
     public IDisposable Subscribe(Action<LogEntry> observer)
     {
@@ -88,7 +88,8 @@ public sealed class Logger
     /// entries before live delivery. Concurrent producers are held behind
     /// synchronous sequence backpressure until replay completes, preventing
     /// gaps, duplicates, out-of-order callbacks, and an unbounded handoff
-    /// buffer. Callbacks must not write recursively to this same logger.
+    /// buffer. Callbacks must not write recursively through a cycle that
+    /// reaches this logger.
     /// </summary>
     public IDisposable SubscribeWithReplay(Action<LogEntry> observer)
     {
@@ -129,10 +130,10 @@ public sealed class Logger
         // recursively from one of this logger's callbacks would wait on the
         // callback that is currently executing, so reject it before assigning
         // a sequence or mutating the retained ring.
-        if (ReferenceEquals(s_observerCallbackLogger, this))
+        if (s_observerCallbackLoggers?.Contains(this) == true)
         {
             throw new InvalidOperationException(
-                "A logger observer cannot write recursively to the same Logger instance.");
+                "A logger observer cannot write through a recursive Logger callback cycle.");
         }
 
         var entry = new LogEntry(
@@ -317,11 +318,14 @@ public sealed class Logger
 
         private void Deliver(LogEntry entry)
         {
-            var previousLogger = s_observerCallbackLogger;
-            s_observerCallbackLogger = _owner;
+            var activeLoggers = s_observerCallbackLoggers ??= [];
+            activeLoggers.Add(_owner);
             try { _observer(entry); }
             catch { /* observer faults must not kill logging or later delivery */ }
-            finally { s_observerCallbackLogger = previousLogger; }
+            finally
+            {
+                activeLoggers.RemoveAt(activeLoggers.Count - 1);
+            }
         }
     }
 
