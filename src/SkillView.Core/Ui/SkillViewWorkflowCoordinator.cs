@@ -253,7 +253,11 @@ internal sealed class SkillViewWorkflowCoordinator
         {
             var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
             var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
+            var candidates = CleanupClassifier.ClassifyWithCancellation(
+                snapshot,
+                snapshot.ScannedRoots,
+                options: null,
+                cancellationToken);
             _invoke(() =>
             {
                 _clearBusy();

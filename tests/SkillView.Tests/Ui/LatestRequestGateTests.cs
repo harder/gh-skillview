@@ -45,7 +45,28 @@ public sealed class LatestRequestGateTests
                 {
                     using var replacement = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
                     gate.Cancel();
-                });
+            });
         }
+    }
+
+    [Fact]
+    public void Cancel_DoesNotHoldGateLockWhileRunningCallbacks()
+    {
+        using var gate = new LatestRequestGate();
+        var request = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
+        var releasedInsideCallback = false;
+        using var registration = request.Token.Register(() =>
+        {
+            var release = Task.Run(
+                request.Dispose,
+                TestContext.Current.CancellationToken);
+            releasedInsideCallback = release.Wait(TimeSpan.FromSeconds(2));
+        });
+
+        Assert.True(gate.Cancel());
+
+        Assert.True(releasedInsideCallback);
+        Assert.True(request.Token.IsCancellationRequested);
+        Assert.False(request.IsCurrent);
     }
 }

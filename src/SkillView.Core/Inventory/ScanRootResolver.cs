@@ -40,16 +40,23 @@ public sealed class ScanRootResolver
 
     /// Emits scan roots that actually exist on disk. `Options.CurrentDirectory`
     /// is used to probe for a git working tree.
-    public ImmutableArray<ScanRoot> Resolve(Options opts)
+    public ImmutableArray<ScanRoot> Resolve(Options opts) =>
+        ResolveWithCancellation(opts, CancellationToken.None);
+
+    internal ImmutableArray<ScanRoot> ResolveWithCancellation(
+        Options opts,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var builder = ImmutableArray.CreateBuilder<ScanRoot>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        var gitRoot = FindGitRoot(opts.CurrentDirectory);
+        var gitRoot = FindGitRootWithCancellation(opts.CurrentDirectory, cancellationToken);
         if (gitRoot is not null)
         {
             foreach (var (rel, agent) in ProjectSeeds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var path = Path.Combine(gitRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 TryAdd(builder, seen, path, Scope.Project, agent);
             }
@@ -57,6 +64,7 @@ public sealed class ScanRootResolver
 
         foreach (var (rel, agent) in UserSeeds)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var path = Path.Combine(opts.HomeDirectory, rel.Replace('/', Path.DirectorySeparatorChar));
             TryAdd(builder, seen, path, Scope.User, agent);
         }
@@ -76,6 +84,7 @@ public sealed class ScanRootResolver
 
         foreach (var custom in opts.CustomRoots)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(custom)) continue;
             var full = Path.GetFullPath(custom);
             TryAdd(builder, seen, full, Scope.Custom, agentHint: null);
@@ -87,12 +96,18 @@ public sealed class ScanRootResolver
     /// Exposed for the Doctor screen — returns the same roots `Resolve` would
     /// produce, but marked by existence. UI wants to show "Would scan X
     /// (missing)" vs "Will scan X" without treating missing as error.
-    public static string? FindGitRoot(string start)
+    public static string? FindGitRoot(string start) =>
+        FindGitRootWithCancellation(start, CancellationToken.None);
+
+    internal static string? FindGitRootWithCancellation(
+        string start,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(start)) return null;
         string? cursor = Path.GetFullPath(start);
         while (!string.IsNullOrEmpty(cursor))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (Directory.Exists(Path.Combine(cursor, ".git"))) return cursor;
             // Shallow-clone worktrees store `.git` as a pointer file, not a dir.
             if (File.Exists(Path.Combine(cursor, ".git"))) return cursor;

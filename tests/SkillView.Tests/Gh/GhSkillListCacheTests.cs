@@ -223,6 +223,35 @@ public sealed class GhSkillListCacheTests
         Assert.Empty(errors);
     }
 
+    [Fact]
+    public void ClockCallback_RunsOutsideCacheLock()
+    {
+        GhSkillListCache? cache = null;
+        var firstCall = 1;
+        var invalidatedInsideClock = false;
+        cache = new GhSkillListCache(
+            () =>
+            {
+                if (Interlocked.Exchange(ref firstCall, 0) == 1)
+                {
+                    var invalidation = Task.Run(
+                        cache!.Invalidate,
+                        TestContext.Current.CancellationToken);
+                    invalidatedInsideClock = invalidation.Wait(TimeSpan.FromSeconds(2));
+                }
+                return DateTimeOffset.Parse("2026-05-01T00:00:00Z");
+            },
+            ttl: TimeSpan.FromSeconds(10));
+
+        cache.Store(
+            "/usr/bin/gh",
+            scope: null,
+            agent: null,
+            ImmutableArray<GhSkillListRecord>.Empty);
+
+        Assert.True(invalidatedInsideClock);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
         while (!condition())

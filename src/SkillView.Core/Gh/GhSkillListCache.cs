@@ -25,9 +25,10 @@ internal sealed class GhSkillListCache
         out ImmutableArray<GhSkillListRecord> records)
     {
         var key = BuildKey(ghPath, scope, agent);
+        var now = _now();
         lock (_gate)
         {
-            return TryGetLocked(key, out records);
+            return TryGetLocked(key, now, out records);
         }
     }
 
@@ -42,12 +43,13 @@ internal sealed class GhSkillListCache
         cancellationToken.ThrowIfCancellationRequested();
 
         var key = BuildKey(ghPath, scope, agent);
+        var now = _now();
         InflightLoad flight;
         var startsLoad = false;
 
         lock (_gate)
         {
-            if (TryGetLocked(key, out var cached))
+            if (TryGetLocked(key, now, out var cached))
             {
                 return new LookupResult(cached, FromCache: true);
             }
@@ -83,9 +85,12 @@ internal sealed class GhSkillListCache
         }
     }
 
-    private bool TryGetLocked(string key, out ImmutableArray<GhSkillListRecord> records)
+    private bool TryGetLocked(
+        string key,
+        DateTimeOffset now,
+        out ImmutableArray<GhSkillListRecord> records)
     {
-        if (_entries.TryGetValue(key, out var entry) && _now() - entry.CapturedAt <= _ttl)
+        if (_entries.TryGetValue(key, out var entry) && now - entry.CapturedAt <= _ttl)
         {
             records = entry.Records;
             return true;
@@ -102,9 +107,10 @@ internal sealed class GhSkillListCache
         string? agent,
         ImmutableArray<GhSkillListRecord> records)
     {
+        var capturedAt = _now();
         lock (_gate)
         {
-            _entries[BuildKey(ghPath, scope, agent)] = new CacheEntry(_now(), records);
+            _entries[BuildKey(ghPath, scope, agent)] = new CacheEntry(capturedAt, records);
         }
     }
 
@@ -158,6 +164,12 @@ internal sealed class GhSkillListCache
         bool invalidated;
         bool dispose;
         CancellationToken sharedCancellationToken;
+        var capturedAt = default(DateTimeOffset);
+        if (!canceled && failure is null && loaded.ShouldCache)
+        {
+            try { capturedAt = _now(); }
+            catch (Exception ex) { failure = ex; }
+        }
         lock (_gate)
         {
             invalidated = flight.Invalidated;
@@ -170,7 +182,7 @@ internal sealed class GhSkillListCache
             {
                 if (loaded.ShouldCache)
                 {
-                    _entries[key] = new CacheEntry(_now(), loaded.Records);
+                    _entries[key] = new CacheEntry(capturedAt, loaded.Records);
                 }
             }
 

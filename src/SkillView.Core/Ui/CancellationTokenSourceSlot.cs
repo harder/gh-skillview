@@ -1,12 +1,13 @@
 namespace SkillView.Ui;
 
 /// Coordinates one owned cancellation source across replacement, cancellation,
-/// and lease disposal. Every operation that can touch the source itself runs
-/// under the same gate, preventing Cancel from racing Dispose.
+/// and lease disposal. Ownership transitions run under one gate, while
+/// cancellation callbacks run outside it; disposal is deferred until an
+/// in-progress cancellation finishes.
 internal sealed class CancellationTokenSourceSlot
 {
     private readonly object _gate = new();
-    private CancellationTokenSource? _active;
+    private SourceState? _active;
 
     internal bool HasActive
     {
@@ -21,24 +22,27 @@ internal sealed class CancellationTokenSourceSlot
 
     internal Lease Replace(CancellationToken lifetime)
     {
-        var next = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+        var next = new SourceState(CancellationTokenSource.CreateLinkedTokenSource(lifetime));
+        SourceState? previous;
         lock (_gate)
         {
-            _active?.Cancel();
+            previous = _active;
             _active = next;
+            PrepareCancellationLocked(previous);
         }
+        CancelPrepared(previous);
 
         return new Lease(this, next);
     }
 
     internal Lease? TryBegin(CancellationToken lifetime)
     {
-        var next = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+        var next = new SourceState(CancellationTokenSource.CreateLinkedTokenSource(lifetime));
         lock (_gate)
         {
             if (_active is not null)
             {
-                next.Dispose();
+                next.Source.Dispose();
                 return null;
             }
 
@@ -50,6 +54,7 @@ internal sealed class CancellationTokenSourceSlot
 
     internal bool Cancel()
     {
+        SourceState? active;
         lock (_gate)
         {
             if (_active is null)
@@ -57,40 +62,94 @@ internal sealed class CancellationTokenSourceSlot
                 return false;
             }
 
-            _active.Cancel();
+            active = _active;
             _active = null;
-            return true;
+            PrepareCancellationLocked(active);
         }
+        CancelPrepared(active);
+        return true;
     }
 
-    private void Release(CancellationTokenSource source)
+    private void Release(SourceState state)
     {
+        var dispose = false;
         lock (_gate)
         {
-            if (ReferenceEquals(_active, source))
+            if (ReferenceEquals(_active, state))
             {
                 _active = null;
             }
 
-            source.Dispose();
+            state.LeaseReleased = true;
+            if (!state.CancellationInProgress && !state.Disposed)
+            {
+                state.Disposed = true;
+                dispose = true;
+            }
+        }
+        if (dispose)
+        {
+            state.Source.Dispose();
+        }
+    }
+
+    private static void PrepareCancellationLocked(SourceState? state)
+    {
+        if (state is not null)
+        {
+            state.CancellationInProgress = true;
+        }
+    }
+
+    private void CancelPrepared(SourceState? state)
+    {
+        if (state is null) return;
+        try
+        {
+            state.Source.Cancel();
+        }
+        finally
+        {
+            var dispose = false;
+            lock (_gate)
+            {
+                state.CancellationInProgress = false;
+                if (state.LeaseReleased && !state.Disposed)
+                {
+                    state.Disposed = true;
+                    dispose = true;
+                }
+            }
+            if (dispose)
+            {
+                state.Source.Dispose();
+            }
         }
     }
 
     internal sealed class Lease : IDisposable
     {
         private CancellationTokenSourceSlot? _owner;
-        private readonly CancellationTokenSource _source;
+        private readonly SourceState _state;
 
-        internal Lease(CancellationTokenSourceSlot owner, CancellationTokenSource source)
+        internal Lease(CancellationTokenSourceSlot owner, SourceState state)
         {
             _owner = owner;
-            _source = source;
-            Token = source.Token;
+            _state = state;
+            Token = state.Source.Token;
         }
 
         internal CancellationToken Token { get; }
 
         public void Dispose() =>
-            Interlocked.Exchange(ref _owner, null)?.Release(_source);
+            Interlocked.Exchange(ref _owner, null)?.Release(_state);
+    }
+
+    internal sealed class SourceState(CancellationTokenSource source)
+    {
+        internal CancellationTokenSource Source { get; } = source;
+        internal bool CancellationInProgress { get; set; }
+        internal bool LeaseReleased { get; set; }
+        internal bool Disposed { get; set; }
     }
 }

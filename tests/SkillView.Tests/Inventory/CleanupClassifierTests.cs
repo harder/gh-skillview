@@ -224,4 +224,18 @@ public class CleanupClassifierTests : IDisposable
         Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Malformed);
         Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.HiddenNestedResidue);
     }
+
+    [Fact]
+    public void ClassifyWithCancellation_StopsBeforeFilesystemEnumeration()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            CleanupClassifier.ClassifyWithCancellation(
+                Snapshot(false),
+                [new ScanRoot(_tempRoot, Scope.User, null)],
+                options: null,
+                cancellation.Token));
+    }
 }
