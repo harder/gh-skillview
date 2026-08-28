@@ -67,6 +67,10 @@ logging, or subprocess adapters.
   and add another implicit queue. Esc cancels the active traversal, and each
   removal window cancels and drains its owned task before disposing controls.
   Partial cancellation counts still trigger inventory invalidation/rescan.
+  `BatchProgressAdapter` retains the latest aggregate snapshot so the outer
+  cancellation boundary cannot replace mid-target file/directory counts with
+  completed-target-only totals. Each async removal entry point emits a final
+  `IsCanceled` update for already-canceled tokens as well as in-flight work.
   Traversal retains O(depth) enumerator state and no more than 128 detailed
   runtime errors plus one omission summary.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain

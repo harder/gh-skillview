@@ -137,7 +137,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   modal alive until cancellation quiesces and rescan when cancellation made
   any partial filesystem change. Runtime reports retain at most 128 individual
   errors plus an omission summary while preserving the exact error count. Do
-  not claim the path checks are atomic against a hostile same-user process:
+  not overwrite a mid-target cancellation snapshot with completed-target-only
+  totals: the batch progress adapter owns the latest aggregate state, and every
+  async removal entry point must publish a terminal canceled update even when
+  its token was already canceled. Do not claim the path checks are atomic
+  against a hostile same-user process:
   supported .NET 10 deletion APIs remain path-based on Windows and Unix;
   native handle-relative deletion is separate follow-up work.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history

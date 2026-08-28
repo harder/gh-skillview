@@ -915,7 +915,11 @@ Cancellation publishes exact aggregate progress, including cancellation
 between batch targets. The workflow invalidates and rescans inventory whenever
 even a partial target deleted files or directories. Runtime failure detail is
 bounded to 128 messages plus an omission summary while `ErrorCount` preserves
-the exact total.
+the exact total. PR #14's first Copilot review found two terminal-progress
+gaps: already-canceled link removal omitted its final canceled event, and the
+outer batch catch could overwrite exact mid-target counts with completed-target
+totals. Both are fixed by explicit early-cancellation publication and by making
+the batch adapter retain and republish its latest aggregate snapshot.
 
 ### Impact
 

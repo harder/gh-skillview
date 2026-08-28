@@ -326,7 +326,16 @@ public sealed class RemoveService
             var fullPath = Path.GetFullPath(path);
             var progressTracker = new ProgressTracker(progress, _logger);
             progressTracker.Publish(0, 0, 0, 0, fullPath, force: true);
-            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException)
+            {
+                progressTracker.Publish(0, 0, 0, 0, fullPath,
+                    force: true, isCanceled: true);
+                throw;
+            }
 
             if (!PathResolver.IsSymlink(fullPath))
             {
@@ -620,7 +629,7 @@ public sealed class RemoveService
         }
         catch (OperationCanceledException)
         {
-            progressAdapter.CancelBatch(filesDeleted, directoriesDeleted, errors.Count);
+            progressAdapter.CancelBatch();
             throw;
         }
 
@@ -743,6 +752,10 @@ public sealed class RemoveService
         private int _filesBeforeTarget;
         private int _directoriesBeforeTarget;
         private int _errorsBeforeTarget;
+        private int _latestTargets;
+        private int _latestFiles;
+        private int _latestDirectories;
+        private int _latestErrors;
         private string _currentPath = string.Empty;
         private long _lastPublished;
         private bool _disabled;
@@ -750,14 +763,16 @@ public sealed class RemoveService
         public void Report(RemoveProgress value)
         {
             _currentPath = value.CurrentPath;
-            Publish(value with
+            var aggregate = value with
             {
                 TargetsProcessed = _targetsProcessed + value.TargetsProcessed,
                 FilesProcessed = _filesBeforeTarget + value.FilesProcessed,
                 DirectoriesProcessed = _directoriesBeforeTarget + value.DirectoriesProcessed,
                 Errors = _errorsBeforeTarget + value.Errors,
                 IsCompleted = false,
-            }, force: value.IsCanceled);
+            };
+            Remember(aggregate);
+            Publish(aggregate, force: value.IsCanceled);
         }
 
         internal void CompleteTarget(
@@ -771,35 +786,49 @@ public sealed class RemoveService
             _directoriesBeforeTarget = directories;
             _errorsBeforeTarget = errors;
             _currentPath = currentPath;
-            Publish(new RemoveProgress(
+            var aggregate = new RemoveProgress(
                 _targetsProcessed,
                 files,
                 directories,
                 errors,
                 currentPath,
                 IsCompleted: false,
-                IsCanceled: false), force: false);
+                IsCanceled: false);
+            Remember(aggregate);
+            Publish(aggregate, force: false);
         }
 
-        internal void CompleteBatch(int files, int directories, int errors) =>
-            Publish(new RemoveProgress(
+        internal void CompleteBatch(int files, int directories, int errors)
+        {
+            var aggregate = new RemoveProgress(
                 _targetsProcessed,
                 files,
                 directories,
                 errors,
                 _currentPath,
                 IsCompleted: true,
-                IsCanceled: false), force: true);
+                IsCanceled: false);
+            Remember(aggregate);
+            Publish(aggregate, force: true);
+        }
 
-        internal void CancelBatch(int files, int directories, int errors) =>
+        internal void CancelBatch() =>
             Publish(new RemoveProgress(
-                _targetsProcessed,
-                files,
-                directories,
-                errors,
+                _latestTargets,
+                _latestFiles,
+                _latestDirectories,
+                _latestErrors,
                 _currentPath,
                 IsCompleted: false,
                 IsCanceled: true), force: true);
+
+        private void Remember(RemoveProgress value)
+        {
+            _latestTargets = value.TargetsProcessed;
+            _latestFiles = value.FilesProcessed;
+            _latestDirectories = value.DirectoriesProcessed;
+            _latestErrors = value.Errors;
+        }
 
         private void Publish(RemoveProgress value, bool force)
         {

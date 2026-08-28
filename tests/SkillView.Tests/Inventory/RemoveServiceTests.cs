@@ -385,6 +385,36 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RemoveManyAsync_CancellationMidTargetPreservesPartialAggregate()
+    {
+        var (skill, dir) = MakeSkill("cancel-mid-target", extraFiles: 2_000);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        using var cancellation = new CancellationTokenSource();
+        var observedEntries = 0;
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+        var service = new RemoveService(_logger, _ =>
+        {
+            if (Interlocked.Increment(ref observedEntries) == 2)
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.RemoveManyAsync(
+                [validation],
+                cancellationToken: cancellation.Token,
+                progress: progress));
+
+        Assert.True(Directory.Exists(dir));
+        Assert.True(updates[^1].IsCanceled);
+        Assert.Equal(0, updates[^1].TargetsProcessed);
+        Assert.Equal(1, updates[^1].FilesProcessed);
+        Assert.Equal(0, updates[^1].DirectoriesProcessed);
+    }
+
+    [Fact]
     public async Task RemoveLinkAsync_DeletesOnlyObservedLink()
     {
         var externalFile = Path.Combine(_tempRoot, "keep.txt");
@@ -400,6 +430,40 @@ public class RemoveServiceTests : IDisposable
         Assert.False(PathResolver.IsSymlink(link));
         Assert.True(File.Exists(externalFile));
         Assert.Equal("keep", File.ReadAllText(externalFile));
+    }
+
+    [Fact]
+    public async Task RemoveLinkAsync_AlreadyCanceledPublishesTerminalProgress()
+    {
+        var externalFile = Path.Combine(_tempRoot, "keep-canceled.txt");
+        File.WriteAllText(externalFile, "keep");
+        var link = Path.Combine(_tempRoot, "agent-link-canceled.txt");
+        if (!TryCreateFileLink(link, externalFile)) return;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new RemoveService(_logger).RemoveLinkAsync(
+                link,
+                cancellation.Token,
+                progress));
+
+        Assert.True(PathResolver.IsSymlink(link));
+        Assert.True(File.Exists(externalFile));
+        Assert.Collection(
+            updates,
+            update =>
+            {
+                Assert.False(update.IsCompleted);
+                Assert.False(update.IsCanceled);
+            },
+            update =>
+            {
+                Assert.False(update.IsCompleted);
+                Assert.True(update.IsCanceled);
+            });
     }
 
     [Fact]
