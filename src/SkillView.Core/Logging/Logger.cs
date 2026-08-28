@@ -10,7 +10,7 @@ public sealed class Logger
     private readonly object _observerGate = new();
     private readonly LinkedList<LogEntry> _ring = new();
     private readonly int _capacity;
-    private readonly Dictionary<long, Action<LogEntry>> _observers = new();
+    private readonly Dictionary<long, ObserverRegistration> _observers = new();
     private long _nextObserverId;
 
     public Logger(LogLevel minimumLevel = LogLevel.Info, int capacity = 2048)
@@ -27,8 +27,9 @@ public sealed class Logger
         lock (_observerGate)
         {
             var id = ++_nextObserverId;
-            _observers.Add(id, observer);
-            return new Subscription(this, id);
+            var registration = new ObserverRegistration(observer);
+            _observers.Add(id, registration);
+            return new Subscription(this, id, registration);
         }
     }
 
@@ -54,14 +55,14 @@ public sealed class Logger
             }
         }
 
-        Action<LogEntry>[] observers;
+        ObserverRegistration[] observers;
         lock (_observerGate)
         {
             observers = _observers.Values.ToArray();
         }
         foreach (var observer in observers)
         {
-            try { observer(entry); }
+            try { observer.Invoke(entry); }
             catch { /* observer faults must not kill the logger */ }
         }
     }
@@ -90,11 +91,47 @@ public sealed class Logger
             entry.Message);
     }
 
-    private void Unsubscribe(long id)
+    private void Unsubscribe(long id, ObserverRegistration registration)
     {
         lock (_observerGate)
         {
             _observers.Remove(id);
+        }
+
+        // Do not hold the collection lock while waiting for an in-flight
+        // callback. This avoids lock inversion if an observer subscribes or
+        // disposes a subscription from inside its callback.
+        registration.Deactivate();
+    }
+
+    private sealed class ObserverRegistration
+    {
+        private readonly object _gate = new();
+        private readonly Action<LogEntry> _observer;
+        private bool _active = true;
+
+        internal ObserverRegistration(Action<LogEntry> observer)
+        {
+            _observer = observer;
+        }
+
+        internal void Invoke(LogEntry entry)
+        {
+            lock (_gate)
+            {
+                if (_active)
+                {
+                    _observer(entry);
+                }
+            }
+        }
+
+        internal void Deactivate()
+        {
+            lock (_gate)
+            {
+                _active = false;
+            }
         }
     }
 
@@ -102,13 +139,16 @@ public sealed class Logger
     {
         private Logger? _owner;
         private readonly long _id;
+        private readonly ObserverRegistration _registration;
 
-        internal Subscription(Logger owner, long id)
+        internal Subscription(Logger owner, long id, ObserverRegistration registration)
         {
             _owner = owner;
             _id = id;
+            _registration = registration;
         }
 
-        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Unsubscribe(_id);
+        public void Dispose() =>
+            Interlocked.Exchange(ref _owner, null)?.Unsubscribe(_id, _registration);
     }
 }

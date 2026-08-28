@@ -49,8 +49,8 @@ internal sealed class UpdatesTabView : FrameView
     private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
     private int _nameW = 12;
     private long _loadGeneration;
-    private CancellationTokenSource? _loadCancellation;
-    private CancellationTokenSource? _operationCancellation;
+    private readonly CancellationTokenSourceSlot _loadCancellations = new();
+    private readonly CancellationTokenSourceSlot _operationCancellations = new();
 
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
@@ -190,7 +190,7 @@ internal sealed class UpdatesTabView : FrameView
     internal async Task LoadAsync()
     {
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
-        using var loadCancellation = ReplaceLoadCancellation();
+        using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
         SetBusy(true);
         _status.Text = " loading inventory…";
@@ -207,7 +207,7 @@ internal sealed class UpdatesTabView : FrameView
                 Populate(snapshot);
             }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
         {
             // A newer load or teardown superseded this one.
         }
@@ -223,10 +223,6 @@ internal sealed class UpdatesTabView : FrameView
                 _status.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                 SetBusy(false);
             }).ConfigureAwait(false);
-        }
-        finally
-        {
-            Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);
         }
     }
 
@@ -369,7 +365,7 @@ internal sealed class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_operationCancellation is not null || _loadCancellation is not null) return;
+        if (_operationCancellations.HasActive || _loadCancellations.HasActive) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -392,10 +388,9 @@ internal sealed class UpdatesTabView : FrameView
             return;
         }
 
-        var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
-        if (Interlocked.CompareExchange(ref _operationCancellation, operationCancellation, null) is not null)
+        using var operationCancellation = _operationCancellations.TryBegin(_lifetimeToken);
+        if (operationCancellation is null)
         {
-            operationCancellation.Dispose();
             return;
         }
         SetBusy(true);
@@ -447,7 +442,7 @@ internal sealed class UpdatesTabView : FrameView
                 }
             }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (operationCancellation.Token.IsCancellationRequested)
         {
             _logger.Debug("update.tab", "update canceled during teardown");
         }
@@ -461,34 +456,22 @@ internal sealed class UpdatesTabView : FrameView
                 _status.Text = $" update failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
             }).ConfigureAwait(false);
         }
-        finally
-        {
-            Interlocked.CompareExchange(ref _operationCancellation, null, operationCancellation);
-            operationCancellation.Dispose();
-        }
     }
 
     internal void CancelPendingLoad()
     {
         Interlocked.Increment(ref _loadGeneration);
-        Interlocked.Exchange(ref _loadCancellation, null)?.Cancel();
-        if (_operationCancellation is null)
+        _loadCancellations.Cancel();
+        if (!_operationCancellations.HasActive)
         {
             SetBusy(false);
         }
     }
 
-    private CancellationTokenSource ReplaceLoadCancellation()
-    {
-        var next = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
-        Interlocked.Exchange(ref _loadCancellation, next)?.Cancel();
-        return next;
-    }
-
     private void CancelPendingWork()
     {
         CancelPendingLoad();
-        Interlocked.Exchange(ref _operationCancellation, null)?.Cancel();
+        _operationCancellations.Cancel();
     }
 
     private void SetBusy(bool busy)

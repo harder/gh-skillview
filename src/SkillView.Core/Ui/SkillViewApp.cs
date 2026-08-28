@@ -1942,8 +1942,11 @@ public sealed class SkillViewApp
             text = _visibleLogLines.Count == 0
                 ? "(no log entries yet)"
                 : string.Join('\n', _visibleLogLines);
+
+            // Reset while the queue snapshot is protected. An entry enqueued
+            // after this point must observe zero and schedule another flush.
+            Interlocked.Exchange(ref _logRefreshQueued, 0);
         }
-        Interlocked.Exchange(ref _logRefreshQueued, 0);
         if (_showingLogs && _logPane is not null)
         {
             _logPane.Text = text;

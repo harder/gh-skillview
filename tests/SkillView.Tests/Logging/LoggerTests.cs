@@ -64,4 +64,35 @@ public class LoggerTests
         var entry = Assert.Single(received);
         Assert.Equal("before", entry.Message);
     }
+
+    [Fact]
+    public async Task DisposedSubscriptionIsSkippedWhenAConcurrentLogAlreadySnapshottedIt()
+    {
+        var logger = new Logger();
+        var firstObserverStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstObserver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var targetCallCount = 0;
+        using var blockingSubscription = logger.Subscribe(_ =>
+        {
+            firstObserverStarted.SetResult();
+            releaseFirstObserver.Task.GetAwaiter().GetResult();
+        });
+        var targetSubscription = logger.Subscribe(_ => Interlocked.Increment(ref targetCallCount));
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var logTask = Task.Run(() => logger.Info("cat", "concurrent"), cancellationToken);
+        await firstObserverStarted.Task.WaitAsync(cancellationToken);
+
+        try
+        {
+            targetSubscription.Dispose();
+        }
+        finally
+        {
+            releaseFirstObserver.SetResult();
+        }
+        await logTask;
+
+        Assert.Equal(0, targetCallCount);
+    }
 }

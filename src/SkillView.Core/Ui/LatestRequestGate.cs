@@ -14,29 +14,26 @@ internal sealed class LatestRequestGate : IDisposable
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         cancellation.CancelAfter(timeout);
 
-        CancellationTokenSource? previous;
         long generation;
         lock (_gate)
         {
             generation = ++_generation;
-            previous = _active;
+            _active?.Cancel();
             _active = cancellation;
         }
-        previous?.Cancel();
         return new Lease(this, generation, cancellation);
     }
 
     internal bool Cancel()
     {
-        CancellationTokenSource? active;
         lock (_gate)
         {
             _generation++;
-            active = _active;
+            var active = _active;
+            active?.Cancel();
             _active = null;
+            return active is not null;
         }
-        active?.Cancel();
-        return active is not null;
     }
 
     public void Dispose() => _ = Cancel();
@@ -57,8 +54,9 @@ internal sealed class LatestRequestGate : IDisposable
             {
                 _active = null;
             }
+
+            cancellation.Dispose();
         }
-        cancellation.Dispose();
     }
 
     internal sealed class Lease : IDisposable

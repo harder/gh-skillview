@@ -26,17 +26,23 @@ logging, or subprocess adapters.
   updating UI.
 - Installed, Changes, and Updates cancel superseded inventory loads. Pass their
   cancellation token through to inventory capture; do not add generation-only
-  refreshes that leave obsolete scans running.
+  refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`
+  so source replacement, cancellation, and lease disposal share one ownership
+  boundary; never cancel a source that another path can independently dispose.
 - Async update/install controls stay disabled while their operation is active.
   Continue to pass cancellation into subprocess-backed services.
 - `ProcessRunner` retains at most 1 MiB of child output per stdout/stderr stream,
-  plus a small truncation marker. Increase this only with evidence that a
-  supported command needs more structured output.
+  plus a small truncation marker. It drains both streams in fixed-size chunks;
+  do not use line-based process events because a newline-free child can make the
+  framework retain an unbounded line before SkillView sees it. Increase the
+  capture limit only with evidence that a supported command needs more output.
 - `SearchAgentMetadataCache` is a thread-safe 512-entry LRU. Do not replace it
   with an unbounded dictionary.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
-  and dispose its subscription. The visible log pane retains at most 512
-  formatted lines and coalesces burst refreshes.
+  and dispose its subscription. Disposal deactivates registrations that were
+  already snapshotted and waits for an in-flight callback, so no callback can
+  begin after disposal returns. The visible log pane retains at most 512
+  formatted lines and coalesces burst refreshes without lost wakeups.
 
 ## Focused verification
 

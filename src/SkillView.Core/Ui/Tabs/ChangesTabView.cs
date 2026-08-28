@@ -35,7 +35,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private long _loadGeneration;
-    private CancellationTokenSource? _loadCancellation;
+    private readonly CancellationTokenSourceSlot _loadCancellations = new();
 
     internal ChangesTabView(
         Func<Action, Task> runOnUi,
@@ -113,7 +113,7 @@ internal sealed class ChangesTabView : FrameView
     internal async Task LoadAsync()
     {
         var gen = Interlocked.Increment(ref _loadGeneration);
-        using var loadCancellation = ReplaceLoadCancellation();
+        using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
         SetLoading(true);
         _status.Text = " loading inventory…";
@@ -143,7 +143,7 @@ internal sealed class ChangesTabView : FrameView
                 summary);
             }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
         {
             // A newer load or tab deactivation superseded this one.
         }
@@ -155,10 +155,6 @@ internal sealed class ChangesTabView : FrameView
                 _status.Text = $" load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                 SetLoading(false);
             }).ConfigureAwait(false);
-        }
-        finally
-        {
-            Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);
         }
     }
 
@@ -345,15 +341,8 @@ internal sealed class ChangesTabView : FrameView
     internal void CancelPendingLoad()
     {
         Interlocked.Increment(ref _loadGeneration);
-        Interlocked.Exchange(ref _loadCancellation, null)?.Cancel();
+        _loadCancellations.Cancel();
         SetLoading(false);
-    }
-
-    private CancellationTokenSource ReplaceLoadCancellation()
-    {
-        var next = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
-        Interlocked.Exchange(ref _loadCancellation, next)?.Cancel();
-        return next;
     }
 
     private void SetLoading(bool loading)

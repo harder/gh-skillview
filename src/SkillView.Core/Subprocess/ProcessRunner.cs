@@ -45,9 +45,6 @@ public sealed class ProcessRunner
         var stdout = new BoundedTextBuffer(_maxCapturedCharsPerStream);
         var stderr = new BoundedTextBuffer(_maxCapturedCharsPerStream);
 
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdout.AppendLine(e.Data); };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
-
         var sw = Stopwatch.StartNew();
         try
         {
@@ -59,18 +56,27 @@ public sealed class ProcessRunner
             return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed);
         }
 
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
         process.StandardInput.Close();
+        var stdoutDrain = DrainAsync(process.StandardOutput, stdout, cancellationToken);
+        var stderrDrain = DrainAsync(process.StandardError, stderr, cancellationToken);
 
         try
         {
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             try { process.Kill(entireProcessTree: true); }
             catch { /* best-effort */ }
+
+            // Observe both readers. They use the same cancellation token, so
+            // cancellation cannot leave background reads attached to a process
+            // that this method is about to dispose.
+            try { await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            catch (IOException) { }
             throw;
         }
 
@@ -89,6 +95,29 @@ public sealed class ProcessRunner
         return result;
     }
 
+    private static async Task DrainAsync(
+        StreamReader reader,
+        BoundedTextBuffer destination,
+        CancellationToken cancellationToken)
+    {
+        // StreamReader's line-oriented APIs retain a whole unterminated line.
+        // Fixed-size reads keep memory bounded even for a child that never
+        // emits a newline, while continuing to drain bytes after capture fills.
+        var chunk = new char[4096];
+        while (true)
+        {
+            var read = await reader
+                .ReadAsync(chunk.AsMemory(), cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0)
+            {
+                return;
+            }
+
+            destination.Append(chunk.AsSpan(0, read));
+        }
+    }
+
     /// Retains only the leading portion of a stream. Process output is
     /// untrusted and can be arbitrarily large, so callers get a clear marker
     /// instead of allowing a noisy child process to grow the app indefinitely.
@@ -105,7 +134,7 @@ public sealed class ProcessRunner
             _buffer = new StringBuilder(Math.Min(limit, 16 * 1024));
         }
 
-        internal void AppendLine(string line)
+        internal void Append(ReadOnlySpan<char> text)
         {
             lock (_gate)
             {
@@ -117,15 +146,9 @@ public sealed class ProcessRunner
                     return;
                 }
 
-                var take = Math.Min(line.Length, remaining);
-                _buffer.Append(line.AsSpan(0, take));
-                remaining -= take;
-                if (remaining > 0)
-                {
-                    _buffer.AppendLine();
-                }
-
-                if (take < line.Length || remaining <= 0)
+                var take = Math.Min(text.Length, remaining);
+                _buffer.Append(text[..take]);
+                if (take < text.Length)
                 {
                     _truncated = true;
                 }

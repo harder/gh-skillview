@@ -32,6 +32,8 @@ public sealed class ProcessRunnerTests
         Assert.True(result.Succeeded);
         Assert.Contains("output truncated after 128 characters", result.StdOut);
         Assert.InRange(result.StdOut.Length, limit, limit + 80);
+        Assert.Contains("output truncated after 128 characters", result.StdErr);
+        Assert.InRange(result.StdErr.Length, limit, limit + 80);
     }
 
     private static (string Executable, string[] Arguments) CreateWaitForEofCommand()
@@ -61,14 +63,14 @@ public sealed class ProcessRunnerTests
             {
                 "-NoProfile",
                 "-Command",
-                "Write-Output ('x' * 4096)"
+                "[Console]::Out.Write('x' * 4096); [Console]::Error.Write('e' * 4096)"
             });
         }
 
         return ("/bin/sh", new[]
         {
             "-c",
-            "i=0; while [ $i -lt 512 ]; do printf 0123456789; i=$((i+1)); done"
+            "i=0; while [ $i -lt 512 ]; do printf 0123456789; printf abcdefghij >&2; i=$((i+1)); done"
         });
     }
 }
