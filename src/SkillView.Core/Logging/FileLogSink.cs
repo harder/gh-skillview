@@ -28,6 +28,9 @@ public sealed class FileLogSink : IDisposable
     private int _currentPart;
     private bool _disposed;
     private bool _trimPending;
+    private bool _retainedBytesKnown;
+    private long _retainedBytes;
+    private long _nextTrimAtRetainedBytes;
     private IDisposable? _subscription;
     private bool _attaching;
     private readonly Action? _beforeAppendLockForTests;
@@ -121,8 +124,18 @@ public sealed class FileLogSink : IDisposable
 
                 if (_trimPending)
                 {
+                    RefreshRetentionAccountingLocked();
                     _trimPending = false;
-                    TrimLocked();
+                }
+                else if (_retainedBytesKnown)
+                {
+                    _retainedBytes = _retainedBytes > long.MaxValue - lineBytes
+                        ? long.MaxValue
+                        : _retainedBytes + lineBytes;
+                    if (_retainedBytes >= _nextTrimAtRetainedBytes)
+                    {
+                        RefreshRetentionAccountingLocked();
+                    }
                 }
             }
             catch
@@ -163,6 +176,9 @@ public sealed class FileLogSink : IDisposable
             _currentPath = null;
             _currentBytes = 0;
             _currentPart = 0;
+            _retainedBytesKnown = true;
+            _retainedBytes = 0;
+            _nextTrimAtRetainedBytes = ByteAfter(_totalSizeBudgetBytes);
             return count;
         }
     }
@@ -236,9 +252,36 @@ public sealed class FileLogSink : IDisposable
         _trimPending = true;
     }
 
-    private void TrimLocked()
+    private void RefreshRetentionAccountingLocked()
     {
-        if (!System.IO.Directory.Exists(_directory)) return;
+        _retainedBytes = TrimLocked();
+        _retainedBytesKnown = true;
+
+        if (_retainedBytes <= _totalSizeBudgetBytes)
+        {
+            // Incremental accounting makes the next pass happen on the first
+            // append that crosses the configured aggregate budget. Avoid a
+            // directory enumeration for every ordinary log entry.
+            _nextTrimAtRetainedBytes = ByteAfter(_totalSizeBudgetBytes);
+            return;
+        }
+
+        // The active part is never deleted, and another process or filesystem
+        // policy can prevent an old part from being removed. In that case the
+        // budget cannot be restored immediately. Retry after bounded growth
+        // instead of rescanning the directory on every subsequent line.
+        var retryGrowthBytes = Math.Clamp(_maxFileSizeBytes / 16, 4 * 1024, 64 * 1024);
+        _nextTrimAtRetainedBytes = _retainedBytes > long.MaxValue - retryGrowthBytes
+            ? long.MaxValue
+            : _retainedBytes + retryGrowthBytes;
+    }
+
+    private static long ByteAfter(long value) =>
+        value == long.MaxValue ? long.MaxValue : value + 1;
+
+    private long TrimLocked()
+    {
+        if (!System.IO.Directory.Exists(_directory)) return 0;
 
         var files = System.IO.Directory
             .EnumerateFiles(_directory, "skillview-*.log")
@@ -254,6 +297,9 @@ public sealed class FileLogSink : IDisposable
         var retentionCutoff = DateOnly.FromDateTime(now.AddDays(-RetentionDays));
         var runningTotal = 0L;
         var toDelete = new List<FileInfo>();
+        var retainedTotal = files
+            .Where(item => item.Parsed)
+            .Sum(item => item.File.Length);
 
         foreach (var item in files)
         {
@@ -283,8 +329,16 @@ public sealed class FileLogSink : IDisposable
 
         foreach (var f in toDelete)
         {
-            try { f.Delete(); } catch { /* best effort */ }
+            try
+            {
+                var length = f.Length;
+                f.Delete();
+                retainedTotal -= length;
+            }
+            catch { /* best effort */ }
         }
+
+        return retainedTotal;
     }
 
     private static bool TryParseLogFileIdentity(string fileName, out DateOnly date, out int part)

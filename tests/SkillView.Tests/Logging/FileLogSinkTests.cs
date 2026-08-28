@@ -290,4 +290,41 @@ public class FileLogSinkTests
             Directory.Delete(dir, true);
         }
     }
+
+    [Fact]
+    public void AggregateBudget_IsRecheckedAsActiveFileGrows()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            var now = new DateTimeOffset(2026, 8, 28, 12, 0, 0, TimeSpan.Zero);
+            var oldPart = Path.Combine(dir, "skillview-2026-08-27.log");
+            File.WriteAllText(oldPart, new string('o', 100));
+
+            using var sink = new FileLogSink(
+                dir,
+                () => now,
+                beforeAppendLockForTests: null,
+                maxFileSizeBytes: 250,
+                totalSizeBudgetBytes: 300);
+
+            // The initial trim leaves the old part in place because aggregate
+            // usage still fits. Later active-part growth must re-run retention
+            // before size rotation opens another writer.
+            sink.Append(new LogEntry(now, LogLevel.Info, "budget", new string('a', 10)));
+            Assert.True(File.Exists(oldPart));
+
+            for (var index = 0; index < 3 && File.Exists(oldPart); index++)
+            {
+                sink.Append(new LogEntry(now, LogLevel.Info, "budget", new string('b', 25)));
+            }
+
+            Assert.False(File.Exists(oldPart));
+            Assert.Single(Directory.EnumerateFiles(dir, "skillview-*.log"));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
 }

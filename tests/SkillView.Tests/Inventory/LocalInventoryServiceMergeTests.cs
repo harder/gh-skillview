@@ -8,6 +8,19 @@ namespace SkillView.Tests.Inventory;
 
 public class LocalInventoryServiceMergeTests
 {
+    [Fact]
+    public void MergeWithCancellation_HonorsPreCanceledToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            LocalInventoryService.MergeWithCancellation(
+                ImmutableArray<InstalledSkill>.Empty,
+                ImmutableArray<GhSkillListRecord>.Empty,
+                cancellation.Token));
+    }
+
     private static InstalledSkill Scan(string name, string path, Scope scope = Scope.User) => new()
     {
         Name = name,

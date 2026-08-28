@@ -62,4 +62,24 @@ public sealed class CancellationTokenSourceSlotTests
         Assert.NotNull(first);
         Assert.Null(rejected);
     }
+
+    [Fact]
+    public void Cancel_DoesNotHoldSlotLockWhileRunningCallbacks()
+    {
+        var slot = new CancellationTokenSourceSlot();
+        var lease = slot.Replace(CancellationToken.None);
+        var releasedInsideCallback = false;
+        using var registration = lease.Token.Register(() =>
+        {
+            var release = Task.Run(
+                lease.Dispose,
+                TestContext.Current.CancellationToken);
+            releasedInsideCallback = release.Wait(TimeSpan.FromSeconds(2));
+        });
+
+        Assert.True(slot.Cancel());
+
+        Assert.True(releasedInsideCallback);
+        Assert.False(slot.HasActive);
+    }
 }

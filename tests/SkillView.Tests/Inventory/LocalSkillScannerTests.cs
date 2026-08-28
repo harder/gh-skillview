@@ -161,4 +161,79 @@ public class LocalSkillScannerTests : IDisposable
 
         Assert.Contains(results, r => r.Validity == ValidityState.BrokenSymlink);
     }
+
+    [Fact]
+    public void Scan_CancellationBetweenCandidates_StopsPromptly()
+    {
+        var root = Path.Combine(_tempRoot, ".claude", "skills");
+        Directory.CreateDirectory(root);
+        MakeSkill(root, "one");
+        MakeSkill(root, "two");
+        MakeSkill(root, "three");
+
+        using var cancellation = new CancellationTokenSource();
+        var observed = 0;
+        var scanner = new LocalSkillScanner(
+            _logger,
+            _ =>
+            {
+                if (Interlocked.Increment(ref observed) == 1)
+                {
+                    cancellation.Cancel();
+                }
+            });
+
+        Assert.Throws<OperationCanceledException>(() => scanner.ScanWithCancellation(
+            [new ScanRoot(root, Scope.User, "claude")],
+            options: null,
+            cancellation.Token));
+        Assert.Equal(1, observed);
+    }
+
+    [Fact]
+    public void Scan_DoesNotReadPastBoundedFrontMatterPrefix()
+    {
+        var root = Path.Combine(_tempRoot, ".claude", "skills");
+        Directory.CreateDirectory(root);
+        MakeSkill(
+            root,
+            "oversized-frontmatter",
+            "---\nname: oversized-frontmatter\ndescription: "
+            + new string('x', LocalSkillScanner.MaxFrontMatterPrefixBytes)
+            + "\n---\nbody\n");
+
+        var scanner = new LocalSkillScanner(_logger);
+        var result = Assert.Single(scanner.Scan(
+            [new ScanRoot(root, Scope.User, "claude")]));
+
+        Assert.Equal(ValidityState.UnparsableFrontMatter, result.Validity);
+    }
+
+    [Fact]
+    public void Scan_IterationFailure_IsLoggedWithoutAbortingInventoryCapture()
+    {
+        var root = Path.Combine(_tempRoot, ".claude", "skills");
+        Directory.CreateDirectory(root);
+        var scanner = new LocalSkillScanner(
+            _logger,
+            candidateObservedForTests: null,
+            _ => new ThrowingEnumerator());
+
+        var result = scanner.Scan([new ScanRoot(root, Scope.User, "claude")]);
+
+        Assert.Empty(result);
+        Assert.Contains(
+            _logger.Snapshot(),
+            entry => entry.Category == "inventory.scan"
+                && entry.Message.Contains("enumerate", StringComparison.Ordinal));
+    }
+
+    private sealed class ThrowingEnumerator : IEnumerator<string>
+    {
+        public string Current => throw new InvalidOperationException();
+        object System.Collections.IEnumerator.Current => Current;
+        public bool MoveNext() => throw new IOException("simulated disconnect");
+        public void Reset() => throw new NotSupportedException();
+        public void Dispose() { }
+    }
 }

@@ -37,20 +37,35 @@ public static class CleanupClassifier
     public static ImmutableArray<Candidate> Classify(
         InventorySnapshot snapshot,
         IReadOnlyList<ScanRoot> scanRoots,
-        Options? options = null)
+        Options? options = null) =>
+        ClassifyWithCancellation(snapshot, scanRoots, options, CancellationToken.None);
+
+    internal static ImmutableArray<Candidate> ClassifyWithCancellation(
+        InventorySnapshot snapshot,
+        IReadOnlyList<ScanRoot> scanRoots,
+        Options? options,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         options ??= new Options();
         var result = ImmutableArray.CreateBuilder<Candidate>();
 
         // Pre-index: skills keyed by resolved path, name→count for duplicates,
         // symlink incoming counts for orphan detection.
-        var byResolved = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
+        var byResolved = new Dictionary<string, List<InstalledSkill>>(StringComparer.Ordinal);
         var byName = new Dictionary<string, List<InstalledSkill>>(StringComparer.OrdinalIgnoreCase);
         var incomingSymlinksByResolved = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var s in snapshot.Skills)
         {
-            byResolved[PathResolver.Normalize(s.ResolvedPath)] = s;
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolvedKey = PathResolver.Normalize(s.ResolvedPath);
+            if (!byResolved.TryGetValue(resolvedKey, out var resolvedBucket))
+            {
+                resolvedBucket = [];
+                byResolved.Add(resolvedKey, resolvedBucket);
+            }
+            resolvedBucket.Add(s);
             if (!byName.TryGetValue(s.Name, out var bucket))
             {
                 bucket = new List<InstalledSkill>();
@@ -60,6 +75,7 @@ public static class CleanupClassifier
 
             foreach (var a in s.Agents)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!a.IsSymlink) continue;
                 var resolved = PathResolver.Resolve(a.Path);
                 if (resolved is null) continue;
@@ -71,6 +87,7 @@ public static class CleanupClassifier
 
         foreach (var skill in snapshot.Skills)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (skill.Ignored && !options.IncludeIgnored) continue;
 
             // Broken symlink — scanner already stamps `BrokenSymlink` validity.
@@ -141,6 +158,7 @@ public static class CleanupClassifier
         // resolved paths, neither symlinked to the other.
         foreach (var (name, bucket) in byName)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (bucket.Count < 2) continue;
             // Pick the "primary" (prefer `Both` > `CliList` > `FsScan`, then
             // earliest InstalledAt, then shortest path) and mark the rest as
@@ -157,6 +175,7 @@ public static class CleanupClassifier
                 .ToList();
             for (var i = 1; i < sorted.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var dup = sorted[i];
                 if (dup.Ignored && !options.IncludeIgnored) continue;
                 result.Add(new Candidate(
@@ -170,47 +189,64 @@ public static class CleanupClassifier
         // Broken shared mapping: two records with the SAME resolved path but
         // different front-matter names — indicates the shared directory has
         // drifted.
-        var byResolvedGroup = snapshot.Skills.GroupBy(s => PathResolver.Normalize(s.ResolvedPath));
-        foreach (var g in byResolvedGroup)
+        foreach (var group in byResolved.Values)
         {
-            if (g.Count() < 2) continue;
-            var names = g.Select(s => s.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (group.Count < 2) continue;
+            var names = group.Select(s => s.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (names.Count < 2) continue;
             result.Add(new Candidate(
                 CandidateKind.BrokenSharedMapping,
-                g.First().ResolvedPath,
+                group[0].ResolvedPath,
                 $"shared install reports conflicting names: {string.Join(", ", names)}",
-                g.First()));
+                group[0]));
         }
 
         // Empty directories inside scan roots — not in `snapshot.Skills`
         // because the scanner already filtered them (no SKILL.md). Walk each
         // scan root, enumerate children, flag empty dirs that aren't already
         // an `InstalledSkill`.
-        var knownResolved = new HashSet<string>(
-            snapshot.Skills.Select(s => PathResolver.Normalize(s.ResolvedPath)),
-            StringComparer.Ordinal);
+        var knownResolved = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var skill in snapshot.Skills)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            knownResolved.Add(PathResolver.Normalize(skill.ResolvedPath));
+        }
 
         foreach (var root in scanRoots)
         {
-            IEnumerable<string> children;
-            try { children = Directory.EnumerateDirectories(root.Path); }
-            catch { continue; }
-            foreach (var child in children)
+            cancellationToken.ThrowIfCancellationRequested();
+            IEnumerator<string>? children;
+            try { children = Directory.EnumerateDirectories(root.Path).GetEnumerator(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+            using (children)
             {
-                var resolved = PathResolver.Resolve(child);
-                if (resolved is null) continue;
-                if (knownResolved.Contains(PathResolver.Normalize(resolved))) continue;
-                bool empty;
-                try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
-                catch { continue; }
-                if (empty)
+                while (true)
                 {
-                    result.Add(new Candidate(
-                        CandidateKind.EmptyDirectory,
-                        resolved,
-                        $"empty directory under scan root '{root.Path}'",
-                        Skill: null));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    bool hasNext;
+                    try { hasNext = children.MoveNext(); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        break;
+                    }
+                    if (!hasNext) break;
+
+                    var child = children.Current;
+                    var resolved = PathResolver.Resolve(child);
+                    if (resolved is null) continue;
+                    if (knownResolved.Contains(PathResolver.Normalize(resolved))) continue;
+                    bool empty;
+                    try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+                    if (empty)
+                    {
+                        result.Add(new Candidate(
+                            CandidateKind.EmptyDirectory,
+                            resolved,
+                            $"empty directory under scan root '{root.Path}'",
+                            Skill: null));
+                    }
                 }
             }
         }

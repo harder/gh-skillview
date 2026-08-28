@@ -39,7 +39,10 @@ logging, or subprocess adapters.
   cancellation token through to inventory capture; do not add generation-only
   refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`
   so source replacement, cancellation, and lease disposal share one ownership
-  boundary; never cancel a source that another path can independently dispose.
+  boundary. Publish the transition while holding the slot/gate lock, then run
+  `Cancel()` callbacks outside that lock and defer source disposal until the
+  cancellation call completes. A callback can synchronously wait for lease
+  release, so calling it under the ownership lock is a real deadlock.
 - Async update/install controls stay disabled while their operation is active.
   Continue to pass cancellation into subprocess-backed services.
 - `ProcessRunner` retains at most 1 MiB of child output per stdout/stderr stream,
@@ -49,6 +52,14 @@ logging, or subprocess adapters.
   capture limit only with evidence that a supported command needs more output.
 - `SearchAgentMetadataCache` is a thread-safe 512-entry LRU. Do not replace it
   with an unbounded dictionary.
+- Local inventory capture schedules synchronous filesystem work on the thread
+  pool and runs it concurrently with `gh skill list`. Resolver, scanner,
+  package-lock reader, and cleanup classification check cancellation between
+  roots and entries. `LocalSkillScanner` reads no more than 64 KiB from each
+  `SKILL.md`; `SkillLockFileReader` ignores manifests over 1 MiB. Keep actual
+  lazy-enumerator `MoveNext` calls inside the I/O exception boundary because
+  disconnects, ACL changes, and disappearing directories fail there rather
+  than when the enumerable is created.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
@@ -59,6 +70,10 @@ logging, or subprocess adapters.
   A → B → A cycles, and concurrent A → B / B → A lock inversion without
   allocating per-entry tracking collections. The visible log pane retains at
   most 512 formatted lines and coalesces burst refreshes without lost wakeups.
+- `FileLogSink` tracks aggregate retained bytes after its initial trim and
+  re-enforces the disk budget on the first append that crosses it. When the
+  active part alone is oversized or an old file is undeletable, retries occur
+  after bounded growth rather than once per line.
 - Fire-and-forget UI work must consume `OperationCanceledException` only when
   its own app/view lifetime is canceled. Normal shutdown must not become a
   false `CRASH`, while unrelated cancellation and real faults remain visible.
@@ -67,5 +82,6 @@ logging, or subprocess adapters.
 
 Run `dotnet build`, then `dotnet test --no-build`. Resource-focused coverage
 includes large subprocess output, LRU eviction, subscription disposal,
+callback-safe cancellation gates, bounded inventory files, iteration failures,
 overlapping preview cancellation, superseded inventory scans, inline busy
 state, and layout guards at 80×24, 100×30, and 140×42.

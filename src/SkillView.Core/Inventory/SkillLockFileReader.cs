@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.IO;
 using System.Text.Json;
@@ -19,6 +20,7 @@ namespace SkillView.Inventory;
 public sealed class SkillLockFileReader
 {
     public const string FileName = ".skill-lock.json";
+    public const int MaxFileBytes = 1024 * 1024;
 
     private readonly Logger _logger;
 
@@ -28,13 +30,20 @@ public sealed class SkillLockFileReader
     /// reach from the given scan roots. The lookup key is the skill folder
     /// name (the leaf of `<root>/<name>`), which matches the skill-name
     /// convention used by both `npx skills` and our own `InstalledSkill.Name`.
-    public ImmutableDictionary<string, SkillPackage> LoadFromRoots(IEnumerable<string> scanRootPaths)
+    public ImmutableDictionary<string, SkillPackage> LoadFromRoots(
+        IEnumerable<string> scanRootPaths) =>
+        LoadFromRootsWithCancellation(scanRootPaths, CancellationToken.None);
+
+    internal ImmutableDictionary<string, SkillPackage> LoadFromRootsWithCancellation(
+        IEnumerable<string> scanRootPaths,
+        CancellationToken cancellationToken)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, SkillPackage>(StringComparer.Ordinal);
         var seenLockfiles = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var root in scanRootPaths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(root)) continue;
             // Lockfile lives one level above the skills/ folder. e.g. for
             // `~/.claude/skills`, look at `~/.claude/.skill-lock.json` AND
@@ -51,7 +60,7 @@ public sealed class SkillLockFileReader
             }
             if (string.IsNullOrEmpty(parent)) continue;
 
-            TryReadInto(Path.Combine(parent, FileName), builder, seenLockfiles);
+            TryReadInto(Path.Combine(parent, FileName), builder, seenLockfiles, cancellationToken);
 
             // Many configurations symlink `~/.<agent>/skills/<x>` to
             // `~/.agents/skills/<x>`. Probe the home-level `.agents`
@@ -62,7 +71,11 @@ public sealed class SkillLockFileReader
                 var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 if (!string.IsNullOrEmpty(home))
                 {
-                    TryReadInto(Path.Combine(home, ".agents", FileName), builder, seenLockfiles);
+                    TryReadInto(
+                        Path.Combine(home, ".agents", FileName),
+                        builder,
+                        seenLockfiles,
+                        cancellationToken);
                 }
             }
             catch { /* best-effort */ }
@@ -74,37 +87,86 @@ public sealed class SkillLockFileReader
     private void TryReadInto(
         string path,
         ImmutableDictionary<string, SkillPackage>.Builder builder,
-        HashSet<string> seen)
+        HashSet<string> seen,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!seen.Add(path)) return;
         if (!File.Exists(path)) return;
 
         try
         {
-            using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
-            if (!doc.RootElement.TryGetProperty("skills", out var skills) || skills.ValueKind != JsonValueKind.Object)
+            var buffer = ArrayPool<byte>.Shared.Rent(MaxFileBytes + 1);
+            try
             {
-                return;
-            }
+                using var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    bufferSize: 16 * 1024,
+                    FileOptions.SequentialScan);
+                var total = 0;
+                while (total <= MaxFileBytes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var read = stream.Read(buffer, total, MaxFileBytes + 1 - total);
+                    if (read == 0) break;
+                    total += read;
+                }
 
-            var added = 0;
-            foreach (var entry in skills.EnumerateObject())
-            {
-                if (entry.Value.ValueKind != JsonValueKind.Object) continue;
-                var pkg = ParseEntry(entry.Value);
-                if (pkg is null) continue;
-                // First lockfile wins on conflict — agents-skill-lock is
-                // typically the canonical one; per-agent shadows are rare.
-                builder.TryAdd(entry.Name, pkg);
-                added++;
+                if (total > MaxFileBytes)
+                {
+                    _logger.Warn(
+                        "inventory.lockfile",
+                        $"{path}: ignored because it exceeds {MaxFileBytes} bytes");
+                    return;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                using var doc = JsonDocument.Parse(buffer.AsMemory(0, total));
+                ReadDocumentInto(path, doc, builder, cancellationToken);
             }
-            _logger.Info("inventory.lockfile", $"{path}: {added} skill(s) tagged");
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             _logger.Warn("inventory.lockfile", $"{path}: parse failed — {ex.Message}");
         }
+    }
+
+    private void ReadDocumentInto(
+        string path,
+        JsonDocument doc,
+        ImmutableDictionary<string, SkillPackage>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
+        if (!doc.RootElement.TryGetProperty("skills", out var skills) || skills.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        var added = 0;
+        foreach (var entry in skills.EnumerateObject())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.Value.ValueKind != JsonValueKind.Object) continue;
+            var pkg = ParseEntry(entry.Value);
+            if (pkg is null) continue;
+            // First lockfile wins on conflict — agents-skill-lock is
+            // typically the canonical one; per-agent shadows are rare.
+            builder.TryAdd(entry.Name, pkg);
+            added++;
+        }
+        _logger.Info("inventory.lockfile", $"{path}: {added} skill(s) tagged");
     }
 
     private static SkillPackage? ParseEntry(JsonElement el)

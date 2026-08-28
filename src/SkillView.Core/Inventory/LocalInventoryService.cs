@@ -44,46 +44,56 @@ public sealed class LocalInventoryService
         Options options,
         CancellationToken cancellationToken = default)
     {
-        var roots = _resolver.Resolve(new ScanRootResolver.Options(
-            CurrentDirectory: Environment.CurrentDirectory,
-            HomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            CustomRoots: options.ScanRoots,
-            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")));
+        cancellationToken.ThrowIfCancellationRequested();
 
-        _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
-
-        var fsSw = Stopwatch.StartNew();
-        var scanned = _scanner.Scan(roots, new LocalSkillScanner.Options(options.AllowHiddenDirs));
-        fsSw.Stop();
-        _logger.Info("inventory", $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
+        // Local filesystem probing is synchronous by nature. Keep it off the
+        // Terminal.Gui thread and make every stage cancellation-aware. Run the
+        // gh inventory call concurrently so a slow disk does not add its full
+        // latency to a slow subprocess.
+        var localTask = Task.Run(() => CaptureLocal(options, cancellationToken), cancellationToken);
 
         // `gh skill list` is the primary inventory source (gh ≥ 2.95 is
         // required, so it's always available); the filesystem scan above
         // supplements it with symlink/anomaly/package data gh doesn't emit.
         var usedGhList = false;
         ImmutableArray<GhSkillListRecord> ghRecords = ImmutableArray<GhSkillListRecord>.Empty;
-        var ghSw = Stopwatch.StartNew();
+        var ghTask = ghPath is null
+            ? Task.FromResult(new GhCapture(
+                ImmutableArray<GhSkillListRecord>.Empty,
+                TimeSpan.Zero))
+            : CaptureGhAsync(
+                ghPath,
+                options.FilterScope,
+                options.FilterAgent,
+                cancellationToken);
+
+        await Task.WhenAll(localTask, ghTask).ConfigureAwait(false);
+        var local = await localTask.ConfigureAwait(false);
+        var gh = await ghTask.ConfigureAwait(false);
         if (ghPath is not null)
         {
-            ghRecords = await _listAdapter
-                .ListAsync(ghPath, options.FilterScope, options.FilterAgent, cancellationToken)
-                .ConfigureAwait(false);
+            ghRecords = gh.Records;
             usedGhList = true;
             _logger.Info("inventory", $"gh skill list returned {ghRecords.Length} record(s)");
         }
-        ghSw.Stop();
 
-        var merged = Merge(scanned, ghRecords);
+        var merged = MergeWithCancellation(local.Scanned, ghRecords, cancellationToken);
 
         // Enrich with package-bundle metadata from any `.skill-lock.json`
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
         // written by `npx skills`). Free signal — best-effort.
-        var packages = _lockReader.LoadFromRoots(roots.Select(r => r.Path));
+        var packages = local.Packages;
         if (!packages.IsEmpty)
         {
-            merged = merged
-                .Select(s => packages.TryGetValue(s.Name, out var pkg) ? s with { Package = pkg } : s)
-                .ToImmutableArray();
+            var enriched = ImmutableArray.CreateBuilder<InstalledSkill>(merged.Length);
+            foreach (var skill in merged)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                enriched.Add(packages.TryGetValue(skill.Name, out var package)
+                    ? skill with { Package = package }
+                    : skill);
+            }
+            merged = enriched.MoveToImmutable();
         }
 
         if (!string.IsNullOrEmpty(options.FilterScope))
@@ -91,39 +101,108 @@ public sealed class LocalInventoryService
             var wanted = ParseScope(options.FilterScope);
             if (wanted is not null)
             {
-                merged = merged.Where(s => s.Scope == wanted).ToImmutableArray();
+                merged = FilterWithCancellation(
+                    merged,
+                    skill => skill.Scope == wanted,
+                    cancellationToken);
             }
         }
         if (!string.IsNullOrEmpty(options.FilterAgent))
         {
-            merged = merged
-                .Where(s => s.Agents.Any(a => string.Equals(a.AgentId, options.FilterAgent, StringComparison.OrdinalIgnoreCase)))
-                .ToImmutableArray();
+            merged = FilterWithCancellation(
+                merged,
+                skill => skill.Agents.Any(agent => string.Equals(
+                    agent.AgentId,
+                    options.FilterAgent,
+                    StringComparison.OrdinalIgnoreCase)),
+                cancellationToken);
         }
 
         // Collect diagnostics from the scan pass.
-        var brokenCount = merged.Count(s => s.Validity == ValidityState.BrokenSymlink);
+        var brokenCount = 0;
+        foreach (var skill in merged)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (skill.Validity == ValidityState.BrokenSymlink) brokenCount++;
+        }
         var diagnostics = new ScanDiagnostics
         {
-            FsScanDuration = fsSw.Elapsed,
-            GhListDuration = usedGhList ? ghSw.Elapsed : TimeSpan.Zero,
+            FsScanDuration = local.Duration,
+            GhListDuration = gh.Duration,
             BrokenSymlinksFound = brokenCount,
         };
 
         return new InventorySnapshot
         {
             Skills = merged,
-            ScannedRoots = roots,
+            ScannedRoots = local.Roots,
             UsedGhSkillList = usedGhList,
             CapturedAt = DateTimeOffset.UtcNow,
             Diagnostics = diagnostics,
         };
     }
 
+    private async Task<GhCapture> CaptureGhAsync(
+        string ghPath,
+        string? filterScope,
+        string? filterAgent,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var records = await _listAdapter
+            .ListAsync(ghPath, filterScope, filterAgent, cancellationToken)
+            .ConfigureAwait(false);
+        stopwatch.Stop();
+        return new GhCapture(records, stopwatch.Elapsed);
+    }
+
+    private LocalCapture CaptureLocal(Options options, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var roots = _resolver.ResolveWithCancellation(new ScanRootResolver.Options(
+            CurrentDirectory: Environment.CurrentDirectory,
+            HomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            CustomRoots: options.ScanRoots,
+            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")),
+            cancellationToken);
+
+        _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
+        var fsSw = Stopwatch.StartNew();
+        var scanned = _scanner.ScanWithCancellation(
+            roots,
+            new LocalSkillScanner.Options(options.AllowHiddenDirs),
+            cancellationToken);
+        var packages = _lockReader.LoadFromRootsWithCancellation(
+            roots.Select(root => root.Path),
+            cancellationToken);
+        fsSw.Stop();
+        _logger.Info(
+            "inventory",
+            $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
+        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed);
+    }
+
+    private sealed record LocalCapture(
+        ImmutableArray<ScanRoot> Roots,
+        ImmutableArray<InstalledSkill> Scanned,
+        ImmutableDictionary<string, SkillPackage> Packages,
+        TimeSpan Duration);
+
+    private sealed record GhCapture(
+        ImmutableArray<GhSkillListRecord> Records,
+        TimeSpan Duration);
+
     internal static ImmutableArray<InstalledSkill> Merge(
         ImmutableArray<InstalledSkill> scanned,
-        ImmutableArray<GhSkillListRecord> ghRecords)
+        ImmutableArray<GhSkillListRecord> ghRecords) =>
+        MergeWithCancellation(scanned, ghRecords, CancellationToken.None);
+
+    internal static ImmutableArray<InstalledSkill> MergeWithCancellation(
+        ImmutableArray<InstalledSkill> scanned,
+        ImmutableArray<GhSkillListRecord> ghRecords,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (ghRecords.IsEmpty)
         {
             return scanned;
@@ -133,6 +212,7 @@ public sealed class LocalInventoryService
         var scanIndex = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
         foreach (var s in scanned)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             scanIndex[PathResolver.Normalize(s.ResolvedPath)] = s;
         }
 
@@ -141,6 +221,7 @@ public sealed class LocalInventoryService
 
         foreach (var rec in ghRecords)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var key = ResolveKey(rec);
             if (key is not null && scanIndex.TryGetValue(key, out var match))
             {
@@ -186,11 +267,26 @@ public sealed class LocalInventoryService
 
         foreach (var kv in scanIndex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (matchedScanKeys.Contains(kv.Key)) continue;
             outputBuilder.Add(kv.Value);
         }
 
         return outputBuilder.ToImmutable();
+    }
+
+    private static ImmutableArray<InstalledSkill> FilterWithCancellation(
+        ImmutableArray<InstalledSkill> source,
+        Func<InstalledSkill, bool> predicate,
+        CancellationToken cancellationToken)
+    {
+        var builder = ImmutableArray.CreateBuilder<InstalledSkill>();
+        foreach (var skill in source)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (predicate(skill)) builder.Add(skill);
+        }
+        return builder.ToImmutable();
     }
 
     private static string? ResolveKey(GhSkillListRecord rec)

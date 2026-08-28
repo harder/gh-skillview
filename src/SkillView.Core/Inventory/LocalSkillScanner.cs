@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.IO;
+using System.Text;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 
@@ -12,29 +14,58 @@ public sealed class LocalSkillScanner
 {
     public const string IgnoreMarkerName = ".skillview-ignore";
     public const string SkillFileName = "SKILL.md";
+    public const int MaxFrontMatterPrefixBytes = 64 * 1024;
 
     private readonly Logger _logger;
-    public LocalSkillScanner(Logger logger) { _logger = logger; }
+    private readonly Action<string>? _candidateObservedForTests;
+    private readonly Func<string, IEnumerator<string>> _enumerateEntries;
+
+    public LocalSkillScanner(Logger logger) : this(
+        logger,
+        candidateObservedForTests: null,
+        enumerateEntriesForTests: null)
+    {
+    }
+
+    internal LocalSkillScanner(
+        Logger logger,
+        Action<string>? candidateObservedForTests,
+        Func<string, IEnumerator<string>>? enumerateEntriesForTests = null)
+    {
+        _logger = logger;
+        _candidateObservedForTests = candidateObservedForTests;
+        _enumerateEntries = enumerateEntriesForTests
+            ?? (path => Directory.EnumerateFileSystemEntries(path).GetEnumerator());
+    }
 
     public sealed record Options(bool AllowHiddenDirs = false);
 
     public ImmutableArray<InstalledSkill> Scan(
         IReadOnlyList<ScanRoot> roots,
-        Options? options = null)
+        Options? options = null) =>
+        ScanWithCancellation(roots, options, CancellationToken.None);
+
+    internal ImmutableArray<InstalledSkill> ScanWithCancellation(
+        IReadOnlyList<ScanRoot> roots,
+        Options? options,
+        CancellationToken cancellationToken)
     {
         options ??= new Options();
         var byResolved = new Dictionary<string, Builder>(StringComparer.Ordinal);
 
         foreach (var root in roots)
         {
-            ScanRoot(root, options, byResolved);
+            cancellationToken.ThrowIfCancellationRequested();
+            ScanRoot(root, options, byResolved, cancellationToken);
         }
 
         var builder = ImmutableArray.CreateBuilder<InstalledSkill>(byResolved.Count);
         foreach (var entry in byResolved.Values)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             builder.Add(entry.Build());
         }
+        cancellationToken.ThrowIfCancellationRequested();
         // Stable ordering by name then resolved path for reproducible output.
         builder.Sort((a, b) =>
         {
@@ -45,15 +76,19 @@ public sealed class LocalSkillScanner
         return builder.ToImmutable();
     }
 
-    private void ScanRoot(ScanRoot root, Options opts, Dictionary<string, Builder> acc)
+    private void ScanRoot(
+        ScanRoot root,
+        Options opts,
+        Dictionary<string, Builder> acc,
+        CancellationToken cancellationToken)
     {
         // `EnumerateFileSystemEntries` includes broken symlinks, which
         // `EnumerateDirectories` silently skips on POSIX when stat fails.
         // Broken symlinks should surface, not disappear.
-        IEnumerable<string> children;
+        IEnumerator<string>? children = null;
         try
         {
-            children = Directory.EnumerateFileSystemEntries(root.Path);
+            children = _enumerateEntries(root.Path);
         }
         catch (IOException ex)
         {
@@ -66,19 +101,47 @@ public sealed class LocalSkillScanner
             return;
         }
 
-        foreach (var child in children)
+        try
         {
-            var leaf = Path.GetFileName(child);
-            if (!opts.AllowHiddenDirs && leaf.StartsWith('.')) continue;
-            // Ignore plain files at the scan root: skills are directories.
-            var isSymlink = PathResolver.IsSymlink(child);
-            if (!Directory.Exists(child) && !isSymlink) continue;
-            ConsiderCandidate(root, child, acc);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                bool hasNext;
+                try
+                {
+                    hasNext = children.MoveNext();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    _logger.Warn("inventory.scan", $"enumerate {root.Path} failed: {ex.Message}");
+                    return;
+                }
+
+                if (!hasNext) return;
+                var child = children.Current;
+                _candidateObservedForTests?.Invoke(child);
+                cancellationToken.ThrowIfCancellationRequested();
+                var leaf = Path.GetFileName(child);
+                if (!opts.AllowHiddenDirs && leaf.StartsWith('.')) continue;
+                // Ignore plain files at the scan root: skills are directories.
+                var isSymlink = PathResolver.IsSymlink(child);
+                if (!Directory.Exists(child) && !isSymlink) continue;
+                ConsiderCandidate(root, child, acc, cancellationToken);
+            }
+        }
+        finally
+        {
+            children.Dispose();
         }
     }
 
-    private void ConsiderCandidate(ScanRoot root, string candidatePath, Dictionary<string, Builder> acc)
+    private void ConsiderCandidate(
+        ScanRoot root,
+        string candidatePath,
+        Dictionary<string, Builder> acc,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var isSymlink = PathResolver.IsSymlink(candidatePath);
         var resolved = PathResolver.Resolve(candidatePath);
         if (resolved is null)
@@ -104,7 +167,7 @@ public sealed class LocalSkillScanner
         {
             try
             {
-                var content = File.ReadAllText(skillMdPath);
+                var content = ReadBoundedPrefix(skillMdPath, cancellationToken);
                 var (_, parsed, parsedFence) = FrontMatterParser.Parse(content);
                 if (!parsedFence)
                 {
@@ -117,7 +180,7 @@ public sealed class LocalSkillScanner
                     validity = ValidityState.NameMismatch;
                 }
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _logger.Warn("inventory.scan", $"read {skillMdPath} failed: {ex.Message}");
                 validity = ValidityState.UnparsableFrontMatter;
@@ -158,6 +221,35 @@ public sealed class LocalSkillScanner
             ? root.AgentHint ?? "unknown"
             : root.AgentHint ?? "unknown";
         entry.AgentMemberships.Add(new AgentMembership(agentId, candidatePath, isSymlink));
+    }
+
+    private static string ReadBoundedPrefix(string path, CancellationToken cancellationToken)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(MaxFrontMatterPrefixBytes);
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                bufferSize: 8 * 1024,
+                FileOptions.SequentialScan);
+            var total = 0;
+            while (total < MaxFrontMatterPrefixBytes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var read = stream.Read(buffer, total, MaxFrontMatterPrefixBytes - total);
+                if (read == 0) break;
+                total += read;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return Encoding.UTF8.GetString(buffer, 0, total);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private static DateTimeOffset? TryGetInstalledAt(string resolved)

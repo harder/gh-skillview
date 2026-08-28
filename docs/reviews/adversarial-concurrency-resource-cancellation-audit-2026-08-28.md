@@ -6,10 +6,11 @@ Reviewed commit: `7d43336` (`fix: address concurrency review findings`)
 PR follow-up reviewed: `df62a22` (`fix: close remaining lifecycle review gaps`),
 merged by PR #11 as `40bbf0b`
 Hardening branch: `fix/adversarial-hardening`
-Status: Active remediation. The first six recommended implementation areas are
-locally verified for the documented application threat model; hostile same-user
-path replacement remains part of the removal follow-up, and findings 6-11 and
-14 remain scheduled.
+Second hardening branch: `fix/resource-lifecycle-hardening-2`
+Status: Active remediation. PR #12 is merged. Its final disk-budget follow-up,
+the analogous cancellation-callback lock hazard, and bounded/cancellable local
+inventory I/O are implemented on the second hardening branch. Removal UI work,
+hostile same-user path replacement, and findings 7-11 and 14 remain scheduled.
 
 ## Executive summary
 
@@ -291,7 +292,69 @@ findings. All three were independently reassessed and accepted:
    source audit found no equivalent externally-disposed source dereference in
    the tab cancellation-slot paths; their leases retain source ownership until
    completion. Modal lifetime ownership remains separately tracked by Finding
-   8/9 and is not conflated with this workspace-source race.
+   8 and is not conflated with this workspace-source race.
+
+### PR #12 final review and post-merge analogous reassessment
+
+The final Copilot review was labeled “needs a closer look” and contained one
+suppressed finding. It was independently reassessed and accepted:
+
+1. **Aggregate log usage can exceed the budget while the active part grows —
+   correct and fixed on `fix/resource-lifecycle-hardening-2`.** The first append
+   after writer open/rotation established retention, but subsequent appends did
+   not revisit it until another rotation. Older parts could therefore remain
+   while active growth pushed aggregate usage over 50 MiB. `FileLogSink` now
+   keeps incremental retained-byte accounting and re-runs retention on the
+   first append that crosses the budget. If the active part alone is oversized
+   or an old part cannot be deleted, retry is deferred until bounded additional
+   growth so logging does not enumerate the directory on every line. A
+   regression test begins with old and active parts under budget, grows only the
+   active part, and proves the old part is removed before rotation.
+
+The earlier review misses were then used as bug-family prompts rather than
+one-off patches. This found four report/code gaps:
+
+1. **Cancellation callbacks ran under ownership locks — correct and fixed.**
+   `CancellationTokenSourceSlot` and `LatestRequestGate` called `Cancel()` while
+   holding their private gates. `Cancel()` synchronously invokes arbitrary
+   registered callbacks; a callback that waits for another thread to release
+   or query the lease creates the same lock/callback inversion class that the
+   logger reviews exposed. Ownership is now published under the lock,
+   cancellation runs outside it, and source disposal is deferred until an
+   in-progress cancellation returns. Leases capture the token struct at
+   construction. Deterministic tests have a cancellation callback wait for a
+   different thread to dispose the lease and prove it completes while the
+   callback is active.
+2. **The disposed-source pattern remains present in install modals — already
+   tracked, report sharpened.** All three install surfaces use `async void`
+   handlers with a `using`-owned source and repeatedly access `lifetime.Token`
+   after awaits. If the synchronous dialog run returns first, the source is
+   disposed while the handler continues. This is the same failure family as the
+   Discover continuation bug, but it belongs to the already-scheduled modal
+   lifetime redesign in Finding 8 rather than this checkpoint.
+3. **Cleanup classification had a second uncancellable lazy-directory walk —
+   correct and fixed with Finding 6.** The original inventory finding focused
+   on `LocalSkillScanner`; `CleanupClassifier` also enumerated scan-root
+   children without a token and placed only enumerable creation, not
+   `MoveNext`, inside its error boundary. Cleanup classification now checks its
+   owning token throughout and contains iteration-time I/O failures.
+4. **The cache invoked its injected clock while holding the cache lock —
+   low production risk, fixed.** The production clock is `UtcNow`, but the
+   abstraction allowed an injected delegate to re-enter or coordinate with
+   cache operations under `_gate`. Time capture now occurs before lock entry;
+   loader-completion clock faults are converted into the shared load outcome
+   so waiters cannot be stranded. A deterministic callback test invalidates on
+   another thread while the clock is running and proves the cache lock is free.
+
+Second-branch local verification at this checkpoint:
+
+- `dotnet build --no-restore`: passed with zero warnings and zero errors.
+- `dotnet test --no-build`: 625 of 625 tests passed, including the ANSI-driver
+  integration suite.
+- macOS ARM64 AOT publish and `--version` smoke checks passed for both the
+  standalone app and gh extension. The first standalone restore emitted a
+  local NuGet vulnerability-cache access warning, but native compilation and
+  execution completed; CI will repeat the clean three-platform matrix.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 
@@ -458,7 +521,8 @@ The field is also neither volatile nor accessed exclusively under the lock.
 
 Severity: **High**
 
-Implementation status: **Completed on `fix/adversarial-hardening`.**
+Implementation status: **Completed on `fix/adversarial-hardening`; aggregate
+active-growth enforcement completed on `fix/resource-lifecycle-hardening-2`.**
 
 Locations:
 
@@ -618,6 +682,9 @@ file, trimming can select the active file:
 
 Severity: **Medium**
 
+Implementation status: **Completed on
+`fix/resource-lifecycle-hardening-2`.**
+
 Locations:
 
 - `src/SkillView.Core/Inventory/LocalInventoryService.cs`, `CaptureAsync` around lines 42-81.
@@ -639,6 +706,23 @@ also reads complete files into byte arrays without a size limit.
 around creation of the enumerable but performs `foreach` outside that catch.
 ACL changes, directory removal, disconnection, or other errors raised during
 iteration can escape and abort the scan.
+
+### Remediation checkpoint
+
+`LocalInventoryService` now schedules root resolution, filesystem scanning,
+and package-lock enrichment on the thread pool and runs that work concurrently
+with `gh skill list`. Cancellation is checked between roots, candidates,
+bounded read chunks, lockfiles, and cleanup-classification entries.
+
+`LocalSkillScanner` reads at most 64 KiB from each `SKILL.md`, enough for normal
+front matter without allocating the entire third-party document.
+`SkillLockFileReader` rents a bounded buffer, reads at most 1 MiB plus one byte,
+and rejects oversized manifests. Both use delete-sharing so concurrent package
+updates/removal do not unnecessarily pin files on Windows. Lazy enumeration
+now catches failures from the actual `MoveNext` call, not only enumerable
+creation. Focused tests cover mid-scan cancellation, a closing front-matter
+fence beyond the byte bound, oversized lockfiles, cancellation before lockfile
+I/O, and a simulated iteration-time disconnect.
 
 ### Impact
 
@@ -726,6 +810,15 @@ original try/catch and can escape the `async void` handler.
 
 `InstallScreen` has an inner cancellation check and is safer, but still does not
 own/await the operation and can encounter application-disposal races.
+
+The later disposed-source reassessment adds a second concrete failure mode:
+each handler repeatedly reads `lifetime.Token` after awaits even though
+`lifetime` is a `using` local owned by the synchronous `Show` method. If the
+dialog stops and `Show` returns while its `async void` handler is still active,
+the source is disposed and a continuation can throw `ObjectDisposedException`
+while merely evaluating the token, including from an exception/cancellation
+path. The modal fix must capture a stable token before the first await in
+addition to owning and awaiting the operation task.
 
 ### Impact
 
@@ -1027,8 +1120,7 @@ that updating an existing value refreshes recency.
 
 These should be included while the related components are being changed:
 
-1. Validate that `Logger` capacity is non-negative; a negative value eventually
-   calls `RemoveFirst` on an empty ring.
+1. [x] Validate that `Logger` capacity is non-negative; completed in PR #12.
 2. Serialize tests that mutate `TuiHelpers.CurrentTheme`, Terminal.Gui scheme
    facades, or other static UI configuration.
 3. Stream CLI JSON directly to `Console.Out` rather than creating a
@@ -1064,7 +1156,7 @@ coordinated within their current scope:
   `IApplication.Dispose()` lifecycle.
 - External TUI cancellation is connected to `IApplication.RunAsync`; this
   branch adds ownership and shutdown quiescence for subordinate application
-  tasks, while modal-specific lifetimes remain remediation item 9.
+  tasks, while modal-specific lifetimes remain remediation item 10.
 
 ## Recommended remediation order
 
@@ -1075,15 +1167,20 @@ coordinated within their current scope:
    search/preview/probe cancellation and generation checks.
 5. [x] Replace log snapshot-plus-subscribe/replacement with exact-once replay.
 6. [x] Add log character/byte budgets and correct disk rotation.
-7. [ ] Move inventory and removal I/O off the UI thread with cancellation, and
+7. [x] Enforce aggregate disk retention during active-file growth and remove
+   cancellation-callback execution from request/slot ownership locks.
+8. [~] Move inventory and removal I/O off the UI thread with cancellation, and
    evaluate native handle-relative deletion for hostile same-user mutation.
-8. [ ] Finish metadata-preview deadlines and bounded scheduling (search
+   Inventory scanning and cleanup classification are complete; asynchronous
+   removal/progress and native deletion evaluation remain.
+9. [ ] Finish metadata-preview deadlines and bounded scheduling (search
    supersession and a whole-request deadline are complete).
-9. [ ] Make modal operation lifetimes awaitable and disposal-safe.
-10. [ ] Wire root CLI cancellation and bounded post-kill waiting.
-11. [ ] Centralize cross-platform path identity semantics.
-12. [ ] Correct Esc focus behavior and strengthen the LRU contract test.
-13. [ ] Finish the lower-risk hardening and stress coverage.
+10. [ ] Make modal operation lifetimes awaitable and disposal-safe, including
+    stable token capture before the first await.
+11. [ ] Wire root CLI cancellation and bounded post-kill waiting.
+12. [ ] Centralize cross-platform path identity semantics.
+13. [ ] Correct Esc focus behavior and strengthen the LRU contract test.
+14. [ ] Finish the lower-risk hardening and stress coverage.
 
 `FileLogSink` lock ordering, Doctor-to-tab cancellation, and Updates operation
 deactivation were completed in `df62a22` and are not in the remaining order.

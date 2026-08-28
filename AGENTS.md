@@ -112,6 +112,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `CancellationToken`, and only update UI through `app.Invoke()` while that
   lifetime is still active. Do not fall back to direct UI mutation after
   teardown.
+- Never call `CancellationTokenSource.Cancel()` while holding an ownership
+  lock. Cancellation callbacks are arbitrary user code and can synchronously
+  re-enter or wait for lease release; publish the ownership transition under
+  the lock, cancel outside it, and defer source disposal until cancellation
+  finishes. Capture the token value in the lease instead of dereferencing the
+  source after ownership can end.
 - Route application-owned fire-and-forget work through `BackgroundTaskTracker`
   (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
   tied to their activation lifetimes and put generation/ownership checks inside
@@ -188,6 +194,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
   remote content and is separate from Terminal.Gui's pasted-input sanitization.
+- Keep local inventory I/O off the Terminal.Gui thread. Scanner, cleanup
+  classification, root resolution, and package-lock enrichment must accept and
+  check cancellation between roots/entries. Read at most the bounded
+  front-matter prefix from `SKILL.md` and reject `.skill-lock.json` files over
+  the configured byte limit; do not reintroduce whole-file reads for either.
+- File-log aggregate retention is enforced as the active part grows, not only
+  when a writer opens or rotates. Maintain incremental byte accounting and a
+  bounded retry threshold for undeletable files so the fix does not enumerate
+  the log directory on every line.
 - Keep the main shell's contextual header, inline busy indicators, quit routing,
   cancellation ownership, and memory bounds aligned with
   `agent_docs/ui-lifecycle-and-resource-bounds.md`. In particular, `Ctrl+Q`
