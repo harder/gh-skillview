@@ -928,6 +928,10 @@ advanced removal flows retain mutation totals across retries and escalation;
 cancellation reports preserve the exact observed runtime-error count while
 marking cancellation separately; and remove JSON only emits runtime-error
 fields after validation and confirmation permit an actual removal or dry run.
+The subsequent Balanced review also found that a refused direct removal
+returned after its initial progress event. Refusals now publish a forced
+terminal completed snapshot with one processed target, zero deleted targets,
+and the refusal error count.
 
 ### Impact
 

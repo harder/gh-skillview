@@ -145,6 +145,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Every async removal entry point must publish a terminal canceled update even
   when its token was already canceled; synthetic cancellation reports retain
   the exact observed runtime-error count and mark cancellation explicitly.
+  All non-canceled return paths, including validation refusals, must publish a
+  terminal completed progress update with exact processed/deleted/error counts.
   CLI JSON must not duplicate validation refusals or unaccepted warnings into
   `runtimeErrors`. Do not claim the path checks are atomic
   against a hostile same-user process:

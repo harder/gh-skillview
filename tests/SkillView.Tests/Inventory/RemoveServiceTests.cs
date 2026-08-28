@@ -102,6 +102,34 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RemoveAsync_RefusedValidationPublishesTerminalProgress()
+    {
+        var (skill, dir) = MakeSkill("bad-progress");
+        Directory.CreateDirectory(Path.Combine(dir, ".git"));
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        Assert.False(validation.Allowed);
+        var updates = new List<RemoveService.RemoveProgress>();
+        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
+
+        var report = await new RemoveService(_logger).RemoveAsync(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken,
+            progress: progress);
+
+        Assert.False(report.Succeeded);
+        Assert.True(Directory.Exists(dir));
+        Assert.Equal(2, updates.Count);
+        Assert.False(updates[0].IsCompleted);
+        Assert.True(updates[^1].IsCompleted);
+        Assert.False(updates[^1].IsCanceled);
+        Assert.Equal(1, updates[^1].TargetsProcessed);
+        Assert.Equal(0, updates[^1].TargetsDeleted);
+        Assert.Equal(0, updates[^1].FilesProcessed);
+        Assert.Equal(0, updates[^1].DirectoriesProcessed);
+        Assert.Equal(1, updates[^1].Errors);
+    }
+
+    [Fact]
     public void RemoveMany_HappyPath_DeletesEveryValidatedTarget()
     {
         var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);

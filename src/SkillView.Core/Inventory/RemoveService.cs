@@ -114,6 +114,8 @@ public sealed class RemoveService
         {
             var reason = string.Join("; ", validation.Errors.Select(e => $"{e.Kind}: {e.Detail}"));
             _logger.Error("remove", $"refused: {reason}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
             return RemoveReport.Refused(validation.ResolvedPath, reason);
         }
 
