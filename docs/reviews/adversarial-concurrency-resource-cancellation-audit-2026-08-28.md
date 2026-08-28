@@ -155,13 +155,15 @@ The first natural implementation checkpoint completes remediation-order items
 Local verification at this checkpoint:
 
 - `dotnet build --no-restore`: passed with zero warnings.
-- `dotnet test --no-build`: 593 of 593 tests passed, including the ANSI-driver
+- `dotnet test --no-build`: 602 of 602 tests passed, including the ANSI-driver
   integration suite.
 - New deterministic tests cover removal escapes/cycles/retargeting,
   cancellation between entries in a 2,000-file directory, 100,000-operation
   cache contention, invalidation cleanup, shutdown drain, workspace exits,
   replay/live interleavings, message budgets, same-day file rotation, restart
-  with an oversized active file, and active-file retention.
+  with an oversized active file, active-file retention, logger sequence-gap
+  backpressure, search/preview commit invalidation, and parse-aware inventory
+  caching.
 - PR #12's initial Linux, macOS, and Windows tests, AOT smoke publishes on all
   three platforms, and CodeQL checks passed. Follow-up CI reruns after review
   fixes are recorded on the PR.
@@ -187,6 +189,30 @@ reassessed:
    completion is published only after the loader returns from process
    kill/drain cleanup; a deterministic held-cleanup test proves the waiter
    remains incomplete until then.
+
+The second Copilot review surfaced one inline finding and two suppressed
+findings from unchanged lines. All three were independently reassessed and
+accepted:
+
+1. **Logger sequence-gap buffer — correct and fixed.** The per-observer
+   `SortedDictionary` could grow without relation to the bounded ring when the
+   thread owning sequence N paused before observer dispatch. Out-of-order
+   deliveries now apply synchronous monitor backpressure until the missing
+   sequence is delivered, so the logger retains no separate gap collection.
+   Recursive writes from an observer to the same logger are rejected before
+   assigning a sequence because they are incompatible with synchronous ordered
+   delivery. A deterministic test pauses sequence N before registration,
+   proves N+1 remains blocked, then verifies exact ordered delivery.
+2. **Preview started from the old table during search — correct and fixed.** A
+   search already canceled the preview active at submission, but a user could
+   start another preview before the search completed. Successful result commit
+   now invalidates the preview gate again before replacing the table, preventing
+   that old-row preview from painting over the new result set.
+3. **Malformed successful inventory output cached as empty — correct and
+   fixed.** Parsing now carries an explicit success signal into
+   `GhSkillListCache.LoadResult.ShouldCache`. Only a schema-valid payload,
+   including a genuine empty `[]`, is cacheable. Blank, malformed, non-array,
+   non-object-record, and missing-name payloads remain retryable.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 

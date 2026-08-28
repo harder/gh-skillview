@@ -789,12 +789,11 @@ public sealed class SkillViewApp
 
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
     {
-        _resultsNaturalOrder = results.ToList();
-        _results = results.ToList();
-        RefreshResultsTable();
-        UpdateMetadataPane();
-        UpdatePreviewPlaceholder();
+        ReplaceSearchResults(results);
     }
+
+    internal LatestRequestGate.Lease BeginPreviewRequestForTests() =>
+        _previewRequests.Begin(DiscoverLifetimeForTests, PreviewTimeout);
 
     internal void SetPreviewTextForTests(string text) => SetPreviewText(text);
 
@@ -1166,13 +1165,7 @@ public sealed class SkillViewApp
                     _services.Logger.Debug("search", $"dropping stale results for generation {generation}");
                     return;
                 }
-                _resultsNaturalOrder = filteredResults.ToList();
-                _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
-                _loadedPreviewKey = null;
-                RefreshResultsTable();
-                RefreshDiscoverResultsTitle();
-                UpdateMetadataPane();
-                UpdatePreviewPlaceholder();
+                ReplaceSearchResults(filteredResults);
                 UpdateDiscoverActions();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
@@ -1230,6 +1223,21 @@ public sealed class SkillViewApp
     }
 
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(30);
+
+    private void ReplaceSearchResults(IReadOnlyList<SearchResultSkill> results)
+    {
+        // A preview may have started against the old table after this search
+        // began. Invalidate again at the commit boundary so it cannot paint
+        // after the table has been replaced with a different result set.
+        CancelCurrentPreview(clearBusy: false);
+        _resultsNaturalOrder = results.ToList();
+        _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
+        _loadedPreviewKey = null;
+        RefreshResultsTable();
+        RefreshDiscoverResultsTitle();
+        UpdateMetadataPane();
+        UpdatePreviewPlaceholder();
+    }
 
     private async Task<IReadOnlyList<SearchResultSkill>> FilterResultsByAgentAsync(
         IReadOnlyList<SearchResultSkill> results,

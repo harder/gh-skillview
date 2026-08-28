@@ -129,7 +129,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
-  rotation and active-file exclusion when changing logging.
+  rotation and active-file exclusion when changing logging. Observer delivery
+  uses synchronous sequence backpressure rather than retaining out-of-order
+  entries; observer callbacks must not write recursively to the same `Logger`.
+- A successful `gh skill list` process result is cacheable only when its JSON
+  parses as the expected inventory schema. Preserve the distinction between a
+  valid empty `[]` payload and malformed, truncated, or schema-incompatible
+  output, which must remain retryable.
 - The main TUI host path now runs through `SkillViewApp.RunAsync(ct)`, and
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via

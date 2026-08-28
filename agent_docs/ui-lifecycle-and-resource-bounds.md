@@ -23,7 +23,9 @@ logging, or subprocess adapters.
 
 - `LatestRequestGate` owns Discover preview cancellation. A new preview cancels
   the previous request, and every completion checks `Lease.IsCurrent` before
-  updating UI.
+  updating UI. Search cancels previews both when the search starts and when its
+  new result set is committed; the second boundary catches previews launched
+  from the old table while the search was in flight.
 - Installed, Changes, and Updates cancel superseded inventory loads. Pass their
   cancellation token through to inventory capture; do not add generation-only
   refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`
@@ -41,8 +43,11 @@ logging, or subprocess adapters.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
-  begin after disposal returns. The visible log pane retains at most 512
-  formatted lines and coalesces burst refreshes without lost wakeups.
+  begin after disposal returns. Out-of-order concurrent delivery waits for the
+  missing sequence instead of retaining pending log entries. Callbacks must not
+  log recursively to the same `Logger`; that is rejected before the ring is
+  mutated. The visible log pane retains at most 512 formatted lines and
+  coalesces burst refreshes without lost wakeups.
 
 ## Focused verification
 

@@ -84,13 +84,7 @@ public sealed class GhSkillListAdapter
                 ShouldCache: false);
         }
 
-        if (string.IsNullOrWhiteSpace(result.StdOut))
-        {
-            return new GhSkillListCache.LoadResult(ImmutableArray<GhSkillListRecord>.Empty);
-        }
-
-        var parsed = Parse(result.StdOut, _logger);
-        return new GhSkillListCache.LoadResult(parsed);
+        return ParseLoadResult(result.StdOut, _logger);
     }
 
     public void Invalidate() => _cache.Invalidate();
@@ -99,6 +93,21 @@ public sealed class GhSkillListAdapter
     /// level array or a top-level object with a records array under one of
     /// several common field names.
     public static ImmutableArray<GhSkillListRecord> Parse(string json, Logger? logger = null)
+    {
+        _ = TryParse(json, out var records, logger);
+        return records;
+    }
+
+    internal static GhSkillListCache.LoadResult ParseLoadResult(string json, Logger? logger = null)
+    {
+        var succeeded = TryParse(json, out var records, logger);
+        return new GhSkillListCache.LoadResult(records, ShouldCache: succeeded);
+    }
+
+    internal static bool TryParse(
+        string json,
+        out ImmutableArray<GhSkillListRecord> records,
+        Logger? logger = null)
     {
         try
         {
@@ -119,21 +128,37 @@ public sealed class GhSkillListAdapter
             else
             {
                 logger?.Warn("gh.skill.list", $"unexpected JSON root kind {root.ValueKind}");
-                return ImmutableArray<GhSkillListRecord>.Empty;
+                records = ImmutableArray<GhSkillListRecord>.Empty;
+                return false;
             }
 
             var builder = ImmutableArray.CreateBuilder<GhSkillListRecord>();
             foreach (var el in array.EnumerateArray())
             {
-                if (el.ValueKind != JsonValueKind.Object) continue;
-                builder.Add(ReadRecord(el));
+                if (el.ValueKind != JsonValueKind.Object)
+                {
+                    logger?.Warn("gh.skill.list", "unexpected non-object inventory record");
+                    records = ImmutableArray<GhSkillListRecord>.Empty;
+                    return false;
+                }
+
+                var record = ReadRecord(el);
+                if (string.IsNullOrWhiteSpace(record.Name))
+                {
+                    logger?.Warn("gh.skill.list", "inventory record is missing skillName");
+                    records = ImmutableArray<GhSkillListRecord>.Empty;
+                    return false;
+                }
+                builder.Add(record);
             }
-            return builder.ToImmutable();
+            records = builder.ToImmutable();
+            return true;
         }
         catch (JsonException ex)
         {
             logger?.Error("gh.skill.list", $"JSON parse failed: {ex.Message}");
-            return ImmutableArray<GhSkillListRecord>.Empty;
+            records = ImmutableArray<GhSkillListRecord>.Empty;
+            return false;
         }
     }
 

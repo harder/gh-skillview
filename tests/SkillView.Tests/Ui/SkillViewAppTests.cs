@@ -416,6 +416,22 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void SearchResultCommit_CancelsPreviewStartedAgainstSupersededTable()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        using var preview = app.BeginPreviewRequestForTests();
+
+        app.LoadSearchResultsForTests(
+        [
+            new SearchResultSkill(null, null, null, "owner/repo", "new-result", null),
+        ]);
+
+        Assert.True(preview.Token.IsCancellationRequested);
+        Assert.False(preview.IsCurrent);
+    }
+
+    [Fact]
     public void DiscoverSelectionChange_ClearsLoadedPreviewAndRestoresSelectionPlaceholder()
     {
         var app = CreateApp();

@@ -187,6 +187,29 @@ public class GhSkillListAdapterTests
         Assert.Empty(GhSkillListAdapter.Parse("42"));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("not json")]
+    [InlineData("42")]
+    [InlineData("[1, 2]")]
+    [InlineData("[{}]")]
+    public void Malformed_or_schema_incompatible_payload_is_not_cacheable(string json)
+    {
+        var result = GhSkillListAdapter.ParseLoadResult(json);
+
+        Assert.False(result.ShouldCache);
+        Assert.Empty(result.Records);
+    }
+
+    [Fact]
+    public void Valid_empty_array_is_cacheable()
+    {
+        var result = GhSkillListAdapter.ParseLoadResult("[]");
+
+        Assert.True(result.ShouldCache);
+        Assert.Empty(result.Records);
+    }
+
     // Belt-and-braces: when both `hosts` and `agents` are present (transition
     // window), upstream-canonical `hosts` wins.
     [Fact]

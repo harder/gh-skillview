@@ -175,6 +175,61 @@ public class LoggerTests
     }
 
     [Fact]
+    public async Task Subscriber_OutOfOrderGapAppliesBackpressureWithoutRetainingPendingEntries()
+    {
+        var firstInvokeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstInvoke = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondWaitingForSequence = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var logger = new Logger(
+            LogLevel.Info,
+            capacity: 16,
+            maxMessageChars: Logger.DefaultMaxMessageChars,
+            maxRetainedChars: Logger.DefaultMaxRetainedChars,
+            beforeObserverInvokeForTests: sequence =>
+            {
+                if (sequence != 1) return;
+                firstInvokeStarted.SetResult();
+                releaseFirstInvoke.Task.GetAwaiter().GetResult();
+            },
+            observerBackpressureForTests: sequence =>
+            {
+                if (sequence == 2) secondWaitingForSequence.SetResult();
+            });
+        var received = new List<string>();
+        using var subscription = logger.Subscribe(entry => received.Add(entry.Message));
+
+        var first = Task.Run(
+            () => logger.Info("test", "first"),
+            TestContext.Current.CancellationToken);
+        await firstInvokeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var second = Task.Run(
+            () => logger.Info("test", "second"),
+            TestContext.Current.CancellationToken);
+        await secondWaitingForSequence.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(second.IsCompleted);
+
+        releaseFirstInvoke.SetResult();
+        await Task.WhenAll(first, second);
+        Assert.Equal(["first", "second"], received);
+    }
+
+    [Fact]
+    public void Subscriber_RecursiveWriteToSameLoggerIsRejectedWithoutMutatingRing()
+    {
+        var logger = new Logger();
+        using var subscription = logger.Subscribe(_ => logger.Info("test", "nested"));
+
+        logger.Info("test", "outer");
+
+        var entry = Assert.Single(logger.Snapshot());
+        Assert.Equal("outer", entry.Message);
+    }
+
+    [Fact]
     public void SubscribeWithReplay_UsesOnlyRetainedRingEntries()
     {
         var logger = new Logger(capacity: 2);

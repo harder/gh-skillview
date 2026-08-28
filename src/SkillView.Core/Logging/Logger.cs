@@ -19,12 +19,34 @@ public sealed class Logger
     private int _retainedChars;
     private readonly int _maxMessageChars;
     private readonly int _maxRetainedChars;
+    private readonly Action<long>? _beforeObserverInvokeForTests;
+    private readonly Action<long>? _observerBackpressureForTests;
+
+    [ThreadStatic]
+    private static Logger? s_observerCallbackLogger;
 
     public Logger(
         LogLevel minimumLevel = LogLevel.Info,
         int capacity = 2048,
         int maxMessageChars = DefaultMaxMessageChars,
         int maxRetainedChars = DefaultMaxRetainedChars)
+        : this(
+            minimumLevel,
+            capacity,
+            maxMessageChars,
+            maxRetainedChars,
+            beforeObserverInvokeForTests: null,
+            observerBackpressureForTests: null)
+    {
+    }
+
+    internal Logger(
+        LogLevel minimumLevel,
+        int capacity,
+        int maxMessageChars,
+        int maxRetainedChars,
+        Action<long>? beforeObserverInvokeForTests,
+        Action<long>? observerBackpressureForTests)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(capacity);
         ArgumentOutOfRangeException.ThrowIfNegative(maxMessageChars);
@@ -33,10 +55,16 @@ public sealed class Logger
         _capacity = capacity;
         _maxMessageChars = maxMessageChars;
         _maxRetainedChars = maxRetainedChars;
+        _beforeObserverInvokeForTests = beforeObserverInvokeForTests;
+        _observerBackpressureForTests = observerBackpressureForTests;
     }
 
     public LogLevel MinimumLevel { get; set; }
 
+    /// <summary>
+    /// Subscribes to future entries. Callbacks are synchronously ordered and
+    /// must not write recursively to this same logger instance.
+    /// </summary>
     public IDisposable Subscribe(Action<LogEntry> observer)
     {
         ArgumentNullException.ThrowIfNull(observer);
@@ -44,9 +72,12 @@ public sealed class Logger
         {
             var id = ++_nextObserverId;
             var registration = new ObserverRegistration(
+                this,
                 observer,
                 nextSequence: _nextSequence + 1,
-                replaying: false);
+                replaying: false,
+                _beforeObserverInvokeForTests,
+                _observerBackpressureForTests);
             _observers.Add(id, registration);
             return new Subscription(this, id, registration);
         }
@@ -54,9 +85,10 @@ public sealed class Logger
 
     /// <summary>
     /// Atomically subscribes at the ring-buffer boundary and replays retained
-    /// entries before live delivery. Concurrent entries are buffered by
-    /// sequence until replay completes, preventing gaps, duplicates, and
-    /// out-of-order callbacks at the handoff.
+    /// entries before live delivery. Concurrent producers are held behind
+    /// synchronous sequence backpressure until replay completes, preventing
+    /// gaps, duplicates, out-of-order callbacks, and an unbounded handoff
+    /// buffer. Callbacks must not write recursively to this same logger.
     /// </summary>
     public IDisposable SubscribeWithReplay(Action<LogEntry> observer)
     {
@@ -72,7 +104,13 @@ public sealed class Logger
             var nextSequence = replay.Length > 0
                 ? replay[0].Sequence
                 : _nextSequence + 1;
-            registration = new ObserverRegistration(observer, nextSequence, replaying: true);
+            registration = new ObserverRegistration(
+                this,
+                observer,
+                nextSequence,
+                replaying: true,
+                _beforeObserverInvokeForTests,
+                _observerBackpressureForTests);
             _observers.Add(id, registration);
         }
 
@@ -85,6 +123,16 @@ public sealed class Logger
         if (level < MinimumLevel)
         {
             return;
+        }
+
+        // Ordered observer delivery applies synchronous backpressure. Logging
+        // recursively from one of this logger's callbacks would wait on the
+        // callback that is currently executing, so reject it before assigning
+        // a sequence or mutating the retained ring.
+        if (ReferenceEquals(s_observerCallbackLogger, this))
+        {
+            throw new InvalidOperationException(
+                "A logger observer cannot write recursively to the same Logger instance.");
         }
 
         var entry = new LogEntry(
@@ -194,17 +242,28 @@ public sealed class Logger
     private sealed class ObserverRegistration
     {
         private readonly object _gate = new();
+        private readonly Logger _owner;
         private readonly Action<LogEntry> _observer;
-        private readonly SortedDictionary<long, LogEntry> _pending = new();
+        private readonly Action<long>? _beforeInvokeForTests;
+        private readonly Action<long>? _backpressureForTests;
         private long _nextSequence;
         private bool _replaying;
         private bool _active = true;
 
-        internal ObserverRegistration(Action<LogEntry> observer, long nextSequence, bool replaying)
+        internal ObserverRegistration(
+            Logger owner,
+            Action<LogEntry> observer,
+            long nextSequence,
+            bool replaying,
+            Action<long>? beforeInvokeForTests,
+            Action<long>? backpressureForTests)
         {
+            _owner = owner;
             _observer = observer;
             _nextSequence = nextSequence;
             _replaying = replaying;
+            _beforeInvokeForTests = beforeInvokeForTests;
+            _backpressureForTests = backpressureForTests;
         }
 
         internal void Replay(IReadOnlyList<SequencedEntry> entries)
@@ -215,34 +274,35 @@ public sealed class Logger
                 foreach (var entry in entries)
                 {
                     if (entry.Sequence < _nextSequence) continue;
-                    if (entry.Sequence > _nextSequence)
-                    {
-                        _pending[entry.Sequence] = entry.Entry;
-                        continue;
-                    }
+                    if (entry.Sequence > _nextSequence) break;
 
                     Deliver(entry.Entry);
                     _nextSequence++;
                 }
                 _replaying = false;
-                DrainPending();
+                Monitor.PulseAll(_gate);
             }
         }
 
         internal void Invoke(SequencedEntry entry)
         {
+            _beforeInvokeForTests?.Invoke(entry.Sequence);
             lock (_gate)
             {
-                if (!_active || entry.Sequence < _nextSequence) return;
-                if (_replaying || entry.Sequence > _nextSequence)
+                // Do not retain a later entry while a lower sequence is still
+                // between ring insertion and this registration. The producer
+                // waits here, bounding logger-owned observer state to O(1).
+                while (_active
+                    && (_replaying || entry.Sequence > _nextSequence))
                 {
-                    _pending[entry.Sequence] = entry.Entry;
-                    return;
+                    _backpressureForTests?.Invoke(entry.Sequence);
+                    Monitor.Wait(_gate);
                 }
 
+                if (!_active || entry.Sequence < _nextSequence) return;
                 Deliver(entry.Entry);
                 _nextSequence++;
-                DrainPending();
+                Monitor.PulseAll(_gate);
             }
         }
 
@@ -251,23 +311,17 @@ public sealed class Logger
             lock (_gate)
             {
                 _active = false;
-                _pending.Clear();
-            }
-        }
-
-        private void DrainPending()
-        {
-            while (_pending.Remove(_nextSequence, out var entry))
-            {
-                Deliver(entry);
-                _nextSequence++;
+                Monitor.PulseAll(_gate);
             }
         }
 
         private void Deliver(LogEntry entry)
         {
+            var previousLogger = s_observerCallbackLogger;
+            s_observerCallbackLogger = _owner;
             try { _observer(entry); }
             catch { /* observer faults must not kill logging or later delivery */ }
+            finally { s_observerCallbackLogger = previousLogger; }
         }
     }
 
