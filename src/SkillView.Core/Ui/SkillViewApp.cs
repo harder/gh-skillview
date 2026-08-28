@@ -34,6 +34,7 @@ public sealed class SkillViewApp
     private readonly Func<IApplication> _applicationFactory;
     private readonly bool _probeOnRun;
     private readonly SearchAgentMetadataCache _searchAgentMetadata = new();
+    private readonly SearchAgentMetadataLoader _searchAgentMetadataLoader;
     private readonly SkillViewWorkflowCoordinator _workflows;
     private readonly BackgroundTaskTracker _backgroundTasks;
     private const int MaxVisibleLogLines = 512;
@@ -141,6 +142,7 @@ public sealed class SkillViewApp
         _applicationFactory = applicationFactory;
         _probeOnRun = probeOnRun;
         _backgroundTasks = new BackgroundTaskTracker(LogUnhandledException);
+        _searchAgentMetadataLoader = new SearchAgentMetadataLoader(_searchAgentMetadata, services.Logger);
         _workflows = new SkillViewWorkflowCoordinator(
             services,
             options,
@@ -1064,13 +1066,15 @@ public sealed class SkillViewApp
         var owner = _ownerField?.Text.Trim();
         var agent = _agentField?.Text.Trim();
         var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
+        var allowHiddenDirs = HiddenDirsEnabled;
         UpdateContextBar();
         RunOwnedTask(
             () => RunSearchAsync(
                 query,
                 string.IsNullOrEmpty(owner) ? null : owner,
                 limit,
-                string.IsNullOrEmpty(agent) ? null : agent),
+                string.IsNullOrEmpty(agent) ? null : agent,
+                allowHiddenDirs),
             "search");
     }
 
@@ -1163,7 +1167,12 @@ public sealed class SkillViewApp
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task RunSearchAsync(string query, string? owner = null, int? limit = null, string? agent = null)
+    private async Task RunSearchAsync(
+        string query,
+        string? owner = null,
+        int? limit = null,
+        string? agent = null,
+        bool allowHiddenDirs = false)
     {
         if (_ghPath is null)
         {
@@ -1190,7 +1199,11 @@ public sealed class SkillViewApp
                 .SearchAsync(_ghPath, query, options, cancellationToken)
                 .ConfigureAwait(false);
             var results = response.Results;
-            var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
+            var filteredResults = await FilterResultsByAgentAsync(
+                results,
+                agent,
+                allowHiddenDirs,
+                cancellationToken).ConfigureAwait(false);
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent
@@ -1270,55 +1283,25 @@ public sealed class SkillViewApp
     private async Task<IReadOnlyList<SearchResultSkill>> FilterResultsByAgentAsync(
         IReadOnlyList<SearchResultSkill> results,
         string? requestedAgent,
+        bool allowHiddenDirs,
         CancellationToken cancellationToken)
     {
-        var normalizedAgent = SearchAgentMetadataCache.NormalizeAgent(requestedAgent);
-        if (normalizedAgent is null || _ghPath is null)
+        if (SearchAgentMetadataCache.NormalizeAgent(requestedAgent) is null || _ghPath is null)
         {
             return results;
         }
 
-        foreach (var result in results)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (_searchAgentMetadata.Has(result))
-            {
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(result.Repo))
-            {
-                _searchAgentMetadata.Store(result, ImmutableArray<string>.Empty);
-                continue;
-            }
-
-            try
-            {
-                var preview = await _services.PreviewService
-                    .PreviewAsync(
-                        _ghPath,
-                        result.Repo,
-                        result.SkillName,
-                        allowHiddenDirs: ShouldAllowHiddenDirs(result, HiddenDirsEnabled),
-                        cancellationToken: cancellationToken)
-                    .ConfigureAwait(false);
-                var agents = preview.Succeeded
-                    ? SearchAgentMetadataCache.ExtractAgentsFromMarkdown(preview.MarkdownBody ?? preview.Body ?? string.Empty)
-                    : ImmutableArray<string>.Empty;
-                _searchAgentMetadata.Store(result, agents);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _services.Logger.Warn("search.agent", $"{result.Repo}/{result.SkillName}: {ex.Message}");
-                _searchAgentMetadata.Store(result, ImmutableArray<string>.Empty);
-            }
-        }
-
-        return _searchAgentMetadata.Filter(results, normalizedAgent);
+        var ghPath = _ghPath;
+        return await _searchAgentMetadataLoader.FilterAsync(
+            results,
+            requestedAgent,
+            (result, token) => _services.PreviewService.PreviewAsync(
+                ghPath,
+                result.Repo!,
+                result.SkillName,
+                allowHiddenDirs: ShouldAllowHiddenDirs(result, allowHiddenDirs),
+                cancellationToken: token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task PreviewSelectedAsync()

@@ -52,6 +52,12 @@ logging, or subprocess adapters.
   capture limit only with evidence that a supported command needs more output.
 - `SearchAgentMetadataCache` is a thread-safe 512-entry LRU. Do not replace it
   with an unbounded dictionary.
+- Discover agent metadata loading has a global four-preview concurrency bound,
+  a 15-second deadline per preview, and the search request's two-minute outer
+  deadline. A timeout or failed preview stays retryable; only a successful
+  preview or a result with definitively absent repository metadata is cached.
+  Keep both the per-request worker bound and shared slot bound so superseded
+  searches cannot temporarily multiply process concurrency.
 - Local inventory capture schedules synchronous filesystem work on the thread
   pool and runs it concurrently with `gh skill list`. Resolver, scanner,
   package-lock reader, and cleanup classification check cancellation between
@@ -97,6 +103,11 @@ logging, or subprocess adapters.
 - Fire-and-forget UI work must consume `OperationCanceledException` only when
   its own app/view lifetime is canceled. Normal shutdown must not become a
   false `CRASH`, while unrelated cancellation and real faults remain visible.
+- For synchronous modals that own an async task, non-null task identity is the
+  ownership boundary. A completed worker may still have an `IApplication.Invoke`
+  completion queued; shortcuts must remain blocked until that callback clears
+  the task or closes the modal. Cancel only when the owned task is still
+  running, then drain it before controls are disposed.
 
 ## Focused verification
 
@@ -104,5 +115,6 @@ Run `dotnet build`, then `dotnet test --no-build`. Resource-focused coverage
 includes large subprocess output, LRU eviction, subscription disposal,
 callback-safe cancellation gates, bounded inventory files, iteration failures,
 overlapping preview cancellation, superseded inventory scans, asynchronous
-removal cancellation/progress/error bounds, inline busy state, and layout
+removal cancellation/progress/error bounds, bounded and timed metadata
+previews, inline busy state, and layout
 guards at 80×24, 100×30, and 140×42.

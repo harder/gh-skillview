@@ -92,12 +92,32 @@ public sealed class SearchAgentMetadataCacheTests
 
         cache.Store(first, ImmutableArray.Create("claude-code"));
         cache.Store(second, ImmutableArray.Create("github-copilot"));
+        Assert.True(cache.Has(first));
         cache.Store(third, ImmutableArray.Create("gemini-cli"));
 
         Assert.Equal(2, cache.CountForTests);
-        Assert.False(cache.Has(first));
-        Assert.True(cache.Has(second));
+        Assert.True(cache.Has(first));
+        Assert.False(cache.Has(second));
         Assert.True(cache.Has(third));
+    }
+
+    [Fact]
+    public void Store_UpdatingExistingValueRefreshesRecency()
+    {
+        var cache = new SearchAgentMetadataCache(capacity: 2);
+        var first = Skill("owner/one", "alpha");
+        var second = Skill("owner/two", "beta");
+        var third = Skill("owner/three", "gamma");
+
+        cache.Store(first, ImmutableArray.Create("claude-code"));
+        cache.Store(second, ImmutableArray.Create("github-copilot"));
+        cache.Store(first, ImmutableArray.Create("gemini-cli"));
+        cache.Store(third, ImmutableArray.Create("github-copilot"));
+
+        Assert.True(cache.Has(first));
+        Assert.False(cache.Has(second));
+        Assert.True(cache.Has(third));
+        Assert.Single(cache.Filter([first], "gemini-cli"));
     }
 
     private static SearchResultSkill Skill(string repo, string skillName) =>
