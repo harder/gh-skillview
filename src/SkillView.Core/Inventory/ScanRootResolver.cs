@@ -133,7 +133,6 @@ public sealed class ScanRootResolver
 
     internal static string NormalizeKey(string path)
     {
-        var full = Path.GetFullPath(path);
-        return full.Replace('\\', '/').TrimEnd('/');
+        return PathIdentity.NormalizeKey(path);
     }
 }

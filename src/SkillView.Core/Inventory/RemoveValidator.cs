@@ -191,12 +191,11 @@ public static class RemoveValidator
     private static bool HasEscapingAncestorSymlink(string root, string target, out string detail)
     {
         detail = string.Empty;
-        var rootKey = PathResolver.Normalize(root);
         var cursor = Path.GetFullPath(target);
         var rootFull = Path.GetFullPath(root);
 
         while (!string.IsNullOrEmpty(cursor) &&
-               !string.Equals(cursor, rootFull, StringComparison.Ordinal))
+               !PathIdentity.Equals(cursor, rootFull))
         {
             if (PathResolver.IsSymlink(cursor))
             {
@@ -213,7 +212,7 @@ public static class RemoveValidator
                 }
             }
             var parent = Path.GetDirectoryName(cursor);
-            if (parent is null || string.Equals(parent, cursor, StringComparison.Ordinal)) break;
+            if (parent is null || PathIdentity.Equals(parent, cursor)) break;
             cursor = parent;
         }
         return false;
@@ -221,9 +220,6 @@ public static class RemoveValidator
 
     private static bool PathKeysEqual(string a, string b)
     {
-        return string.Equals(
-            PathResolver.Normalize(a),
-            PathResolver.Normalize(b),
-            StringComparison.Ordinal);
+        return PathIdentity.Equals(a, b);
     }
 }

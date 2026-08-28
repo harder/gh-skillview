@@ -67,31 +67,13 @@ public sealed class InstallScreen
 
     public void Show()
     {
-        using var lifetime = new CancellationTokenSource();
         using var dialog = new Dialog
         {
             Title = $"Install — {_request.Repo}{(_request.SkillName is null ? "" : "/" + _request.SkillName)}",
             Width = Dim.Percent(85),
             Height = Dim.Percent(85),
         };
-
-        void InvokeIfActive(Action action)
-        {
-            if (lifetime.IsCancellationRequested)
-            {
-                return;
-            }
-
-            _app.Invoke(() =>
-            {
-                if (lifetime.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                action();
-            });
-        }
+        using var operation = new ModalOperationTracker(_app, _logger, "install.ui");
 
         // ── SOURCE ─────────────────────────────────────────────────────
         var sourceFrame = new FrameView
@@ -391,26 +373,21 @@ public sealed class InstallScreen
             allowHiddenBox, fromLocalBox);
         foreach (var cb in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, cb);
 
-        installButton.Accepting += async (_, ev) =>
+        async Task RunInstallAsync(
+            GhSkillInstallService.Options options,
+            string? skillName,
+            CancellationToken cancellationToken)
         {
-            ev.Handled = true;
             try
             {
-                if (spinner.Visible) return;
-                spinner.Visible = true;
-                spinner.AutoSpin = true;
-                installButton.Enabled = false;
-                status.Text = $" installing {_request.Repo}…";
-
-                var options = BuildOptions();
-                var skillName = NullIfEmpty(skillField.Text);
                 var result = await _install.InstallAsync(
                     _ghPath,
                     _request.Repo,
                     skillName,
                     options,
-                    lifetime.Token).ConfigureAwait(false);
-                InvokeIfActive(() =>
+                    cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                operation.InvokeIfActive(() =>
                 {
                     LastResult = result;
                     spinner.AutoSpin = false;
@@ -422,6 +399,7 @@ public sealed class InstallScreen
                     }
                     else
                     {
+                        operation.Release();
                         var snippet = TuiHelpers.ErrorSnippet(result.ErrorMessage);
                         status.Text = snippet.Length > 0
                             ? $" install failed (exit {result.ExitCode}): {snippet}"
@@ -430,15 +408,23 @@ public sealed class InstallScreen
                     }
                 });
             }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install", "install canceled because the dialog closed");
+                operation.InvokeIfActive(() =>
+                {
+                    spinner.AutoSpin = false;
+                    spinner.Visible = false;
+                    status.Text = " install canceled";
+                    dialog.RequestStop();
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error("install", ex.Message);
-                InvokeIfActive(() =>
+                operation.InvokeIfActive(() =>
                 {
+                    operation.Release();
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     var snippet = TuiHelpers.ErrorSnippet(ex.Message);
@@ -448,12 +434,39 @@ public sealed class InstallScreen
                     installButton.Enabled = true;
                 });
             }
+        }
+
+        installButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
+
+            var options = BuildOptions();
+            var skillName = NullIfEmpty(skillField.Text);
+            spinner.Visible = true;
+            spinner.AutoSpin = true;
+            installButton.Enabled = false;
+            cancelButton.Enabled = false;
+            status.Text = $" installing {_request.Repo}…";
+            operation.TryStart(token => RunInstallAsync(options, skillName, token));
         };
 
         cancelButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            lifetime.Cancel();
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+            {
+                if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                {
+                    operation.Cancel();
+                    status.Text = " canceling install…";
+                }
+                else
+                {
+                    status.Text = " finishing install…";
+                }
+                return;
+            }
             dialog.RequestStop();
         };
 
@@ -465,9 +478,21 @@ public sealed class InstallScreen
         {
             if (key.KeyCode == KeyCode.Esc)
             {
-                lifetime.Cancel();
-                dialog.RequestStop();
                 key.Handled = true;
+                if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+                {
+                    if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                    {
+                        operation.Cancel();
+                        status.Text = " canceling install…";
+                    }
+                    else
+                    {
+                        status.Text = " finishing install…";
+                    }
+                    return;
+                }
+                dialog.RequestStop();
             }
         };
 
@@ -479,7 +504,7 @@ public sealed class InstallScreen
         }
         finally
         {
-            lifetime.Cancel();
+            operation.Cancel();
         }
     }
 

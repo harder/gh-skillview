@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
+using SkillView.Inventory;
 
 namespace SkillView.Logging;
 
@@ -309,12 +310,7 @@ public sealed class FileLogSink : IDisposable
                 continue;
             }
             var isActive = _currentPath is not null
-                && string.Equals(
-                    Path.GetFullPath(file.FullName),
-                    Path.GetFullPath(_currentPath),
-                    OperatingSystem.IsWindows()
-                        ? StringComparison.OrdinalIgnoreCase
-                        : StringComparison.Ordinal);
+                && PathIdentity.Equals(file.FullName, _currentPath);
             if (!isActive && item.Date < retentionCutoff)
             {
                 toDelete.Add(file);

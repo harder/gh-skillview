@@ -20,33 +20,64 @@ namespace SkillView.Cli;
 /// `internal` helpers for snapshot testing.
 public static class CliDispatcher
 {
-    public static async Task<int> RunAsync(AppOptions options, TuiServices services)
+    public static async Task<int> RunAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken = default)
     {
-        return options.SubcommandName switch
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var timeout = TimeoutFor(options.SubcommandName);
+        deadline.CancelAfter(timeout);
+
+        try
         {
-            "doctor" => await DoctorAsync(options, services).ConfigureAwait(false),
-            "list" => await ListAsync(options, services).ConfigureAwait(false),
-            "rescan" => await RescanAsync(options, services).ConfigureAwait(false),
-            "search" => await SearchAsync(options, services).ConfigureAwait(false),
-            "preview" => await PreviewAsync(options, services).ConfigureAwait(false),
-            "install" => await InstallAsync(options, services).ConfigureAwait(false),
-            "update" => await UpdateAsync(options, services).ConfigureAwait(false),
-            "remove" => await RemoveAsync(options, services).ConfigureAwait(false),
-            "cleanup" => await CleanupAsync(options, services).ConfigureAwait(false),
-            "--help" or "-h" or "help" => PrintHelp(options),
-            "--version" or "-V" => PrintVersion(options),
-            _ => UnknownSubcommand(options.SubcommandName ?? "<null>", services.Logger),
-        };
+            return options.SubcommandName switch
+            {
+                "doctor" => await DoctorAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "list" => await ListAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "install" => await InstallAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "update" => await UpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "--help" or "-h" or "help" => PrintHelp(options),
+                "--version" or "-V" => PrintVersion(options),
+                _ => UnknownSubcommand(options.SubcommandName ?? "<null>", services.Logger),
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            Console.Error.WriteLine(
+                $"skillview: {options.SubcommandName ?? "operation"} timed out after {timeout.TotalSeconds:F0}s");
+            return ExitCodes.EnvironmentError;
+        }
     }
 
-    private static async Task<int> DoctorAsync(AppOptions options, TuiServices services)
+    internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
+    {
+        "doctor" or "preview" => TimeSpan.FromSeconds(30),
+        "list" or "rescan" or "search" => TimeSpan.FromMinutes(2),
+        "install" or "update" or "remove" or "cleanup" => TimeSpan.FromMinutes(10),
+        _ => TimeSpan.FromSeconds(30),
+    };
+
+    private static async Task<int> DoctorAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         if (options.SubcommandArgs.Contains("--clear-logs"))
         {
             return ClearLogs(services);
         }
 
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         var json = options.SubcommandArgs.Contains("--json");
         if (json)
         {
@@ -104,45 +135,43 @@ public static class CliDispatcher
     }
 
     private static void WriteDoctorJson(EnvironmentReport r, AppOptions options)
-        => Console.Out.WriteLine(RenderDoctorJson(r, options));
+        => WriteJson(w => WriteDoctorJson(w, r, options));
 
     internal static string RenderDoctorJson(EnvironmentReport r, AppOptions options)
+        => RenderJson(w => WriteDoctorJson(w, r, options));
+
+    private static void WriteDoctorJson(Utf8JsonWriter writer, EnvironmentReport r, AppOptions options)
     {
-        using var ms = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("invocation", options.InvocationMode.ToString());
-            writer.WriteString("ghPath", r.GhPath);
-            writer.WriteString("ghVersion", r.GhVersionRaw);
-            writer.WriteString("ghVersionParsed", r.GhVersion?.ToString());
-            writer.WriteString("ghMinimum", GhBinaryLocator.MinimumVersion.ToString());
-            writer.WriteBoolean("ghMeetsMinimum", r.GhMeetsMinimum);
-            writer.WriteBoolean("debug", options.Debug);
-            writer.WriteString("logDirectory", r.LogDirectory);
-            writer.WriteBoolean("baselineOk", r.BaselineOk);
+        writer.WriteStartObject();
+        writer.WriteString("invocation", options.InvocationMode.ToString());
+        writer.WriteString("ghPath", r.GhPath);
+        writer.WriteString("ghVersion", r.GhVersionRaw);
+        writer.WriteString("ghVersionParsed", r.GhVersion?.ToString());
+        writer.WriteString("ghMinimum", GhBinaryLocator.MinimumVersion.ToString());
+        writer.WriteBoolean("ghMeetsMinimum", r.GhMeetsMinimum);
+        writer.WriteBoolean("debug", options.Debug);
+        writer.WriteString("logDirectory", r.LogDirectory);
+        writer.WriteBoolean("baselineOk", r.BaselineOk);
 
-            writer.WriteStartObject("auth");
-            writer.WriteBoolean("loggedIn", r.Auth.LoggedIn);
-            writer.WriteString("activeHost", r.Auth.ActiveHost);
-            writer.WriteString("account", r.Auth.Account);
-            writer.WriteStartArray("hosts");
-            foreach (var h in r.Auth.Hosts) writer.WriteStringValue(h);
-            writer.WriteEndArray();
-            writer.WriteEndObject();
+        writer.WriteStartObject("auth");
+        writer.WriteBoolean("loggedIn", r.Auth.LoggedIn);
+        writer.WriteString("activeHost", r.Auth.ActiveHost);
+        writer.WriteString("account", r.Auth.Account);
+        writer.WriteStartArray("hosts");
+        foreach (var h in r.Auth.Hosts) writer.WriteStringValue(h);
+        writer.WriteEndArray();
+        writer.WriteEndObject();
 
-            // gh ≥ 2.95 is required, so the full `gh skill` flag surface is
-            // guaranteed once the command is present — a single availability
-            // bool replaces the old per-flag capability probe.
-            writer.WriteBoolean("ghSkillAvailable", r.GhSkillAvailable);
+        // gh ≥ 2.95 is required, so the full `gh skill` flag surface is
+        // guaranteed once the command is present — a single availability
+        // bool replaces the old per-flag capability probe.
+        writer.WriteBoolean("ghSkillAvailable", r.GhSkillAvailable);
 
-            writer.WriteStartArray("scanRoots");
-            foreach (var root in options.ScanRoots) writer.WriteStringValue(root);
-            writer.WriteEndArray();
+        writer.WriteStartArray("scanRoots");
+        foreach (var root in options.ScanRoots) writer.WriteStringValue(root);
+        writer.WriteEndArray();
 
-            writer.WriteEndObject();
-        }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        writer.WriteEndObject();
     }
 
 
@@ -158,10 +187,13 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private static async Task<int> RescanAsync(AppOptions options, TuiServices services)
+    private static async Task<int> RescanAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         services.ListAdapter.Invalidate();
-        var snapshot = await CaptureInventoryAsync(options, services).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(options, services, cancellationToken: cancellationToken).ConfigureAwait(false);
         var d = snapshot.Diagnostics;
         Console.Out.WriteLine($"rescan: {snapshot.Skills.Length} skill(s) across {snapshot.ScannedRoots.Length} root(s)" +
                               (snapshot.UsedGhSkillList ? " (gh skill list used)" : " (filesystem only)"));
@@ -171,10 +203,13 @@ public static class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private static async Task<int> ListAsync(AppOptions options, TuiServices services)
+    private static async Task<int> ListAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var listOptions = ParseListArgs(options.SubcommandArgs, out var json);
-        var snapshot = await CaptureInventoryAsync(options, services, listOptions).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(options, services, listOptions, cancellationToken).ConfigureAwait(false);
 
         if (json)
         {
@@ -215,9 +250,10 @@ public static class CliDispatcher
         CaptureInventoryAsync(
             AppOptions options,
             TuiServices services,
-            (string? scope, string? agent, string? path, List<string> scanRoots)? listOptions = null)
+            (string? scope, string? agent, string? path, List<string> scanRoots)? listOptions = null,
+            CancellationToken cancellationToken = default)
     {
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         var scanRoots = new List<string>(options.ScanRoots);
         string? scope = null, agent = null;
         var allowHidden = options.SubcommandArgs.Contains("--allow-hidden-dirs");
@@ -237,7 +273,7 @@ public static class CliDispatcher
                 allowHidden,
                 FilterScope: scope,
                 FilterAgent: agent)
-        ).ConfigureAwait(false);
+        , cancellationToken).ConfigureAwait(false);
     }
 
     private static void WriteListText(Inventory.Models.InventorySnapshot snapshot)
@@ -269,64 +305,65 @@ public static class CliDispatcher
     }
 
     private static void WriteListJson(Inventory.Models.InventorySnapshot snapshot)
-        => Console.Out.WriteLine(RenderListJson(snapshot));
+        => WriteJson(w => WriteListJson(w, snapshot));
 
     internal static string RenderListJson(Inventory.Models.InventorySnapshot snapshot)
+        => RenderJson(w => WriteListJson(w, snapshot));
+
+    private static void WriteListJson(Utf8JsonWriter w, Inventory.Models.InventorySnapshot snapshot)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteString("capturedAt", snapshot.CapturedAt.ToString("O"));
+        w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
+
+        w.WriteStartArray("scannedRoots");
+        foreach (var r in snapshot.ScannedRoots)
         {
             w.WriteStartObject();
-            w.WriteString("capturedAt", snapshot.CapturedAt.ToString("O"));
-            w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
-
-            w.WriteStartArray("scannedRoots");
-            foreach (var r in snapshot.ScannedRoots)
-            {
-                w.WriteStartObject();
-                w.WriteString("path", r.Path);
-                w.WriteString("scope", r.Scope.ToString());
-                w.WriteString("agentHint", r.AgentHint);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
-            w.WriteStartArray("skills");
-            foreach (var skill in snapshot.Skills)
-            {
-                w.WriteStartObject();
-                w.WriteString("name", skill.Name);
-                w.WriteString("resolvedPath", skill.ResolvedPath);
-                w.WriteString("scanRoot", skill.ScanRoot);
-                w.WriteString("scope", skill.Scope.ToString());
-                w.WriteString("provenance", skill.Provenance.ToString());
-                w.WriteString("validity", skill.Validity.ToString());
-                w.WriteBoolean("pinned", skill.Pinned);
-                w.WriteBoolean("isSymlinked", skill.IsSymlinked);
-                w.WriteBoolean("ignored", skill.Ignored);
-                w.WriteString("githubTreeSha", skill.TreeSha);
-                w.WriteString("version", skill.FrontMatter.Version);
-                w.WriteString("description", skill.FrontMatter.Description);
-                w.WriteStartArray("agents");
-                foreach (var a in skill.Agents)
-                {
-                    w.WriteStartObject();
-                    w.WriteString("id", a.AgentId);
-                    w.WriteString("path", a.Path);
-                    w.WriteBoolean("isSymlink", a.IsSymlink);
-                    w.WriteEndObject();
-                }
-                w.WriteEndArray();
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
+            w.WriteString("path", r.Path);
+            w.WriteString("scope", r.Scope.ToString());
+            w.WriteString("agentHint", r.AgentHint);
             w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndArray();
+
+        w.WriteStartArray("skills");
+        foreach (var skill in snapshot.Skills)
+        {
+            w.WriteStartObject();
+            w.WriteString("name", skill.Name);
+            w.WriteString("resolvedPath", skill.ResolvedPath);
+            w.WriteString("scanRoot", skill.ScanRoot);
+            w.WriteString("scope", skill.Scope.ToString());
+            w.WriteString("provenance", skill.Provenance.ToString());
+            w.WriteString("validity", skill.Validity.ToString());
+            w.WriteBoolean("pinned", skill.Pinned);
+            w.WriteBoolean("isSymlinked", skill.IsSymlinked);
+            w.WriteBoolean("ignored", skill.Ignored);
+            w.WriteString("githubTreeSha", skill.TreeSha);
+            w.WriteString("version", skill.FrontMatter.Version);
+            w.WriteString("description", skill.FrontMatter.Description);
+            w.WriteStartArray("agents");
+            foreach (var a in skill.Agents)
+            {
+                w.WriteStartObject();
+                w.WriteString("id", a.AgentId);
+                w.WriteString("path", a.Path);
+                w.WriteBoolean("isSymlink", a.IsSymlink);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
+        w.WriteEndObject();
     }
 
-    private static async Task<int> SearchAsync(AppOptions options, TuiServices services)
+    private static async Task<int> SearchAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParseSearchArgs(options.SubcommandArgs);
         if (parsed.Query is null)
@@ -336,7 +373,7 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
@@ -349,7 +386,8 @@ public static class CliDispatcher
             new GhSkillSearchService.Options(
                 Owner: parsed.Owner,
                 Limit: parsed.Limit ?? GhSkillSearchService.DefaultLimit,
-                Page: parsed.Page ?? 1)
+                Page: parsed.Page ?? 1),
+            cancellationToken
         ).ConfigureAwait(false);
 
         if (!response.Succeeded)
@@ -406,37 +444,41 @@ public static class CliDispatcher
     }
 
     private static void WriteSearchJson(IReadOnlyList<SearchResultSkill> rows, ParsedSearchArgs parsed)
-        => Console.Out.WriteLine(RenderSearchJson(rows, parsed));
+        => WriteJson(w => WriteSearchJson(w, rows, parsed));
 
     internal static string RenderSearchJson(IReadOnlyList<SearchResultSkill> rows, ParsedSearchArgs parsed)
+        => RenderJson(w => WriteSearchJson(w, rows, parsed));
+
+    private static void WriteSearchJson(
+        Utf8JsonWriter w,
+        IReadOnlyList<SearchResultSkill> rows,
+        ParsedSearchArgs parsed)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteString("query", parsed.Query);
+        w.WriteString("owner", parsed.Owner);
+        w.WriteNumber("limit", parsed.Limit ?? GhSkillSearchService.DefaultLimit);
+        if (parsed.Page is int pg) w.WriteNumber("page", pg);
+        w.WriteStartArray("results");
+        foreach (var r in rows)
         {
             w.WriteStartObject();
-            w.WriteString("query", parsed.Query);
-            w.WriteString("owner", parsed.Owner);
-            w.WriteNumber("limit", parsed.Limit ?? GhSkillSearchService.DefaultLimit);
-            if (parsed.Page is int pg) w.WriteNumber("page", pg);
-            w.WriteStartArray("results");
-            foreach (var r in rows)
-            {
-                w.WriteStartObject();
-                w.WriteString("skillName", r.SkillName);
-                w.WriteString("repo", r.Repo);
-                w.WriteString("namespace", r.Namespace);
-                w.WriteString("path", r.Path);
-                w.WriteString("description", r.Description);
-                if (r.Stars is int s) w.WriteNumber("stars", s);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
+            w.WriteString("skillName", r.SkillName);
+            w.WriteString("repo", r.Repo);
+            w.WriteString("namespace", r.Namespace);
+            w.WriteString("path", r.Path);
+            w.WriteString("description", r.Description);
+            if (r.Stars is int s) w.WriteNumber("stars", s);
             w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndArray();
+        w.WriteEndObject();
     }
 
-    private static async Task<int> PreviewAsync(AppOptions options, TuiServices services)
+    private static async Task<int> PreviewAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParsePreviewArgs(options.SubcommandArgs);
         if (parsed.Repo is null)
@@ -446,7 +488,7 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
@@ -458,7 +500,8 @@ public static class CliDispatcher
             parsed.Repo,
             parsed.SkillName,
             parsed.Version,
-            parsed.AllowHiddenDirs
+            parsed.AllowHiddenDirs,
+            cancellationToken
         ).ConfigureAwait(false);
 
         if (!preview.Succeeded)
@@ -509,7 +552,7 @@ public static class CliDispatcher
     }
 
     private static void WritePreviewJson(PreviewResult p)
-        => Console.Out.WriteLine(RenderPreviewJson(p));
+        => WriteJson(w => WritePreviewJson(w, p));
 
     internal static string RenderPreviewText(PreviewResult preview, bool rendered)
     {
@@ -543,24 +586,25 @@ public static class CliDispatcher
     }
 
     internal static string RenderPreviewJson(PreviewResult p)
+        => RenderJson(w => WritePreviewJson(w, p));
+
+    private static void WritePreviewJson(Utf8JsonWriter w, PreviewResult p)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
-        {
-            w.WriteStartObject();
-            w.WriteString("repo", p.Repo);
-            w.WriteString("skillName", p.SkillName);
-            w.WriteString("version", p.Version);
-            w.WriteString("markdown", p.MarkdownBody);
-            w.WriteStartArray("associatedFiles");
-            foreach (var f in p.AssociatedFiles) w.WriteStringValue(f);
-            w.WriteEndArray();
-            w.WriteEndObject();
-        }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteStartObject();
+        w.WriteString("repo", p.Repo);
+        w.WriteString("skillName", p.SkillName);
+        w.WriteString("version", p.Version);
+        w.WriteString("markdown", p.MarkdownBody);
+        w.WriteStartArray("associatedFiles");
+        foreach (var f in p.AssociatedFiles) w.WriteStringValue(f);
+        w.WriteEndArray();
+        w.WriteEndObject();
     }
 
-    private static async Task<int> InstallAsync(AppOptions options, TuiServices services)
+    private static async Task<int> InstallAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParseInstallArgs(options.SubcommandArgs);
         if (parsed.Repo is null)
@@ -574,7 +618,7 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
@@ -598,14 +642,16 @@ public static class CliDispatcher
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
-                AllowHiddenDirs: parsed.AllowHiddenDirs)
+                AllowHiddenDirs: parsed.AllowHiddenDirs),
+            cancellationToken
         ).ConfigureAwait(false);
 
         var result = await services.InstallService.InstallAsync(
             report.GhPath!,
             parsed.Repo,
             parsed.SkillName,
-            installOptions
+            installOptions,
+            cancellationToken
         ).ConfigureAwait(false);
 
         if (!result.Succeeded)
@@ -624,7 +670,8 @@ public static class CliDispatcher
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
-                AllowHiddenDirs: parsed.AllowHiddenDirs)
+                AllowHiddenDirs: parsed.AllowHiddenDirs),
+            cancellationToken
         ).ConfigureAwait(false);
         var added = InventoryDiff(preSnapshot, postSnapshot);
 
@@ -698,10 +745,13 @@ public static class CliDispatcher
             upstream, fromLocal, allowHidden, json, all);
     }
 
-    private static async Task<int> UpdateAsync(AppOptions options, TuiServices services)
+    private static async Task<int> UpdateAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParseUpdateArgs(options.SubcommandArgs);
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
             Console.Error.WriteLine("skillview: gh or gh skill not available (run `skillview doctor`)");
@@ -722,7 +772,8 @@ public static class CliDispatcher
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
-                AllowHiddenDirs: false)
+                AllowHiddenDirs: false),
+            cancellationToken
         ).ConfigureAwait(false);
 
         var updateOptions = new GhSkillUpdateService.Options(
@@ -734,7 +785,8 @@ public static class CliDispatcher
 
         var result = await services.UpdateService.UpdateAsync(
             report.GhPath!,
-            updateOptions
+            updateOptions,
+            cancellationToken
         ).ConfigureAwait(false);
 
         if (!result.Succeeded)
@@ -763,7 +815,8 @@ public static class CliDispatcher
                 report.GhPath,
                 new Inventory.LocalInventoryService.Options(
                     ScanRoots: options.ScanRoots,
-                    AllowHiddenDirs: false)
+                    AllowHiddenDirs: false),
+                cancellationToken
             ).ConfigureAwait(false);
             added = InventoryDiff(preSnapshot, postSnapshot);
             changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
@@ -811,12 +864,12 @@ public static class CliDispatcher
         Inventory.Models.InventorySnapshot after)
     {
         var beforeIndex = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
-        foreach (var s in before.Skills) beforeIndex[s.ResolvedPath] = s;
+        foreach (var s in before.Skills) beforeIndex[PathIdentity.NormalizeKey(s.ResolvedPath)] = s;
 
         var changed = new List<UpdateDiffEntry>();
         foreach (var a in after.Skills)
         {
-            if (!beforeIndex.TryGetValue(a.ResolvedPath, out var b)) continue;
+            if (!beforeIndex.TryGetValue(PathIdentity.NormalizeKey(a.ResolvedPath), out var b)) continue;
             var fromSha = b.TreeSha;
             var toSha = a.TreeSha;
             var fromVer = b.FrontMatter.Version;
@@ -899,73 +952,76 @@ public static class CliDispatcher
         UpdateResult r, ParsedUpdateArgs p,
         IReadOnlyList<InstalledSkill> added,
         IReadOnlyList<UpdateDiffEntry> changed)
-        => Console.Out.WriteLine(RenderUpdateJson(r, p, added, changed));
+        => WriteJson(w => WriteUpdateJson(w, r, p, added, changed));
 
     internal static string RenderUpdateJson(
         UpdateResult r, ParsedUpdateArgs p,
         IReadOnlyList<InstalledSkill> added,
         IReadOnlyList<UpdateDiffEntry> changed)
+        => RenderJson(w => WriteUpdateJson(w, r, p, added, changed));
+
+    private static void WriteUpdateJson(
+        Utf8JsonWriter w,
+        UpdateResult r,
+        ParsedUpdateArgs p,
+        IReadOnlyList<InstalledSkill> added,
+        IReadOnlyList<UpdateDiffEntry> changed)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteBoolean("dryRun", r.DryRun);
+        w.WriteBoolean("succeeded", r.Succeeded);
+        w.WriteNumber("exitCode", r.ExitCode);
+        if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
+        w.WriteBoolean("all", p.All);
+        w.WriteBoolean("force", p.Force);
+        w.WriteBoolean("unpin", p.Unpin);
+
+        w.WriteStartArray("skills");
+        foreach (var s in p.Skills) w.WriteStringValue(s);
+        w.WriteEndArray();
+
+        w.WriteStartArray("commandLine");
+        foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
+        w.WriteEndArray();
+
+        w.WriteStartArray("entries");
+        foreach (var e in r.Entries)
         {
             w.WriteStartObject();
-            w.WriteBoolean("dryRun", r.DryRun);
-            w.WriteBoolean("succeeded", r.Succeeded);
-            w.WriteNumber("exitCode", r.ExitCode);
-            if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
-            w.WriteBoolean("all", p.All);
-            w.WriteBoolean("force", p.Force);
-            w.WriteBoolean("unpin", p.Unpin);
-
-            w.WriteStartArray("skills");
-            foreach (var s in p.Skills) w.WriteStringValue(s);
-            w.WriteEndArray();
-
-            w.WriteStartArray("commandLine");
-            foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
-            w.WriteEndArray();
-
-            w.WriteStartArray("entries");
-            foreach (var e in r.Entries)
-            {
-                w.WriteStartObject();
-                w.WriteString("name", e.Name);
-                w.WriteString("status", e.Status);
-                w.WriteString("fromVersion", e.FromVersion);
-                w.WriteString("toVersion", e.ToVersion);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
-            w.WriteStartArray("added");
-            foreach (var s in added)
-            {
-                w.WriteStartObject();
-                w.WriteString("name", s.Name);
-                w.WriteString("resolvedPath", s.ResolvedPath);
-                w.WriteString("scope", s.Scope.ToString());
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
-            w.WriteStartArray("changed");
-            foreach (var c in changed)
-            {
-                w.WriteStartObject();
-                w.WriteString("name", c.Name);
-                w.WriteString("resolvedPath", c.ResolvedPath);
-                w.WriteString("fromVersion", c.FromVersion);
-                w.WriteString("toVersion", c.ToVersion);
-                w.WriteString("fromSha", c.FromSha);
-                w.WriteString("toSha", c.ToSha);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
+            w.WriteString("name", e.Name);
+            w.WriteString("status", e.Status);
+            w.WriteString("fromVersion", e.FromVersion);
+            w.WriteString("toVersion", e.ToVersion);
             w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndArray();
+
+        w.WriteStartArray("added");
+        foreach (var s in added)
+        {
+            w.WriteStartObject();
+            w.WriteString("name", s.Name);
+            w.WriteString("resolvedPath", s.ResolvedPath);
+            w.WriteString("scope", s.Scope.ToString());
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
+        w.WriteStartArray("changed");
+        foreach (var c in changed)
+        {
+            w.WriteStartObject();
+            w.WriteString("name", c.Name);
+            w.WriteString("resolvedPath", c.ResolvedPath);
+            w.WriteString("fromVersion", c.FromVersion);
+            w.WriteString("toVersion", c.ToVersion);
+            w.WriteString("fromSha", c.FromSha);
+            w.WriteString("toSha", c.ToSha);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
+        w.WriteEndObject();
     }
 
     internal static IReadOnlyList<InstalledSkill> InventoryDiff(
@@ -973,12 +1029,12 @@ public static class CliDispatcher
         Inventory.Models.InventorySnapshot after)
     {
         var beforeKeys = new HashSet<string>(
-            before.Skills.Select(s => s.ResolvedPath),
+            before.Skills.Select(s => PathIdentity.NormalizeKey(s.ResolvedPath)),
             StringComparer.Ordinal);
         var added = new List<InstalledSkill>();
         foreach (var s in after.Skills)
         {
-            if (!beforeKeys.Contains(s.ResolvedPath)) added.Add(s);
+            if (!beforeKeys.Contains(PathIdentity.NormalizeKey(s.ResolvedPath))) added.Add(s);
         }
         return added;
     }
@@ -1003,54 +1059,59 @@ public static class CliDispatcher
     }
 
     private static void WriteInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
-        => Console.Out.WriteLine(RenderInstallJson(r, p, added));
+        => WriteJson(w => WriteInstallJson(w, r, p, added));
 
     internal static string RenderInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
+        => RenderJson(w => WriteInstallJson(w, r, p, added));
+
+    private static void WriteInstallJson(
+        Utf8JsonWriter w,
+        InstallResult r,
+        ParsedInstallArgs p,
+        IReadOnlyList<InstalledSkill> added)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteString("repo", r.Repo);
+        w.WriteString("skillName", r.SkillName);
+        w.WriteString("version", r.Version);
+        w.WriteBoolean("succeeded", r.Succeeded);
+        w.WriteNumber("exitCode", r.ExitCode);
+        if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
+
+        w.WriteStartArray("agents");
+        foreach (var a in p.Agents) w.WriteStringValue(a);
+        w.WriteEndArray();
+        w.WriteString("scope", p.Scope);
+        w.WriteString("path", p.Path);
+        w.WriteBoolean("pin", p.Pin);
+        w.WriteBoolean("force", p.Force);
+        w.WriteBoolean("all", p.All);
+
+        w.WriteStartArray("commandLine");
+        foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
+        w.WriteEndArray();
+
+        w.WriteStartArray("added");
+        foreach (var s in added)
         {
             w.WriteStartObject();
-            w.WriteString("repo", r.Repo);
-            w.WriteString("skillName", r.SkillName);
-            w.WriteString("version", r.Version);
-            w.WriteBoolean("succeeded", r.Succeeded);
-            w.WriteNumber("exitCode", r.ExitCode);
-            if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
-
+            w.WriteString("name", s.Name);
+            w.WriteString("resolvedPath", s.ResolvedPath);
+            w.WriteString("scope", s.Scope.ToString());
             w.WriteStartArray("agents");
-            foreach (var a in p.Agents) w.WriteStringValue(a);
+            foreach (var ag in s.Agents) w.WriteStringValue(ag.AgentId);
             w.WriteEndArray();
-            w.WriteString("scope", p.Scope);
-            w.WriteString("path", p.Path);
-            w.WriteBoolean("pin", p.Pin);
-            w.WriteBoolean("force", p.Force);
-            w.WriteBoolean("all", p.All);
-
-            w.WriteStartArray("commandLine");
-            foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
-            w.WriteEndArray();
-
-            w.WriteStartArray("added");
-            foreach (var s in added)
-            {
-                w.WriteStartObject();
-                w.WriteString("name", s.Name);
-                w.WriteString("resolvedPath", s.ResolvedPath);
-                w.WriteString("scope", s.Scope.ToString());
-                w.WriteStartArray("agents");
-                foreach (var ag in s.Agents) w.WriteStringValue(ag.AgentId);
-                w.WriteEndArray();
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-
             w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndArray();
+
+        w.WriteEndObject();
     }
 
-    private static async Task<int> RemoveAsync(AppOptions options, TuiServices services)
+    private static async Task<int> RemoveAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParseRemoveArgs(options.SubcommandArgs);
         if (parsed.Name is null)
@@ -1060,12 +1121,13 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
-                AllowHiddenDirs: false)
+                AllowHiddenDirs: false),
+            cancellationToken
         ).ConfigureAwait(false);
 
         var matches = snapshot.Skills
@@ -1112,11 +1174,16 @@ public static class CliDispatcher
         }
         else if (!parsed.Yes)
         {
-            result = services.RemoveService.Remove(validation, new RemoveService.Options(DryRun: true));
+            result = await services.RemoveService.RemoveAsync(
+                validation,
+                new RemoveService.Options(DryRun: true),
+                cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            result = services.RemoveService.Remove(validation);
+            result = await services.RemoveService.RemoveAsync(
+                validation,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             if (result.Succeeded)
             {
                 services.ListAdapter.Invalidate();
@@ -1198,9 +1265,17 @@ public static class CliDispatcher
         InstalledSkill target,
         ParsedRemoveArgs p,
         RemoveValidator.RemoveValidation validation)
-        => Console.Out.WriteLine(RenderRemoveJson(r, target, p, validation));
+        => WriteJson(w => WriteRemoveJson(w, r, target, p, validation));
 
     internal static string RenderRemoveJson(
+        RemoveService.RemoveReport r,
+        InstalledSkill target,
+        ParsedRemoveArgs p,
+        RemoveValidator.RemoveValidation validation)
+        => RenderJson(w => WriteRemoveJson(w, r, target, p, validation));
+
+    private static void WriteRemoveJson(
+        Utf8JsonWriter w,
         RemoveService.RemoveReport r,
         InstalledSkill target,
         ParsedRemoveArgs p,
@@ -1208,57 +1283,56 @@ public static class CliDispatcher
     {
         var removalAttempted = validation.Allowed
             && (!validation.RequiresSecondConfirm || p.Yes);
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteBoolean("dryRun", r.DryRun);
+        w.WriteBoolean("succeeded", r.Succeeded);
+        w.WriteBoolean("allowed", validation.Allowed);
+        w.WriteString("name", target.Name);
+        w.WriteString("resolvedPath", validation.ResolvedPath);
+        w.WriteString("scope", target.Scope.ToString());
+        w.WriteNumber("filesDeleted", r.FilesDeleted);
+        w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
+        w.WriteNumber("runtimeErrorCount", removalAttempted ? r.ErrorCount : 0);
+        w.WriteStartArray("errors");
+        foreach (var e in validation.Errors)
         {
             w.WriteStartObject();
-            w.WriteBoolean("dryRun", r.DryRun);
-            w.WriteBoolean("succeeded", r.Succeeded);
-            w.WriteBoolean("allowed", validation.Allowed);
-            w.WriteString("name", target.Name);
-            w.WriteString("resolvedPath", validation.ResolvedPath);
-            w.WriteString("scope", target.Scope.ToString());
-            w.WriteNumber("filesDeleted", r.FilesDeleted);
-            w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
-            w.WriteNumber("runtimeErrorCount", removalAttempted ? r.ErrorCount : 0);
-            w.WriteStartArray("errors");
-            foreach (var e in validation.Errors)
-            {
-                w.WriteStartObject();
-                w.WriteString("kind", e.Kind.ToString());
-                w.WriteString("detail", e.Detail);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-            w.WriteStartArray("warnings");
-            foreach (var warn in validation.Warnings)
-            {
-                w.WriteStartObject();
-                w.WriteString("kind", warn.Kind.ToString());
-                w.WriteString("detail", warn.Detail);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-            w.WriteStartArray("runtimeErrors");
-            if (removalAttempted)
-            {
-                foreach (var e in r.Errors) w.WriteStringValue(e);
-            }
-            w.WriteEndArray();
+            w.WriteString("kind", e.Kind.ToString());
+            w.WriteString("detail", e.Detail);
             w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndArray();
+        w.WriteStartArray("warnings");
+        foreach (var warn in validation.Warnings)
+        {
+            w.WriteStartObject();
+            w.WriteString("kind", warn.Kind.ToString());
+            w.WriteString("detail", warn.Detail);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+        w.WriteStartArray("runtimeErrors");
+        if (removalAttempted)
+        {
+            foreach (var e in r.Errors) w.WriteStringValue(e);
+        }
+        w.WriteEndArray();
+        w.WriteEndObject();
     }
 
-    private static async Task<int> CleanupAsync(AppOptions options, TuiServices services)
+    private static async Task<int> CleanupAsync(
+        AppOptions options,
+        TuiServices services,
+        CancellationToken cancellationToken)
     {
         var parsed = ParseCleanupArgs(options.SubcommandArgs);
-        var report = await services.EnvironmentProbe.ProbeAsync().ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots,
-                AllowHiddenDirs: false)
+                AllowHiddenDirs: false),
+            cancellationToken
         ).ConfigureAwait(false);
 
         var candidates = CleanupClassifier.Classify(snapshot, snapshot.ScannedRoots);
@@ -1277,6 +1351,7 @@ public static class CliDispatcher
             }
             foreach (var c in candidates)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills);
                 if (!validation.Allowed || validation.RequiresSecondConfirm)
                 {
@@ -1284,7 +1359,9 @@ public static class CliDispatcher
                         validation.Allowed ? "requires second-confirm" : "validation refused")));
                     continue;
                 }
-                var removal = services.RemoveService.Remove(validation);
+                var removal = await services.RemoveService.RemoveAsync(
+                    validation,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
                 applied.Add((c, removal));
                 if (removal.Succeeded)
                 {
@@ -1495,50 +1572,52 @@ public static class CliDispatcher
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
         ParsedCleanupArgs p)
-        => Console.Out.WriteLine(RenderCleanupJson(candidates, applied, p));
+        => WriteJson(w => WriteCleanupJson(w, candidates, applied, p));
 
     internal static string RenderCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
         ParsedCleanupArgs p)
+        => RenderJson(w => WriteCleanupJson(w, candidates, applied, p));
+
+    private static void WriteCleanupJson(
+        Utf8JsonWriter w,
+        IReadOnlyList<CleanupClassifier.Candidate> candidates,
+        IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        ParsedCleanupArgs p)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+        w.WriteStartObject();
+        w.WriteBoolean("apply", p.Apply);
+        w.WriteNumber("candidates", candidates.Count);
+        w.WriteStartArray("entries");
+        foreach (var c in candidates)
         {
             w.WriteStartObject();
-            w.WriteBoolean("apply", p.Apply);
-            w.WriteNumber("candidates", candidates.Count);
-            w.WriteStartArray("entries");
-            foreach (var c in candidates)
+            w.WriteString("kind", c.Kind.ToString());
+            w.WriteString("path", c.Path);
+            w.WriteString("reason", c.Reason);
+            w.WriteString("name", c.Skill?.Name);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+        if (p.Apply)
+        {
+            w.WriteStartArray("applied");
+            foreach (var (c, r) in applied)
             {
                 w.WriteStartObject();
-                w.WriteString("kind", c.Kind.ToString());
                 w.WriteString("path", c.Path);
-                w.WriteString("reason", c.Reason);
-                w.WriteString("name", c.Skill?.Name);
+                w.WriteBoolean("succeeded", r.Succeeded);
+                w.WriteNumber("filesDeleted", r.FilesDeleted);
+                w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
+                w.WriteStartArray("errors");
+                foreach (var e in r.Errors) w.WriteStringValue(e);
+                w.WriteEndArray();
                 w.WriteEndObject();
             }
             w.WriteEndArray();
-            if (p.Apply)
-            {
-                w.WriteStartArray("applied");
-                foreach (var (c, r) in applied)
-                {
-                    w.WriteStartObject();
-                    w.WriteString("path", c.Path);
-                    w.WriteBoolean("succeeded", r.Succeeded);
-                    w.WriteNumber("filesDeleted", r.FilesDeleted);
-                    w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
-                    w.WriteStartArray("errors");
-                    foreach (var e in r.Errors) w.WriteStringValue(e);
-                    w.WriteEndArray();
-                    w.WriteEndObject();
-                }
-                w.WriteEndArray();
-            }
-            w.WriteEndObject();
         }
-        return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        w.WriteEndObject();
     }
 
     internal static string RenderCleanupReport(IReadOnlyList<CleanupClassifier.Candidate> candidates)
@@ -1554,6 +1633,26 @@ public static class CliDispatcher
             sb.AppendLine($"  why  : {c.Reason}");
         }
         return sb.ToString();
+    }
+
+    private static void WriteJson(Action<Utf8JsonWriter> write)
+    {
+        using var stream = new Utf8TextWriterStream(Console.Out);
+        using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+        write(writer);
+        writer.Flush();
+        Console.Out.WriteLine();
+    }
+
+    private static string RenderJson(Action<Utf8JsonWriter> write)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            write(writer);
+        }
+
+        return Encoding.UTF8.GetString(stream.GetBuffer(), 0, checked((int)stream.Length));
     }
 
     private static int UnknownSubcommand(string name, Logger logger)
@@ -1640,7 +1739,7 @@ public static class CliDispatcher
             SkillView is automation-friendly when you want safer wrappers than raw `gh skill`.
 
             - Prefer `--json` on `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
-            - Use exit codes in scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches.
+            - Use exit codes in scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches, `130` canceled.
             - Put global flags like `--scan-root` and `--theme` before the subcommand; only `--debug` is accepted after the subcommand.
 
             ## Notes
@@ -1659,6 +1758,7 @@ public static class CliDispatcher
             | `2` | Invalid usage |
             | `10` | Environment error |
             | `20` | No matches |
+            | `130` | Canceled by the caller or Ctrl+C |
             """;
     }
 

@@ -59,7 +59,7 @@ public static class CleanupClassifier
         foreach (var s in snapshot.Skills)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var resolvedKey = PathResolver.Normalize(s.ResolvedPath);
+            var resolvedKey = PathIdentity.NormalizeKey(s.ResolvedPath);
             if (!byResolved.TryGetValue(resolvedKey, out var resolvedBucket))
             {
                 resolvedBucket = [];
@@ -79,7 +79,7 @@ public static class CleanupClassifier
                 if (!a.IsSymlink) continue;
                 var resolved = PathResolver.Resolve(a.Path);
                 if (resolved is null) continue;
-                var key = PathResolver.Normalize(resolved);
+                var key = PathIdentity.NormalizeKey(resolved);
                 incomingSymlinksByResolved.TryGetValue(key, out var n);
                 incomingSymlinksByResolved[key] = n + 1;
             }
@@ -147,7 +147,7 @@ public static class CleanupClassifier
                 skill.Agents.Length > 0 &&
                 skill.Agents.All(a => !a.IsSymlink) &&
                 incomingSymlinksByResolved.GetValueOrDefault(
-                    PathResolver.Normalize(skill.ResolvedPath)) == 0 &&
+                    PathIdentity.NormalizeKey(skill.ResolvedPath)) == 0 &&
                 LooksLikeCanonicalCopy(skill))
             {
                 // Skip — "looks like canonical copy" guard prevents noise.
@@ -210,7 +210,7 @@ public static class CleanupClassifier
         foreach (var skill in snapshot.Skills)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            knownResolved.Add(PathResolver.Normalize(skill.ResolvedPath));
+            knownResolved.Add(PathIdentity.NormalizeKey(skill.ResolvedPath));
         }
 
         foreach (var root in scanRoots)
@@ -235,7 +235,7 @@ public static class CleanupClassifier
                     var child = children.Current;
                     var resolved = PathResolver.Resolve(child);
                     if (resolved is null) continue;
-                    if (knownResolved.Contains(PathResolver.Normalize(resolved))) continue;
+                    if (knownResolved.Contains(PathIdentity.NormalizeKey(resolved))) continue;
                     bool empty;
                     try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
@@ -259,13 +259,10 @@ public static class CleanupClassifier
         foreach (var root in roots)
         {
             if (!PathResolver.IsInside(resolvedPath, root.Path)) continue;
-            var rootKey = PathResolver.Normalize(root.Path);
-            var pathKey = PathResolver.Normalize(resolvedPath);
-            if (!pathKey.StartsWith(rootKey, StringComparison.Ordinal)) continue;
-            var rel = pathKey.Length == rootKey.Length
-                ? string.Empty
-                : pathKey[(rootKey.Length + 1)..];
-            foreach (var segment in rel.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            var relative = Path.GetRelativePath(root.Path, resolvedPath);
+            foreach (var segment in relative.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries))
             {
                 if (segment.StartsWith('.')) return true;
             }

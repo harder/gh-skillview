@@ -213,7 +213,7 @@ public sealed class LocalInventoryService
         foreach (var s in scanned)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            scanIndex[PathResolver.Normalize(s.ResolvedPath)] = s;
+            scanIndex[PathIdentity.NormalizeKey(s.ResolvedPath)] = s;
         }
 
         var outputBuilder = ImmutableArray.CreateBuilder<InstalledSkill>(scanned.Length + ghRecords.Length);
@@ -292,7 +292,7 @@ public sealed class LocalInventoryService
     private static string? ResolveKey(GhSkillListRecord rec)
     {
         var path = rec.ResolvedPath ?? rec.Path;
-        return string.IsNullOrEmpty(path) ? null : PathResolver.Normalize(path);
+        return string.IsNullOrEmpty(path) ? null : PathIdentity.NormalizeKey(path);
     }
 
     internal static Scope? ParseScope(string? scope)

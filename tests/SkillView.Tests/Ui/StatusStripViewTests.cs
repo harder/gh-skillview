@@ -7,6 +7,7 @@ using Attribute = Terminal.Gui.Drawing.Attribute;
 
 namespace SkillView.Tests.Ui;
 
+[Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class StatusStripViewTests
 {
     [Fact]

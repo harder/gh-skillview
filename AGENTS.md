@@ -185,6 +185,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   run and explicitly releases or closes the modal. `Task.IsCompleted` only
   describes the worker; it is not permission for keyboard shortcuts to cancel,
   close, retry, or escalate against controls whose completion is still queued.
+  Synchronous install dialogs use `ModalOperationTracker`; its release request
+  also waits for the worker itself to return before clearing ownership.
+- CLI entrypoints translate Ctrl+C/external cancellation to exit code 130 and
+  apply bounded per-command deadlines. Propagate the root token through every
+  adapter. After process-tree termination, retain the bounded parent-exit wait
+  and observe both output drains.
+- Use `PathIdentity` for path normalization, keys, equality, and containment.
+  Do not substitute a global Windows/macOS ignore-case rule: Windows supports
+  case-sensitive directories and macOS supports case-sensitive volumes.
+- Tests that mutate Terminal.Gui static configuration belong to the serialized
+  `TerminalGuiStaticState` collection. Allocation and process stress tests
+  belong to the serialized `ResourceStress` collection.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

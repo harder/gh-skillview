@@ -44,7 +44,19 @@ logging, or subprocess adapters.
   cancellation call completes. A callback can synchronously wait for lease
   release, so calling it under the ownership lock is a real deadlock.
 - Async update/install controls stay disabled while their operation is active.
-  Continue to pass cancellation into subprocess-backed services.
+  Continue to pass cancellation into subprocess-backed services. Synchronous
+  install dialogs use `ModalOperationTracker`: capture its stable token, retain
+  non-null ownership until the UI commit and worker return are both complete,
+  gate every queued callback through `InvokeIfActive`, and let disposal cancel
+  and drain before any controls are disposed.
+- CLI and TUI hosts share `EntryPoint` root cancellation. CLI operations must
+  propagate it through every adapter and retain a bounded command deadline.
+  `ProcessRunner` whole-tree termination is followed by a five-second bounded
+  parent-exit wait and observation of both output drains.
+- Use `PathIdentity.NormalizeKey`, `PathIdentity.Equals`, and
+  `PathIdentity.IsInside` for filesystem identity. Do not introduce platform-
+  global case assumptions: macOS volumes and Windows directories can opt into
+  the opposite of their common case behavior.
 - `ProcessRunner` retains at most 1 MiB of child output per stdout/stderr stream,
   plus a small truncation marker. It drains both streams in fixed-size chunks;
   do not use line-based process events because a newline-free child can make the
@@ -111,10 +123,13 @@ logging, or subprocess adapters.
 
 ## Focused verification
 
-Run `dotnet build`, then `dotnet test --no-build`. Resource-focused coverage
+Run `dotnet build`, then `dotnet test --no-build`. Tests that mutate
+Terminal.Gui static configuration belong to the nonparallel
+`TerminalGuiStaticState` collection; allocation/process stress tests belong to
+the nonparallel `ResourceStress` collection. Resource-focused coverage
 includes large subprocess output, LRU eviction, subscription disposal,
 callback-safe cancellation gates, bounded inventory files, iteration failures,
 overlapping preview cancellation, superseded inventory scans, asynchronous
 removal cancellation/progress/error bounds, bounded and timed metadata
-previews, inline busy state, and layout
+previews, streaming CLI JSON, install-modal ownership, inline busy state, and layout
 guards at 80×24, 100×30, and 140×42.

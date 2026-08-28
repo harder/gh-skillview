@@ -17,6 +17,7 @@ using Xunit;
 
 namespace SkillView.Tests.Ui;
 
+[Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class SkillViewAppTests
 {
     private static GhAuthStatus LoggedInAuth(string? activeHost = "github.com") => new()
@@ -626,6 +627,20 @@ public sealed class SkillViewAppTests
 
         Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
         Assert.True(app.QueryFieldForTests.HasFocus);
+    }
+
+    [Fact]
+    public void BuildUi_EscLeavesDiscoverQueryField()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var input = app.QueryFieldForTests!;
+
+        input.SetFocus();
+        input.NewKeyDownEvent(new Key(KeyCode.Esc));
+
+        Assert.True(app.ResultsTableForTests!.HasFocus);
+        Assert.False(input.HasFocus);
     }
 
     [Fact]

@@ -8,14 +8,25 @@ namespace SkillView.Subprocess;
 public sealed class ProcessRunner
 {
     public const int DefaultMaxCapturedCharsPerStream = 1024 * 1024;
+    public static readonly TimeSpan DefaultTerminationWait = TimeSpan.FromSeconds(5);
     private readonly Logger _logger;
     private readonly int _maxCapturedCharsPerStream;
+    private readonly TimeSpan _terminationWait;
 
-    public ProcessRunner(Logger logger, int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream)
+    public ProcessRunner(
+        Logger logger,
+        int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream,
+        TimeSpan? terminationWait = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCapturedCharsPerStream, 1);
+        var resolvedTerminationWait = terminationWait ?? DefaultTerminationWait;
+        if (resolvedTerminationWait <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(terminationWait));
+        }
         _logger = logger;
         _maxCapturedCharsPerStream = maxCapturedCharsPerStream;
+        _terminationWait = resolvedTerminationWait;
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -67,8 +78,35 @@ public sealed class ProcessRunner
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); }
-            catch { /* best-effort */ }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or System.ComponentModel.Win32Exception)
+            {
+                _logger.Warn("subprocess", $"failed to terminate {executable}: {ex.Message}");
+            }
+
+            // Process.Kill is asynchronous on every supported platform. Wait
+            // for a bounded grace period so the parent and redirected pipes can
+            // settle, but never let a wedged or unkillable child stall shutdown.
+            using (var termination = new CancellationTokenSource(_terminationWait))
+            {
+                try
+                {
+                    await process.WaitForExitAsync(termination.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (termination.IsCancellationRequested)
+                {
+                    _logger.Warn(
+                        "subprocess",
+                        $"process did not exit within {_terminationWait.TotalSeconds:F1}s after termination: {executable}");
+                }
+                catch (InvalidOperationException)
+                {
+                    // Process exited between Kill and the wait registration.
+                }
+            }
 
             // Observe both readers. They use the same cancellation token, so
             // cancellation cannot leave background reads attached to a process

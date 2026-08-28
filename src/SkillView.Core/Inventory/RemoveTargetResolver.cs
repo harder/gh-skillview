@@ -115,7 +115,7 @@ internal static class RemoveTargetResolver
 
         var matches = snapshot.Skills
             .Where(skill => string.Equals(skill.Package?.Source, package.Source, StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(skill => PathResolver.Normalize(skill.ResolvedPath))
+            .DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath))
             .ToImmutableArray();
 
         return matches.Length > 1
@@ -138,7 +138,7 @@ internal static class RemoveTargetResolver
 
         var matches = snapshot.Skills
             .Where(skill => string.Equals(RepoKey(skill), repoKey, StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(skill => PathResolver.Normalize(skill.ResolvedPath))
+            .DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath))
             .ToImmutableArray();
 
         return matches.Length > 1
@@ -158,8 +158,8 @@ internal static class RemoveTargetResolver
             return false;
         }
 
-        var left = candidate.Skills.Select(skill => PathResolver.Normalize(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
-        var right = other.Skills.Select(skill => PathResolver.Normalize(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
+        var left = candidate.Skills.Select(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
+        var right = other.Skills.Select(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
         return left.SequenceEqual(right, StringComparer.Ordinal);
     }
 }

@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using SkillView.Inventory.Models;
 using SkillView.Ui.Tabs;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
 using Terminal.Gui.Views;
 using Xunit;
 
@@ -153,6 +155,22 @@ public sealed class InstalledTabViewTests
 
         Assert.True(view.FilterHasFocusForTests);
         Assert.False(view.TableHasFocusForTests);
+    }
+
+    [Fact]
+    public void EscLeavesInstalledFilterWithoutDiscardingIt()
+    {
+        var view = CreateSubject();
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+        view.FocusFilterForTests();
+
+        view.SendFilterKeyForTests(new Key(KeyCode.Esc));
+
+        Assert.False(view.FilterHasFocusForTests);
+        Assert.True(view.TableHasFocusForTests);
     }
 
     [Fact]
