@@ -13,8 +13,15 @@ public sealed class RemoveService
 {
     private const int MaxTraversalDepth = 256;
     private readonly Logger _logger;
+    private readonly Action<string>? _entryObservedForTests;
 
-    public RemoveService(Logger logger) { _logger = logger; }
+    public RemoveService(Logger logger) : this(logger, entryObservedForTests: null) { }
+
+    internal RemoveService(Logger logger, Action<string>? entryObservedForTests)
+    {
+        _logger = logger;
+        _entryObservedForTests = entryObservedForTests;
+    }
 
     public sealed record Options(bool DryRun = false);
 
@@ -56,7 +63,10 @@ public sealed class RemoveService
     /// `RemoveValidator.Validate` first and honor its errors and warnings;
     /// this method does NOT re-run the policy rules. Execution still rechecks
     /// that every entry is inside the selected target and that no ancestor
-    /// introduced after validation is a reparse point.
+    /// introduced after validation is a reparse point. These supported .NET
+    /// path APIs fail closed for links observed before each operation, but they
+    /// cannot make validation and deletion atomic against another same-user
+    /// process replacing a path component in the intervening instruction window.
     public RemoveReport Remove(
         RemoveValidator.RemoveValidation validation,
         Options? options = null,
@@ -102,78 +112,107 @@ public sealed class RemoveService
 
         var errors = ImmutableArray.CreateBuilder<string>();
         int files = 0, dirs = 0;
-        var pending = new Stack<TraversalEntry>();
-        pending.Push(new TraversalEntry(target, Depth: 0, DeleteAfterChildren: false));
+        var pending = new Stack<TraversalFrame>();
+        pending.Push(new TraversalFrame(target, depth: 0));
 
-        while (pending.TryPop(out var entry))
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!TryValidateEntry(target, entry.Path, allowLeafReparsePoint: entry.Path != target,
-                    out var attributes, out var validationError))
+            while (pending.TryPeek(out var frame))
             {
-                RecordFailure(entry.Path, validationError!, errors);
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            var isReparsePoint = attributes.HasFlag(FileAttributes.ReparsePoint);
-            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
-
-            // A child link is always a leaf. Never enumerate its target, even
-            // when its directory bit is set (Unix symlink, Windows junction,
-            // mount-point reparse point, or another link-like filesystem entry).
-            if (isReparsePoint)
-            {
-                DeleteLeaf(entry.Path, expectedReparsePoint: true, options.DryRun,
-                    target, ref files, errors);
-                continue;
-            }
-
-            if (!isDirectory)
-            {
-                if (entry.DeleteAfterChildren)
+                if (!frame.EnumerationStarted)
                 {
-                    RecordFailure(entry.Path, "directory changed into a file during removal", errors);
+                    if (!TryValidateEntry(target, frame.Path,
+                            allowLeafReparsePoint: frame.Path != target,
+                            out var attributes, out var validationError))
+                    {
+                        RecordFailure(frame.Path, validationError!, errors);
+                        PopAndDispose(pending);
+                        continue;
+                    }
+
+                    var isReparsePoint = attributes.HasFlag(FileAttributes.ReparsePoint);
+                    var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+
+                    // A child link is always a leaf. Never enumerate its target,
+                    // even when its directory bit is set (Unix symlink, Windows
+                    // junction, mount-point reparse point, or another link-like
+                    // filesystem entry).
+                    if (isReparsePoint)
+                    {
+                        DeleteLeaf(frame.Path, expectedReparsePoint: true, options.DryRun,
+                            target, ref files, errors);
+                        PopAndDispose(pending);
+                        continue;
+                    }
+
+                    if (!isDirectory)
+                    {
+                        DeleteLeaf(frame.Path, expectedReparsePoint: false, options.DryRun,
+                            target, ref files, errors);
+                        PopAndDispose(pending);
+                        continue;
+                    }
+
+                    if (frame.Depth >= MaxTraversalDepth)
+                    {
+                        RecordFailure(frame.Path,
+                            $"directory nesting exceeds the safety limit of {MaxTraversalDepth}", errors);
+                        PopAndDispose(pending);
+                        continue;
+                    }
+
+                    try
+                    {
+                        // Keep one lazy enumerator per active depth. This
+                        // retains O(depth) traversal state rather than every
+                        // unvisited sibling path, and lets cancellation run
+                        // between individual MoveNext calls.
+                        frame.StartEnumeration(
+                            Directory.EnumerateFileSystemEntries(frame.Path).GetEnumerator());
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        RecordFailure(frame.Path, $"enumerate failed: {ex.Message}", errors);
+                        PopAndDispose(pending);
+                    }
                     continue;
                 }
 
-                DeleteLeaf(entry.Path, expectedReparsePoint: false, options.DryRun,
-                    target, ref files, errors);
-                continue;
-            }
+                bool hasNext;
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    hasNext = frame.MoveNext();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    RecordFailure(frame.Path, $"enumerate failed: {ex.Message}", errors);
+                    PopAndDispose(pending);
+                    continue;
+                }
 
-            if (entry.DeleteAfterChildren)
-            {
-                DeleteDirectory(entry.Path, options.DryRun, target, ref dirs, errors);
-                continue;
-            }
+                if (hasNext)
+                {
+                    var child = frame.Current;
+                    _entryObservedForTests?.Invoke(child);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    pending.Push(new TraversalFrame(child, frame.Depth + 1));
+                    continue;
+                }
 
-            if (entry.Depth >= MaxTraversalDepth)
-            {
-                RecordFailure(entry.Path,
-                    $"directory nesting exceeds the safety limit of {MaxTraversalDepth}", errors);
-                continue;
+                var completedPath = frame.Path;
+                PopAndDispose(pending);
+                DeleteDirectory(completedPath, options.DryRun, target, ref dirs, errors);
             }
-
-            IReadOnlyList<string> children;
-            try
+        }
+        finally
+        {
+            while (pending.Count > 0)
             {
-                // Enumerate one directory at a time. This avoids recursive API
-                // link traversal and bounds retained path memory to the widest
-                // single directory plus the current traversal depth.
-                children = Directory.EnumerateFileSystemEntries(entry.Path).ToArray();
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                RecordFailure(entry.Path, $"enumerate failed: {ex.Message}", errors);
-                continue;
-            }
-
-            pending.Push(entry with { DeleteAfterChildren = true });
-            for (var index = children.Count - 1; index >= 0; index--)
-            {
-                pending.Push(new TraversalEntry(children[index], entry.Depth + 1,
-                    DeleteAfterChildren: false));
+                PopAndDispose(pending);
             }
         }
 
@@ -202,7 +241,35 @@ public sealed class RemoveService
             DryRun: false);
     }
 
-    private readonly record struct TraversalEntry(string Path, int Depth, bool DeleteAfterChildren);
+    private static void PopAndDispose(Stack<TraversalFrame> frames) =>
+        frames.Pop().Dispose();
+
+    private sealed class TraversalFrame(string path, int depth) : IDisposable
+    {
+        private IEnumerator<string>? _enumerator;
+
+        internal string Path { get; } = path;
+        internal int Depth { get; } = depth;
+        internal bool EnumerationStarted => _enumerator is not null;
+        internal string Current => _enumerator!.Current;
+
+        internal void StartEnumeration(IEnumerator<string> enumerator)
+        {
+            if (_enumerator is not null)
+            {
+                throw new InvalidOperationException("Traversal enumeration has already started.");
+            }
+            _enumerator = enumerator;
+        }
+
+        internal bool MoveNext() => _enumerator!.MoveNext();
+
+        public void Dispose()
+        {
+            _enumerator?.Dispose();
+            _enumerator = null;
+        }
+    }
 
     private void DeleteLeaf(
         string path,

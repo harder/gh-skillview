@@ -6,8 +6,10 @@ Reviewed commit: `7d43336` (`fix: address concurrency review findings`)
 PR follow-up reviewed: `df62a22` (`fix: close remaining lifecycle review gaps`),
 merged by PR #11 as `40bbf0b`
 Hardening branch: `fix/adversarial-hardening`
-Status: Active remediation. The first six recommended remediations are
-implemented and locally verified; findings 6-11 and 14 remain scheduled.
+Status: Active remediation. The first six recommended implementation areas are
+locally verified for the documented application threat model; hostile same-user
+path replacement remains part of the removal follow-up, and findings 6-11 and
+14 remain scheduled.
 
 ## Executive summary
 
@@ -121,10 +123,15 @@ tests, AOT smoke publishing on all three platforms, and CodeQL.
 The first natural implementation checkpoint completes remediation-order items
 1-6:
 
-1. Removal now uses an explicit, depth-bounded, cancellation-aware traversal.
+1. Removal now uses an explicit, depth-bounded, cancellation-aware traversal
+   with one lazy enumerator frame per active depth rather than materialized
+   child arrays or pending sibling stacks.
    Nested symbolic links, junctions, mount-point reparse points, broken links,
    and cycles are deleted only as leaf links; containment and ancestor link
-   state are revalidated immediately before each destructive operation.
+   state are revalidated immediately before each destructive operation. This
+   closes the static packaged-link escape, but supported .NET path deletion is
+   not atomic against a hostile same-user process replacing an ancestor between
+   the last check and use; that stronger native design remains open.
 2. `GhSkillListCache` serializes all state and shares one cancellable load per
    key. Invalidation cancels in-flight loads, rejects stale completion, and the
    final canceled waiter waits for subprocess cleanup.
@@ -148,21 +155,45 @@ The first natural implementation checkpoint completes remediation-order items
 Local verification at this checkpoint:
 
 - `dotnet build --no-restore`: passed with zero warnings.
-- `dotnet test --no-build`: 592 of 592 tests passed, including the ANSI-driver
+- `dotnet test --no-build`: 593 of 593 tests passed, including the ANSI-driver
   integration suite.
 - New deterministic tests cover removal escapes/cycles/retargeting,
-  100,000-operation cache contention, cancellation cleanup, shutdown drain,
-  workspace exits, replay/live interleavings, message budgets, same-day file
-  rotation, restart with an oversized active file, and active-file retention.
-- Windows junction behavior has a Windows-only test and will be exercised when
-  the branch is pushed to the repository's Windows CI runner. Linux/Windows CI,
-  AOT, and CodeQL have not yet run for this unpushed checkpoint.
+  cancellation between entries in a 2,000-file directory, 100,000-operation
+  cache contention, invalidation cleanup, shutdown drain, workspace exits,
+  replay/live interleavings, message budgets, same-day file rotation, restart
+  with an oversized active file, and active-file retention.
+- PR #12's initial Linux, macOS, and Windows tests, AOT smoke publishes on all
+  three platforms, and CodeQL checks passed. Follow-up CI reruns after review
+  fixes are recorded on the PR.
+
+### PR #12 Copilot review disposition
+
+The first Copilot review generated four comments. Each was independently
+reassessed:
+
+1. **Path check/use race — correct residual limitation, not representable as a
+   portable managed fix.** The static nested-link escape remains fixed, but
+   path revalidation is not atomic against hostile same-user mutation. The
+   threat-model boundary, .NET runtime evidence, and native follow-up are now
+   explicit in this report, `AGENTS.md`, and `RemoveService` documentation.
+2. **Per-directory `ToArray()` — correct and fixed.** Traversal now advances a
+   lazy enumerator one entry at a time and checks cancellation between
+   `MoveNext` calls.
+3. **Pending sibling stack — correct and fixed.** One enumerator frame is kept
+   per active depth, so retained traversal state is O(depth), not proportional
+   to all unvisited siblings across the active path.
+4. **Cache invalidation releases waiters before loader cleanup — correct and
+   fixed.** Invalidation marks and cancels a flight without completing it. The
+   completion is published only after the loader returns from process
+   kill/drain cleanup; a deterministic held-cleanup test proves the waiter
+   remains incomplete until then.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 
 Severity: **Critical**
 
-Implementation status: **Completed on `fix/adversarial-hardening`.**
+Implementation status: **Static nested-link escape completed on
+`fix/adversarial-hardening`; hostile concurrent path replacement remains open.**
 
 Locations:
 
@@ -224,12 +255,39 @@ link. A non-dry run would call `File.Delete` on that external file.
   latency, and allocation before enumeration fails.
 - Windows junctions and mounted paths are in scope in addition to POSIX links.
 
+### Post-implementation concurrent-mutation boundary
+
+PR #12's first Copilot review correctly identified that revalidating ancestors
+immediately before `File.Delete` or `Directory.Delete` still leaves a
+check-to-use instruction window. Another same-user process can replace an
+ancestor with a link after the check and before the path-based operation.
+
+The static malicious-package defect reproduced above is fixed: links already
+present in the skill are treated as leaves and never traversed. The remaining
+race is a different threat model. .NET 10 exposes no supported portable API for
+handle-relative enumeration and deletion with no-follow semantics. Its own
+`Directory.Delete(..., recursive: true)` implementation is path-based on both
+[Unix](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/IO/FileSystem.Unix.cs#L478-L523)
+and
+[Windows](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/IO/FileSystem.Windows.cs#L307-L402),
+so substituting that API would not close the window and would also lose
+SkillView's cancellation and partial-failure behavior.
+
+Do not describe the current checks as atomic against a hostile process running
+as the same user. A stronger design requires audited native implementations
+(`openat`/`unlinkat`-style traversal on Unix and handle-relative/open-reparse-
+point deletion on Windows), plus platform-specific identity and race tests.
+This remains grouped with removal I/O work because it materially changes the
+filesystem abstraction and cross-platform test matrix.
+
 ### Required remediation
 
 - Never recurse into entries with `FileAttributes.ReparsePoint`.
 - Treat every nested link as a leaf and delete only the link itself.
 - Revalidate canonical containment immediately before each destructive operation.
 - Use an explicit bounded traversal so link handling and cancellation are visible.
+- For a hostile same-user mutation threat model, design and audit native
+  handle-relative/no-follow deletion separately on Unix and Windows.
 - Add regression tests for:
   - External directory links.
   - External file links.
@@ -905,14 +963,15 @@ coordinated within their current scope:
 
 ## Recommended remediation order
 
-1. [x] Fix nested-link traversal before any further release or removal testing.
+1. [x] Fix static nested-link traversal before any further release or removal testing.
 2. [x] Make `GhSkillListCache` thread-safe and single-flight.
 3. [x] Add tracked background-task ownership and shutdown quiescence.
 4. [x] Add workspace activation lifetimes for Discover and Doctor, including
    search/preview/probe cancellation and generation checks.
 5. [x] Replace log snapshot-plus-subscribe/replacement with exact-once replay.
 6. [x] Add log character/byte budgets and correct disk rotation.
-7. [ ] Move inventory and removal I/O off the UI thread with cancellation.
+7. [ ] Move inventory and removal I/O off the UI thread with cancellation, and
+   evaluate native handle-relative deletion for hostile same-user mutation.
 8. [ ] Finish metadata-preview deadlines and bounded scheduling (search
    supersession and a whole-request deadline are complete).
 9. [ ] Make modal operation lifetimes awaitable and disposal-safe.

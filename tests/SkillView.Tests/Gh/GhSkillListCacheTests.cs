@@ -108,29 +108,41 @@ public sealed class GhSkillListCacheTests
     }
 
     [Fact]
-    public async Task Invalidate_DuringLoadRejectsStaleCompletion()
+    public async Task Invalidate_DuringLoadWaitsForCancellationCleanup_AndRejectsStaleCompletion()
     {
         var cache = new GhSkillListCache(ttl: TimeSpan.FromMinutes(1));
         var loaderStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseLoader = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var lookup = cache.GetOrLoadAsync(
             "/usr/bin/gh",
             null,
             null,
-            async _ =>
+            async cancellationToken =>
             {
                 loaderStarted.SetResult();
-                await releaseLoader.Task;
-                return new GhSkillListCache.LoadResult(
-                    ImmutableArray.Create(new GhSkillListRecord { Name = "stale" }));
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    throw new InvalidOperationException("unreachable");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationObserved.SetResult();
+                    await releaseCleanup.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    throw;
+                }
             },
             TestContext.Current.CancellationToken);
 
         await loaderStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
         cache.Invalidate();
-        releaseLoader.SetResult();
+        await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
 
+        Assert.False(lookup.IsCompleted);
+
+        releaseCleanup.SetResult();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => lookup);
         Assert.False(cache.TryGet("/usr/bin/gh", null, null, out _));
     }

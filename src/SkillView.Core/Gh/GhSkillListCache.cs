@@ -119,7 +119,10 @@ internal sealed class GhSkillListCache
             _inflight.Clear();
             foreach (var flight in invalidated)
             {
-                flight.Completion.TrySetCanceled(flight.Cancellation.Token);
+                // Do not complete waiters here. The loader may still be
+                // killing and draining a child process. CompleteLoadAsync
+                // publishes cancellation only after that cleanup returns.
+                flight.Invalidated = true;
             }
         }
 
@@ -134,52 +137,72 @@ internal sealed class GhSkillListCache
         InflightLoad flight,
         Func<CancellationToken, Task<LoadResult>> loader)
     {
+        LoadResult loaded = default;
+        Exception? failure = null;
+        CancellationToken cancellationToken = default;
+        var canceled = false;
         try
         {
-            var loaded = await loader(flight.Cancellation.Token).ConfigureAwait(false);
-            lock (_gate)
-            {
-                if (_inflight.TryGetValue(key, out var current)
-                    && ReferenceEquals(current, flight)
-                    && flight.Generation == _generation)
-                {
-                    _inflight.Remove(key);
-                    if (loaded.ShouldCache)
-                    {
-                        _entries[key] = new CacheEntry(_now(), loaded.Records);
-                    }
-                }
-                flight.Completion.TrySetResult(loaded);
-            }
+            loaded = await loader(flight.Cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex)
         {
-            lock (_gate)
-            {
-                RemoveCurrentFlightLocked(key, flight);
-                flight.Completion.TrySetCanceled(ex.CancellationToken);
-            }
+            canceled = true;
+            cancellationToken = ex.CancellationToken;
         }
         catch (Exception ex)
         {
-            lock (_gate)
-            {
-                RemoveCurrentFlightLocked(key, flight);
-                flight.Completion.TrySetException(ex);
-            }
+            failure = ex;
         }
-        finally
+
+        bool invalidated;
+        bool dispose;
+        CancellationToken sharedCancellationToken;
+        lock (_gate)
         {
-            var dispose = false;
-            lock (_gate)
+            invalidated = flight.Invalidated;
+            if (!invalidated
+                && !canceled
+                && failure is null
+                && _inflight.TryGetValue(key, out var current)
+                && ReferenceEquals(current, flight)
+                && flight.Generation == _generation)
             {
-                flight.LoaderFinished = true;
-                dispose = flight.WaiterCount == 0;
+                if (loaded.ShouldCache)
+                {
+                    _entries[key] = new CacheEntry(_now(), loaded.Records);
+                }
             }
-            if (dispose)
-            {
-                flight.Cancellation.Dispose();
-            }
+
+            RemoveCurrentFlightLocked(key, flight);
+            flight.LoaderFinished = true;
+            dispose = flight.WaiterCount == 0;
+            sharedCancellationToken = flight.Cancellation.Token;
+        }
+
+        if (dispose)
+        {
+            flight.Cancellation.Dispose();
+        }
+
+        // Publish the outcome only after the loader and shared-flight cleanup
+        // above have finished. Invalidation therefore cannot release an
+        // application-owned waiter while its gh process is still draining.
+        if (invalidated)
+        {
+            flight.Completion.TrySetCanceled(sharedCancellationToken);
+        }
+        else if (canceled)
+        {
+            flight.Completion.TrySetCanceled(cancellationToken);
+        }
+        else if (failure is not null)
+        {
+            flight.Completion.TrySetException(failure);
+        }
+        else
+        {
+            flight.Completion.TrySetResult(loaded);
         }
     }
 
@@ -252,6 +275,7 @@ internal sealed class GhSkillListCache
         internal long Generation { get; } = generation;
         internal int WaiterCount { get; set; }
         internal bool LoaderFinished { get; set; }
+        internal bool Invalidated { get; set; }
         internal Task? Execution { get; set; }
     }
 }

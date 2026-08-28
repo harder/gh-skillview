@@ -260,6 +260,29 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_CancellationBetweenDirectoryEntriesStopsEnumerationPromptly()
+    {
+        var (skill, dir) = MakeSkill("cancel-during-enumeration", extraFiles: 2_000);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        using var cancellation = new CancellationTokenSource();
+        var observedEntries = 0;
+        var service = new RemoveService(_logger, _ =>
+        {
+            if (Interlocked.Increment(ref observedEntries) == 1)
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.Equal(1, observedEntries);
+        Assert.True(Directory.Exists(dir));
+        Assert.Equal(2_001, Directory.EnumerateFiles(dir).Count());
+    }
+
+    [Fact]
     public void Remove_WindowsDirectoryJunction_DeletesOnlyJunction()
     {
         if (!OperatingSystem.IsWindows()) return;
