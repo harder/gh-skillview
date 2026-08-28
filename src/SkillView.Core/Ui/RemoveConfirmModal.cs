@@ -28,6 +28,13 @@ internal sealed class RemoveConfirmModal
 
     internal sealed record Result(Outcome Outcome, RemoveService.RemoveReport? Report);
 
+    internal enum OperationOwnership
+    {
+        None,
+        Running,
+        AwaitingUiCompletion,
+    }
+
     private readonly IApplication _app;
     private readonly RemoveService _remove;
     private readonly Logger _logger;
@@ -60,6 +67,13 @@ internal sealed class RemoveConfirmModal
         if (evaluation.Errors.Length > 0) return false;
         return true;
     }
+
+    internal static OperationOwnership ClassifyOperation(Task? operation) => operation switch
+    {
+        null => OperationOwnership.None,
+        { IsCompleted: false } => OperationOwnership.Running,
+        _ => OperationOwnership.AwaitingUiCompletion,
+    };
 
     internal Result Show()
     {
@@ -287,10 +301,18 @@ internal sealed class RemoveConfirmModal
             else if (ch == 'n' || ch == 'N' || key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (activeOperation is { IsCompleted: false })
+                var operationOwnership = ClassifyOperation(activeOperation);
+                if (operationOwnership != OperationOwnership.None)
                 {
-                    lifetime.Cancel();
-                    status.Text = " canceling removal…";
+                    if (operationOwnership == OperationOwnership.Running)
+                    {
+                        lifetime.Cancel();
+                        status.Text = " canceling removal…";
+                    }
+                    else
+                    {
+                        status.Text = " finishing removal…";
+                    }
                     return;
                 }
                 lifetime.Cancel();
@@ -300,9 +322,11 @@ internal sealed class RemoveConfirmModal
             else if (ch == 'a' || ch == 'A')
             {
                 key.Handled = true;
-                if (activeOperation is { IsCompleted: false })
+                if (ClassifyOperation(activeOperation) != OperationOwnership.None)
                 {
-                    status.Text = " removal in progress — Esc cancels";
+                    status.Text = activeOperation!.IsCompleted
+                        ? " finishing removal…"
+                        : " removal in progress — Esc cancels";
                     return;
                 }
                 outcome = Outcome.EscalateToWizard;

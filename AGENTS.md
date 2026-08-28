@@ -176,6 +176,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `CancellationTokenSource`, capture its `CancellationToken` before the first
   await and use only that value afterward. Never dereference the source from a
   continuation after navigation can cancel and dispose it.
+- Discover agent filtering previews at most four skills concurrently, applies
+  a 15-second deadline to each metadata preview, and retains the existing
+  two-minute whole-search deadline. Keep scheduling bounded across overlapping
+  searches through `SearchAgentMetadataLoader`; do not cache timeout, process,
+  or other transient preview failures as an empty agent list.
+- A modal operation remains owned until its queued UI completion callback has
+  run and explicitly releases or closes the modal. `Task.IsCompleted` only
+  describes the worker; it is not permission for keyboard shortcuts to cancel,
+  close, retry, or escalate against controls whose completion is still queued.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

@@ -10,6 +10,27 @@ namespace SkillView.Tests.Ui;
 public sealed class RemoveConfirmModalTests
 {
     [Fact]
+    public void ClassifyOperation_TreatsCompletedWorkerAsOwnedUntilUiCompletion()
+    {
+        Assert.Equal(
+            RemoveConfirmModal.OperationOwnership.AwaitingUiCompletion,
+            RemoveConfirmModal.ClassifyOperation(Task.CompletedTask));
+    }
+
+    [Fact]
+    public void ClassifyOperation_DistinguishesIdleAndRunningWorkers()
+    {
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Assert.Equal(
+            RemoveConfirmModal.OperationOwnership.None,
+            RemoveConfirmModal.ClassifyOperation(null));
+        Assert.Equal(
+            RemoveConfirmModal.OperationOwnership.Running,
+            RemoveConfirmModal.ClassifyOperation(running.Task));
+    }
+
+    [Fact]
     public void CanRunCompact_TrueForSimpleSingleSkillEval()
     {
         var root = NewTempRoot();

@@ -8,12 +8,15 @@ merged by PR #11 as `40bbf0b`
 Hardening branch: `fix/adversarial-hardening`
 Second hardening branch: `fix/resource-lifecycle-hardening-2`
 Third hardening branch: `fix/removal-lifecycle-hardening`
-Status: Active remediation. PRs #12 and #13 are merged. Aggregate log retention,
+Fourth hardening branch: `fix/search-metadata-hardening`
+Status: Active remediation. PRs #12, #13, and #14 are merged. Aggregate log retention,
 callback-safe cancellation ownership, bounded/cancellable inventory I/O, and
-portable asynchronous removal are implemented. Native handle-relative deletion
-for hostile same-user mutation remains a separate security design; metadata
-scheduling, install-modal ownership, root CLI cancellation, path identity, Esc/
-LRU coverage, and the lower-risk remainder stay scheduled.
+portable asynchronous removal are implemented. The fourth batch adds bounded,
+timed metadata-preview scheduling and closes the compact-removal queued-
+completion race from PR #14's final review. Native handle-relative deletion for
+hostile same-user mutation remains a separate security design; install-modal
+ownership, root CLI cancellation, path identity, Esc coverage, and the lower-
+risk remainder stay scheduled.
 
 ## Executive summary
 
@@ -750,9 +753,10 @@ I/O, and a simulated iteration-time disconnect.
 
 Severity: **Medium**
 
-Implementation status: **Partially completed.** New searches now supersede the
-previous request and the whole search has a two-minute deadline. Per-metadata
-preview deadlines and bounded scheduling remain in remediation item 8.
+Implementation status: **Completed on `fix/search-metadata-hardening`.** New
+searches supersede the previous request, the whole search has a two-minute
+deadline, metadata previews have a 15-second per-item deadline, and no more
+than four previews run concurrently across overlapping searches.
 
 Locations:
 
@@ -786,6 +790,23 @@ rejected rather than canceling and superseding the stale request.
   bounded concurrency and rate-aware scheduling.
 - Preserve the bounded LRU metadata cache.
 - Add timeout, supersession, partial-failure, and 200-result tests.
+
+### Remediation
+
+`SearchAgentMetadataLoader` now runs at most four preview workers per request
+and enforces the same four-slot ceiling across overlapping/superseded searches.
+Each metadata subprocess receives a linked 15-second deadline under the outer
+two-minute search request. Parent cancellation is propagated; per-item timeout
+and transient preview failure affect only that result and remain retryable
+rather than being cached as a false empty-agent result. Missing repository
+identity is the only non-preview case cached as definitively empty.
+
+Deterministic coverage holds all four slots while submitting the full 200-result
+maximum, proves no fifth preview starts, then releases the batch and verifies
+all results. Separate tests cover per-item timeout with a healthy concurrent
+result, transient failure retry, and request cancellation reaching every active
+preview. The LRU contract test now touches an older entry before eviction and
+also verifies that updating an existing value refreshes recency.
 
 ## Finding 8: install modal async handlers can outlive disposed dialogs
 
@@ -932,6 +953,21 @@ The subsequent Balanced review also found that a refused direct removal
 returned after its initial progress event. Refusals now publish a forced
 terminal completed snapshot with one processed target, zero deleted targets,
 and the refusal error count.
+
+PR #14's final post-merge review contained one suppressed finding from
+unchanged lines. It was independently reassessed and accepted:
+
+1. **Compact-modal shortcuts can race a queued completion callback — correct
+   and fixed on `fix/search-metadata-hardening`.** `Task.IsCompleted` can become
+   true on a worker thread before the callback queued through
+   `IApplication.Invoke` commits `Removed`/`Failed` and clears or closes the
+   modal. During that interval, Esc/`n` could overwrite a successful outcome
+   with `Cancelled`, while `a` could open the advanced wizard against an
+   already-deleted skill. Any non-null task is now treated as owned until its
+   UI completion runs. Esc cancels only a still-running worker; completed-but-
+   queued workers display a finishing status and all close/escalate shortcuts
+   remain blocked. A state-classification regression test protects the worker-
+   complete/UI-pending boundary.
 
 ### Impact
 
@@ -1146,14 +1182,14 @@ but the UI message and expected two-step Esc then q behavior are wrong.
 - Keep the application-level Ctrl+Q test because focused editors are precisely
   where global quit routing tends to regress.
 
-## Test gap: the LRU test currently proves only FIFO eviction
+## Test gap: the LRU test previously proved only FIFO eviction
 
-`Store_EvictsLeastRecentlyUsedMetadataAtCapacity` inserts first, second, and
-third without touching an older entry before eviction. A FIFO cache would pass
-the same test. The implementation's `Has` method does call `Touch`, so this is
-not evidence of a production defect, but the contract is unprotected. Touch
-`first` before storing `third` and assert that `second` was evicted. Also test
-that updating an existing value refreshes recency.
+Status: **Closed on `fix/search-metadata-hardening`.**
+
+`Store_EvictsLeastRecentlyUsedMetadataAtCapacity` now touches `first` before
+storing `third` and asserts that `second` was evicted. A separate test verifies
+that updating an existing value refreshes recency and retains the replacement
+metadata.
 
 ## Lower-risk hardening opportunities
 
@@ -1214,14 +1250,17 @@ coordinated within their current scope:
    confirmed that supported .NET 10 APIs cannot make path validation and
    deletion atomic; an audited Unix/Windows native implementation remains a
    separate Finding 1 security follow-up rather than an implicit portable fix.
-9. [ ] Finish metadata-preview deadlines and bounded scheduling (search
-   supersession and a whole-request deadline are complete).
+9. [x] Finish metadata-preview deadlines and bounded scheduling. Search
+   supersession, the whole-request deadline, a per-preview deadline, and a
+   global four-process ceiling are complete.
 10. [~] Make modal operation lifetimes awaitable and disposal-safe, including
-    stable token capture before the first await. Removal modals are complete;
-    the three install flows remain.
+    stable token capture before the first await. Removal modals are complete,
+    including the compact worker-complete/UI-pending shortcut boundary; the
+    three install flows remain.
 11. [ ] Wire root CLI cancellation and bounded post-kill waiting.
 12. [ ] Centralize cross-platform path identity semantics.
-13. [ ] Correct Esc focus behavior and strengthen the LRU contract test.
+13. [~] Correct Esc focus behavior and strengthen the LRU contract test. The
+    LRU contract is complete; Esc focus behavior remains.
 14. [ ] Finish the lower-risk hardening and stress coverage.
 
 `FileLogSink` lock ordering, Doctor-to-tab cancellation, and Updates operation
