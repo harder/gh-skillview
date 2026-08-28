@@ -115,8 +115,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - Route application-owned fire-and-forget work through `BackgroundTaskTracker`
   (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
   tied to their activation lifetimes and put generation/ownership checks inside
-  queued UI callbacks. Shutdown must stop task admission, cancel lifetimes, and
-  drain owned work before disposing Terminal.Gui or logging resources.
+  queued UI callbacks. When a callback still depends on a request lease, await
+  `SkillViewApp.InvokeAsync` so the lease cannot be disposed before the UI loop
+  executes it. Shared spinner updates must retain an operation owner; ending a
+  preview must not clear or hide a still-running search. Shutdown must stop task
+  admission, cancel lifetimes, and drain owned work before disposing
+  Terminal.Gui or logging resources.
 - Removal traversal must never use recursive filesystem enumeration. Treat
   every `FileAttributes.ReparsePoint` child (Unix symlink, Windows junction,
   mount point, or broken link) as a leaf, revalidate containment immediately

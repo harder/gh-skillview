@@ -25,7 +25,13 @@ logging, or subprocess adapters.
   the previous request, and every completion checks `Lease.IsCurrent` before
   updating UI. Search cancels previews both when the search starts and when its
   new result set is committed; the second boundary catches previews launched
-  from the old table while the search was in flight.
+  from the old table while the search was in flight. Search and preview await
+  their queued UI dispatches before disposing the request lease; a fire-and-
+  forget `Invoke` must not capture `Lease.IsCurrent`.
+- The shared status spinner uses operation IDs. Ending or canceling one owner
+  reveals the newest remaining operation instead of clearing the spinner
+  globally. In particular, canceling an old-table preview while search remains
+  active must restore the search text and spinner.
 - Installed, Changes, and Updates cancel superseded inventory loads. Pass their
   cancellation token through to inventory capture; do not add generation-only
   refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`

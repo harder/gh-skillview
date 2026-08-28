@@ -155,7 +155,7 @@ The first natural implementation checkpoint completes remediation-order items
 Local verification at this checkpoint:
 
 - `dotnet build --no-restore`: passed with zero warnings.
-- `dotnet test --no-build`: 602 of 602 tests passed, including the ANSI-driver
+- `dotnet test --no-build`: 605 of 605 tests passed, including the ANSI-driver
   integration suite.
 - New deterministic tests cover removal escapes/cycles/retargeting,
   cancellation between entries in a 2,000-file directory, 100,000-operation
@@ -213,6 +213,30 @@ accepted:
    `GhSkillListCache.LoadResult.ShouldCache`. Only a schema-valid payload,
    including a genuine empty `[]`, is cacheable. Blank, malformed, non-array,
    non-object-record, and missing-name payloads remain retryable.
+
+The third Copilot review generated one inline finding and two suppressed
+findings. They describe two underlying ownership defects and were accepted:
+
+1. **Queued search/preview callbacks outlive request leases — correct and
+   fixed.** Terminal.Gui 2.4.17 does not install a UI synchronization context,
+   so continuations commonly reach `IApplication.Invoke` from a worker thread.
+   The old fire-and-forget dispatch returned immediately, allowing each `using`
+   request lease to dispose before the UI loop evaluated `IsCurrent`. Search
+   and preview success, error, timeout, and cleanup paths now use an awaitable,
+   cancellation-aware dispatch wrapper. The request method cannot exit and
+   dispose its lease until the queued callback runs or its owning workspace is
+   canceled.
+2. **Preview cancellation can clear search-owned busy state — correct and
+   fixed.** The global boolean spinner had no owner. Search and preview now
+   register distinct monotonic busy operation IDs. Removing a preview owner
+   restores the newest remaining operation, including its status text, so
+   opening logs or completing a preview cannot clear a still-running search.
+   Workspace deactivation retains an explicit clear-all path.
+
+Deterministic coverage holds an awaitable dispatch callback outside the UI
+loop and proves the request remains current until execution, then exercises the
+real log-pane action while search and preview busy owners overlap and verifies
+that search remains visible after preview cancellation.
 
 ## Finding 1: recursive removal can delete outside the selected skill
 

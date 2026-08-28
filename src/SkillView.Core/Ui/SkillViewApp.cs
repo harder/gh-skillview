@@ -105,6 +105,11 @@ public sealed class SkillViewApp
     private bool _contextBarShown = true;
     private View? _lastDiscoverFocus;
     private string? _loadedPreviewKey;
+    private readonly object _busyGate = new();
+    private readonly Dictionary<long, string> _busyOperations = new();
+    private long _nextBusyOperationId;
+    private long? _legacyBusyOperationId;
+    private long _activePreviewBusyOperationId;
     private readonly object _visibleLogGate = new();
     private readonly Queue<string> _visibleLogLines = new(MaxVisibleLogLines);
     private int _visibleLogCharacters;
@@ -792,8 +797,18 @@ public sealed class SkillViewApp
         ReplaceSearchResults(results);
     }
 
-    internal LatestRequestGate.Lease BeginPreviewRequestForTests() =>
-        _previewRequests.Begin(DiscoverLifetimeForTests, PreviewTimeout);
+    internal LatestRequestGate.Lease BeginPreviewRequestForTests()
+    {
+        var request = _previewRequests.Begin(DiscoverLifetimeForTests, PreviewTimeout);
+        _ = BeginPreviewBusyOperation(request, "preview test…");
+        return request;
+    }
+
+    internal long BeginBusyOperationForTests(string text) => BeginBusyOperation(text);
+
+    internal void EndBusyOperationForTests(long operation) => EndBusyOperation(operation);
+
+    internal void ShowLogPaneForTests() => ShowLogPane();
 
     internal void SetPreviewTextForTests(string text) => SetPreviewText(text);
 
@@ -910,7 +925,7 @@ public sealed class SkillViewApp
     {
         Interlocked.Increment(ref _discoverGeneration);
         _searchRequests.Cancel();
-        CancelCurrentPreview(clearBusy: false);
+        CancelCurrentPreview();
         var lifetime = Interlocked.Exchange(ref _discoverLifetime, null);
         if (lifetime is not null)
         {
@@ -919,7 +934,7 @@ public sealed class SkillViewApp
         }
         if (clearBusy)
         {
-            ClearBusy();
+            ClearAllBusyOperations();
         }
     }
 
@@ -941,7 +956,7 @@ public sealed class SkillViewApp
         }
         if (clearBusy)
         {
-            ClearBusy();
+            ClearAllBusyOperations();
         }
     }
 
@@ -1138,11 +1153,11 @@ public sealed class SkillViewApp
             return;
         }
 
-        CancelCurrentPreview(clearBusy: false);
+        CancelCurrentPreview();
         using var request = _searchRequests.Begin(discoverLifetime.Token, TimeSpan.FromMinutes(2));
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
-        SetBusy($"searching {query}…");
+        var busyOperation = BeginBusyOperation($"searching {query}…");
         var cancellationToken = request.Token;
         try
         {
@@ -1154,7 +1169,7 @@ public sealed class SkillViewApp
                 .ConfigureAwait(false);
             var results = response.Results;
             var filteredResults = await FilterResultsByAgentAsync(results, agent, cancellationToken).ConfigureAwait(false);
-            Invoke(() =>
+            await InvokeAsync(() =>
             {
                 if (!request.IsCurrent
                     || !IsDiscoverWorkspaceActive(discoverGeneration)
@@ -1178,47 +1193,38 @@ public sealed class SkillViewApp
                     _previewFrame.Title = "Preview";
                 }
                 SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
-            });
+            }, discoverLifetime.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _services.Logger.Debug("search", "search canceled or superseded");
             if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
             {
-                Invoke(() =>
+                await InvokeAsync(() =>
                 {
                     if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
                     {
                         SetStatus("search timed out", TuiHelpers.NotificationLevel.Error);
                     }
-                });
+                }, discoverLifetime.Token).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
             _services.Logger.Error("search", ex.Message);
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
-            Invoke(() =>
+            await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 SetStatus(snippet.Length > 0
                     ? $"search failed: {snippet}"
                     : "search failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
-            });
+            }, discoverLifetime.Token).ConfigureAwait(false);
         }
         finally
         {
-            if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
-            {
-                Invoke(() =>
-                {
-                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
-                    {
-                        ClearBusy();
-                    }
-                });
-            }
+            EndBusyOperation(busyOperation);
         }
     }
 
@@ -1229,7 +1235,7 @@ public sealed class SkillViewApp
         // A preview may have started against the old table after this search
         // began. Invalidate again at the commit boundary so it cannot paint
         // after the table has been replaced with a different result set.
-        CancelCurrentPreview(clearBusy: false);
+        CancelCurrentPreview();
         _resultsNaturalOrder = results.ToList();
         _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
         _loadedPreviewKey = null;
@@ -1325,7 +1331,9 @@ public sealed class SkillViewApp
         }
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         using var request = _previewRequests.Begin(discoverLifetime.Token, PreviewTimeout);
-        SetBusy($"preview {repo}/{pick.SkillName}…");
+        var busyOperation = BeginPreviewBusyOperation(
+            request,
+            $"preview {repo}/{pick.SkillName}…");
         try
         {
             _services.Logger.Info("preview", $"loading {repo}/{pick.SkillName}…");
@@ -1338,7 +1346,7 @@ public sealed class SkillViewApp
                     cancellationToken: request.Token)
                 .ConfigureAwait(false);
             _services.Logger.Debug("preview", $"PreviewAsync returned: succeeded={preview.Succeeded} exit={preview.ExitCode} bodyLen={preview.Body?.Length ?? 0}");
-            Invoke(() =>
+            await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = preview.Succeeded ? BuildPreviewSelectionKey(pick) : null;
@@ -1361,7 +1369,7 @@ public sealed class SkillViewApp
                 {
                     SetStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
                 }
-            });
+            }, discoverLifetime.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (discoverLifetime.IsCancellationRequested)
         {
@@ -1375,19 +1383,19 @@ public sealed class SkillViewApp
                 return;
             }
             _services.Logger.Warn("preview", "preview timed out");
-            Invoke(() =>
+            await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
                 SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
-            });
+            }, discoverLifetime.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _services.Logger.Error("preview", ex.Message);
             var snippet = TuiHelpers.ErrorSnippet(ex.Message);
-            Invoke(() =>
+            await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = null;
@@ -1399,20 +1407,15 @@ public sealed class SkillViewApp
                     ? $"preview failed: {snippet}"
                     : "preview failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
-            });
+            }, discoverLifetime.Token).ConfigureAwait(false);
         }
         finally
         {
-            if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
-            {
-                Invoke(() =>
-                {
-                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
-                    {
-                        ClearBusy();
-                    }
-                });
-            }
+            Interlocked.CompareExchange(
+                ref _activePreviewBusyOperationId,
+                value: 0,
+                comparand: busyOperation);
+            EndBusyOperation(busyOperation);
         }
     }
 
@@ -1991,7 +1994,7 @@ public sealed class SkillViewApp
     {
         // Logs are an explicit user choice. A preview already in flight must
         // not be allowed to close the log pane when it completes.
-        CancelCurrentPreview(clearBusy: true);
+        CancelCurrentPreview();
         _showingLogs = true;
         if (_previewPane is not null) _previewPane.CanFocus = false;
         if (_previewPane is not null) _previewPane.Visible = false;
@@ -2008,7 +2011,10 @@ public sealed class SkillViewApp
             _rightFrame.X = 0;
             _rightFrame.Width = Dim.Fill();
         }
-        UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
+        if (!ApplyBusyUi())
+        {
+            UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
+        }
     }
 
     private void ShowHelp()
@@ -2162,11 +2168,15 @@ public sealed class SkillViewApp
         }
     }
 
-    private void CancelCurrentPreview(bool clearBusy = true)
+    private void CancelCurrentPreview()
     {
-        if (_previewRequests.Cancel() && clearBusy)
+        _previewRequests.Cancel();
+        var busyOperation = Interlocked.Exchange(
+            ref _activePreviewBusyOperationId,
+            value: 0);
+        if (busyOperation != 0)
         {
-            Invoke(ClearBusy);
+            EndBusyOperation(busyOperation);
         }
     }
 
@@ -2309,15 +2319,125 @@ public sealed class SkillViewApp
         _statusToken = null;
     }
 
-    private void SetBusy(string text) => Invoke(() =>
+    private long BeginBusyOperation(string text)
     {
-        _statusStrip?.SetBusy(true);
-        UpdateStatusStrip(text, TuiHelpers.NotificationLevel.Info);
-    });
+        long operation;
+        lock (_busyGate)
+        {
+            operation = ++_nextBusyOperationId;
+            _busyOperations.Add(operation, text);
+        }
+        Invoke(RefreshBusyUi);
+        return operation;
+    }
+
+    private long BeginPreviewBusyOperation(
+        LatestRequestGate.Lease request,
+        string text)
+    {
+        var operation = BeginBusyOperation(text);
+        var previous = Interlocked.Exchange(
+            ref _activePreviewBusyOperationId,
+            operation);
+        if (previous != 0)
+        {
+            EndBusyOperation(previous);
+        }
+
+        // Cancellation can race the small interval between beginning the
+        // request and publishing its busy owner. Remove the just-published
+        // owner if the request already lost ownership.
+        if (!request.IsCurrent
+            && Interlocked.CompareExchange(
+                ref _activePreviewBusyOperationId,
+                value: 0,
+                comparand: operation) == operation)
+        {
+            EndBusyOperation(operation);
+        }
+        return operation;
+    }
+
+    private void EndBusyOperation(long operation)
+    {
+        var changed = false;
+        lock (_busyGate)
+        {
+            changed = _busyOperations.Remove(operation);
+            if (_legacyBusyOperationId == operation)
+            {
+                _legacyBusyOperationId = null;
+            }
+        }
+        if (changed)
+        {
+            Invoke(RefreshBusyUi);
+        }
+    }
+
+    private void SetBusy(string text)
+    {
+        lock (_busyGate)
+        {
+            if (_legacyBusyOperationId is { } previous)
+            {
+                _busyOperations.Remove(previous);
+            }
+
+            var operation = ++_nextBusyOperationId;
+            _busyOperations.Add(operation, text);
+            _legacyBusyOperationId = operation;
+        }
+        Invoke(RefreshBusyUi);
+    }
 
     private void ClearBusy()
     {
-        _statusStrip?.SetBusy(false);
+        long? operation;
+        lock (_busyGate)
+        {
+            operation = _legacyBusyOperationId;
+        }
+        if (operation is { } active)
+        {
+            EndBusyOperation(active);
+        }
+    }
+
+    private void ClearAllBusyOperations()
+    {
+        lock (_busyGate)
+        {
+            _busyOperations.Clear();
+            _legacyBusyOperationId = null;
+        }
+        Interlocked.Exchange(ref _activePreviewBusyOperationId, value: 0);
+        Invoke(RefreshBusyUi);
+    }
+
+    private void RefreshBusyUi() => _ = ApplyBusyUi();
+
+    private bool ApplyBusyUi()
+    {
+        string? text = null;
+        long newest = 0;
+        lock (_busyGate)
+        {
+            foreach (var operation in _busyOperations)
+            {
+                if (operation.Key <= newest) continue;
+                newest = operation.Key;
+                text = operation.Value;
+            }
+        }
+
+        var busy = text is not null;
+        _statusStrip?.SetBusy(busy);
+        if (busy)
+        {
+            UpdateStatusStrip(text!, TuiHelpers.NotificationLevel.Info);
+        }
+        return busy;
     }
 
     private void Invoke(Action action)
@@ -2350,6 +2470,80 @@ public sealed class SkillViewApp
         if (!_hasEnteredRunLifecycle)
         {
             action();
+        }
+    }
+
+    private async Task<bool> InvokeAsync(
+        Action action,
+        CancellationToken cancellationToken)
+    {
+        var lifetime = _runLifetime;
+        var app = _app;
+
+        if (app is not null)
+        {
+            using var dispatchLifetime = lifetime is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    lifetime.Token);
+            return await AwaitDispatchAsync(
+                    app.Invoke,
+                    action,
+                    dispatchLifetime.Token)
+                .ConfigureAwait(false);
+        }
+
+        if (!_hasEnteredRunLifecycle && !cancellationToken.IsCancellationRequested)
+        {
+            action();
+            return true;
+        }
+        return false;
+    }
+
+    internal static async Task<bool> AwaitDispatchAsync(
+        Action<Action> dispatch,
+        Action action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(dispatch);
+        ArgumentNullException.ThrowIfNull(action);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        var completion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        dispatch(() =>
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                completion.TrySetResult(false);
+                return;
+            }
+
+            try
+            {
+                action();
+                completion.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+
+        try
+        {
+            return await completion.Task
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
         }
     }
 

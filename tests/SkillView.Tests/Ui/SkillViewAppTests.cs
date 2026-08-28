@@ -432,6 +432,72 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public async Task AwaitDispatchAsync_KeepsRequestLeaseCurrentUntilQueuedCallbackRuns()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        using var gate = new LatestRequestGate();
+        using var request = gate.Begin(lifetime.Token, TimeSpan.FromMinutes(1));
+        Action? queued = null;
+        var callbackObservedCurrentLease = false;
+
+        var dispatch = SkillViewApp.AwaitDispatchAsync(
+            callback => queued = callback,
+            () => callbackObservedCurrentLease = request.IsCurrent,
+            lifetime.Token);
+
+        Assert.False(dispatch.IsCompleted);
+        Assert.True(request.IsCurrent);
+        Assert.NotNull(queued);
+
+        queued();
+
+        Assert.True(await dispatch);
+        Assert.True(callbackObservedCurrentLease);
+    }
+
+    [Fact]
+    public async Task AwaitDispatchAsync_CanceledLifetimeRejectsDelayedCallback()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        Action? queued = null;
+        var callbackRan = false;
+
+        var dispatch = SkillViewApp.AwaitDispatchAsync(
+            callback => queued = callback,
+            () => callbackRan = true,
+            lifetime.Token);
+        Assert.NotNull(queued);
+
+        lifetime.Cancel();
+
+        Assert.False(await dispatch);
+        queued();
+        Assert.False(callbackRan);
+    }
+
+    [Fact]
+    public void CancelingPreview_RestoresStillRunningSearchBusyState()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var searchBusy = app.BeginBusyOperationForTests("searching retained-query…");
+        using var preview = app.BeginPreviewRequestForTests();
+
+        Assert.True(app.StatusStripForTests!.IsBusyForTests);
+        Assert.Equal("preview test…", app.StatusTextForTests);
+
+        app.ShowLogPaneForTests();
+
+        Assert.True(app.StatusStripForTests.IsBusyForTests);
+        Assert.Equal("searching retained-query…", app.StatusTextForTests);
+
+        app.EndBusyOperationForTests(searchBusy);
+        Assert.False(app.StatusStripForTests.IsBusyForTests);
+    }
+
+    [Fact]
     public void DiscoverSelectionChange_ClearsLoadedPreviewAndRestoresSelectionPlaceholder()
     {
         var app = CreateApp();
