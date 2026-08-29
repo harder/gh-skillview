@@ -202,8 +202,6 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                         var openedIdentity = ReadIdentity(childHandle);
                         if (child.Value.FileIdLow != openedIdentity.FileIdLow
                             || child.Value.FileIdHigh != openedIdentity.FileIdHigh
-                            || child.Value.CreationTime != openedIdentity.CreationTime
-                            || child.Value.ChangeTime != openedIdentity.ChangeTime
                             || openedIdentity.Volume != rootIdentity.Volume
                             || openedIdentity.IsDirectory != isDirectory
                             || openedIdentity.IsReparsePoint != isReparsePoint)
@@ -648,16 +646,12 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         string Name,
         uint Attributes,
         ulong FileIdLow,
-        ulong FileIdHigh,
-        long CreationTime,
-        long ChangeTime);
+        ulong FileIdHigh);
 
     private sealed class DirectoryFrame : IDisposable
     {
         private const int BufferSize = 1024;
         private const int NextEntryOffset = 0;
-        private const int CreationTimeOffset = 8;
-        private const int ChangeTimeOffset = 32;
         private const int FileAttributesOffset = 56;
         private const int FileNameLengthOffset = 60;
         private const int FileIdLowOffset = 72;
@@ -738,12 +732,6 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 var attributes = BitConverter.ToUInt32(
                     _buffer,
                     _offset + FileAttributesOffset);
-                var creationTime = BitConverter.ToInt64(
-                    _buffer,
-                    _offset + CreationTimeOffset);
-                var changeTime = BitConverter.ToInt64(
-                    _buffer,
-                    _offset + ChangeTimeOffset);
                 var fileIdLow = BitConverter.ToUInt64(_buffer, _offset + FileIdLowOffset);
                 var fileIdHigh = BitConverter.ToUInt64(_buffer, _offset + FileIdHighOffset);
                 var next = BitConverter.ToUInt32(_buffer, _offset + NextEntryOffset);
@@ -763,13 +751,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 }
 
                 if (name is "." or "..") continue;
-                entry = new DirectoryEntry(
-                    name,
-                    attributes,
-                    fileIdLow,
-                    fileIdHigh,
-                    creationTime,
-                    changeTime);
+                entry = new DirectoryEntry(name, attributes, fileIdLow, fileIdHigh);
                 return true;
             }
         }

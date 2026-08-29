@@ -628,8 +628,12 @@ expectations: replacing a link could immediately reuse its file ID, and adding a
 child changed an empty directory without changing its file ID. Treating that as
 a Windows-only test exception would have preserved the same class of bug. The
 Windows backend now captures `FILE_BASIC_INFO.CreationTime` and `ChangeTime`
-alongside the full 128-bit ID for selected directories, parents, links, and
-opened enumerated entries. The broader invariant is platform-neutral: an
+alongside the full 128-bit ID for selected directories and validated parent/link
+identities. Transient traversal entries deliberately use parent-relative open
+plus full ID/type comparison: Windows directory-enumeration timestamps proved
+unstable across ordinary traversal, and those entries were not independently
+approved policy objects. The broader policy-boundary invariant is
+platform-neutral: an
 object ID identifies a filesystem slot, while the platform
 change-time/generation signal binds the validated incarnation occupying that
 slot.

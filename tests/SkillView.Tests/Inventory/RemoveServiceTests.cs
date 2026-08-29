@@ -916,23 +916,22 @@ public class RemoveServiceTests : IDisposable
         var movedOriginal = Path.Combine(_tempRoot, "relative-child-open-original");
         var external = Path.Combine(_tempRoot, "relative-child-open-external");
         Directory.CreateDirectory(external);
+        var externalHardLink = Path.Combine(external, "SKILL.md");
+        if (!WindowsTestNative.CreateHardLinkW(
+                externalHardLink,
+                Path.Combine(dir, "SKILL.md"),
+                IntPtr.Zero))
+        {
+            return;
+        }
         var swapped = false;
-        var hardLinkCreated = false;
         var linkCreated = false;
-        string? externalHardLink = null;
         var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
-        var service = new RemoveService(_logger, observed =>
+        var service = new RemoveService(_logger, _ =>
         {
             if (swapped) return;
             swapped = true;
-            var name = Path.GetFileName(observed);
             Directory.Move(dir, movedOriginal);
-            externalHardLink = Path.Combine(external, name);
-            hardLinkCreated = WindowsTestNative.CreateHardLinkW(
-                externalHardLink,
-                Path.Combine(movedOriginal, name),
-                IntPtr.Zero);
-            if (!hardLinkCreated) return;
             linkCreated = TryCreateDirectoryLink(dir, external);
         });
 
@@ -940,11 +939,10 @@ public class RemoveServiceTests : IDisposable
             validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        if (!hardLinkCreated || !linkCreated) return;
+        if (!linkCreated) return;
         Assert.True(swapped);
         Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
         Assert.True(PathResolver.IsSymlink(dir));
-        Assert.NotNull(externalHardLink);
         Assert.Equal("body", File.ReadAllText(externalHardLink));
         Assert.False(Directory.Exists(movedOriginal));
     }

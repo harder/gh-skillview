@@ -146,8 +146,11 @@ logging, or subprocess adapters.
   canonicalization for this purpose. Review each native operation as an
   observe/reopen/compare/delete chain and reject reconstructed child paths once
   a parent handle exists. Every platform comparison includes both its full
-  native object ID and a change-time/generation signal; do not scope immediate
-  ID reuse reasoning or tests to Unix. Regression coverage includes Windows
+  native object ID and a change-time/generation signal for identities captured
+  during validation. Transient traversal entries rely on parent-relative open
+  plus full ID/type comparison because Windows directory-enumeration timestamps
+  are not a stable policy-generation contract. Do not scope immediate ID reuse
+  reasoning or tests to Unix. Regression coverage includes Windows
   ancestor replacement plus a matching hard link, final-component link
   replacement, and same-ID generation reuse on each supported OS.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain

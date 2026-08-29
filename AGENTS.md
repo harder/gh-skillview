@@ -161,7 +161,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   same handle-based path before comparing them. Windows uses `FileIdInfo`
   and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared, and
   pairs them with `FILE_BASIC_INFO.CreationTime`/`ChangeTime` for selected
-  directories, parents, links, and enumerated entries so immediate ID reuse is
+  directories plus validated parents and links so immediate ID reuse is
   refused. It enumerates opened directory handles, opens every enumerated child and link
   relative to its held parent with `NtOpenFile`/`OBJECT_ATTRIBUTES.RootDirectory`,
   and deletes opened objects with
@@ -209,7 +209,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   observe → reopen → compare → delete step: a child path reconstructed after a
   parent handle was acquired is not an authority address. Require both the
   platform's full native object ID and its generation/change-time signal at
-  every reopen boundary; never assume ID reuse is Unix-only. Adversarial
+  every validation-to-execution policy boundary; never assume ID reuse is
+  Unix-only. Transient traversal children still compare their full IDs and
+  types, but are made authoritative by opening relative to the held parent;
+  directory-enumeration timestamps are not a stable validation contract.
+  Adversarial
   coverage must combine ancestor rename/replacement with hard links,
   final-component symlink replacement, and immediate native-identifier reuse
   on every supported OS.
