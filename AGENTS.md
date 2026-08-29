@@ -150,16 +150,24 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   CLI JSON must not duplicate validation refusals or unaccepted warnings into
   `runtimeErrors`. Real removals on supported platforms must stay on
   `SecureRemovalBackend`: validation pins the target's native volume/device and
-  file/inode identity; Windows enumerates opened directory handles and deletes
-  opened objects with `FileDispositionInfoEx`; Unix walks canonicalized paths
+  full file/inode identity, then re-runs containment and all other policy checks
+  against that captured canonical deletion address. Windows uses `FileIdInfo`
+  and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared,
+  enumerates opened directory handles, and deletes opened objects with
+  `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
+  invalid-function/parameter); Unix walks canonicalized paths
   through `openat`, enumerates opened directory descriptors, compares
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
   `unlinkat`. Do not fall back to path-recursive deletion on Windows, macOS, or
-  Linux. Do not overstate the Unix guarantee: POSIX has no general unlink-by-
-  descriptor operation, so the final `fstatat` → `unlinkat` leaf-name interval
-  remains non-atomic against a process with the same UID. It cannot redirect
-  recursive traversal through an ancestor or replacement directory.
+  Linux. Keep cancellation checks immediately before every native destructive
+  call and dispose handles even when identity inspection, callbacks, or those
+  checks throw. Do not overstate the Unix guarantee: POSIX has no general
+  unlink-by-descriptor operation, so the final `fstatat` → `unlinkat` name
+  interval remains non-atomic for every entry, including directories and the
+  selected root, against a process with the same UID. It cannot redirect
+  recursive traversal through an ancestor or replacement directory, but an
+  empty replacement at that final name can itself be unlinked.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

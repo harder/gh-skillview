@@ -17,13 +17,26 @@ public sealed class RemoveService
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
     private readonly Logger _logger;
     private readonly Action<string>? _entryObservedForTests;
+    private readonly Action<string, bool>? _entryDeletingForTests;
 
-    public RemoveService(Logger logger) : this(logger, entryObservedForTests: null) { }
+    public RemoveService(Logger logger) : this(
+        logger,
+        entryObservedForTests: null,
+        entryDeletingForTests: null)
+    { }
 
     internal RemoveService(Logger logger, Action<string>? entryObservedForTests)
+        : this(logger, entryObservedForTests, entryDeletingForTests: null)
+    { }
+
+    internal RemoveService(
+        Logger logger,
+        Action<string>? entryObservedForTests,
+        Action<string, bool>? entryDeletingForTests)
     {
         _logger = logger;
         _entryObservedForTests = entryObservedForTests;
+        _entryDeletingForTests = entryDeletingForTests;
     }
 
     public sealed record Options(bool DryRun = false);
@@ -116,6 +129,21 @@ public sealed class RemoveService
             progressTracker.Publish(1, 0, 0, 1, target,
                 force: true, isCompleted: true, targetsDeleted: 0);
             return RemoveReport.Refused(validation.ResolvedPath, reason);
+        }
+
+        // A normal skill validation pins the selected directory identity. Route
+        // that operation through the native backend before inspecting the
+        // current pathname: a post-validation replacement with a symlink must
+        // be rejected as an identity change, never handled as a link cleanup.
+        if (!options.DryRun
+            && SecureRemovalBackend.IsSupported
+            && validation.ExecutionIdentity is not null)
+        {
+            return RemoveWithSecureBackend(
+                validation,
+                target,
+                cancellationToken,
+                progressTracker);
         }
 
         if (PathResolver.IsSymlink(target))
@@ -466,6 +494,10 @@ public sealed class RemoveService
                 {
                     _entryObservedForTests?.Invoke(path);
                     progressTracker.Publish(0, files, directories, errors.Count, path);
+                },
+                (path, isDirectory) =>
+                {
+                    _entryDeletingForTests?.Invoke(path, isDirectory);
                 },
                 (path, isDirectory) =>
                 {

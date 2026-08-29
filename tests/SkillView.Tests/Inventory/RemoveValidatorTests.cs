@@ -123,4 +123,39 @@ public class RemoveValidatorTests : IDisposable
         Assert.Contains(v.Warnings, w => w.Kind == RemoveValidator.WarningKind.HasIncomingSymlinks);
         Assert.NotEmpty(v.IncomingSymlinkPaths);
     }
+
+    [Fact]
+    public void Validate_SymlinkedScanRoot_UsesCanonicalRootForCapturedTarget()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var realRoot = Path.Combine(_tempRoot, "real-root");
+        var linkedRoot = Path.Combine(_tempRoot, "linked-root");
+        Directory.CreateDirectory(realRoot);
+        if (!TryCreateDirectoryLink(linkedRoot, realRoot)) return;
+        var realSkill = Path.Combine(realRoot, "linked-root-skill");
+        Directory.CreateDirectory(realSkill);
+        File.WriteAllText(Path.Combine(realSkill, "SKILL.md"), "body");
+        var linkedSkill = Path.Combine(linkedRoot, "linked-root-skill");
+        var skill = MakeSkill(linkedSkill, "linked-root-skill");
+        var root = new ScanRoot(linkedRoot, Scope.User, "claude");
+
+        var validation = RemoveValidator.Validate(skill, new[] { root }, new[] { skill });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.Equal(validation.ExecutionIdentity.Value.CanonicalPath, validation.ResolvedPath);
+    }
+
+    private static bool TryCreateDirectoryLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
 }

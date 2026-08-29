@@ -299,6 +299,32 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_TargetReplacedByLinkAfterValidation_RefusesLinkAndBothDirectories()
+    {
+        var (skill, dir) = MakeSkill("target-replaced-by-link");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        Assert.True(validation.Allowed);
+        Assert.NotNull(validation.ExecutionIdentity);
+
+        var original = Path.Combine(_tempRoot, "target-replaced-by-link-original");
+        var external = Path.Combine(_tempRoot, "target-replaced-by-link-external");
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(external);
+        var externalFile = Path.Combine(external, "must-survive.txt");
+        File.WriteAllText(externalFile, "keep");
+        if (!TryCreateDirectoryLink(dir, external)) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.True(PathResolver.IsSymlink(dir));
+        Assert.True(File.Exists(Path.Combine(original, "SKILL.md")));
+        Assert.Equal("keep", File.ReadAllText(externalFile));
+    }
+
+    [Fact]
     public void Remove_DirectoryReplacedWhileObserved_DoesNotTraverseReplacement()
     {
         var (skill, dir) = MakeSkill("directory-swap");
@@ -365,6 +391,100 @@ public class RemoveServiceTests : IDisposable
         Assert.Equal(1, observedEntries);
         Assert.True(Directory.Exists(dir));
         Assert.Equal(2_001, Directory.EnumerateFiles(dir).Count());
+    }
+
+    [Fact]
+    public void Remove_CancellationAtLeafDeletionBoundary_DoesNotDeleteObservedEntry()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("cancel-before-delete");
+        var skillFile = Path.Combine(dir, "SKILL.md");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        using var cancellation = new CancellationTokenSource();
+        var deletingEntries = 0;
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (_, isDirectory) =>
+            {
+                if (isDirectory) return;
+                Interlocked.Increment(ref deletingEntries);
+                cancellation.Cancel();
+            });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.Equal(1, deletingEntries);
+        Assert.True(Directory.Exists(dir));
+        Assert.True(File.Exists(skillFile));
+    }
+
+    [Fact]
+    public void Remove_CancellationAtDirectoryDeletionBoundary_DoesNotDeleteDirectory()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("cancel-before-directory-delete");
+        var nested = Path.Combine(dir, "nested");
+        Directory.CreateDirectory(nested);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
+        using var cancellation = new CancellationTokenSource();
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (path, isDirectory) =>
+            {
+                if (isDirectory && PathIdentity.Equals(path, canonicalNested)) cancellation.Cancel();
+            });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.True(Directory.Exists(dir));
+        Assert.True(Directory.Exists(nested));
+    }
+
+    [Fact]
+    public void Remove_UnixFinalDirectoryNameReplacement_DeletesOnlyEmptyReplacement()
+    {
+        if (OperatingSystem.IsWindows() || !SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("final-directory-name");
+        var nested = Path.Combine(dir, "nested");
+        var movedOriginal = Path.Combine(_tempRoot, "final-directory-name-original");
+        Directory.CreateDirectory(nested);
+        var swapped = false;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (path, isDirectory) =>
+            {
+                if (swapped || !isDirectory || !PathIdentity.Equals(path, canonicalNested)) return;
+                Directory.Move(canonicalNested, movedOriginal);
+                Directory.CreateDirectory(canonicalNested);
+                swapped = true;
+            });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(swapped);
+        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.False(Directory.Exists(dir));
+        Assert.True(Directory.Exists(movedOriginal));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(50, true)]
+    [InlineData(87, true)]
+    [InlineData(5, false)]
+    public void WindowsDispositionFallback_RecognizesUnsupportedErrors(int error, bool expected)
+    {
+        Assert.Equal(expected, WindowsSecureRemovalBackend.ShouldFallbackToLegacyDisposition(error));
     }
 
     [Fact]

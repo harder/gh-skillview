@@ -101,15 +101,19 @@ logging, or subprocess adapters.
   the individual logged details are unavailable.
   Traversal retains O(depth) enumerator/handle state and no more than 128
   detailed runtime errors plus one omission summary. Validation pins the
-  selected target's native filesystem identity. Windows removal enumerates and
-  deletes opened handles; Unix removal walks and enumerates opened directory
+  selected target's native filesystem identity and validates the captured
+  canonical deletion address. Windows removal compares full 128-bit file IDs,
+  enumerates and deletes opened handles; Unix removal walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
   mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. Keep
   actual deletion on `SecureRemovalBackend` for Windows, macOS,
-  and Linux. POSIX `unlinkat` is parent-handle-relative but still names its
-  final entry, so document rather than conceal its narrow final-name race; the
+  and Linux. Check cancellation immediately before each native delete and keep
+  handle cleanup in `finally` paths. POSIX `unlinkat` is parent-handle-relative
+  but still names its final entry, so document rather than conceal its narrow
+  final-name race for files, links, directories, and the selected root; the
   held-directory design prevents a replacement ancestor or child directory
-  from redirecting recursive traversal.
+  from redirecting recursive traversal, though an empty final-name replacement
+  can be removed.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

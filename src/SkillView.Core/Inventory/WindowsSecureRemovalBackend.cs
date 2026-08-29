@@ -22,9 +22,11 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const uint OpenReparsePoint = 0x00200000;
     private const int ErrorNoMoreFiles = 18;
     private const int ErrorInvalidFunction = 1;
+    private const int ErrorNotSupported = 50;
     private const int ErrorInvalidParameter = 87;
-    private const int FileIdBothDirectoryInfo = 10;
-    private const int FileIdBothDirectoryRestartInfo = 11;
+    private const int FileIdInfo = 18;
+    private const int FileIdExtdDirectoryInfo = 19;
+    private const int FileIdExtdDirectoryRestartInfo = 20;
     private const int FileDispositionInfo = 4;
     private const int FileDispositionInfoEx = 21;
     private const uint FileDispositionDelete = 0x00000001;
@@ -47,7 +49,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             var information = ReadIdentity(handle);
             identity = new SecureFileIdentity(
                 information.Volume,
-                information.FileId,
+                information.FileIdLow,
+                information.FileIdHigh,
                 Path.GetFullPath(path),
                 information.IsDirectory,
                 information.IsReparsePoint);
@@ -60,11 +63,31 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    public bool TryCanonicalizePath(
+        string path,
+        out string canonicalPath,
+        out string? error)
+    {
+        try
+        {
+            canonicalPath = Path.GetFullPath(path);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            canonicalPath = string.Empty;
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public void RemoveTree(
         string path,
         SecureFileIdentity? expectedIdentity,
         int maxDepth,
         Action<string> entryObserved,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken)
@@ -103,13 +126,53 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                     var isDirectory = (child.Value.Attributes & FileAttributeDirectory) != 0;
                     var isReparsePoint =
                         (child.Value.Attributes & FileAttributeReparsePoint) != 0;
-                    SafeFileHandle childHandle;
+                    SafeFileHandle? childHandle = null;
                     try
                     {
                         childHandle = OpenEntry(
                             childPath,
                             directory: isDirectory,
                             enumerateDirectory: isDirectory && !isReparsePoint);
+                        var openedIdentity = ReadIdentity(childHandle);
+                        if (child.Value.FileIdLow != openedIdentity.FileIdLow
+                            || child.Value.FileIdHigh != openedIdentity.FileIdHigh
+                            || openedIdentity.Volume != rootIdentity.Volume
+                            || openedIdentity.IsDirectory != isDirectory
+                            || openedIdentity.IsReparsePoint != isReparsePoint)
+                        {
+                            failure(childPath, "entry identity changed during removal");
+                            frame.PreventDelete();
+                            continue;
+                        }
+
+                        if (isDirectory && !isReparsePoint)
+                        {
+                            if (frame.Depth >= maxDepth)
+                            {
+                                failure(childPath,
+                                    $"directory nesting exceeds the safety limit of {maxDepth}");
+                                frame.PreventDelete();
+                                continue;
+                            }
+                            frames.Push(new DirectoryFrame(
+                                childHandle,
+                                childPath,
+                                openedIdentity,
+                                frame.Depth + 1));
+                            childHandle = null;
+                            continue;
+                        }
+
+                        entryDeleting(childPath, false);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!TryDeleteHandle(childHandle, out var deleteError))
+                        {
+                            failure(childPath, deleteError!);
+                            frame.PreventDelete();
+                            continue;
+                        }
+                        entryDeleted(childPath, false);
+                        continue;
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -117,47 +180,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                         frame.PreventDelete();
                         continue;
                     }
-
-                    var openedIdentity = ReadIdentity(childHandle);
-                    if (child.Value.FileId != openedIdentity.FileId
-                        || openedIdentity.Volume != rootIdentity.Volume
-                        || openedIdentity.IsDirectory != isDirectory
-                        || openedIdentity.IsReparsePoint != isReparsePoint)
+                    finally
                     {
-                        childHandle.Dispose();
-                        failure(childPath, "entry identity changed during removal");
-                        frame.PreventDelete();
-                        continue;
+                        childHandle?.Dispose();
                     }
-
-                    if (isDirectory && !isReparsePoint)
-                    {
-                        if (frame.Depth >= maxDepth)
-                        {
-                            childHandle.Dispose();
-                            failure(childPath,
-                                $"directory nesting exceeds the safety limit of {maxDepth}");
-                            frame.PreventDelete();
-                            continue;
-                        }
-                        frames.Push(new DirectoryFrame(
-                            childHandle,
-                            childPath,
-                            openedIdentity,
-                            frame.Depth + 1));
-                        continue;
-                    }
-
-                    if (!TryDeleteHandle(childHandle, out var deleteError))
-                    {
-                        childHandle.Dispose();
-                        failure(childPath, deleteError!);
-                        frame.PreventDelete();
-                        continue;
-                    }
-                    childHandle.Dispose();
-                    entryDeleted(childPath, false);
-                    continue;
                 }
 
                 if (enumerationError is not null)
@@ -167,18 +193,26 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 }
 
                 frames.Pop();
-                if (frame.CanDelete)
+                try
                 {
-                    if (!TryDeleteHandle(frame.Directory, out var deleteError))
+                    if (frame.CanDelete)
                     {
-                        failure(frame.DisplayPath, deleteError!);
-                    }
-                    else
-                    {
-                        entryDeleted(frame.DisplayPath, true);
+                        entryDeleting(frame.DisplayPath, true);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!TryDeleteHandle(frame.Directory, out var deleteError))
+                        {
+                            failure(frame.DisplayPath, deleteError!);
+                        }
+                        else
+                        {
+                            entryDeleted(frame.DisplayPath, true);
+                        }
                     }
                 }
-                frame.Dispose();
+                finally
+                {
+                    frame.Dispose();
+                }
             }
         }
         catch (OperationCanceledException)
@@ -263,10 +297,19 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             throw new IOException(
                 $"inspect opened entry failed: {LastErrorMessage()}");
         }
-        var fileId = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+        if (!WindowsNative.GetFileInformationByHandleEx(
+                handle,
+                FileIdInfo,
+                out var fileIdInformation,
+                Marshal.SizeOf<FileIdInfoData>()))
+        {
+            throw new IOException(
+                $"inspect opened entry identity failed: {LastErrorMessage()}");
+        }
         return new NativeIdentity(
-            information.VolumeSerialNumber,
-            fileId,
+            fileIdInformation.VolumeSerialNumber,
+            fileIdInformation.FileId.Low,
+            fileIdInformation.FileId.High,
             (information.FileAttributes & FileAttributeDirectory) != 0,
             (information.FileAttributes & FileAttributeReparsePoint) != 0);
     }
@@ -290,7 +333,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         }
 
         var lastError = Marshal.GetLastPInvokeError();
-        if (lastError is ErrorInvalidFunction or ErrorInvalidParameter)
+        if (ShouldFallbackToLegacyDisposition(lastError))
         {
             var legacy = new FileDispositionInfoData { DeleteFile = true };
             if (WindowsNative.SetFileInformationByHandle(
@@ -311,9 +354,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private static bool Matches(SecureFileIdentity expected, NativeIdentity actual) =>
         expected.Volume == actual.Volume
-        && expected.FileId == actual.FileId
+        && expected.FileIdLow == actual.FileIdLow
+        && expected.FileIdHigh == actual.FileIdHigh
         && expected.IsDirectory == actual.IsDirectory
         && expected.IsReparsePoint == actual.IsReparsePoint;
+
+    internal static bool ShouldFallbackToLegacyDisposition(int error) =>
+        error is ErrorInvalidFunction or ErrorNotSupported or ErrorInvalidParameter;
 
     private static string ToExtendedPath(string path)
     {
@@ -331,11 +378,16 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private readonly record struct NativeIdentity(
         ulong Volume,
-        ulong FileId,
+        ulong FileIdLow,
+        ulong FileIdHigh,
         bool IsDirectory,
         bool IsReparsePoint);
 
-    private readonly record struct DirectoryEntry(string Name, uint Attributes, ulong FileId);
+    private readonly record struct DirectoryEntry(
+        string Name,
+        uint Attributes,
+        ulong FileIdLow,
+        ulong FileIdHigh);
 
     private sealed class DirectoryFrame : IDisposable
     {
@@ -343,8 +395,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         private const int NextEntryOffset = 0;
         private const int FileAttributesOffset = 56;
         private const int FileNameLengthOffset = 60;
-        private const int FileIdOffset = 96;
-        private const int FileNameOffset = 104;
+        private const int FileIdLowOffset = 72;
+        private const int FileIdHighOffset = 80;
+        private const int FileNameOffset = 88;
 
         private readonly byte[] _buffer = new byte[BufferSize];
         private bool _restart = true;
@@ -384,8 +437,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 {
                     Array.Clear(_buffer);
                     var informationClass = _restart
-                        ? FileIdBothDirectoryRestartInfo
-                        : FileIdBothDirectoryInfo;
+                        ? FileIdExtdDirectoryRestartInfo
+                        : FileIdExtdDirectoryInfo;
                     if (!WindowsNative.GetFileInformationByHandleEx(
                             Directory,
                             informationClass,
@@ -420,7 +473,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 var attributes = BitConverter.ToUInt32(
                     _buffer,
                     _offset + FileAttributesOffset);
-                var fileId = BitConverter.ToUInt64(_buffer, _offset + FileIdOffset);
+                var fileIdLow = BitConverter.ToUInt64(_buffer, _offset + FileIdLowOffset);
+                var fileIdHigh = BitConverter.ToUInt64(_buffer, _offset + FileIdHighOffset);
                 var next = BitConverter.ToUInt32(_buffer, _offset + NextEntryOffset);
                 if (next == 0)
                 {
@@ -438,7 +492,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 }
 
                 if (name is "." or "..") continue;
-                entry = new DirectoryEntry(name, attributes, fileId);
+                entry = new DirectoryEntry(name, attributes, fileIdLow, fileIdHigh);
                 return true;
             }
         }
@@ -466,6 +520,20 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         internal uint NumberOfLinks;
         internal uint FileIndexHigh;
         internal uint FileIndexLow;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileIdInfoData
+    {
+        internal ulong VolumeSerialNumber;
+        internal FileId128 FileId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileId128
+    {
+        internal ulong Low;
+        internal ulong High;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -498,6 +566,14 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         internal static extern bool GetFileInformationByHandle(
             SafeFileHandle file,
             out ByHandleFileInformation information);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetFileInformationByHandleEx(
+            SafeFileHandle file,
+            int informationClass,
+            out FileIdInfoData information,
+            int bufferSize);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

@@ -450,11 +450,13 @@ so substituting that API would not close the window and would also lose
 SkillView's cancellation and partial-failure behavior.
 
 The native batch now pins the selected target's volume/device and file/inode
-identity during validation and checks it again after opening the target for
-execution. Windows enumerates each opened directory handle, verifies every
-child's volume and file ID after opening it with reparse-point semantics, and
-deletes the opened object with `FileDispositionInfoEx`. Renaming or replacing
-an ancestor pathname therefore cannot redirect enumeration or deletion.
+identity during validation, applies containment and the remaining policy to
+the captured canonical deletion address, and checks the identity again after
+opening the target for execution. Windows enumerates each opened directory
+handle, verifies every child's volume and full 128-bit file ID after opening it
+with reparse-point semantics, and deletes the opened object with
+`FileDispositionInfoEx`. Renaming or replacing an ancestor pathname therefore
+cannot redirect enumeration or deletion.
 
 Unix canonicalizes the validated target, opens each path component and child
 directory with `openat(..., O_NOFOLLOW | O_DIRECTORY)`, enumerates duplicated
@@ -467,11 +469,13 @@ traversal. Directory identity is checked again before removal.
 There is one narrower Unix limitation that must remain explicit. POSIX
 `unlinkat` removes a name relative to a directory descriptor; it does not
 provide a general "unlink this already-open inode" operation. A same-UID
-attacker can theoretically replace a non-directory leaf between the final
-`fstatat` identity comparison and `unlinkat`. The operation will not follow a
-replacement symlink, will not recursively delete a replacement directory, and
-cannot escape through an ancestor, but the final leaf-name interval is not
-fully atomic. Windows deletion is bound to the opened object handle. This is a
+attacker can theoretically replace any final entry name between the final
+`fstatat` identity comparison and `unlinkat`, including a directory or the
+selected root. The operation will not follow a replacement symlink, will not
+recursively delete a replacement directory, and cannot escape through an
+ancestor, but it can unlink an empty replacement at the final name. That
+final-name interval is not fully atomic. Windows deletion is bound to the
+opened object handle. This is a
 platform capability boundary, not something another managed path check can
 close. See the Linux man-pages documentation for
 [`unlinkat`](https://man7.org/linux/man-pages/man2/unlinkat.2.html) and
@@ -504,8 +508,8 @@ commands or recursive managed deletion:
 - `RemoveValidator` records the native identity of every allowed target; an
   identity that cannot be captured is a hard refusal rather than a downgrade.
 - Windows retains one 1 KiB enumeration buffer per active depth, opens entries
-  with reparse-point semantics, compares volume/file IDs, and marks the opened
-  handle for deletion. The stack and buffers remain O(depth).
+  with reparse-point semantics, compares volume/full 128-bit file IDs, and
+  marks the opened handle for deletion. The stack and buffers remain O(depth).
 - macOS and Linux retain one opened descriptor/`DIR*` per active depth and one
   reusable 512-byte stat buffer for the whole operation. Device/inode checks
   bind descent to the entry actually enumerated. Linux `openat2` also refuses
@@ -516,6 +520,27 @@ commands or recursive managed deletion:
 - Deterministic tests replace the selected target after validation and replace
   an observed child directory with an external link. Both original and
   replacement data survive; traversal reports the identity change.
+
+### PR #17 Copilot follow-up
+
+The Balanced review found nine related gaps, all accepted and addressed in the
+same native-removal batch:
+
+- Policy is now evaluated against the canonical address captured with the
+  target identity, including canonicalized scan-root comparisons.
+- Windows uses the full 128-bit `FILE_ID_128` from `FileIdInfo` and
+  `FileIdExtdDirectoryInfo`, disposes an opened child handle if identity reads
+  fail, and treats `ERROR_NOT_SUPPORTED` as a reason to try the legacy
+  disposition API.
+- Unix disposes an opened child descriptor if identity reads fail. The audit
+  and tests now correctly apply the final-name race to directories and the
+  selected root as well as non-directory leaves.
+- Identity-pinned skill removals enter the secure backend before any current-
+  path symlink branch, so a replacement link is refused rather than removed.
+- Both backends check cancellation at the last safe point before leaf and
+  directory deletion; Unix link removal does the same. Popped traversal frames
+  are disposed in `finally` blocks so cancellation at that boundary cannot
+  leak their handles.
 
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
@@ -1345,7 +1370,7 @@ coordinated within their current scope:
 8. [x] Move inventory and removal I/O off the UI thread with cancellation, then
    implement the native removal boundary for hostile path replacement. Windows
    deletion is opened-object-bound. Unix traversal is descriptor-relative and
-   identity-checked; its irreducible final non-directory name interval is
+   identity-checked; its irreducible final-entry name interval is
    documented above rather than represented as fully atomic.
 9. [x] Finish metadata-preview deadlines and bounded scheduling. Search
    supersession, the whole-request deadline, a per-preview deadline, and a

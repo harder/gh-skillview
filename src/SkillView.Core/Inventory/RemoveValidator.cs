@@ -60,17 +60,47 @@ public static class RemoveValidator
 
         var targetPath = target.ResolvedPath;
         var resolved = PathResolver.Resolve(targetPath) ?? targetPath;
+        SecureFileIdentity? executionIdentity = null;
 
         // Rule 12.1.1: must be inside a known scan root before resolution.
-        var matchedRootByRawPath = FindContainingRoot(target.ResolvedPath, knownRoots);
+        var matchedRootByRawPath = FindContainingRoot(
+            target.ResolvedPath,
+            knownRoots,
+            canonicalizeRoots: false);
         if (matchedRootByRawPath is null)
         {
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
                 $"target '{target.ResolvedPath}' is not inside any known scan root"));
         }
 
+        // Pin the actual object before applying policy to its canonical path.
+        // On Unix, realpath can differ from the earlier best-effort resolution
+        // if an ancestor is retargeted between those operations. The captured
+        // canonical path is also the only path native execution will use, so
+        // every remaining policy rule must validate that exact address.
+        if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureIdentity(
+                    resolved,
+                    out var capturedIdentity,
+                    out var identityError))
+            {
+                executionIdentity = capturedIdentity;
+                resolved = capturedIdentity.CanonicalPath;
+            }
+            else
+            {
+                errors.Add(new Error(
+                    ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected filesystem object: {identityError}"));
+            }
+        }
+
         // Rule 12.1.2: resolved path must still be inside a known scan root.
-        var matchedRootByResolved = FindContainingRoot(resolved, knownRoots);
+        var matchedRootByResolved = FindContainingRoot(
+            resolved,
+            knownRoots,
+            canonicalizeRoots: true);
         if (matchedRootByResolved is null)
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
@@ -103,7 +133,7 @@ public static class RemoveValidator
         foreach (var root in knownRoots)
         {
             if (PathKeysEqual(root.Path, target.ResolvedPath) ||
-                PathKeysEqual(root.Path, resolved))
+                PathKeysEqual(CanonicalizeForComparison(root.Path), resolved))
             {
                 errors.Add(new Error(ErrorKind.TargetIsScanRoot,
                     $"'{target.ResolvedPath}' is itself a scan root"));
@@ -130,7 +160,7 @@ public static class RemoveValidator
                 if (!agent.IsSymlink) continue;
                 var linkResolved = PathResolver.Resolve(agent.Path);
                 if (linkResolved is null) continue;
-                if (PathKeysEqual(linkResolved, resolved))
+                if (PathKeysEqual(CanonicalizeForComparison(linkResolved), resolved))
                 {
                     incomingBuilder.Add(agent.Path);
                 }
@@ -143,7 +173,7 @@ public static class RemoveValidator
             if (!agent.IsSymlink) continue;
             var linkResolved = PathResolver.Resolve(agent.Path);
             if (linkResolved is null) continue;
-            if (PathKeysEqual(linkResolved, resolved) &&
+            if (PathKeysEqual(CanonicalizeForComparison(linkResolved), resolved) &&
                 !PathKeysEqual(agent.Path, resolved))
             {
                 incomingBuilder.Add(agent.Path);
@@ -165,24 +195,6 @@ public static class RemoveValidator
             }
         }
 
-        SecureFileIdentity? executionIdentity = null;
-        if (errors.Count == 0)
-        {
-            if (SecureRemovalBackend.TryCaptureIdentity(
-                    resolved,
-                    out var capturedIdentity,
-                    out var identityError))
-            {
-                executionIdentity = capturedIdentity;
-            }
-            else
-            {
-                errors.Add(new Error(
-                    ErrorKind.FilesystemIdentityUnavailable,
-                    $"could not pin the selected filesystem object: {identityError}"));
-            }
-        }
-
         return new RemoveValidation(
             errors.ToImmutable(),
             warnings.ToImmutable(),
@@ -199,14 +211,25 @@ public static class RemoveValidator
         return File.Exists(Path.Combine(dir, LocalSkillScanner.SkillFileName));
     }
 
-    private static ScanRoot? FindContainingRoot(string path, IReadOnlyList<ScanRoot> roots)
+    private static ScanRoot? FindContainingRoot(
+        string path,
+        IReadOnlyList<ScanRoot> roots,
+        bool canonicalizeRoots)
     {
         foreach (var root in roots)
         {
-            if (PathResolver.IsInside(path, root.Path)) return root;
+            var comparisonRoot = canonicalizeRoots
+                ? CanonicalizeForComparison(root.Path)
+                : root.Path;
+            if (PathResolver.IsInside(path, comparisonRoot)) return root;
         }
         return null;
     }
+
+    private static string CanonicalizeForComparison(string path) =>
+        SecureRemovalBackend.TryCanonicalizePath(path, out var canonicalPath, out _)
+            ? canonicalPath
+            : path;
 
     /// True if any directory on the chain from `root` down to `target`
     /// (exclusive of `root`, inclusive of `target`) is a symlink whose

@@ -2,7 +2,8 @@ namespace SkillView.Inventory;
 
 internal readonly record struct SecureFileIdentity(
     ulong Volume,
-    ulong FileId,
+    ulong FileIdLow,
+    ulong FileIdHigh,
     string CanonicalPath,
     bool IsDirectory,
     bool IsReparsePoint);
@@ -11,11 +12,14 @@ internal interface ISecureRemovalBackend
 {
     bool TryCaptureIdentity(string path, out SecureFileIdentity identity, out string? error);
 
+    bool TryCanonicalizePath(string path, out string canonicalPath, out string? error);
+
     void RemoveTree(
         string path,
         SecureFileIdentity? expectedIdentity,
         int maxDepth,
         Action<string> entryObserved,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken);
@@ -48,11 +52,26 @@ internal static class SecureRemovalBackend
         return Current.TryCaptureIdentity(path, out identity, out error);
     }
 
+    internal static bool TryCanonicalizePath(
+        string path,
+        out string canonicalPath,
+        out string? error)
+    {
+        if (Current is null)
+        {
+            canonicalPath = string.Empty;
+            error = "secure removal is not supported on this operating system";
+            return false;
+        }
+        return Current.TryCanonicalizePath(path, out canonicalPath, out error);
+    }
+
     internal static void RemoveTree(
         string path,
         SecureFileIdentity? expectedIdentity,
         int maxDepth,
         Action<string> entryObserved,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken) =>
@@ -63,6 +82,7 @@ internal static class SecureRemovalBackend
             expectedIdentity,
             maxDepth,
             entryObserved,
+            entryDeleting,
             entryDeleted,
             failure,
             cancellationToken);

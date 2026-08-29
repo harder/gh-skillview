@@ -29,6 +29,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 identity = new SecureFileIdentity(
                     stat.Device,
                     stat.Inode,
+                    0,
                     canonicalPath,
                     IsDirectory: stat.IsDirectory,
                     IsReparsePoint: stat.IsSymlink);
@@ -42,11 +43,31 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    public bool TryCanonicalizePath(
+        string path,
+        out string canonicalPath,
+        out string? error)
+    {
+        try
+        {
+            canonicalPath = RealPath(path);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            canonicalPath = string.Empty;
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public void RemoveTree(
         string path,
         SecureFileIdentity? expectedIdentity,
         int maxDepth,
         Action<string> entryObserved,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken)
@@ -133,38 +154,40 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                             continue;
                         }
 
-                        SafeUnixHandle childHandle;
+                        SafeUnixHandle? childHandle = null;
                         try
                         {
                             childHandle = OpenDirectoryAt(
                                 frame.Directory,
                                 child.Value.Name,
                                 refuseNestedMount: true);
+                            var openedStat = ReadStat(childHandle, statBuffer.Pointer);
+                            if (!Matches(childStat, openedStat))
+                            {
+                                failure(childPath, "directory identity changed before it could be opened");
+                                frame.PreventDelete();
+                                continue;
+                            }
+
+                            frames.Push(new DirectoryFrame(
+                                childHandle,
+                                frame.Directory,
+                                child.Value.Name,
+                                childPath,
+                                openedStat,
+                                frame.Depth + 1,
+                                ownsParent: false));
+                            childHandle = null;
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                         {
                             failure(childPath, ex.Message);
                             frame.PreventDelete();
-                            continue;
                         }
-
-                        var openedStat = ReadStat(childHandle, statBuffer.Pointer);
-                        if (!Matches(childStat, openedStat))
+                        finally
                         {
-                            childHandle.Dispose();
-                            failure(childPath, "directory identity changed before it could be opened");
-                            frame.PreventDelete();
-                            continue;
+                            childHandle?.Dispose();
                         }
-
-                        frames.Push(new DirectoryFrame(
-                            childHandle,
-                            frame.Directory,
-                            child.Value.Name,
-                            childPath,
-                            openedStat,
-                            frame.Depth + 1,
-                            ownsParent: false));
                         continue;
                     }
 
@@ -177,6 +200,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                         continue;
                     }
 
+                    entryDeleting(childPath, false);
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (UnixNative.unlinkat(
                             frame.Directory.FileDescriptor,
                             child.Value.Name,
@@ -197,28 +222,39 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 }
 
                 frames.Pop();
-                if (frame.CanDelete)
+                try
                 {
-                    if (!TryReadStatAt(frame.Parent, frame.Name, statBuffer.Pointer,
-                            out var beforeDelete, out var statError)
-                        || !Matches(frame.Identity, beforeDelete))
+                    if (frame.CanDelete)
                     {
-                        failure(frame.DisplayPath,
-                            statError ?? "directory identity changed before deletion");
-                    }
-                    else if (UnixNative.unlinkat(
-                            frame.Parent.FileDescriptor,
-                            frame.Name,
-                            UnixConstants.RemoveDirectoryFlag) != 0)
-                    {
-                        failure(frame.DisplayPath, LastError("delete directory failed"));
-                    }
-                    else
-                    {
-                        entryDeleted(frame.DisplayPath, true);
+                        if (!TryReadStatAt(frame.Parent, frame.Name, statBuffer.Pointer,
+                                out var beforeDelete, out var statError)
+                            || !Matches(frame.Identity, beforeDelete))
+                        {
+                            failure(frame.DisplayPath,
+                                statError ?? "directory identity changed before deletion");
+                        }
+                        else
+                        {
+                            entryDeleting(frame.DisplayPath, true);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (UnixNative.unlinkat(
+                                    frame.Parent.FileDescriptor,
+                                    frame.Name,
+                                    UnixConstants.RemoveDirectoryFlag) != 0)
+                            {
+                                failure(frame.DisplayPath, LastError("delete directory failed"));
+                            }
+                            else
+                            {
+                                entryDeleted(frame.DisplayPath, true);
+                            }
+                        }
                     }
                 }
-                frame.Dispose();
+                finally
+                {
+                    frame.Dispose();
+                }
             }
         }
         catch (OperationCanceledException)
@@ -273,6 +309,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 failure(path, statError ?? "link identity changed before deletion");
                 return;
             }
+            cancellationToken.ThrowIfCancellationRequested();
             if (UnixNative.unlinkat(parent.FileDescriptor, name, flags: 0) != 0)
             {
                 failure(path, LastError("unlink failed"));
@@ -453,7 +490,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static bool Matches(SecureFileIdentity expected, NativeStat actual) =>
         expected.Volume == actual.Device
-        && expected.FileId == actual.Inode
+        && expected.FileIdLow == actual.Inode
+        && expected.FileIdHigh == 0
         && expected.IsDirectory == actual.IsDirectory
         && expected.IsReparsePoint == actual.IsSymlink;
 
