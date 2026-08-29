@@ -16,7 +16,8 @@ internal interface ISecureRemovalBackend
 
     void RemoveTree(
         string path,
-        SecureFileIdentity? expectedIdentity,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
         int maxDepth,
         Action<string> entryObserved,
         Action<string, bool> entryDeleting,
@@ -68,7 +69,8 @@ internal static class SecureRemovalBackend
 
     internal static void RemoveTree(
         string path,
-        SecureFileIdentity? expectedIdentity,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
         int maxDepth,
         Action<string> entryObserved,
         Action<string, bool> entryDeleting,
@@ -80,6 +82,7 @@ internal static class SecureRemovalBackend
         .RemoveTree(
             path,
             expectedIdentity,
+            requireEmptyDirectory,
             maxDepth,
             entryObserved,
             entryDeleting,

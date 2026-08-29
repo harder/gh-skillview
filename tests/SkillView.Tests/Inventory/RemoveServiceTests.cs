@@ -325,6 +325,75 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_IdentitylessAllowedDirectory_RefusesWithoutTouchingContents()
+    {
+        var (_, dir) = MakeSkill("identityless-directory");
+        var skillFile = Path.Combine(dir, "SKILL.md");
+        var validation = new RemoveValidator.RemoveValidation(
+            ImmutableArray<RemoveValidator.Error>.Empty,
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            dir,
+            ImmutableArray<string>.Empty);
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("pinned filesystem identity", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
+        Assert.True(File.Exists(skillFile));
+    }
+
+    [Fact]
+    public void Remove_ValidatedEmptyDirectoryPopulatedBeforeExecution_DoesNotDeleteContents()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-became-populated");
+        Directory.CreateDirectory(dir);
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.True(validation.RequiresEmptyDirectory);
+        var lateFile = Path.Combine(dir, "late.txt");
+        File.WriteAllText(lateFile, "keep");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("no longer empty", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
+        Assert.Equal("keep", File.ReadAllText(lateFile));
+    }
+
+    [Fact]
+    public void Remove_ValidatedEmptyDirectoryReplacedBeforeExecution_RefusesBothDirectories()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-replaced");
+        var original = Path.Combine(_tempRoot, "empty-replaced-original");
+        Directory.CreateDirectory(dir);
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(dir);
+        var replacementFile = Path.Combine(dir, "replacement.txt");
+        File.WriteAllText(replacementFile, "keep");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(original));
+        Assert.Equal("keep", File.ReadAllText(replacementFile));
+    }
+
+    [Fact]
     public void Remove_DirectoryReplacedWhileObserved_DoesNotTraverseReplacement()
     {
         var (skill, dir) = MakeSkill("directory-swap");

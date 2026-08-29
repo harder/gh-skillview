@@ -131,6 +131,17 @@ public sealed class RemoveService
             return RemoveReport.Refused(validation.ResolvedPath, reason);
         }
 
+        if (!options.DryRun
+            && validation.ExecutionIdentity is null
+            && !validation.RemovesLinkOnly)
+        {
+            const string reason = "real directory removal requires a pinned filesystem identity";
+            _logger.Error("remove", $"refused: {reason}: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
+            return RemoveReport.Refused(target, reason);
+        }
+
         // A normal skill validation pins the selected directory identity. Route
         // that operation through the native backend before inspecting the
         // current pathname: a post-validation replacement with a symlink must
@@ -140,7 +151,8 @@ public sealed class RemoveService
             && validation.ExecutionIdentity is not null)
         {
             return RemoveWithSecureBackend(
-                validation,
+                validation.ExecutionIdentity.Value,
+                validation.RequiresEmptyDirectory,
                 target,
                 cancellationToken,
                 progressTracker);
@@ -193,6 +205,15 @@ public sealed class RemoveService
             }
         }
 
+        if (validation.RemovesLinkOnly)
+        {
+            const string reason = "validated link target is no longer a symlink or reparse point";
+            _logger.Error("remove", $"refused: {reason}: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
+            return RemoveReport.Refused(target, reason);
+        }
+
         if (!Directory.Exists(target))
         {
             _logger.Warn("remove", $"target missing at execute time: {target}");
@@ -203,7 +224,8 @@ public sealed class RemoveService
         if (!options.DryRun && SecureRemovalBackend.IsSupported)
         {
             return RemoveWithSecureBackend(
-                validation,
+                validation.ExecutionIdentity!.Value,
+                validation.RequiresEmptyDirectory,
                 target,
                 cancellationToken,
                 progressTracker);
@@ -476,7 +498,8 @@ public sealed class RemoveService
         });
 
     private RemoveReport RemoveWithSecureBackend(
-        RemoveValidator.RemoveValidation validation,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
         string target,
         CancellationToken cancellationToken,
         ProgressTracker progressTracker)
@@ -488,7 +511,8 @@ public sealed class RemoveService
         {
             SecureRemovalBackend.RemoveTree(
                 target,
-                validation.ExecutionIdentity,
+                expectedIdentity,
+                requireEmptyDirectory,
                 MaxTraversalDepth,
                 path =>
                 {

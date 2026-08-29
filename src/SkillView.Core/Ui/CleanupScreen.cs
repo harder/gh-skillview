@@ -378,8 +378,10 @@ public sealed class CleanupScreen
             // inside known scan roots.
             var validation = candidate.Kind switch
             {
-                CleanupClassifier.CandidateKind.BrokenSymlink => ValidateBrokenSymlink(candidate.Path),
-                CleanupClassifier.CandidateKind.EmptyDirectory => ValidateEmptyDir(candidate.Path),
+                CleanupClassifier.CandidateKind.BrokenSymlink =>
+                    RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots),
+                CleanupClassifier.CandidateKind.EmptyDirectory =>
+                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots),
                 _ when candidate.Skill is not null =>
                     RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills),
                 _ => RefuseUnsupportedCandidate(candidate),
@@ -518,101 +520,6 @@ public sealed class CleanupScreen
     ];
 
     private static string BuildHeaderText() => "Select with Space.";
-
-    private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)
-    {
-        // Empty-dir candidates don't look like skills (no SKILL.md), so the
-        // standard validator would refuse. Build a scoped validation that
-        // only enforces scan-root containment + no-.git.
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in _scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (System.IO.Directory.Exists(System.IO.Path.Combine(path, ".git")))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.ContainsGitDirectory,
-                $"'{path}' contains .git"));
-        }
-        if (PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is now a symlink"));
-        }
-        if (!System.IO.Directory.Exists(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a directory"));
-        }
-        else
-        {
-            try
-            {
-                if (System.IO.Directory.EnumerateFileSystemEntries(path).Any())
-                {
-                    errors.Add(new RemoveValidator.Error(
-                        RemoveValidator.ErrorKind.NotASkillDirectory,
-                        $"'{path}' is no longer empty"));
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                errors.Add(new RemoveValidator.Error(
-                    RemoveValidator.ErrorKind.NotASkillDirectory,
-                    $"'{path}' could not be inspected: {ex.Message}"));
-            }
-        }
-
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
-    }
-
-    private RemoveValidator.RemoveValidation ValidateBrokenSymlink(string path)
-    {
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in _scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (!PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a symlink"));
-        }
-        else if (PathResolver.Resolve(path) is not null)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer broken"));
-        }
-
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
-    }
 
     private static RemoveValidator.RemoveValidation RefuseUnsupportedCandidate(CleanupClassifier.Candidate candidate) =>
         new(

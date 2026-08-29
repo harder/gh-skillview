@@ -64,7 +64,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     public void RemoveTree(
         string path,
-        SecureFileIdentity? expectedIdentity,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
         int maxDepth,
         Action<string> entryObserved,
         Action<string, bool> entryDeleting,
@@ -73,16 +74,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string canonicalPath;
-        try
-        {
-            canonicalPath = expectedIdentity?.CanonicalPath ?? RealPath(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            failure(path, ex.Message);
-            return;
-        }
+        var canonicalPath = expectedIdentity.CanonicalPath;
 
         SafeUnixHandle? target = null;
         SafeUnixHandle? parent = null;
@@ -92,7 +84,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         {
             target = OpenAbsoluteDirectory(canonicalPath, out parent, out var targetName);
             var targetStat = ReadStat(target, statBuffer.Pointer);
-            if (expectedIdentity is { } expected && !Matches(expected, targetStat))
+            if (!Matches(expectedIdentity, targetStat))
             {
                 failure(path, "selected target identity changed after validation");
                 return;
@@ -120,6 +112,12 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 if (frame.TryReadNext(out var child, out var enumerationError))
                 {
                     if (child is null) continue;
+                    if (requireEmptyDirectory && frame.Depth == 0)
+                    {
+                        failure(frame.DisplayPath,
+                            "validated empty directory is no longer empty");
+                        return;
+                    }
                     var childPath = Path.Combine(frame.DisplayPath, child.Value.Name);
                     entryObserved(childPath);
                     cancellationToken.ThrowIfCancellationRequested();

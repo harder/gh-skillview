@@ -542,6 +542,20 @@ same native-removal batch:
   are disposed in `finally` blocks so cancellation at that boundary cannot
   leak their handles.
 
+The subsequent review found one more correct gap in the cleanup-specific path:
+the UI and CLI empty-directory validators constructed allowed validations
+without an execution identity. A path replacement could therefore reach native
+recursive removal with `expectedIdentity: null`. The fix centralizes empty-
+directory validation in `RemoveValidator`, captures and canonical-policy-checks
+its identity, refuses scan roots, and marks the operation with an empty-only
+execution contract. Native traversal now refuses as soon as it observes a child
+instead of deleting it, covering both replacement and same-directory population
+after validation. `RemoveService` also refuses every real identity-less
+directory operation. Broken-symlink cleanup is now explicitly marked link-only
+and refuses if the entry changes kind before execution. Regression tests cover
+identity-less synthetic validation, population after validation, and complete
+directory replacement.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

@@ -84,7 +84,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     public void RemoveTree(
         string path,
-        SecureFileIdentity? expectedIdentity,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
         int maxDepth,
         Action<string> entryObserved,
         Action<string, bool> entryDeleting,
@@ -100,7 +101,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         {
             root = OpenEntry(fullPath, directory: true, enumerateDirectory: true);
             var rootIdentity = ReadIdentity(root);
-            if (expectedIdentity is { } expected && !Matches(expected, rootIdentity))
+            if (!Matches(expectedIdentity, rootIdentity))
             {
                 failure(path, "selected target identity changed after validation");
                 return;
@@ -119,6 +120,12 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 if (frame.TryReadNext(out var child, out var enumerationError))
                 {
                     if (child is null) continue;
+                    if (requireEmptyDirectory && frame.Depth == 0)
+                    {
+                        failure(frame.DisplayPath,
+                            "validated empty directory is no longer empty");
+                        return;
+                    }
                     var childPath = Path.Combine(frame.DisplayPath, child.Value.Name);
                     entryObserved(childPath);
                     cancellationToken.ThrowIfCancellationRequested();

@@ -146,6 +146,30 @@ public class RemoveValidatorTests : IDisposable
         Assert.Equal(validation.ExecutionIdentity.Value.CanonicalPath, validation.ResolvedPath);
     }
 
+    [Fact]
+    public void ValidateEmptyDirectory_CapturesIdentityAndEmptyOnlyContract()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-cleanup");
+        Directory.CreateDirectory(dir);
+
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.True(validation.RequiresEmptyDirectory);
+        Assert.False(validation.RemovesLinkOnly);
+    }
+
+    [Fact]
+    public void ValidateEmptyDirectory_RefusesScanRootItself()
+    {
+        var validation = RemoveValidator.ValidateEmptyDirectory(_tempRoot, new[] { Root() });
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors,
+            error => error.Kind == RemoveValidator.ErrorKind.TargetIsScanRoot);
+    }
+
     private static bool TryCreateDirectoryLink(string link, string target)
     {
         try

@@ -168,6 +168,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   selected root, against a process with the same UID. It cannot redirect
   recursive traversal through an ancestor or replacement directory, but an
   empty replacement at that final name can itself be unlinked.
+  Every real directory removal requires a captured `ExecutionIdentity`; only a
+  validation explicitly marked as link-only may execute without one. Empty-
+  directory cleanup must use `RemoveValidator.ValidateEmptyDirectory`, which
+  captures identity, canonicalizes containment, refuses scan roots, and sets
+  `RequiresEmptyDirectory`. Both native backends must fail without deleting any
+  children if such a directory is populated after validation—never downgrade
+  that path into ordinary recursive removal. Broken-link cleanup similarly uses
+  `RemoveValidator.ValidateBrokenSymlink` and its explicit link-only contract.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

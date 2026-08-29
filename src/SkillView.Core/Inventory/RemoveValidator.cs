@@ -43,6 +43,8 @@ public static class RemoveValidator
         public bool Allowed => Errors.IsDefaultOrEmpty || Errors.Length == 0;
         public bool RequiresSecondConfirm => Warnings.Length > 0;
         internal SecureFileIdentity? ExecutionIdentity { get; init; }
+        internal bool RequiresEmptyDirectory { get; init; }
+        internal bool RemovesLinkOnly { get; init; }
     }
 
     /// Validate removal of `target`. `knownRoots` is the union of scan roots
@@ -202,6 +204,148 @@ public static class RemoveValidator
             incoming)
         {
             ExecutionIdentity = executionIdentity,
+        };
+    }
+
+    internal static RemoveValidation ValidateEmptyDirectory(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots)
+    {
+        var errors = ImmutableArray.CreateBuilder<Error>();
+        var fullPath = Path.GetFullPath(path);
+        var resolved = fullPath;
+        SecureFileIdentity? executionIdentity = null;
+        var matchedRootByRawPath = FindContainingRoot(
+            fullPath,
+            knownRoots,
+            canonicalizeRoots: false);
+        if (matchedRootByRawPath is null)
+        {
+            errors.Add(new Error(ErrorKind.OutsideKnownRoots,
+                $"'{fullPath}' not inside any scan root"));
+        }
+
+        if (PathResolver.IsSymlink(fullPath))
+        {
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{fullPath}' is now a symlink"));
+        }
+        else if (!Directory.Exists(fullPath))
+        {
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{fullPath}' is no longer a directory"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureIdentity(
+                    fullPath,
+                    out var capturedIdentity,
+                    out var identityError))
+            {
+                executionIdentity = capturedIdentity;
+                resolved = capturedIdentity.CanonicalPath;
+                if (!capturedIdentity.IsDirectory || capturedIdentity.IsReparsePoint)
+                {
+                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                        $"'{resolved}' is no longer a non-link directory"));
+                }
+            }
+            else
+            {
+                errors.Add(new Error(ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected filesystem object: {identityError}"));
+            }
+        }
+
+        if (FindContainingRoot(resolved, knownRoots, canonicalizeRoots: true) is null)
+        {
+            errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
+                $"resolved path '{resolved}' is not inside any known scan root"));
+        }
+
+        foreach (var root in knownRoots)
+        {
+            if (PathKeysEqual(root.Path, fullPath)
+                || PathKeysEqual(CanonicalizeForComparison(root.Path), resolved))
+            {
+                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                    $"'{fullPath}' is itself a scan root"));
+                break;
+            }
+        }
+
+        if (Directory.Exists(Path.Combine(resolved, ".git")))
+        {
+            errors.Add(new Error(ErrorKind.ContainsGitDirectory,
+                $"'{resolved}' contains .git"));
+        }
+
+        if (executionIdentity is not null)
+        {
+            try
+            {
+                if (Directory.EnumerateFileSystemEntries(resolved).Any())
+                {
+                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                        $"'{resolved}' is no longer empty"));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                    $"'{resolved}' could not be inspected: {ex.Message}"));
+            }
+        }
+
+        return new RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<Warning>.Empty,
+            resolved,
+            ImmutableArray<string>.Empty)
+        {
+            ExecutionIdentity = executionIdentity,
+            RequiresEmptyDirectory = true,
+        };
+    }
+
+    internal static RemoveValidation ValidateBrokenSymlink(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots)
+    {
+        var errors = ImmutableArray.CreateBuilder<Error>();
+        var fullPath = Path.GetFullPath(path);
+        if (FindContainingRoot(fullPath, knownRoots, canonicalizeRoots: false) is null)
+        {
+            errors.Add(new Error(ErrorKind.OutsideKnownRoots,
+                $"'{fullPath}' not inside any scan root"));
+        }
+        foreach (var root in knownRoots)
+        {
+            if (PathKeysEqual(root.Path, fullPath))
+            {
+                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                    $"'{fullPath}' is itself a scan root"));
+                break;
+            }
+        }
+        if (!PathResolver.IsSymlink(fullPath))
+        {
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{fullPath}' is no longer a symlink"));
+        }
+        else if (PathResolver.Resolve(fullPath) is not null)
+        {
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{fullPath}' is no longer broken"));
+        }
+
+        return new RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<Warning>.Empty,
+            fullPath,
+            ImmutableArray<string>.Empty)
+        {
+            RemovesLinkOnly = true,
         };
     }
 

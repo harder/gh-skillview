@@ -114,6 +114,12 @@ logging, or subprocess adapters.
   held-directory design prevents a replacement ancestor or child directory
   from redirecting recursive traversal, though an empty final-name replacement
   can be removed.
+  Real directory execution fails closed without a pinned native identity.
+  Empty-directory cleanup is a distinct execution contract: validation pins
+  the identity and native traversal refuses immediately if it observes any
+  child, so a directory populated after validation is not recursively cleaned.
+  Identity-less execution is reserved for validations explicitly marked as
+  link-only, and those refuse if the path is no longer a link.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can
