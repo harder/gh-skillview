@@ -17,13 +17,16 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     private const uint SymlinkType = 0xA000;
     private readonly Action? _directoryIdentityCapturedForTests;
     private readonly Action? _linkTargetObservedForTests;
+    private readonly Action? _rootIdentityCapturedForTests;
 
     internal UnixSecureRemovalBackend(
         Action? directoryIdentityCapturedForTests = null,
-        Action? linkTargetObservedForTests = null)
+        Action? linkTargetObservedForTests = null,
+        Action? rootIdentityCapturedForTests = null)
     {
         _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
         _linkTargetObservedForTests = linkTargetObservedForTests;
+        _rootIdentityCapturedForTests = rootIdentityCapturedForTests;
     }
 
     internal static bool IsSupportedOnCurrentPlatform =>
@@ -103,50 +106,42 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 out _);
             using (parent)
             {
-                var before = ReadStat(handle, statBuffer.Pointer);
-                if (!before.IsDirectory || before.IsSymlink)
-                {
-                    throw new IOException($"'{path}' is no longer a non-link directory");
-                }
-                _directoryIdentityCapturedForTests?.Invoke();
-
-                var hasSkill = TryReadFollowedStatAt(
-                    handle,
-                    LocalSkillScanner.SkillFileName,
-                    statBuffer.Pointer,
-                    out var skillStat,
-                    out var skillError)
-                    ? !skillStat.IsDirectory
-                    : skillError is null
-                        ? false
-                        : throw new IOException(skillError);
-                var hasGit = TryReadFollowedStatAt(
-                    handle,
-                    ".git",
-                    statBuffer.Pointer,
-                    out var gitStat,
-                    out var gitError)
-                    ? gitStat.IsDirectory
-                    : gitError is null
-                        ? false
-                        : throw new IOException(gitError);
-                var isEmpty = IsDirectoryEmpty(handle, out var enumerationError);
-                if (enumerationError is not null) throw new IOException(enumerationError);
-
-                var canonicalPath = ReadFinalPath(handle);
-                var after = ReadStat(handle, statBuffer.Pointer);
-                var identity = ToSecureIdentity(after, canonicalPath);
-                if (!Matches(ToSecureIdentity(before, canonicalPath), after))
-                {
-                    throw new IOException("selected directory changed during policy inspection");
-                }
-                snapshot = new SecureDirectoryValidationSnapshot(
-                    identity,
-                    hasSkill,
-                    hasGit,
-                    isEmpty);
+                snapshot = CaptureDirectoryValidation(handle, path, statBuffer);
                 return true;
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureDirectoryValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var components = GetRelativeComponents(rootPath, path);
+            using var root = OpenDirectory(RealPath(rootPath));
+            var rootBefore = ReadStat(root, statBuffer.Pointer);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var target = OpenRelativeDirectory(root, components);
+            var directory = CaptureDirectoryValidation(target, path, statBuffer);
+            var rootIdentity = CaptureStableRootIdentity(
+                root,
+                rootBefore,
+                statBuffer);
+            snapshot = new SecureRootedDirectoryValidationSnapshot(
+                rootIdentity,
+                directory);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -204,46 +199,52 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
             var resolvedParent = RealPath(parentPath);
             using var parent = OpenDirectory(resolvedParent);
-            var parentStat = ReadStat(parent, statBuffer.Pointer);
-            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
-                    out var linkStat, out var statError))
-            {
-                throw new IOException(statError);
-            }
-            if (!linkStat.IsSymlink)
-            {
-                throw new IOException($"'{path}' is no longer a symlink");
-            }
+            (identity, isBroken) = CaptureLink(
+                parent,
+                name,
+                path,
+                inspectTarget,
+                statBuffer);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
 
-            if (inspectTarget)
-            {
-                isBroken = !TryReadFollowedStatAt(
-                    parent,
-                    name,
-                    statBuffer.Pointer,
-                    out _,
-                    out var targetError);
-                if (targetError is not null) throw new IOException(targetError);
-                _linkTargetObservedForTests?.Invoke();
-                if (!TryReadStatAt(parent, name, statBuffer.Pointer,
-                        out var linkAfter, out statError)
-                    || !Matches(ToSecureIdentity(linkStat, string.Empty), linkAfter))
-                {
-                    throw new IOException(statError ?? "link changed during target inspection");
-                }
-            }
-
-            var canonicalParent = ReadFinalPath(parent);
-            var parentAfter = ReadStat(parent, statBuffer.Pointer);
-            if (!Matches(ToSecureIdentity(parentStat, canonicalParent), parentAfter))
-            {
-                throw new IOException("link parent changed during identity capture");
-            }
-            var canonicalLink = Path.Combine(canonicalParent, name);
-            identity = new SecureLinkIdentity(
-                ToSecureIdentity(parentAfter, canonicalParent),
-                ToSecureIdentity(linkStat, canonicalLink),
-                name);
+    public bool TryCaptureLinkValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var components = GetRelativeComponents(rootPath, path);
+            var name = components[^1];
+            using var root = OpenDirectory(RealPath(rootPath));
+            var rootBefore = ReadStat(root, statBuffer.Pointer);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var ownedParent = OpenRelativeParent(root, components);
+            var parent = ownedParent ?? root;
+            var (identity, isBroken) = CaptureLink(
+                parent,
+                name,
+                path,
+                inspectTarget: true,
+                statBuffer);
+            var rootIdentity = CaptureStableRootIdentity(
+                root,
+                rootBefore,
+                statBuffer);
+            snapshot = new SecureRootedLinkValidationSnapshot(
+                rootIdentity,
+                new SecureLinkValidationSnapshot(identity, isBroken));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -261,11 +262,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         try
         {
             var resolvedPath = RealPath(path);
-            using var handle = OpenAbsoluteDirectory(resolvedPath, out var parent, out _);
-            using (parent)
-            {
-                canonicalPath = ReadFinalPath(handle);
-            }
+            using var handle = OpenDirectory(resolvedPath);
+            canonicalPath = ReadFinalPath(handle);
             error = null;
             return true;
         }
@@ -274,6 +272,201 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             canonicalPath = string.Empty;
             error = ex.Message;
             return false;
+        }
+    }
+
+    private SecureDirectoryValidationSnapshot CaptureDirectoryValidation(
+        SafeUnixHandle handle,
+        string displayPath,
+        StatBuffer statBuffer)
+    {
+        var before = ReadStat(handle, statBuffer.Pointer);
+        if (!before.IsDirectory || before.IsSymlink)
+        {
+            throw new IOException(
+                $"'{displayPath}' is no longer a non-link directory");
+        }
+        _directoryIdentityCapturedForTests?.Invoke();
+
+        var hasSkill = TryReadFollowedStatAt(
+            handle,
+            LocalSkillScanner.SkillFileName,
+            statBuffer.Pointer,
+            out var skillStat,
+            out var skillError)
+            ? !skillStat.IsDirectory
+            : skillError is null
+                ? false
+                : throw new IOException(skillError);
+        var hasGit = TryReadFollowedStatAt(
+            handle,
+            ".git",
+            statBuffer.Pointer,
+            out var gitStat,
+            out var gitError)
+            ? gitStat.IsDirectory
+            : gitError is null
+                ? false
+                : throw new IOException(gitError);
+        var isEmpty = IsDirectoryEmpty(handle, out var enumerationError);
+        if (enumerationError is not null) throw new IOException(enumerationError);
+
+        var canonicalPath = ReadFinalPath(handle);
+        var after = ReadStat(handle, statBuffer.Pointer);
+        if (!Matches(before, after))
+        {
+            throw new IOException(
+                "selected directory changed during policy inspection");
+        }
+        return new SecureDirectoryValidationSnapshot(
+            ToSecureIdentity(after, canonicalPath),
+            hasSkill,
+            hasGit,
+            isEmpty);
+    }
+
+    private (SecureLinkIdentity Identity, bool IsBroken) CaptureLink(
+        SafeUnixHandle parent,
+        string name,
+        string displayPath,
+        bool inspectTarget,
+        StatBuffer statBuffer)
+    {
+        var parentStat = ReadStat(parent, statBuffer.Pointer);
+        if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                out var linkStat, out var statError))
+        {
+            throw new IOException(statError);
+        }
+        if (!linkStat.IsSymlink)
+        {
+            throw new IOException($"'{displayPath}' is no longer a symlink");
+        }
+
+        var isBroken = false;
+        if (inspectTarget)
+        {
+            isBroken = !TryReadFollowedStatAt(
+                parent,
+                name,
+                statBuffer.Pointer,
+                out _,
+                out var targetError);
+            if (targetError is not null) throw new IOException(targetError);
+            _linkTargetObservedForTests?.Invoke();
+            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                    out var linkAfter, out statError)
+                || !Matches(linkStat, linkAfter))
+            {
+                throw new IOException(
+                    statError ?? "link changed during target inspection");
+            }
+        }
+
+        var canonicalParent = ReadFinalPath(parent);
+        var parentAfter = ReadStat(parent, statBuffer.Pointer);
+        if (!Matches(parentStat, parentAfter))
+        {
+            throw new IOException("link parent changed during identity capture");
+        }
+        var canonicalLink = Path.Combine(canonicalParent, name);
+        return (new SecureLinkIdentity(
+            ToSecureIdentity(parentAfter, canonicalParent),
+            ToSecureIdentity(linkStat, canonicalLink),
+            name), isBroken);
+    }
+
+    private static SecureFileIdentity CaptureStableRootIdentity(
+        SafeUnixHandle root,
+        NativeStat before,
+        StatBuffer statBuffer)
+    {
+        var canonicalRoot = ReadFinalPath(root);
+        var after = ReadStat(root, statBuffer.Pointer);
+        if (!Matches(before, after))
+        {
+            throw new IOException("scan root changed during validation");
+        }
+        return ToSecureIdentity(after, canonicalRoot);
+    }
+
+    private static string[] GetRelativeComponents(string rootPath, string path)
+    {
+        var root = Path.GetFullPath(rootPath);
+        var target = Path.GetFullPath(path);
+        if (!PathResolver.IsInside(target, root)
+            || PathIdentity.Equals(target, root))
+        {
+            throw new IOException(
+                $"target '{target}' is not a child of scan root '{root}'");
+        }
+
+        var relative = Path.GetRelativePath(root, target);
+        var components = relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        if (components.Length == 0
+            || components.Any(component => component is "." or ".."))
+        {
+            throw new IOException("refusing an invalid scan-root-relative path");
+        }
+        return components;
+    }
+
+    private static SafeUnixHandle OpenRelativeDirectory(
+        SafeUnixHandle root,
+        IReadOnlyList<string> components)
+    {
+        SafeUnixHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenDirectoryAt(
+                    parent,
+                    components[index],
+                    refuseNestedMount: false,
+                    followFinalComponent: index < components.Count - 1);
+                current?.Dispose();
+                current = next;
+            }
+            return current
+                ?? throw new IOException("scan-root-relative target is empty");
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeUnixHandle? OpenRelativeParent(
+        SafeUnixHandle root,
+        IReadOnlyList<string> components)
+    {
+        if (components.Count == 1) return null;
+
+        SafeUnixHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count - 1; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenDirectoryAt(
+                    parent,
+                    components[index],
+                    refuseNestedMount: false,
+                    followFinalComponent: true);
+                current?.Dispose();
+                current = next;
+            }
+            return current;
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
         }
     }
 
@@ -622,14 +815,18 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     private static SafeUnixHandle OpenDirectoryAt(
         SafeUnixHandle parent,
         string name,
-        bool refuseNestedMount)
+        bool refuseNestedMount,
+        bool followFinalComponent = false)
     {
+        var openFlags = followFinalComponent
+            ? UnixConstants.DirectoryFollowOpenFlags
+            : UnixConstants.DirectoryOpenFlags;
         int fd;
         if (OperatingSystem.IsLinux() && refuseNestedMount)
         {
             var how = new OpenHow
             {
-                Flags = unchecked((ulong)UnixConstants.DirectoryOpenFlags),
+                Flags = unchecked((ulong)openFlags),
                 Resolve = UnixConstants.ResolveBeneath
                     | UnixConstants.ResolveNoSymlinks
                     | UnixConstants.ResolveNoCrossDevice,
@@ -646,7 +843,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             fd = UnixNative.openat(
                 parent.FileDescriptor,
                 name,
-                UnixConstants.DirectoryOpenFlags);
+                openFlags);
         }
         return CreateHandle(fd, $"open directory entry '{name}' failed");
     }
@@ -1184,6 +1381,10 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         internal static int DirectoryOpenFlags => OperatingSystem.IsMacOS()
             ? 0x00100000 | 0x00000100 | 0x01000000
             : 0x00010000 | 0x00020000 | 0x00080000;
+
+        internal static int DirectoryFollowOpenFlags => OperatingSystem.IsMacOS()
+            ? 0x00100000 | 0x01000000
+            : 0x00010000 | 0x00080000;
 
         internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
         internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;

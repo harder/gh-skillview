@@ -74,6 +74,47 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
+    public async Task RemoveSelectedAsync_RemovesSiblingBrokenLinksWithFreshParentIdentities()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "broken-first");
+        var second = Path.Combine(root, "broken-second");
+        Directory.CreateSymbolicLink(first, Path.Combine(root, "missing-first"));
+        Directory.CreateSymbolicLink(second, Path.Combine(root, "missing-second"));
+
+        try
+        {
+            var candidates = new[] { first, second }
+                .Select(path => new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.BrokenSymlink,
+                    path,
+                    "broken symlink",
+                    Skill: null))
+                .ToImmutableArray();
+            var screen = CreateScreen(
+                candidates,
+                [new ScanRoot(root, Scope.User, null)]);
+
+            var summary = await screen.RemoveSelectedAsync(
+                [0, 1], TestContext.Current.CancellationToken);
+
+            Assert.False(PathResolver.IsSymlink(first));
+            Assert.False(PathResolver.IsSymlink(second));
+            Assert.Equal(2, screen.RemovedCount);
+            Assert.Equal(
+                new CleanupScreen.RemovalSummary(2, 0, Confirmed: true),
+                summary);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_RemovesBrokenSymlinkCandidateWhenCandidateCarriesSkill()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));

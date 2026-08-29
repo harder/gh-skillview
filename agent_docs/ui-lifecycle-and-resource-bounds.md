@@ -102,14 +102,19 @@ logging, or subprocess adapters.
   Traversal retains O(depth) enumerator/handle state and no more than 128
   detailed runtime errors plus one omission summary. Validation pins the
   selected target's native filesystem identity and validates the captured
-  canonical deletion address. The canonical address and canonical scan roots
+  canonical deletion address. Containment capture opens the matched scan root
+  first and then opens the target directory or link parent relative to that
+  held object; target and root canonicalization must never be separate,
+  independently raceable opens. The canonical address and canonical scan roots
   come from opened handles, not lexical normalization: Windows uses
   `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
   `fgetattrlist`, and Linux reads `/proc/self/fd`. Because Linux's unescaped
   ` (deleted)` annotation is also legal filename text, a returned path ending
   with it is accepted only when that name's native identity and generation
   match the still-open descriptor; suffix text alone is not evidence that the
-  entry was unlinked. Windows removal compares full
+  entry was unlinked. Non-destructive Unix canonicalization opens the resolved
+  directory directly so `/` is a valid scan root, while destructive helpers
+  continue refusing a filesystem-root target. Windows removal compares full
   128-bit file IDs plus `FILE_BASIC_INFO.CreationTime`/`ChangeTime`, opens
   enumerated children and links relative to the held parent handle with
   `NtOpenFile` and
@@ -145,6 +150,9 @@ logging, or subprocess adapters.
   parent plus native parent/link identities. Broken-link cleanup and agent
   unlink actions revalidate both identities and delete through the opened
   parent/object boundary rather than trusting the current pathname.
+  Cleanup batches validate lazily immediately before each target executes;
+  prevalidating sibling links is incorrect because the first unlink changes
+  their shared parent's generation and invalidates later captures.
   Unix destructive identity capture resolves only the parent, then opens the
   final candidate with `O_NOFOLLOW | O_DIRECTORY`; do not reuse final-following
   canonicalization for this purpose. Review each native operation as an
@@ -166,6 +174,9 @@ logging, or subprocess adapters.
   which case the returned policy snapshot must still describe the held object.
   Cross-platform ABA tests should assert those two safe outcomes rather than
   require one volume-specific timestamp behavior.
+  Windows final-path normalization converts extended UNC paths and strips the
+  extended prefix from drive-letter paths only. Preserve volume-GUID and other
+  non-DOS extended namespaces so absolute authority paths never become relative.
   Broken-link cleanup observes target existence relative to the held parent and
   rechecks both parent and link identities around that observation, preventing a
   broken-to-valid replacement from being authorized.

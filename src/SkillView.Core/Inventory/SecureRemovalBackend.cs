@@ -30,6 +30,14 @@ internal readonly record struct SecureLinkValidationSnapshot(
     SecureLinkIdentity Identity,
     bool IsBroken);
 
+internal readonly record struct SecureRootedDirectoryValidationSnapshot(
+    SecureFileIdentity RootIdentity,
+    SecureDirectoryValidationSnapshot Directory);
+
+internal readonly record struct SecureRootedLinkValidationSnapshot(
+    SecureFileIdentity RootIdentity,
+    SecureLinkValidationSnapshot Link);
+
 internal interface ISecureRemovalBackend
 {
     bool TryCaptureIdentity(string path, out SecureFileIdentity identity, out string? error);
@@ -39,11 +47,23 @@ internal interface ISecureRemovalBackend
         out SecureDirectoryValidationSnapshot snapshot,
         out string? error);
 
+    bool TryCaptureDirectoryValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedDirectoryValidationSnapshot snapshot,
+        out string? error);
+
     bool TryCaptureLinkIdentity(string path, out SecureLinkIdentity identity, out string? error);
 
     bool TryCaptureLinkValidation(
         string path,
         out SecureLinkValidationSnapshot snapshot,
+        out string? error);
+
+    bool TryCaptureLinkValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedLinkValidationSnapshot snapshot,
         out string? error);
 
     bool TryCanonicalizePath(string path, out string canonicalPath, out string? error);
@@ -117,6 +137,25 @@ internal static class SecureRemovalBackend
         return Current.TryCaptureDirectoryValidation(path, out snapshot, out error);
     }
 
+    internal static bool TryCaptureDirectoryValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        if (Current is null)
+        {
+            snapshot = default;
+            error = "secure removal is not supported on this operating system";
+            return false;
+        }
+        return Current.TryCaptureDirectoryValidationWithinRoot(
+            rootPath,
+            path,
+            out snapshot,
+            out error);
+    }
+
     internal static bool TryCaptureLinkIdentity(
         string path,
         out SecureLinkIdentity identity,
@@ -144,6 +183,25 @@ internal static class SecureRemovalBackend
             return false;
         }
         return Current.TryCaptureLinkValidation(path, out snapshot, out error);
+    }
+
+    internal static bool TryCaptureLinkValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        if (Current is null)
+        {
+            snapshot = default;
+            error = "secure link removal is not supported on this operating system";
+            return false;
+        }
+        return Current.TryCaptureLinkValidationWithinRoot(
+            rootPath,
+            path,
+            out snapshot,
+            out error);
     }
 
     internal static void RemoveTree(

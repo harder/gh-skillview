@@ -129,6 +129,131 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
+    public void TryCanonicalizePath_FilesystemRoot_Succeeds()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var filesystemRoot = Path.GetPathRoot(_tempRoot)!;
+        var canonicalized = new UnixSecureRemovalBackend().TryCanonicalizePath(
+            filesystemRoot,
+            out var canonicalPath,
+            out var error);
+
+        Assert.True(canonicalized, error);
+        Assert.Equal(Path.GetFullPath(filesystemRoot), canonicalPath);
+    }
+
+    [Fact]
+    public void TryCaptureDirectoryValidationWithinRoot_RootLinkRetargeted_UsesHeldRoot()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var originalRoot = Path.Combine(_tempRoot, "root-original");
+        var replacementRoot = Path.Combine(_tempRoot, "root-replacement");
+        var linkedRoot = Path.Combine(_tempRoot, "root-link");
+        var originalSkill = Path.Combine(originalRoot, "skill");
+        var replacementSkill = Path.Combine(replacementRoot, "skill");
+        Directory.CreateDirectory(Path.Combine(originalSkill, ".git"));
+        Directory.CreateDirectory(replacementSkill);
+        File.WriteAllText(Path.Combine(originalSkill, "SKILL.md"), "original");
+        File.WriteAllText(Path.Combine(replacementSkill, "SKILL.md"), "replacement");
+        try
+        {
+            Directory.CreateSymbolicLink(linkedRoot, originalRoot);
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var backend = new UnixSecureRemovalBackend(
+            rootIdentityCapturedForTests: () =>
+            {
+                Directory.Delete(linkedRoot);
+                Directory.CreateSymbolicLink(linkedRoot, replacementRoot);
+            });
+        var captured = backend.TryCaptureDirectoryValidationWithinRoot(
+            linkedRoot,
+            Path.Combine(linkedRoot, "skill"),
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.Directory.HasGitDirectory);
+        Assert.True(backend.TryCanonicalizePath(
+            originalRoot,
+            out var canonicalOriginalRoot,
+            out var rootError), rootError);
+        Assert.True(backend.TryCanonicalizePath(
+            originalSkill,
+            out var canonicalOriginalSkill,
+            out var skillError), skillError);
+        Assert.True(PathIdentity.Equals(
+            canonicalOriginalRoot,
+            snapshot.RootIdentity.CanonicalPath));
+        Assert.True(PathIdentity.Equals(
+            canonicalOriginalSkill,
+            snapshot.Directory.Identity.CanonicalPath));
+    }
+
+    [Fact]
+    public void TryCaptureLinkValidationWithinRoot_RootLinkRetargeted_UsesHeldRoot()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var originalRoot = Path.Combine(_tempRoot, "link-root-original");
+        var replacementRoot = Path.Combine(_tempRoot, "link-root-replacement");
+        var linkedRoot = Path.Combine(_tempRoot, "link-root-link");
+        var originalLink = Path.Combine(originalRoot, "broken-link");
+        var replacementLink = Path.Combine(replacementRoot, "broken-link");
+        var replacementTarget = Path.Combine(replacementRoot, "valid-target");
+        Directory.CreateDirectory(originalRoot);
+        Directory.CreateDirectory(replacementTarget);
+        try
+        {
+            Directory.CreateSymbolicLink(originalLink, Path.Combine(originalRoot, "missing"));
+            Directory.CreateSymbolicLink(replacementLink, replacementTarget);
+            Directory.CreateSymbolicLink(linkedRoot, originalRoot);
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var backend = new UnixSecureRemovalBackend(
+            rootIdentityCapturedForTests: () =>
+            {
+                Directory.Delete(linkedRoot);
+                Directory.CreateSymbolicLink(linkedRoot, replacementRoot);
+            });
+        var captured = backend.TryCaptureLinkValidationWithinRoot(
+            linkedRoot,
+            Path.Combine(linkedRoot, "broken-link"),
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.Link.IsBroken);
+        Assert.True(backend.TryCanonicalizePath(
+            originalRoot,
+            out var canonicalOriginalRoot,
+            out var rootError), rootError);
+        Assert.True(PathIdentity.Equals(
+            canonicalOriginalRoot,
+            snapshot.RootIdentity.CanonicalPath));
+        Assert.True(PathIdentity.Equals(
+            Path.Combine(canonicalOriginalRoot, "broken-link"),
+            snapshot.Link.Identity.CanonicalPath));
+    }
+
+    [Fact]
     public void TryCaptureIdentity_FinalSymlinkToDirectory_FailsClosed()
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;

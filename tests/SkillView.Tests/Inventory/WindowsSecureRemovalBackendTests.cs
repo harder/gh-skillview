@@ -20,6 +20,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
     [Theory]
     [InlineData(@"\\?\C:\skills\demo", @"C:\skills\demo")]
     [InlineData(@"\\?\UNC\server\share\demo", @"\\server\share\demo")]
+    [InlineData(@"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}\skills\demo", @"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}\skills\demo")]
     [InlineData(@"C:\skills\demo", @"C:\skills\demo")]
     public void NormalizeFinalPath_ConvertsExtendedDosPath(string path, string expected)
     {
@@ -64,6 +65,83 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
 
         Assert.True(canonicalized, error);
         Assert.True(PathIdentity.Equals(realRoot, canonicalPath));
+    }
+
+    [Fact]
+    public void TryCaptureDirectoryValidationWithinRoot_RootLinkRetargeted_UsesHeldRoot()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var originalRoot = Path.Combine(_tempRoot, "root-original");
+        var replacementRoot = Path.Combine(_tempRoot, "root-replacement");
+        var linkedRoot = Path.Combine(_tempRoot, "root-link");
+        var originalSkill = Path.Combine(originalRoot, "skill");
+        var replacementSkill = Path.Combine(replacementRoot, "skill");
+        Directory.CreateDirectory(Path.Combine(originalSkill, ".git"));
+        Directory.CreateDirectory(replacementSkill);
+        File.WriteAllText(Path.Combine(originalSkill, "SKILL.md"), "original");
+        File.WriteAllText(Path.Combine(replacementSkill, "SKILL.md"), "replacement");
+        if (!TryCreateDirectoryLink(linkedRoot, originalRoot)) return;
+
+        var backend = new WindowsSecureRemovalBackend(
+            rootIdentityCapturedForTests: () =>
+            {
+                Directory.Delete(linkedRoot);
+                Directory.CreateSymbolicLink(linkedRoot, replacementRoot);
+            });
+        var captured = backend.TryCaptureDirectoryValidationWithinRoot(
+            linkedRoot,
+            Path.Combine(linkedRoot, "skill"),
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.Directory.HasGitDirectory);
+        Assert.True(PathIdentity.Equals(
+            originalRoot,
+            snapshot.RootIdentity.CanonicalPath));
+        Assert.True(PathIdentity.Equals(
+            originalSkill,
+            snapshot.Directory.Identity.CanonicalPath));
+    }
+
+    [Fact]
+    public void TryCaptureLinkValidationWithinRoot_RootLinkRetargeted_UsesHeldRoot()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var originalRoot = Path.Combine(_tempRoot, "link-root-original");
+        var replacementRoot = Path.Combine(_tempRoot, "link-root-replacement");
+        var linkedRoot = Path.Combine(_tempRoot, "link-root-link");
+        var originalLink = Path.Combine(originalRoot, "broken-link");
+        var replacementLink = Path.Combine(replacementRoot, "broken-link");
+        var replacementTarget = Path.Combine(replacementRoot, "valid-target");
+        Directory.CreateDirectory(originalRoot);
+        Directory.CreateDirectory(replacementTarget);
+        if (!TryCreateDirectoryLink(originalLink, Path.Combine(originalRoot, "missing"))) return;
+        if (!TryCreateDirectoryLink(replacementLink, replacementTarget)) return;
+        if (!TryCreateDirectoryLink(linkedRoot, originalRoot)) return;
+
+        var backend = new WindowsSecureRemovalBackend(
+            rootIdentityCapturedForTests: () =>
+            {
+                Directory.Delete(linkedRoot);
+                Directory.CreateSymbolicLink(linkedRoot, replacementRoot);
+            });
+        var captured = backend.TryCaptureLinkValidationWithinRoot(
+            linkedRoot,
+            Path.Combine(linkedRoot, "broken-link"),
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.Link.IsBroken);
+        Assert.True(PathIdentity.Equals(
+            originalRoot,
+            snapshot.RootIdentity.CanonicalPath));
+        Assert.True(PathIdentity.Equals(
+            originalLink,
+            snapshot.Link.Identity.CanonicalPath));
     }
 
     [Fact]

@@ -347,35 +347,30 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
-        var (validations, failedValidationCount) = await Task.Run(
-            () => BuildRemovalPlan(checkedRows, cancellationToken)).ConfigureAwait(false);
-
         var report = await _remove.RemoveManyAsync(
-            validations,
+            ValidateImmediatelyBeforeRemoval(selected, cancellationToken),
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
         var removed = report.TargetsDeleted;
-        var failed = failedValidationCount + validations.Length - removed;
+        var failed = selected.Length - removed;
         RemovedCount += removed;
         RemovedFileCount += report.FilesDeleted;
         RemovedDirectoryCount += report.DirectoriesDeleted;
         return new RemovalSummary(removed, failed, Confirmed: true);
     }
 
-    private (ImmutableArray<RemoveValidator.RemoveValidation> Validations, int Failed)
-        BuildRemovalPlan(HashSet<int> checkedRows, CancellationToken cancellationToken)
+    private IEnumerable<RemoveValidator.RemoveValidation>
+        ValidateImmediatelyBeforeRemoval(
+            ImmutableArray<CleanupClassifier.Candidate> selected,
+            CancellationToken cancellationToken)
     {
-        var failed = 0;
-        var validations = ImmutableArray.CreateBuilder<RemoveValidator.RemoveValidation>();
-        for (var i = 0; i < _candidates.Length; i++)
+        foreach (var candidate in selected)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!checkedRows.Contains(i)) continue;
-            var candidate = _candidates[i];
-            // For skill-backed candidates, run full validator. Non-skill cleanup
-            // candidates need synthetic validations because they don't look like
-            // install directories, but are still safe to remove when they stay
-            // inside known scan roots.
+            // RemoveMany enumerates this sequence immediately before each
+            // target executes. Do not materialize it: deleting an earlier
+            // sibling changes the shared parent's native generation, so later
+            // link identities must be captured after that owned mutation.
             var validation = candidate.Kind switch
             {
                 CleanupClassifier.CandidateKind.BrokenSymlink =>
@@ -388,14 +383,11 @@ public sealed class CleanupScreen
             };
             if (!validation.Allowed || validation.RequiresSecondConfirm)
             {
-                failed++;
                 _logger.Warn("cleanup", $"skipped {candidate.Path}: {(validation.Allowed ? "needs second confirm" : "validation refused")}");
                 continue;
             }
-            validations.Add(validation);
+            yield return validation;
         }
-
-        return (validations.ToImmutable(), failed);
     }
 
     private static string FormatProgress(RemoveService.RemoveProgress progress) =>

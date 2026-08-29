@@ -62,8 +62,9 @@ public static class RemoveValidator
         var incoming = ImmutableArray<string>.Empty;
 
         var targetPath = target.ResolvedPath;
-        var resolved = PathResolver.Resolve(targetPath) ?? targetPath;
+        var resolved = targetPath;
         SecureFileIdentity? executionIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
         SecureDirectoryValidationSnapshot? directorySnapshot = null;
 
         // Rule 12.1.1: must be inside a known scan root before resolution.
@@ -82,15 +83,24 @@ public static class RemoveValidator
         // if an ancestor is retargeted between those operations. The captured
         // canonical path is also the only path native execution will use, so
         // every remaining policy rule must validate that exact address.
-        if (matchedRootByRawPath is not null)
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, target.ResolvedPath))
         {
-            if (SecureRemovalBackend.TryCaptureDirectoryValidation(
-                    resolved,
-                    out var capturedSnapshot,
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{target.ResolvedPath}' is itself a scan root"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
+                    matchedRootByRawPath.Path,
+                    target.ResolvedPath,
+                    out var rootedSnapshot,
                     out var identityError))
             {
+                var capturedSnapshot = rootedSnapshot.Directory;
                 directorySnapshot = capturedSnapshot;
                 executionIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
                 resolved = capturedSnapshot.Identity.CanonicalPath;
             }
             else
@@ -102,11 +112,11 @@ public static class RemoveValidator
         }
 
         // Rule 12.1.2: resolved path must still be inside a known scan root.
-        var matchedRootByResolved = FindContainingRoot(
-            resolved,
-            knownRoots,
-            canonicalizeRoots: true);
-        if (matchedRootByResolved is null)
+        if (executionIdentity is not null
+            && (rootIdentity is null
+                || !PathResolver.IsInside(
+                    resolved,
+                    rootIdentity.Value.CanonicalPath)))
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
                 $"resolved path '{resolved}' is not inside any known scan root"));
@@ -138,10 +148,16 @@ public static class RemoveValidator
         foreach (var root in knownRoots)
         {
             if (PathKeysEqual(root.Path, target.ResolvedPath) ||
-                PathKeysEqual(CanonicalizeForComparison(root.Path), resolved))
+                (rootIdentity is not null
+                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved)) ||
+                (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
+                    && PathKeysEqual(canonicalRoot, resolved)))
             {
-                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
-                    $"'{target.ResolvedPath}' is itself a scan root"));
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{target.ResolvedPath}' is itself a scan root"));
+                }
                 break;
             }
         }
@@ -218,6 +234,7 @@ public static class RemoveValidator
         var fullPath = Path.GetFullPath(path);
         var resolved = fullPath;
         SecureFileIdentity? executionIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
         SecureDirectoryValidationSnapshot? directorySnapshot = null;
         var matchedRootByRawPath = FindContainingRoot(
             fullPath,
@@ -229,25 +246,24 @@ public static class RemoveValidator
                 $"'{fullPath}' not inside any scan root"));
         }
 
-        if (PathResolver.IsSymlink(fullPath))
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, fullPath))
         {
-            errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                $"'{fullPath}' is now a symlink"));
-        }
-        else if (!Directory.Exists(fullPath))
-        {
-            errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                $"'{fullPath}' is no longer a directory"));
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{fullPath}' is itself a scan root"));
         }
         else if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureDirectoryValidation(
+            if (SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
+                    matchedRootByRawPath.Path,
                     fullPath,
-                    out var capturedSnapshot,
+                    out var rootedSnapshot,
                     out var identityError))
             {
+                var capturedSnapshot = rootedSnapshot.Directory;
                 directorySnapshot = capturedSnapshot;
                 executionIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
                 resolved = capturedSnapshot.Identity.CanonicalPath;
                 if (!capturedSnapshot.Identity.IsDirectory
                     || capturedSnapshot.Identity.IsReparsePoint)
@@ -263,7 +279,11 @@ public static class RemoveValidator
             }
         }
 
-        if (FindContainingRoot(resolved, knownRoots, canonicalizeRoots: true) is null)
+        if (executionIdentity is not null
+            && (rootIdentity is null
+                || !PathResolver.IsInside(
+                    resolved,
+                    rootIdentity.Value.CanonicalPath)))
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
                 $"resolved path '{resolved}' is not inside any known scan root"));
@@ -272,10 +292,16 @@ public static class RemoveValidator
         foreach (var root in knownRoots)
         {
             if (PathKeysEqual(root.Path, fullPath)
-                || PathKeysEqual(CanonicalizeForComparison(root.Path), resolved))
+                || (rootIdentity is not null
+                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved))
+                || (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
+                    && PathKeysEqual(canonicalRoot, resolved)))
             {
-                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
-                    $"'{fullPath}' is itself a scan root"));
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{fullPath}' is itself a scan root"));
+                }
                 break;
             }
         }
@@ -317,6 +343,7 @@ public static class RemoveValidator
         var fullPath = Path.GetFullPath(path);
         var resolved = fullPath;
         SecureLinkIdentity? executionLinkIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
         var matchedRootByRawPath = FindContainingRoot(
             fullPath,
             knownRoots,
@@ -326,19 +353,23 @@ public static class RemoveValidator
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
                 $"'{fullPath}' not inside any scan root"));
         }
-        if (!PathResolver.IsSymlink(fullPath))
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, fullPath))
         {
-            errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                $"'{fullPath}' is no longer a symlink"));
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{fullPath}' is itself a scan root"));
         }
         else if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureLinkValidation(
+            if (SecureRemovalBackend.TryCaptureLinkValidationWithinRoot(
+                    matchedRootByRawPath.Path,
                     fullPath,
-                    out var capturedSnapshot,
+                    out var rootedSnapshot,
                     out var identityError))
             {
+                var capturedSnapshot = rootedSnapshot.Link;
                 executionLinkIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
                 resolved = capturedSnapshot.Identity.CanonicalPath;
                 if (requireBroken && !capturedSnapshot.IsBroken)
                 {
@@ -354,7 +385,10 @@ public static class RemoveValidator
         }
 
         if (executionLinkIdentity is not null
-            && FindContainingRoot(resolved, knownRoots, canonicalizeRoots: true) is null)
+            && (rootIdentity is null
+                || !PathResolver.IsInside(
+                    resolved,
+                    rootIdentity.Value.CanonicalPath)))
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
                 $"resolved link path '{resolved}' is not inside any known scan root"));
@@ -363,11 +397,16 @@ public static class RemoveValidator
         foreach (var root in knownRoots)
         {
             if (PathKeysEqual(root.Path, fullPath)
+                || (rootIdentity is not null
+                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved))
                 || (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
                     && PathKeysEqual(canonicalRoot, resolved)))
             {
-                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
-                    $"'{fullPath}' is itself a scan root"));
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{fullPath}' is itself a scan root"));
+                }
                 break;
             }
         }

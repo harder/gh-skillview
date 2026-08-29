@@ -667,6 +667,24 @@ an absent, replaced, or unstable name fails closed. Regression tests cover both
 the legitimate-name case and an unlinked directory colliding with a replacement
 at the annotated pathname.
 
+The next review identified four further valid boundary and portability gaps.
+First, target and scan-root canonicalization used separate opens, allowing a
+scan-root symlink ABA to make both path comparisons authorize an external
+target. Validation now opens and pins the matched scan root first, opens the
+selected directory or link parent relative to that held object, derives both
+canonical addresses from those handles, and verifies the root generation after
+policy capture. Second, cleanup prevalidated an entire batch; unlinking the
+first sibling changes their shared parent's native generation and invalidated
+the remaining link identities. Cleanup now supplies a lazy validation sequence
+that pins each candidate immediately before its removal. Third, Windows stripped
+`\\?\` from volume-GUID paths and thereby made them relative; only drive-letter
+paths now lose that prefix, while extended UNC conversion remains unchanged.
+Fourth, non-destructive Unix canonicalization routed `/` through a destructive
+parent helper that intentionally refuses filesystem roots. It now opens the
+`realpath` result directly. Regression coverage exercises root retargeting on
+Unix and Windows, sibling broken-link batches, volume-GUID normalization, and
+filesystem-root canonicalization.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

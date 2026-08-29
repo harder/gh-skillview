@@ -43,13 +43,16 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const int MaxFinalPathCapacity = 32_768;
     private readonly Action? _directoryIdentityCapturedForTests;
     private readonly Action? _linkTargetObservedForTests;
+    private readonly Action? _rootIdentityCapturedForTests;
 
     internal WindowsSecureRemovalBackend(
         Action? directoryIdentityCapturedForTests = null,
-        Action? linkTargetObservedForTests = null)
+        Action? linkTargetObservedForTests = null,
+        Action? rootIdentityCapturedForTests = null)
     {
         _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
         _linkTargetObservedForTests = linkTargetObservedForTests;
+        _rootIdentityCapturedForTests = rootIdentityCapturedForTests;
     }
 
     public bool TryCaptureIdentity(
@@ -94,37 +97,36 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         try
         {
             using var handle = OpenEntry(path, directory: true, enumerateDirectory: true);
-            var before = ReadIdentity(handle);
-            if (!before.IsDirectory || before.IsReparsePoint)
-            {
-                throw new IOException($"'{path}' is no longer a non-link directory");
-            }
-            _directoryIdentityCapturedForTests?.Invoke();
+            snapshot = CaptureDirectoryValidation(handle, path);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
 
-            var hasSkill = EntryIsDirectory(
-                handle,
-                LocalSkillScanner.SkillFileName) is false;
-            var hasGit = EntryIsDirectory(handle, ".git") is true;
-            using var frame = new DirectoryFrame(
-                handle,
-                path,
-                before,
-                depth: 0,
-                ownsDirectory: false);
-            var isEmpty = !frame.TryReadNext(out _, out var enumerationError);
-            if (enumerationError is not null) throw new IOException(enumerationError);
-
-            var canonicalPath = ReadFinalPath(handle);
-            var after = ReadIdentity(handle);
-            if (!Matches(before, after))
-            {
-                throw new IOException("selected directory changed during policy inspection");
-            }
-            snapshot = new SecureDirectoryValidationSnapshot(
-                ToSecureIdentity(after, canonicalPath),
-                hasSkill,
-                hasGit,
-                isEmpty);
+    public bool TryCaptureDirectoryValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            var components = GetRelativeComponents(rootPath, path);
+            using var root = OpenCanonicalDirectory(rootPath, enumerateDirectory: true);
+            var rootBefore = ReadIdentity(root);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var target = OpenRelativeDirectory(root, components);
+            var directory = CaptureDirectoryValidation(target, path);
+            var rootIdentity = CaptureStableRootIdentity(root, rootBefore);
+            snapshot = new SecureRootedDirectoryValidationSnapshot(
+                rootIdentity,
+                directory);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -181,59 +183,46 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             }
 
             using var parent = OpenCanonicalDirectory(parentPath);
-            var parentInformation = ReadIdentity(parent);
-            using var link = OpenEntryAt(
+            (identity, isBroken) = CaptureLink(
                 parent,
                 name,
-                directory: null,
-                enumerateDirectory: false);
-            var linkInformation = ReadIdentity(link);
-            if (!linkInformation.IsReparsePoint)
-            {
-                throw new IOException($"'{path}' is no longer a symlink or reparse point");
-            }
+                path,
+                inspectTarget);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
 
-            if (inspectTarget)
-            {
-                try
-                {
-                    using var target = OpenEntryAt(
-                        parent,
-                        name,
-                        directory: null,
-                        enumerateDirectory: false,
-                        openReparsePoint: false,
-                        requestDeleteAccess: false);
-                }
-                catch (WindowsOpenException ex) when (
-                    ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
-                {
-                    isBroken = true;
-                }
-                _linkTargetObservedForTests?.Invoke();
-                using var linkAfter = OpenEntryAt(
-                    parent,
-                    name,
-                    directory: null,
-                    enumerateDirectory: false);
-                if (!Matches(linkInformation, ReadIdentity(linkAfter)))
-                {
-                    throw new IOException("link changed during target inspection");
-                }
-            }
-
-            var canonicalParent = ReadFinalPath(parent);
-            var parentAfter = ReadIdentity(parent);
-            if (!Matches(parentInformation, parentAfter))
-            {
-                throw new IOException("link parent changed during identity capture");
-            }
-            identity = new SecureLinkIdentity(
-                ToSecureIdentity(parentAfter, canonicalParent),
-                ToSecureIdentity(
-                    linkInformation,
-                    Path.Combine(canonicalParent, name)),
-                name);
+    public bool TryCaptureLinkValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            var components = GetRelativeComponents(rootPath, path);
+            var name = components[^1];
+            using var root = OpenCanonicalDirectory(rootPath, enumerateDirectory: true);
+            var rootBefore = ReadIdentity(root);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var ownedParent = OpenRelativeParent(root, components);
+            var parent = ownedParent ?? root;
+            var (identity, isBroken) = CaptureLink(
+                parent,
+                name,
+                path,
+                inspectTarget: true);
+            var rootIdentity = CaptureStableRootIdentity(root, rootBefore);
+            snapshot = new SecureRootedLinkValidationSnapshot(
+                rootIdentity,
+                new SecureLinkValidationSnapshot(identity, isBroken));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -260,6 +249,205 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             canonicalPath = string.Empty;
             error = ex.Message;
             return false;
+        }
+    }
+
+    private SecureDirectoryValidationSnapshot CaptureDirectoryValidation(
+        SafeFileHandle handle,
+        string displayPath)
+    {
+        var before = ReadIdentity(handle);
+        if (!before.IsDirectory || before.IsReparsePoint)
+        {
+            throw new IOException(
+                $"'{displayPath}' is no longer a non-link directory");
+        }
+        _directoryIdentityCapturedForTests?.Invoke();
+
+        var hasSkill = EntryIsDirectory(
+            handle,
+            LocalSkillScanner.SkillFileName) is false;
+        var hasGit = EntryIsDirectory(handle, ".git") is true;
+        using var frame = new DirectoryFrame(
+            handle,
+            displayPath,
+            before,
+            depth: 0,
+            ownsDirectory: false);
+        var isEmpty = !frame.TryReadNext(out _, out var enumerationError);
+        if (enumerationError is not null) throw new IOException(enumerationError);
+
+        var canonicalPath = ReadFinalPath(handle);
+        var after = ReadIdentity(handle);
+        if (!Matches(before, after))
+        {
+            throw new IOException(
+                "selected directory changed during policy inspection");
+        }
+        return new SecureDirectoryValidationSnapshot(
+            ToSecureIdentity(after, canonicalPath),
+            hasSkill,
+            hasGit,
+            isEmpty);
+    }
+
+    private (SecureLinkIdentity Identity, bool IsBroken) CaptureLink(
+        SafeFileHandle parent,
+        string name,
+        string displayPath,
+        bool inspectTarget)
+    {
+        var parentInformation = ReadIdentity(parent);
+        using var link = OpenEntryAt(
+            parent,
+            name,
+            directory: null,
+            enumerateDirectory: false);
+        var linkInformation = ReadIdentity(link);
+        if (!linkInformation.IsReparsePoint)
+        {
+            throw new IOException(
+                $"'{displayPath}' is no longer a symlink or reparse point");
+        }
+
+        var isBroken = false;
+        if (inspectTarget)
+        {
+            try
+            {
+                using var target = OpenEntryAt(
+                    parent,
+                    name,
+                    directory: null,
+                    enumerateDirectory: false,
+                    openReparsePoint: false,
+                    requestDeleteAccess: false);
+            }
+            catch (WindowsOpenException ex) when (
+                ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
+            {
+                isBroken = true;
+            }
+            _linkTargetObservedForTests?.Invoke();
+            using var linkAfter = OpenEntryAt(
+                parent,
+                name,
+                directory: null,
+                enumerateDirectory: false);
+            if (!Matches(linkInformation, ReadIdentity(linkAfter)))
+            {
+                throw new IOException("link changed during target inspection");
+            }
+        }
+
+        var canonicalParent = ReadFinalPath(parent);
+        var parentAfter = ReadIdentity(parent);
+        if (!Matches(parentInformation, parentAfter))
+        {
+            throw new IOException("link parent changed during identity capture");
+        }
+        return (new SecureLinkIdentity(
+            ToSecureIdentity(parentAfter, canonicalParent),
+            ToSecureIdentity(
+                linkInformation,
+                Path.Combine(canonicalParent, name)),
+            name), isBroken);
+    }
+
+    private static SecureFileIdentity CaptureStableRootIdentity(
+        SafeFileHandle root,
+        NativeIdentity before)
+    {
+        var canonicalRoot = ReadFinalPath(root);
+        var after = ReadIdentity(root);
+        if (!Matches(before, after))
+        {
+            throw new IOException("scan root changed during validation");
+        }
+        return ToSecureIdentity(after, canonicalRoot);
+    }
+
+    private static string[] GetRelativeComponents(string rootPath, string path)
+    {
+        var root = Path.GetFullPath(rootPath);
+        var target = Path.GetFullPath(path);
+        if (!PathResolver.IsInside(target, root)
+            || PathIdentity.Equals(target, root))
+        {
+            throw new IOException(
+                $"target '{target}' is not a child of scan root '{root}'");
+        }
+
+        var relative = Path.GetRelativePath(root, target);
+        var components = relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        if (components.Length == 0
+            || components.Any(component => component is "." or ".."))
+        {
+            throw new IOException("refusing an invalid scan-root-relative path");
+        }
+        return components;
+    }
+
+    private static SafeFileHandle OpenRelativeDirectory(
+        SafeFileHandle root,
+        IReadOnlyList<string> components)
+    {
+        SafeFileHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenEntryAt(
+                    parent,
+                    components[index],
+                    directory: true,
+                    enumerateDirectory: index == components.Count - 1,
+                    openReparsePoint: index == components.Count - 1,
+                    requestDeleteAccess: index == components.Count - 1);
+                current?.Dispose();
+                current = next;
+            }
+            return current
+                ?? throw new IOException("scan-root-relative target is empty");
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeFileHandle? OpenRelativeParent(
+        SafeFileHandle root,
+        IReadOnlyList<string> components)
+    {
+        if (components.Count == 1) return null;
+
+        SafeFileHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count - 1; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenEntryAt(
+                    parent,
+                    components[index],
+                    directory: true,
+                    enumerateDirectory: false,
+                    openReparsePoint: false,
+                    requestDeleteAccess: false);
+                current?.Dispose();
+                current = next;
+            }
+            return current;
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
         }
     }
 
@@ -478,11 +666,15 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             WindowsCreationTime: identity.CreationTime,
             WindowsChangeTime: identity.ChangeTime);
 
-    private static SafeFileHandle OpenCanonicalDirectory(string path)
+    private static SafeFileHandle OpenCanonicalDirectory(
+        string path,
+        bool enumerateDirectory = false)
     {
+        var desiredAccess = FileReadAttributes | SynchronizeAccess;
+        if (enumerateDirectory) desiredAccess |= FileListDirectory;
         var handle = WindowsNative.CreateFileW(
             ToExtendedPath(path),
-            FileReadAttributes | SynchronizeAccess,
+            desiredAccess,
             ShareRead | ShareWrite | ShareDelete,
             IntPtr.Zero,
             OpenExisting,
@@ -757,9 +949,15 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         {
             return @"\\" + path[uncPrefix.Length..];
         }
-        return path.StartsWith(extendedPrefix, StringComparison.OrdinalIgnoreCase)
-            ? path[extendedPrefix.Length..]
-            : path;
+        if (path.StartsWith(extendedPrefix, StringComparison.OrdinalIgnoreCase)
+            && path.Length > extendedPrefix.Length + 2
+            && char.IsAsciiLetter(path[extendedPrefix.Length])
+            && path[extendedPrefix.Length + 1] == ':'
+            && path[extendedPrefix.Length + 2] is '\\' or '/')
+        {
+            return path[extendedPrefix.Length..];
+        }
+        return path;
     }
 
     private static string ToExtendedPath(string path)

@@ -154,7 +154,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `runtimeErrors`. Real removals on supported platforms must stay on
   `SecureRemovalBackend`: validation pins the target's native volume/device and
   full file/inode identity, then re-runs containment and all other policy checks
-  against that captured canonical deletion address. Canonical addresses must
+  against that captured canonical deletion address. Root containment is one
+  native authority boundary: open and pin the matched scan root first, open the
+  selected directory or link parent relative to that held root, and derive both
+  canonical addresses before verifying the root generation. Never canonicalize
+  target and root through separate opens. Canonical addresses must
   come from the opened object (`GetFinalPathNameByHandleW` on Windows,
   `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
   never only from lexical normalization; canonicalize scan roots through the
@@ -162,7 +166,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   ` (deleted)` `/proc/self/fd` annotation, so a live name can legitimately end
   with that text; disambiguate it by comparing the named path's full native
   identity and generation with the still-open descriptor, never by suffix
-  rejection alone. Windows uses `FileIdInfo`
+  rejection alone. Non-destructive Unix scan-root canonicalization must open
+  the `realpath` result directly so filesystem root `/` remains valid;
+  destructive helpers must continue refusing filesystem-root targets. Windows
+  uses `FileIdInfo`
   and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared, and
   pairs them with `FILE_BASIC_INFO.CreationTime`/`ChangeTime` for selected
   directories plus validated parents and links so immediate ID reuse is
@@ -206,6 +213,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   that path into ordinary recursive removal. Broken-link cleanup similarly uses
   `RemoveValidator.ValidateBrokenSymlink` and its identity-pinned link-only
   contract; agent unlink actions use `ValidateSymlink` with the inventory roots.
+  Cleanup batches must enumerate validations lazily so each candidate is pinned
+  immediately before its own removal; deleting one sibling link changes the
+  parent generation and intentionally invalidates any earlier sibling capture.
   Destructive directory identity capture may resolve ancestor components, but
   must open the final candidate name relative to the canonical parent with
   no-follow and directory-only flags. Only non-destructive canonicalization may
@@ -230,6 +240,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   cleanup. Adversarial coverage must combine ancestor rename/replacement with hard links,
   final-component symlink replacement, and immediate native-identifier reuse
   on every supported OS.
+  `GetFinalPathNameByHandleW` normalization may strip `\\?\` only from DOS
+  drive-letter paths and convert `\\?\UNC\` to ordinary UNC form. Preserve
+  other extended namespaces such as `\\?\Volume{GUID}\...`; stripping their
+  prefix turns them into unsafe relative paths.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

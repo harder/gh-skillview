@@ -59,6 +59,25 @@ public class RemoveValidatorTests : IDisposable
     }
 
     [Fact]
+    public void Validate_FilesystemRootScanRoot_Allowed()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var dir = MakeSkillDir("filesystem-root-skill");
+        var skill = MakeSkill(dir, "filesystem-root-skill");
+        var filesystemRoot = Path.GetPathRoot(dir)!;
+
+        var validation = RemoveValidator.Validate(
+            skill,
+            [new ScanRoot(filesystemRoot, Scope.User, "claude")],
+            [skill]);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+    }
+
+    [Fact]
     public void Validate_OutsideKnownRoots_Refused()
     {
         var dir = MakeSkillDir("ok");
