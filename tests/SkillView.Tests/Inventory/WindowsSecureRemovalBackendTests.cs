@@ -67,7 +67,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
-    public void TryCaptureDirectoryValidation_TargetAba_FailsClosed()
+    public void TryCaptureDirectoryValidation_TargetAba_InspectsOpenedDirectory()
     {
         if (!OperatingSystem.IsWindows()) return;
 
@@ -83,10 +83,15 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
             File.WriteAllText(Path.Combine(skill, "SKILL.md"), "clean");
         });
 
-        var captured = backend.TryCaptureDirectoryValidation(skill, out _, out var error);
+        var captured = backend.TryCaptureDirectoryValidation(
+            skill,
+            out var snapshot,
+            out var error);
 
-        Assert.False(captured);
-        Assert.NotNull(error);
+        Assert.True(captured, error);
+        Assert.True(snapshot.HasSkillFile);
+        Assert.True(snapshot.HasGitDirectory);
+        Assert.True(PathIdentity.Equals(movedSkill, snapshot.Identity.CanonicalPath));
         Assert.True(Directory.Exists(Path.Combine(movedSkill, ".git")));
         Assert.False(Directory.Exists(Path.Combine(skill, ".git")));
     }
