@@ -10,13 +10,14 @@ Second hardening branch: `fix/resource-lifecycle-hardening-2`
 Third hardening branch: `fix/removal-lifecycle-hardening`
 Fourth hardening branch: `fix/search-metadata-hardening`
 Fifth hardening branch: `fix/final-adversarial-hardening`
-Status: Portable remediation complete. PRs #12, #13, #14, and #15 are merged.
+Sixth hardening branch: `fix/native-removal-hardening`
+Status: Portable remediation complete. PRs #12 through #16 are merged.
 The fifth batch completes install-modal ownership, root CLI cancellation and
 deadlines, bounded post-kill waiting, volume-aware path identity, Esc focus
 behavior, streaming CLI JSON, serialized static-UI tests, and bounded-resource
-stress coverage. Native handle-relative deletion for hostile same-user
-mutation remains a separate security design rather than part of this portable
-backlog.
+stress coverage. The sixth batch implements the separately designed native
+removal boundary for Windows, macOS, and Linux and records the narrower
+guarantee Unix can actually provide.
 
 ## Executive summary
 
@@ -367,7 +368,8 @@ Second-branch local verification at this checkpoint:
 Severity: **Critical**
 
 Implementation status: **Static nested-link escape completed on
-`fix/adversarial-hardening`; hostile concurrent path replacement remains open.**
+`fix/adversarial-hardening`; native identity pinning and opened-directory
+removal completed on `fix/native-removal-hardening`.**
 
 Locations:
 
@@ -447,12 +449,34 @@ and
 so substituting that API would not close the window and would also lose
 SkillView's cancellation and partial-failure behavior.
 
-Do not describe the current checks as atomic against a hostile process running
-as the same user. A stronger design requires audited native implementations
-(`openat`/`unlinkat`-style traversal on Unix and handle-relative/open-reparse-
-point deletion on Windows), plus platform-specific identity and race tests.
-This remains grouped with removal I/O work because it materially changes the
-filesystem abstraction and cross-platform test matrix.
+The native batch now pins the selected target's volume/device and file/inode
+identity during validation and checks it again after opening the target for
+execution. Windows enumerates each opened directory handle, verifies every
+child's volume and file ID after opening it with reparse-point semantics, and
+deletes the opened object with `FileDispositionInfoEx`. Renaming or replacing
+an ancestor pathname therefore cannot redirect enumeration or deletion.
+
+Unix canonicalizes the validated target, opens each path component and child
+directory with `openat(..., O_NOFOLLOW | O_DIRECTORY)`, enumerates duplicated
+opened directory descriptors, compares `st_dev`/`st_ino`, uses Linux
+`openat2(RESOLVE_NO_XDEV)` to reject bind and filesystem mounts, refuses macOS
+device changes, and deletes names relative to the held parent with `unlinkat`.
+Replacing an ancestor or an observed directory cannot redirect recursive
+traversal. Directory identity is checked again before removal.
+
+There is one narrower Unix limitation that must remain explicit. POSIX
+`unlinkat` removes a name relative to a directory descriptor; it does not
+provide a general "unlink this already-open inode" operation. A same-UID
+attacker can theoretically replace a non-directory leaf between the final
+`fstatat` identity comparison and `unlinkat`. The operation will not follow a
+replacement symlink, will not recursively delete a replacement directory, and
+cannot escape through an ancestor, but the final leaf-name interval is not
+fully atomic. Windows deletion is bound to the opened object handle. This is a
+platform capability boundary, not something another managed path check can
+close. See the Linux man-pages documentation for
+[`unlinkat`](https://man7.org/linux/man-pages/man2/unlinkat.2.html) and
+Microsoft's documentation for
+[`SetFileInformationByHandle`](https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle).
 
 ### Required remediation
 
@@ -469,6 +493,29 @@ filesystem abstraction and cross-platform test matrix.
   - Links to ancestors/cycles.
   - Links whose targets change after validation.
   - Windows directory junctions.
+  - Target replacement after validation.
+  - Child-directory replacement between observation and open.
+
+### Native-removal checkpoint
+
+`fix/native-removal-hardening` implements the platform boundary without shell
+commands or recursive managed deletion:
+
+- `RemoveValidator` records the native identity of every allowed target; an
+  identity that cannot be captured is a hard refusal rather than a downgrade.
+- Windows retains one 1 KiB enumeration buffer per active depth, opens entries
+  with reparse-point semantics, compares volume/file IDs, and marks the opened
+  handle for deletion. The stack and buffers remain O(depth).
+- macOS and Linux retain one opened descriptor/`DIR*` per active depth and one
+  reusable 512-byte stat buffer for the whole operation. Device/inode checks
+  bind descent to the entry actually enumerated. Linux `openat2` also refuses
+  bind mounts; macOS refuses directory device changes.
+- Cancellation is checked between entries and before descent/deletion;
+  existing throttled progress, exact partial counts, bounded errors, and batch
+  accounting remain unchanged.
+- Deterministic tests replace the selected target after validation and replace
+  an observed child directory with an external link. Both original and
+  replacement data survive; traversal reports the identity change.
 
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
@@ -1295,12 +1342,11 @@ coordinated within their current scope:
 6. [x] Add log character/byte budgets and correct disk rotation.
 7. [x] Enforce aggregate disk retention during active-file growth and remove
    cancellation-callback execution from request/slot ownership locks.
-8. [x] Move inventory and removal I/O off the UI thread with cancellation, and
-   evaluate native handle-relative deletion for hostile same-user mutation.
-   The portable inventory/removal work is complete. The native evaluation
-   confirmed that supported .NET 10 APIs cannot make path validation and
-   deletion atomic; an audited Unix/Windows native implementation remains a
-   separate Finding 1 security follow-up rather than an implicit portable fix.
+8. [x] Move inventory and removal I/O off the UI thread with cancellation, then
+   implement the native removal boundary for hostile path replacement. Windows
+   deletion is opened-object-bound. Unix traversal is descriptor-relative and
+   identity-checked; its irreducible final non-directory name interval is
+   documented above rather than represented as fully atomic.
 9. [x] Finish metadata-preview deadlines and bounded scheduling. Search
    supersession, the whole-request deadline, a per-preview deadline, and a
    global four-process ceiling are complete.

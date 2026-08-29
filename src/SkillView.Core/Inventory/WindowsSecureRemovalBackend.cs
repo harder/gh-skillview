@@ -1,0 +1,526 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+namespace SkillView.Inventory;
+
+internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
+{
+    private const uint FileAttributeDirectory = 0x00000010;
+    private const uint FileAttributeReparsePoint = 0x00000400;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint FileListDirectory = 0x00000001;
+    private const uint FileReadAttributes = 0x00000080;
+    private const uint FileWriteAttributes = 0x00000100;
+    private const uint SynchronizeAccess = 0x00100000;
+    private const uint ShareRead = 0x00000001;
+    private const uint ShareWrite = 0x00000002;
+    private const uint ShareDelete = 0x00000004;
+    private const uint OpenExisting = 3;
+    private const uint BackupSemantics = 0x02000000;
+    private const uint OpenReparsePoint = 0x00200000;
+    private const int ErrorNoMoreFiles = 18;
+    private const int ErrorInvalidFunction = 1;
+    private const int ErrorInvalidParameter = 87;
+    private const int FileIdBothDirectoryInfo = 10;
+    private const int FileIdBothDirectoryRestartInfo = 11;
+    private const int FileDispositionInfo = 4;
+    private const int FileDispositionInfoEx = 21;
+    private const uint FileDispositionDelete = 0x00000001;
+    private const uint FileDispositionPosixSemantics = 0x00000002;
+    private const uint FileDispositionIgnoreReadonly = 0x00000010;
+
+    public bool TryCaptureIdentity(
+        string path,
+        out SecureFileIdentity identity,
+        out string? error)
+    {
+        identity = default;
+        error = null;
+        try
+        {
+            using var handle = OpenEntry(
+                path,
+                directory: Directory.Exists(path),
+                enumerateDirectory: false);
+            var information = ReadIdentity(handle);
+            identity = new SecureFileIdentity(
+                information.Volume,
+                information.FileId,
+                Path.GetFullPath(path),
+                information.IsDirectory,
+                information.IsReparsePoint);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public void RemoveTree(
+        string path,
+        SecureFileIdentity? expectedIdentity,
+        int maxDepth,
+        Action<string> entryObserved,
+        Action<string, bool> entryDeleted,
+        Action<string, string> failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var fullPath = Path.GetFullPath(path);
+        var frames = new Stack<DirectoryFrame>();
+        SafeFileHandle? root = null;
+        try
+        {
+            root = OpenEntry(fullPath, directory: true, enumerateDirectory: true);
+            var rootIdentity = ReadIdentity(root);
+            if (expectedIdentity is { } expected && !Matches(expected, rootIdentity))
+            {
+                failure(path, "selected target identity changed after validation");
+                return;
+            }
+            if (!rootIdentity.IsDirectory || rootIdentity.IsReparsePoint)
+            {
+                failure(path, "selected target is no longer a non-link directory");
+                return;
+            }
+
+            frames.Push(new DirectoryFrame(root, fullPath, rootIdentity, depth: 0));
+            root = null;
+            while (frames.TryPeek(out var frame))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (frame.TryReadNext(out var child, out var enumerationError))
+                {
+                    if (child is null) continue;
+                    var childPath = Path.Combine(frame.DisplayPath, child.Value.Name);
+                    entryObserved(childPath);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var isDirectory = (child.Value.Attributes & FileAttributeDirectory) != 0;
+                    var isReparsePoint =
+                        (child.Value.Attributes & FileAttributeReparsePoint) != 0;
+                    SafeFileHandle childHandle;
+                    try
+                    {
+                        childHandle = OpenEntry(
+                            childPath,
+                            directory: isDirectory,
+                            enumerateDirectory: isDirectory && !isReparsePoint);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        failure(childPath, ex.Message);
+                        frame.PreventDelete();
+                        continue;
+                    }
+
+                    var openedIdentity = ReadIdentity(childHandle);
+                    if (child.Value.FileId != openedIdentity.FileId
+                        || openedIdentity.Volume != rootIdentity.Volume
+                        || openedIdentity.IsDirectory != isDirectory
+                        || openedIdentity.IsReparsePoint != isReparsePoint)
+                    {
+                        childHandle.Dispose();
+                        failure(childPath, "entry identity changed during removal");
+                        frame.PreventDelete();
+                        continue;
+                    }
+
+                    if (isDirectory && !isReparsePoint)
+                    {
+                        if (frame.Depth >= maxDepth)
+                        {
+                            childHandle.Dispose();
+                            failure(childPath,
+                                $"directory nesting exceeds the safety limit of {maxDepth}");
+                            frame.PreventDelete();
+                            continue;
+                        }
+                        frames.Push(new DirectoryFrame(
+                            childHandle,
+                            childPath,
+                            openedIdentity,
+                            frame.Depth + 1));
+                        continue;
+                    }
+
+                    if (!TryDeleteHandle(childHandle, out var deleteError))
+                    {
+                        childHandle.Dispose();
+                        failure(childPath, deleteError!);
+                        frame.PreventDelete();
+                        continue;
+                    }
+                    childHandle.Dispose();
+                    entryDeleted(childPath, false);
+                    continue;
+                }
+
+                if (enumerationError is not null)
+                {
+                    failure(frame.DisplayPath, enumerationError);
+                    frame.PreventDelete();
+                }
+
+                frames.Pop();
+                if (frame.CanDelete)
+                {
+                    if (!TryDeleteHandle(frame.Directory, out var deleteError))
+                    {
+                        failure(frame.DisplayPath, deleteError!);
+                    }
+                    else
+                    {
+                        entryDeleted(frame.DisplayPath, true);
+                    }
+                }
+                frame.Dispose();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            failure(path, ex.Message);
+        }
+        finally
+        {
+            while (frames.Count > 0) frames.Pop().Dispose();
+            root?.Dispose();
+        }
+    }
+
+    public void RemoveLink(
+        string path,
+        Action<string, bool> entryDeleted,
+        Action<string, string> failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+            using var handle = OpenEntry(path, isDirectory, enumerateDirectory: false);
+            var identity = ReadIdentity(handle);
+            if (!identity.IsReparsePoint)
+            {
+                failure(path, "path is no longer a symlink or reparse point");
+                return;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryDeleteHandle(handle, out var deleteError))
+            {
+                failure(path, deleteError!);
+                return;
+            }
+            entryDeleted(path, false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            failure(path, ex.Message);
+        }
+    }
+
+    private static SafeFileHandle OpenEntry(
+        string path,
+        bool directory,
+        bool enumerateDirectory)
+    {
+        var desiredAccess = DeleteAccess
+            | FileReadAttributes
+            | FileWriteAttributes
+            | SynchronizeAccess;
+        if (enumerateDirectory) desiredAccess |= FileListDirectory;
+        var flags = OpenReparsePoint | (directory ? BackupSemantics : 0u);
+        var handle = WindowsNative.CreateFileW(
+            ToExtendedPath(path),
+            desiredAccess,
+            ShareRead | ShareWrite | ShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            flags,
+            IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            throw new IOException($"open '{path}' failed: {new Win32Exception(error).Message}");
+        }
+        return handle;
+    }
+
+    private static NativeIdentity ReadIdentity(SafeFileHandle handle)
+    {
+        if (!WindowsNative.GetFileInformationByHandle(handle, out var information))
+        {
+            throw new IOException(
+                $"inspect opened entry failed: {LastErrorMessage()}");
+        }
+        var fileId = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+        return new NativeIdentity(
+            information.VolumeSerialNumber,
+            fileId,
+            (information.FileAttributes & FileAttributeDirectory) != 0,
+            (information.FileAttributes & FileAttributeReparsePoint) != 0);
+    }
+
+    private static bool TryDeleteHandle(SafeFileHandle handle, out string? error)
+    {
+        var extended = new FileDispositionInfoExData
+        {
+            Flags = FileDispositionDelete
+                | FileDispositionPosixSemantics
+                | FileDispositionIgnoreReadonly,
+        };
+        if (WindowsNative.SetFileInformationByHandle(
+                handle,
+                FileDispositionInfoEx,
+                ref extended,
+                Marshal.SizeOf<FileDispositionInfoExData>()))
+        {
+            error = null;
+            return true;
+        }
+
+        var lastError = Marshal.GetLastPInvokeError();
+        if (lastError is ErrorInvalidFunction or ErrorInvalidParameter)
+        {
+            var legacy = new FileDispositionInfoData { DeleteFile = true };
+            if (WindowsNative.SetFileInformationByHandle(
+                    handle,
+                    FileDispositionInfo,
+                    ref legacy,
+                    Marshal.SizeOf<FileDispositionInfoData>()))
+            {
+                error = null;
+                return true;
+            }
+            lastError = Marshal.GetLastPInvokeError();
+        }
+
+        error = $"delete opened entry failed: {new Win32Exception(lastError).Message}";
+        return false;
+    }
+
+    private static bool Matches(SecureFileIdentity expected, NativeIdentity actual) =>
+        expected.Volume == actual.Volume
+        && expected.FileId == actual.FileId
+        && expected.IsDirectory == actual.IsDirectory
+        && expected.IsReparsePoint == actual.IsReparsePoint;
+
+    private static string ToExtendedPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (fullPath.StartsWith("\\\\?\\", StringComparison.Ordinal)) return fullPath;
+        if (fullPath.StartsWith("\\\\", StringComparison.Ordinal))
+        {
+            return "\\\\?\\UNC\\" + fullPath[2..];
+        }
+        return "\\\\?\\" + fullPath;
+    }
+
+    private static string LastErrorMessage() =>
+        new Win32Exception(Marshal.GetLastPInvokeError()).Message;
+
+    private readonly record struct NativeIdentity(
+        ulong Volume,
+        ulong FileId,
+        bool IsDirectory,
+        bool IsReparsePoint);
+
+    private readonly record struct DirectoryEntry(string Name, uint Attributes, ulong FileId);
+
+    private sealed class DirectoryFrame : IDisposable
+    {
+        private const int BufferSize = 1024;
+        private const int NextEntryOffset = 0;
+        private const int FileAttributesOffset = 56;
+        private const int FileNameLengthOffset = 60;
+        private const int FileIdOffset = 96;
+        private const int FileNameOffset = 104;
+
+        private readonly byte[] _buffer = new byte[BufferSize];
+        private bool _restart = true;
+        private bool _finished;
+        private int _offset;
+        private bool _hasBufferedEntry;
+
+        internal DirectoryFrame(
+            SafeFileHandle directory,
+            string displayPath,
+            NativeIdentity identity,
+            int depth)
+        {
+            Directory = directory;
+            DisplayPath = displayPath;
+            Identity = identity;
+            Depth = depth;
+        }
+
+        internal SafeFileHandle Directory { get; }
+        internal string DisplayPath { get; }
+        internal NativeIdentity Identity { get; }
+        internal int Depth { get; }
+        internal bool CanDelete { get; private set; } = true;
+
+        internal void PreventDelete() => CanDelete = false;
+
+        internal bool TryReadNext(out DirectoryEntry? entry, out string? error)
+        {
+            entry = null;
+            error = null;
+            if (_finished) return false;
+
+            while (true)
+            {
+                if (!_hasBufferedEntry)
+                {
+                    Array.Clear(_buffer);
+                    var informationClass = _restart
+                        ? FileIdBothDirectoryRestartInfo
+                        : FileIdBothDirectoryInfo;
+                    if (!WindowsNative.GetFileInformationByHandleEx(
+                            Directory,
+                            informationClass,
+                            _buffer,
+                            _buffer.Length))
+                    {
+                        var nativeError = Marshal.GetLastPInvokeError();
+                        _finished = true;
+                        if (nativeError != ErrorNoMoreFiles)
+                        {
+                            error = $"enumerate opened directory failed: "
+                                + new Win32Exception(nativeError).Message;
+                        }
+                        return false;
+                    }
+                    _restart = false;
+                    _offset = 0;
+                    _hasBufferedEntry = true;
+                }
+
+                var nameLength = BitConverter.ToInt32(_buffer, _offset + FileNameLengthOffset);
+                if (nameLength < 0 || nameLength > _buffer.Length - _offset - FileNameOffset)
+                {
+                    _finished = true;
+                    error = "opened-directory enumeration returned an invalid entry";
+                    return false;
+                }
+                var name = Encoding.Unicode.GetString(
+                    _buffer,
+                    _offset + FileNameOffset,
+                    nameLength);
+                var attributes = BitConverter.ToUInt32(
+                    _buffer,
+                    _offset + FileAttributesOffset);
+                var fileId = BitConverter.ToUInt64(_buffer, _offset + FileIdOffset);
+                var next = BitConverter.ToUInt32(_buffer, _offset + NextEntryOffset);
+                if (next == 0)
+                {
+                    _hasBufferedEntry = false;
+                }
+                else if (next > _buffer.Length - _offset)
+                {
+                    _finished = true;
+                    error = "opened-directory enumeration returned an invalid offset";
+                    return false;
+                }
+                else
+                {
+                    _offset += checked((int)next);
+                }
+
+                if (name is "." or "..") continue;
+                entry = new DirectoryEntry(name, attributes, fileId);
+                return true;
+            }
+        }
+
+        public void Dispose() => Directory.Dispose();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileTime
+    {
+        internal uint Low;
+        internal uint High;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        internal uint FileAttributes;
+        internal FileTime CreationTime;
+        internal FileTime LastAccessTime;
+        internal FileTime LastWriteTime;
+        internal uint VolumeSerialNumber;
+        internal uint FileSizeHigh;
+        internal uint FileSizeLow;
+        internal uint NumberOfLinks;
+        internal uint FileIndexHigh;
+        internal uint FileIndexLow;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileDispositionInfoExData
+    {
+        internal uint Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileDispositionInfoData
+    {
+        [MarshalAs(UnmanagedType.Bool)]
+        internal bool DeleteFile;
+    }
+
+    private static class WindowsNative
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern SafeFileHandle CreateFileW(
+            string fileName,
+            uint desiredAccess,
+            uint shareMode,
+            IntPtr securityAttributes,
+            uint creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetFileInformationByHandle(
+            SafeFileHandle file,
+            out ByHandleFileInformation information);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetFileInformationByHandleEx(
+            SafeFileHandle file,
+            int informationClass,
+            [Out] byte[] information,
+            int bufferSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetFileInformationByHandle(
+            SafeFileHandle file,
+            int informationClass,
+            ref FileDispositionInfoExData information,
+            int bufferSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetFileInformationByHandle(
+            SafeFileHandle file,
+            int informationClass,
+            ref FileDispositionInfoData information,
+            int bufferSize);
+    }
+}

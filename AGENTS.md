@@ -148,10 +148,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   All non-canceled return paths, including validation refusals, must publish a
   terminal completed progress update with exact processed/deleted/error counts.
   CLI JSON must not duplicate validation refusals or unaccepted warnings into
-  `runtimeErrors`. Do not claim the path checks are atomic
-  against a hostile same-user process:
-  supported .NET 10 deletion APIs remain path-based on Windows and Unix;
-  native handle-relative deletion is separate follow-up work.
+  `runtimeErrors`. Real removals on supported platforms must stay on
+  `SecureRemovalBackend`: validation pins the target's native volume/device and
+  file/inode identity; Windows enumerates opened directory handles and deletes
+  opened objects with `FileDispositionInfoEx`; Unix walks canonicalized paths
+  through `openat`, enumerates opened directory descriptors, compares
+  device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
+  and filesystem mounts, refuses device changes on macOS, and deletes with
+  `unlinkat`. Do not fall back to path-recursive deletion on Windows, macOS, or
+  Linux. Do not overstate the Unix guarantee: POSIX has no general unlink-by-
+  descriptor operation, so the final `fstatat` → `unlinkat` leaf-name interval
+  remains non-atomic against a process with the same UID. It cannot redirect
+  recursive traversal through an ancestor or replacement directory.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

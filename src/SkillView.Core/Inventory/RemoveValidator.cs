@@ -17,6 +17,7 @@ public static class RemoveValidator
         OutsideKnownRoots,
         ResolvedOutsideKnownRoots,
         AncestorSymlinkEscapesRoot,
+        FilesystemIdentityUnavailable,
         NotASkillDirectory,
         ContainsGitDirectory,
         TargetIsScanRoot,
@@ -41,6 +42,7 @@ public static class RemoveValidator
     {
         public bool Allowed => Errors.IsDefaultOrEmpty || Errors.Length == 0;
         public bool RequiresSecondConfirm => Warnings.Length > 0;
+        internal SecureFileIdentity? ExecutionIdentity { get; init; }
     }
 
     /// Validate removal of `target`. `knownRoots` is the union of scan roots
@@ -163,11 +165,32 @@ public static class RemoveValidator
             }
         }
 
+        SecureFileIdentity? executionIdentity = null;
+        if (errors.Count == 0)
+        {
+            if (SecureRemovalBackend.TryCaptureIdentity(
+                    resolved,
+                    out var capturedIdentity,
+                    out var identityError))
+            {
+                executionIdentity = capturedIdentity;
+            }
+            else
+            {
+                errors.Add(new Error(
+                    ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected filesystem object: {identityError}"));
+            }
+        }
+
         return new RemoveValidation(
             errors.ToImmutable(),
             warnings.ToImmutable(),
             resolved,
-            incoming);
+            incoming)
+        {
+            ExecutionIdentity = executionIdentity,
+        };
     }
 
     private static bool LooksLikeSkill(string dir)

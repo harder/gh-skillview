@@ -274,6 +274,63 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_TargetReplacedAfterValidation_RefusesBothObjects()
+    {
+        var (skill, dir) = MakeSkill("target-replaced");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        Assert.True(validation.Allowed);
+        Assert.NotNull(validation.ExecutionIdentity);
+
+        var original = Path.Combine(_tempRoot, "target-replaced-original");
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(dir);
+        var replacementFile = Path.Combine(dir, "replacement.txt");
+        File.WriteAllText(replacementFile, "keep replacement");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(File.Exists(Path.Combine(original, "SKILL.md")));
+        Assert.Equal("keep replacement", File.ReadAllText(replacementFile));
+    }
+
+    [Fact]
+    public void Remove_DirectoryReplacedWhileObserved_DoesNotTraverseReplacement()
+    {
+        var (skill, dir) = MakeSkill("directory-swap");
+        var nested = Path.Combine(dir, "nested");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, "original.txt"), "original");
+        var external = Path.Combine(_tempRoot, "directory-swap-external");
+        Directory.CreateDirectory(external);
+        var externalFile = Path.Combine(external, "must-survive.txt");
+        File.WriteAllText(externalFile, "keep");
+        var movedOriginal = Path.Combine(_tempRoot, "directory-swap-original");
+        var swapped = false;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var service = new RemoveService(_logger, observed =>
+        {
+            if (swapped || !PathIdentity.Equals(observed, nested)) return;
+            Directory.Move(nested, movedOriginal);
+            swapped = TryCreateDirectoryLink(nested, external);
+        });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        if (!swapped) return;
+        Assert.False(report.Succeeded);
+        Assert.True(File.Exists(externalFile));
+        Assert.Equal("keep", File.ReadAllText(externalFile));
+        Assert.True(File.Exists(Path.Combine(movedOriginal, "original.txt")));
+    }
+
+    [Fact]
     public void Remove_AlreadyCanceled_DoesNotTouchDisk()
     {
         var (skill, dir) = MakeSkill("canceled", extraFiles: 2, nestedDirs: 1);

@@ -6,9 +6,9 @@ using SkillView.Logging;
 
 namespace SkillView.Inventory;
 
-/// Executes a validated removal with per-file .NET APIs ("never compose
-/// file ops via shell"). Partial failures are logged and survivable: the
-/// method walks every file and collects errors rather than aborting at the
+/// Executes a validated removal without composing file operations through a
+/// shell. Supported platforms use opened-directory/native-handle traversal;
+/// partial failures are logged and survivable rather than aborting at the
 /// first one.
 public sealed class RemoveService
 {
@@ -85,11 +85,10 @@ public sealed class RemoveService
     /// Removes a previously-validated skill directory. Callers MUST run
     /// `RemoveValidator.Validate` first and honor its errors and warnings;
     /// this method does NOT re-run the policy rules. Execution still rechecks
-    /// that every entry is inside the selected target and that no ancestor
-    /// introduced after validation is a reparse point. These supported .NET
-    /// path APIs fail closed for links observed before each operation, but they
-    /// cannot make validation and deletion atomic against another same-user
-    /// process replacing a path component in the intervening instruction window.
+    /// that the selected filesystem object still has the identity captured by
+    /// validation. Native traversal holds directory handles while enumerating
+    /// and deleting children, so replacing an ancestor pathname cannot redirect
+    /// recursion into another tree.
     public RemoveReport Remove(
         RemoveValidator.RemoveValidation validation,
         Options? options = null,
@@ -130,7 +129,29 @@ public sealed class RemoveService
 
             try
             {
-                TryDeleteSymlink(target);
+                if (SecureRemovalBackend.IsSupported)
+                {
+                    var linkErrors = new FailureCollector();
+                    SecureRemovalBackend.RemoveLink(
+                        target,
+                        (_, _) => { },
+                        (path, detail) => RecordFailure(path, detail, linkErrors),
+                        cancellationToken);
+                    if (linkErrors.Count > 0)
+                    {
+                        progressTracker.Publish(1, 0, 0, linkErrors.Count, target,
+                            force: true, isCompleted: true);
+                        return new RemoveReport(false, target, 0, 0,
+                            linkErrors.ToImmutable(), DryRun: false)
+                        {
+                            ErrorCount = linkErrors.Count,
+                        };
+                    }
+                }
+                else
+                {
+                    TryDeleteSymlink(target);
+                }
                 _logger.Info("remove", $"removed symlink {target}");
                 progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
@@ -149,6 +170,15 @@ public sealed class RemoveService
             _logger.Warn("remove", $"target missing at execute time: {target}");
             progressTracker.Publish(1, 0, 0, 1, target, force: true, isCompleted: true);
             return RemoveReport.Refused(target, $"target '{target}' no longer exists");
+        }
+
+        if (!options.DryRun && SecureRemovalBackend.IsSupported)
+        {
+            return RemoveWithSecureBackend(
+                validation,
+                target,
+                cancellationToken,
+                progressTracker);
         }
 
         var errors = new FailureCollector();
@@ -360,7 +390,34 @@ public sealed class RemoveService
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                TryDeleteSymlink(fullPath);
+                if (SecureRemovalBackend.IsSupported)
+                {
+                    var errors = new FailureCollector();
+                    SecureRemovalBackend.RemoveLink(
+                        fullPath,
+                        (_, _) => { },
+                        (path, detail) => RecordFailure(path, detail, errors),
+                        cancellationToken);
+                    if (errors.Count > 0)
+                    {
+                        progressTracker.Publish(1, 0, 0, errors.Count, fullPath,
+                            force: true, isCompleted: true);
+                        return new RemoveReport(
+                            Succeeded: false,
+                            ResolvedPath: fullPath,
+                            FilesDeleted: 0,
+                            DirectoriesDeleted: 0,
+                            Errors: errors.ToImmutable(),
+                            DryRun: false)
+                        {
+                            ErrorCount = errors.Count,
+                        };
+                    }
+                }
+                else
+                {
+                    TryDeleteSymlink(fullPath);
+                }
                 _logger.Info("remove.agent", $"unlinked {fullPath}");
                 progressTracker.Publish(1, 1, 0, 0, fullPath, force: true, isCompleted: true);
                 return new RemoveReport(
@@ -389,6 +446,68 @@ public sealed class RemoveService
                     DryRun: false);
             }
         });
+
+    private RemoveReport RemoveWithSecureBackend(
+        RemoveValidator.RemoveValidation validation,
+        string target,
+        CancellationToken cancellationToken,
+        ProgressTracker progressTracker)
+    {
+        var errors = new FailureCollector();
+        var files = 0;
+        var directories = 0;
+        try
+        {
+            SecureRemovalBackend.RemoveTree(
+                target,
+                validation.ExecutionIdentity,
+                MaxTraversalDepth,
+                path =>
+                {
+                    _entryObservedForTests?.Invoke(path);
+                    progressTracker.Publish(0, files, directories, errors.Count, path);
+                },
+                (path, isDirectory) =>
+                {
+                    if (isDirectory) directories++;
+                    else files++;
+                    progressTracker.Publish(0, files, directories, errors.Count, path);
+                },
+                (path, detail) =>
+                {
+                    RecordFailure(path, detail, errors);
+                    progressTracker.Publish(0, files, directories, errors.Count, path);
+                },
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            progressTracker.Publish(0, files, directories, errors.Count, target,
+                force: true, isCanceled: true);
+            throw;
+        }
+
+        if (errors.Count == 0)
+        {
+            _logger.Info("remove", $"removed {target}: {files} file(s), {directories} dir(s)");
+        }
+        else
+        {
+            _logger.Error("remove", $"remove {target} completed with {errors.Count} error(s)");
+        }
+        progressTracker.Publish(1, files, directories, errors.Count, target,
+            force: true, isCompleted: true);
+        return new RemoveReport(
+            Succeeded: errors.Count == 0,
+            ResolvedPath: target,
+            FilesDeleted: files,
+            DirectoriesDeleted: directories,
+            Errors: errors.ToImmutable(),
+            DryRun: false)
+        {
+            ErrorCount = errors.Count,
+        };
+    }
 
     private static void PopAndDispose(Stack<TraversalFrame> frames) =>
         frames.Pop().Dispose();
