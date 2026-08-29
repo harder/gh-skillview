@@ -24,6 +24,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const int ErrorInvalidFunction = 1;
     private const int ErrorNotSupported = 50;
     private const int ErrorInvalidParameter = 87;
+    private const int FileBasicInfo = 0;
     private const int FileIdInfo = 18;
     private const int FileIdExtdDirectoryInfo = 19;
     private const int FileIdExtdDirectoryRestartInfo = 20;
@@ -60,7 +61,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 information.FileIdHigh,
                 ReadFinalPath(handle),
                 information.IsDirectory,
-                information.IsReparsePoint);
+                information.IsReparsePoint,
+                WindowsCreationTime: information.CreationTime,
+                WindowsChangeTime: information.ChangeTime);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -199,6 +202,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                         var openedIdentity = ReadIdentity(childHandle);
                         if (child.Value.FileIdLow != openedIdentity.FileIdLow
                             || child.Value.FileIdHigh != openedIdentity.FileIdHigh
+                            || child.Value.CreationTime != openedIdentity.CreationTime
+                            || child.Value.ChangeTime != openedIdentity.ChangeTime
                             || openedIdentity.Volume != rootIdentity.Volume
                             || openedIdentity.IsDirectory != isDirectory
                             || openedIdentity.IsReparsePoint != isReparsePoint)
@@ -348,7 +353,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             identity.FileIdHigh,
             canonicalPath,
             identity.IsDirectory,
-            identity.IsReparsePoint);
+            identity.IsReparsePoint,
+            WindowsCreationTime: identity.CreationTime,
+            WindowsChangeTime: identity.ChangeTime);
 
     private static SafeFileHandle OpenCanonicalDirectory(string path)
     {
@@ -490,15 +497,21 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private static NativeIdentity ReadIdentity(SafeFileHandle handle)
     {
-        if (!WindowsNative.GetFileInformationByHandle(handle, out var information))
+        FileBasicInfoData basicInformation;
+        if (!WindowsNative.GetFileInformationByHandleEx(
+                handle,
+                FileBasicInfo,
+                out basicInformation,
+                Marshal.SizeOf<FileBasicInfoData>()))
         {
             throw new IOException(
-                $"inspect opened entry failed: {LastErrorMessage()}");
+                $"inspect opened entry metadata failed: {LastErrorMessage()}");
         }
+        FileIdInfoData fileIdInformation;
         if (!WindowsNative.GetFileInformationByHandleEx(
                 handle,
                 FileIdInfo,
-                out var fileIdInformation,
+                out fileIdInformation,
                 Marshal.SizeOf<FileIdInfoData>()))
         {
             throw new IOException(
@@ -508,8 +521,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             fileIdInformation.VolumeSerialNumber,
             fileIdInformation.FileId.Low,
             fileIdInformation.FileId.High,
-            (information.FileAttributes & FileAttributeDirectory) != 0,
-            (information.FileAttributes & FileAttributeReparsePoint) != 0);
+            basicInformation.CreationTime,
+            basicInformation.ChangeTime,
+            (basicInformation.FileAttributes & FileAttributeDirectory) != 0,
+            (basicInformation.FileAttributes & FileAttributeReparsePoint) != 0);
     }
 
     private static bool TryDeleteHandle(SafeFileHandle handle, out string? error)
@@ -554,6 +569,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         expected.Volume == actual.Volume
         && expected.FileIdLow == actual.FileIdLow
         && expected.FileIdHigh == actual.FileIdHigh
+        && expected.WindowsCreationTime == actual.CreationTime
+        && expected.WindowsChangeTime == actual.ChangeTime
         && expected.IsDirectory == actual.IsDirectory
         && expected.IsReparsePoint == actual.IsReparsePoint;
 
@@ -622,6 +639,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         ulong Volume,
         ulong FileIdLow,
         ulong FileIdHigh,
+        long CreationTime,
+        long ChangeTime,
         bool IsDirectory,
         bool IsReparsePoint);
 
@@ -629,12 +648,16 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         string Name,
         uint Attributes,
         ulong FileIdLow,
-        ulong FileIdHigh);
+        ulong FileIdHigh,
+        long CreationTime,
+        long ChangeTime);
 
     private sealed class DirectoryFrame : IDisposable
     {
         private const int BufferSize = 1024;
         private const int NextEntryOffset = 0;
+        private const int CreationTimeOffset = 8;
+        private const int ChangeTimeOffset = 32;
         private const int FileAttributesOffset = 56;
         private const int FileNameLengthOffset = 60;
         private const int FileIdLowOffset = 72;
@@ -715,6 +738,12 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 var attributes = BitConverter.ToUInt32(
                     _buffer,
                     _offset + FileAttributesOffset);
+                var creationTime = BitConverter.ToInt64(
+                    _buffer,
+                    _offset + CreationTimeOffset);
+                var changeTime = BitConverter.ToInt64(
+                    _buffer,
+                    _offset + ChangeTimeOffset);
                 var fileIdLow = BitConverter.ToUInt64(_buffer, _offset + FileIdLowOffset);
                 var fileIdHigh = BitConverter.ToUInt64(_buffer, _offset + FileIdHighOffset);
                 var next = BitConverter.ToUInt32(_buffer, _offset + NextEntryOffset);
@@ -734,19 +763,18 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 }
 
                 if (name is "." or "..") continue;
-                entry = new DirectoryEntry(name, attributes, fileIdLow, fileIdHigh);
+                entry = new DirectoryEntry(
+                    name,
+                    attributes,
+                    fileIdLow,
+                    fileIdHigh,
+                    creationTime,
+                    changeTime);
                 return true;
             }
         }
 
         public void Dispose() => Directory.Dispose();
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct FileTime
-    {
-        internal uint Low;
-        internal uint High;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -776,18 +804,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct ByHandleFileInformation
+    private struct FileBasicInfoData
     {
+        internal long CreationTime;
+        internal long LastAccessTime;
+        internal long LastWriteTime;
+        internal long ChangeTime;
         internal uint FileAttributes;
-        internal FileTime CreationTime;
-        internal FileTime LastAccessTime;
-        internal FileTime LastWriteTime;
-        internal uint VolumeSerialNumber;
-        internal uint FileSizeHigh;
-        internal uint FileSizeLow;
-        internal uint NumberOfLinks;
-        internal uint FileIndexHigh;
-        internal uint FileIndexLow;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -850,16 +873,18 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool GetFileInformationByHandle(
+        internal static extern bool GetFileInformationByHandleEx(
             SafeFileHandle file,
-            out ByHandleFileInformation information);
+            int informationClass,
+            out FileIdInfoData information,
+            int bufferSize);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool GetFileInformationByHandleEx(
             SafeFileHandle file,
             int informationClass,
-            out FileIdInfoData information,
+            out FileBasicInfoData information,
             int bufferSize);
 
         [DllImport("kernel32.dll", SetLastError = true)]

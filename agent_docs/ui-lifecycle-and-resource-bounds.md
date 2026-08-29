@@ -106,9 +106,11 @@ logging, or subprocess adapters.
   come from opened handles, not lexical normalization: Windows uses
   `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
   `fgetattrlist`, and Linux reads `/proc/self/fd`. Windows removal compares full
-  128-bit file IDs, opens enumerated children and links relative to the held
-  parent handle with `NtOpenFile` and `OBJECT_ATTRIBUTES.RootDirectory`, and
-  deletes opened handles; Unix removal walks and enumerates opened directory
+  128-bit file IDs plus `FILE_BASIC_INFO.CreationTime`/`ChangeTime`, opens
+  enumerated children and links relative to the held parent handle with
+  `NtOpenFile` and
+  `OBJECT_ATTRIBUTES.RootDirectory`, and deletes opened handles; Unix removal
+  walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
   mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
   Linux backend probes the exact `openat2` contract at startup and remains
@@ -143,9 +145,11 @@ logging, or subprocess adapters.
   final candidate with `O_NOFOLLOW | O_DIRECTORY`; do not reuse final-following
   canonicalization for this purpose. Review each native operation as an
   observe/reopen/compare/delete chain and reject reconstructed child paths once
-  a parent handle exists. Regression coverage includes Windows ancestor
-  replacement plus a matching hard link, Unix final-component link replacement,
-  and same-inode generation reuse.
+  a parent handle exists. Every platform comparison includes both its full
+  native object ID and a change-time/generation signal; do not scope immediate
+  ID reuse reasoning or tests to Unix. Regression coverage includes Windows
+  ancestor replacement plus a matching hard link, final-component link
+  replacement, and same-ID generation reuse on each supported OS.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

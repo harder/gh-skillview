@@ -623,6 +623,17 @@ red flag. The corresponding adversarial matrix combines ancestor rename and
 replacement with hard links, final-component symlink replacement, and immediate
 identifier reuse instead of testing each mechanism in isolation.
 
+Windows CI then exposed the analogous generation mistake in the updated test
+expectations: replacing a link could immediately reuse its file ID, and adding a
+child changed an empty directory without changing its file ID. Treating that as
+a Windows-only test exception would have preserved the same class of bug. The
+Windows backend now captures `FILE_BASIC_INFO.CreationTime` and `ChangeTime`
+alongside the full 128-bit ID for selected directories, parents, links, and
+opened enumerated entries. The broader invariant is platform-neutral: an
+object ID identifies a filesystem slot, while the platform
+change-time/generation signal binds the validated incarnation occupying that
+slot.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

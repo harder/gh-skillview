@@ -159,8 +159,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
   never only from lexical normalization; canonicalize scan roots through the
   same handle-based path before comparing them. Windows uses `FileIdInfo`
-  and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared,
-  enumerates opened directory handles, opens every enumerated child and link
+  and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared, and
+  pairs them with `FILE_BASIC_INFO.CreationTime`/`ChangeTime` for selected
+  directories, parents, links, and enumerated entries so immediate ID reuse is
+  refused. It enumerates opened directory handles, opens every enumerated child and link
   relative to its held parent with `NtOpenFile`/`OBJECT_ATTRIBUTES.RootDirectory`,
   and deletes opened objects with
   `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
@@ -205,9 +207,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   no-follow and directory-only flags. Only non-destructive canonicalization may
   follow the final component. When reviewing this boundary, inventory every
   observe → reopen → compare → delete step: a child path reconstructed after a
-  parent handle was acquired is not an authority address. Adversarial coverage
-  must combine ancestor rename/replacement with hard links, final-component
-  symlink replacement, and immediate native-identifier reuse.
+  parent handle was acquired is not an authority address. Require both the
+  platform's full native object ID and its generation/change-time signal at
+  every reopen boundary; never assume ID reuse is Unix-only. Adversarial
+  coverage must combine ancestor rename/replacement with hard links,
+  final-component symlink replacement, and immediate native-identifier reuse
+  on every supported OS.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

@@ -8,7 +8,9 @@ internal readonly record struct SecureFileIdentity(
     bool IsDirectory,
     bool IsReparsePoint,
     long ChangeTimeSeconds = 0,
-    long ChangeTimeNanoseconds = 0);
+    long ChangeTimeNanoseconds = 0,
+    long WindowsCreationTime = 0,
+    long WindowsChangeTime = 0);
 
 internal readonly record struct SecureLinkIdentity(
     SecureFileIdentity ParentIdentity,
