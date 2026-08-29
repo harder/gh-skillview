@@ -105,7 +105,11 @@ logging, or subprocess adapters.
   canonical deletion address. The canonical address and canonical scan roots
   come from opened handles, not lexical normalization: Windows uses
   `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
-  `fgetattrlist`, and Linux reads `/proc/self/fd`. Windows removal compares full
+  `fgetattrlist`, and Linux reads `/proc/self/fd`. Because Linux's unescaped
+  ` (deleted)` annotation is also legal filename text, a returned path ending
+  with it is accepted only when that name's native identity and generation
+  match the still-open descriptor; suffix text alone is not evidence that the
+  entry was unlinked. Windows removal compares full
   128-bit file IDs plus `FILE_BASIC_INFO.CreationTime`/`ChangeTime`, opens
   enumerated children and links relative to the held parent handle with
   `NtOpenFile` and

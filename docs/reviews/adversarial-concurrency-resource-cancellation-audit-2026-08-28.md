@@ -656,6 +656,17 @@ The analogous review also revisited Windows access masks. Native opens requested
 and handle disposition requires `DELETE`; the unrelated access bit could reject
 otherwise-authorized removals and has been removed.
 
+A subsequent Linux review found that `/proc/self/fd` appends the unescaped text
+` (deleted)` to an unlinked entry, even though the same suffix is legal in a
+live filename. Final-path capture previously rejected every such suffix and
+therefore refused valid skills or scan roots with that name. The Linux backend
+now stats the returned absolute name without following its final component and
+compares the full device, inode, type, and change-time generation with the open
+descriptor before and after that lookup. A matching live name is accepted;
+an absent, replaced, or unstable name fails closed. Regression tests cover both
+the legitimate-name case and an unlinked directory colliding with a replacement
+at the annotated pathname.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

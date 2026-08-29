@@ -10,6 +10,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     private const int StatBufferSize = 512;
     private const int InitialLinuxFinalPathCapacity = 512;
     private const int MaxLinuxFinalPathCapacity = 32_768;
+    private const string LinuxDeletedPathSuffix = " (deleted)";
     private const int MacAttributeBufferCapacity = 8_192;
     private const uint FileTypeMask = 0xF000;
     private const uint DirectoryType = 0x4000;
@@ -744,10 +745,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                     var path = Marshal.PtrToStringUTF8(buffer, checked((int)length))
                         ?? throw new IOException(
                             "resolve opened entry returned an invalid path");
-                    if (path.EndsWith(" (deleted)", StringComparison.Ordinal))
+                    if (path.EndsWith(LinuxDeletedPathSuffix, StringComparison.Ordinal)
+                        && !LinuxFinalPathNamesOpenedEntry(handle, path))
                     {
                         throw new IOException(
-                            "opened entry was unlinked while its identity was captured");
+                            "opened entry was unlinked or replaced while its identity was captured");
                     }
                     return Path.GetFullPath(path);
                 }
@@ -761,6 +763,30 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
         throw new IOException(
             $"resolved opened entry path exceeds {MaxLinuxFinalPathCapacity} bytes");
+    }
+
+    private static bool LinuxFinalPathNamesOpenedEntry(
+        SafeUnixHandle handle,
+        string path)
+    {
+        using var statBuffer = new StatBuffer();
+        var before = ReadStat(handle, statBuffer.Pointer);
+        if (UnixNative.fstatat(
+                UnixConstants.CurrentWorkingDirectory,
+                path,
+                statBuffer.Pointer,
+                UnixConstants.NoFollowFlag) != 0)
+        {
+            var nativeError = Marshal.GetLastPInvokeError();
+            if (nativeError is 2 or 20) return false;
+            throw new IOException(
+                $"verify opened entry path failed: "
+                + new Win32Exception(nativeError).Message);
+        }
+
+        var named = ParseStat(statBuffer.Pointer);
+        var after = ReadStat(handle, statBuffer.Pointer);
+        return Matches(before, named) && Matches(before, after);
     }
 
     private static NativeStat ReadStat(SafeUnixHandle handle, IntPtr buffer)

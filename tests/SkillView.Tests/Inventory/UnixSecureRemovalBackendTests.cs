@@ -160,6 +160,49 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
+    public void TryCaptureIdentity_LiveDirectoryNamedDeletedSuffix_Succeeds()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var directory = Path.Combine(_tempRoot, "live-directory (deleted)");
+        Directory.CreateDirectory(directory);
+
+        var captured = new UnixSecureRemovalBackend().TryCaptureIdentity(
+            directory,
+            out var identity,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.Equal(Path.GetFullPath(directory), identity.CanonicalPath);
+    }
+
+    [Fact]
+    public void TryCaptureDirectoryValidation_UnlinkedDirectoryWithAnnotatedReplacement_FailsClosed()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var directory = Path.Combine(_tempRoot, "unlinked-directory");
+        var annotatedReplacement = directory + " (deleted)";
+        Directory.CreateDirectory(directory);
+        var backend = new UnixSecureRemovalBackend(() =>
+        {
+            Directory.Delete(directory);
+            Directory.CreateDirectory(annotatedReplacement);
+        });
+
+        var captured = backend.TryCaptureDirectoryValidation(
+            directory,
+            out _,
+            out var error);
+
+        Assert.False(captured);
+        Assert.Contains("unlinked or replaced", error);
+        Assert.True(Directory.Exists(annotatedReplacement));
+    }
+
+    [Fact]
     public void TryCaptureDirectoryValidation_AncestorAba_InspectsOpenedDirectory()
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;

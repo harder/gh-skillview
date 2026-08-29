@@ -158,7 +158,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   come from the opened object (`GetFinalPathNameByHandleW` on Windows,
   `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
   never only from lexical normalization; canonicalize scan roots through the
-  same handle-based path before comparing them. Windows uses `FileIdInfo`
+  same handle-based path before comparing them. Linux does not escape its
+  ` (deleted)` `/proc/self/fd` annotation, so a live name can legitimately end
+  with that text; disambiguate it by comparing the named path's full native
+  identity and generation with the still-open descriptor, never by suffix
+  rejection alone. Windows uses `FileIdInfo`
   and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared, and
   pairs them with `FILE_BASIC_INFO.CreationTime`/`ChangeTime` for selected
   directories plus validated parents and links so immediate ID reuse is
