@@ -11,6 +11,14 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     private const uint DirectoryType = 0x4000;
     private const uint SymlinkType = 0xA000;
 
+    internal static bool IsSupportedOnCurrentPlatform =>
+        OperatingSystem.IsMacOS()
+        || (OperatingSystem.IsLinux()
+            && TryGetLinuxStatLayout(
+                RuntimeInformation.ProcessArchitecture,
+                BitConverter.IsLittleEndian,
+                out _));
+
     public bool TryCaptureIdentity(
         string path,
         out SecureFileIdentity identity,
@@ -480,10 +488,38 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             return new NativeStat(device, inode, mode);
         }
 
+        if (!OperatingSystem.IsLinux()
+            || !TryGetLinuxStatLayout(
+                RuntimeInformation.ProcessArchitecture,
+                BitConverter.IsLittleEndian,
+                out var layout))
+        {
+            throw new PlatformNotSupportedException(
+                $"The native stat layout for {RuntimeInformation.OSDescription} "
+                + $"({RuntimeInformation.ProcessArchitecture}) is not supported.");
+        }
+
         return new NativeStat(
-            unchecked((ulong)Marshal.ReadInt64(buffer, 0)),
-            unchecked((ulong)Marshal.ReadInt64(buffer, 8)),
-            unchecked((uint)Marshal.ReadInt32(buffer, 24)));
+            unchecked((ulong)Marshal.ReadInt64(buffer, layout.DeviceOffset)),
+            unchecked((ulong)Marshal.ReadInt64(buffer, layout.InodeOffset)),
+            unchecked((uint)Marshal.ReadInt32(buffer, layout.ModeOffset)));
+    }
+
+    internal static bool TryGetLinuxStatLayout(
+        Architecture architecture,
+        bool isLittleEndian,
+        out LinuxStatLayout layout)
+    {
+        // .NET's supported Linux x64 and ARM64 targets use the libc ABI layouts
+        // below. Refuse unknown architectures and endianness rather than reading
+        // an unverified field from the native buffer.
+        layout = (architecture, isLittleEndian) switch
+        {
+            (Architecture.X64, true) => new LinuxStatLayout(0, 8, 24),
+            (Architecture.Arm64, true) => new LinuxStatLayout(0, 8, 16),
+            _ => default,
+        };
+        return layout != default;
     }
 
     private static bool Matches(SecureFileIdentity expected, NativeStat actual) =>
@@ -509,6 +545,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         internal bool IsDirectory => FileType == DirectoryType;
         internal bool IsSymlink => FileType == SymlinkType;
     }
+
+    internal readonly record struct LinuxStatLayout(
+        int DeviceOffset,
+        int InodeOffset,
+        int ModeOffset);
 
     private readonly record struct DirectoryEntry(string Name, ulong Inode);
 

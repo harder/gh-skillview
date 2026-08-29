@@ -159,10 +159,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   through `openat`, enumerates opened directory descriptors, compares
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
-  `unlinkat`. Do not fall back to path-recursive deletion on Windows, macOS, or
-  Linux. Keep cancellation checks immediately before every native destructive
-  call and dispose handles even when identity inspection, callbacks, or those
-  checks throw. Do not overstate the Unix guarantee: POSIX has no general
+  `unlinkat`. Linux native `stat` parsing must select the verified layout for
+  the current process architecture: little-endian x64 reads `st_mode` at byte
+  24, little-endian ARM64 at byte 16, and unverified architectures or
+  endianness disable secure removal rather than guessing. Do not fall back to
+  path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
+  checks immediately before every native destructive call and dispose handles
+  even when identity inspection, callbacks, or those checks throw. Do not
+  overstate the Unix guarantee: POSIX has no general
   unlink-by-descriptor operation, so the final `fstatat` → `unlinkat` name
   interval remains non-atomic for every entry, including directories and the
   selected root, against a process with the same UID. It cannot redirect

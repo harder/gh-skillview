@@ -114,6 +114,10 @@ logging, or subprocess adapters.
   held-directory design prevents a replacement ancestor or child directory
   from redirecting recursive traversal, though an empty final-name replacement
   can be removed.
+  Linux `struct stat` is architecture-specific: the secure backend explicitly
+  selects the verified little-endian x64 or ARM64 layout and stays disabled on
+  unverified architectures or endianness instead of interpreting arbitrary
+  buffer offsets.
   Real directory execution fails closed without a pinned native identity.
   Empty-directory cleanup is a distinct execution contract: validation pins
   the identity and native traversal refuses immediately if it observes any

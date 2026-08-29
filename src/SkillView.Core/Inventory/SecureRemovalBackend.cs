@@ -102,7 +102,8 @@ internal static class SecureRemovalBackend
     private static ISecureRemovalBackend? Create()
     {
         if (OperatingSystem.IsWindows()) return new WindowsSecureRemovalBackend();
-        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        if ((OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            && UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform)
         {
             return new UnixSecureRemovalBackend();
         }
