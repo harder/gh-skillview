@@ -584,6 +584,16 @@ reads the final path from `/proc/self/fd`; macOS uses the fixed-signature
 offset validation. Thus all three supported operating-system families bind the
 policy address and identity to the same opened object.
 
+The first Linux CI run then exposed an additional identity subtlety: ext4
+immediately recycled the removed test symlink's inode, so device/inode alone
+accepted the replacement even though the implementation had followed the
+review literally. Unix link identity now also retains and compares `st_ctim`
+seconds/nanoseconds. Directory traversal uses the same stronger comparison
+between observations and at the destructive boundary; for the final directory
+name it compares a fresh stat of the still-open descriptor to `fstatat`, since
+deleting children legitimately changes the directory's change time. The
+verified Linux x64 and ARM64 layouts both place those fields at bytes 104/112.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

@@ -41,7 +41,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                     0,
                     canonicalPath,
                     IsDirectory: stat.IsDirectory,
-                    IsReparsePoint: stat.IsSymlink);
+                    IsReparsePoint: stat.IsSymlink,
+                    stat.ChangeTimeSeconds,
+                    stat.ChangeTimeNanoseconds);
                 return true;
             }
         }
@@ -161,7 +163,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 parent,
                 targetName,
                 canonicalPath,
-                targetStat,
                 depth: 0,
                 ownsParent: true));
             target = null;
@@ -233,7 +234,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                                 frame.Directory,
                                 child.Value.Name,
                                 childPath,
-                                openedStat,
                                 frame.Depth + 1,
                                 ownsParent: false));
                             childHandle = null;
@@ -285,9 +285,12 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 {
                     if (frame.CanDelete)
                     {
+                        var openedBeforeDelete = ReadStat(
+                            frame.Directory,
+                            statBuffer.Pointer);
                         if (!TryReadStatAt(frame.Parent, frame.Name, statBuffer.Pointer,
                                 out var beforeDelete, out var statError)
-                            || !Matches(frame.Identity, beforeDelete))
+                            || !Matches(openedBeforeDelete, beforeDelete))
                         {
                             failure(frame.DisplayPath,
                                 statError ?? "directory identity changed before deletion");
@@ -358,7 +361,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 failure(path, statError!);
                 return;
             }
-            if (!Matches(expectedIdentity.LinkIdentity, identity)
+            if (!MatchesLink(expectedIdentity.LinkIdentity, identity)
                 || !identity.IsSymlink)
             {
                 failure(path, "link identity changed after validation");
@@ -368,7 +371,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
                     out var beforeDelete, out statError)
-                || !Matches(expectedIdentity.LinkIdentity, beforeDelete))
+                || !MatchesLink(expectedIdentity.LinkIdentity, beforeDelete))
             {
                 failure(path, statError ?? "link identity changed before deletion");
                 return;
@@ -402,7 +405,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             0,
             canonicalPath,
             stat.IsDirectory,
-            stat.IsSymlink);
+            stat.IsSymlink,
+            stat.ChangeTimeSeconds,
+            stat.ChangeTimeNanoseconds);
 
     private static SafeUnixHandle OpenAbsoluteDirectory(
         string path,
@@ -645,7 +650,14 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             var device = unchecked((uint)Marshal.ReadInt32(buffer, 0));
             var mode = unchecked((ushort)Marshal.ReadInt16(buffer, 4));
             var inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
-            return new NativeStat(device, inode, mode);
+            var changeTimeSeconds = Marshal.ReadInt64(buffer, 64);
+            var changeTimeNanoseconds = Marshal.ReadInt64(buffer, 72);
+            return new NativeStat(
+                device,
+                inode,
+                mode,
+                changeTimeSeconds,
+                changeTimeNanoseconds);
         }
 
         if (!OperatingSystem.IsLinux()
@@ -662,7 +674,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         return new NativeStat(
             unchecked((ulong)Marshal.ReadInt64(buffer, layout.DeviceOffset)),
             unchecked((ulong)Marshal.ReadInt64(buffer, layout.InodeOffset)),
-            unchecked((uint)Marshal.ReadInt32(buffer, layout.ModeOffset)));
+            unchecked((uint)Marshal.ReadInt32(buffer, layout.ModeOffset)),
+            Marshal.ReadInt64(buffer, layout.ChangeTimeSecondsOffset),
+            Marshal.ReadInt64(buffer, layout.ChangeTimeNanosecondsOffset));
     }
 
     internal static bool TryGetLinuxStatLayout(
@@ -675,8 +689,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         // an unverified field from the native buffer.
         layout = (architecture, isLittleEndian) switch
         {
-            (Architecture.X64, true) => new LinuxStatLayout(0, 8, 24),
-            (Architecture.Arm64, true) => new LinuxStatLayout(0, 8, 16),
+            (Architecture.X64, true) => new LinuxStatLayout(0, 8, 24, 104, 112),
+            (Architecture.Arm64, true) => new LinuxStatLayout(0, 8, 16, 104, 112),
             _ => default,
         };
         return layout != default;
@@ -734,17 +748,29 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         && expected.IsDirectory == actual.IsDirectory
         && expected.IsReparsePoint == actual.IsSymlink;
 
+    private static bool MatchesLink(SecureFileIdentity expected, NativeStat actual) =>
+        Matches(expected, actual)
+        && expected.ChangeTimeSeconds == actual.ChangeTimeSeconds
+        && expected.ChangeTimeNanoseconds == actual.ChangeTimeNanoseconds;
+
     private static bool Matches(NativeStat expected, NativeStat actual) =>
         expected.Device == actual.Device
         && expected.Inode == actual.Inode
-        && expected.FileType == actual.FileType;
+        && expected.FileType == actual.FileType
+        && expected.ChangeTimeSeconds == actual.ChangeTimeSeconds
+        && expected.ChangeTimeNanoseconds == actual.ChangeTimeNanoseconds;
 
     private static string LastError(string action) => $"{action}: {LastErrorMessage()}";
 
     private static string LastErrorMessage() =>
         new Win32Exception(Marshal.GetLastPInvokeError()).Message;
 
-    private readonly record struct NativeStat(ulong Device, ulong Inode, uint Mode)
+    private readonly record struct NativeStat(
+        ulong Device,
+        ulong Inode,
+        uint Mode,
+        long ChangeTimeSeconds,
+        long ChangeTimeNanoseconds)
     {
         internal uint FileType => Mode & FileTypeMask;
         internal bool IsDirectory => FileType == DirectoryType;
@@ -754,7 +780,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     internal readonly record struct LinuxStatLayout(
         int DeviceOffset,
         int InodeOffset,
-        int ModeOffset);
+        int ModeOffset,
+        int ChangeTimeSecondsOffset,
+        int ChangeTimeNanosecondsOffset);
 
     private readonly record struct DirectoryEntry(string Name, ulong Inode);
 
@@ -789,7 +817,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             SafeUnixHandle parent,
             string name,
             string displayPath,
-            NativeStat identity,
             int depth,
             bool ownsParent)
         {
@@ -797,7 +824,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             Parent = parent;
             Name = name;
             DisplayPath = displayPath;
-            Identity = identity;
             Depth = depth;
             _ownsParent = ownsParent;
         }
@@ -806,7 +832,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         internal SafeUnixHandle Parent { get; }
         internal string Name { get; }
         internal string DisplayPath { get; }
-        internal NativeStat Identity { get; }
         internal int Depth { get; }
         internal bool CanDelete { get; private set; } = true;
 

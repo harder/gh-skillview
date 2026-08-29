@@ -33,6 +33,8 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
         Assert.Equal(0, layout.DeviceOffset);
         Assert.Equal(8, layout.InodeOffset);
         Assert.Equal(expectedModeOffset, layout.ModeOffset);
+        Assert.Equal(104, layout.ChangeTimeSecondsOffset);
+        Assert.Equal(112, layout.ChangeTimeNanosecondsOffset);
     }
 
     [Theory]

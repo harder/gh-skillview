@@ -122,7 +122,11 @@ logging, or subprocess adapters.
   Linux `struct stat` is architecture-specific: the secure backend explicitly
   selects the verified little-endian x64 or ARM64 layout and stays disabled on
   unverified architectures or endianness instead of interpreting arbitrary
-  buffer offsets.
+  buffer offsets. Link identity also compares kernel-maintained change-time
+  seconds/nanoseconds so immediate inode reuse cannot make a replacement link
+  look like the one validated earlier. Directory final-name checks compare the
+  current opened-descriptor stat to the named entry after traversal, because
+  deleting children legitimately changes the directory's change time.
   Real directory execution fails closed without a pinned native identity.
   Empty-directory cleanup is a distinct execution contract: validation pins
   the identity and native traversal refuses immediately if it observes any

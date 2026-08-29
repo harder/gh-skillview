@@ -6,7 +6,9 @@ internal readonly record struct SecureFileIdentity(
     ulong FileIdHigh,
     string CanonicalPath,
     bool IsDirectory,
-    bool IsReparsePoint);
+    bool IsReparsePoint,
+    long ChangeTimeSeconds = 0,
+    long ChangeTimeNanoseconds = 0);
 
 internal readonly record struct SecureLinkIdentity(
     SecureFileIdentity ParentIdentity,

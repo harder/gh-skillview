@@ -167,8 +167,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   so an old kernel or seccomp denial fails before validation or mutation.
   Linux native `stat` parsing must select the verified layout for
   the current process architecture: little-endian x64 reads `st_mode` at byte
-  24, little-endian ARM64 at byte 16, and unverified architectures or
-  endianness disable secure removal rather than guessing. Do not fall back to
+  24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
+  unverified architectures or endianness disable secure removal rather than
+  guessing. Unix link identity includes change-time seconds/nanoseconds as well
+  as device/inode because filesystems may immediately recycle a deleted
+  symlink's inode. Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles
   even when identity inspection, callbacks, or those checks throw. Do not
