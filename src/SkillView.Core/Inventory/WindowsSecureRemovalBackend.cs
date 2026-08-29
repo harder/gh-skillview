@@ -12,7 +12,6 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const uint DeleteAccess = 0x00010000;
     private const uint FileListDirectory = 0x00000001;
     private const uint FileReadAttributes = 0x00000080;
-    private const uint FileWriteAttributes = 0x00000100;
     private const uint SynchronizeAccess = 0x00100000;
     private const uint ShareRead = 0x00000001;
     private const uint ShareWrite = 0x00000002;
@@ -24,6 +23,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const int ErrorInvalidFunction = 1;
     private const int ErrorNotSupported = 50;
     private const int ErrorInvalidParameter = 87;
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorPathNotFound = 3;
     private const int FileBasicInfo = 0;
     private const int FileIdInfo = 18;
     private const int FileIdExtdDirectoryInfo = 19;
@@ -40,6 +41,16 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const uint FileOpenReparsePoint = 0x00200000;
     private const int InitialFinalPathCapacity = 512;
     private const int MaxFinalPathCapacity = 32_768;
+    private readonly Action? _directoryIdentityCapturedForTests;
+    private readonly Action? _linkTargetObservedForTests;
+
+    internal WindowsSecureRemovalBackend(
+        Action? directoryIdentityCapturedForTests = null,
+        Action? linkTargetObservedForTests = null)
+    {
+        _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
+        _linkTargetObservedForTests = linkTargetObservedForTests;
+    }
 
     public bool TryCaptureIdentity(
         string path,
@@ -73,12 +84,90 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    public bool TryCaptureDirectoryValidation(
+        string path,
+        out SecureDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var handle = OpenEntry(path, directory: true, enumerateDirectory: true);
+            var before = ReadIdentity(handle);
+            if (!before.IsDirectory || before.IsReparsePoint)
+            {
+                throw new IOException($"'{path}' is no longer a non-link directory");
+            }
+            _directoryIdentityCapturedForTests?.Invoke();
+
+            var hasSkill = EntryIsDirectory(
+                handle,
+                LocalSkillScanner.SkillFileName) is false;
+            var hasGit = EntryIsDirectory(handle, ".git") is true;
+            using var frame = new DirectoryFrame(
+                handle,
+                path,
+                before,
+                depth: 0,
+                ownsDirectory: false);
+            var isEmpty = !frame.TryReadNext(out _, out var enumerationError);
+            if (enumerationError is not null) throw new IOException(enumerationError);
+
+            var canonicalPath = ReadFinalPath(handle);
+            var after = ReadIdentity(handle);
+            if (!Matches(before, after))
+            {
+                throw new IOException("selected directory changed during policy inspection");
+            }
+            snapshot = new SecureDirectoryValidationSnapshot(
+                ToSecureIdentity(after, canonicalPath),
+                hasSkill,
+                hasGit,
+                isEmpty);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public bool TryCaptureLinkIdentity(
         string path,
         out SecureLinkIdentity identity,
+        out string? error) =>
+        TryCaptureLink(path, inspectTarget: false, out identity, out _, out error);
+
+    public bool TryCaptureLinkValidation(
+        string path,
+        out SecureLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        if (!TryCaptureLink(
+                path,
+                inspectTarget: true,
+                out var identity,
+                out var isBroken,
+                out error))
+        {
+            return false;
+        }
+        snapshot = new SecureLinkValidationSnapshot(identity, isBroken);
+        return true;
+    }
+
+    private bool TryCaptureLink(
+        string path,
+        bool inspectTarget,
+        out SecureLinkIdentity identity,
+        out bool isBroken,
         out string? error)
     {
         identity = default;
+        isBroken = false;
         error = null;
         try
         {
@@ -93,7 +182,6 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
             using var parent = OpenCanonicalDirectory(parentPath);
             var parentInformation = ReadIdentity(parent);
-            var canonicalParent = ReadFinalPath(parent);
             using var link = OpenEntryAt(
                 parent,
                 name,
@@ -105,8 +193,43 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 throw new IOException($"'{path}' is no longer a symlink or reparse point");
             }
 
+            if (inspectTarget)
+            {
+                try
+                {
+                    using var target = OpenEntryAt(
+                        parent,
+                        name,
+                        directory: null,
+                        enumerateDirectory: false,
+                        openReparsePoint: false,
+                        requestDeleteAccess: false);
+                }
+                catch (WindowsOpenException ex) when (
+                    ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
+                {
+                    isBroken = true;
+                }
+                _linkTargetObservedForTests?.Invoke();
+                using var linkAfter = OpenEntryAt(
+                    parent,
+                    name,
+                    directory: null,
+                    enumerateDirectory: false);
+                if (!Matches(linkInformation, ReadIdentity(linkAfter)))
+                {
+                    throw new IOException("link changed during target inspection");
+                }
+            }
+
+            var canonicalParent = ReadFinalPath(parent);
+            var parentAfter = ReadIdentity(parent);
+            if (!Matches(parentInformation, parentAfter))
+            {
+                throw new IOException("link parent changed during identity capture");
+            }
             identity = new SecureLinkIdentity(
-                ToSecureIdentity(parentInformation, canonicalParent),
+                ToSecureIdentity(parentAfter, canonicalParent),
                 ToSecureIdentity(
                     linkInformation,
                     Path.Combine(canonicalParent, name)),
@@ -382,7 +505,6 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     {
         var desiredAccess = DeleteAccess
             | FileReadAttributes
-            | FileWriteAttributes
             | SynchronizeAccess;
         if (enumerateDirectory) desiredAccess |= FileListDirectory;
         var flags = OpenReparsePoint | (directory ? BackupSemantics : 0u);
@@ -407,17 +529,17 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         SafeFileHandle parent,
         string name,
         bool? directory,
-        bool enumerateDirectory)
+        bool enumerateDirectory,
+        bool openReparsePoint = true,
+        bool requestDeleteAccess = true)
     {
         ValidateRelativeEntryName(name);
-        var desiredAccess = DeleteAccess
-            | FileReadAttributes
-            | FileWriteAttributes
-            | SynchronizeAccess;
+        var desiredAccess = FileReadAttributes | SynchronizeAccess;
+        if (requestDeleteAccess) desiredAccess |= DeleteAccess;
         if (enumerateDirectory) desiredAccess |= FileListDirectory;
-        var openOptions = FileOpenReparsePoint
-            | FileOpenForBackupIntent
+        var openOptions = FileOpenForBackupIntent
             | FileSynchronousIoNonAlert;
+        if (openReparsePoint) openOptions |= FileOpenReparsePoint;
         if (directory is true) openOptions |= FileDirectoryFile;
         if (directory is false) openOptions |= FileNonDirectoryFile;
 
@@ -456,9 +578,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             if (status != 0)
             {
                 var error = WindowsNative.RtlNtStatusToDosError(status);
-                throw new IOException(
-                    $"open relative entry '{name}' failed: "
-                    + new Win32Exception(unchecked((int)error)).Message);
+                throw new WindowsOpenException(name, unchecked((int)error));
             }
 
             var handle = new SafeFileHandle(rawHandle, ownsHandle: true);
@@ -478,6 +598,26 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             }
             if (unicodePointer != IntPtr.Zero) Marshal.FreeHGlobal(unicodePointer);
             Marshal.FreeHGlobal(nameBuffer);
+        }
+    }
+
+    private static bool? EntryIsDirectory(SafeFileHandle parent, string name)
+    {
+        try
+        {
+            using var entry = OpenEntryAt(
+                parent,
+                name,
+                directory: null,
+                enumerateDirectory: false,
+                openReparsePoint: false,
+                requestDeleteAccess: false);
+            return ReadIdentity(entry).IsDirectory;
+        }
+        catch (WindowsOpenException ex) when (
+            ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
+        {
+            return null;
         }
     }
 
@@ -571,6 +711,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         && expected.WindowsChangeTime == actual.ChangeTime
         && expected.IsDirectory == actual.IsDirectory
         && expected.IsReparsePoint == actual.IsReparsePoint;
+
+    private static bool Matches(NativeIdentity expected, NativeIdentity actual) =>
+        expected == actual;
 
     internal static bool ShouldFallbackToLegacyDisposition(int error) =>
         error is ErrorInvalidFunction or ErrorNotSupported or ErrorInvalidParameter;
@@ -668,13 +811,17 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             SafeFileHandle directory,
             string displayPath,
             NativeIdentity identity,
-            int depth)
+            int depth,
+            bool ownsDirectory = true)
         {
             Directory = directory;
             DisplayPath = displayPath;
             Identity = identity;
             Depth = depth;
+            _ownsDirectory = ownsDirectory;
         }
+
+        private readonly bool _ownsDirectory;
 
         internal SafeFileHandle Directory { get; }
         internal string DisplayPath { get; }
@@ -756,7 +903,20 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             }
         }
 
-        public void Dispose() => Directory.Dispose();
+        public void Dispose()
+        {
+            if (_ownsDirectory) Directory.Dispose();
+        }
+    }
+
+    private sealed class WindowsOpenException : IOException
+    {
+        internal WindowsOpenException(string name, int nativeError)
+            : base($"open relative entry '{name}' failed: "
+                + new Win32Exception(nativeError).Message) =>
+            NativeError = nativeError;
+
+        internal int NativeError { get; }
     }
 
     [StructLayout(LayoutKind.Sequential)]

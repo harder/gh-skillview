@@ -14,6 +14,16 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     private const uint FileTypeMask = 0xF000;
     private const uint DirectoryType = 0x4000;
     private const uint SymlinkType = 0xA000;
+    private readonly Action? _directoryIdentityCapturedForTests;
+    private readonly Action? _linkTargetObservedForTests;
+
+    internal UnixSecureRemovalBackend(
+        Action? directoryIdentityCapturedForTests = null,
+        Action? linkTargetObservedForTests = null)
+    {
+        _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
+        _linkTargetObservedForTests = linkTargetObservedForTests;
+    }
 
     internal static bool IsSupportedOnCurrentPlatform =>
         OperatingSystem.IsMacOS()
@@ -66,12 +76,118 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    public bool TryCaptureDirectoryValidation(
+        string path,
+        out SecureDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var handle = OpenAbsoluteDirectory(
+                Path.Combine(resolvedParent, name),
+                out var parent,
+                out _);
+            using (parent)
+            {
+                var before = ReadStat(handle, statBuffer.Pointer);
+                if (!before.IsDirectory || before.IsSymlink)
+                {
+                    throw new IOException($"'{path}' is no longer a non-link directory");
+                }
+                _directoryIdentityCapturedForTests?.Invoke();
+
+                var hasSkill = TryReadFollowedStatAt(
+                    handle,
+                    LocalSkillScanner.SkillFileName,
+                    statBuffer.Pointer,
+                    out var skillStat,
+                    out var skillError)
+                    ? !skillStat.IsDirectory
+                    : skillError is null
+                        ? false
+                        : throw new IOException(skillError);
+                var hasGit = TryReadFollowedStatAt(
+                    handle,
+                    ".git",
+                    statBuffer.Pointer,
+                    out var gitStat,
+                    out var gitError)
+                    ? gitStat.IsDirectory
+                    : gitError is null
+                        ? false
+                        : throw new IOException(gitError);
+                var isEmpty = IsDirectoryEmpty(handle, out var enumerationError);
+                if (enumerationError is not null) throw new IOException(enumerationError);
+
+                var canonicalPath = ReadFinalPath(handle);
+                var after = ReadStat(handle, statBuffer.Pointer);
+                var identity = ToSecureIdentity(after, canonicalPath);
+                if (!Matches(ToSecureIdentity(before, canonicalPath), after))
+                {
+                    throw new IOException("selected directory changed during policy inspection");
+                }
+                snapshot = new SecureDirectoryValidationSnapshot(
+                    identity,
+                    hasSkill,
+                    hasGit,
+                    isEmpty);
+                return true;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public bool TryCaptureLinkIdentity(
         string path,
         out SecureLinkIdentity identity,
+        out string? error) =>
+        TryCaptureLink(path, inspectTarget: false, out identity, out _, out error);
+
+    public bool TryCaptureLinkValidation(
+        string path,
+        out SecureLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        if (!TryCaptureLink(
+                path,
+                inspectTarget: true,
+                out var identity,
+                out var isBroken,
+                out error))
+        {
+            return false;
+        }
+        snapshot = new SecureLinkValidationSnapshot(identity, isBroken);
+        return true;
+    }
+
+    private bool TryCaptureLink(
+        string path,
+        bool inspectTarget,
+        out SecureLinkIdentity identity,
+        out bool isBroken,
         out string? error)
     {
         identity = default;
+        isBroken = false;
         error = null;
         try
         {
@@ -88,7 +204,6 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             var resolvedParent = RealPath(parentPath);
             using var parent = OpenDirectory(resolvedParent);
             var parentStat = ReadStat(parent, statBuffer.Pointer);
-            var canonicalParent = ReadFinalPath(parent);
             if (!TryReadStatAt(parent, name, statBuffer.Pointer,
                     out var linkStat, out var statError))
             {
@@ -99,9 +214,33 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 throw new IOException($"'{path}' is no longer a symlink");
             }
 
+            if (inspectTarget)
+            {
+                isBroken = !TryReadFollowedStatAt(
+                    parent,
+                    name,
+                    statBuffer.Pointer,
+                    out _,
+                    out var targetError);
+                if (targetError is not null) throw new IOException(targetError);
+                _linkTargetObservedForTests?.Invoke();
+                if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                        out var linkAfter, out statError)
+                    || !Matches(ToSecureIdentity(linkStat, string.Empty), linkAfter))
+                {
+                    throw new IOException(statError ?? "link changed during target inspection");
+                }
+            }
+
+            var canonicalParent = ReadFinalPath(parent);
+            var parentAfter = ReadStat(parent, statBuffer.Pointer);
+            if (!Matches(ToSecureIdentity(parentStat, canonicalParent), parentAfter))
+            {
+                throw new IOException("link parent changed during identity capture");
+            }
             var canonicalLink = Path.Combine(canonicalParent, name);
             identity = new SecureLinkIdentity(
-                ToSecureIdentity(parentStat, canonicalParent),
+                ToSecureIdentity(parentAfter, canonicalParent),
                 ToSecureIdentity(linkStat, canonicalLink),
                 name);
             return true;
@@ -653,6 +792,83 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         stat = ParseStat(buffer);
         error = null;
         return true;
+    }
+
+    private static bool TryReadFollowedStatAt(
+        SafeUnixHandle parent,
+        string name,
+        IntPtr buffer,
+        out NativeStat stat,
+        out string? error)
+    {
+        if (UnixNative.fstatat(parent.FileDescriptor, name, buffer, flags: 0) == 0)
+        {
+            stat = ParseStat(buffer);
+            error = null;
+            return true;
+        }
+
+        var nativeError = Marshal.GetLastPInvokeError();
+        stat = default;
+        if (nativeError is 2 or 20)
+        {
+            error = null;
+            return false;
+        }
+        error = $"inspect followed entry failed: {new Win32Exception(nativeError).Message}";
+        return false;
+    }
+
+    private static bool IsDirectoryEmpty(SafeUnixHandle directory, out string? error)
+    {
+        var duplicate = UnixNative.dup(directory.FileDescriptor);
+        if (duplicate < 0)
+        {
+            error = LastError("duplicate directory handle failed");
+            return false;
+        }
+        var stream = UnixNative.fdopendir(duplicate);
+        if (stream == IntPtr.Zero)
+        {
+            UnixNative.close(duplicate);
+            error = LastError("open directory stream failed");
+            return false;
+        }
+        try
+        {
+            while (true)
+            {
+                Marshal.SetLastPInvokeError(0);
+                var nativeEntry = UnixNative.readdir(stream);
+                if (nativeEntry == IntPtr.Zero)
+                {
+                    var nativeError = Marshal.GetLastPInvokeError();
+                    error = nativeError == 0
+                        ? null
+                        : new Win32Exception(nativeError).Message;
+                    return nativeError == 0;
+                }
+                string? name;
+                if (OperatingSystem.IsMacOS())
+                {
+                    var length = unchecked((ushort)Marshal.ReadInt16(nativeEntry, 18));
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 21), length);
+                }
+                else
+                {
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 19));
+                }
+                if (!string.IsNullOrEmpty(name) && name is not "." and not "..")
+                {
+                    error = null;
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            UnixNative.closedir(stream);
+        }
     }
 
     private static NativeStat ParseStat(IntPtr buffer)

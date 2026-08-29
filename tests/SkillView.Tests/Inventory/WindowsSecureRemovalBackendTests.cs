@@ -66,6 +66,59 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         Assert.True(PathIdentity.Equals(realRoot, canonicalPath));
     }
 
+    [Fact]
+    public void TryCaptureDirectoryValidation_AncestorAba_InspectsOpenedDirectory()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var parent = Path.Combine(_tempRoot, "policy-parent");
+        var movedParent = Path.Combine(_tempRoot, "policy-parent-original");
+        var skill = Path.Combine(parent, "skill");
+        Directory.CreateDirectory(Path.Combine(skill, ".git"));
+        File.WriteAllText(Path.Combine(skill, "SKILL.md"), "body");
+        var backend = new WindowsSecureRemovalBackend(() =>
+        {
+            Directory.Move(parent, movedParent);
+            Directory.CreateDirectory(Path.Combine(parent, "skill"));
+            File.WriteAllText(Path.Combine(parent, "skill", "SKILL.md"), "clean");
+        });
+
+        var captured = backend.TryCaptureDirectoryValidation(
+            skill,
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.HasSkillFile);
+        Assert.True(snapshot.HasGitDirectory);
+        Assert.True(PathIdentity.Equals(
+            Path.Combine(movedParent, "skill"),
+            snapshot.Identity.CanonicalPath));
+    }
+
+    [Fact]
+    public void TryCaptureLinkValidation_BrokenLinkReplacedWithValidLink_FailsClosed()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var target = Path.Combine(_tempRoot, "valid-target");
+        var link = Path.Combine(_tempRoot, "changing-broken-link");
+        Directory.CreateDirectory(target);
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing"))) return;
+        var backend = new WindowsSecureRemovalBackend(linkTargetObservedForTests: () =>
+        {
+            Directory.Delete(link);
+            Directory.CreateSymbolicLink(link, target);
+        });
+
+        var captured = backend.TryCaptureLinkValidation(link, out _, out var error);
+
+        Assert.False(captured);
+        Assert.NotNull(error);
+        Assert.True(Directory.Exists(target));
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
     private static bool TryCreateDirectoryLink(string link, string target)
     {
         try

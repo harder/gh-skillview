@@ -193,6 +193,23 @@ public class RemoveValidatorTests : IDisposable
     }
 
     [Fact]
+    public void ValidateBrokenSymlink_ValidTarget_IsRefusedFromCapturedObservation()
+    {
+        var target = Path.Combine(_tempRoot, "valid-link-target");
+        var link = Path.Combine(_tempRoot, "valid-link");
+        Directory.CreateDirectory(target);
+        if (!TryCreateDirectoryLink(link, target)) return;
+
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors,
+            error => error.Kind == RemoveValidator.ErrorKind.NotASkillDirectory
+                && error.Detail.Contains("no longer broken", StringComparison.Ordinal));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+    }
+
+    [Fact]
     public void ValidateSymlink_UsesCanonicalizedScanRootAndParent()
     {
         var realRoot = Path.Combine(_tempRoot, "real-link-root");

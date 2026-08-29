@@ -158,4 +158,66 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
         Assert.True(Directory.Exists(target));
         Assert.True(PathResolver.IsSymlink(link));
     }
+
+    [Fact]
+    public void TryCaptureDirectoryValidation_AncestorAba_InspectsOpenedDirectory()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var parent = Path.Combine(_tempRoot, "policy-parent");
+        var movedParent = Path.Combine(_tempRoot, "policy-parent-original");
+        var skill = Path.Combine(parent, "skill");
+        Directory.CreateDirectory(Path.Combine(skill, ".git"));
+        File.WriteAllText(Path.Combine(skill, "SKILL.md"), "body");
+        var backend = new UnixSecureRemovalBackend(() =>
+        {
+            Directory.Move(parent, movedParent);
+            Directory.CreateDirectory(Path.Combine(parent, "skill"));
+            File.WriteAllText(Path.Combine(parent, "skill", "SKILL.md"), "clean");
+        });
+
+        var captured = backend.TryCaptureDirectoryValidation(
+            skill,
+            out var snapshot,
+            out var error);
+
+        Assert.True(captured, error);
+        Assert.True(snapshot.HasSkillFile);
+        Assert.True(snapshot.HasGitDirectory);
+        Assert.Contains("policy-parent-original", snapshot.Identity.CanonicalPath);
+    }
+
+    [Fact]
+    public void TryCaptureLinkValidation_BrokenLinkReplacedWithValidLink_FailsClosed()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var target = Path.Combine(_tempRoot, "valid-target");
+        var link = Path.Combine(_tempRoot, "changing-broken-link");
+        Directory.CreateDirectory(target);
+        try
+        {
+            Directory.CreateSymbolicLink(link, Path.Combine(_tempRoot, "missing"));
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+        {
+            return;
+        }
+        var backend = new UnixSecureRemovalBackend(linkTargetObservedForTests: () =>
+        {
+            Directory.Delete(link);
+            Directory.CreateSymbolicLink(link, target);
+        });
+
+        var captured = backend.TryCaptureLinkValidation(link, out _, out var error);
+
+        Assert.False(captured);
+        Assert.NotNull(error);
+        Assert.True(Directory.Exists(target));
+        Assert.True(PathResolver.IsSymlink(link));
+    }
 }

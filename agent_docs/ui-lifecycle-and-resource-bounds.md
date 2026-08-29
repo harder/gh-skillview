@@ -153,6 +153,13 @@ logging, or subprocess adapters.
   reasoning or tests to Unix. Regression coverage includes Windows
   ancestor replacement plus a matching hard link, final-component link
   replacement, and same-ID generation reuse on each supported OS.
+  Validation also captures an object-local policy snapshot through the held
+  directory: `SKILL.md`, `.git`, and emptiness are inspected relative to that
+  handle/descriptor and bracketed by generation checks. Canonical pathnames are
+  display/containment addresses, not substitutes for object-relative policy I/O.
+  Broken-link cleanup observes target existence relative to the held parent and
+  rechecks both parent and link identities around that observation, preventing a
+  broken-to-valid replacement from being authorized.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

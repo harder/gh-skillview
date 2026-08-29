@@ -213,8 +213,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Unix-only. Transient traversal children still compare their full IDs and
   types, but are made authoritative by opening relative to the held parent;
   directory-enumeration timestamps are not a stable validation contract.
-  Adversarial
-  coverage must combine ancestor rename/replacement with hard links,
+  Object-local removal policy must be captured through that same held directory:
+  inspect `SKILL.md`, `.git`, and empty-directory state relative to the opened
+  handle/descriptor, then verify the directory generation did not change during
+  inspection. Never capture identity and perform those checks later through its
+  canonical pathname. Broken-link eligibility likewise belongs to the captured
+  parent/name/link observation: determine whether the target resolves relative
+  to the held parent, then recheck parent and link identities before approving
+  cleanup. Adversarial coverage must combine ancestor rename/replacement with hard links,
   final-component symlink replacement, and immediate native-identifier reuse
   on every supported OS.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history

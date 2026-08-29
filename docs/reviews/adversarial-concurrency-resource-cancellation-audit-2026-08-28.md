@@ -638,6 +638,24 @@ object ID identifies a filesystem slot, while the platform
 change-time/generation signal binds the validated incarnation occupying that
 slot.
 
+The final suppressed review body identified two additional valid policy-binding
+gaps. First, `SKILL.md` and `.git` were checked through the captured canonical
+pathname after the native identity handle had closed. An ancestor ABA swap could
+therefore present a clean replacement for policy inspection and restore the
+original, uninspected object for execution. Directory validation now returns a
+single handle-bound snapshot containing identity, canonical address, skill-file
+presence, `.git`-directory presence, and emptiness; the object generation is
+checked before and after the relative inspection. Second, brokenness was checked
+before link identity capture. Link validation now observes target existence
+relative to the held parent and rechecks both the parent and named-link identity
+around that observation, so replacing a broken link with a valid link refuses
+validation. Deterministic Unix and Windows tests exercise both ABA sequences.
+
+The analogous review also revisited Windows access masks. Native opens requested
+`FILE_WRITE_ATTRIBUTES` even though identity inspection requires read attributes
+and handle disposition requires `DELETE`; the unrelated access bit could reject
+otherwise-authorized removals and has been removed.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

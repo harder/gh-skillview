@@ -64,6 +64,7 @@ public static class RemoveValidator
         var targetPath = target.ResolvedPath;
         var resolved = PathResolver.Resolve(targetPath) ?? targetPath;
         SecureFileIdentity? executionIdentity = null;
+        SecureDirectoryValidationSnapshot? directorySnapshot = null;
 
         // Rule 12.1.1: must be inside a known scan root before resolution.
         var matchedRootByRawPath = FindContainingRoot(
@@ -83,13 +84,14 @@ public static class RemoveValidator
         // every remaining policy rule must validate that exact address.
         if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureIdentity(
+            if (SecureRemovalBackend.TryCaptureDirectoryValidation(
                     resolved,
-                    out var capturedIdentity,
+                    out var capturedSnapshot,
                     out var identityError))
             {
-                executionIdentity = capturedIdentity;
-                resolved = capturedIdentity.CanonicalPath;
+                directorySnapshot = capturedSnapshot;
+                executionIdentity = capturedSnapshot.Identity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
             }
             else
             {
@@ -119,14 +121,14 @@ public static class RemoveValidator
         }
 
         // Rule 12.1.4: target must look like a skill install.
-        if (!LooksLikeSkill(resolved))
+        if (directorySnapshot is { HasSkillFile: false })
         {
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{resolved}' does not contain {LocalSkillScanner.SkillFileName} or recognizable skill metadata"));
         }
 
         // Rule 12.1.5: reject in-place clones.
-        if (Directory.Exists(Path.Combine(resolved, ".git")))
+        if (directorySnapshot is { HasGitDirectory: true })
         {
             errors.Add(new Error(ErrorKind.ContainsGitDirectory,
                 $"'{resolved}' contains a .git directory — looks like an in-place clone"));
@@ -216,6 +218,7 @@ public static class RemoveValidator
         var fullPath = Path.GetFullPath(path);
         var resolved = fullPath;
         SecureFileIdentity? executionIdentity = null;
+        SecureDirectoryValidationSnapshot? directorySnapshot = null;
         var matchedRootByRawPath = FindContainingRoot(
             fullPath,
             knownRoots,
@@ -238,14 +241,16 @@ public static class RemoveValidator
         }
         else if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureIdentity(
+            if (SecureRemovalBackend.TryCaptureDirectoryValidation(
                     fullPath,
-                    out var capturedIdentity,
+                    out var capturedSnapshot,
                     out var identityError))
             {
-                executionIdentity = capturedIdentity;
-                resolved = capturedIdentity.CanonicalPath;
-                if (!capturedIdentity.IsDirectory || capturedIdentity.IsReparsePoint)
+                directorySnapshot = capturedSnapshot;
+                executionIdentity = capturedSnapshot.Identity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
+                if (!capturedSnapshot.Identity.IsDirectory
+                    || capturedSnapshot.Identity.IsReparsePoint)
                 {
                     errors.Add(new Error(ErrorKind.NotASkillDirectory,
                         $"'{resolved}' is no longer a non-link directory"));
@@ -275,27 +280,16 @@ public static class RemoveValidator
             }
         }
 
-        if (Directory.Exists(Path.Combine(resolved, ".git")))
+        if (directorySnapshot is { HasGitDirectory: true })
         {
             errors.Add(new Error(ErrorKind.ContainsGitDirectory,
                 $"'{resolved}' contains .git"));
         }
 
-        if (executionIdentity is not null)
+        if (directorySnapshot is { IsEmpty: false })
         {
-            try
-            {
-                if (Directory.EnumerateFileSystemEntries(resolved).Any())
-                {
-                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                        $"'{resolved}' is no longer empty"));
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                    $"'{resolved}' could not be inspected: {ex.Message}"));
-            }
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{resolved}' is no longer empty"));
         }
 
         return new RemoveValidation(
@@ -337,20 +331,20 @@ public static class RemoveValidator
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{fullPath}' is no longer a symlink"));
         }
-        else if (requireBroken && PathResolver.Resolve(fullPath) is not null)
-        {
-            errors.Add(new Error(ErrorKind.NotASkillDirectory,
-                $"'{fullPath}' is no longer broken"));
-        }
         else if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureLinkIdentity(
+            if (SecureRemovalBackend.TryCaptureLinkValidation(
                     fullPath,
-                    out var capturedIdentity,
+                    out var capturedSnapshot,
                     out var identityError))
             {
-                executionLinkIdentity = capturedIdentity;
-                resolved = capturedIdentity.CanonicalPath;
+                executionLinkIdentity = capturedSnapshot.Identity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
+                if (requireBroken && !capturedSnapshot.IsBroken)
+                {
+                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                        $"'{fullPath}' is no longer broken"));
+                }
             }
             else
             {
@@ -387,12 +381,6 @@ public static class RemoveValidator
             ExecutionLinkIdentity = executionLinkIdentity,
             RemovesLinkOnly = true,
         };
-    }
-
-    private static bool LooksLikeSkill(string dir)
-    {
-        if (!Directory.Exists(dir)) return false;
-        return File.Exists(Path.Combine(dir, LocalSkillScanner.SkillFileName));
     }
 
     private static ScanRoot? FindContainingRoot(
