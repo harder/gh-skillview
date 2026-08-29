@@ -67,33 +67,28 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
-    public void TryCaptureDirectoryValidation_AncestorAba_InspectsOpenedDirectory()
+    public void TryCaptureDirectoryValidation_TargetAba_FailsClosed()
     {
         if (!OperatingSystem.IsWindows()) return;
 
         var parent = Path.Combine(_tempRoot, "policy-parent");
-        var movedParent = Path.Combine(_tempRoot, "policy-parent-original");
         var skill = Path.Combine(parent, "skill");
+        var movedSkill = Path.Combine(parent, "skill-original");
         Directory.CreateDirectory(Path.Combine(skill, ".git"));
         File.WriteAllText(Path.Combine(skill, "SKILL.md"), "body");
         var backend = new WindowsSecureRemovalBackend(() =>
         {
-            Directory.Move(parent, movedParent);
-            Directory.CreateDirectory(Path.Combine(parent, "skill"));
-            File.WriteAllText(Path.Combine(parent, "skill", "SKILL.md"), "clean");
+            Directory.Move(skill, movedSkill);
+            Directory.CreateDirectory(skill);
+            File.WriteAllText(Path.Combine(skill, "SKILL.md"), "clean");
         });
 
-        var captured = backend.TryCaptureDirectoryValidation(
-            skill,
-            out var snapshot,
-            out var error);
+        var captured = backend.TryCaptureDirectoryValidation(skill, out _, out var error);
 
-        Assert.True(captured, error);
-        Assert.True(snapshot.HasSkillFile);
-        Assert.True(snapshot.HasGitDirectory);
-        Assert.True(PathIdentity.Equals(
-            Path.Combine(movedParent, "skill"),
-            snapshot.Identity.CanonicalPath));
+        Assert.False(captured);
+        Assert.NotNull(error);
+        Assert.True(Directory.Exists(Path.Combine(movedSkill, ".git")));
+        Assert.False(Directory.Exists(Path.Combine(skill, ".git")));
     }
 
     [Fact]
