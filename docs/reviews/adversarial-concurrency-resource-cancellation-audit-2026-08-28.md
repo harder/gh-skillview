@@ -556,6 +556,34 @@ and refuses if the entry changes kind before execution. Regression tests cover
 identity-less synthetic validation, population after validation, and complete
 directory replacement.
 
+The next Balanced review found three more valid object-binding and capability
+gaps:
+
+1. **Windows canonical paths were lexical.** `Path.GetFullPath` retained
+   junction/symlink ancestors even though the file identity came from an opened
+   handle. Windows now obtains the fully resolved path from that handle with
+   `GetFinalPathNameByHandleW`, and scan-root canonicalization uses the same
+   opened-handle method before policy comparison.
+2. **Link-only cleanup pinned neither the parent nor the link.** Broken-link and
+   agent-link validation now capture the canonical parent path, native parent
+   identity, final name, and native link identity. Execution reopens and verifies
+   the parent and link before deleting the descriptor-relative Unix name or the
+   exact Windows link handle. Replacement-link, replacement-parent, and
+   cancellation-boundary tests prove the wrong entry is preserved/refused.
+3. **Linux discovered missing `openat2` support after mutation began.** Backend
+   selection now probes the exact `RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS |
+   RESOLVE_NO_XDEV` request. Pre-5.6 kernels and seccomp denials disable secure
+   removal before validation, so nested traversal cannot discover the missing
+   capability only after root-level leaves were removed.
+
+A nearby analogue not called out by the review was fixed in the same pass:
+Unix previously called `realpath` and then opened that string, retaining the
+pre-open path even if a rename race changed which object was opened. Linux now
+reads the final path from `/proc/self/fd`; macOS uses the fixed-signature
+`fgetattrlist(ATTR_CMN_FULLPATH)` API with a bounded buffer and strict returned-
+offset validation. Thus all three supported operating-system families bind the
+policy address and identity to the same opened object.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

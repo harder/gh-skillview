@@ -102,10 +102,15 @@ logging, or subprocess adapters.
   Traversal retains O(depth) enumerator/handle state and no more than 128
   detailed runtime errors plus one omission summary. Validation pins the
   selected target's native filesystem identity and validates the captured
-  canonical deletion address. Windows removal compares full 128-bit file IDs,
+  canonical deletion address. The canonical address and canonical scan roots
+  come from opened handles, not lexical normalization: Windows uses
+  `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
+  `fgetattrlist`, and Linux reads `/proc/self/fd`. Windows removal compares full 128-bit file IDs,
   enumerates and deletes opened handles; Unix removal walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
-  mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. Keep
+  mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
+  Linux backend probes the exact `openat2` contract at startup and remains
+  disabled when the kernel or sandbox refuses it, before any mutation can begin. Keep
   actual deletion on `SecureRemovalBackend` for Windows, macOS,
   and Linux. Check cancellation immediately before each native delete and keep
   handle cleanup in `finally` paths. POSIX `unlinkat` is parent-handle-relative
@@ -122,8 +127,10 @@ logging, or subprocess adapters.
   Empty-directory cleanup is a distinct execution contract: validation pins
   the identity and native traversal refuses immediately if it observes any
   child, so a directory populated after validation is not recursively cleaned.
-  Identity-less execution is reserved for validations explicitly marked as
-  link-only, and those refuse if the path is no longer a link.
+  Real link-only execution likewise fails closed without a pinned canonical
+  parent plus native parent/link identities. Broken-link cleanup and agent
+  unlink actions revalidate both identities and delete through the opened
+  parent/object boundary rather than trusting the current pathname.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

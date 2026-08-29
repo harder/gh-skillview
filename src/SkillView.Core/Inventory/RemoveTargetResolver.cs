@@ -27,9 +27,10 @@ internal sealed record RemoveTargetEvaluation(
     RemoveTarget Target,
     ImmutableArray<RemoveTargetItem> Items)
 {
-    public bool CanExecute => Target.Kind == RemoveTargetKind.AgentSymlink || Items.All(item => item.Validation.Allowed);
-    public bool RequiresSecondConfirm => Target.Kind != RemoveTargetKind.AgentSymlink
-        && Items.Any(item => item.Validation.RequiresSecondConfirm);
+    public bool CanExecute => Items.Length > 0
+        && Items.All(item => item.Validation.Allowed);
+    public bool RequiresSecondConfirm =>
+        Items.Any(item => item.Validation.RequiresSecondConfirm);
 
     public ImmutableArray<RemoveValidator.Error> Errors => Items
         .SelectMany(item => item.Validation.Errors)
@@ -80,7 +81,18 @@ internal static class RemoveTargetResolver
     {
         if (target.Kind == RemoveTargetKind.AgentSymlink)
         {
-            return new RemoveTargetEvaluation(target, ImmutableArray<RemoveTargetItem>.Empty);
+            if (target.Skills.Length != 1 || target.AgentMembership is not { } link)
+            {
+                return new RemoveTargetEvaluation(
+                    target,
+                    ImmutableArray<RemoveTargetItem>.Empty);
+            }
+            var skill = target.Skills[0];
+            return new RemoveTargetEvaluation(
+                target,
+                [new RemoveTargetItem(
+                    skill,
+                    RemoveValidator.ValidateSymlink(link.Path, snapshot.ScannedRoots))]);
         }
 
         var items = target.Skills

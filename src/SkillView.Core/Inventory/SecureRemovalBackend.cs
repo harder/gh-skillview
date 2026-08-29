@@ -8,9 +8,19 @@ internal readonly record struct SecureFileIdentity(
     bool IsDirectory,
     bool IsReparsePoint);
 
+internal readonly record struct SecureLinkIdentity(
+    SecureFileIdentity ParentIdentity,
+    SecureFileIdentity LinkIdentity,
+    string Name)
+{
+    internal string CanonicalPath => Path.Combine(ParentIdentity.CanonicalPath, Name);
+}
+
 internal interface ISecureRemovalBackend
 {
     bool TryCaptureIdentity(string path, out SecureFileIdentity identity, out string? error);
+
+    bool TryCaptureLinkIdentity(string path, out SecureLinkIdentity identity, out string? error);
 
     bool TryCanonicalizePath(string path, out string canonicalPath, out string? error);
 
@@ -27,6 +37,8 @@ internal interface ISecureRemovalBackend
 
     void RemoveLink(
         string path,
+        SecureLinkIdentity expectedIdentity,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken);
@@ -67,6 +79,21 @@ internal static class SecureRemovalBackend
         return Current.TryCanonicalizePath(path, out canonicalPath, out error);
     }
 
+    internal static bool TryCaptureLinkIdentity(
+        string path,
+        out SecureLinkIdentity identity,
+        out string? error)
+    {
+        if (Current is null)
+        {
+            identity = default;
+            error = "secure link removal is not supported on this operating system";
+            return false;
+        }
+
+        return Current.TryCaptureLinkIdentity(path, out identity, out error);
+    }
+
     internal static void RemoveTree(
         string path,
         SecureFileIdentity expectedIdentity,
@@ -92,12 +119,20 @@ internal static class SecureRemovalBackend
 
     internal static void RemoveLink(
         string path,
+        SecureLinkIdentity expectedIdentity,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken) =>
         (Current ?? throw new PlatformNotSupportedException(
             "Secure removal is not supported on this operating system."))
-        .RemoveLink(path, entryDeleted, failure, cancellationToken);
+        .RemoveLink(
+            path,
+            expectedIdentity,
+            entryDeleting,
+            entryDeleted,
+            failure,
+            cancellationToken);
 
     private static ISecureRemovalBackend? Create()
     {

@@ -142,6 +142,28 @@ public sealed class RemoveService
             return RemoveReport.Refused(target, reason);
         }
 
+        if (!options.DryRun
+            && validation.RemovesLinkOnly
+            && validation.ExecutionLinkIdentity is null)
+        {
+            const string reason = "real link removal requires pinned parent and link identities";
+            _logger.Error("remove", $"refused: {reason}: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
+            return RemoveReport.Refused(target, reason);
+        }
+
+        if (!options.DryRun
+            && SecureRemovalBackend.IsSupported
+            && validation.ExecutionLinkIdentity is not null)
+        {
+            return RemoveLinkWithSecureBackend(
+                validation.ExecutionLinkIdentity.Value,
+                target,
+                cancellationToken,
+                progressTracker);
+        }
+
         // A normal skill validation pins the selected directory identity. Route
         // that operation through the native backend before inspecting the
         // current pathname: a post-validation replacement with a symlink must
@@ -171,27 +193,13 @@ public sealed class RemoveService
             {
                 if (SecureRemovalBackend.IsSupported)
                 {
-                    var linkErrors = new FailureCollector();
-                    SecureRemovalBackend.RemoveLink(
-                        target,
-                        (_, _) => { },
-                        (path, detail) => RecordFailure(path, detail, linkErrors),
-                        cancellationToken);
-                    if (linkErrors.Count > 0)
-                    {
-                        progressTracker.Publish(1, 0, 0, linkErrors.Count, target,
-                            force: true, isCompleted: true);
-                        return new RemoveReport(false, target, 0, 0,
-                            linkErrors.ToImmutable(), DryRun: false)
-                        {
-                            ErrorCount = linkErrors.Count,
-                        };
-                    }
+                    const string reason = "secure link removal requires pinned parent and link identities";
+                    _logger.Error("remove", $"refused: {reason}: {target}");
+                    progressTracker.Publish(1, 0, 0, 1, target,
+                        force: true, isCompleted: true, targetsDeleted: 0);
+                    return RemoveReport.Refused(target, reason);
                 }
-                else
-                {
-                    TryDeleteSymlink(target);
-                }
+                TryDeleteSymlink(target);
                 _logger.Info("remove", $"removed symlink {target}");
                 progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
@@ -400,9 +408,10 @@ public sealed class RemoveService
         Task.Run(() => Remove(validation, options, cancellationToken, progress));
 
     /// Removes one inventory-observed symlink without following its target.
-    /// This is used for the wizard's "unlink from agent" action, which has no
-    /// skill-directory validation object because it intentionally leaves the
-    /// canonical installation in place.
+    /// Supported platforms capture the canonical parent plus both native
+    /// identities immediately before execution. Callers with known roots
+    /// should prefer a `RemoveValidator.ValidateSymlink` validation so the
+    /// canonical link address is policy-checked as well.
     public Task<RemoveReport> RemoveLinkAsync(
         string path,
         CancellationToken cancellationToken = default,
@@ -423,51 +432,39 @@ public sealed class RemoveService
                 throw;
             }
 
-            if (!PathResolver.IsSymlink(fullPath))
+            if (SecureRemovalBackend.IsSupported)
             {
-                const string detail = "path is no longer a symlink";
-                _logger.Warn("remove.agent", $"{fullPath}: {detail}");
-                progressTracker.Publish(1, 0, 0, 1, fullPath, force: true, isCompleted: true);
-                return new RemoveReport(
-                    Succeeded: false,
-                    ResolvedPath: fullPath,
-                    FilesDeleted: 0,
-                    DirectoriesDeleted: 0,
-                    Errors: ImmutableArray.Create($"{fullPath}: {detail}"),
-                    DryRun: false);
+                if (!SecureRemovalBackend.TryCaptureLinkIdentity(
+                        fullPath,
+                        out var identity,
+                        out var identityError))
+                {
+                    var detail = identityError ?? "link identity could not be captured";
+                    _logger.Warn("remove.agent", $"{fullPath}: {detail}");
+                    progressTracker.Publish(1, 0, 0, 1, fullPath,
+                        force: true, isCompleted: true);
+                    return RemoveReport.Refused(fullPath, detail);
+                }
+
+                return RemoveLinkWithSecureBackend(
+                    identity,
+                    fullPath,
+                    cancellationToken,
+                    progressTracker);
             }
 
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (SecureRemovalBackend.IsSupported)
+                if (!PathResolver.IsSymlink(fullPath))
                 {
-                    var errors = new FailureCollector();
-                    SecureRemovalBackend.RemoveLink(
-                        fullPath,
-                        (_, _) => { },
-                        (path, detail) => RecordFailure(path, detail, errors),
-                        cancellationToken);
-                    if (errors.Count > 0)
-                    {
-                        progressTracker.Publish(1, 0, 0, errors.Count, fullPath,
-                            force: true, isCompleted: true);
-                        return new RemoveReport(
-                            Succeeded: false,
-                            ResolvedPath: fullPath,
-                            FilesDeleted: 0,
-                            DirectoriesDeleted: 0,
-                            Errors: errors.ToImmutable(),
-                            DryRun: false)
-                        {
-                            ErrorCount = errors.Count,
-                        };
-                    }
+                    const string detail = "path is no longer a symlink";
+                    _logger.Warn("remove.agent", $"{fullPath}: {detail}");
+                    progressTracker.Publish(1, 0, 0, 1, fullPath,
+                        force: true, isCompleted: true);
+                    return RemoveReport.Refused(fullPath, detail);
                 }
-                else
-                {
-                    TryDeleteSymlink(fullPath);
-                }
+                TryDeleteSymlink(fullPath);
                 _logger.Info("remove.agent", $"unlinked {fullPath}");
                 progressTracker.Publish(1, 1, 0, 0, fullPath, force: true, isCompleted: true);
                 return new RemoveReport(
@@ -496,6 +493,62 @@ public sealed class RemoveService
                     DryRun: false);
             }
         });
+
+    private RemoveReport RemoveLinkWithSecureBackend(
+        SecureLinkIdentity expectedIdentity,
+        string target,
+        CancellationToken cancellationToken,
+        ProgressTracker progressTracker)
+    {
+        var errors = new FailureCollector();
+        var files = 0;
+        try
+        {
+            SecureRemovalBackend.RemoveLink(
+                target,
+                expectedIdentity,
+                (path, isDirectory) =>
+                    _entryDeletingForTests?.Invoke(path, isDirectory),
+                (path, _) =>
+                {
+                    files++;
+                    progressTracker.Publish(0, files, 0, errors.Count, path);
+                },
+                (path, detail) =>
+                {
+                    RecordFailure(path, detail, errors);
+                    progressTracker.Publish(0, files, 0, errors.Count, path);
+                },
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            progressTracker.Publish(0, files, 0, errors.Count, target,
+                force: true, isCanceled: true);
+            throw;
+        }
+
+        if (errors.Count == 0)
+        {
+            _logger.Info("remove", $"unlinked {target}");
+        }
+        else
+        {
+            _logger.Error("remove", $"unlink {target} completed with {errors.Count} error(s)");
+        }
+        progressTracker.Publish(1, files, 0, errors.Count, target,
+            force: true, isCompleted: true);
+        return new RemoveReport(
+            Succeeded: errors.Count == 0,
+            ResolvedPath: target,
+            FilesDeleted: files,
+            DirectoriesDeleted: 0,
+            Errors: errors.ToImmutable(),
+            DryRun: false)
+        {
+            ErrorCount = errors.Count,
+        };
+    }
 
     private RemoveReport RemoveWithSecureBackend(
         SecureFileIdentity expectedIdentity,

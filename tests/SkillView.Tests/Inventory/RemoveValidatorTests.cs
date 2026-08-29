@@ -170,6 +170,54 @@ public class RemoveValidatorTests : IDisposable
             error => error.Kind == RemoveValidator.ErrorKind.TargetIsScanRoot);
     }
 
+    [Fact]
+    public void ValidateBrokenSymlink_CapturesParentAndLinkIdentities()
+    {
+        var link = Path.Combine(_tempRoot, "broken-link");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-target"))) return;
+
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.True(validation.RemovesLinkOnly);
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+        Assert.True(validation.ExecutionLinkIdentity.Value.LinkIdentity.IsReparsePoint);
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(
+            _tempRoot,
+            out var canonicalRoot,
+            out var canonicalError), canonicalError);
+        Assert.True(PathIdentity.Equals(
+            canonicalRoot,
+            validation.ExecutionLinkIdentity.Value.ParentIdentity.CanonicalPath));
+        Assert.Equal(validation.ExecutionLinkIdentity.Value.CanonicalPath, validation.ResolvedPath);
+    }
+
+    [Fact]
+    public void ValidateSymlink_UsesCanonicalizedScanRootAndParent()
+    {
+        var realRoot = Path.Combine(_tempRoot, "real-link-root");
+        var linkedRoot = Path.Combine(_tempRoot, "linked-link-root");
+        Directory.CreateDirectory(realRoot);
+        if (!TryCreateDirectoryLink(linkedRoot, realRoot)) return;
+        var realLink = Path.Combine(realRoot, "agent-link");
+        var linkedPath = Path.Combine(linkedRoot, "agent-link");
+        if (!TryCreateDirectoryLink(realLink, Path.Combine(_tempRoot, "missing-agent-target"))) return;
+
+        var validation = RemoveValidator.ValidateSymlink(
+            linkedPath,
+            [new ScanRoot(linkedRoot, Scope.User, "claude")]);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(
+            realRoot,
+            out var canonicalRoot,
+            out var canonicalError), canonicalError);
+        Assert.True(PathIdentity.Equals(
+            Path.Combine(canonicalRoot, "agent-link"),
+            validation.ResolvedPath));
+    }
+
     private static bool TryCreateDirectoryLink(string link, string target)
     {
         try

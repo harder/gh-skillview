@@ -151,7 +151,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `runtimeErrors`. Real removals on supported platforms must stay on
   `SecureRemovalBackend`: validation pins the target's native volume/device and
   full file/inode identity, then re-runs containment and all other policy checks
-  against that captured canonical deletion address. Windows uses `FileIdInfo`
+  against that captured canonical deletion address. Canonical addresses must
+  come from the opened object (`GetFinalPathNameByHandleW` on Windows,
+  `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
+  never only from lexical normalization; canonicalize scan roots through the
+  same handle-based path before comparing them. Windows uses `FileIdInfo`
   and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared,
   enumerates opened directory handles, and deletes opened objects with
   `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
@@ -159,7 +163,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   through `openat`, enumerates opened directory descriptors, compares
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
-  `unlinkat`. Linux native `stat` parsing must select the verified layout for
+  `unlinkat`. Probe the exact Linux `openat2` flags before enabling the backend
+  so an old kernel or seccomp denial fails before validation or mutation.
+  Linux native `stat` parsing must select the verified layout for
   the current process architecture: little-endian x64 reads `st_mode` at byte
   24, little-endian ARM64 at byte 16, and unverified architectures or
   endianness disable secure removal rather than guessing. Do not fall back to
@@ -172,14 +178,17 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   selected root, against a process with the same UID. It cannot redirect
   recursive traversal through an ancestor or replacement directory, but an
   empty replacement at that final name can itself be unlinked.
-  Every real directory removal requires a captured `ExecutionIdentity`; only a
-  validation explicitly marked as link-only may execute without one. Empty-
+  Every real directory removal requires a captured `ExecutionIdentity`. Every
+  real link-only removal requires an `ExecutionLinkIdentity` that pins the
+  canonical parent identity, final name, and native link identity; reverify the
+  parent and link immediately before deleting the opened/relative entry. Empty-
   directory cleanup must use `RemoveValidator.ValidateEmptyDirectory`, which
   captures identity, canonicalizes containment, refuses scan roots, and sets
   `RequiresEmptyDirectory`. Both native backends must fail without deleting any
   children if such a directory is populated after validation—never downgrade
   that path into ordinary recursive removal. Broken-link cleanup similarly uses
-  `RemoveValidator.ValidateBrokenSymlink` and its explicit link-only contract.
+  `RemoveValidator.ValidateBrokenSymlink` and its identity-pinned link-only
+  contract; agent unlink actions use `ValidateSymlink` with the inventory roots.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

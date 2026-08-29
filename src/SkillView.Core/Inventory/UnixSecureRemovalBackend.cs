@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace SkillView.Inventory;
@@ -7,17 +8,16 @@ namespace SkillView.Inventory;
 internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 {
     private const int StatBufferSize = 512;
+    private const int InitialLinuxFinalPathCapacity = 512;
+    private const int MaxLinuxFinalPathCapacity = 32_768;
+    private const int MacAttributeBufferCapacity = 8_192;
     private const uint FileTypeMask = 0xF000;
     private const uint DirectoryType = 0x4000;
     private const uint SymlinkType = 0xA000;
 
     internal static bool IsSupportedOnCurrentPlatform =>
         OperatingSystem.IsMacOS()
-        || (OperatingSystem.IsLinux()
-            && TryGetLinuxStatLayout(
-                RuntimeInformation.ProcessArchitecture,
-                BitConverter.IsLittleEndian,
-                out _));
+        || (OperatingSystem.IsLinux() && IsCurrentLinuxPlatformSupported());
 
     public bool TryCaptureIdentity(
         string path,
@@ -29,11 +29,12 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         try
         {
             using var statBuffer = new StatBuffer();
-            var canonicalPath = RealPath(path);
-            using var handle = OpenAbsoluteDirectory(canonicalPath, out var parent, out var name);
+            var resolvedPath = RealPath(path);
+            using var handle = OpenAbsoluteDirectory(resolvedPath, out var parent, out _);
             using (parent)
             {
                 var stat = ReadStat(handle, statBuffer.Pointer);
+                var canonicalPath = ReadFinalPath(handle);
                 identity = new SecureFileIdentity(
                     stat.Device,
                     stat.Inode,
@@ -51,6 +52,53 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    public bool TryCaptureLinkIdentity(
+        string path,
+        out SecureLinkIdentity identity,
+        out string? error)
+    {
+        identity = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var parent = OpenDirectory(resolvedParent);
+            var parentStat = ReadStat(parent, statBuffer.Pointer);
+            var canonicalParent = ReadFinalPath(parent);
+            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                    out var linkStat, out var statError))
+            {
+                throw new IOException(statError);
+            }
+            if (!linkStat.IsSymlink)
+            {
+                throw new IOException($"'{path}' is no longer a symlink");
+            }
+
+            var canonicalLink = Path.Combine(canonicalParent, name);
+            identity = new SecureLinkIdentity(
+                ToSecureIdentity(parentStat, canonicalParent),
+                ToSecureIdentity(linkStat, canonicalLink),
+                name);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public bool TryCanonicalizePath(
         string path,
         out string canonicalPath,
@@ -58,7 +106,12 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         try
         {
-            canonicalPath = RealPath(path);
+            var resolvedPath = RealPath(path);
+            using var handle = OpenAbsoluteDirectory(resolvedPath, out var parent, out _);
+            using (parent)
+            {
+                canonicalPath = ReadFinalPath(handle);
+            }
             error = null;
             return true;
         }
@@ -281,6 +334,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     public void RemoveLink(
         string path,
+        SecureLinkIdentity expectedIdentity,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken)
@@ -290,33 +345,39 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         using var statBuffer = new StatBuffer();
         try
         {
-            var fullPath = Path.GetFullPath(path);
-            var name = Path.GetFileName(fullPath);
-            var parentPath = Path.GetDirectoryName(fullPath)
-                ?? throw new IOException($"path '{path}' has no parent directory");
-            var canonicalParent = RealPath(parentPath);
-            parent = OpenAbsoluteParent(Path.Combine(canonicalParent, name), out name);
-            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+            parent = OpenDirectory(expectedIdentity.ParentIdentity.CanonicalPath);
+            var parentStat = ReadStat(parent, statBuffer.Pointer);
+            if (!Matches(expectedIdentity.ParentIdentity, parentStat))
+            {
+                failure(path, "link parent identity changed after validation");
+                return;
+            }
+            if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
                     out var identity, out var statError))
             {
                 failure(path, statError!);
                 return;
             }
-            if (!identity.IsSymlink)
+            if (!Matches(expectedIdentity.LinkIdentity, identity)
+                || !identity.IsSymlink)
             {
-                failure(path, "path is no longer a symlink");
+                failure(path, "link identity changed after validation");
                 return;
             }
+            entryDeleting(path, false);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+            if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
                     out var beforeDelete, out statError)
-                || !Matches(identity, beforeDelete))
+                || !Matches(expectedIdentity.LinkIdentity, beforeDelete))
             {
                 failure(path, statError ?? "link identity changed before deletion");
                 return;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (UnixNative.unlinkat(parent.FileDescriptor, name, flags: 0) != 0)
+            if (UnixNative.unlinkat(
+                    parent.FileDescriptor,
+                    expectedIdentity.Name,
+                    flags: 0) != 0)
             {
                 failure(path, LastError("unlink failed"));
                 return;
@@ -332,6 +393,16 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             parent?.Dispose();
         }
     }
+
+    private static SecureFileIdentity ToSecureIdentity(
+        NativeStat stat,
+        string canonicalPath) => new(
+            stat.Device,
+            stat.Inode,
+            0,
+            canonicalPath,
+            stat.IsDirectory,
+            stat.IsSymlink);
 
     private static SafeUnixHandle OpenAbsoluteDirectory(
         string path,
@@ -447,6 +518,95 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         }
     }
 
+    private static string ReadFinalPath(SafeUnixHandle handle)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            var attributes = new MacAttributeList
+            {
+                BitmapCount = UnixConstants.AttributeBitmapCount,
+                CommonAttributes = UnixConstants.AttributeCommonFullPath,
+            };
+            var buffer = new byte[MacAttributeBufferCapacity];
+            if (UnixNative.fgetattrlist(
+                    handle.FileDescriptor,
+                    ref attributes,
+                    buffer,
+                    checked((nuint)buffer.Length),
+                    options: 0) != 0)
+            {
+                throw new IOException(
+                    $"resolve opened entry path failed: {LastErrorMessage()}");
+            }
+
+            const int lengthFieldOffset = 0;
+            const int referenceOffset = sizeof(uint);
+            const int referenceSize = sizeof(int) + sizeof(uint);
+            var returnedLength = BitConverter.ToUInt32(buffer, lengthFieldOffset);
+            var dataOffset = BitConverter.ToInt32(buffer, referenceOffset);
+            var dataLength = BitConverter.ToUInt32(
+                buffer,
+                referenceOffset + sizeof(int));
+            var dataStart = referenceOffset + (long)dataOffset;
+            var dataEnd = dataStart + dataLength;
+            if (returnedLength > buffer.Length
+                || returnedLength < referenceOffset + referenceSize
+                || dataStart < referenceOffset + referenceSize
+                || dataLength <= 1
+                || dataEnd > returnedLength
+                || dataEnd > buffer.Length
+                || buffer[checked((int)dataEnd - 1)] != 0)
+            {
+                throw new IOException("resolve opened entry returned an invalid path");
+            }
+
+            var path = Encoding.UTF8.GetString(
+                buffer,
+                checked((int)dataStart),
+                checked((int)dataLength - 1));
+            return Path.GetFullPath(path);
+        }
+
+        var descriptorPath = $"/proc/self/fd/{handle.FileDescriptor}";
+        var capacity = InitialLinuxFinalPathCapacity;
+        while (capacity <= MaxLinuxFinalPathCapacity)
+        {
+            var buffer = Marshal.AllocHGlobal(capacity);
+            try
+            {
+                var length = UnixNative.readlink(
+                    descriptorPath,
+                    buffer,
+                    checked((nuint)capacity));
+                if (length < 0)
+                {
+                    throw new IOException(
+                        $"resolve opened entry path failed: {LastErrorMessage()}");
+                }
+                if (length < capacity)
+                {
+                    var path = Marshal.PtrToStringUTF8(buffer, checked((int)length))
+                        ?? throw new IOException(
+                            "resolve opened entry returned an invalid path");
+                    if (path.EndsWith(" (deleted)", StringComparison.Ordinal))
+                    {
+                        throw new IOException(
+                            "opened entry was unlinked while its identity was captured");
+                    }
+                    return Path.GetFullPath(path);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+            capacity = checked(capacity * 2);
+        }
+
+        throw new IOException(
+            $"resolved opened entry path exceeds {MaxLinuxFinalPathCapacity} bytes");
+    }
+
     private static NativeStat ReadStat(SafeUnixHandle handle, IntPtr buffer)
     {
         if (UnixNative.fstat(handle.FileDescriptor, buffer) != 0)
@@ -522,6 +682,51 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         return layout != default;
     }
 
+    internal static bool IsLinuxPlatformSupported(
+        Architecture architecture,
+        bool isLittleEndian,
+        bool openAt2Available) =>
+        openAt2Available
+        && TryGetLinuxStatLayout(architecture, isLittleEndian, out _);
+
+    private static bool IsCurrentLinuxPlatformSupported()
+    {
+        var architecture = RuntimeInformation.ProcessArchitecture;
+        var isLittleEndian = BitConverter.IsLittleEndian;
+        if (!TryGetLinuxStatLayout(architecture, isLittleEndian, out _))
+        {
+            return false;
+        }
+        return IsLinuxPlatformSupported(
+            architecture,
+            isLittleEndian,
+            openAt2Available: ProbeOpenAt2());
+    }
+
+    private static bool ProbeOpenAt2()
+    {
+        var how = new OpenHow
+        {
+            Flags = unchecked((ulong)UnixConstants.DirectoryOpenFlags),
+            Resolve = UnixConstants.ResolveBeneath
+                | UnixConstants.ResolveNoSymlinks
+                | UnixConstants.ResolveNoCrossDevice,
+        };
+        var descriptor = UnixNative.syscall(
+            UnixConstants.OpenAt2SystemCall,
+            UnixConstants.CurrentWorkingDirectory,
+            ".",
+            ref how,
+            (nuint)Marshal.SizeOf<OpenHow>());
+        if (descriptor < 0 || descriptor > int.MaxValue)
+        {
+            return false;
+        }
+
+        using var handle = new SafeUnixHandle(checked((int)descriptor));
+        return true;
+    }
+
     private static bool Matches(SecureFileIdentity expected, NativeStat actual) =>
         expected.Volume == actual.Device
         && expected.FileIdLow == actual.Inode
@@ -559,6 +764,18 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         internal ulong Flags;
         internal ulong Mode;
         internal ulong Resolve;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MacAttributeList
+    {
+        internal ushort BitmapCount;
+        internal ushort Reserved;
+        internal uint CommonAttributes;
+        internal uint VolumeAttributes;
+        internal uint DirectoryAttributes;
+        internal uint FileAttributes;
+        internal uint ForkAttributes;
     }
 
     private sealed class DirectoryFrame : IDisposable
@@ -694,6 +911,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
         internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
         internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;
+        internal const ushort AttributeBitmapCount = 5;
+        internal const uint AttributeCommonFullPath = 0x08000000;
+        internal const int CurrentWorkingDirectory = -100;
         internal const long OpenAt2SystemCall = 437;
         internal const ulong ResolveNoCrossDevice = 0x01;
         internal const ulong ResolveNoSymlinks = 0x04;
@@ -718,6 +938,17 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
         [DllImport("libc", SetLastError = true)]
         internal static extern int fstat(int descriptor, IntPtr buffer);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int fgetattrlist(
+            int descriptor,
+            ref MacAttributeList attributes,
+            [Out] byte[] buffer,
+            nuint bufferSize,
+            uint options);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern nint readlink(string path, IntPtr buffer, nuint bufferSize);
 
         [DllImport("libc", SetLastError = true)]
         internal static extern int fstatat(int directory, string path, IntPtr buffer, int flags);

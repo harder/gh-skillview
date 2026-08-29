@@ -347,6 +347,79 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_ValidatedBrokenLinkReplacedBeforeExecution_RefusesReplacement()
+    {
+        var parent = Path.Combine(_tempRoot, "broken-link-replaced");
+        Directory.CreateDirectory(parent);
+        var link = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-first"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+
+        DeleteDirectoryLink(link);
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-second"))) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("link identity changed", StringComparison.Ordinal));
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
+    public void Remove_ValidatedBrokenLinkParentReplacedBeforeExecution_RefusesBothParents()
+    {
+        var parent = Path.Combine(_tempRoot, "broken-link-parent");
+        var originalParent = Path.Combine(_tempRoot, "broken-link-parent-original");
+        Directory.CreateDirectory(parent);
+        var link = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-original"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+
+        Directory.Move(parent, originalParent);
+        Directory.CreateDirectory(parent);
+        var replacementLink = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(
+                replacementLink,
+                Path.Combine(_tempRoot, "missing-replacement"))) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("parent identity changed", StringComparison.Ordinal));
+        Assert.True(PathResolver.IsSymlink(Path.Combine(originalParent, "broken")));
+        Assert.True(PathResolver.IsSymlink(replacementLink));
+    }
+
+    [Fact]
+    public void Remove_ValidatedBrokenLinkCanceledAtDeletionBoundary_PreservesLink()
+    {
+        var link = Path.Combine(_tempRoot, "broken-link-canceled");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-canceled"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        using var cancellation = new CancellationTokenSource();
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (_, _) => cancellation.Cancel());
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
     public void Remove_ValidatedEmptyDirectoryPopulatedBeforeExecution_DoesNotDeleteContents()
     {
         var dir = Path.Combine(_tempRoot, "empty-became-populated");

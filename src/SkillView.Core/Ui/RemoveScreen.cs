@@ -439,9 +439,12 @@ public sealed class RemoveScreen
         CancellationToken cancellationToken,
         IProgress<RemoveService.RemoveProgress> progress)
     {
-        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
+        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink)
         {
-            var report = await _remove.RemoveLinkAsync(agent.Path, cancellationToken, progress)
+            var report = await _remove.RemoveAsync(
+                    evaluation.Items.Single().Validation,
+                    cancellationToken: cancellationToken,
+                    progress: progress)
                 .ConfigureAwait(false);
             return RemoveService.BatchRemoveReport.FromSingle(
                 report,

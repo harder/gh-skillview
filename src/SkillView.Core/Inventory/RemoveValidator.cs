@@ -43,6 +43,7 @@ public static class RemoveValidator
         public bool Allowed => Errors.IsDefaultOrEmpty || Errors.Length == 0;
         public bool RequiresSecondConfirm => Warnings.Length > 0;
         internal SecureFileIdentity? ExecutionIdentity { get; init; }
+        internal SecureLinkIdentity? ExecutionLinkIdentity { get; init; }
         internal bool RequiresEmptyDirectory { get; init; }
         internal bool RemovesLinkOnly { get; init; }
     }
@@ -310,41 +311,80 @@ public static class RemoveValidator
 
     internal static RemoveValidation ValidateBrokenSymlink(
         string path,
-        IReadOnlyList<ScanRoot> knownRoots)
+        IReadOnlyList<ScanRoot> knownRoots) =>
+        ValidateSymlink(path, knownRoots, requireBroken: true);
+
+    internal static RemoveValidation ValidateSymlink(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots,
+        bool requireBroken = false)
     {
         var errors = ImmutableArray.CreateBuilder<Error>();
         var fullPath = Path.GetFullPath(path);
-        if (FindContainingRoot(fullPath, knownRoots, canonicalizeRoots: false) is null)
+        var resolved = fullPath;
+        SecureLinkIdentity? executionLinkIdentity = null;
+        var matchedRootByRawPath = FindContainingRoot(
+            fullPath,
+            knownRoots,
+            canonicalizeRoots: false);
+        if (matchedRootByRawPath is null)
         {
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
                 $"'{fullPath}' not inside any scan root"));
-        }
-        foreach (var root in knownRoots)
-        {
-            if (PathKeysEqual(root.Path, fullPath))
-            {
-                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
-                    $"'{fullPath}' is itself a scan root"));
-                break;
-            }
         }
         if (!PathResolver.IsSymlink(fullPath))
         {
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{fullPath}' is no longer a symlink"));
         }
-        else if (PathResolver.Resolve(fullPath) is not null)
+        else if (requireBroken && PathResolver.Resolve(fullPath) is not null)
         {
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{fullPath}' is no longer broken"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureLinkIdentity(
+                    fullPath,
+                    out var capturedIdentity,
+                    out var identityError))
+            {
+                executionLinkIdentity = capturedIdentity;
+                resolved = capturedIdentity.CanonicalPath;
+            }
+            else
+            {
+                errors.Add(new Error(ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected link and its parent: {identityError}"));
+            }
+        }
+
+        if (executionLinkIdentity is not null
+            && FindContainingRoot(resolved, knownRoots, canonicalizeRoots: true) is null)
+        {
+            errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
+                $"resolved link path '{resolved}' is not inside any known scan root"));
+        }
+
+        foreach (var root in knownRoots)
+        {
+            if (PathKeysEqual(root.Path, fullPath)
+                || (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
+                    && PathKeysEqual(canonicalRoot, resolved)))
+            {
+                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                    $"'{fullPath}' is itself a scan root"));
+                break;
+            }
         }
 
         return new RemoveValidation(
             errors.ToImmutable(),
             ImmutableArray<Warning>.Empty,
-            fullPath,
+            resolved,
             ImmutableArray<string>.Empty)
         {
+            ExecutionLinkIdentity = executionLinkIdentity,
             RemovesLinkOnly = true,
         };
     }
@@ -362,18 +402,26 @@ public static class RemoveValidator
     {
         foreach (var root in roots)
         {
-            var comparisonRoot = canonicalizeRoots
-                ? CanonicalizeForComparison(root.Path)
-                : root.Path;
+            var comparisonRoot = root.Path;
+            if (canonicalizeRoots
+                && !TryCanonicalizeForComparison(root.Path, out comparisonRoot))
+            {
+                continue;
+            }
             if (PathResolver.IsInside(path, comparisonRoot)) return root;
         }
         return null;
     }
 
     private static string CanonicalizeForComparison(string path) =>
-        SecureRemovalBackend.TryCanonicalizePath(path, out var canonicalPath, out _)
+        TryCanonicalizeForComparison(path, out var canonicalPath)
             ? canonicalPath
             : path;
+
+    private static bool TryCanonicalizeForComparison(
+        string path,
+        out string canonicalPath) =>
+        SecureRemovalBackend.TryCanonicalizePath(path, out canonicalPath, out _);
 
     /// True if any directory on the chain from `root` down to `target`
     /// (exclusive of `root`, inclusive of `target`) is a symlink whose

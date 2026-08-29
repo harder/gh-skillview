@@ -32,6 +32,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const uint FileDispositionDelete = 0x00000001;
     private const uint FileDispositionPosixSemantics = 0x00000002;
     private const uint FileDispositionIgnoreReadonly = 0x00000010;
+    private const int InitialFinalPathCapacity = 512;
+    private const int MaxFinalPathCapacity = 32_768;
 
     public bool TryCaptureIdentity(
         string path,
@@ -44,16 +46,63 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         {
             using var handle = OpenEntry(
                 path,
-                directory: Directory.Exists(path),
+                directory: true,
                 enumerateDirectory: false);
             var information = ReadIdentity(handle);
             identity = new SecureFileIdentity(
                 information.Volume,
                 information.FileIdLow,
                 information.FileIdHigh,
-                Path.GetFullPath(path),
+                ReadFinalPath(handle),
                 information.IsDirectory,
                 information.IsReparsePoint);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureLinkIdentity(
+        string path,
+        out SecureLinkIdentity identity,
+        out string? error)
+    {
+        identity = default;
+        error = null;
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            using var parent = OpenCanonicalDirectory(parentPath);
+            var parentInformation = ReadIdentity(parent);
+            var canonicalParent = ReadFinalPath(parent);
+            var canonicalLink = Path.Combine(canonicalParent, name);
+            var attributes = File.GetAttributes(canonicalLink);
+            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+            using var link = OpenEntry(
+                canonicalLink,
+                directory: isDirectory,
+                enumerateDirectory: false);
+            var linkInformation = ReadIdentity(link);
+            if (!linkInformation.IsReparsePoint)
+            {
+                throw new IOException($"'{path}' is no longer a symlink or reparse point");
+            }
+
+            identity = new SecureLinkIdentity(
+                ToSecureIdentity(parentInformation, canonicalParent),
+                ToSecureIdentity(linkInformation, canonicalLink),
+                name);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -70,7 +119,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     {
         try
         {
-            canonicalPath = Path.GetFullPath(path);
+            using var handle = OpenCanonicalDirectory(path);
+            canonicalPath = ReadFinalPath(handle);
             error = null;
             return true;
         }
@@ -94,7 +144,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var fullPath = Path.GetFullPath(path);
+        var fullPath = expectedIdentity.CanonicalPath;
         var frames = new Stack<DirectoryFrame>();
         SafeFileHandle? root = null;
         try
@@ -239,6 +289,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     public void RemoveLink(
         string path,
+        SecureLinkIdentity expectedIdentity,
+        Action<string, bool> entryDeleting,
         Action<string, bool> entryDeleted,
         Action<string, string> failure,
         CancellationToken cancellationToken)
@@ -246,15 +298,31 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var attributes = File.GetAttributes(path);
-            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
-            using var handle = OpenEntry(path, isDirectory, enumerateDirectory: false);
-            var identity = ReadIdentity(handle);
-            if (!identity.IsReparsePoint)
+            using var parent = OpenCanonicalDirectory(
+                expectedIdentity.ParentIdentity.CanonicalPath);
+            var parentIdentity = ReadIdentity(parent);
+            if (!Matches(expectedIdentity.ParentIdentity, parentIdentity))
             {
-                failure(path, "path is no longer a symlink or reparse point");
+                failure(path, "link parent identity changed after validation");
                 return;
             }
+
+            var canonicalParent = ReadFinalPath(parent);
+            var canonicalLink = Path.Combine(canonicalParent, expectedIdentity.Name);
+            var attributes = File.GetAttributes(canonicalLink);
+            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
+            using var handle = OpenEntry(
+                canonicalLink,
+                isDirectory,
+                enumerateDirectory: false);
+            var identity = ReadIdentity(handle);
+            if (!Matches(expectedIdentity.LinkIdentity, identity)
+                || !identity.IsReparsePoint)
+            {
+                failure(path, "link identity changed after validation");
+                return;
+            }
+            entryDeleting(path, false);
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryDeleteHandle(handle, out var deleteError))
             {
@@ -267,6 +335,36 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         {
             failure(path, ex.Message);
         }
+    }
+
+    private static SecureFileIdentity ToSecureIdentity(
+        NativeIdentity identity,
+        string canonicalPath) => new(
+            identity.Volume,
+            identity.FileIdLow,
+            identity.FileIdHigh,
+            canonicalPath,
+            identity.IsDirectory,
+            identity.IsReparsePoint);
+
+    private static SafeFileHandle OpenCanonicalDirectory(string path)
+    {
+        var handle = WindowsNative.CreateFileW(
+            ToExtendedPath(path),
+            FileReadAttributes | SynchronizeAccess,
+            ShareRead | ShareWrite | ShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            BackupSemantics,
+            IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            throw new IOException(
+                $"open canonical directory '{path}' failed: {new Win32Exception(error).Message}");
+        }
+        return handle;
     }
 
     private static SafeFileHandle OpenEntry(
@@ -368,6 +466,50 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     internal static bool ShouldFallbackToLegacyDisposition(int error) =>
         error is ErrorInvalidFunction or ErrorNotSupported or ErrorInvalidParameter;
+
+    private static string ReadFinalPath(SafeFileHandle handle)
+    {
+        var capacity = InitialFinalPathCapacity;
+        while (capacity <= MaxFinalPathCapacity)
+        {
+            var buffer = new StringBuilder(capacity);
+            var length = WindowsNative.GetFinalPathNameByHandleW(
+                handle,
+                buffer,
+                checked((uint)capacity),
+                flags: 0);
+            if (length == 0)
+            {
+                throw new IOException(
+                    $"resolve opened entry path failed: {LastErrorMessage()}");
+            }
+            if (length < capacity)
+            {
+                return NormalizeFinalPath(buffer.ToString());
+            }
+            if (length > MaxFinalPathCapacity)
+            {
+                break;
+            }
+            capacity = checked((int)length);
+        }
+
+        throw new IOException(
+            $"resolved opened entry path exceeds {MaxFinalPathCapacity} characters");
+    }
+
+    internal static string NormalizeFinalPath(string path)
+    {
+        const string uncPrefix = @"\\?\UNC\";
+        const string extendedPrefix = @"\\?\";
+        if (path.StartsWith(uncPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return @"\\" + path[uncPrefix.Length..];
+        }
+        return path.StartsWith(extendedPrefix, StringComparison.OrdinalIgnoreCase)
+            ? path[extendedPrefix.Length..]
+            : path;
+    }
 
     private static string ToExtendedPath(string path)
     {
@@ -567,6 +709,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             uint creationDisposition,
             uint flagsAndAttributes,
             IntPtr templateFile);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern uint GetFinalPathNameByHandleW(
+            SafeFileHandle file,
+            [Out] StringBuilder path,
+            uint pathCapacity,
+            uint flags);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
