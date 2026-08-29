@@ -161,6 +161,11 @@ logging, or subprocess adapters.
   directory: `SKILL.md`, `.git`, and emptiness are inspected relative to that
   handle/descriptor and bracketed by generation checks. Canonical pathnames are
   display/containment addresses, not substitutes for object-relative policy I/O.
+  Windows rename behavior varies by filesystem: a rename may update
+  `ChangeTime`, in which case validation must fail closed, or preserve it, in
+  which case the returned policy snapshot must still describe the held object.
+  Cross-platform ABA tests should assert those two safe outcomes rather than
+  require one volume-specific timestamp behavior.
   Broken-link cleanup observes target existence relative to the held parent and
   rechecks both parent and link identities around that observation, preventing a
   broken-to-valid replacement from being authorized.

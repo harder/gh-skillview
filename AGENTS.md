@@ -220,7 +220,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Object-local removal policy must be captured through that same held directory:
   inspect `SKILL.md`, `.git`, and empty-directory state relative to the opened
   handle/descriptor, then verify the directory generation did not change during
-  inspection. Never capture identity and perform those checks later through its
+  inspection. Windows filesystems can either preserve or change `ChangeTime`
+  across a rename, so ABA tests must accept only the two safe outcomes: a
+  handle-bound snapshot when generation remains stable, or an explicit
+  generation-change refusal. Never capture identity and perform those checks later through its
   canonical pathname. Broken-link eligibility likewise belongs to the captured
   parent/name/link observation: determine whether the target resolves relative
   to the held parent, then recheck parent and link identities before approving

@@ -67,7 +67,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
-    public void TryCaptureDirectoryValidation_TargetAba_InspectsOpenedDirectory()
+    public void TryCaptureDirectoryValidation_TargetAba_InspectsOpenedDirectoryOrFailsClosed()
     {
         if (!OperatingSystem.IsWindows()) return;
 
@@ -88,12 +88,19 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
             out var snapshot,
             out var error);
 
-        Assert.True(captured, error);
+        Assert.True(Directory.Exists(Path.Combine(movedSkill, ".git")));
+        Assert.False(Directory.Exists(Path.Combine(skill, ".git")));
+        if (!captured)
+        {
+            Assert.Equal(
+                "selected directory changed during policy inspection",
+                error);
+            return;
+        }
+
         Assert.True(snapshot.HasSkillFile);
         Assert.True(snapshot.HasGitDirectory);
         Assert.True(PathIdentity.Equals(movedSkill, snapshot.Identity.CanonicalPath));
-        Assert.True(Directory.Exists(Path.Combine(movedSkill, ".git")));
-        Assert.False(Directory.Exists(Path.Combine(skill, ".git")));
     }
 
     [Fact]
