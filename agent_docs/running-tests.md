@@ -6,6 +6,12 @@ A bare project path (e.g. `dotnet test tests/Foo/Foo.csproj`) no longer works â€
 pass `--project <path>` explicitly, or run `dotnet test` from the repo root to
 target the whole solution.
 
+Run product publish commands sequentially. Both product hosts build the shared
+`SkillView.Core` project into the same intermediate/output locations, and
+parallel publish processes can contend on files such as
+`SkillView.Core.deps.json`. That contention is a verification artifact, not a
+product failure.
+
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,
 `--filter-class`, `--filter-not-class`, `--filter-method`, `--filter-not-method`,

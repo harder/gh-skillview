@@ -105,8 +105,10 @@ logging, or subprocess adapters.
   canonical deletion address. The canonical address and canonical scan roots
   come from opened handles, not lexical normalization: Windows uses
   `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
-  `fgetattrlist`, and Linux reads `/proc/self/fd`. Windows removal compares full 128-bit file IDs,
-  enumerates and deletes opened handles; Unix removal walks and enumerates opened directory
+  `fgetattrlist`, and Linux reads `/proc/self/fd`. Windows removal compares full
+  128-bit file IDs, opens enumerated children and links relative to the held
+  parent handle with `NtOpenFile` and `OBJECT_ATTRIBUTES.RootDirectory`, and
+  deletes opened handles; Unix removal walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
   mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
   Linux backend probes the exact `openat2` contract at startup and remains
@@ -122,9 +124,11 @@ logging, or subprocess adapters.
   Linux `struct stat` is architecture-specific: the secure backend explicitly
   selects the verified little-endian x64 or ARM64 layout and stays disabled on
   unverified architectures or endianness instead of interpreting arbitrary
-  buffer offsets. Link identity also compares kernel-maintained change-time
-  seconds/nanoseconds so immediate inode reuse cannot make a replacement link
-  look like the one validated earlier. Directory final-name checks compare the
+  buffer offsets. Every captured Unix object identity also compares kernel-
+  maintained change-time seconds/nanoseconds so immediate inode reuse cannot
+  make a replacement link, parent, or selected directory look like the one
+  validated earlier. A directory changed after validation is refused and must
+  be revalidated. Directory final-name checks compare the
   current opened-descriptor stat to the named entry after traversal, because
   deleting children legitimately changes the directory's change time.
   Real directory execution fails closed without a pinned native identity.
@@ -135,6 +139,13 @@ logging, or subprocess adapters.
   parent plus native parent/link identities. Broken-link cleanup and agent
   unlink actions revalidate both identities and delete through the opened
   parent/object boundary rather than trusting the current pathname.
+  Unix destructive identity capture resolves only the parent, then opens the
+  final candidate with `O_NOFOLLOW | O_DIRECTORY`; do not reuse final-following
+  canonicalization for this purpose. Review each native operation as an
+  observe/reopen/compare/delete chain and reject reconstructed child paths once
+  a parent handle exists. Regression coverage includes Windows ancestor
+  replacement plus a matching hard link, Unix final-component link replacement,
+  and same-inode generation reuse.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

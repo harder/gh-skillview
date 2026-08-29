@@ -127,4 +127,35 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
             identity.CanonicalPath,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void TryCaptureIdentity_FinalSymlinkToDirectory_FailsClosed()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var target = Path.Combine(_tempRoot, "final-link-target");
+        var link = Path.Combine(_tempRoot, "final-link");
+        Directory.CreateDirectory(target);
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var captured = new UnixSecureRemovalBackend().TryCaptureIdentity(
+            link,
+            out _,
+            out var error);
+
+        Assert.False(captured);
+        Assert.NotNull(error);
+        Assert.True(Directory.Exists(target));
+        Assert.True(PathResolver.IsSymlink(link));
+    }
 }

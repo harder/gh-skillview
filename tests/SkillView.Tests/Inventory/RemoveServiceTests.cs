@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -268,7 +269,10 @@ public class RemoveServiceTests : IDisposable
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
         Assert.True(File.Exists(firstFile));
         Assert.True(File.Exists(secondFile));
     }
@@ -366,7 +370,7 @@ public class RemoveServiceTests : IDisposable
 
         Assert.False(report.Succeeded);
         Assert.Contains(report.Errors,
-            error => error.Contains("link identity changed", StringComparison.Ordinal));
+            error => error.Contains("identity changed", StringComparison.Ordinal));
         Assert.True(PathResolver.IsSymlink(link));
     }
 
@@ -437,7 +441,7 @@ public class RemoveServiceTests : IDisposable
 
         Assert.False(report.Succeeded);
         Assert.Contains(report.Errors,
-            error => error.Contains("no longer empty", StringComparison.Ordinal));
+            error => error.Contains("identity changed", StringComparison.Ordinal));
         Assert.True(Directory.Exists(dir));
         Assert.Equal("keep", File.ReadAllText(lateFile));
     }
@@ -903,6 +907,48 @@ public class RemoveServiceTests : IDisposable
         Assert.True(File.Exists(externalFile));
     }
 
+    [Fact]
+    public void Remove_WindowsRootPathReplacedWithHardLinkJunction_UsesHeldParent()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var (skill, dir) = MakeSkill("relative-child-open");
+        var movedOriginal = Path.Combine(_tempRoot, "relative-child-open-original");
+        var external = Path.Combine(_tempRoot, "relative-child-open-external");
+        Directory.CreateDirectory(external);
+        var swapped = false;
+        var hardLinkCreated = false;
+        var linkCreated = false;
+        string? externalHardLink = null;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var service = new RemoveService(_logger, observed =>
+        {
+            if (swapped) return;
+            swapped = true;
+            var name = Path.GetFileName(observed);
+            Directory.Move(dir, movedOriginal);
+            externalHardLink = Path.Combine(external, name);
+            hardLinkCreated = WindowsTestNative.CreateHardLinkW(
+                externalHardLink,
+                Path.Combine(movedOriginal, name),
+                IntPtr.Zero);
+            if (!hardLinkCreated) return;
+            linkCreated = TryCreateDirectoryLink(dir, external);
+        });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        if (!hardLinkCreated || !linkCreated) return;
+        Assert.True(swapped);
+        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.True(PathResolver.IsSymlink(dir));
+        Assert.NotNull(externalHardLink);
+        Assert.Equal("body", File.ReadAllText(externalHardLink));
+        Assert.False(Directory.Exists(movedOriginal));
+    }
+
     private static bool TryCreateDirectoryLink(string link, string target)
     {
         try
@@ -962,5 +1008,15 @@ public class RemoveServiceTests : IDisposable
     private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
     {
         public void Report(T value) => callback(value);
+    }
+
+    private static class WindowsTestNative
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool CreateHardLinkW(
+            string fileName,
+            string existingFileName,
+            IntPtr securityAttributes);
     }
 }

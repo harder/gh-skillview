@@ -594,6 +594,35 @@ name it compares a fresh stat of the still-open descriptor to `fstatat`, since
 deleting children legitimately changes the directory's change time. The
 verified Linux x64 and ARM64 layouts both place those fields at bytes 104/112.
 
+The following review added three more valid findings, all consequences of the
+same incomplete object-binding model:
+
+1. **Windows children were observed by handle but reopened by full path.** A
+   held directory could be renamed, its old path replaced by a junction, and a
+   matching hard link placed behind that junction. The full 128-bit file ID
+   would legitimately match while deletion removed the external hard-link name.
+   Every enumerated child and link is now opened relative to the held parent
+   with `NtOpenFile` and `OBJECT_ATTRIBUTES.RootDirectory`; display paths are no
+   longer reused as authority paths.
+2. **Unix directory capture followed the final component.** `realpath(path)`
+   allowed an empty-directory candidate swapped to a symlink to be captured as
+   its destination. Destructive capture now resolves only the parent and opens
+   the final name with `O_NOFOLLOW | O_DIRECTORY`. Final-following behavior
+   remains only in the explicitly non-destructive canonicalization operation.
+3. **Selected-directory identity omitted the new generation fields.** The prior
+   inode-reuse correction compared `st_ctim` for links and traversal
+   observations but intentionally preserved the old selected-directory behavior
+   to allow content changes after confirmation. That was the wrong safety
+   tradeoff. Selected directories and link parents now compare change time too;
+   any intervening namespace/content change causes refusal and revalidation.
+
+The durable review method is now explicit: map every native destructive path as
+observe → reopen → compare → delete, identify the exact authority object at each
+edge, and treat any pathname reconstructed after a parent handle is held as a
+red flag. The corresponding adversarial matrix combines ancestor rename and
+replacement with hard links, final-component symlink replacement, and immediate
+identifier reuse instead of testing each mechanism in isolation.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**

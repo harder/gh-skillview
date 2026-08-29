@@ -25,6 +25,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 - Build/style verification: `dotnet build`
 - Full tests: `dotnet test --no-build`
+- Run product publish commands sequentially. The App and gh-extension publishes
+  share `SkillView.Core` intermediate/output files, so parallel publishes can
+  race while writing `SkillView.Core.deps.json` and cause false build failures.
 - Integration tests only: `dotnet test --project tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj` (a bare project path no longer works under the .NET 10 SDK's `dotnet test` runner)
 - Launch TUI: `src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview`
 - For CLI global flags such as `--scan-root`, pass them **before** the
@@ -157,7 +160,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   never only from lexical normalization; canonicalize scan roots through the
   same handle-based path before comparing them. Windows uses `FileIdInfo`
   and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared,
-  enumerates opened directory handles, and deletes opened objects with
+  enumerates opened directory handles, opens every enumerated child and link
+  relative to its held parent with `NtOpenFile`/`OBJECT_ATTRIBUTES.RootDirectory`,
+  and deletes opened objects with
   `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
   invalid-function/parameter); Unix walks canonicalized paths
   through `openat`, enumerates opened directory descriptors, compares
@@ -169,9 +174,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   the current process architecture: little-endian x64 reads `st_mode` at byte
   24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
   unverified architectures or endianness disable secure removal rather than
-  guessing. Unix link identity includes change-time seconds/nanoseconds as well
-  as device/inode because filesystems may immediately recycle a deleted
-  symlink's inode. Do not fall back to
+  guessing. Unix captured identity includes change-time seconds/nanoseconds as
+  well as device/inode for selected directories, parents, links, and observed
+  entries because filesystems may immediately recycle an inode. A selected
+  directory whose generation or contents changed after validation must be
+  refused and revalidated, not accepted for compatibility with stale behavior.
+  Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles
   even when identity inspection, callbacks, or those checks throw. Do not
@@ -192,6 +200,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   that path into ordinary recursive removal. Broken-link cleanup similarly uses
   `RemoveValidator.ValidateBrokenSymlink` and its identity-pinned link-only
   contract; agent unlink actions use `ValidateSymlink` with the inventory roots.
+  Destructive directory identity capture may resolve ancestor components, but
+  must open the final candidate name relative to the canonical parent with
+  no-follow and directory-only flags. Only non-destructive canonicalization may
+  follow the final component. When reviewing this boundary, inventory every
+  observe → reopen → compare → delete step: a child path reconstructed after a
+  parent handle was acquired is not an authority address. Adversarial coverage
+  must combine ancestor rename/replacement with hard links, final-component
+  symlink replacement, and immediate native-identifier reuse.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

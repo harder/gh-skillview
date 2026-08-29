@@ -32,6 +32,11 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private const uint FileDispositionDelete = 0x00000001;
     private const uint FileDispositionPosixSemantics = 0x00000002;
     private const uint FileDispositionIgnoreReadonly = 0x00000010;
+    private const uint FileDirectoryFile = 0x00000001;
+    private const uint FileSynchronousIoNonAlert = 0x00000020;
+    private const uint FileNonDirectoryFile = 0x00000040;
+    private const uint FileOpenForBackupIntent = 0x00004000;
+    private const uint FileOpenReparsePoint = 0x00200000;
     private const int InitialFinalPathCapacity = 512;
     private const int MaxFinalPathCapacity = 32_768;
 
@@ -86,12 +91,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             using var parent = OpenCanonicalDirectory(parentPath);
             var parentInformation = ReadIdentity(parent);
             var canonicalParent = ReadFinalPath(parent);
-            var canonicalLink = Path.Combine(canonicalParent, name);
-            var attributes = File.GetAttributes(canonicalLink);
-            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
-            using var link = OpenEntry(
-                canonicalLink,
-                directory: isDirectory,
+            using var link = OpenEntryAt(
+                parent,
+                name,
+                directory: null,
                 enumerateDirectory: false);
             var linkInformation = ReadIdentity(link);
             if (!linkInformation.IsReparsePoint)
@@ -101,7 +104,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
             identity = new SecureLinkIdentity(
                 ToSecureIdentity(parentInformation, canonicalParent),
-                ToSecureIdentity(linkInformation, canonicalLink),
+                ToSecureIdentity(
+                    linkInformation,
+                    Path.Combine(canonicalParent, name)),
                 name);
             return true;
         }
@@ -186,8 +191,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                     SafeFileHandle? childHandle = null;
                     try
                     {
-                        childHandle = OpenEntry(
-                            childPath,
+                        childHandle = OpenEntryAt(
+                            frame.Directory,
+                            child.Value.Name,
                             directory: isDirectory,
                             enumerateDirectory: isDirectory && !isReparsePoint);
                         var openedIdentity = ReadIdentity(childHandle);
@@ -307,13 +313,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 return;
             }
 
-            var canonicalParent = ReadFinalPath(parent);
-            var canonicalLink = Path.Combine(canonicalParent, expectedIdentity.Name);
-            var attributes = File.GetAttributes(canonicalLink);
-            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
-            using var handle = OpenEntry(
-                canonicalLink,
-                isDirectory,
+            using var handle = OpenEntryAt(
+                parent,
+                expectedIdentity.Name,
+                expectedIdentity.LinkIdentity.IsDirectory,
                 enumerateDirectory: false);
             var identity = ReadIdentity(handle);
             if (!Matches(expectedIdentity.LinkIdentity, identity)
@@ -393,6 +396,96 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             throw new IOException($"open '{path}' failed: {new Win32Exception(error).Message}");
         }
         return handle;
+    }
+
+    private static SafeFileHandle OpenEntryAt(
+        SafeFileHandle parent,
+        string name,
+        bool? directory,
+        bool enumerateDirectory)
+    {
+        ValidateRelativeEntryName(name);
+        var desiredAccess = DeleteAccess
+            | FileReadAttributes
+            | FileWriteAttributes
+            | SynchronizeAccess;
+        if (enumerateDirectory) desiredAccess |= FileListDirectory;
+        var openOptions = FileOpenReparsePoint
+            | FileOpenForBackupIntent
+            | FileSynchronousIoNonAlert;
+        if (directory is true) openOptions |= FileDirectoryFile;
+        if (directory is false) openOptions |= FileNonDirectoryFile;
+
+        var nameBytes = checked(name.Length * sizeof(char));
+        if (nameBytes > ushort.MaxValue - sizeof(char))
+        {
+            throw new IOException("relative entry name exceeds the native limit");
+        }
+
+        var nameBuffer = Marshal.StringToHGlobalUni(name);
+        var unicodePointer = IntPtr.Zero;
+        IntPtr rawHandle = IntPtr.Zero;
+        try
+        {
+            var unicode = new UnicodeString
+            {
+                Length = checked((ushort)nameBytes),
+                MaximumLength = checked((ushort)(nameBytes + sizeof(char))),
+                Buffer = nameBuffer,
+            };
+            unicodePointer = Marshal.AllocHGlobal(Marshal.SizeOf<UnicodeString>());
+            Marshal.StructureToPtr(unicode, unicodePointer, fDeleteOld: false);
+            var attributes = new ObjectAttributes
+            {
+                Length = checked((uint)Marshal.SizeOf<ObjectAttributes>()),
+                RootDirectory = parent.DangerousGetHandle(),
+                ObjectName = unicodePointer,
+            };
+            var status = WindowsNative.NtOpenFile(
+                out rawHandle,
+                desiredAccess,
+                ref attributes,
+                out _,
+                ShareRead | ShareWrite | ShareDelete,
+                openOptions);
+            if (status != 0)
+            {
+                var error = WindowsNative.RtlNtStatusToDosError(status);
+                throw new IOException(
+                    $"open relative entry '{name}' failed: "
+                    + new Win32Exception(unchecked((int)error)).Message);
+            }
+
+            var handle = new SafeFileHandle(rawHandle, ownsHandle: true);
+            rawHandle = IntPtr.Zero;
+            if (handle.IsInvalid)
+            {
+                handle.Dispose();
+                throw new IOException($"open relative entry '{name}' returned an invalid handle");
+            }
+            return handle;
+        }
+        finally
+        {
+            if (rawHandle != IntPtr.Zero && rawHandle != new IntPtr(-1))
+            {
+                using var abandonedHandle = new SafeFileHandle(rawHandle, ownsHandle: true);
+            }
+            if (unicodePointer != IntPtr.Zero) Marshal.FreeHGlobal(unicodePointer);
+            Marshal.FreeHGlobal(nameBuffer);
+        }
+    }
+
+    private static void ValidateRelativeEntryName(string name)
+    {
+        if (string.IsNullOrEmpty(name)
+            || name is "." or ".."
+            || name.Contains('\\')
+            || name.Contains('/')
+            || name.Contains('\0'))
+        {
+            throw new IOException("refusing an invalid relative entry name");
+        }
     }
 
     private static NativeIdentity ReadIdentity(SafeFileHandle handle)
@@ -657,6 +750,32 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct UnicodeString
+    {
+        internal ushort Length;
+        internal ushort MaximumLength;
+        internal IntPtr Buffer;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ObjectAttributes
+    {
+        internal uint Length;
+        internal IntPtr RootDirectory;
+        internal IntPtr ObjectName;
+        internal uint Attributes;
+        internal IntPtr SecurityDescriptor;
+        internal IntPtr SecurityQualityOfService;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoStatusBlock
+    {
+        internal IntPtr Status;
+        internal nuint Information;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation
     {
         internal uint FileAttributes;
@@ -700,6 +819,18 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private static class WindowsNative
     {
+        [DllImport("ntdll.dll")]
+        internal static extern int NtOpenFile(
+            out IntPtr fileHandle,
+            uint desiredAccess,
+            ref ObjectAttributes objectAttributes,
+            out IoStatusBlock ioStatusBlock,
+            uint shareAccess,
+            uint openOptions);
+
+        [DllImport("ntdll.dll")]
+        internal static extern uint RtlNtStatusToDosError(int status);
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         internal static extern SafeFileHandle CreateFileW(
             string fileName,

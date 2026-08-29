@@ -29,8 +29,20 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         try
         {
             using var statBuffer = new StatBuffer();
-            var resolvedPath = RealPath(path);
-            using var handle = OpenAbsoluteDirectory(resolvedPath, out var parent, out _);
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var handle = OpenAbsoluteDirectory(
+                Path.Combine(resolvedParent, name),
+                out var parent,
+                out _);
             using (parent)
             {
                 var stat = ReadStat(handle, statBuffer.Pointer);
@@ -361,7 +373,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 failure(path, statError!);
                 return;
             }
-            if (!MatchesLink(expectedIdentity.LinkIdentity, identity)
+            if (!Matches(expectedIdentity.LinkIdentity, identity)
                 || !identity.IsSymlink)
             {
                 failure(path, "link identity changed after validation");
@@ -371,7 +383,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
                     out var beforeDelete, out statError)
-                || !MatchesLink(expectedIdentity.LinkIdentity, beforeDelete))
+                || !Matches(expectedIdentity.LinkIdentity, beforeDelete))
             {
                 failure(path, statError ?? "link identity changed before deletion");
                 return;
@@ -746,10 +758,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         && expected.FileIdLow == actual.Inode
         && expected.FileIdHigh == 0
         && expected.IsDirectory == actual.IsDirectory
-        && expected.IsReparsePoint == actual.IsSymlink;
-
-    private static bool MatchesLink(SecureFileIdentity expected, NativeStat actual) =>
-        Matches(expected, actual)
+        && expected.IsReparsePoint == actual.IsSymlink
         && expected.ChangeTimeSeconds == actual.ChangeTimeSeconds
         && expected.ChangeTimeNanoseconds == actual.ChangeTimeNanoseconds;
 
