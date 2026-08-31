@@ -61,7 +61,6 @@ public sealed class RemoveScreen
 
     public void Show()
     {
-        using var operation = new ModalOperationTracker(_app, _logger, "remove.ui");
         var targets = RemoveTargetResolver.BuildTargets(_target, _snapshot);
         var evaluations = new Dictionary<int, RemoveTargetEvaluation>();
         var selectedIndex = 0;
@@ -82,6 +81,10 @@ public sealed class RemoveScreen
             Width = Dim.Percent(80),
             Height = Dim.Percent(70),
         };
+        // Using declarations dispose in reverse order. Keep the operation
+        // owner after the wizard declaration so cancellation and worker drain
+        // finish before any wizard controls are disposed.
+        using var operation = new ModalOperationTracker(_app, _logger, "remove.ui");
 
         var chooseStep = new WizardStep
         {

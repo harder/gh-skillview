@@ -234,9 +234,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   immediately before its own removal; deleting one sibling link changes the
   parent generation and intentionally invalidates any earlier sibling capture.
   Deduplicate all selected cleanup path keys before yielding the first
-  validation, then carry that pre-validation skip count into the batch report;
-  otherwise the first deletion can make a later duplicate look like a failed
-  validation.
+  validation in both TUI and CLI apply flows, then carry that pre-validation
+  skip count into the result; otherwise the first deletion can make a later
+  duplicate look like a failed validation or environment refusal.
   Destructive directory identity capture may resolve ancestor components, but
   must open the final candidate name relative to the canonical parent with
   no-follow and directory-only flags. Only non-destructive canonicalization may
@@ -307,6 +307,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   run and explicitly releases or closes the modal. `Task.IsCompleted` only
   describes the worker; it is not permission for keyboard shortcuts to cancel,
   close, retry, or escalate against controls whose completion is still queued.
+  Declare the modal control before its `ModalOperationTracker` using declaration
+  so reverse-order teardown cancels and drains the operation before disposing
+  controls.
   Synchronous install dialogs use `ModalOperationTracker`; its release request
   also waits for the worker itself to return before clearing ownership. Use
   `InvokeTerminalIfActive` for the completion that releases or closes a modal,

@@ -386,24 +386,18 @@ public sealed class CleanupScreen
         // Resolve all selected path keys before yielding the first validation.
         // Otherwise the first deletion can make a later duplicate disappear
         // before it reaches RemoveMany's canonical-target deduplicator.
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var unique = ImmutableArray.CreateBuilder<CleanupClassifier.Candidate>(
-            selected.Length);
-        foreach (var candidate in selected)
+        var selection = CleanupClassifier.DeduplicateByPath(
+            selected,
+            cancellationToken);
+        foreach (var candidate in selection.Duplicates)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!seen.Add(PathIdentity.NormalizeKey(candidate.Path)))
-            {
-                duplicateSkipped();
-                _logger.Debug(
-                    "cleanup",
-                    $"skipped duplicate selected path {candidate.Path}");
-                continue;
-            }
-            unique.Add(candidate);
+            duplicateSkipped();
+            _logger.Debug(
+                "cleanup",
+                $"skipped duplicate selected path {candidate.Path}");
         }
 
-        foreach (var candidate in unique)
+        foreach (var candidate in selection.Unique)
         {
             cancellationToken.ThrowIfCancellationRequested();
             // RemoveMany enumerates this sequence immediately before each

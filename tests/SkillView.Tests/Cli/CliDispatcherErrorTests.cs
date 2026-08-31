@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.IO;
+using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Cli;
 using SkillView.Inventory;
@@ -247,6 +248,51 @@ public class CliDispatcherErrorTests : IDisposable
         var json = CliDispatcher.RenderCleanupJson(candidates, applied, parsed);
         Assert.Contains("\"apply\": true", json);
         Assert.Contains("\"applied\"", json);
+    }
+
+    [Fact]
+    public void RenderCleanupJson_WithDuplicateSkip_ReportsSkipSeparately()
+    {
+        var unique = new CleanupClassifier.Candidate(
+            CleanupClassifier.CandidateKind.SourceOrphaned,
+            "/duplicate",
+            "not in gh inventory",
+            null);
+        var duplicate = unique with
+        {
+            Kind = CleanupClassifier.CandidateKind.Duplicate,
+            Reason = "same skill name",
+        };
+        var applied = new[]
+        {
+            (unique, new RemoveService.RemoveReport(
+                true,
+                unique.Path,
+                0,
+                1,
+                ImmutableArray<string>.Empty,
+                false)),
+        };
+        var parsed = new CliDispatcher.ParsedCleanupArgs(
+            null,
+            Apply: true,
+            Yes: true,
+            Json: true,
+            Output: null);
+
+        using var document = JsonDocument.Parse(CliDispatcher.RenderCleanupJson(
+            [unique, duplicate],
+            applied,
+            parsed,
+            [duplicate]));
+
+        var root = document.RootElement;
+        Assert.Equal(1, root.GetProperty("skippedCandidates").GetInt32());
+        Assert.Single(root.GetProperty("applied").EnumerateArray());
+        var skipped = Assert.Single(root.GetProperty("skipped").EnumerateArray());
+        Assert.Equal("/duplicate", skipped.GetProperty("path").GetString());
+        Assert.Equal("Duplicate", skipped.GetProperty("kind").GetString());
+        Assert.Equal("duplicate candidate path", skipped.GetProperty("reason").GetString());
     }
 
     private static async Task<(int ExitCode, string Stdout, string Stderr)> RunCliAsync(string processPath, params string[] args)

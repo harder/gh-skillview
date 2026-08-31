@@ -1341,6 +1341,7 @@ public static class CliDispatcher
         }
 
         var applied = new List<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)>();
+        var duplicateSkips = ImmutableArray<CleanupClassifier.Candidate>.Empty;
         var environmentRefusal = false;
         if (parsed.Apply)
         {
@@ -1349,7 +1350,15 @@ public static class CliDispatcher
                 Console.Error.WriteLine("skillview: cleanup --apply requires --yes");
                 return ExitCodes.UserError;
             }
-            foreach (var c in candidates)
+            // Resolve every key before the first removal. A candidate may be
+            // emitted under multiple cleanup kinds; validating its second
+            // occurrence after the first was deleted would falsely report an
+            // identity/environment failure.
+            var selection = CleanupClassifier.DeduplicateByPath(
+                candidates,
+                cancellationToken);
+            duplicateSkips = selection.Duplicates;
+            foreach (var c in selection.Unique)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills);
@@ -1375,8 +1384,8 @@ public static class CliDispatcher
             }
         }
 
-        if (parsed.Json) WriteCleanupJson(candidates, applied, parsed);
-        else WriteCleanupText(candidates, applied, parsed);
+        if (parsed.Json) WriteCleanupJson(candidates, applied, duplicateSkips, parsed);
+        else WriteCleanupText(candidates, applied, duplicateSkips, parsed);
 
         if (parsed.Output is not null)
         {
@@ -1466,6 +1475,7 @@ public static class CliDispatcher
     private static void WriteCleanupText(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
     {
         Console.Out.WriteLine($"cleanup: {candidates.Count} candidate(s){(p.Apply ? " (--apply)" : "")}");
@@ -1474,11 +1484,16 @@ public static class CliDispatcher
             Console.Out.WriteLine($"  {c.Kind,-22}  {c.Path}");
             Console.Out.WriteLine($"    why: {c.Reason}");
         }
-        if (applied.Count > 0)
+        if (applied.Count > 0 || duplicateSkips.Count > 0)
         {
             var ok = applied.Count(a => a.R.Succeeded);
             Console.Out.WriteLine();
             Console.Out.WriteLine($"applied: {ok}/{applied.Count} succeeded");
+            if (duplicateSkips.Count > 0)
+            {
+                Console.Out.WriteLine(
+                    $"skipped: {duplicateSkips.Count} duplicate candidate path(s)");
+            }
             foreach (var (c, r) in applied.Where(a => !a.R.Succeeded))
             {
                 Console.Out.WriteLine($"  ✗ {c.Path}: {string.Join("; ", r.Errors)}");
@@ -1489,19 +1504,27 @@ public static class CliDispatcher
     private static void WriteCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
-        => WriteJson(w => WriteCleanupJson(w, candidates, applied, p));
+        => WriteJson(w => WriteCleanupJson(w, candidates, applied, duplicateSkips, p));
 
     internal static string RenderCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
-        ParsedCleanupArgs p)
-        => RenderJson(w => WriteCleanupJson(w, candidates, applied, p));
+        ParsedCleanupArgs p,
+        IReadOnlyList<CleanupClassifier.Candidate>? duplicateSkips = null)
+        => RenderJson(w => WriteCleanupJson(
+            w,
+            candidates,
+            applied,
+            duplicateSkips ?? [],
+            p));
 
     private static void WriteCleanupJson(
         Utf8JsonWriter w,
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
     {
         w.WriteStartObject();
@@ -1520,6 +1543,7 @@ public static class CliDispatcher
         w.WriteEndArray();
         if (p.Apply)
         {
+            w.WriteNumber("skippedCandidates", duplicateSkips.Count);
             w.WriteStartArray("applied");
             foreach (var (c, r) in applied)
             {
@@ -1531,6 +1555,16 @@ public static class CliDispatcher
                 w.WriteStartArray("errors");
                 foreach (var e in r.Errors) w.WriteStringValue(e);
                 w.WriteEndArray();
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteStartArray("skipped");
+            foreach (var candidate in duplicateSkips)
+            {
+                w.WriteStartObject();
+                w.WriteString("path", candidate.Path);
+                w.WriteString("kind", candidate.Kind.ToString());
+                w.WriteString("reason", "duplicate candidate path");
                 w.WriteEndObject();
             }
             w.WriteEndArray();

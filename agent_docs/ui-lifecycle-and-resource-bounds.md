@@ -51,7 +51,8 @@ logging, or subprocess adapters.
   `InvokeTerminalIfActive`, and let disposal cancel and drain before any
   controls are disposed. The terminal form releases ownership if dispatch or
   the callback throws; the progress form must not release a worker that is
-  still active.
+  still active. Because C# using declarations dispose in reverse order, declare
+  the modal control first and its `ModalOperationTracker` second.
 - CLI and TUI hosts share `EntryPoint` root cancellation. CLI operations must
   propagate it through every adapter and retain a bounded command deadline.
   `ProcessRunner` whole-tree termination is followed by a five-second bounded
@@ -204,8 +205,10 @@ logging, or subprocess adapters.
   `gh skill list` path into a root automatically. Batch duplicate targets are
   reported as skipped so cleanup summaries do not mislabel them as failures.
   Cleanup resolves and deduplicates every selected path key before yielding the
-  first lazy validation, while still capturing each unique native identity only
-  immediately before its removal. The advanced remove wizard's finish-time
+  first lazy validation in both TUI and CLI apply flows, while still capturing
+  each unique native identity only immediately before its removal. CLI duplicate
+  candidates are reported as skipped and do not change a successful apply into
+  an environment error. The advanced remove wizard's finish-time
   revalidation compares the captured directory/link identities and removal mode
   as well as visible policy content; a replacement object always returns the
   user to Review rather than inheriting the earlier confirmation.
