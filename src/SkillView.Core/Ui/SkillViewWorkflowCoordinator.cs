@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Inventory;
@@ -19,6 +20,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Action<string> _setStatus;
     private readonly Action<string, TuiHelpers.NotificationLevel> _setStatusWithLevel;
     private readonly Action<Action> _invoke;
+    private readonly Func<Action, CancellationToken, Task<bool>> _invokeAsync;
     private readonly Action<Func<CancellationToken, Task>, string> _runBackground;
     private readonly Action _focusSearchFromInstalled;
     private readonly Action _refreshActiveTab;
@@ -35,6 +37,7 @@ internal sealed class SkillViewWorkflowCoordinator
         Action<string> setStatus,
         Action<string, TuiHelpers.NotificationLevel> setStatusWithLevel,
         Action<Action> invoke,
+        Func<Action, CancellationToken, Task<bool>> invokeAsync,
         Action<Func<CancellationToken, Task>, string> runBackground,
         Action focusSearchFromInstalled,
         Action refreshActiveTab)
@@ -50,6 +53,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _setStatus = setStatus;
         _setStatusWithLevel = setStatusWithLevel;
         _invoke = invoke;
+        _invokeAsync = invokeAsync;
         _runBackground = runBackground;
         _focusSearchFromInstalled = focusSearchFromInstalled;
         _refreshActiveTab = refreshActiveTab;
@@ -308,8 +312,51 @@ internal sealed class SkillViewWorkflowCoordinator
         return CaptureForTabAsync(scopeFilter, cancellationToken);
     }
 
-    public void OpenRemoveDialog(InstalledSkill target, InventorySnapshot snapshot) =>
-        OpenRemoveDialogInternal(target, snapshot);
+    public async Task OpenRemoveDialogAsync(
+        InstalledSkill target,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (_getApp() is null)
+        {
+            return;
+        }
+
+        var plan = await BuildRemoveDialogPlanAsync(target, snapshot, cancellationToken)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _invokeAsync(
+                () =>
+                {
+                    var app = _getApp();
+                    if (app is not null)
+                    {
+                        OpenRemoveDialogInternal(app, target, snapshot, plan);
+                    }
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal static Task<RemoveDialogPlan> BuildRemoveDialogPlanAsync(
+        InstalledSkill target,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken,
+        Func<RemoveTarget, InventorySnapshot, CancellationToken, RemoveTargetEvaluation>? evaluator = null) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var targets = RemoveTargetResolver.BuildTargetsWithCancellation(
+                target,
+                snapshot,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var primaryEvaluation = targets.IsEmpty
+                ? null
+                : (evaluator ?? RemoveTargetResolver.EvaluateWithCancellation)(targets[0], snapshot, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return new RemoveDialogPlan(targets, primaryEvaluation);
+        }, cancellationToken);
 
     private async Task<InventorySnapshot> CaptureForTabAsync(string? scopeFilter, CancellationToken cancellationToken)
     {
@@ -317,25 +364,21 @@ internal sealed class SkillViewWorkflowCoordinator
         return await CaptureInventoryAsync(report, cancellationToken, scopeFilter).ConfigureAwait(false);
     }
 
-    private void OpenRemoveDialogInternal(InstalledSkill target, InventorySnapshot snapshot)
+    private void OpenRemoveDialogInternal(
+        IApplication app,
+        InstalledSkill target,
+        InventorySnapshot snapshot,
+        RemoveDialogPlan plan)
     {
-        var app = _getApp();
-        if (app is null)
-        {
-            return;
-        }
-
         RemoveService.RemoveReport? compactAttemptReport = null;
 
         // Compact path: a single skill with no second-confirm warnings and no
         // validation errors gets the winget-tui `[y] yes  [n] no` confirm.
         // Anything more involved (package/repo group, incoming symlinks,
         // errors) escalates to the full RemoveScreen wizard.
-        var targets = RemoveTargetResolver.BuildTargets(target, snapshot);
-        var primary = targets.IsEmpty ? null : (RemoveTarget?)targets[0];
-        if (primary is { } primaryTarget)
+        var targets = plan.Targets;
+        if (plan.PrimaryEvaluation is { } evaluation)
         {
-            var evaluation = RemoveTargetResolver.Evaluate(primaryTarget, snapshot);
             if (RemoveConfirmModal.CanRunCompact(evaluation))
             {
                 var modal = new RemoveConfirmModal(app, _services.RemoveService, _services.Logger, target, evaluation);
@@ -406,7 +449,14 @@ internal sealed class SkillViewWorkflowCoordinator
             }
         }
 
-        var screen = new RemoveScreen(app, _services.RemoveService, _services.Logger, target, snapshot);
+        var screen = new RemoveScreen(
+            app,
+            _services.RemoveService,
+            _services.Logger,
+            target,
+            snapshot,
+            targets,
+            plan.PrimaryEvaluation);
         screen.Show();
         var report = screen.LastReport;
         if (compactAttemptReport is { } compactReport)
@@ -494,3 +544,7 @@ internal sealed class SkillViewWorkflowCoordinator
         activateUpdates(hideChanges);
 
 }
+
+internal sealed record RemoveDialogPlan(
+    ImmutableArray<RemoveTarget> Targets,
+    RemoveTargetEvaluation? PrimaryEvaluation);

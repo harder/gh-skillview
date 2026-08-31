@@ -92,6 +92,21 @@ logging, or subprocess adapters.
   immediately handed to `IApplication.Invoke`; they must not use `Progress<T>`
   and add another implicit queue. Esc cancels the active traversal, and each
   removal window cancels and drains its owned task before disposing controls.
+  The Installed tab owns compact-remove preflight as an asynchronous operation:
+  both target construction and native compact-eligibility evaluation run off
+  the UI thread, repeated remove shortcuts are ignored until it completes, and
+  tab/app cancellation prevents a delayed dialog from opening. The resulting
+  primary evaluation is passed into the wizard when compact mode is unsuitable,
+  avoiding a duplicate native inspection while retaining finish-time
+  revalidation before deletion. Inventory loading and remove preflight retain
+  separate activity owners even though they share the tab's spinner and footer.
+  Render that feedback from both owners (with remove preflight taking display
+  precedence), so a load completion cannot hide an active remove and a remove
+  completion cannot hide an active load.
+  Dispatching the compact/wizard decision uses a start-aware owned callback:
+  cancellation rejects it while it is queued, but cannot complete its owner
+  after the callback has entered the synchronous nested modal loop. This keeps
+  app shutdown from draining the background task before the modal returns.
   Partial cancellation counts still trigger inventory invalidation/rescan.
   `BatchProgressAdapter` retains the latest aggregate snapshot so the outer
   cancellation boundary cannot replace mid-target file/directory counts with

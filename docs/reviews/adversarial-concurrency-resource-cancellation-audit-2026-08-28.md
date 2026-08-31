@@ -1835,3 +1835,55 @@ Regression coverage uses Linux's `/proc` mount to prove both directory and link-
 parent validation refuse a mounted subtree, directly checks the macOS/Linux
 device guard, and cancels a duplicate cleanup selection at the native deletion
 boundary to prove its skip remains observable.
+
+### PR #17 final review finding and post-merge backlog disposition
+
+Copilot's final `Needs a closer look` review
+([review 5071638437](https://github.com/harder/gh-skillview/pull/17#pullrequestreview-5071638437))
+identified one previously missed UI-thread path. It was accepted into the
+post-merge backlog at highest priority and selected as the next coherent batch:
+
+1. [x] **Move compact-remove routing off the Terminal.Gui thread.**
+   `SkillViewWorkflowCoordinator.OpenRemoveDialogInternal` built removal targets
+   and called `RemoveTargetResolver.Evaluate` directly from the Installed tab's
+   `onRemove` callback. That evaluation can open native handles, enumerate the
+   selected directory for policy, and inspect paths on slow or disconnected
+   filesystems. The main loop could therefore freeze before `RemoveScreen`'s
+   existing background evaluator ever appeared.
+
+The Installed tab now owns an asynchronous remove preflight. Target construction
+and compact eligibility both run on the thread pool with cancellation checks
+before and between grouped targets. The tab displays inline busy feedback,
+rejects repeated remove shortcuts, and cancels the preflight when its/app
+lifetime ends so a stale dialog cannot open after navigation or shutdown. The
+UI callback receives a completed `RemoveDialogPlan`; a simple result opens the
+compact confirmation, while a complex result enters `RemoveScreen` with the
+already captured targets and primary evaluation. The wizard consumes that
+result rather than repeating native inspection, but still performs its required
+fresh validation immediately before deletion.
+
+The analogous-path audit found no other production UI caller of
+`RemoveTargetResolver.Evaluate`. Cleanup validation remains lazily enumerated by
+its owned removal worker, and CLI validation has no Terminal.Gui-thread concern.
+Regression tests prove the preflight evaluator runs on a different thread,
+pre-cancellation prevents evaluation, and repeated Installed-tab remove requests
+cannot overlap.
+
+The broader ownership review found and closed one adjacent race before opening
+the new PR. The ordinary awaitable UI dispatcher stops waiting when its token is
+canceled, even if a dispatched callback has already begun. That is appropriate
+for short cosmetic callbacks but would let remove-preflight ownership end while
+the callback was still inside `IApplication.Run` for the compact modal or
+wizard. Remove activation now uses a start-aware owned dispatcher: cancellation
+atomically rejects callbacks that remain queued, while a callback that won the
+start race is awaited through its return. Dedicated tests cover both sides of
+that boundary, including a `LongRunning` callback so thread-pool scheduling
+cannot masquerade as ownership behavior.
+
+Copilot's PR #18 review then identified one remaining shared-presentation race:
+Installed inventory loading and remove preflight independently cleared the same
+spinner and footer. Both operations could overlap through refresh/scope actions,
+so the first completion could hide the other's still-active feedback. The tab
+now tracks the two activity owners separately and derives the shared display
+from both, prioritizing the remove message while remove input remains gated.
+Regression tests cover each completion order.

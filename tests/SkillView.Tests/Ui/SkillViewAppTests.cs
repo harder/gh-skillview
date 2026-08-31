@@ -493,6 +493,67 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public async Task AwaitOwnedDispatchAsync_CanceledLifetimeRejectsQueuedCallback()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        Action? queued = null;
+        var callbackRan = false;
+
+        var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
+            callback => queued = callback,
+            () => callbackRan = true,
+            lifetime.Token);
+        Assert.NotNull(queued);
+
+        lifetime.Cancel();
+
+        Assert.False(await dispatch);
+        queued();
+        Assert.False(callbackRan);
+    }
+
+    [Fact]
+    public async Task AwaitOwnedDispatchAsync_CancellationWaitsForStartedCallback()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Action? queued = null;
+        var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
+            callback => queued = callback,
+            () =>
+            {
+                entered.Set();
+                release.Wait(TestContext.Current.CancellationToken);
+            },
+            lifetime.Token);
+        Assert.NotNull(queued);
+        var callback = Task.Factory.StartNew(
+            queued,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
+        try
+        {
+            Assert.True(entered.Wait(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+            lifetime.Cancel();
+            Assert.False(dispatch.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await callback;
+        Assert.True(await dispatch);
+    }
+
+    [Fact]
     public void CancelingPreview_RestoresStillRunningSearchBusyState()
     {
         var app = CreateApp();

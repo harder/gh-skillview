@@ -120,7 +120,7 @@ public sealed class UpdatesTabViewTests
             },
             runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => ++loadCount == 1 ? first.Task : second.Task,
-            onRemove: static (_, _) => { },
+            onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
             onGoToSearch: static () => { });
 
@@ -159,7 +159,7 @@ public sealed class UpdatesTabViewTests
                 }
                 return SnapshotWithSkill("newer");
             },
-            onRemove: static (_, _) => { },
+            onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
             onGoToSearch: static () => { });
 
@@ -188,7 +188,7 @@ public sealed class UpdatesTabViewTests
             },
             runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => Task.FromResult(SnapshotWithSkill("loaded")),
-            onRemove: static (_, _) => { },
+            onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
             onGoToSearch: static () => { },
             onStateChange: () =>
