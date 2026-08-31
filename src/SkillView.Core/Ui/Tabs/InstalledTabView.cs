@@ -63,7 +63,9 @@ internal sealed class InstalledTabView : FrameView
     private long _loadGeneration;
     private readonly CancellationTokenSourceSlot _loadCancellations = new();
     private readonly CancellationTokenSourceSlot _removeCancellations = new();
+    private int _loadActive;
     private int _removeActive;
+    private string? _idleStatusMessage;
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
@@ -216,8 +218,9 @@ internal sealed class InstalledTabView : FrameView
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
-        SetLoading(true);
-        _footer.Text = " loading inventory…";
+        Interlocked.Exchange(ref _loadActive, 1);
+        _idleStatusMessage = null;
+        RefreshOperationStatus();
         try
         {
             var snapshot = await CaptureSnapshotAsync(loadCancellation.Token).ConfigureAwait(false);
@@ -228,6 +231,7 @@ internal sealed class InstalledTabView : FrameView
                     return;
                 }
 
+                Interlocked.Exchange(ref _loadActive, 0);
                 Populate(snapshot);
             }).ConfigureAwait(false);
         }
@@ -244,8 +248,9 @@ internal sealed class InstalledTabView : FrameView
                     return;
                 }
 
-                _footer.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
-                SetLoading(false);
+                Interlocked.Exchange(ref _loadActive, 0);
+                _idleStatusMessage = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                RefreshOperationStatus();
             }).ConfigureAwait(false);
         }
     }
@@ -276,11 +281,11 @@ internal sealed class InstalledTabView : FrameView
         RecomputeColumnWidths();
         BuildTableSource();
         ScheduleDeferredWidthStabilization();
-        RefreshFooter();
+        _idleStatusMessage = null;
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
         RestoreFocus();
         _onStateChange?.Invoke();
-        SetLoading(false);
+        RefreshOperationStatus();
     }
 
     private void ApplyFilter()
@@ -546,7 +551,7 @@ internal sealed class InstalledTabView : FrameView
         ApplyFilter();
         RecomputeColumnWidths();
         BuildTableSource();
-        RefreshFooter();
+        RefreshOperationStatus();
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
             : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
@@ -670,7 +675,8 @@ internal sealed class InstalledTabView : FrameView
         Interlocked.Increment(ref _loadGeneration);
         if (_loadCancellations.Cancel())
         {
-            SetLoading(false);
+            Interlocked.Exchange(ref _loadActive, 0);
+            RefreshOperationStatus();
         }
         _removeCancellations.Cancel();
     }
@@ -697,8 +703,7 @@ internal sealed class InstalledTabView : FrameView
                 await _runOnUi(() =>
                 {
                     Interlocked.Exchange(ref _removeActive, 0);
-                    SetLoading(false);
-                    RefreshFooter();
+                    RefreshOperationStatus();
                     if (shouldRefresh && !cancellationToken.IsCancellationRequested)
                     {
                         // The modal invalidates the shared inventory cache when
@@ -728,18 +733,43 @@ internal sealed class InstalledTabView : FrameView
 
         var skill = _rows[index];
         var snapshot = _snapshot;
-        SetLoading(true);
-        _footer.Text = " checking removal safety…";
+        RefreshOperationStatus();
         _runTask(
             () => RunRemoveAsync(skill, snapshot),
             "installed.remove");
         return true;
     }
 
-    private void SetLoading(bool loading)
+    private void RefreshOperationStatus()
     {
-        _spinner.Visible = loading;
-        _spinner.AutoSpin = loading;
+        if (Volatile.Read(ref _removeActive) != 0)
+        {
+            SetSpinnerActive(true);
+            _footer.Text = " checking removal safety…";
+            return;
+        }
+
+        if (Volatile.Read(ref _loadActive) != 0)
+        {
+            SetSpinnerActive(true);
+            _footer.Text = " loading inventory…";
+            return;
+        }
+
+        SetSpinnerActive(false);
+        if (_idleStatusMessage is not null)
+        {
+            _footer.Text = _idleStatusMessage;
+            return;
+        }
+
+        RefreshFooter();
+    }
+
+    private void SetSpinnerActive(bool active)
+    {
+        _spinner.Visible = active;
+        _spinner.AutoSpin = active;
     }
 
     internal string GetFilterText() => _filterField.Text.Trim();
@@ -772,6 +802,12 @@ internal sealed class InstalledTabView : FrameView
     internal void SendFilterKeyForTests(Key key) => _filterField.NewKeyDownEvent(key);
 
     internal bool RemoveActiveForTests => Volatile.Read(ref _removeActive) != 0;
+
+    internal bool LoadActiveForTests => Volatile.Read(ref _loadActive) != 0;
+
+    internal bool SpinnerVisibleForTests => _spinner.Visible;
+
+    internal string FooterTextForTests => _footer.Text.ToString();
 
     internal bool TryStartSelectedRemoveForTests() => TryStartSelectedRemove();
 }

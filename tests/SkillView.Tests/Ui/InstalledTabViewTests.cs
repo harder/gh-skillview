@@ -12,6 +12,103 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public async Task InventoryCompletion_DoesNotClearActiveRemoveFeedback()
+    {
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemove = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeStarted.TrySetResult();
+                await releaseRemove.Task.WaitAsync(cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        await view.LoadAsync();
+
+        Assert.True(view.RemoveActiveForTests);
+        Assert.False(view.LoadActiveForTests);
+        Assert.True(view.SpinnerVisibleForTests);
+        Assert.Equal(" checking removal safety…", view.FooterTextForTests);
+
+        view.CancelPendingWork();
+        releaseRemove.TrySetResult();
+        await operations["installed.remove"];
+    }
+
+    [Fact]
+    public async Task RemoveCompletion_DoesNotClearActiveInventoryFeedback()
+    {
+        var inventoryStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseInventory = new TaskCompletionSource<InventorySnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemove = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: async cancellationToken =>
+            {
+                inventoryStarted.TrySetResult();
+                return await releaseInventory.Task.WaitAsync(cancellationToken);
+            },
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeStarted.TrySetResult();
+                await releaseRemove.Task.WaitAsync(cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        var initialLoad = view.LoadAsync();
+        await inventoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        releaseRemove.TrySetResult();
+        await operations["installed.remove"];
+        await initialLoad;
+
+        Assert.False(view.RemoveActiveForTests);
+        Assert.True(view.LoadActiveForTests);
+        Assert.True(view.SpinnerVisibleForTests);
+        Assert.Equal(" loading inventory…", view.FooterTextForTests);
+
+        view.CancelPendingWork();
+        await operations["installed.remove-refresh"];
+    }
+
+    [Fact]
     public async Task RemoveShortcut_GatesRepeatedPreflightAndRefreshesAfterCompletion()
     {
         var removeStarted = new TaskCompletionSource(

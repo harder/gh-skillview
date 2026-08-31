@@ -1879,3 +1879,11 @@ atomically rejects callbacks that remain queued, while a callback that won the
 start race is awaited through its return. Dedicated tests cover both sides of
 that boundary, including a `LongRunning` callback so thread-pool scheduling
 cannot masquerade as ownership behavior.
+
+Copilot's PR #18 review then identified one remaining shared-presentation race:
+Installed inventory loading and remove preflight independently cleared the same
+spinner and footer. Both operations could overlap through refresh/scope actions,
+so the first completion could hide the other's still-active feedback. The tab
+now tracks the two activity owners separately and derives the shared display
+from both, prioritizing the remove message while remove input remains gated.
+Regression tests cover each completion order.

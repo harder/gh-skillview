@@ -284,7 +284,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   not in the `onRemove` UI callback. Gate repeated remove shortcuts while that
   preflight is active, cancel it when the tab/app lifetime ends, and seed the
   advanced wizard with the preflight result instead of repeating the same
-  native inspection.
+  native inspection. Installed inventory loading and remove preflight own busy
+  state independently; derive their shared spinner/footer from both owners so
+  either completion cannot hide the other operation's feedback.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
