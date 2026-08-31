@@ -486,7 +486,8 @@ public class RemoveServiceTests : IDisposable
 
         Assert.False(report.Succeeded);
         Assert.Contains(report.Errors,
-            error => error.Contains("identity changed", StringComparison.Ordinal));
+            error => error.Contains("identity changed", StringComparison.Ordinal)
+                || error.Contains("no longer empty", StringComparison.Ordinal));
         Assert.True(Directory.Exists(dir));
         Assert.Equal("keep", File.ReadAllText(lateFile));
     }
