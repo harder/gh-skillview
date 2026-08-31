@@ -16,7 +16,21 @@ namespace SkillView.Ui;
 /// actions: remove, mark ignored, rescan, export.
 public sealed class CleanupScreen
 {
-    internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed);
+    internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed)
+    {
+        internal int Skipped { get; init; }
+    }
+
+    internal sealed class RemovalAttemptState
+    {
+        private int _preValidationSkipped;
+
+        internal int PreValidationSkipped =>
+            Volatile.Read(ref _preValidationSkipped);
+
+        internal void SetPreValidationSkipped(int value) =>
+            Volatile.Write(ref _preValidationSkipped, value);
+    }
 
     private readonly IApplication _app;
     private readonly RemoveService _remove;
@@ -205,6 +219,7 @@ public sealed class CleanupScreen
         async Task RunRemovalAsync(HashSet<int> selectedRows, CancellationToken cancellationToken)
         {
             var selectedCount = selectedRows.Count(index => index >= 0 && index < _candidates.Length);
+            var attemptState = new RemovalAttemptState();
             var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
             {
                 lastProgress = value;
@@ -213,7 +228,11 @@ public sealed class CleanupScreen
 
             try
             {
-                var summary = await RemoveSelectedAsync(selectedRows, cancellationToken, progress)
+                var summary = await RemoveSelectedAsync(
+                        selectedRows,
+                        cancellationToken,
+                        progress,
+                        attemptState)
                     .ConfigureAwait(false);
                 InvokeIfActive(() =>
                 {
@@ -221,7 +240,7 @@ public sealed class CleanupScreen
                     spinner.Visible = false;
                     activeOperation = null;
                     status.Text = summary.Confirmed
-                        ? $" removed {summary.Removed}, skipped/failed {summary.Failed}"
+                        ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}"
                         : " cleanup removal canceled";
                 });
             }
@@ -231,13 +250,17 @@ public sealed class CleanupScreen
                 RemovedCount += removed;
                 RemovedFileCount += lastProgress?.FilesProcessed ?? 0;
                 RemovedDirectoryCount += lastProgress?.DirectoriesProcessed ?? 0;
-                var failed = Math.Max(0, selectedCount - removed);
+                var skipped = attemptState.PreValidationSkipped;
+                var failed = CountFailedSelections(
+                    selectedCount,
+                    removed,
+                    skipped);
                 _logger.Debug("cleanup.remove", "cleanup removal canceled");
                 InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    status.Text = $" removal canceled after {removed}; skipped/failed {failed}";
+                    status.Text = $" removal canceled after {removed}; skipped {skipped}, failed {failed}";
                     if (Volatile.Read(ref closeAfterCancellation) != 0)
                     {
                         _app.RequestStop();
@@ -330,7 +353,8 @@ public sealed class CleanupScreen
     internal async Task<RemovalSummary> RemoveSelectedAsync(
         HashSet<int> checkedRows,
         CancellationToken cancellationToken = default,
-        IProgress<RemoveService.RemoveProgress>? progress = null)
+        IProgress<RemoveService.RemoveProgress>? progress = null,
+        RemovalAttemptState? attemptState = null)
     {
         var selected = checkedRows
             .Where(i => i >= 0 && i < _candidates.Length)
@@ -347,15 +371,27 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
-        var validationSkipped = 0;
+        // Resolve every selected key before the first lazy validation/deletion,
+        // and publish the skip count outside this worker so cancellation can
+        // still account for duplicates when RemoveManyAsync throws.
+        var selection = CleanupClassifier.DeduplicateByPath(
+            selected,
+            cancellationToken);
+        var skippedBeforeValidation = selection.Duplicates.Length;
+        attemptState?.SetPreValidationSkipped(skippedBeforeValidation);
+        foreach (var candidate in selection.Duplicates)
+        {
+            _logger.Debug(
+                "cleanup",
+                $"skipped duplicate selected path {candidate.Path}");
+        }
+
         var report = await _remove.RemoveManyAsync(
             ValidateImmediatelyBeforeRemoval(
-                selected,
-                cancellationToken,
-                () => Interlocked.Increment(ref validationSkipped)),
+                selection.Unique,
+                cancellationToken),
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
-        var skippedBeforeValidation = Volatile.Read(ref validationSkipped);
         if (skippedBeforeValidation > 0)
         {
             report = report with
@@ -369,35 +405,32 @@ public sealed class CleanupScreen
         RemovedCount += removed;
         RemovedFileCount += report.FilesDeleted;
         RemovedDirectoryCount += report.DirectoriesDeleted;
-        return new RemovalSummary(removed, failed, Confirmed: true);
+        return new RemovalSummary(removed, failed, Confirmed: true)
+        {
+            Skipped = report.TargetsSkipped,
+        };
     }
 
     internal static int CountFailedSelections(
         int selectedCount,
         RemoveService.BatchRemoveReport report) =>
-        Math.Max(0, selectedCount - report.TargetsDeleted - report.TargetsSkipped);
+        CountFailedSelections(
+            selectedCount,
+            report.TargetsDeleted,
+            report.TargetsSkipped);
+
+    internal static int CountFailedSelections(
+        int selectedCount,
+        int removedCount,
+        int skippedCount) =>
+        Math.Max(0, selectedCount - removedCount - skippedCount);
 
     private IEnumerable<RemoveValidator.RemoveValidation>
         ValidateImmediatelyBeforeRemoval(
-            ImmutableArray<CleanupClassifier.Candidate> selected,
-            CancellationToken cancellationToken,
-            Action duplicateSkipped)
+            ImmutableArray<CleanupClassifier.Candidate> unique,
+            CancellationToken cancellationToken)
     {
-        // Resolve all selected path keys before yielding the first validation.
-        // Otherwise the first deletion can make a later duplicate disappear
-        // before it reaches RemoveMany's canonical-target deduplicator.
-        var selection = CleanupClassifier.DeduplicateByPath(
-            selected,
-            cancellationToken);
-        foreach (var candidate in selection.Duplicates)
-        {
-            duplicateSkipped();
-            _logger.Debug(
-                "cleanup",
-                $"skipped duplicate selected path {candidate.Path}");
-        }
-
-        foreach (var candidate in selection.Unique)
+        foreach (var candidate in unique)
         {
             cancellationToken.ThrowIfCancellationRequested();
             // RemoveMany enumerates this sequence immediately before each

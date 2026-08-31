@@ -188,7 +188,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   through `openat`, enumerates opened directory descriptors, compares
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
-  `unlinkat`. Probe the exact Linux `openat2` flags before enabling the backend
+  `unlinkat`. Apply that mount boundary while validating the selected directory
+  and every link-parent component relative to the held scan root, not only
+  while descending during deletion. Probe the exact Linux `openat2` flags
+  before enabling the backend
   relative to an opened `/` descriptor, never process CWD, so an old kernel or
   seccomp denial fails before validation or mutation without a deleted working
   directory producing a false negative. Retry interruptible Unix open/stat/
@@ -235,8 +238,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   parent generation and intentionally invalidates any earlier sibling capture.
   Deduplicate all selected cleanup path keys before yielding the first
   validation in both TUI and CLI apply flows, then carry that pre-validation
-  skip count into the result; otherwise the first deletion can make a later
-  duplicate look like a failed validation or environment refusal.
+  skip count into successful and canceled result accounting; otherwise the
+  first deletion can make a later duplicate look like a failed validation or
+  environment refusal, and cancellation can make a known skip look like a
+  failure.
   Destructive directory identity capture may resolve ancestor components, but
   must open the final candidate name relative to the canonical parent with
   no-follow and directory-only flags. Only non-destructive canonicalization may

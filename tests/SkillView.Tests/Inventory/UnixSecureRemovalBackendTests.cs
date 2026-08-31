@@ -107,6 +107,13 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
+    public void IsSameDevice_RejectsCrossDeviceChild()
+    {
+        Assert.True(UnixSecureRemovalBackend.IsSameDevice(17, 17));
+        Assert.False(UnixSecureRemovalBackend.IsSameDevice(17, 18));
+    }
+
+    [Fact]
     public void RetryOnInterrupted_RetriesEintrAndReturnsLaterResult()
     {
         var attempts = 0;
@@ -236,6 +243,24 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
+    public void TryCaptureDirectoryValidationWithinRoot_LinuxProcMount_IsRefused()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+        if (!Directory.Exists("/proc")) return;
+
+        var captured = new UnixSecureRemovalBackend()
+            .TryCaptureDirectoryValidationWithinRoot(
+                Path.DirectorySeparatorChar.ToString(),
+                "/proc",
+                out _,
+                out var error);
+
+        Assert.False(captured);
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
     public void TryCaptureLinkValidationWithinRoot_RootLinkRetargeted_UsesHeldRoot()
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
@@ -286,6 +311,24 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
         Assert.True(PathIdentity.Equals(
             Path.Combine(canonicalOriginalRoot, "broken-link"),
             snapshot.Link.Identity.CanonicalPath));
+    }
+
+    [Fact]
+    public void TryCaptureLinkValidationWithinRoot_LinuxProcParentMount_IsRefused()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+        if (!Directory.Exists("/proc/self/fd")) return;
+
+        var captured = new UnixSecureRemovalBackend()
+            .TryCaptureLinkValidationWithinRoot(
+                Path.DirectorySeparatorChar.ToString(),
+                "/proc/self/fd/0",
+                out _,
+                out var error);
+
+        Assert.False(captured);
+        Assert.False(string.IsNullOrWhiteSpace(error));
     }
 
     [Fact]

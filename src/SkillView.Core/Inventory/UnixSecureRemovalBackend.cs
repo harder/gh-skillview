@@ -137,7 +137,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             using var root = OpenDirectory(RealPath(rootPath));
             var rootBefore = ReadStat(root, statBuffer.Pointer);
             _rootIdentityCapturedForTests?.Invoke();
-            using var target = OpenRelativeDirectory(root, components);
+            using var target = OpenRelativeDirectory(
+                root,
+                components,
+                rootBefore.Device,
+                statBuffer.Pointer);
             var directory = CaptureDirectoryValidation(target, path, statBuffer);
             var rootIdentity = CaptureStableRootIdentity(
                 root,
@@ -235,7 +239,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             using var root = OpenDirectory(RealPath(rootPath));
             var rootBefore = ReadStat(root, statBuffer.Pointer);
             _rootIdentityCapturedForTests?.Invoke();
-            using var ownedParent = OpenRelativeParent(root, components);
+            using var ownedParent = OpenRelativeParent(
+                root,
+                components,
+                rootBefore.Device,
+                statBuffer.Pointer);
             var parent = ownedParent ?? root;
             var (identity, isBroken) = CaptureLink(
                 parent,
@@ -420,7 +428,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static SafeUnixHandle OpenRelativeDirectory(
         SafeUnixHandle root,
-        IReadOnlyList<string> components)
+        IReadOnlyList<string> components,
+        ulong rootDevice,
+        IntPtr statBuffer)
     {
         SafeUnixHandle? current = null;
         try
@@ -428,10 +438,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             for (var index = 0; index < components.Count; index++)
             {
                 var parent = current ?? root;
-                var next = OpenDirectoryAt(
+                var next = OpenRootBoundDirectoryAt(
                     parent,
                     components[index],
-                    refuseNestedMount: false,
+                    rootDevice,
+                    statBuffer,
                     followFinalComponent: index < components.Count - 1);
                 current?.Dispose();
                 current = next;
@@ -448,7 +459,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static SafeUnixHandle? OpenRelativeParent(
         SafeUnixHandle root,
-        IReadOnlyList<string> components)
+        IReadOnlyList<string> components,
+        ulong rootDevice,
+        IntPtr statBuffer)
     {
         if (components.Count == 1) return null;
 
@@ -458,10 +471,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             for (var index = 0; index < components.Count - 1; index++)
             {
                 var parent = current ?? root;
-                var next = OpenDirectoryAt(
+                var next = OpenRootBoundDirectoryAt(
                     parent,
                     components[index],
-                    refuseNestedMount: false,
+                    rootDevice,
+                    statBuffer,
                     followFinalComponent: true);
                 current?.Dispose();
                 current = next;
@@ -474,6 +488,38 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             throw;
         }
     }
+
+    private static SafeUnixHandle OpenRootBoundDirectoryAt(
+        SafeUnixHandle parent,
+        string name,
+        ulong rootDevice,
+        IntPtr statBuffer,
+        bool followFinalComponent)
+    {
+        var child = OpenDirectoryAt(
+            parent,
+            name,
+            refuseNestedMount: true,
+            followFinalComponent: followFinalComponent);
+        try
+        {
+            var childStat = ReadStat(child, statBuffer);
+            if (!IsSameDevice(rootDevice, childStat.Device))
+            {
+                throw new IOException(
+                    "scan-root-relative path crosses a filesystem mount boundary");
+            }
+            return child;
+        }
+        catch
+        {
+            child.Dispose();
+            throw;
+        }
+    }
+
+    internal static bool IsSameDevice(ulong rootDevice, ulong childDevice) =>
+        rootDevice == childDevice;
 
     public void RemoveTree(
         string path,

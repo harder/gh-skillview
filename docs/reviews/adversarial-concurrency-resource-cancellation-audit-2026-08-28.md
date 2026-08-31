@@ -1810,3 +1810,28 @@ were valid after tracing them through the complete workflow:
    path keys and removes duplicates before yielding the first validation, then
    adds those skips to the batch report. Unique candidates remain lazily pinned
    immediately before their individual removals.
+
+### Copilot follow-up on held-root mount boundaries and canceled accounting
+
+The next balanced review exposed three related omissions. All three were valid:
+
+1. **Selected Unix directories could cross a mount below the held scan root.**
+   Validation opened each relative component with ordinary `openat`, so a Linux
+   bind mount or cross-device macOS directory could become the captured removal
+   baseline before deletion-time descent checks ran. Root-relative validation
+   now uses Linux `openat2(RESOLVE_NO_XDEV)` for every component and verifies
+   every opened component's device against the held root on both Unix platforms.
+2. **Link parents had the same mount escape.** Broken-link cleanup and agent
+   unlink validation now apply the same no-cross-device component walk before
+   issuing `ExecutionLinkIdentity`; a link inside an external mounted tree is
+   refused before it can be authorized for `unlinkat`.
+3. **Canceled TUI cleanup lost known duplicate skips.** The skip count existed
+   only inside the async iterator/report path. If cancellation threw before a
+   report returned, the outer status recomputed every non-deleted selection as a
+   failure. Per-attempt state now publishes pre-validation skips before removal
+   begins and carries them into cancellation accounting.
+
+Regression coverage uses Linux's `/proc` mount to prove both directory and link-
+parent validation refuse a mounted subtree, directly checks the macOS/Linux
+device guard, and cancels a duplicate cleanup selection at the native deletion
+boundary to prove its skip remains observable.

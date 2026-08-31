@@ -127,6 +127,10 @@ logging, or subprocess adapters.
   walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
   mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
+  same no-cross-device boundary applies while opening a selected directory or
+  link parent relative to the held scan root during validation; deletion-time
+  traversal checks alone are too late because the captured target could already
+  belong to an external mount.
   Linux backend probes the exact `openat2` contract at startup relative to an
   opened filesystem-root descriptor, not process CWD, and remains disabled
   when the kernel or sandbox refuses it, before any mutation can begin. Native
@@ -208,7 +212,9 @@ logging, or subprocess adapters.
   first lazy validation in both TUI and CLI apply flows, while still capturing
   each unique native identity only immediately before its removal. CLI duplicate
   candidates are reported as skipped and do not change a successful apply into
-  an environment error. The advanced remove wizard's finish-time
+  an environment error. TUI removal attempt state retains that pre-validation
+  skip count when cancellation throws before a batch report is returned, so
+  canceled summaries do not reclassify duplicates as failures. The advanced remove wizard's finish-time
   revalidation compares the captured directory/link identities and removal mode
   as well as visible policy content; a replacement object always returns the
   user to Review rather than inheriting the earlier confirmation.
