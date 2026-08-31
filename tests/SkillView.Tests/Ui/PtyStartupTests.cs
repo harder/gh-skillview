@@ -41,6 +41,7 @@ public sealed class PtyStartupTests
         {
             FileName = scriptPath,
             UseShellExecute = false,
+            RedirectStandardInput = true,
             RedirectStandardError = true,
         };
         startInfo.ArgumentList.Add("-q");
@@ -61,6 +62,7 @@ public sealed class PtyStartupTests
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();
+        WriteTerminalProbeResponses(process);
         string stderr = string.Empty;
 
         try
@@ -73,6 +75,15 @@ public sealed class PtyStartupTests
 
             if (!ready)
             {
+                // Reading a redirected stream to EOF while the TUI is still
+                // alive blocks forever and prevents the finally cleanup from
+                // running. Stop the owned process first so a readiness timeout
+                // remains a bounded, diagnostic test failure.
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit();
+                }
                 stderr = process.StandardError.ReadToEnd();
             }
 
@@ -112,10 +123,37 @@ public sealed class PtyStartupTests
                 return false;
             }
 
+            WriteTerminalProbeResponses(process);
             Thread.Sleep(100);
         }
 
         return false;
+    }
+
+    private static void WriteTerminalProbeResponses(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            // /usr/bin/script supplies a PTY but no terminal emulator to answer
+            // the driver's startup probes. Report the configured size, cursor
+            // position, baseline device attributes, and no keyboard protocol.
+            process.StandardInput.Write(
+                "\u001b[8;40;120t\u001b[1;1R\u001b[?1;2c\u001b[?0u");
+            process.StandardInput.Flush();
+        }
+        catch (InvalidOperationException)
+        {
+            // The process exited between the ownership check and the write.
+        }
+        catch (IOException)
+        {
+            // The PTY closed between the ownership check and the write.
+        }
     }
 
     private static bool HasStartupLog(string logDir)
@@ -147,7 +185,8 @@ public sealed class PtyStartupTests
 
         var text = File.ReadAllText(transcriptPath);
         return text.Contains("SkillView", StringComparison.Ordinal)
-            && text.Contains("Query:", StringComparison.Ordinal);
+            && (text.Contains("Search:", StringComparison.Ordinal)
+                || text.Contains("Query:", StringComparison.Ordinal));
     }
 
     private static string ResolveBuiltBinaryPath()

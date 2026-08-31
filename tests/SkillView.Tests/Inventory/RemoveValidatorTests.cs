@@ -59,6 +59,42 @@ public class RemoveValidatorTests : IDisposable
     }
 
     [Fact]
+    public void ValidateForPreview_UnsupportedBackend_UsesManagedPolicyWithoutExecutionIdentity()
+    {
+        var dir = MakeSkillDir("preview-without-backend");
+        var skill = MakeSkill(dir, "preview-without-backend");
+
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: true,
+            secureBackendSupported: false);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.Null(validation.ExecutionIdentity);
+    }
+
+    [Fact]
+    public void ValidateForRemoval_UnsupportedBackend_ReportsEnvironmentFailure()
+    {
+        var dir = MakeSkillDir("remove-without-backend");
+        var skill = MakeSkill(dir, "remove-without-backend");
+
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: false,
+            secureBackendSupported: false);
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error =>
+            error.Kind == RemoveValidator.ErrorKind.FilesystemIdentityUnavailable);
+        Assert.Null(validation.ExecutionIdentity);
+    }
+
+    [Fact]
     public void Validate_FilesystemRootScanRoot_Allowed()
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;

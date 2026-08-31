@@ -352,12 +352,17 @@ public sealed class CleanupScreen
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
         var removed = report.TargetsDeleted;
-        var failed = selected.Length - removed;
+        var failed = CountFailedSelections(selected.Length, report);
         RemovedCount += removed;
         RemovedFileCount += report.FilesDeleted;
         RemovedDirectoryCount += report.DirectoriesDeleted;
         return new RemovalSummary(removed, failed, Confirmed: true);
     }
+
+    internal static int CountFailedSelections(
+        int selectedCount,
+        RemoveService.BatchRemoveReport report) =>
+        Math.Max(0, selectedCount - report.TargetsDeleted - report.TargetsSkipped);
 
     private IEnumerable<RemoveValidator.RemoveValidation>
         ValidateImmediatelyBeforeRemoval(

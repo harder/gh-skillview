@@ -51,6 +51,14 @@ src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview --scan-root "$SCAN_ROOT"
 
 - Do **not** use `dotnet run` for PTY automation unless you need to rebuild.
   First-run SDK messages make synchronization much harder.
+- `/usr/bin/script` creates a PTY, but it is not a terminal emulator. An
+  automated harness must answer Terminal.Gui's startup probes (window size,
+  cursor position, device attributes, and keyboard protocol) or initialization
+  can wait indefinitely. The opt-in `PtyStartupTests` fixture shows the minimal
+  response sequence used by this repo.
+- If readiness times out, terminate and wait for the owned process before
+  calling `ReadToEnd` on a redirected stream. Reading to EOF while the TUI is
+  still alive blocks the test before its cleanup can run.
 
 ## Why `.agents/skills`
 
@@ -110,6 +118,10 @@ Screen text can mislead because:
 - status auto-clears back to the default message
 - result tables truncate repo names
 - old frames remain in the PTY buffer
+
+For startup smoke detection, accept the current `Search:` label as well as the
+older `Query:` label so a harmless UI copy change does not masquerade as an
+event-loop failure.
 
 ### 3. Modal screens need unique wait conditions
 

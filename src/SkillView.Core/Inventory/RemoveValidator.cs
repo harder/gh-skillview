@@ -55,7 +55,38 @@ public static class RemoveValidator
     public static RemoveValidation Validate(
         InstalledSkill target,
         IReadOnlyList<ScanRoot> knownRoots,
-        IReadOnlyList<InstalledSkill> otherSkills)
+        IReadOnlyList<InstalledSkill> otherSkills) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: false);
+
+    /// Performs the same non-mutating policy checks for a dry run. On a host
+    /// where the native secure backend is unavailable, this may use managed
+    /// path inspection for preview data; the returned validation deliberately
+    /// contains no execution identity and therefore cannot authorize deletion.
+    public static RemoveValidation ValidateForPreview(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: true);
+
+    internal static RemoveValidation ValidateWithBackendAvailabilityForTests(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills,
+        bool allowUnpinnedPreview,
+        bool secureBackendSupported) =>
+        ValidateCore(
+            target,
+            knownRoots,
+            otherSkills,
+            allowUnpinnedPreview,
+            secureBackendSupported);
+
+    private static RemoveValidation ValidateCore(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills,
+        bool allowUnpinnedPreview,
+        bool? secureBackendSupportedOverride = null)
     {
         var errors = ImmutableArray.CreateBuilder<Error>();
         var warnings = ImmutableArray.CreateBuilder<Warning>();
@@ -66,12 +97,12 @@ public static class RemoveValidator
         SecureFileIdentity? executionIdentity = null;
         SecureFileIdentity? rootIdentity = null;
         SecureDirectoryValidationSnapshot? directorySnapshot = null;
+        string? previewCanonicalRoot = null;
+        bool? previewHasSkillFile = null;
+        bool? previewHasGitDirectory = null;
 
         // Rule 12.1.1: must be inside a known scan root before resolution.
-        var matchedRootByRawPath = FindContainingRoot(
-            target.ResolvedPath,
-            knownRoots,
-            canonicalizeRoots: false);
+        var matchedRootByRawPath = FindContainingRoot(target.ResolvedPath, knownRoots);
         if (matchedRootByRawPath is null)
         {
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
@@ -91,11 +122,15 @@ public static class RemoveValidator
         }
         else if (matchedRootByRawPath is not null)
         {
-            if (SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
+            var secureBackendSupported = secureBackendSupportedOverride
+                ?? SecureRemovalBackend.IsSupported;
+            string? identityError = null;
+            if (secureBackendSupported
+                && SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
                     matchedRootByRawPath.Path,
                     target.ResolvedPath,
                     out var rootedSnapshot,
-                    out var identityError))
+                    out identityError))
             {
                 var capturedSnapshot = rootedSnapshot.Directory;
                 directorySnapshot = capturedSnapshot;
@@ -103,8 +138,27 @@ public static class RemoveValidator
                 rootIdentity = rootedSnapshot.RootIdentity;
                 resolved = capturedSnapshot.Identity.CanonicalPath;
             }
+            else if (allowUnpinnedPreview
+                && !secureBackendSupported
+                && TryCaptureManagedPreview(
+                    matchedRootByRawPath.Path,
+                    target.ResolvedPath,
+                    out resolved,
+                    out previewCanonicalRoot,
+                    out var managedHasSkillFile,
+                    out var managedHasGitDirectory,
+                    out identityError))
+            {
+                // Preview-only inspection intentionally leaves
+                // ExecutionIdentity null. RemoveService refuses every real
+                // deletion without the native identity contract.
+                previewHasSkillFile = managedHasSkillFile;
+                previewHasGitDirectory = managedHasGitDirectory;
+            }
             else
             {
+                identityError ??= SecureRemovalBackend.UnsupportedReason
+                    ?? "secure removal is not supported on this operating system";
                 errors.Add(new Error(
                     ErrorKind.FilesystemIdentityUnavailable,
                     $"could not pin the selected filesystem object: {identityError}"));
@@ -112,11 +166,9 @@ public static class RemoveValidator
         }
 
         // Rule 12.1.2: resolved path must still be inside a known scan root.
-        if (executionIdentity is not null
-            && (rootIdentity is null
-                || !PathResolver.IsInside(
-                    resolved,
-                    rootIdentity.Value.CanonicalPath)))
+        var canonicalRoot = rootIdentity?.CanonicalPath ?? previewCanonicalRoot;
+        if (canonicalRoot is not null
+            && !PathResolver.IsInside(resolved, canonicalRoot))
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
                 $"resolved path '{resolved}' is not inside any known scan root"));
@@ -131,14 +183,16 @@ public static class RemoveValidator
         }
 
         // Rule 12.1.4: target must look like a skill install.
-        if (directorySnapshot is { HasSkillFile: false })
+        if (directorySnapshot is { HasSkillFile: false }
+            || previewHasSkillFile is false)
         {
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{resolved}' does not contain {LocalSkillScanner.SkillFileName} or recognizable skill metadata"));
         }
 
         // Rule 12.1.5: reject in-place clones.
-        if (directorySnapshot is { HasGitDirectory: true })
+        if (directorySnapshot is { HasGitDirectory: true }
+            || previewHasGitDirectory is true)
         {
             errors.Add(new Error(ErrorKind.ContainsGitDirectory,
                 $"'{resolved}' contains a .git directory — looks like an in-place clone"));
@@ -147,11 +201,14 @@ public static class RemoveValidator
         // Never-delete: the scan root itself.
         foreach (var root in knownRoots)
         {
-            if (PathKeysEqual(root.Path, target.ResolvedPath) ||
-                (rootIdentity is not null
-                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved)) ||
-                (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
-                    && PathKeysEqual(canonicalRoot, resolved)))
+            if (PathKeysEqual(root.Path, target.ResolvedPath)
+                || (canonicalRoot is not null
+                    && PathKeysEqual(canonicalRoot, resolved))
+                || (TryCanonicalizeForComparison(root.Path, out var comparisonRoot)
+                    && PathKeysEqual(comparisonRoot, resolved))
+                || (allowUnpinnedPreview
+                    && TryCanonicalizeManaged(root.Path, out comparisonRoot)
+                    && PathKeysEqual(comparisonRoot, resolved)))
             {
                 if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
                 {
@@ -236,10 +293,7 @@ public static class RemoveValidator
         SecureFileIdentity? executionIdentity = null;
         SecureFileIdentity? rootIdentity = null;
         SecureDirectoryValidationSnapshot? directorySnapshot = null;
-        var matchedRootByRawPath = FindContainingRoot(
-            fullPath,
-            knownRoots,
-            canonicalizeRoots: false);
+        var matchedRootByRawPath = FindContainingRoot(fullPath, knownRoots);
         if (matchedRootByRawPath is null)
         {
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
@@ -344,10 +398,7 @@ public static class RemoveValidator
         var resolved = fullPath;
         SecureLinkIdentity? executionLinkIdentity = null;
         SecureFileIdentity? rootIdentity = null;
-        var matchedRootByRawPath = FindContainingRoot(
-            fullPath,
-            knownRoots,
-            canonicalizeRoots: false);
+        var matchedRootByRawPath = FindContainingRoot(fullPath, knownRoots);
         if (matchedRootByRawPath is null)
         {
             errors.Add(new Error(ErrorKind.OutsideKnownRoots,
@@ -424,20 +475,64 @@ public static class RemoveValidator
 
     private static ScanRoot? FindContainingRoot(
         string path,
-        IReadOnlyList<ScanRoot> roots,
-        bool canonicalizeRoots)
+        IReadOnlyList<ScanRoot> roots)
     {
         foreach (var root in roots)
         {
-            var comparisonRoot = root.Path;
-            if (canonicalizeRoots
-                && !TryCanonicalizeForComparison(root.Path, out comparisonRoot))
-            {
-                continue;
-            }
-            if (PathResolver.IsInside(path, comparisonRoot)) return root;
+            if (PathResolver.IsInside(path, root.Path)) return root;
         }
         return null;
+    }
+
+    private static bool TryCaptureManagedPreview(
+        string rootPath,
+        string path,
+        out string resolvedPath,
+        out string canonicalRoot,
+        out bool hasSkillFile,
+        out bool hasGitDirectory,
+        out string? error)
+    {
+        resolvedPath = string.Empty;
+        canonicalRoot = string.Empty;
+        hasSkillFile = false;
+        hasGitDirectory = false;
+        error = null;
+        try
+        {
+            if (!TryCanonicalizeManaged(rootPath, out canonicalRoot))
+            {
+                error = $"could not resolve scan root '{rootPath}' for preview";
+                return false;
+            }
+            if (!TryCanonicalizeManaged(path, out resolvedPath)
+                || !Directory.Exists(resolvedPath))
+            {
+                error = $"could not resolve directory '{path}' for preview";
+                return false;
+            }
+
+            hasSkillFile = File.Exists(
+                Path.Combine(resolvedPath, LocalSkillScanner.SkillFileName));
+            hasGitDirectory = Directory.Exists(Path.Combine(resolvedPath, ".git"));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TryCanonicalizeManaged(
+        string path,
+        out string canonicalPath)
+    {
+        canonicalPath = PathResolver.Resolve(path) ?? string.Empty;
+        return canonicalPath.Length > 0;
     }
 
     private static string CanonicalizeForComparison(string path) =>

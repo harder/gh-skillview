@@ -91,6 +91,41 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
             openAt2Available: true));
     }
 
+    [Theory]
+    [InlineData(Architecture.Arm64, true, true)]
+    [InlineData(Architecture.X64, true, false)]
+    [InlineData(Architecture.Arm64, false, false)]
+    [InlineData(Architecture.X86, true, false)]
+    public void IsMacPlatformSupported_RequiresLittleEndianArm64(
+        Architecture architecture,
+        bool isLittleEndian,
+        bool expected)
+    {
+        Assert.Equal(expected, UnixSecureRemovalBackend.IsMacPlatformSupported(
+            architecture,
+            isLittleEndian));
+    }
+
+    [Fact]
+    public void RetryOnInterrupted_RetriesEintrAndReturnsLaterResult()
+    {
+        var attempts = 0;
+
+        var result = UnixSecureRemovalBackend.RetryOnInterrupted(() =>
+        {
+            attempts++;
+            if (attempts < 4)
+            {
+                Marshal.SetLastPInvokeError(4);
+                return -1;
+            }
+            return 17;
+        });
+
+        Assert.Equal(17, result);
+        Assert.Equal(4, attempts);
+    }
+
     [Fact]
     public void TryCaptureIdentity_UsesFinalPathFromOpenedHandle()
     {

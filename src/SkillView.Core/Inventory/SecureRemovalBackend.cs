@@ -90,9 +90,11 @@ internal interface ISecureRemovalBackend
 
 internal static class SecureRemovalBackend
 {
-    private static readonly ISecureRemovalBackend? Current = Create();
+    private static readonly BackendSelection Selection = Create();
+    private static ISecureRemovalBackend? Current => Selection.Backend;
 
     internal static bool IsSupported => Current is not null;
+    internal static string? UnsupportedReason => Selection.Error;
 
     internal static bool TryCaptureIdentity(
         string path,
@@ -102,7 +104,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             identity = default;
-            error = "secure removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure removal is not supported on this operating system";
             return false;
         }
 
@@ -117,7 +120,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             canonicalPath = string.Empty;
-            error = "secure removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure removal is not supported on this operating system";
             return false;
         }
         return Current.TryCanonicalizePath(path, out canonicalPath, out error);
@@ -131,7 +135,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             snapshot = default;
-            error = "secure removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure removal is not supported on this operating system";
             return false;
         }
         return Current.TryCaptureDirectoryValidation(path, out snapshot, out error);
@@ -146,7 +151,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             snapshot = default;
-            error = "secure removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure removal is not supported on this operating system";
             return false;
         }
         return Current.TryCaptureDirectoryValidationWithinRoot(
@@ -164,7 +170,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             identity = default;
-            error = "secure link removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure link removal is not supported on this operating system";
             return false;
         }
 
@@ -179,7 +186,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             snapshot = default;
-            error = "secure link removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure link removal is not supported on this operating system";
             return false;
         }
         return Current.TryCaptureLinkValidation(path, out snapshot, out error);
@@ -194,7 +202,8 @@ internal static class SecureRemovalBackend
         if (Current is null)
         {
             snapshot = default;
-            error = "secure link removal is not supported on this operating system";
+            error = UnsupportedReason
+                ?? "secure link removal is not supported on this operating system";
             return false;
         }
         return Current.TryCaptureLinkValidationWithinRoot(
@@ -244,14 +253,24 @@ internal static class SecureRemovalBackend
             failure,
             cancellationToken);
 
-    private static ISecureRemovalBackend? Create()
+    private static BackendSelection Create()
     {
-        if (OperatingSystem.IsWindows()) return new WindowsSecureRemovalBackend();
+        if (OperatingSystem.IsWindows())
+        {
+            return new BackendSelection(new WindowsSecureRemovalBackend(), null);
+        }
         if ((OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
             && UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform)
         {
-            return new UnixSecureRemovalBackend();
+            return new BackendSelection(new UnixSecureRemovalBackend(), null);
         }
-        return null;
+        return new BackendSelection(
+            null,
+            UnixSecureRemovalBackend.UnsupportedReason
+                ?? "secure removal is not supported on this operating system");
     }
+
+    private readonly record struct BackendSelection(
+        ISecureRemovalBackend? Backend,
+        string? Error);
 }

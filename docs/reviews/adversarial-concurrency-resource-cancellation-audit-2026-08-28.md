@@ -1724,3 +1724,67 @@ adding release-build overhead.
   <https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle>
 - Windows/Linux case sensitivity:
   <https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity>
+
+## 2026-08-31 PR #17 comprehensive follow-up
+
+An independent Claude Opus review of commit `8300606` reported ten additional
+issues. All ten were traced through their production callers rather than
+accepted from the report at face value.
+
+1. **macOS x64 native ABI — valid, fixed fail-closed.** Apple's x86_64 headers
+   map the unsuffixed `fstat`, `fstatat`, and `readdir` symbols to the legacy
+   32-bit-inode ABI, while SkillView parses the 64-bit-inode layout. Secure Unix
+   removal now supports macOS only in a native little-endian ARM64 process and
+   throws/refuses rather than interpreting unverified bytes on Intel or under
+   Rosetta. This is preferable to adding a second ABI in the security boundary;
+   releases currently ship `osx-arm64`.
+2. **Unavailable backend also blocked dry-run — valid, fixed.** Real removal
+   remains fail-closed and now reports the backend reason as an environment
+   failure. A non-mutating `remove` preview may use managed canonicalization and
+   policy inspection when the backend is unavailable, but returns no execution
+   identity. `RemoveService` still refuses every real directory or link delete
+   without its native identity. Warning confirmation is required only for
+   execution, not for preview output.
+3. **CliList-only agent links outside roots — valid UX gap, fixed without
+   weakening policy.** Such links remain blocked, and the wizard explains that
+   the directory must be supplied with `--scan-root`. SkillView deliberately
+   does not promote a path reported by `gh skill list` into a trusted removal
+   root automatically; doing so would let discovery data redefine the deletion
+   authority boundary.
+4. **advanced-remove validation on the UI thread — valid, fixed.** Initial and
+   selection-specific evaluations now run in a modal-owned background
+   operation. Per-target results are cached only for display. Finish performs a
+   fresh background validation and returns to Review if its blocking errors,
+   warnings, resolved paths, or incoming-link content changed; only the fresh
+   native identities reach execution.
+5. **Windows directory-entry header bound — valid defence in depth, fixed.**
+   Enumeration verifies that the full 88-byte fixed header remains before any
+   field read and rejects offsets that cannot leave another complete header.
+6. **Unix `EINTR` handling — valid reliability gap, fixed.** Open, openat,
+   openat2, fstat, fstatat, dup, readdir, and unlinkat use bounded retries.
+   Every unlink retry rechecks cancellation because it is a new destructive
+   call. `close` and `closedir` are not retried.
+7. **public root-unvalidated `RemoveLinkAsync` — valid, removed.** Agent-link
+   deletion now has one route: `ValidateSymlink` followed by `RemoveAsync`.
+   Managed path deletion branches were removed; the remaining managed traversal
+   is explicitly preview-only.
+8. **dead `FindContainingRoot(canonicalizeRoots:)` branch — valid, removed.**
+   The helper now performs its only real raw-path containment role; canonical
+   containment remains part of the held-root identity capture.
+9. **cleanup duplicate accounting — valid, fixed.** `RemoveMany` logs and counts
+   canonical duplicates as skipped. Cleanup subtracts skipped targets before
+   calculating failures, so a safe deduplication is not mislabeled as a failed
+   removal.
+10. **`openat2` probe depended on CWD — valid, fixed with a qualification.**
+    Probing absolute `/` with `RESOLVE_BENEATH` would fail by contract. SkillView
+    instead opens `/` once and probes `.` relative to that descriptor using the
+    exact production resolve flags. Platform support is cached, and an
+    unavailable Linux backend includes the probe errno and message in its
+    diagnostic.
+
+Targeted regression coverage now includes the macOS architecture matrix,
+bounded `EINTR` retry, Windows fixed-header bounds, unsupported-backend preview
+versus execution behavior, outside-root agent-link messaging, and duplicate
+batch accounting. The required verification matrix remains full unit and
+integration tests, macOS/Linux/Windows CI, CodeQL, and sequential Native AOT
+publishes for both hosts.

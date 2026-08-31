@@ -47,6 +47,42 @@ public sealed class RemoveTargetResolverTests : IDisposable
     }
 
     [Fact]
+    public void Evaluate_AgentLinkOutsideScanRoots_IsExplicitlyRefused()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var canonicalDir = MakeSkillDir("outside-agent-link");
+        var outsideRoot = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-agent-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideRoot);
+        var linkPath = Path.Combine(outsideRoot, "outside-agent-link");
+        try
+        {
+            Directory.CreateSymbolicLink(linkPath, canonicalDir);
+            var skill = MakeSkill(
+                canonicalDir,
+                "outside-agent-link",
+                agents: ImmutableArray.Create(
+                    new AgentMembership("claude", linkPath, true)));
+            var snapshot = Snapshot(skill);
+            var target = Assert.Single(
+                RemoveTargetResolver.BuildTargets(skill, snapshot),
+                item => item.Kind == RemoveTargetKind.AgentSymlink);
+
+            var evaluation = RemoveTargetResolver.Evaluate(target, snapshot);
+
+            Assert.False(evaluation.CanExecute);
+            Assert.Contains(evaluation.Errors, error =>
+                error.Kind == RemoveValidator.ErrorKind.OutsideKnownRoots);
+        }
+        finally
+        {
+            try { Directory.Delete(outsideRoot, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public void BuildTargets_IncludesPackageGroup_WhenPackageSourceMatchesMultipleSkills()
     {
         var package = new SkillPackage("npm:@acme/demo-pack", "npm", "https://github.com/acme/demo-pack", null, null);

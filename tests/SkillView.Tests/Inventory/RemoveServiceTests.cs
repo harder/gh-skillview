@@ -131,6 +131,34 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_UnsupportedBackendPreview_SucceedsButRealRemovalRefuses()
+    {
+        var (skill, dir) = MakeSkill("unsupported-backend-preview", extraFiles: 1);
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: true,
+            secureBackendSupported: false);
+        var service = new RemoveService(_logger);
+
+        var preview = service.Remove(
+            validation,
+            new RemoveService.Options(DryRun: true),
+            TestContext.Current.CancellationToken);
+        var real = service.Remove(
+            validation,
+            new RemoveService.Options(DryRun: false),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Succeeded, string.Join(System.Environment.NewLine, preview.Errors));
+        Assert.True(preview.DryRun);
+        Assert.False(real.Succeeded);
+        Assert.False(real.DryRun);
+        Assert.True(Directory.Exists(dir));
+    }
+
+    [Fact]
     public void RemoveMany_HappyPath_DeletesEveryValidatedTarget()
     {
         var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);
@@ -147,6 +175,23 @@ public class RemoveServiceTests : IDisposable
         Assert.False(Directory.Exists(firstDir));
         Assert.False(Directory.Exists(secondDir));
         Assert.True(report.FilesDeleted >= 4);
+    }
+
+    [Fact]
+    public void RemoveMany_DuplicateCanonicalTarget_IsReportedAsSkipped()
+    {
+        var (skill, dir) = MakeSkill("group-duplicate", extraFiles: 1);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+
+        var report = new RemoveService(_logger).RemoveMany(
+            [validation, validation],
+            new RemoveService.Options(DryRun: true),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(report.Succeeded);
+        Assert.Equal(1, report.TargetsDeleted);
+        Assert.Equal(1, report.TargetsSkipped);
+        Assert.True(Directory.Exists(dir));
     }
 
     [Fact]
@@ -592,22 +637,6 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
-    public void TryDeleteSymlink_CanceledAfterPrimaryFailure_SkipsDirectoryFallback()
-    {
-        var directory = Path.Combine(_tempRoot, "fallback-cancellation");
-        Directory.CreateDirectory(directory);
-        using var cancellation = new CancellationTokenSource();
-
-        Assert.Throws<OperationCanceledException>(() =>
-            RemoveService.TryDeleteSymlink(
-                directory,
-                cancellation.Token,
-                primaryDeleteFailedForTests: cancellation.Cancel));
-
-        Assert.True(Directory.Exists(directory));
-    }
-
-    [Fact]
     public void Remove_UnixFinalDirectoryNameReplacement_DeletesOnlyEmptyReplacement()
     {
         if (OperatingSystem.IsWindows() || !SecureRemovalBackend.IsSupported) return;
@@ -824,58 +853,6 @@ public class RemoveServiceTests : IDisposable
         Assert.Equal(0, updates[^1].TargetsDeleted);
         Assert.Equal(1, updates[^1].FilesProcessed);
         Assert.Equal(0, updates[^1].DirectoriesProcessed);
-    }
-
-    [Fact]
-    public async Task RemoveLinkAsync_DeletesOnlyObservedLink()
-    {
-        var externalFile = Path.Combine(_tempRoot, "keep.txt");
-        File.WriteAllText(externalFile, "keep");
-        var link = Path.Combine(_tempRoot, "agent-link.txt");
-        if (!TryCreateFileLink(link, externalFile)) return;
-
-        var report = await new RemoveService(_logger).RemoveLinkAsync(
-            link,
-            TestContext.Current.CancellationToken);
-
-        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
-        Assert.False(PathResolver.IsSymlink(link));
-        Assert.True(File.Exists(externalFile));
-        Assert.Equal("keep", File.ReadAllText(externalFile));
-    }
-
-    [Fact]
-    public async Task RemoveLinkAsync_AlreadyCanceledPublishesTerminalProgress()
-    {
-        var externalFile = Path.Combine(_tempRoot, "keep-canceled.txt");
-        File.WriteAllText(externalFile, "keep");
-        var link = Path.Combine(_tempRoot, "agent-link-canceled.txt");
-        if (!TryCreateFileLink(link, externalFile)) return;
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        var updates = new List<RemoveService.RemoveProgress>();
-        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
-
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            new RemoveService(_logger).RemoveLinkAsync(
-                link,
-                cancellation.Token,
-                progress));
-
-        Assert.True(PathResolver.IsSymlink(link));
-        Assert.True(File.Exists(externalFile));
-        Assert.Collection(
-            updates,
-            update =>
-            {
-                Assert.False(update.IsCompleted);
-                Assert.False(update.IsCanceled);
-            },
-            update =>
-            {
-                Assert.False(update.IsCompleted);
-                Assert.True(update.IsCanceled);
-            });
     }
 
     [Fact]

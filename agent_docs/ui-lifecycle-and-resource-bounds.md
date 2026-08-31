@@ -82,8 +82,12 @@ logging, or subprocess adapters.
   disconnects, ACL changes, and disappearing directories fail there rather
   than when the enumerable is created.
 - Removal uses the same thread-pool boundary: compact remove, the advanced
-  wizard, cleanup batches, and agent-link unlinking call the asynchronous
-  `RemoveService` APIs. Progress callbacks are throttled to 10 per second and
+  wizard, cleanup batches, and agent-link unlinking call `RemoveAsync`/
+  `RemoveManyAsync` with a root-validated `RemoveValidation`. The advanced
+  wizard also evaluates native filesystem policy off the UI thread, caches
+  results only for display, and refreshes the selected target immediately
+  before execution. If refreshed errors or warnings differ, it returns to
+  Review. Progress callbacks are throttled to 10 per second and
   immediately handed to `IApplication.Invoke`; they must not use `Progress<T>`
   and add another implicit queue. Esc cancels the active traversal, and each
   removal window cancels and drains its owned task before disposing controls.
@@ -122,18 +126,22 @@ logging, or subprocess adapters.
   walks and enumerates opened directory
   descriptors, compares device/inode identities, rejects Linux bind/filesystem
   mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
-  Linux backend probes the exact `openat2` contract at startup and remains
-  disabled when the kernel or sandbox refuses it, before any mutation can begin. Keep
+  Linux backend probes the exact `openat2` contract at startup relative to an
+  opened filesystem-root descriptor, not process CWD, and remains disabled
+  when the kernel or sandbox refuses it, before any mutation can begin. Native
+  open/stat/enumeration/delete calls retry bounded `EINTR`; each retried
+  `unlinkat` is a fresh destructive boundary with its own cancellation check,
+  while `close` is never retried. Keep
   actual deletion on `SecureRemovalBackend` for Windows, macOS,
   and Linux. Check cancellation immediately before each native delete and keep
   handle cleanup in `finally` paths. On Windows, the legacy
   `FileDispositionInfo` fallback is a second destructive call after
   `FileDispositionInfoEx`, so it needs its own cancellation gate; its
   `DeleteFile` field is a one-byte native `BOOLEAN`, while the API return value
-  remains a four-byte `BOOL`. Unsupported-platform path fallbacks follow the
-  same rule: recheck cancellation before both the primary file delete and any
-  directory-delete fallback, and never translate cancellation into a normal
-  removal failure. POSIX `unlinkat` is parent-handle-relative
+  remains a four-byte `BOOL`. The managed traversal retained for dry-run
+  counting is preview-only; an unavailable secure backend refuses real
+  deletion with an actionable environment error and never falls back to
+  `File.Delete`/`Directory.Delete`. POSIX `unlinkat` is parent-handle-relative
   but still names its final entry, so document rather than conceal its narrow
   final-name race for files, links, directories, and the selected root; the
   held-directory design prevents a replacement ancestor or child directory
@@ -142,7 +150,9 @@ logging, or subprocess adapters.
   Linux `struct stat` is architecture-specific: the secure backend explicitly
   selects the verified little-endian x64 or ARM64 layout and stays disabled on
   unverified architectures or endianness instead of interpreting arbitrary
-  buffer offsets. Every captured Unix object identity also compares kernel-
+  buffer offsets. macOS likewise supports only native little-endian ARM64: its
+  unsuffixed libc symbols expose a different legacy inode ABI on x86_64, so
+  Intel and Rosetta processes fail closed. Every captured Unix object identity also compares kernel-
   maintained change-time seconds/nanoseconds so immediate inode reuse cannot
   make a replacement link, parent, or selected directory look like the one
   validated earlier. A directory changed after validation is refused and must
@@ -187,6 +197,12 @@ logging, or subprocess adapters.
   Broken-link cleanup observes target existence relative to the held parent and
   rechecks both parent and link identities around that observation, preventing a
   broken-to-valid replacement from being authorized.
+  A non-mutating `remove` preview may use managed path inspection when the
+  secure backend is unavailable, but it carries no execution identity and can
+  never authorize deletion. Agent links outside inventory scan roots remain
+  blocked with explicit `--scan-root` guidance; never promote an untrusted
+  `gh skill list` path into a root automatically. Batch duplicate targets are
+  reported as skipped so cleanup summaries do not mislabel them as failures.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

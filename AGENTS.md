@@ -185,12 +185,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
   `unlinkat`. Probe the exact Linux `openat2` flags before enabling the backend
-  so an old kernel or seccomp denial fails before validation or mutation.
+  relative to an opened `/` descriptor, never process CWD, so an old kernel or
+  seccomp denial fails before validation or mutation without a deleted working
+  directory producing a false negative. Retry interruptible Unix open/stat/
+  enumeration/delete calls on `EINTR` with a bound; never retry `close`, and
+  recheck cancellation before every retried `unlinkat` attempt.
   Linux native `stat` parsing must select the verified layout for
   the current process architecture: little-endian x64 reads `st_mode` at byte
   24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
   unverified architectures or endianness disable secure removal rather than
-  guessing. Unix captured identity includes change-time seconds/nanoseconds as
+  guessing. The unsuffixed macOS libc symbols expose the verified 64-bit-inode
+  ABI only to native ARM64 processes; fail closed on Intel/Rosetta rather than
+  parsing the ARM64 layout. Unix captured identity includes change-time seconds/nanoseconds as
   well as device/inode for selected directories, parents, links, and observed
   entries because filesystems may immediately recycle an inode. A selected
   directory whose generation or contents changed after validation must be
@@ -198,10 +204,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles
-  even when identity inspection, callbacks, or those checks throw. Apply the
-  same rule to unsupported-platform path fallbacks: a failed `File.Delete`
-  followed by `Directory.Delete` is two destructive boundaries, and
-  cancellation must propagate rather than becoming an ordinary failure. Do not
+  even when identity inspection, callbacks, or those checks throw. There is no
+  unsupported-platform path deletion fallback: real removal is an environment
+  refusal when the secure backend is unavailable. `remove` without `--yes`
+  remains a non-mutating managed preview and cannot produce an execution
+  identity. Do not
   overstate the Unix guarantee: POSIX has no general
   unlink-by-descriptor operation, so the final `fstatat` → `unlinkat` name
   interval remains non-atomic for every entry, including directories and the
@@ -250,6 +257,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   drive-letter paths and convert `\\?\UNC\` to ordinary UNC form. Preserve
   other extended namespaces such as `\\?\Volume{GUID}\...`; stripping their
   prefix turns them into unsafe relative paths.
+- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Cache
+  per-target evaluations only for wizard display and always validate again in
+  the owned background operation immediately before execution; if blocking or
+  warning content changed, return to Review instead of deleting. Agent-link
+  removal is available only through `ValidateSymlink` plus `RemoveAsync`; do
+  not restore a public path-only unlink entry point or silently trust a
+  `gh skill list` parent as a scan root. Explain `--scan-root` when a reported
+  agent link lies outside known roots. Batch deduplication is a skip, not a
+  failure, and must remain explicit in logs and report accounting.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

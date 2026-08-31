@@ -7,6 +7,7 @@ namespace SkillView.Inventory;
 
 internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 {
+    private const int DirectoryEntryHeaderSize = 88;
     private const uint FileAttributeDirectory = 0x00000010;
     private const uint FileAttributeReparsePoint = 0x00000400;
     private const uint DeleteAccess = 0x00010000;
@@ -1048,7 +1049,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         private const int FileNameLengthOffset = 60;
         private const int FileIdLowOffset = 72;
         private const int FileIdHighOffset = 80;
-        private const int FileNameOffset = 88;
+        private const int FileNameOffset = DirectoryEntryHeaderSize;
 
         private readonly byte[] _buffer = new byte[BufferSize];
         private bool _restart = true;
@@ -1114,6 +1115,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                     _hasBufferedEntry = true;
                 }
 
+                if (!HasCompleteDirectoryEntryHeader(_buffer.Length, _offset))
+                {
+                    _finished = true;
+                    error = "opened-directory enumeration returned a truncated entry";
+                    return false;
+                }
+
                 var nameLength = BitConverter.ToInt32(_buffer, _offset + FileNameLengthOffset);
                 if (nameLength < 0 || nameLength > _buffer.Length - _offset - FileNameOffset)
                 {
@@ -1135,7 +1143,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 {
                     _hasBufferedEntry = false;
                 }
-                else if (next > _buffer.Length - _offset)
+                else if (next > _buffer.Length - _offset - FileNameOffset)
                 {
                     _finished = true;
                     error = "opened-directory enumeration returned an invalid offset";
@@ -1157,6 +1165,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             if (_ownsDirectory) Directory.Dispose();
         }
     }
+
+    internal static bool HasCompleteDirectoryEntryHeader(
+        int bufferLength,
+        int offset) =>
+        bufferLength >= DirectoryEntryHeaderSize
+        && offset >= 0
+        && offset <= bufferLength - DirectoryEntryHeaderSize;
 
     private sealed class WindowsOpenException : IOException
     {

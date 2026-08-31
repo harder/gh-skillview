@@ -81,6 +81,7 @@ public sealed class RemoveService
     {
         public int ErrorCount { get; init; } = Errors.Length;
         public bool IsCanceled { get; init; }
+        public int TargetsSkipped { get; init; }
 
         public static BatchRemoveReport FromSingle(RemoveReport report, int targetsDeleted) => new(
             Succeeded: report.Succeeded,
@@ -189,34 +190,11 @@ public sealed class RemoveService
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: true);
             }
 
-            try
-            {
-                if (SecureRemovalBackend.IsSupported)
-                {
-                    const string reason = "secure link removal requires pinned parent and link identities";
-                    _logger.Error("remove", $"refused: {reason}: {target}");
-                    progressTracker.Publish(1, 0, 0, 1, target,
-                        force: true, isCompleted: true, targetsDeleted: 0);
-                    return RemoveReport.Refused(target, reason);
-                }
-                TryDeleteSymlink(target, cancellationToken);
-                _logger.Info("remove", $"removed symlink {target}");
-                progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
-                return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
-            }
-            catch (OperationCanceledException)
-            {
-                progressTracker.Publish(0, 0, 0, 0, target,
-                    force: true, isCanceled: true);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("remove", $"delete symlink {target} failed: {ex.Message}");
-                progressTracker.Publish(1, 0, 0, 1, target, force: true, isCompleted: true);
-                return new RemoveReport(false, target, 0, 0,
-                    ImmutableArray.Create($"{target}: {ex.Message}"), DryRun: false);
-            }
+            const string reason = "real link removal requires pinned parent and link identities";
+            _logger.Error("remove", $"refused: {reason}: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
+            return RemoveReport.Refused(target, reason);
         }
 
         if (validation.RemovesLinkOnly)
@@ -235,14 +213,14 @@ public sealed class RemoveService
             return RemoveReport.Refused(target, $"target '{target}' no longer exists");
         }
 
-        if (!options.DryRun && SecureRemovalBackend.IsSupported)
+        if (!options.DryRun)
         {
-            return RemoveWithSecureBackend(
-                validation.ExecutionIdentity!.Value,
-                validation.RequiresEmptyDirectory,
-                target,
-                cancellationToken,
-                progressTracker);
+            var reason = SecureRemovalBackend.UnsupportedReason
+                ?? "managed traversal is preview-only and cannot execute removal";
+            _logger.Error("remove", $"refused: {reason}: {target}");
+            progressTracker.Publish(1, 0, 0, 1, target,
+                force: true, isCompleted: true, targetsDeleted: 0);
+            return RemoveReport.Refused(target, reason);
         }
 
         var errors = new FailureCollector();
@@ -277,8 +255,12 @@ public sealed class RemoveService
                     // filesystem entry).
                     if (isReparsePoint)
                     {
-                        DeleteLeaf(frame.Path, expectedReparsePoint: true, options.DryRun,
-                            target, cancellationToken, ref files, errors);
+                        CountLeafForPreview(
+                            frame.Path,
+                            expectedReparsePoint: true,
+                            target,
+                            ref files,
+                            errors);
                         progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
@@ -286,8 +268,12 @@ public sealed class RemoveService
 
                     if (!isDirectory)
                     {
-                        DeleteLeaf(frame.Path, expectedReparsePoint: false, options.DryRun,
-                            target, cancellationToken, ref files, errors);
+                        CountLeafForPreview(
+                            frame.Path,
+                            expectedReparsePoint: false,
+                            target,
+                            ref files,
+                            errors);
                         progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
@@ -347,11 +333,9 @@ public sealed class RemoveService
 
                 var completedPath = frame.Path;
                 PopAndDispose(pending);
-                DeleteDirectory(
+                CountDirectoryForPreview(
                     completedPath,
-                    options.DryRun,
                     target,
-                    cancellationToken,
                     ref dirs,
                     errors);
                 progressTracker.Publish(0, files, dirs, errors.Count, completedPath);
@@ -371,37 +355,11 @@ public sealed class RemoveService
             }
         }
 
-        if (options.DryRun)
-        {
-            _logger.Info("remove.dryrun", $"would remove {target}: {files} file(s), {dirs} dir(s)");
-            progressTracker.Publish(1, files, dirs, errors.Count, target,
-                force: true, isCompleted: true);
-            return new RemoveReport(errors.Count == 0, target, files, dirs,
-                errors.ToImmutable(), DryRun: true)
-            {
-                ErrorCount = errors.Count,
-            };
-        }
-
-        if (errors.Count == 0)
-        {
-            _logger.Info("remove", $"removed {target}: {files} file(s), {dirs} dir(s)");
-        }
-        else
-        {
-            _logger.Error("remove", $"remove {target} completed with {errors.Count} error(s)");
-        }
-
+        _logger.Info("remove.dryrun", $"would remove {target}: {files} file(s), {dirs} dir(s)");
         progressTracker.Publish(1, files, dirs, errors.Count, target,
             force: true, isCompleted: true);
-
-        return new RemoveReport(
-            Succeeded: errors.Count == 0,
-            ResolvedPath: target,
-            FilesDeleted: files,
-            DirectoriesDeleted: dirs,
-            Errors: errors.ToImmutable(),
-            DryRun: false)
+        return new RemoveReport(errors.Count == 0, target, files, dirs,
+            errors.ToImmutable(), DryRun: true)
         {
             ErrorCount = errors.Count,
         };
@@ -418,93 +376,6 @@ public sealed class RemoveService
         CancellationToken cancellationToken = default,
         IProgress<RemoveProgress>? progress = null) =>
         Task.Run(() => Remove(validation, options, cancellationToken, progress));
-
-    /// Removes one inventory-observed symlink without following its target.
-    /// Supported platforms capture the canonical parent plus both native
-    /// identities immediately before execution. Callers with known roots
-    /// should prefer a `RemoveValidator.ValidateSymlink` validation so the
-    /// canonical link address is policy-checked as well.
-    public Task<RemoveReport> RemoveLinkAsync(
-        string path,
-        CancellationToken cancellationToken = default,
-        IProgress<RemoveProgress>? progress = null) =>
-        Task.Run(() =>
-        {
-            var fullPath = Path.GetFullPath(path);
-            var progressTracker = new ProgressTracker(progress, _logger);
-            progressTracker.Publish(0, 0, 0, 0, fullPath, force: true);
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            catch (OperationCanceledException)
-            {
-                progressTracker.Publish(0, 0, 0, 0, fullPath,
-                    force: true, isCanceled: true);
-                throw;
-            }
-
-            if (SecureRemovalBackend.IsSupported)
-            {
-                if (!SecureRemovalBackend.TryCaptureLinkIdentity(
-                        fullPath,
-                        out var identity,
-                        out var identityError))
-                {
-                    var detail = identityError ?? "link identity could not be captured";
-                    _logger.Warn("remove.agent", $"{fullPath}: {detail}");
-                    progressTracker.Publish(1, 0, 0, 1, fullPath,
-                        force: true, isCompleted: true);
-                    return RemoveReport.Refused(fullPath, detail);
-                }
-
-                return RemoveLinkWithSecureBackend(
-                    identity,
-                    fullPath,
-                    cancellationToken,
-                    progressTracker);
-            }
-
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!PathResolver.IsSymlink(fullPath))
-                {
-                    const string detail = "path is no longer a symlink";
-                    _logger.Warn("remove.agent", $"{fullPath}: {detail}");
-                    progressTracker.Publish(1, 0, 0, 1, fullPath,
-                        force: true, isCompleted: true);
-                    return RemoveReport.Refused(fullPath, detail);
-                }
-                TryDeleteSymlink(fullPath, cancellationToken);
-                _logger.Info("remove.agent", $"unlinked {fullPath}");
-                progressTracker.Publish(1, 1, 0, 0, fullPath, force: true, isCompleted: true);
-                return new RemoveReport(
-                    Succeeded: true,
-                    ResolvedPath: fullPath,
-                    FilesDeleted: 1,
-                    DirectoriesDeleted: 0,
-                    Errors: ImmutableArray<string>.Empty,
-                    DryRun: false);
-            }
-            catch (OperationCanceledException)
-            {
-                progressTracker.Publish(0, 0, 0, 0, fullPath, force: true, isCanceled: true);
-                throw;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.Warn("remove.agent", $"{fullPath}: {ex.Message}");
-                progressTracker.Publish(1, 0, 0, 1, fullPath, force: true, isCompleted: true);
-                return new RemoveReport(
-                    Succeeded: false,
-                    ResolvedPath: fullPath,
-                    FilesDeleted: 0,
-                    DirectoriesDeleted: 0,
-                    Errors: ImmutableArray.Create($"{fullPath}: {ex.Message}"),
-                    DryRun: false);
-            }
-        });
 
     private RemoveReport RemoveLinkWithSecureBackend(
         SecureLinkIdentity expectedIdentity,
@@ -660,12 +531,10 @@ public sealed class RemoveService
         }
     }
 
-    private void DeleteLeaf(
+    private void CountLeafForPreview(
         string path,
         bool expectedReparsePoint,
-        bool dryRun,
         string target,
-        CancellationToken cancellationToken,
         ref int files,
         FailureCollector errors)
     {
@@ -688,37 +557,13 @@ public sealed class RemoveService
             return;
         }
 
-        if (dryRun)
-        {
-            files++;
-            _logger.Debug("remove.dryrun", $"leaf: {path}");
-            return;
-        }
-
-        try
-        {
-            if (isReparsePoint)
-            {
-                TryDeleteSymlink(path, cancellationToken);
-            }
-            else
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                File.Delete(path);
-            }
-            files++;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            RecordFailure(path, ex.Message, errors);
-        }
+        files++;
+        _logger.Debug("remove.dryrun", $"leaf: {path}");
     }
 
-    private void DeleteDirectory(
+    private void CountDirectoryForPreview(
         string path,
-        bool dryRun,
         string target,
-        CancellationToken cancellationToken,
         ref int dirs,
         FailureCollector errors)
     {
@@ -734,23 +579,8 @@ public sealed class RemoveService
             return;
         }
 
-        if (dryRun)
-        {
-            dirs++;
-            _logger.Debug("remove.dryrun", $"dir: {path}");
-            return;
-        }
-
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Directory.Delete(path, recursive: false);
-            dirs++;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            RecordFailure(path, ex.Message, errors);
-        }
+        dirs++;
+        _logger.Debug("remove.dryrun", $"dir: {path}");
     }
 
     private void RecordFailure(
@@ -818,35 +648,6 @@ public sealed class RemoveService
         }
     }
 
-    internal static void TryDeleteSymlink(
-        string path,
-        CancellationToken cancellationToken,
-        Action? primaryDeleteFailedForTests = null)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            File.Delete(path);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            primaryDeleteFailedForTests?.Invoke();
-            cancellationToken.ThrowIfCancellationRequested();
-            Directory.Delete(path, recursive: false);
-        }
-        catch (IOException)
-        {
-            primaryDeleteFailedForTests?.Invoke();
-            cancellationToken.ThrowIfCancellationRequested();
-            Directory.Delete(path, recursive: false);
-        }
-
-        if (PathResolver.IsSymlink(path) || File.Exists(path) || Directory.Exists(path))
-        {
-            throw new IOException($"symlink '{path}' still exists after delete attempt");
-        }
-    }
-
     public BatchRemoveReport RemoveMany(
         IEnumerable<RemoveValidator.RemoveValidation> validations,
         Options? options = null,
@@ -858,6 +659,7 @@ public sealed class RemoveService
         var errors = new FailureCollector();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var targetsDeleted = 0;
+        var targetsSkipped = 0;
         var filesDeleted = 0;
         var directoriesDeleted = 0;
         var progressAdapter = new BatchProgressAdapter(progress, _logger);
@@ -870,6 +672,8 @@ public sealed class RemoveService
                 var key = PathIdentity.NormalizeKey(validation.ResolvedPath);
                 if (!seen.Add(key))
                 {
+                    targetsSkipped++;
+                    _logger.Debug("remove", $"skipped duplicate target {validation.ResolvedPath}");
                     continue;
                 }
 
@@ -913,6 +717,7 @@ public sealed class RemoveService
             DryRun: options.DryRun)
         {
             ErrorCount = errors.Count,
+            TargetsSkipped = targetsSkipped,
         };
     }
 

@@ -1149,7 +1149,9 @@ public static class CliDispatcher
         }
 
         var target = matches[0];
-        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
+        var validation = parsed.Yes
+            ? RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills)
+            : RemoveValidator.ValidateForPreview(target, snapshot.ScannedRoots, snapshot.Skills);
 
         RemoveService.RemoveReport result;
         if (!validation.Allowed)
@@ -1160,16 +1162,6 @@ public static class CliDispatcher
                 FilesDeleted: 0,
                 DirectoriesDeleted: 0,
                 Errors: validation.Errors.Select(e => $"{e.Kind}: {e.Detail}").ToImmutableArray(),
-                DryRun: false);
-        }
-        else if (validation.RequiresSecondConfirm && !parsed.Yes)
-        {
-            result = new RemoveService.RemoveReport(
-                Succeeded: false,
-                ResolvedPath: validation.ResolvedPath,
-                FilesDeleted: 0,
-                DirectoriesDeleted: 0,
-                Errors: validation.Warnings.Select(w => $"warning {w.Kind}: {w.Detail} (pass --yes to accept)").ToImmutableArray(),
                 DryRun: false);
         }
         else if (!parsed.Yes)
@@ -1193,8 +1185,12 @@ public static class CliDispatcher
         if (parsed.Json) WriteRemoveJson(result, target, parsed, validation);
         else WriteRemoveText(result, target, parsed, validation);
 
-        if (!validation.Allowed) return ExitCodes.UserError;
-        if (validation.RequiresSecondConfirm && !parsed.Yes) return ExitCodes.UserError;
+        if (!validation.Allowed)
+        {
+            return IsEnvironmentRefusal(validation)
+                ? ExitCodes.EnvironmentError
+                : ExitCodes.UserError;
+        }
         if (!result.Succeeded) return ExitCodes.EnvironmentError;
         return ExitCodes.Success;
     }
@@ -1240,8 +1236,7 @@ public static class CliDispatcher
             foreach (var w in validation.Warnings) Console.Error.WriteLine($"  ! {w.Kind}: {w.Detail}");
             if (!p.Yes)
             {
-                Console.Error.WriteLine("hint: rerun with --yes to accept the warnings");
-                return;
+                Console.Error.WriteLine("hint: --yes is required to accept these warnings and execute");
             }
         }
         if (r.DryRun)
@@ -1282,7 +1277,7 @@ public static class CliDispatcher
         RemoveValidator.RemoveValidation validation)
     {
         var removalAttempted = validation.Allowed
-            && (!validation.RequiresSecondConfirm || p.Yes);
+            && (r.DryRun || !validation.RequiresSecondConfirm || p.Yes);
         w.WriteStartObject();
         w.WriteBoolean("dryRun", r.DryRun);
         w.WriteBoolean("succeeded", r.Succeeded);
@@ -1346,6 +1341,7 @@ public static class CliDispatcher
         }
 
         var applied = new List<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)>();
+        var environmentRefusal = false;
         if (parsed.Apply)
         {
             if (!parsed.Yes)
@@ -1359,8 +1355,13 @@ public static class CliDispatcher
                 var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills);
                 if (!validation.Allowed || validation.RequiresSecondConfirm)
                 {
+                    environmentRefusal |= IsEnvironmentRefusal(validation);
+                    var reason = validation.Allowed
+                        ? "requires second-confirm"
+                        : string.Join("; ", validation.Errors.Select(error =>
+                            $"{error.Kind}: {error.Detail}"));
                     applied.Add((c, RemoveService.RemoveReport.Refused(validation.ResolvedPath,
-                        validation.Allowed ? "requires second-confirm" : "validation refused")));
+                        reason)));
                     continue;
                 }
                 var removal = await services.RemoveService.RemoveAsync(
@@ -1392,9 +1393,15 @@ public static class CliDispatcher
         }
 
         if (candidates.Length == 0) return ExitCodes.Success;
+        if (parsed.Apply && environmentRefusal) return ExitCodes.EnvironmentError;
         if (parsed.Apply && applied.Any(a => !a.R.Succeeded)) return ExitCodes.UserError;
         return ExitCodes.Success;
     }
+
+    private static bool IsEnvironmentRefusal(
+        RemoveValidator.RemoveValidation validation) =>
+        validation.Errors.Any(error =>
+            error.Kind == RemoveValidator.ErrorKind.FilesystemIdentityUnavailable);
 
     internal record ParsedCleanupArgs(
         IReadOnlyList<string>? KindFilter,

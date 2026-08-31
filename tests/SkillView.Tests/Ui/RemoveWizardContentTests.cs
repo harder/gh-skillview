@@ -37,6 +37,59 @@ public sealed class RemoveWizardContentTests
         }
     }
 
+    [Fact]
+    public void BuildReviewMarkdown_AgentLinkOutsideRoots_ExplainsScanRootRecovery()
+    {
+        var skill = new InstalledSkill
+        {
+            Name = "demo",
+            ResolvedPath = "/skills/demo",
+            ScanRoot = "/skills",
+            Scope = Scope.User,
+            Agents = ImmutableArray<AgentMembership>.Empty,
+            FrontMatter = new SkillFrontMatter { Name = "demo" },
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.CliList,
+            Ignored = false,
+            IsSymlinked = true,
+            InstalledAt = null,
+        };
+        var target = new RemoveTarget(
+            RemoveTargetKind.AgentSymlink,
+            "Unlink from claude",
+            "Remove only the link.",
+            [skill],
+            new AgentMembership("claude", "/outside/demo", true));
+        var validation = new RemoveValidator.RemoveValidation(
+            [new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.OutsideKnownRoots,
+                "outside")],
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            "/outside/demo",
+            ImmutableArray<string>.Empty);
+        var evaluation = new RemoveTargetEvaluation(
+            target,
+            [new RemoveTargetItem(skill, validation)]);
+
+        var markdown = RemoveWizardContent.BuildReviewMarkdown(evaluation);
+
+        Assert.Contains("--scan-root", markdown, StringComparison.Ordinal);
+        Assert.Contains("agent link", markdown, StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(RemoveScreen.HasSameSafetyContract(evaluation, evaluation));
+        var changedValidation = validation with
+        {
+            Errors = [new RemoveValidator.Error(
+                RemoveValidator.ErrorKind.FilesystemIdentityUnavailable,
+                "backend unavailable")],
+        };
+        var changed = evaluation with
+        {
+            Items = [new RemoveTargetItem(skill, changedValidation)],
+        };
+        Assert.False(RemoveScreen.HasSameSafetyContract(evaluation, changed));
+    }
+
     private static InventorySnapshot Snapshot(string root, params InstalledSkill[] skills) => new()
     {
         Skills = skills.ToImmutableArray(),

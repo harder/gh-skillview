@@ -7,6 +7,7 @@ namespace SkillView.Inventory;
 
 internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 {
+    private const int MaxInterruptedAttempts = 8;
     private const int StatBufferSize = 512;
     private const int InitialLinuxFinalPathCapacity = 512;
     private const int MaxLinuxFinalPathCapacity = 32_768;
@@ -29,9 +30,13 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         _rootIdentityCapturedForTests = rootIdentityCapturedForTests;
     }
 
+    private static readonly PlatformSupport CurrentPlatformSupport =
+        DetectCurrentPlatformSupport();
+
     internal static bool IsSupportedOnCurrentPlatform =>
-        OperatingSystem.IsMacOS()
-        || (OperatingSystem.IsLinux() && IsCurrentLinuxPlatformSupported());
+        CurrentPlatformSupport.IsSupported;
+
+    internal static string? UnsupportedReason => CurrentPlatformSupport.Error;
 
     public bool TryCaptureIdentity(
         string path,
@@ -606,10 +611,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
                     entryDeleting(childPath, false);
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (UnixNative.unlinkat(
+                    if (UnlinkAtWithRetry(
                             frame.Directory.FileDescriptor,
                             child.Value.Name,
-                            flags: 0) != 0)
+                            flags: 0,
+                            cancellationToken) != 0)
                     {
                         failure(childPath, LastError("delete failed"));
                         frame.PreventDelete();
@@ -644,10 +650,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                         {
                             entryDeleting(frame.DisplayPath, true);
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (UnixNative.unlinkat(
+                            if (UnlinkAtWithRetry(
                                     frame.Parent.FileDescriptor,
                                     frame.Name,
-                                    UnixConstants.RemoveDirectoryFlag) != 0)
+                                    UnixConstants.RemoveDirectoryFlag,
+                                    cancellationToken) != 0)
                             {
                                 failure(frame.DisplayPath, LastError("delete directory failed"));
                             }
@@ -722,10 +729,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 return;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (UnixNative.unlinkat(
+            if (UnlinkAtWithRetry(
                     parent.FileDescriptor,
                     expectedIdentity.Name,
-                    flags: 0) != 0)
+                    flags: 0,
+                    cancellationToken) != 0)
             {
                 failure(path, LastError("unlink failed"));
                 return;
@@ -808,7 +816,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static SafeUnixHandle OpenDirectory(string path)
     {
-        var fd = UnixNative.open(path, UnixConstants.DirectoryOpenFlags);
+        var fd = OpenWithRetry(path, UnixConstants.DirectoryOpenFlags);
         return CreateHandle(fd, $"open directory '{path}' failed");
     }
 
@@ -831,7 +839,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                     | UnixConstants.ResolveNoSymlinks
                     | UnixConstants.ResolveNoCrossDevice,
             };
-            fd = checked((int)UnixNative.syscall(
+            fd = checked((int)OpenAt2WithRetry(
                 UnixConstants.OpenAt2SystemCall,
                 parent.FileDescriptor,
                 name,
@@ -840,7 +848,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         }
         else
         {
-            fd = UnixNative.openat(
+            fd = OpenAtWithRetry(
                 parent.FileDescriptor,
                 name,
                 openFlags);
@@ -882,7 +890,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 CommonAttributes = UnixConstants.AttributeCommonFullPath,
             };
             var buffer = new byte[MacAttributeBufferCapacity];
-            if (UnixNative.fgetattrlist(
+            if (FGetAttrListWithRetry(
                     handle.FileDescriptor,
                     ref attributes,
                     buffer,
@@ -928,7 +936,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             var buffer = Marshal.AllocHGlobal(capacity);
             try
             {
-                var length = UnixNative.readlink(
+                var length = ReadLinkWithRetry(
                     descriptorPath,
                     buffer,
                     checked((nuint)capacity));
@@ -968,7 +976,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         using var statBuffer = new StatBuffer();
         var before = ReadStat(handle, statBuffer.Pointer);
-        if (UnixNative.fstatat(
+        if (FStatAtWithRetry(
                 UnixConstants.CurrentWorkingDirectory,
                 path,
                 statBuffer.Pointer,
@@ -988,7 +996,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static NativeStat ReadStat(SafeUnixHandle handle, IntPtr buffer)
     {
-        if (UnixNative.fstat(handle.FileDescriptor, buffer) != 0)
+        if (FStatWithRetry(handle.FileDescriptor, buffer) != 0)
         {
             throw new IOException($"inspect opened entry failed: {LastErrorMessage()}");
         }
@@ -1002,7 +1010,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         out NativeStat stat,
         out string? error)
     {
-        if (UnixNative.fstatat(
+        if (FStatAtWithRetry(
                 parent.FileDescriptor,
                 name,
                 buffer,
@@ -1024,7 +1032,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         out NativeStat stat,
         out string? error)
     {
-        if (UnixNative.fstatat(parent.FileDescriptor, name, buffer, flags: 0) == 0)
+        if (FStatAtWithRetry(parent.FileDescriptor, name, buffer, flags: 0) == 0)
         {
             stat = ParseStat(buffer);
             error = null;
@@ -1044,7 +1052,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static bool IsDirectoryEmpty(SafeUnixHandle directory, out string? error)
     {
-        var duplicate = UnixNative.dup(directory.FileDescriptor);
+        var duplicate = DupWithRetry(directory.FileDescriptor);
         if (duplicate < 0)
         {
             error = LastError("duplicate directory handle failed");
@@ -1062,7 +1070,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             while (true)
             {
                 Marshal.SetLastPInvokeError(0);
-                var nativeEntry = UnixNative.readdir(stream);
+                var nativeEntry = ReadDirectoryWithRetry(stream);
                 if (nativeEntry == IntPtr.Zero)
                 {
                     var nativeError = Marshal.GetLastPInvokeError();
@@ -1098,6 +1106,14 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         if (OperatingSystem.IsMacOS())
         {
+            if (!IsMacPlatformSupported(
+                    RuntimeInformation.ProcessArchitecture,
+                    BitConverter.IsLittleEndian))
+            {
+                throw new PlatformNotSupportedException(
+                    $"The native stat layout for {RuntimeInformation.OSDescription} "
+                    + $"({RuntimeInformation.ProcessArchitecture}) is not supported.");
+            }
             var device = unchecked((uint)Marshal.ReadInt32(buffer, 0));
             var mode = unchecked((ushort)Marshal.ReadInt16(buffer, 4));
             var inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
@@ -1154,22 +1170,71 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         openAt2Available
         && TryGetLinuxStatLayout(architecture, isLittleEndian, out _);
 
-    private static bool IsCurrentLinuxPlatformSupported()
+    internal static bool IsMacPlatformSupported(
+        Architecture architecture,
+        bool isLittleEndian) =>
+        architecture == Architecture.Arm64 && isLittleEndian;
+
+    private static PlatformSupport DetectCurrentPlatformSupport()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return IsMacPlatformSupported(
+                RuntimeInformation.ProcessArchitecture,
+                BitConverter.IsLittleEndian)
+                ? new PlatformSupport(true, null, null)
+                : new PlatformSupport(
+                    false,
+                    "secure removal on macOS requires a native ARM64 process; "
+                    + "Intel and Rosetta processes expose a different inode ABI",
+                    null);
+        }
+
+        if (!OperatingSystem.IsLinux())
+        {
+            return new PlatformSupport(
+                false,
+                "secure removal is supported only on Windows, Linux, and native ARM64 macOS",
+                null);
+        }
+
         var architecture = RuntimeInformation.ProcessArchitecture;
         var isLittleEndian = BitConverter.IsLittleEndian;
         if (!TryGetLinuxStatLayout(architecture, isLittleEndian, out _))
         {
-            return false;
+            return new PlatformSupport(
+                false,
+                $"secure removal has no verified Linux stat ABI for {architecture} "
+                + $"({(isLittleEndian ? "little" : "big")}-endian)",
+                null);
         }
-        return IsLinuxPlatformSupported(
-            architecture,
-            isLittleEndian,
-            openAt2Available: ProbeOpenAt2());
+
+        var openAt2Available = ProbeOpenAt2(out var nativeError);
+        return IsLinuxPlatformSupported(architecture, isLittleEndian, openAt2Available)
+            ? new PlatformSupport(true, null, null)
+            : new PlatformSupport(
+                false,
+                "secure removal requires Linux openat2 with RESOLVE_BENEATH, "
+                + "RESOLVE_NO_SYMLINKS, and RESOLVE_NO_XDEV"
+                + (nativeError is null
+                    ? string.Empty
+                    : $"; the capability probe failed with errno {nativeError}: "
+                        + new Win32Exception(nativeError.Value).Message),
+                nativeError);
     }
 
-    private static bool ProbeOpenAt2()
+    private static bool ProbeOpenAt2(out int? nativeError)
     {
+        nativeError = null;
+        var rootDescriptor = OpenWithRetry(
+            Path.DirectorySeparatorChar.ToString(),
+            UnixConstants.DirectoryOpenFlags);
+        if (rootDescriptor < 0)
+        {
+            nativeError = Marshal.GetLastPInvokeError();
+            return false;
+        }
+        using var root = new SafeUnixHandle(rootDescriptor);
         var how = new OpenHow
         {
             Flags = unchecked((ulong)UnixConstants.DirectoryOpenFlags),
@@ -1177,19 +1242,168 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 | UnixConstants.ResolveNoSymlinks
                 | UnixConstants.ResolveNoCrossDevice,
         };
-        var descriptor = UnixNative.syscall(
+        // Probe the exact descriptor-relative flags used during traversal, but
+        // anchor them to the stable filesystem root rather than process CWD.
+        var descriptor = OpenAt2WithRetry(
             UnixConstants.OpenAt2SystemCall,
-            UnixConstants.CurrentWorkingDirectory,
+            root.FileDescriptor,
             ".",
             ref how,
             (nuint)Marshal.SizeOf<OpenHow>());
         if (descriptor < 0 || descriptor > int.MaxValue)
         {
+            nativeError = Marshal.GetLastPInvokeError();
             return false;
         }
 
         using var handle = new SafeUnixHandle(checked((int)descriptor));
         return true;
+    }
+
+    private static int OpenWithRetry(string path, int flags) =>
+        RetryOnInterrupted(
+            (Path: path, Flags: flags),
+            static state => UnixNative.open(state.Path, state.Flags));
+
+    private static int OpenAtWithRetry(int directory, string path, int flags) =>
+        RetryOnInterrupted(
+            (Directory: directory, Path: path, Flags: flags),
+            static state => UnixNative.openat(
+                state.Directory,
+                state.Path,
+                state.Flags));
+
+    private static long OpenAt2WithRetry(
+        long number,
+        int directory,
+        string path,
+        ref OpenHow how,
+        nuint size)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.syscall(number, directory, path, ref how, size);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static int FStatWithRetry(int descriptor, IntPtr buffer) =>
+        RetryOnInterrupted(
+            (Descriptor: descriptor, Buffer: buffer),
+            static state => UnixNative.fstat(state.Descriptor, state.Buffer));
+
+    private static int FStatAtWithRetry(
+        int directory,
+        string path,
+        IntPtr buffer,
+        int flags) =>
+        RetryOnInterrupted(
+            (Directory: directory, Path: path, Buffer: buffer, Flags: flags),
+            static state => UnixNative.fstatat(
+                state.Directory,
+                state.Path,
+                state.Buffer,
+                state.Flags));
+
+    private static int DupWithRetry(int descriptor) =>
+        RetryOnInterrupted(
+            descriptor,
+            static value => UnixNative.dup(value));
+
+    private static int FGetAttrListWithRetry(
+        int descriptor,
+        ref MacAttributeList attributes,
+        byte[] buffer,
+        nuint bufferSize,
+        uint options)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.fgetattrlist(
+                descriptor,
+                ref attributes,
+                buffer,
+                bufferSize,
+                options);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static nint ReadLinkWithRetry(
+        string path,
+        IntPtr buffer,
+        nuint bufferSize)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.readlink(path, buffer, bufferSize);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static IntPtr ReadDirectoryWithRetry(IntPtr directory)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            Marshal.SetLastPInvokeError(0);
+            var result = UnixNative.readdir(directory);
+            if (result != IntPtr.Zero
+                || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static int UnlinkAtWithRetry(
+        int directory,
+        string path,
+        int flags,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            // Each retry is another destructive boundary, not a continuation
+            // of the prior call, so cancellation must be checked every time.
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = UnixNative.unlinkat(directory, path, flags);
+            if (result == 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    internal static int RetryOnInterrupted(Func<int> syscall) =>
+        RetryOnInterrupted(syscall, static callback => callback());
+
+    private static int RetryOnInterrupted<TState>(
+        TState state,
+        Func<TState, int> syscall)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = syscall(state);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
     }
 
     private static bool Matches(SecureFileIdentity expected, NativeStat actual) =>
@@ -1292,7 +1506,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             if (_finished) return false;
             if (_directoryStream == IntPtr.Zero)
             {
-                var duplicate = UnixNative.dup(Directory.FileDescriptor);
+                var duplicate = DupWithRetry(Directory.FileDescriptor);
                 if (duplicate < 0)
                 {
                     error = LastError("duplicate directory handle failed");
@@ -1312,7 +1526,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             while (true)
             {
                 Marshal.SetLastPInvokeError(0);
-                var nativeEntry = UnixNative.readdir(_directoryStream);
+                var nativeEntry = ReadDirectoryWithRetry(_directoryStream);
                 if (nativeEntry == IntPtr.Zero)
                 {
                     var errno = Marshal.GetLastPInvokeError();
@@ -1388,6 +1602,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
         internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
         internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;
+        internal const int Interrupted = 4;
         internal const ushort AttributeBitmapCount = 5;
         internal const uint AttributeCommonFullPath = 0x08000000;
         internal const int CurrentWorkingDirectory = -100;
@@ -1396,6 +1611,11 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         internal const ulong ResolveNoSymlinks = 0x04;
         internal const ulong ResolveBeneath = 0x08;
     }
+
+    private readonly record struct PlatformSupport(
+        bool IsSupported,
+        string? Error,
+        int? NativeError);
 
     private static class UnixNative
     {

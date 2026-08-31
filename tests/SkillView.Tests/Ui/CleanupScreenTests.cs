@@ -11,6 +11,23 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
+    public void CountFailedSelections_DeduplicatedTarget_IsSkippedNotFailed()
+    {
+        var report = new RemoveService.BatchRemoveReport(
+            Succeeded: true,
+            TargetsDeleted: 1,
+            FilesDeleted: 1,
+            DirectoriesDeleted: 1,
+            Errors: ImmutableArray<string>.Empty,
+            DryRun: false)
+        {
+            TargetsSkipped = 1,
+        };
+
+        Assert.Equal(0, CleanupScreen.CountFailedSelections(2, report));
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_RemovesEmptyDirectoryCandidateInsideScanRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));

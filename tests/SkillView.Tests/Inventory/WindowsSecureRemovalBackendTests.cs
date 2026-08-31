@@ -33,6 +33,23 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         Assert.Equal(1, WindowsSecureRemovalBackend.LegacyDispositionInfoSize);
     }
 
+    [Theory]
+    [InlineData(88, 0, true)]
+    [InlineData(100, 12, true)]
+    [InlineData(100, 13, false)]
+    [InlineData(87, 0, false)]
+    [InlineData(100, -1, false)]
+    public void HasCompleteDirectoryEntryHeader_RequiresEntireFixedHeader(
+        int bufferLength,
+        int offset,
+        bool expected)
+    {
+        Assert.Equal(expected,
+            WindowsSecureRemovalBackend.HasCompleteDirectoryEntryHeader(
+                bufferLength,
+                offset));
+    }
+
     [Fact]
     public void TryDeleteWithFallback_AlreadyCanceled_DoesNotCallNativeBoundary()
     {

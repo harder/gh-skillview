@@ -27,6 +27,7 @@ internal static class RemovalReportState
         current with
         {
             TargetsDeleted = Add(previous?.TargetsDeleted ?? 0, current.TargetsDeleted),
+            TargetsSkipped = Add(previous?.TargetsSkipped ?? 0, current.TargetsSkipped),
             FilesDeleted = Add(previous?.FilesDeleted ?? 0, current.FilesDeleted),
             DirectoriesDeleted = Add(
                 previous?.DirectoriesDeleted ?? 0,
