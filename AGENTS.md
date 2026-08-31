@@ -279,6 +279,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `gh skill list` parent as a scan root. Explain `--scan-root` when a reported
   agent link lies outside known roots. Batch deduplication is a skip, not a
   failure, and must remain explicit in logs and report accounting.
+- Compact-remove routing is also native policy work: build its targets and
+  evaluate compact eligibility in an Installed-tab-owned background operation,
+  not in the `onRemove` UI callback. Gate repeated remove shortcuts while that
+  preflight is active, cancel it when the tab/app lifetime ends, and seed the
+  advanced wizard with the preflight result instead of repeating the same
+  native inspection.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
@@ -321,6 +327,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   so dispatch/callback failure cannot strand ownership; keep nonterminal
   progress on `InvokeIfActive` so a cosmetic failure cannot release a running
   worker.
+- Awaiting dispatch of an entire synchronous modal needs the stronger owned
+  dispatch contract: cancellation may reject a callback that is still queued,
+  but once that callback starts the background owner must wait until the nested
+  modal run returns. Do not use a token-short-circuiting cosmetic dispatcher for
+  this boundary or shutdown can release ownership while the modal is active.
 - CLI entrypoints translate Ctrl+C/external cancellation to exit code 130 and
   apply bounded per-command deadlines. Propagate the root token through every
   adapter. After process-tree termination, retain the bounded parent-exit wait

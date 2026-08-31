@@ -20,6 +20,8 @@ public sealed class RemoveScreen
     private readonly InstalledSkill _target;
     private readonly InventorySnapshot _snapshot;
     private readonly RemoveValidator.RemoveValidation? _legacyValidation;
+    private readonly ImmutableArray<RemoveTarget> _initialTargets;
+    private readonly RemoveTargetEvaluation? _initialEvaluation;
 
     public RemoveService.BatchRemoveReport? LastReport { get; private set; }
     public bool Confirmed { get; private set; }
@@ -36,6 +38,20 @@ public sealed class RemoveScreen
         _logger = logger;
         _target = target;
         _snapshot = snapshot;
+    }
+
+    internal RemoveScreen(
+        IApplication app,
+        RemoveService remove,
+        Logger logger,
+        InstalledSkill target,
+        InventorySnapshot snapshot,
+        ImmutableArray<RemoveTarget> initialTargets,
+        RemoveTargetEvaluation? initialEvaluation)
+        : this(app, remove, logger, target, snapshot)
+    {
+        _initialTargets = initialTargets;
+        _initialEvaluation = initialEvaluation;
     }
 
     internal RemoveScreen(
@@ -61,8 +77,14 @@ public sealed class RemoveScreen
 
     public void Show()
     {
-        var targets = RemoveTargetResolver.BuildTargets(_target, _snapshot);
+        var targets = _initialTargets.IsDefaultOrEmpty
+            ? RemoveTargetResolver.BuildTargets(_target, _snapshot)
+            : _initialTargets;
         var evaluations = new Dictionary<int, RemoveTargetEvaluation>();
+        if (_initialEvaluation is not null && targets.Length > 0)
+        {
+            evaluations[0] = _initialEvaluation;
+        }
         var selectedIndex = 0;
         RemoveTargetEvaluation? currentEvaluation = null;
         RemoveService.RemoveProgress? lastProgress = null;
@@ -361,8 +383,9 @@ public sealed class RemoveScreen
             SetEvaluationBusy(true);
             review.Text = "## Checking removal safety…";
             confirmStep.Enabled = false;
+            var knownEvaluations = evaluations.ToDictionary();
             if (!operation.TryStart(token =>
-                    RunEvaluationAsync(index, findFirstExecutable, token)))
+                    RunEvaluationAsync(index, findFirstExecutable, knownEvaluations, token)))
             {
                 SetEvaluationBusy(false);
             }
@@ -371,6 +394,7 @@ public sealed class RemoveScreen
         async Task RunEvaluationAsync(
             int requestedIndex,
             bool findFirstExecutable,
+            IReadOnlyDictionary<int, RemoveTargetEvaluation> knownEvaluations,
             CancellationToken cancellationToken)
         {
             try
@@ -384,7 +408,9 @@ public sealed class RemoveScreen
                         for (var index = 0; index < targets.Length; index++)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            var evaluation = Evaluate(targets[index]);
+                            var evaluation = knownEvaluations.TryGetValue(index, out var known)
+                                ? known
+                                : Evaluate(targets[index], cancellationToken);
                             completed.Add((index, evaluation));
                             if (evaluation.CanExecute)
                             {
@@ -396,7 +422,10 @@ public sealed class RemoveScreen
                     else
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        completed.Add((requestedIndex, Evaluate(targets[requestedIndex])));
+                        var evaluation = knownEvaluations.TryGetValue(requestedIndex, out var known)
+                            ? known
+                            : Evaluate(targets[requestedIndex], cancellationToken);
+                        completed.Add((requestedIndex, evaluation));
                     }
                     return (Selected: selected, Completed: completed);
                 }, cancellationToken).ConfigureAwait(false);
@@ -453,7 +482,7 @@ public sealed class RemoveScreen
             try
             {
                 var refreshed = await Task.Run(
-                    () => Evaluate(evaluation.Target),
+                    () => Evaluate(evaluation.Target, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!HasSameSafetyContract(evaluation, refreshed))
@@ -543,8 +572,11 @@ public sealed class RemoveScreen
         return RemoveWizardContent.BuildReviewMarkdown(Evaluate(target));
     }
 
-    private RemoveTargetEvaluation Evaluate(RemoveTarget target)
+    private RemoveTargetEvaluation Evaluate(
+        RemoveTarget target,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_legacyValidation is not null && target.Kind == RemoveTargetKind.CurrentInstall)
         {
             return new RemoveTargetEvaluation(
@@ -552,7 +584,7 @@ public sealed class RemoveScreen
                 [new RemoveTargetItem(_target, _legacyValidation)]);
         }
 
-        return RemoveTargetResolver.Evaluate(target, _snapshot);
+        return RemoveTargetResolver.EvaluateWithCancellation(target, _snapshot, cancellationToken);
     }
 
     private async Task<RemoveService.BatchRemoveReport> ExecuteAsync(

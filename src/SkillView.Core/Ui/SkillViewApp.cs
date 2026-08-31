@@ -155,6 +155,7 @@ public sealed class SkillViewApp
             SetStatus,
             SetStatus,
             Invoke,
+            InvokeOwnedAsync,
             RunBackground,
             FocusSearchFromInstalled,
             RefreshActiveTab);
@@ -421,7 +422,8 @@ public sealed class SkillViewApp
             runOnUi: runOnUi,
             runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            onRemove: (skill, snap) => _workflows.OpenRemoveDialog(skill, snap),
+            onRemove: (skill, snap, token) =>
+                _workflows.OpenRemoveDialogAsync(skill, snap, token),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
@@ -884,7 +886,7 @@ public sealed class SkillViewApp
 
     private void CancelPendingTabWork()
     {
-        _installedTab?.CancelPendingLoad();
+        _installedTab?.CancelPendingWork();
         _changesTab?.CancelPendingLoad();
         _updatesTab?.CancelPendingWork();
     }
@@ -2530,6 +2532,35 @@ public sealed class SkillViewApp
         return false;
     }
 
+    private async Task<bool> InvokeOwnedAsync(
+        Action action,
+        CancellationToken cancellationToken)
+    {
+        var lifetime = _runLifetime;
+        var app = _app;
+
+        if (app is not null)
+        {
+            using var dispatchLifetime = lifetime is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    lifetime.Token);
+            return await AwaitOwnedDispatchAsync(
+                    app.Invoke,
+                    action,
+                    dispatchLifetime.Token)
+                .ConfigureAwait(false);
+        }
+
+        if (!_hasEnteredRunLifecycle && !cancellationToken.IsCancellationRequested)
+        {
+            action();
+            return true;
+        }
+        return false;
+    }
+
     internal static async Task<bool> AwaitDispatchAsync(
         Action<Action> dispatch,
         Action action,
@@ -2573,6 +2604,55 @@ public sealed class SkillViewApp
         {
             return false;
         }
+    }
+
+    internal static async Task<bool> AwaitOwnedDispatchAsync(
+        Action<Action> dispatch,
+        Action action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(dispatch);
+        ArgumentNullException.ThrowIfNull(action);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        // 0 = queued, 1 = callback started, 2 = canceled before start.
+        // Cancellation may reject a queued callback, but once the callback has
+        // begun the owner must wait for it to return before releasing state the
+        // callback still uses (notably a nested modal run loop).
+        var dispatchState = 0;
+        var completion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellationToken.Register(() =>
+        {
+            if (Interlocked.CompareExchange(ref dispatchState, 2, 0) == 0)
+            {
+                completion.TrySetResult(false);
+            }
+        });
+
+        dispatch(() =>
+        {
+            if (Interlocked.CompareExchange(ref dispatchState, 1, 0) != 0)
+            {
+                completion.TrySetResult(false);
+                return;
+            }
+
+            try
+            {
+                action();
+                completion.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+
+        return await completion.Task.ConfigureAwait(false);
     }
 
     private bool ShouldAutoOpenInstalledOnStartup(InventorySnapshot snapshot) =>

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using SkillView.Inventory.Models;
 using SkillView.Ui.Tabs;
@@ -10,6 +11,104 @@ namespace SkillView.Tests.Ui;
 
 public sealed class InstalledTabViewTests
 {
+    [Fact]
+    public async Task RemoveShortcut_GatesRepeatedPreflightAndRefreshesAfterCompletion()
+    {
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemove = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var removeCalls = 0;
+        var refreshCalls = 0;
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: _ =>
+            {
+                refreshCalls++;
+                return Task.FromResult(InventorySnapshot.Empty);
+            },
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeCalls++;
+                removeStarted.TrySetResult();
+                await releaseRemove.Task.WaitAsync(cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(SpinWait.SpinUntil(
+            () => operations.ContainsKey("installed.remove"),
+            TimeSpan.FromSeconds(10)));
+        Assert.False(view.TryStartSelectedRemoveForTests());
+
+        Assert.True(view.RemoveActiveForTests);
+        Assert.Equal(1, removeCalls);
+
+        releaseRemove.TrySetResult();
+        await operations["installed.remove"];
+        await operations["installed.remove-refresh"];
+
+        Assert.False(view.RemoveActiveForTests);
+        Assert.Equal(1, refreshCalls);
+    }
+
+    [Fact]
+    public async Task CancelPendingWork_CancelsRemovePreflightWithoutRefreshing()
+    {
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var refreshCalls = 0;
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: _ =>
+            {
+                refreshCalls++;
+                return Task.FromResult(InventorySnapshot.Empty);
+            },
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(SpinWait.SpinUntil(
+            () => operations.ContainsKey("installed.remove"),
+            TimeSpan.FromSeconds(10)));
+
+        view.CancelPendingWork();
+        await operations["installed.remove"];
+
+        Assert.False(view.RemoveActiveForTests);
+        Assert.Equal(0, refreshCalls);
+        Assert.False(operations.ContainsKey("installed.remove-refresh"));
+    }
+
     [Fact]
     public void ResolveWidthForLayout_IgnoresUnstableFrameWidthUntilViewportIsReady()
     {
@@ -101,7 +200,7 @@ public sealed class InstalledTabViewTests
             },
             runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
-            onRemove: static (_, _) => { },
+            onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
             onGoToSearch: static () => { });
 
@@ -123,7 +222,7 @@ public sealed class InstalledTabViewTests
             runOnUi: _ => Task.FromCanceled(lifetime.Token),
             runTask: (operation, _) => deferredPass = operation(),
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
-            onRemove: static (_, _) => { },
+            onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
             onGoToSearch: static () => { },
             lifetimeToken: lifetime.Token);
@@ -202,7 +301,7 @@ public sealed class InstalledTabViewTests
         },
         runTask: (operation, _) => operation().GetAwaiter().GetResult(),
         snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
-        onRemove: static (_, _) => { },
+        onRemove: static (_, _, _) => Task.CompletedTask,
         onLeaveTab: static () => { },
         onGoToSearch: static () => { });
 

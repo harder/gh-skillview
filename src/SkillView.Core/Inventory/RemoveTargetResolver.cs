@@ -44,7 +44,14 @@ internal sealed record RemoveTargetEvaluation(
 internal static class RemoveTargetResolver
 {
     public static ImmutableArray<RemoveTarget> BuildTargets(InstalledSkill selected, InventorySnapshot snapshot)
+        => BuildTargetsWithCancellation(selected, snapshot, CancellationToken.None);
+
+    public static ImmutableArray<RemoveTarget> BuildTargetsWithCancellation(
+        InstalledSkill selected,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var targets = ImmutableArray.CreateBuilder<RemoveTarget>();
         targets.Add(new RemoveTarget(
             RemoveTargetKind.CurrentInstall,
@@ -54,6 +61,7 @@ internal static class RemoveTargetResolver
 
         foreach (var agent in selected.Agents.Where(agent => agent.IsSymlink))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             targets.Add(new RemoveTarget(
                 RemoveTargetKind.AgentSymlink,
                 $"Unlink from {agent.AgentId}",
@@ -62,14 +70,15 @@ internal static class RemoveTargetResolver
                 AgentMembership: agent));
         }
 
-        var packageTarget = BuildPackageTarget(selected, snapshot);
+        var packageTarget = BuildPackageTarget(selected, snapshot, cancellationToken);
         if (packageTarget is not null)
         {
             targets.Add(packageTarget);
         }
 
-        var repoTarget = BuildRepoTarget(selected, snapshot);
-        if (repoTarget is not null && !HasSameSkills(repoTarget, packageTarget))
+        var repoTarget = BuildRepoTarget(selected, snapshot, cancellationToken);
+        if (repoTarget is not null
+            && !HasSameSkills(repoTarget, packageTarget, cancellationToken))
         {
             targets.Add(repoTarget);
         }
@@ -77,8 +86,17 @@ internal static class RemoveTargetResolver
         return targets.ToImmutable();
     }
 
-    public static RemoveTargetEvaluation Evaluate(RemoveTarget target, InventorySnapshot snapshot)
+    public static RemoveTargetEvaluation Evaluate(
+        RemoveTarget target,
+        InventorySnapshot snapshot) =>
+        EvaluateWithCancellation(target, snapshot, CancellationToken.None);
+
+    public static RemoveTargetEvaluation EvaluateWithCancellation(
+        RemoveTarget target,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (target.Kind == RemoveTargetKind.AgentSymlink)
         {
             if (target.Skills.Length != 1 || target.AgentMembership is not { } link)
@@ -88,6 +106,7 @@ internal static class RemoveTargetResolver
                     ImmutableArray<RemoveTargetItem>.Empty);
             }
             var skill = target.Skills[0];
+            cancellationToken.ThrowIfCancellationRequested();
             return new RemoveTargetEvaluation(
                 target,
                 [new RemoveTargetItem(
@@ -95,13 +114,16 @@ internal static class RemoveTargetResolver
                     RemoveValidator.ValidateSymlink(link.Path, snapshot.ScannedRoots))]);
         }
 
-        var items = target.Skills
-            .Select(skill => new RemoveTargetItem(
+        var items = ImmutableArray.CreateBuilder<RemoveTargetItem>(target.Skills.Length);
+        foreach (var skill in target.Skills)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            items.Add(new RemoveTargetItem(
                 skill,
-                RemoveValidator.Validate(skill, snapshot.ScannedRoots, snapshot.Skills)))
-            .ToImmutableArray();
+                RemoveValidator.Validate(skill, snapshot.ScannedRoots, snapshot.Skills)));
+        }
 
-        return new RemoveTargetEvaluation(target, items);
+        return new RemoveTargetEvaluation(target, items.ToImmutable());
     }
 
     internal static string? RepoKey(InstalledSkill skill)
@@ -117,7 +139,10 @@ internal static class RemoveTargetResolver
             : value.Trim();
     }
 
-    private static RemoveTarget? BuildPackageTarget(InstalledSkill selected, InventorySnapshot snapshot)
+    private static RemoveTarget? BuildPackageTarget(
+        InstalledSkill selected,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         var package = selected.Package;
         if (package is null || string.IsNullOrWhiteSpace(package.Source))
@@ -126,8 +151,19 @@ internal static class RemoveTargetResolver
         }
 
         var matches = snapshot.Skills
-            .Where(skill => string.Equals(skill.Package?.Source, package.Source, StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath))
+            .Where(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return string.Equals(
+                    skill.Package?.Source,
+                    package.Source,
+                    StringComparison.OrdinalIgnoreCase);
+            })
+            .DistinctBy(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return PathIdentity.NormalizeKey(skill.ResolvedPath);
+            })
             .ToImmutableArray();
 
         return matches.Length > 1
@@ -140,7 +176,10 @@ internal static class RemoveTargetResolver
             : null;
     }
 
-    private static RemoveTarget? BuildRepoTarget(InstalledSkill selected, InventorySnapshot snapshot)
+    private static RemoveTarget? BuildRepoTarget(
+        InstalledSkill selected,
+        InventorySnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         var repoKey = RepoKey(selected);
         if (string.IsNullOrWhiteSpace(repoKey))
@@ -149,8 +188,19 @@ internal static class RemoveTargetResolver
         }
 
         var matches = snapshot.Skills
-            .Where(skill => string.Equals(RepoKey(skill), repoKey, StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath))
+            .Where(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return string.Equals(
+                    RepoKey(skill),
+                    repoKey,
+                    StringComparison.OrdinalIgnoreCase);
+            })
+            .DistinctBy(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return PathIdentity.NormalizeKey(skill.ResolvedPath);
+            })
             .ToImmutableArray();
 
         return matches.Length > 1
@@ -163,15 +213,30 @@ internal static class RemoveTargetResolver
             : null;
     }
 
-    private static bool HasSameSkills(RemoveTarget candidate, RemoveTarget? other)
+    private static bool HasSameSkills(
+        RemoveTarget candidate,
+        RemoveTarget? other,
+        CancellationToken cancellationToken)
     {
         if (other is null || candidate.Skills.Length != other.Skills.Length)
         {
             return false;
         }
 
-        var left = candidate.Skills.Select(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
-        var right = other.Skills.Select(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).OrderBy(path => path, StringComparer.Ordinal);
+        var left = candidate.Skills
+            .Select(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return PathIdentity.NormalizeKey(skill.ResolvedPath);
+            })
+            .OrderBy(path => path, StringComparer.Ordinal);
+        var right = other.Skills
+            .Select(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return PathIdentity.NormalizeKey(skill.ResolvedPath);
+            })
+            .OrderBy(path => path, StringComparer.Ordinal);
         return left.SequenceEqual(right, StringComparer.Ordinal);
     }
 }
