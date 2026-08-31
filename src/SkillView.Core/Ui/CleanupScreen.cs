@@ -347,10 +347,23 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
+        var validationSkipped = 0;
         var report = await _remove.RemoveManyAsync(
-            ValidateImmediatelyBeforeRemoval(selected, cancellationToken),
+            ValidateImmediatelyBeforeRemoval(
+                selected,
+                cancellationToken,
+                () => Interlocked.Increment(ref validationSkipped)),
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
+        var skippedBeforeValidation = Volatile.Read(ref validationSkipped);
+        if (skippedBeforeValidation > 0)
+        {
+            report = report with
+            {
+                TargetsSkipped = checked(
+                    report.TargetsSkipped + skippedBeforeValidation),
+            };
+        }
         var removed = report.TargetsDeleted;
         var failed = CountFailedSelections(selected.Length, report);
         RemovedCount += removed;
@@ -367,9 +380,30 @@ public sealed class CleanupScreen
     private IEnumerable<RemoveValidator.RemoveValidation>
         ValidateImmediatelyBeforeRemoval(
             ImmutableArray<CleanupClassifier.Candidate> selected,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Action duplicateSkipped)
     {
+        // Resolve all selected path keys before yielding the first validation.
+        // Otherwise the first deletion can make a later duplicate disappear
+        // before it reaches RemoveMany's canonical-target deduplicator.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var unique = ImmutableArray.CreateBuilder<CleanupClassifier.Candidate>(
+            selected.Length);
         foreach (var candidate in selected)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!seen.Add(PathIdentity.NormalizeKey(candidate.Path)))
+            {
+                duplicateSkipped();
+                _logger.Debug(
+                    "cleanup",
+                    $"skipped duplicate selected path {candidate.Path}");
+                continue;
+            }
+            unique.Add(candidate);
+        }
+
+        foreach (var candidate in unique)
         {
             cancellationToken.ThrowIfCancellationRequested();
             // RemoveMany enumerates this sequence immediately before each

@@ -1788,3 +1788,25 @@ versus execution behavior, outside-root agent-link messaging, and duplicate
 batch accounting. The required verification matrix remains full unit and
 integration tests, macOS/Linux/Windows CI, CodeQL, and sequential Native AOT
 publishes for both hosts.
+
+### Copilot follow-up on the comprehensive fixes
+
+The next balanced review identified two gaps in the preceding changes. Both
+were valid after tracing them through the complete workflow:
+
+1. **Finish-time validation could authorize a replacement object.** Comparing
+   only paths, errors, warnings, and incoming links meant a directory or link
+   replaced after Review could receive a new native identity and still inherit
+   the user's earlier confirmation. `HasSameSafetyContract` now compares the
+   full directory or parent/link execution identity plus the link-only and
+   empty-directory execution modes. Any authority change returns the wizard to
+   Review; the replacement's fresh identity is never executed under the old
+   confirmation.
+2. **Duplicate cleanup candidates could fail before batch deduplication.** A
+   path may appear under more than one cleanup classification. The lazy
+   sequence previously validated and removed the first candidate before seeing
+   the second, so the second failed validation instead of reaching
+   `RemoveMany`'s canonical deduplicator. Cleanup now resolves all selected
+   path keys and removes duplicates before yielding the first validation, then
+   adds those skips to the batch report. Unique candidates remain lazily pinned
+   immediately before their individual removals.

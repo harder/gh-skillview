@@ -203,6 +203,12 @@ logging, or subprocess adapters.
   blocked with explicit `--scan-root` guidance; never promote an untrusted
   `gh skill list` path into a root automatically. Batch duplicate targets are
   reported as skipped so cleanup summaries do not mislabel them as failures.
+  Cleanup resolves and deduplicates every selected path key before yielding the
+  first lazy validation, while still capturing each unique native identity only
+  immediately before its removal. The advanced remove wizard's finish-time
+  revalidation compares the captured directory/link identities and removal mode
+  as well as visible policy content; a replacement object always returns the
+  user to Review rather than inheriting the earlier confirmation.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

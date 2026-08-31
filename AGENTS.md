@@ -138,7 +138,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and retained state stays O(depth). TUI removal must use `RemoveAsync` /
   `RemoveManyAsync`, whose progress is throttled to 10 updates/second; keep the
   modal alive until cancellation quiesces and rescan when cancellation made
-  any partial filesystem change. Runtime reports retain at most 128 individual
+  any partial filesystem change. The advanced remove confirmation is bound to
+  the exact captured directory/link identities and execution mode the user
+  reviewed; finish-time validation must return to Review if any of those
+  values changed, even when paths and policy messages are identical. Runtime
+  reports retain at most 128 individual
   errors plus an omission summary while preserving the exact error count. Do
   not overwrite a mid-target cancellation snapshot with completed-target-only
   totals: the batch progress adapter owns the latest aggregate state and keeps
@@ -229,6 +233,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Cleanup batches must enumerate validations lazily so each candidate is pinned
   immediately before its own removal; deleting one sibling link changes the
   parent generation and intentionally invalidates any earlier sibling capture.
+  Deduplicate all selected cleanup path keys before yielding the first
+  validation, then carry that pre-validation skip count into the batch report;
+  otherwise the first deletion can make a later duplicate look like a failed
+  validation.
   Destructive directory identity capture may resolve ancestor components, but
   must open the final candidate name relative to the canonical parent with
   no-follow and directory-only flags. Only non-destructive canonicalization may

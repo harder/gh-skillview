@@ -132,6 +132,53 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
+    public async Task RemoveSelectedAsync_DuplicateCandidatePath_IsSkippedBeforeValidation()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(root, "duplicate-candidate");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "SKILL.md"), "body");
+
+        try
+        {
+            var skill = Skill("duplicate-candidate", directory) with
+            {
+                ScanRoot = root,
+            };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.SourceOrphaned,
+                    directory,
+                    "source orphaned",
+                    skill),
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.Duplicate,
+                    directory,
+                    "duplicate install",
+                    skill));
+            var screen = CreateScreen(
+                candidates,
+                [new ScanRoot(root, Scope.User, null)],
+                [skill]);
+
+            var summary = await screen.RemoveSelectedAsync(
+                [0, 1], TestContext.Current.CancellationToken);
+
+            Assert.False(Directory.Exists(directory));
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(
+                new CleanupScreen.RemovalSummary(1, 0, Confirmed: true),
+                summary);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_RemovesBrokenSymlinkCandidateWhenCandidateCarriesSkill()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));

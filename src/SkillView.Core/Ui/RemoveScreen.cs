@@ -606,6 +606,14 @@ public sealed class RemoveScreen
                 || !PathIdentity.Equals(
                     left.Validation.ResolvedPath,
                     right.Validation.ResolvedPath)
+                || left.Validation.ExecutionIdentity
+                    != right.Validation.ExecutionIdentity
+                || left.Validation.ExecutionLinkIdentity
+                    != right.Validation.ExecutionLinkIdentity
+                || left.Validation.RequiresEmptyDirectory
+                    != right.Validation.RequiresEmptyDirectory
+                || left.Validation.RemovesLinkOnly
+                    != right.Validation.RemovesLinkOnly
                 || !left.Validation.Errors.SequenceEqual(right.Validation.Errors)
                 || !left.Validation.Warnings.SequenceEqual(right.Validation.Warnings)
                 || !left.Validation.IncomingSymlinkPaths.SequenceEqual(
