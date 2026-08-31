@@ -61,13 +61,11 @@ public sealed class RemoveScreen
 
     public void Show()
     {
-        using var lifetime = new CancellationTokenSource();
         var targets = RemoveTargetResolver.BuildTargets(_target, _snapshot);
-        var selectedIndex = FindInitialSelection(targets);
-        var currentEvaluation = Evaluate(targets[selectedIndex]);
+        var evaluations = new Dictionary<int, RemoveTargetEvaluation>();
+        var selectedIndex = 0;
+        RemoveTargetEvaluation? currentEvaluation = null;
         RemoveService.RemoveProgress? lastProgress = null;
-        Task? activeOperation = null;
-        var wizardActive = 1;
 
         using var wizard = new Wizard
         {
@@ -83,6 +81,10 @@ public sealed class RemoveScreen
             Width = Dim.Percent(80),
             Height = Dim.Percent(70),
         };
+        // Using declarations dispose in reverse order. Keep the operation
+        // owner after the wizard declaration so cancellation and worker drain
+        // finish before any wizard controls are disposed.
+        using var operation = new ModalOperationTracker(_app, _logger, "remove.ui");
 
         var chooseStep = new WizardStep
         {
@@ -102,18 +104,37 @@ public sealed class RemoveScreen
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(4),
+            Height = Dim.Fill(5),
             Labels = targets.Select(target => target.Title).ToArray(),
             Value = selectedIndex,
         };
         var choiceDescription = new Label
         {
             X = 0,
-            Y = Pos.AnchorEnd(1),
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(),
             Text = targets[0].Description,
         };
-        chooseStep.Add(choiceLabel, choicePicker, choiceDescription);
+        var evaluationSpinner = new SpinnerView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Visible = false,
+            AutoSpin = false,
+        };
+        var evaluationStatus = new Label
+        {
+            X = 2,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(2),
+            Text = " checking removal safety…",
+        };
+        chooseStep.Add(
+            choiceLabel,
+            choicePicker,
+            choiceDescription,
+            evaluationSpinner,
+            evaluationStatus);
 
         var reviewStep = new WizardStep
         {
@@ -125,7 +146,7 @@ public sealed class RemoveScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            Text = RemoveWizardContent.BuildReviewMarkdown(currentEvaluation),
+            Text = "## Checking removal safety…",
         };
         TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
         reviewStep.Add(review);
@@ -140,7 +161,7 @@ public sealed class RemoveScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(3),
-            Text = RemoveWizardContent.BuildConfirmMarkdown(currentEvaluation),
+            Text = string.Empty,
         };
         TuiHelpers.ConfigureMarkdownPane(confirmText, SkillViewStyling.BaseSchemeName);
         var secondConfirm = new CheckBox
@@ -148,7 +169,7 @@ public sealed class RemoveScreen
             X = 0,
             Y = Pos.AnchorEnd(2),
             Text = "_I understand the warnings and want to continue",
-            Visible = currentEvaluation.RequiresSecondConfirm,
+            Visible = false,
         };
         var status = new Label
         {
@@ -172,6 +193,8 @@ public sealed class RemoveScreen
             choiceLabel,
             choicePicker,
             choiceDescription,
+            evaluationSpinner,
+            evaluationStatus,
             review,
             confirmText,
             secondConfirm,
@@ -182,45 +205,62 @@ public sealed class RemoveScreen
         wizard.AddStep(reviewStep);
         wizard.AddStep(confirmStep);
 
-        void RefreshEvaluation()
+        void SetEvaluationBusy(bool busy)
         {
-            // The radio the user *sees* is the source of truth. The
-            // OptionSelector builds its checkbox subviews lazily during layout
-            // and can raise a transient ValueChanged that leaves both the cached
-            // selectedIndex and the selector's own Value out of sync with the
-            // checkbox that is visually selected (so the default lands on the
-            // first executable option visually, but the evaluation stays on the
-            // blocked first option). Read the checked checkbox directly so
-            // Review/Confirm always match what's on screen.
+            evaluationSpinner.AutoSpin = busy;
+            evaluationSpinner.Visible = busy;
+            choicePicker.Enabled = !busy;
+            evaluationStatus.Text = busy
+                ? " checking removal safety…"
+                : string.Empty;
+        }
+
+        void ApplyEvaluation(int index, RemoveTargetEvaluation evaluation)
+        {
+            selectedIndex = index;
+            currentEvaluation = evaluation;
+            var target = targets[index];
+            choiceDescription.Text = target.Description;
+            review.Text = RemoveWizardContent.BuildReviewMarkdown(evaluation);
+            confirmText.Text = RemoveWizardContent.BuildConfirmMarkdown(evaluation);
+            secondConfirm.Visible = evaluation.RequiresSecondConfirm;
+            secondConfirm.Value = CheckState.UnChecked;
+            status.Text = evaluation.CanExecute
+                ? " ready"
+                : " blocked — choose a different option or close";
+            reviewStep.NextButtonText = evaluation.CanExecute ? "Continue" : "Close";
+            reviewStep.HelpText = evaluation.CanExecute
+                ? "Review the impact, then continue to confirm."
+                : "SkillView can't do this safely. Use Close or go Back to choose a less destructive option.";
+            confirmStep.Enabled = evaluation.CanExecute;
+            confirmStep.NextButtonText = RemoveWizardContent.ActionText(target);
+            confirmStep.HelpText = evaluation.RequiresSecondConfirm
+                ? "Final confirmation is required because SkillView found related installs or repository state."
+                : "Finish to apply this removal.";
+            if (!evaluation.CanExecute && wizard.CurrentStep == confirmStep)
+            {
+                wizard.CurrentStep = reviewStep;
+            }
+        }
+
+        void RefreshFromSelection()
+        {
+            // The checkbox the user sees is the source of truth because
+            // OptionSelector can transiently desynchronize Value during lazy
+            // subview layout.
             var checkedIndex = CurrentSelection(choicePicker, selectedIndex);
             if (checkedIndex >= 0 && checkedIndex < targets.Length)
             {
                 selectedIndex = checkedIndex;
             }
 
-            var target = targets[selectedIndex];
-            currentEvaluation = Evaluate(target);
-            choiceDescription.Text = target.Description;
-            review.Text = RemoveWizardContent.BuildReviewMarkdown(currentEvaluation);
-            confirmText.Text = RemoveWizardContent.BuildConfirmMarkdown(currentEvaluation);
-            secondConfirm.Visible = currentEvaluation.RequiresSecondConfirm;
-            secondConfirm.Value = CheckState.UnChecked;
-            status.Text = currentEvaluation.CanExecute
-                ? " ready"
-                : " blocked — choose a different option or close";
-            reviewStep.NextButtonText = currentEvaluation.CanExecute ? "Continue" : "Close";
-            reviewStep.HelpText = currentEvaluation.CanExecute
-                ? "Review the impact, then continue to confirm."
-                : "SkillView can't do this safely. Use Close or go Back to choose a less destructive option.";
-            confirmStep.Enabled = currentEvaluation.CanExecute;
-            confirmStep.NextButtonText = RemoveWizardContent.ActionText(target);
-            confirmStep.HelpText = currentEvaluation.RequiresSecondConfirm
-                ? "Final confirmation is required because SkillView found related installs or repository state."
-                : "Finish to apply this removal.";
-            if (!currentEvaluation.CanExecute && wizard.CurrentStep == confirmStep)
+            if (evaluations.TryGetValue(selectedIndex, out var cached))
             {
-                wizard.CurrentStep = reviewStep;
+                ApplyEvaluation(selectedIndex, cached);
+                return;
             }
+
+            StartEvaluation(selectedIndex, findFirstExecutable: false);
         }
 
         choicePicker.ValueChanged += (_, _) =>
@@ -228,7 +268,7 @@ public sealed class RemoveScreen
             if (choicePicker.Value is int value && value >= 0 && value < targets.Length)
             {
                 selectedIndex = value;
-                RefreshEvaluation();
+                RefreshFromSelection();
             }
         };
 
@@ -236,11 +276,11 @@ public sealed class RemoveScreen
         // moves between steps. This guarantees the Review and Confirm steps are
         // rebuilt from whatever the radio currently shows, even if an init-time
         // ValueChanged left selectedIndex stale before the user advanced.
-        wizard.StepChanged += (_, _) => RefreshEvaluation();
+        wizard.StepChanged += (_, _) => RefreshFromSelection();
 
         // The OptionSelector opens with keyboard focus on its first checkbox,
-        // which may differ from the checked default (FindInitialSelection picks
-        // the first *executable* option, often not the first one). Pressing
+        // which may differ from the checked default (the initial background
+        // evaluation picks the first executable option). Pressing
         // Enter to advance would then "activate" the focused-but-unchecked
         // checkbox and silently change the selection (e.g. from Unlink back to a
         // blocked full remove). Align the focused item with the checked value so
@@ -263,7 +303,8 @@ public sealed class RemoveScreen
         {
             e.Handled = true;
 
-            if (activeOperation is not null)
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None
+                || currentEvaluation is null)
             {
                 return;
             }
@@ -274,7 +315,8 @@ public sealed class RemoveScreen
                 return;
             }
 
-            if (currentEvaluation.RequiresSecondConfirm && secondConfirm.Value != CheckState.Checked)
+            if (currentEvaluation.RequiresSecondConfirm
+                && secondConfirm.Value != CheckState.Checked)
             {
                 status.Text = " check the confirmation box to continue";
                 return;
@@ -286,8 +328,7 @@ public sealed class RemoveScreen
             lastProgress = null;
             status.Text = " removing…  Esc cancels";
             var evaluation = currentEvaluation;
-            var cancellationToken = lifetime.Token;
-            activeOperation = RunRemovalAsync(evaluation, cancellationToken);
+            operation.TryStart(token => RunRemovalAsync(evaluation, token));
         };
 
         wizard.KeyDown += (_, key) =>
@@ -298,40 +339,104 @@ public sealed class RemoveScreen
             }
 
             key.Handled = true;
-            if (activeOperation is { IsCompleted: false })
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
             {
-                lifetime.Cancel();
-                status.Text = " canceling removal…";
+                operation.Cancel();
+                status.Text = " canceling operation…";
                 return;
             }
 
-            lifetime.Cancel();
             _app.RequestStop();
         };
 
-        void InvokeIfActive(Action action)
+        void StartEvaluation(int index, bool findFirstExecutable)
         {
-            if (Volatile.Read(ref wizardActive) == 0)
+            if (index < 0
+                || index >= targets.Length
+                || operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
             {
                 return;
             }
 
+            SetEvaluationBusy(true);
+            review.Text = "## Checking removal safety…";
+            confirmStep.Enabled = false;
+            if (!operation.TryStart(token =>
+                    RunEvaluationAsync(index, findFirstExecutable, token)))
+            {
+                SetEvaluationBusy(false);
+            }
+        }
+
+        async Task RunEvaluationAsync(
+            int requestedIndex,
+            bool findFirstExecutable,
+            CancellationToken cancellationToken)
+        {
             try
             {
-                _app.Invoke(() =>
+                var result = await Task.Run(() =>
                 {
-                    if (Volatile.Read(ref wizardActive) == 0)
+                    var completed = new List<(int Index, RemoveTargetEvaluation Evaluation)>();
+                    var selected = requestedIndex;
+                    if (findFirstExecutable)
                     {
-                        return;
+                        for (var index = 0; index < targets.Length; index++)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var evaluation = Evaluate(targets[index]);
+                            completed.Add((index, evaluation));
+                            if (evaluation.CanExecute)
+                            {
+                                selected = index;
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        completed.Add((requestedIndex, Evaluate(targets[requestedIndex])));
+                    }
+                    return (Selected: selected, Completed: completed);
+                }, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    foreach (var completed in result.Completed)
+                    {
+                        evaluations[completed.Index] = completed.Evaluation;
                     }
 
-                    try { action(); }
-                    catch (Exception ex) { _logger.Error("remove.ui", ex.Message); }
+                    if (!evaluations.TryGetValue(result.Selected, out var evaluation))
+                    {
+                        evaluation = result.Completed[0].Evaluation;
+                    }
+                    choicePicker.Value = result.Selected;
+                    choicePicker.FocusedItem = result.Selected;
+                    ApplyEvaluation(result.Selected, evaluation);
+                    SetEvaluationBusy(false);
+                    operation.Release();
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    SetEvaluationBusy(false);
+                    evaluationStatus.Text = " safety check canceled";
+                    _app.RequestStop();
                 });
             }
             catch (Exception ex)
             {
-                _logger.Error("remove.ui", ex.Message);
+                _logger.Error("remove.evaluate", ex.Message);
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    SetEvaluationBusy(false);
+                    evaluationStatus.Text = " safety check failed — see logs";
+                    operation.Release();
+                });
             }
         }
 
@@ -342,15 +447,39 @@ public sealed class RemoveScreen
             var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
             {
                 lastProgress = value;
-                InvokeIfActive(() => status.Text = FormatProgress(value));
+                operation.InvokeIfActive(() => status.Text = FormatProgress(value));
             });
 
             try
             {
-                var report = await ExecuteAsync(evaluation, cancellationToken, progress)
+                var refreshed = await Task.Run(
+                    () => Evaluate(evaluation.Target),
+                    cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!HasSameSafetyContract(evaluation, refreshed))
+                {
+                    operation.InvokeTerminalIfActive(() =>
+                    {
+                        var refreshedIndex = targets.IndexOf(evaluation.Target);
+                        if (refreshedIndex >= 0)
+                        {
+                            evaluations[refreshedIndex] = refreshed;
+                            ApplyEvaluation(refreshedIndex, refreshed);
+                        }
+                        spinner.AutoSpin = false;
+                        spinner.Visible = false;
+                        secondConfirm.Enabled = true;
+                        wizard.CurrentStep = reviewStep;
+                        status.Text = " filesystem state changed — review again";
+                        operation.Release();
+                    });
+                    return;
+                }
+
+                var report = await ExecuteAsync(refreshed, cancellationToken, progress)
                     .ConfigureAwait(false);
                 LastReport = RemovalReportState.Accumulate(LastReport, report);
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -362,8 +491,8 @@ public sealed class RemoveScreen
                     }
                     else
                     {
-                        activeOperation = null;
                         status.Text = $" remove failed — {report.ErrorCount} error(s); see logs";
+                        operation.Release();
                     }
                 });
             }
@@ -373,7 +502,7 @@ public sealed class RemoveScreen
                     LastReport,
                     RemovalReportState.Canceled(lastProgress));
                 _logger.Debug("remove", "removal canceled");
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
@@ -387,28 +516,20 @@ public sealed class RemoveScreen
                 LastReport = RemovalReportState.Accumulate(
                     LastReport,
                     RemovalReportState.Failed(lastProgress, ex.Message));
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     secondConfirm.Enabled = true;
-                    activeOperation = null;
                     status.Text = " remove failed — see logs";
+                    operation.Release();
                 });
             }
         }
 
-        RefreshEvaluation();
-        try
-        {
-            _app.Run(wizard);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref wizardActive, 0);
-            lifetime.Cancel();
-            activeOperation?.GetAwaiter().GetResult();
-        }
+        wizard.Initialized += (_, _) =>
+            StartEvaluation(selectedIndex, findFirstExecutable: true);
+        _app.Run(wizard);
     }
 
     internal string BuildSummary()
@@ -439,9 +560,12 @@ public sealed class RemoveScreen
         CancellationToken cancellationToken,
         IProgress<RemoveService.RemoveProgress> progress)
     {
-        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
+        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink)
         {
-            var report = await _remove.RemoveLinkAsync(agent.Path, cancellationToken, progress)
+            var report = await _remove.RemoveAsync(
+                    evaluation.Items.Single().Validation,
+                    cancellationToken: cancellationToken,
+                    progress: progress)
                 .ConfigureAwait(false);
             return RemoveService.BatchRemoveReport.FromSingle(
                 report,
@@ -467,6 +591,45 @@ public sealed class RemoveScreen
             : $" removing… {targets}{progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
     }
 
+    internal static bool HasSameSafetyContract(
+        RemoveTargetEvaluation displayed,
+        RemoveTargetEvaluation refreshed)
+    {
+        if (displayed.Target != refreshed.Target
+            || displayed.Items.Length != refreshed.Items.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < displayed.Items.Length; index++)
+        {
+            var left = displayed.Items[index];
+            var right = refreshed.Items[index];
+            if (!PathIdentity.Equals(left.Skill.ResolvedPath, right.Skill.ResolvedPath)
+                || !PathIdentity.Equals(
+                    left.Validation.ResolvedPath,
+                    right.Validation.ResolvedPath)
+                || left.Validation.ExecutionIdentity
+                    != right.Validation.ExecutionIdentity
+                || left.Validation.ExecutionLinkIdentity
+                    != right.Validation.ExecutionLinkIdentity
+                || left.Validation.RequiresEmptyDirectory
+                    != right.Validation.RequiresEmptyDirectory
+                || left.Validation.RemovesLinkOnly
+                    != right.Validation.RemovesLinkOnly
+                || !left.Validation.Errors.SequenceEqual(right.Validation.Errors)
+                || !left.Validation.Warnings.SequenceEqual(right.Validation.Warnings)
+                || !left.Validation.IncomingSymlinkPaths.SequenceEqual(
+                    right.Validation.IncomingSymlinkPaths,
+                    StringComparer.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /// Returns the index of the checkbox the <see cref="OptionSelector"/> is
     /// currently showing as checked. The selector's own <c>Value</c> can desync
     /// from its visual state during lazy subview layout, so the checked subview
@@ -488,16 +651,4 @@ public sealed class RemoveScreen
         return fallback;
     }
 
-    private int FindInitialSelection(ImmutableArray<RemoveTarget> targets)
-    {
-        for (var i = 0; i < targets.Length; i++)
-        {
-            if (Evaluate(targets[i]).CanExecute)
-            {
-                return i;
-            }
-        }
-
-        return 0;
-    }
 }

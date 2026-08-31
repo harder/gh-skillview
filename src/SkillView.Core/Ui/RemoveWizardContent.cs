@@ -61,7 +61,7 @@ internal static class RemoveWizardContent
             sb.AppendLine();
             foreach (var error in evaluation.Errors)
             {
-                sb.AppendLine($"- {MarkdownTableFormatter.FormatTableCell(Describe(error))}");
+                sb.AppendLine($"- {MarkdownTableFormatter.FormatTableCell(Describe(error, evaluation.Target.Kind))}");
             }
         }
 
@@ -149,22 +149,27 @@ internal static class RemoveWizardContent
             : "SkillView can remove this safely.";
     }
 
-    private static string Describe(RemoveValidator.Error error) => error.Kind switch
-    {
-        RemoveValidator.ErrorKind.OutsideKnownRoots =>
-            "The selected install is outside SkillView's managed scan roots.",
-        RemoveValidator.ErrorKind.ResolvedOutsideKnownRoots =>
-            "The resolved path escapes SkillView's managed scan roots.",
-        RemoveValidator.ErrorKind.AncestorSymlinkEscapesRoot =>
-            "A parent symlink escapes the scan root, so SkillView won't follow it for deletion.",
-        RemoveValidator.ErrorKind.NotASkillDirectory =>
-            "The target no longer looks like a skill directory.",
-        RemoveValidator.ErrorKind.ContainsGitDirectory =>
-            "The target looks like a git clone, so SkillView won't delete it automatically.",
-        RemoveValidator.ErrorKind.TargetIsScanRoot =>
-            "The selected path is itself a scan root, so deleting it would remove the whole skill root.",
-        _ => error.Detail,
-    };
+    private static string Describe(
+        RemoveValidator.Error error,
+        RemoveTargetKind targetKind) => error.Kind switch
+        {
+            RemoveValidator.ErrorKind.OutsideKnownRoots
+                when targetKind == RemoveTargetKind.AgentSymlink =>
+                "The agent link is outside this inventory's scan roots. Restart SkillView with --scan-root for the directory containing that link, then try again.",
+            RemoveValidator.ErrorKind.OutsideKnownRoots =>
+                "The selected install is outside SkillView's managed scan roots.",
+            RemoveValidator.ErrorKind.ResolvedOutsideKnownRoots =>
+                "The resolved path escapes SkillView's managed scan roots.",
+            RemoveValidator.ErrorKind.AncestorSymlinkEscapesRoot =>
+                "A parent symlink escapes the scan root, so SkillView won't follow it for deletion.",
+            RemoveValidator.ErrorKind.NotASkillDirectory =>
+                "The target no longer looks like a skill directory.",
+            RemoveValidator.ErrorKind.ContainsGitDirectory =>
+                "The target looks like a git clone, so SkillView won't delete it automatically.",
+            RemoveValidator.ErrorKind.TargetIsScanRoot =>
+                "The selected path is itself a scan root, so deleting it would remove the whole skill root.",
+            _ => error.Detail,
+        };
 
     private static string Describe(RemoveValidator.Warning warning) => warning.Kind switch
     {

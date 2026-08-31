@@ -30,6 +30,10 @@ public static class CleanupClassifier
         string Reason,
         InstalledSkill? Skill);
 
+    internal sealed record CandidateSelection(
+        ImmutableArray<Candidate> Unique,
+        ImmutableArray<Candidate> Duplicates);
+
     public sealed record Options(bool IncludeIgnored = false);
 
     /// Classify. Candidates with `.skillview-ignore` present are filtered out
@@ -39,6 +43,35 @@ public static class CleanupClassifier
         IReadOnlyList<ScanRoot> scanRoots,
         Options? options = null) =>
         ClassifyWithCancellation(snapshot, scanRoots, options, CancellationToken.None);
+
+    /// <summary>
+    /// Resolves every candidate path key before returning the destructive
+    /// sequence. This must happen before the first removal: otherwise deleting
+    /// one occurrence can make a later duplicate impossible to normalize or
+    /// validate, turning an intentional skip into a false failure.
+    /// </summary>
+    internal static CandidateSelection DeduplicateByPath(
+        IReadOnlyList<Candidate> candidates,
+        CancellationToken cancellationToken = default)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var unique = ImmutableArray.CreateBuilder<Candidate>(candidates.Count);
+        var duplicates = ImmutableArray.CreateBuilder<Candidate>();
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (seen.Add(PathIdentity.NormalizeKey(candidate.Path)))
+            {
+                unique.Add(candidate);
+            }
+            else
+            {
+                duplicates.Add(candidate);
+            }
+        }
+
+        return new CandidateSelection(unique.ToImmutable(), duplicates.ToImmutable());
+    }
 
     internal static ImmutableArray<Candidate> ClassifyWithCancellation(
         InventorySnapshot snapshot,

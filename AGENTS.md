@@ -25,6 +25,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 - Build/style verification: `dotnet build`
 - Full tests: `dotnet test --no-build`
+- Run product publish commands sequentially. The App and gh-extension publishes
+  share `SkillView.Core` intermediate/output files, so parallel publishes can
+  race while writing `SkillView.Core.deps.json` and cause false build failures.
 - Integration tests only: `dotnet test --project tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj` (a bare project path no longer works under the .NET 10 SDK's `dotnet test` runner)
 - Launch TUI: `src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview`
 - For CLI global flags such as `--scan-root`, pass them **before** the
@@ -135,7 +138,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and retained state stays O(depth). TUI removal must use `RemoveAsync` /
   `RemoveManyAsync`, whose progress is throttled to 10 updates/second; keep the
   modal alive until cancellation quiesces and rescan when cancellation made
-  any partial filesystem change. Runtime reports retain at most 128 individual
+  any partial filesystem change. The advanced remove confirmation is bound to
+  the exact captured directory/link identities and execution mode the user
+  reviewed; finish-time validation must return to Review if any of those
+  values changed, even when paths and policy messages are identical. Runtime
+  reports retain at most 128 individual
   errors plus an omission summary while preserving the exact error count. Do
   not overwrite a mid-target cancellation snapshot with completed-target-only
   totals: the batch progress adapter owns the latest aggregate state and keeps
@@ -148,10 +155,130 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   All non-canceled return paths, including validation refusals, must publish a
   terminal completed progress update with exact processed/deleted/error counts.
   CLI JSON must not duplicate validation refusals or unaccepted warnings into
-  `runtimeErrors`. Do not claim the path checks are atomic
-  against a hostile same-user process:
-  supported .NET 10 deletion APIs remain path-based on Windows and Unix;
-  native handle-relative deletion is separate follow-up work.
+  `runtimeErrors`. Real removals on supported platforms must stay on
+  `SecureRemovalBackend`: validation pins the target's native volume/device and
+  full file/inode identity, then re-runs containment and all other policy checks
+  against that captured canonical deletion address. Root containment is one
+  native authority boundary: open and pin the matched scan root first, open the
+  selected directory or link parent relative to that held root, and derive both
+  canonical addresses before verifying the root generation. Never canonicalize
+  target and root through separate opens. Canonical addresses must
+  come from the opened object (`GetFinalPathNameByHandleW` on Windows,
+  `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
+  never only from lexical normalization; canonicalize scan roots through the
+  same handle-based path before comparing them. Linux does not escape its
+  ` (deleted)` `/proc/self/fd` annotation, so a live name can legitimately end
+  with that text; disambiguate it by comparing the named path's full native
+  identity and generation with the still-open descriptor, never by suffix
+  rejection alone. Non-destructive Unix scan-root canonicalization must open
+  the `realpath` result directly so filesystem root `/` remains valid;
+  destructive helpers must continue refusing filesystem-root targets. Windows
+  uses `FileIdInfo`
+  and `FileIdExtdDirectoryInfo` so ReFS's full 128-bit IDs are compared, and
+  pairs them with `FILE_BASIC_INFO.CreationTime`/`ChangeTime` for selected
+  directories plus validated parents and links so immediate ID reuse is
+  refused. It enumerates opened directory handles, opens every enumerated child and link
+  relative to its held parent with `NtOpenFile`/`OBJECT_ATTRIBUTES.RootDirectory`,
+  and deletes opened objects with
+  `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
+  invalid-function/parameter). Treat that legacy fallback as a separate
+  destructive boundary and recheck cancellation immediately before it;
+  `FILE_DISPOSITION_INFO.DeleteFile` is a one-byte Win32 `BOOLEAN`, not the
+  four-byte `BOOL` used by the API return value. Unix walks canonicalized paths
+  through `openat`, enumerates opened directory descriptors, compares
+  device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
+  and filesystem mounts, refuses device changes on macOS, and deletes with
+  `unlinkat`. Apply that mount boundary while validating the selected directory
+  and every link-parent component relative to the held scan root, not only
+  while descending during deletion. Probe the exact Linux `openat2` flags
+  before enabling the backend
+  relative to an opened `/` descriptor, never process CWD, so an old kernel or
+  seccomp denial fails before validation or mutation without a deleted working
+  directory producing a false negative. Retry interruptible Unix open/stat/
+  enumeration/delete calls on `EINTR` with a bound; never retry `close`, and
+  recheck cancellation before every retried `unlinkat` attempt.
+  Linux native `stat` parsing must select the verified layout for
+  the current process architecture: little-endian x64 reads `st_mode` at byte
+  24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
+  unverified architectures or endianness disable secure removal rather than
+  guessing. The unsuffixed macOS libc symbols expose the verified 64-bit-inode
+  ABI only to native ARM64 processes; fail closed on Intel/Rosetta rather than
+  parsing the ARM64 layout. Unix captured identity includes change-time seconds/nanoseconds as
+  well as device/inode for selected directories, parents, links, and observed
+  entries because filesystems may immediately recycle an inode. A selected
+  directory whose generation or contents changed after validation must be
+  refused and revalidated, not accepted for compatibility with stale behavior.
+  Do not fall back to
+  path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
+  checks immediately before every native destructive call and dispose handles
+  even when identity inspection, callbacks, or those checks throw. There is no
+  unsupported-platform path deletion fallback: real removal is an environment
+  refusal when the secure backend is unavailable. `remove` without `--yes`
+  remains a non-mutating managed preview and cannot produce an execution
+  identity. Do not
+  overstate the Unix guarantee: POSIX has no general
+  unlink-by-descriptor operation, so the final `fstatat` → `unlinkat` name
+  interval remains non-atomic for every entry, including directories and the
+  selected root, against a process with the same UID. It cannot redirect
+  recursive traversal through an ancestor or replacement directory, but an
+  empty replacement at that final name can itself be unlinked.
+  Every real directory removal requires a captured `ExecutionIdentity`. Every
+  real link-only removal requires an `ExecutionLinkIdentity` that pins the
+  canonical parent identity, final name, and native link identity; reverify the
+  parent and link immediately before deleting the opened/relative entry. Empty-
+  directory cleanup must use `RemoveValidator.ValidateEmptyDirectory`, which
+  captures identity, canonicalizes containment, refuses scan roots, and sets
+  `RequiresEmptyDirectory`. Both native backends must fail without deleting any
+  children if such a directory is populated after validation—never downgrade
+  that path into ordinary recursive removal. Broken-link cleanup similarly uses
+  `RemoveValidator.ValidateBrokenSymlink` and its identity-pinned link-only
+  contract; agent unlink actions use `ValidateSymlink` with the inventory roots.
+  Cleanup batches must enumerate validations lazily so each candidate is pinned
+  immediately before its own removal; deleting one sibling link changes the
+  parent generation and intentionally invalidates any earlier sibling capture.
+  Deduplicate all selected cleanup path keys before yielding the first
+  validation in both TUI and CLI apply flows, then carry that pre-validation
+  skip count into successful and canceled result accounting; otherwise the
+  first deletion can make a later duplicate look like a failed validation or
+  environment refusal, and cancellation can make a known skip look like a
+  failure.
+  Destructive directory identity capture may resolve ancestor components, but
+  must open the final candidate name relative to the canonical parent with
+  no-follow and directory-only flags. Only non-destructive canonicalization may
+  follow the final component. When reviewing this boundary, inventory every
+  observe → reopen → compare → delete step: a child path reconstructed after a
+  parent handle was acquired is not an authority address. Require both the
+  platform's full native object ID and its generation/change-time signal at
+  every validation-to-execution policy boundary; never assume ID reuse is
+  Unix-only. Transient traversal children still compare their full IDs and
+  types, but are made authoritative by opening relative to the held parent;
+  directory-enumeration timestamps are not a stable validation contract.
+  Object-local removal policy must be captured through that same held directory:
+  inspect `SKILL.md`, `.git`, and empty-directory state relative to the opened
+  handle/descriptor, then verify the directory generation did not change during
+  inspection. Windows filesystems can either preserve or change `ChangeTime`
+  across a rename, so ABA tests must accept only the two safe outcomes: a
+  handle-bound snapshot when generation remains stable, or an explicit
+  generation-change refusal. Never capture identity and perform those checks later through its
+  canonical pathname. Broken-link eligibility likewise belongs to the captured
+  parent/name/link observation: determine whether the target resolves relative
+  to the held parent, then recheck parent and link identities before approving
+  cleanup. Adversarial coverage must combine ancestor rename/replacement with hard links,
+  final-component symlink replacement, and immediate native-identifier reuse
+  on every supported OS.
+  `GetFinalPathNameByHandleW` normalization may strip `\\?\` only from DOS
+  drive-letter paths and convert `\\?\UNC\` to ordinary UNC form. Preserve
+  other extended namespaces such as `\\?\Volume{GUID}\...`; stripping their
+  prefix turns them into unsafe relative paths.
+- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Cache
+  per-target evaluations only for wizard display and always validate again in
+  the owned background operation immediately before execution; if blocking or
+  warning content changed, return to Review instead of deleting. Agent-link
+  removal is available only through `ValidateSymlink` plus `RemoveAsync`; do
+  not restore a public path-only unlink entry point or silently trust a
+  `gh skill list` parent as a scan root. Explain `--scan-root` when a reported
+  agent link lies outside known roots. Batch deduplication is a skip, not a
+  failure, and must remain explicit in logs and report accounting.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
@@ -185,6 +312,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   run and explicitly releases or closes the modal. `Task.IsCompleted` only
   describes the worker; it is not permission for keyboard shortcuts to cancel,
   close, retry, or escalate against controls whose completion is still queued.
+  Declare the modal control before its `ModalOperationTracker` using declaration
+  so reverse-order teardown cancels and drains the operation before disposing
+  controls.
   Synchronous install dialogs use `ModalOperationTracker`; its release request
   also waits for the worker itself to return before clearing ownership. Use
   `InvokeTerminalIfActive` for the completion that releases or closes a modal,
@@ -203,7 +333,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   directory is missing, empty, or cannot be probed.
 - Tests that mutate Terminal.Gui static configuration belong to the serialized
   `TerminalGuiStaticState` collection. Allocation and process stress tests
-  belong to the serialized `ResourceStress` collection.
+  belong to the serialized `ResourceStress` collection. A deadlock regression
+  test that deliberately blocks one worker must run its competing operation on
+  a dedicated `LongRunning` task; shared-pool scheduling delay under the full
+  parallel suite is not evidence about the lock ordering under test.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new

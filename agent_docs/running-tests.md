@@ -6,6 +6,12 @@ A bare project path (e.g. `dotnet test tests/Foo/Foo.csproj`) no longer works �
 pass `--project <path>` explicitly, or run `dotnet test` from the repo root to
 target the whole solution.
 
+Run product publish commands sequentially. Both product hosts build the shared
+`SkillView.Core` project into the same intermediate/output locations, and
+parallel publish processes can contend on files such as
+`SkillView.Core.deps.json`. That contention is a verification artifact, not a
+product failure.
+
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,
 `--filter-class`, `--filter-not-class`, `--filter-method`, `--filter-not-method`,
@@ -23,6 +29,6 @@ flags instead.
 - **UI-focused tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-namespace "SkillView.Tests.Ui"`
 - **Resource stress tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-class "SkillView.Tests.Ui.ResourceStressTests"`. These allocation/process tests are serialized through the `ResourceStress` collection.
 - **Contract tests:** require a real `gh` binary plus auth. CI runs them with `SKILLVIEW_CONTRACT_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --configuration Release --no-build --filter-trait "Category=Contract"` via `.github/workflows/contract-tests.yml`.
-- **PTY startup smoke:** opt-in only. Run `dotnet build`, then `SKILLVIEW_PTY_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-trait "Category=PTY"`. The test uses the built `src/SkillView.App/bin/Debug/net10.0/<rid>/skillview` host under `/usr/bin/script` and expects either `GH_TOKEN` or a working `gh auth token`.
+- **PTY startup smoke:** opt-in only. Run `dotnet build`, then `SKILLVIEW_PTY_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-trait "Category=PTY"`. The test uses the built `src/SkillView.App/bin/Debug/net10.0/<rid>/skillview` host under `/usr/bin/script`, supplies the terminal-probe responses that `script` itself cannot provide, and expects either `GH_TOKEN` or a working `gh auth token`. Keep failure cleanup bounded: terminate and wait for the child before reading redirected streams to EOF.
 - The contract-test workflow runs nightly and on `workflow_dispatch` against a pinned `gh` lane (kept in step with the latest adopted release — see `.github/workflows/contract-tests.yml`) that must pass plus a `latest` lane allowed to fail. Keep the pinned lane at or above `GhBinaryLocator.MinimumVersion` — pinning below SkillView's own hard minimum tests a `gh` version the app refuses to run against.
 - For PTY-driven TUI checks, prefer the built binary and follow `agent_docs/tui-pty-testing.md`.

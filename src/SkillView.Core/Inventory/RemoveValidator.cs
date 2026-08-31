@@ -17,6 +17,7 @@ public static class RemoveValidator
         OutsideKnownRoots,
         ResolvedOutsideKnownRoots,
         AncestorSymlinkEscapesRoot,
+        FilesystemIdentityUnavailable,
         NotASkillDirectory,
         ContainsGitDirectory,
         TargetIsScanRoot,
@@ -41,6 +42,10 @@ public static class RemoveValidator
     {
         public bool Allowed => Errors.IsDefaultOrEmpty || Errors.Length == 0;
         public bool RequiresSecondConfirm => Warnings.Length > 0;
+        internal SecureFileIdentity? ExecutionIdentity { get; init; }
+        internal SecureLinkIdentity? ExecutionLinkIdentity { get; init; }
+        internal bool RequiresEmptyDirectory { get; init; }
+        internal bool RemovesLinkOnly { get; init; }
     }
 
     /// Validate removal of `target`. `knownRoots` is the union of scan roots
@@ -50,14 +55,51 @@ public static class RemoveValidator
     public static RemoveValidation Validate(
         InstalledSkill target,
         IReadOnlyList<ScanRoot> knownRoots,
-        IReadOnlyList<InstalledSkill> otherSkills)
+        IReadOnlyList<InstalledSkill> otherSkills) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: false);
+
+    /// Performs the same non-mutating policy checks for a dry run. On a host
+    /// where the native secure backend is unavailable, this may use managed
+    /// path inspection for preview data; the returned validation deliberately
+    /// contains no execution identity and therefore cannot authorize deletion.
+    public static RemoveValidation ValidateForPreview(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: true);
+
+    internal static RemoveValidation ValidateWithBackendAvailabilityForTests(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills,
+        bool allowUnpinnedPreview,
+        bool secureBackendSupported) =>
+        ValidateCore(
+            target,
+            knownRoots,
+            otherSkills,
+            allowUnpinnedPreview,
+            secureBackendSupported);
+
+    private static RemoveValidation ValidateCore(
+        InstalledSkill target,
+        IReadOnlyList<ScanRoot> knownRoots,
+        IReadOnlyList<InstalledSkill> otherSkills,
+        bool allowUnpinnedPreview,
+        bool? secureBackendSupportedOverride = null)
     {
         var errors = ImmutableArray.CreateBuilder<Error>();
         var warnings = ImmutableArray.CreateBuilder<Warning>();
         var incoming = ImmutableArray<string>.Empty;
 
         var targetPath = target.ResolvedPath;
-        var resolved = PathResolver.Resolve(targetPath) ?? targetPath;
+        var resolved = targetPath;
+        SecureFileIdentity? executionIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
+        SecureDirectoryValidationSnapshot? directorySnapshot = null;
+        string? previewCanonicalRoot = null;
+        bool? previewHasSkillFile = null;
+        bool? previewHasGitDirectory = null;
 
         // Rule 12.1.1: must be inside a known scan root before resolution.
         var matchedRootByRawPath = FindContainingRoot(target.ResolvedPath, knownRoots);
@@ -67,9 +109,66 @@ public static class RemoveValidator
                 $"target '{target.ResolvedPath}' is not inside any known scan root"));
         }
 
+        // Pin the actual object before applying policy to its canonical path.
+        // On Unix, realpath can differ from the earlier best-effort resolution
+        // if an ancestor is retargeted between those operations. The captured
+        // canonical path is also the only path native execution will use, so
+        // every remaining policy rule must validate that exact address.
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, target.ResolvedPath))
+        {
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{target.ResolvedPath}' is itself a scan root"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            var secureBackendSupported = secureBackendSupportedOverride
+                ?? SecureRemovalBackend.IsSupported;
+            string? identityError = null;
+            if (secureBackendSupported
+                && SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
+                    matchedRootByRawPath.Path,
+                    target.ResolvedPath,
+                    out var rootedSnapshot,
+                    out identityError))
+            {
+                var capturedSnapshot = rootedSnapshot.Directory;
+                directorySnapshot = capturedSnapshot;
+                executionIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
+            }
+            else if (allowUnpinnedPreview
+                && !secureBackendSupported
+                && TryCaptureManagedPreview(
+                    matchedRootByRawPath.Path,
+                    target.ResolvedPath,
+                    out resolved,
+                    out previewCanonicalRoot,
+                    out var managedHasSkillFile,
+                    out var managedHasGitDirectory,
+                    out identityError))
+            {
+                // Preview-only inspection intentionally leaves
+                // ExecutionIdentity null. RemoveService refuses every real
+                // deletion without the native identity contract.
+                previewHasSkillFile = managedHasSkillFile;
+                previewHasGitDirectory = managedHasGitDirectory;
+            }
+            else
+            {
+                identityError ??= SecureRemovalBackend.UnsupportedReason
+                    ?? "secure removal is not supported on this operating system";
+                errors.Add(new Error(
+                    ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected filesystem object: {identityError}"));
+            }
+        }
+
         // Rule 12.1.2: resolved path must still be inside a known scan root.
-        var matchedRootByResolved = FindContainingRoot(resolved, knownRoots);
-        if (matchedRootByResolved is null)
+        var canonicalRoot = rootIdentity?.CanonicalPath ?? previewCanonicalRoot;
+        if (canonicalRoot is not null
+            && !PathResolver.IsInside(resolved, canonicalRoot))
         {
             errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
                 $"resolved path '{resolved}' is not inside any known scan root"));
@@ -84,14 +183,16 @@ public static class RemoveValidator
         }
 
         // Rule 12.1.4: target must look like a skill install.
-        if (!LooksLikeSkill(resolved))
+        if (directorySnapshot is { HasSkillFile: false }
+            || previewHasSkillFile is false)
         {
             errors.Add(new Error(ErrorKind.NotASkillDirectory,
                 $"'{resolved}' does not contain {LocalSkillScanner.SkillFileName} or recognizable skill metadata"));
         }
 
         // Rule 12.1.5: reject in-place clones.
-        if (Directory.Exists(Path.Combine(resolved, ".git")))
+        if (directorySnapshot is { HasGitDirectory: true }
+            || previewHasGitDirectory is true)
         {
             errors.Add(new Error(ErrorKind.ContainsGitDirectory,
                 $"'{resolved}' contains a .git directory — looks like an in-place clone"));
@@ -100,11 +201,20 @@ public static class RemoveValidator
         // Never-delete: the scan root itself.
         foreach (var root in knownRoots)
         {
-            if (PathKeysEqual(root.Path, target.ResolvedPath) ||
-                PathKeysEqual(root.Path, resolved))
+            if (PathKeysEqual(root.Path, target.ResolvedPath)
+                || (canonicalRoot is not null
+                    && PathKeysEqual(canonicalRoot, resolved))
+                || (TryCanonicalizeForComparison(root.Path, out var comparisonRoot)
+                    && PathKeysEqual(comparisonRoot, resolved))
+                || (allowUnpinnedPreview
+                    && TryCanonicalizeManaged(root.Path, out comparisonRoot)
+                    && PathKeysEqual(comparisonRoot, resolved)))
             {
-                errors.Add(new Error(ErrorKind.TargetIsScanRoot,
-                    $"'{target.ResolvedPath}' is itself a scan root"));
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{target.ResolvedPath}' is itself a scan root"));
+                }
                 break;
             }
         }
@@ -128,7 +238,7 @@ public static class RemoveValidator
                 if (!agent.IsSymlink) continue;
                 var linkResolved = PathResolver.Resolve(agent.Path);
                 if (linkResolved is null) continue;
-                if (PathKeysEqual(linkResolved, resolved))
+                if (PathKeysEqual(CanonicalizeForComparison(linkResolved), resolved))
                 {
                     incomingBuilder.Add(agent.Path);
                 }
@@ -141,7 +251,7 @@ public static class RemoveValidator
             if (!agent.IsSymlink) continue;
             var linkResolved = PathResolver.Resolve(agent.Path);
             if (linkResolved is null) continue;
-            if (PathKeysEqual(linkResolved, resolved) &&
+            if (PathKeysEqual(CanonicalizeForComparison(linkResolved), resolved) &&
                 !PathKeysEqual(agent.Path, resolved))
             {
                 incomingBuilder.Add(agent.Path);
@@ -167,16 +277,205 @@ public static class RemoveValidator
             errors.ToImmutable(),
             warnings.ToImmutable(),
             resolved,
-            incoming);
+            incoming)
+        {
+            ExecutionIdentity = executionIdentity,
+        };
     }
 
-    private static bool LooksLikeSkill(string dir)
+    internal static RemoveValidation ValidateEmptyDirectory(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots)
     {
-        if (!Directory.Exists(dir)) return false;
-        return File.Exists(Path.Combine(dir, LocalSkillScanner.SkillFileName));
+        var errors = ImmutableArray.CreateBuilder<Error>();
+        var fullPath = Path.GetFullPath(path);
+        var resolved = fullPath;
+        SecureFileIdentity? executionIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
+        SecureDirectoryValidationSnapshot? directorySnapshot = null;
+        var matchedRootByRawPath = FindContainingRoot(fullPath, knownRoots);
+        if (matchedRootByRawPath is null)
+        {
+            errors.Add(new Error(ErrorKind.OutsideKnownRoots,
+                $"'{fullPath}' not inside any scan root"));
+        }
+
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, fullPath))
+        {
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{fullPath}' is itself a scan root"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(
+                    matchedRootByRawPath.Path,
+                    fullPath,
+                    out var rootedSnapshot,
+                    out var identityError))
+            {
+                var capturedSnapshot = rootedSnapshot.Directory;
+                directorySnapshot = capturedSnapshot;
+                executionIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
+                if (!capturedSnapshot.Identity.IsDirectory
+                    || capturedSnapshot.Identity.IsReparsePoint)
+                {
+                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                        $"'{resolved}' is no longer a non-link directory"));
+                }
+            }
+            else
+            {
+                errors.Add(new Error(ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected filesystem object: {identityError}"));
+            }
+        }
+
+        if (executionIdentity is not null
+            && (rootIdentity is null
+                || !PathResolver.IsInside(
+                    resolved,
+                    rootIdentity.Value.CanonicalPath)))
+        {
+            errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
+                $"resolved path '{resolved}' is not inside any known scan root"));
+        }
+
+        foreach (var root in knownRoots)
+        {
+            if (PathKeysEqual(root.Path, fullPath)
+                || (rootIdentity is not null
+                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved))
+                || (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
+                    && PathKeysEqual(canonicalRoot, resolved)))
+            {
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{fullPath}' is itself a scan root"));
+                }
+                break;
+            }
+        }
+
+        if (directorySnapshot is { HasGitDirectory: true })
+        {
+            errors.Add(new Error(ErrorKind.ContainsGitDirectory,
+                $"'{resolved}' contains .git"));
+        }
+
+        if (directorySnapshot is { IsEmpty: false })
+        {
+            errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                $"'{resolved}' is no longer empty"));
+        }
+
+        return new RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<Warning>.Empty,
+            resolved,
+            ImmutableArray<string>.Empty)
+        {
+            ExecutionIdentity = executionIdentity,
+            RequiresEmptyDirectory = true,
+        };
     }
 
-    private static ScanRoot? FindContainingRoot(string path, IReadOnlyList<ScanRoot> roots)
+    internal static RemoveValidation ValidateBrokenSymlink(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots) =>
+        ValidateSymlink(path, knownRoots, requireBroken: true);
+
+    internal static RemoveValidation ValidateSymlink(
+        string path,
+        IReadOnlyList<ScanRoot> knownRoots,
+        bool requireBroken = false)
+    {
+        var errors = ImmutableArray.CreateBuilder<Error>();
+        var fullPath = Path.GetFullPath(path);
+        var resolved = fullPath;
+        SecureLinkIdentity? executionLinkIdentity = null;
+        SecureFileIdentity? rootIdentity = null;
+        var matchedRootByRawPath = FindContainingRoot(fullPath, knownRoots);
+        if (matchedRootByRawPath is null)
+        {
+            errors.Add(new Error(ErrorKind.OutsideKnownRoots,
+                $"'{fullPath}' not inside any scan root"));
+        }
+        if (matchedRootByRawPath is not null
+            && PathKeysEqual(matchedRootByRawPath.Path, fullPath))
+        {
+            errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                $"'{fullPath}' is itself a scan root"));
+        }
+        else if (matchedRootByRawPath is not null)
+        {
+            if (SecureRemovalBackend.TryCaptureLinkValidationWithinRoot(
+                    matchedRootByRawPath.Path,
+                    fullPath,
+                    out var rootedSnapshot,
+                    out var identityError))
+            {
+                var capturedSnapshot = rootedSnapshot.Link;
+                executionLinkIdentity = capturedSnapshot.Identity;
+                rootIdentity = rootedSnapshot.RootIdentity;
+                resolved = capturedSnapshot.Identity.CanonicalPath;
+                if (requireBroken && !capturedSnapshot.IsBroken)
+                {
+                    errors.Add(new Error(ErrorKind.NotASkillDirectory,
+                        $"'{fullPath}' is no longer broken"));
+                }
+            }
+            else
+            {
+                errors.Add(new Error(ErrorKind.FilesystemIdentityUnavailable,
+                    $"could not pin the selected link and its parent: {identityError}"));
+            }
+        }
+
+        if (executionLinkIdentity is not null
+            && (rootIdentity is null
+                || !PathResolver.IsInside(
+                    resolved,
+                    rootIdentity.Value.CanonicalPath)))
+        {
+            errors.Add(new Error(ErrorKind.ResolvedOutsideKnownRoots,
+                $"resolved link path '{resolved}' is not inside any known scan root"));
+        }
+
+        foreach (var root in knownRoots)
+        {
+            if (PathKeysEqual(root.Path, fullPath)
+                || (rootIdentity is not null
+                    && PathKeysEqual(rootIdentity.Value.CanonicalPath, resolved))
+                || (TryCanonicalizeForComparison(root.Path, out var canonicalRoot)
+                    && PathKeysEqual(canonicalRoot, resolved)))
+            {
+                if (!errors.Any(error => error.Kind == ErrorKind.TargetIsScanRoot))
+                {
+                    errors.Add(new Error(ErrorKind.TargetIsScanRoot,
+                        $"'{fullPath}' is itself a scan root"));
+                }
+                break;
+            }
+        }
+
+        return new RemoveValidation(
+            errors.ToImmutable(),
+            ImmutableArray<Warning>.Empty,
+            resolved,
+            ImmutableArray<string>.Empty)
+        {
+            ExecutionLinkIdentity = executionLinkIdentity,
+            RemovesLinkOnly = true,
+        };
+    }
+
+    private static ScanRoot? FindContainingRoot(
+        string path,
+        IReadOnlyList<ScanRoot> roots)
     {
         foreach (var root in roots)
         {
@@ -184,6 +483,67 @@ public static class RemoveValidator
         }
         return null;
     }
+
+    private static bool TryCaptureManagedPreview(
+        string rootPath,
+        string path,
+        out string resolvedPath,
+        out string canonicalRoot,
+        out bool hasSkillFile,
+        out bool hasGitDirectory,
+        out string? error)
+    {
+        resolvedPath = string.Empty;
+        canonicalRoot = string.Empty;
+        hasSkillFile = false;
+        hasGitDirectory = false;
+        error = null;
+        try
+        {
+            if (!TryCanonicalizeManaged(rootPath, out canonicalRoot))
+            {
+                error = $"could not resolve scan root '{rootPath}' for preview";
+                return false;
+            }
+            if (!TryCanonicalizeManaged(path, out resolvedPath)
+                || !Directory.Exists(resolvedPath))
+            {
+                error = $"could not resolve directory '{path}' for preview";
+                return false;
+            }
+
+            hasSkillFile = File.Exists(
+                Path.Combine(resolvedPath, LocalSkillScanner.SkillFileName));
+            hasGitDirectory = Directory.Exists(Path.Combine(resolvedPath, ".git"));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TryCanonicalizeManaged(
+        string path,
+        out string canonicalPath)
+    {
+        canonicalPath = PathResolver.Resolve(path) ?? string.Empty;
+        return canonicalPath.Length > 0;
+    }
+
+    private static string CanonicalizeForComparison(string path) =>
+        TryCanonicalizeForComparison(path, out var canonicalPath)
+            ? canonicalPath
+            : path;
+
+    private static bool TryCanonicalizeForComparison(
+        string path,
+        out string canonicalPath) =>
+        SecureRemovalBackend.TryCanonicalizePath(path, out canonicalPath, out _);
 
     /// True if any directory on the chain from `root` down to `target`
     /// (exclusive of `root`, inclusive of `target`) is a symlink whose

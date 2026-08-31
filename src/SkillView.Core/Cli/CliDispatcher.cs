@@ -1149,7 +1149,9 @@ public static class CliDispatcher
         }
 
         var target = matches[0];
-        var validation = RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills);
+        var validation = parsed.Yes
+            ? RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills)
+            : RemoveValidator.ValidateForPreview(target, snapshot.ScannedRoots, snapshot.Skills);
 
         RemoveService.RemoveReport result;
         if (!validation.Allowed)
@@ -1160,16 +1162,6 @@ public static class CliDispatcher
                 FilesDeleted: 0,
                 DirectoriesDeleted: 0,
                 Errors: validation.Errors.Select(e => $"{e.Kind}: {e.Detail}").ToImmutableArray(),
-                DryRun: false);
-        }
-        else if (validation.RequiresSecondConfirm && !parsed.Yes)
-        {
-            result = new RemoveService.RemoveReport(
-                Succeeded: false,
-                ResolvedPath: validation.ResolvedPath,
-                FilesDeleted: 0,
-                DirectoriesDeleted: 0,
-                Errors: validation.Warnings.Select(w => $"warning {w.Kind}: {w.Detail} (pass --yes to accept)").ToImmutableArray(),
                 DryRun: false);
         }
         else if (!parsed.Yes)
@@ -1193,8 +1185,12 @@ public static class CliDispatcher
         if (parsed.Json) WriteRemoveJson(result, target, parsed, validation);
         else WriteRemoveText(result, target, parsed, validation);
 
-        if (!validation.Allowed) return ExitCodes.UserError;
-        if (validation.RequiresSecondConfirm && !parsed.Yes) return ExitCodes.UserError;
+        if (!validation.Allowed)
+        {
+            return IsEnvironmentRefusal(validation)
+                ? ExitCodes.EnvironmentError
+                : ExitCodes.UserError;
+        }
         if (!result.Succeeded) return ExitCodes.EnvironmentError;
         return ExitCodes.Success;
     }
@@ -1240,8 +1236,7 @@ public static class CliDispatcher
             foreach (var w in validation.Warnings) Console.Error.WriteLine($"  ! {w.Kind}: {w.Detail}");
             if (!p.Yes)
             {
-                Console.Error.WriteLine("hint: rerun with --yes to accept the warnings");
-                return;
+                Console.Error.WriteLine("hint: --yes is required to accept these warnings and execute");
             }
         }
         if (r.DryRun)
@@ -1282,7 +1277,7 @@ public static class CliDispatcher
         RemoveValidator.RemoveValidation validation)
     {
         var removalAttempted = validation.Allowed
-            && (!validation.RequiresSecondConfirm || p.Yes);
+            && (r.DryRun || !validation.RequiresSecondConfirm || p.Yes);
         w.WriteStartObject();
         w.WriteBoolean("dryRun", r.DryRun);
         w.WriteBoolean("succeeded", r.Succeeded);
@@ -1346,6 +1341,8 @@ public static class CliDispatcher
         }
 
         var applied = new List<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)>();
+        var duplicateSkips = ImmutableArray<CleanupClassifier.Candidate>.Empty;
+        var environmentRefusal = false;
         if (parsed.Apply)
         {
             if (!parsed.Yes)
@@ -1353,14 +1350,27 @@ public static class CliDispatcher
                 Console.Error.WriteLine("skillview: cleanup --apply requires --yes");
                 return ExitCodes.UserError;
             }
-            foreach (var c in candidates)
+            // Resolve every key before the first removal. A candidate may be
+            // emitted under multiple cleanup kinds; validating its second
+            // occurrence after the first was deleted would falsely report an
+            // identity/environment failure.
+            var selection = CleanupClassifier.DeduplicateByPath(
+                candidates,
+                cancellationToken);
+            duplicateSkips = selection.Duplicates;
+            foreach (var c in selection.Unique)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills);
                 if (!validation.Allowed || validation.RequiresSecondConfirm)
                 {
+                    environmentRefusal |= IsEnvironmentRefusal(validation);
+                    var reason = validation.Allowed
+                        ? "requires second-confirm"
+                        : string.Join("; ", validation.Errors.Select(error =>
+                            $"{error.Kind}: {error.Detail}"));
                     applied.Add((c, RemoveService.RemoveReport.Refused(validation.ResolvedPath,
-                        validation.Allowed ? "requires second-confirm" : "validation refused")));
+                        reason)));
                     continue;
                 }
                 var removal = await services.RemoveService.RemoveAsync(
@@ -1374,8 +1384,8 @@ public static class CliDispatcher
             }
         }
 
-        if (parsed.Json) WriteCleanupJson(candidates, applied, parsed);
-        else WriteCleanupText(candidates, applied, parsed);
+        if (parsed.Json) WriteCleanupJson(candidates, applied, duplicateSkips, parsed);
+        else WriteCleanupText(candidates, applied, duplicateSkips, parsed);
 
         if (parsed.Output is not null)
         {
@@ -1392,9 +1402,15 @@ public static class CliDispatcher
         }
 
         if (candidates.Length == 0) return ExitCodes.Success;
+        if (parsed.Apply && environmentRefusal) return ExitCodes.EnvironmentError;
         if (parsed.Apply && applied.Any(a => !a.R.Succeeded)) return ExitCodes.UserError;
         return ExitCodes.Success;
     }
+
+    private static bool IsEnvironmentRefusal(
+        RemoveValidator.RemoveValidation validation) =>
+        validation.Errors.Any(error =>
+            error.Kind == RemoveValidator.ErrorKind.FilesystemIdentityUnavailable);
 
     internal record ParsedCleanupArgs(
         IReadOnlyList<string>? KindFilter,
@@ -1437,106 +1453,13 @@ public static class CliDispatcher
     {
         return candidate.Kind switch
         {
-            CleanupClassifier.CandidateKind.BrokenSymlink => ValidateBrokenSymlinkCandidate(candidate.Path, scanRoots),
-            CleanupClassifier.CandidateKind.EmptyDirectory => ValidateEmptyDirectoryCandidate(candidate.Path, scanRoots),
+            CleanupClassifier.CandidateKind.BrokenSymlink =>
+                RemoveValidator.ValidateBrokenSymlink(candidate.Path, scanRoots),
+            CleanupClassifier.CandidateKind.EmptyDirectory =>
+                RemoveValidator.ValidateEmptyDirectory(candidate.Path, scanRoots),
             _ when candidate.Skill is not null => RemoveValidator.Validate(candidate.Skill, scanRoots, allSkills),
             _ => RefuseUnsupportedCleanupCandidate(candidate),
         };
-    }
-
-    private static RemoveValidator.RemoveValidation ValidateEmptyDirectoryCandidate(
-        string path,
-        IReadOnlyList<ScanRoot> scanRoots)
-    {
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (Directory.Exists(Path.Combine(path, ".git")))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.ContainsGitDirectory,
-                $"'{path}' contains .git"));
-        }
-        if (PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is now a symlink"));
-        }
-        if (!Directory.Exists(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a directory"));
-        }
-        else
-        {
-            try
-            {
-                if (Directory.EnumerateFileSystemEntries(path).Any())
-                {
-                    errors.Add(new RemoveValidator.Error(
-                        RemoveValidator.ErrorKind.NotASkillDirectory,
-                        $"'{path}' is no longer empty"));
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                errors.Add(new RemoveValidator.Error(
-                    RemoveValidator.ErrorKind.NotASkillDirectory,
-                    $"'{path}' could not be inspected: {ex.Message}"));
-            }
-        }
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
-    }
-
-    private static RemoveValidator.RemoveValidation ValidateBrokenSymlinkCandidate(
-        string path,
-        IReadOnlyList<ScanRoot> scanRoots)
-    {
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (!PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a symlink"));
-        }
-        else if (PathResolver.Resolve(path) is not null)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer broken"));
-        }
-
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
     }
 
     private static RemoveValidator.RemoveValidation RefuseUnsupportedCleanupCandidate(
@@ -1552,6 +1475,7 @@ public static class CliDispatcher
     private static void WriteCleanupText(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
     {
         Console.Out.WriteLine($"cleanup: {candidates.Count} candidate(s){(p.Apply ? " (--apply)" : "")}");
@@ -1560,11 +1484,16 @@ public static class CliDispatcher
             Console.Out.WriteLine($"  {c.Kind,-22}  {c.Path}");
             Console.Out.WriteLine($"    why: {c.Reason}");
         }
-        if (applied.Count > 0)
+        if (applied.Count > 0 || duplicateSkips.Count > 0)
         {
             var ok = applied.Count(a => a.R.Succeeded);
             Console.Out.WriteLine();
             Console.Out.WriteLine($"applied: {ok}/{applied.Count} succeeded");
+            if (duplicateSkips.Count > 0)
+            {
+                Console.Out.WriteLine(
+                    $"skipped: {duplicateSkips.Count} duplicate candidate path(s)");
+            }
             foreach (var (c, r) in applied.Where(a => !a.R.Succeeded))
             {
                 Console.Out.WriteLine($"  ✗ {c.Path}: {string.Join("; ", r.Errors)}");
@@ -1575,19 +1504,27 @@ public static class CliDispatcher
     private static void WriteCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
-        => WriteJson(w => WriteCleanupJson(w, candidates, applied, p));
+        => WriteJson(w => WriteCleanupJson(w, candidates, applied, duplicateSkips, p));
 
     internal static string RenderCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
-        ParsedCleanupArgs p)
-        => RenderJson(w => WriteCleanupJson(w, candidates, applied, p));
+        ParsedCleanupArgs p,
+        IReadOnlyList<CleanupClassifier.Candidate>? duplicateSkips = null)
+        => RenderJson(w => WriteCleanupJson(
+            w,
+            candidates,
+            applied,
+            duplicateSkips ?? [],
+            p));
 
     private static void WriteCleanupJson(
         Utf8JsonWriter w,
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
+        IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
         ParsedCleanupArgs p)
     {
         w.WriteStartObject();
@@ -1606,6 +1543,7 @@ public static class CliDispatcher
         w.WriteEndArray();
         if (p.Apply)
         {
+            w.WriteNumber("skippedCandidates", duplicateSkips.Count);
             w.WriteStartArray("applied");
             foreach (var (c, r) in applied)
             {
@@ -1617,6 +1555,16 @@ public static class CliDispatcher
                 w.WriteStartArray("errors");
                 foreach (var e in r.Errors) w.WriteStringValue(e);
                 w.WriteEndArray();
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteStartArray("skipped");
+            foreach (var candidate in duplicateSkips)
+            {
+                w.WriteStartObject();
+                w.WriteString("path", candidate.Path);
+                w.WriteString("kind", candidate.Kind.ToString());
+                w.WriteString("reason", "duplicate candidate path");
                 w.WriteEndObject();
             }
             w.WriteEndArray();

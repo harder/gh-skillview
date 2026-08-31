@@ -122,7 +122,15 @@ public class FileLogSinkTests
             var logTask = Task.Run(() => logger.Info("test", "concurrent append"), TestContext.Current.CancellationToken);
             await appendReached.Task.WaitAsync(TestContext.Current.CancellationToken);
 
-            var disposeTask = Task.Run(sink.Dispose, TestContext.Current.CancellationToken);
+            // This test intentionally blocks one ThreadPool worker. Run the
+            // competing dispose on a dedicated thread so full-suite pool
+            // contention cannot fail the scheduling assertion before the lock
+            // ordering under test is exercised.
+            var disposeTask = Task.Factory.StartNew(
+                sink.Dispose,
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
             Assert.True(SpinWait.SpinUntil(
                 () => sink.IsDisposedForTests,
                 TimeSpan.FromSeconds(2)));

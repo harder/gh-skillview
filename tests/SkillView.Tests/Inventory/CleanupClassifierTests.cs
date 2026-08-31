@@ -103,6 +103,40 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
+    public void DeduplicateByPath_SourceOrphanedAndDuplicateShareOneRemoval()
+    {
+        var primary = Skill(
+            "dup",
+            path: Path.Combine(_tempRoot, "primary"),
+            prov: Provenance.Both);
+        var duplicatePath = Path.Combine(_tempRoot, "duplicate");
+        var duplicate = Skill(
+            "dup",
+            path: duplicatePath,
+            prov: Provenance.FsScan);
+        var candidates = CleanupClassifier.Classify(
+            Snapshot(usedGhList: true, primary, duplicate),
+            [new ScanRoot(_tempRoot, Scope.User, null)]);
+
+        var matching = candidates
+            .Where(candidate => PathIdentity.Equals(candidate.Path, duplicatePath))
+            .ToImmutableArray();
+        var selection = CleanupClassifier.DeduplicateByPath(
+            matching,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, matching.Length);
+        Assert.Contains(matching, candidate =>
+            candidate.Kind == CleanupClassifier.CandidateKind.SourceOrphaned);
+        Assert.Contains(matching, candidate =>
+            candidate.Kind == CleanupClassifier.CandidateKind.Duplicate);
+        Assert.Single(selection.Unique);
+        Assert.Single(selection.Duplicates);
+        Assert.Equal(duplicatePath, selection.Unique[0].Path);
+        Assert.Equal(duplicatePath, selection.Duplicates[0].Path);
+    }
+
+    [Fact]
     public void Classify_Ignored_FilteredOutByDefault()
     {
         var snap = Snapshot(false, Skill("m", validity: ValidityState.MissingSkillMd, ignored: true));

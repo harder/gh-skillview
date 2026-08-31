@@ -59,6 +59,61 @@ public class RemoveValidatorTests : IDisposable
     }
 
     [Fact]
+    public void ValidateForPreview_UnsupportedBackend_UsesManagedPolicyWithoutExecutionIdentity()
+    {
+        var dir = MakeSkillDir("preview-without-backend");
+        var skill = MakeSkill(dir, "preview-without-backend");
+
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: true,
+            secureBackendSupported: false);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.Null(validation.ExecutionIdentity);
+    }
+
+    [Fact]
+    public void ValidateForRemoval_UnsupportedBackend_ReportsEnvironmentFailure()
+    {
+        var dir = MakeSkillDir("remove-without-backend");
+        var skill = MakeSkill(dir, "remove-without-backend");
+
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: false,
+            secureBackendSupported: false);
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error =>
+            error.Kind == RemoveValidator.ErrorKind.FilesystemIdentityUnavailable);
+        Assert.Null(validation.ExecutionIdentity);
+    }
+
+    [Fact]
+    public void Validate_FilesystemRootScanRoot_Allowed()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+        if (!UnixSecureRemovalBackend.IsSupportedOnCurrentPlatform) return;
+
+        var dir = MakeSkillDir("filesystem-root-skill");
+        var skill = MakeSkill(dir, "filesystem-root-skill");
+        var filesystemRoot = Path.GetPathRoot(dir)!;
+
+        var validation = RemoveValidator.Validate(
+            skill,
+            [new ScanRoot(filesystemRoot, Scope.User, "claude")],
+            [skill]);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+    }
+
+    [Fact]
     public void Validate_OutsideKnownRoots_Refused()
     {
         var dir = MakeSkillDir("ok");
@@ -122,5 +177,129 @@ public class RemoveValidatorTests : IDisposable
         Assert.True(v.RequiresSecondConfirm);
         Assert.Contains(v.Warnings, w => w.Kind == RemoveValidator.WarningKind.HasIncomingSymlinks);
         Assert.NotEmpty(v.IncomingSymlinkPaths);
+    }
+
+    [Fact]
+    public void Validate_SymlinkedScanRoot_UsesCanonicalRootForCapturedTarget()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var realRoot = Path.Combine(_tempRoot, "real-root");
+        var linkedRoot = Path.Combine(_tempRoot, "linked-root");
+        Directory.CreateDirectory(realRoot);
+        if (!TryCreateDirectoryLink(linkedRoot, realRoot)) return;
+        var realSkill = Path.Combine(realRoot, "linked-root-skill");
+        Directory.CreateDirectory(realSkill);
+        File.WriteAllText(Path.Combine(realSkill, "SKILL.md"), "body");
+        var linkedSkill = Path.Combine(linkedRoot, "linked-root-skill");
+        var skill = MakeSkill(linkedSkill, "linked-root-skill");
+        var root = new ScanRoot(linkedRoot, Scope.User, "claude");
+
+        var validation = RemoveValidator.Validate(skill, new[] { root }, new[] { skill });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.Equal(validation.ExecutionIdentity.Value.CanonicalPath, validation.ResolvedPath);
+    }
+
+    [Fact]
+    public void ValidateEmptyDirectory_CapturesIdentityAndEmptyOnlyContract()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-cleanup");
+        Directory.CreateDirectory(dir);
+
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.True(validation.RequiresEmptyDirectory);
+        Assert.False(validation.RemovesLinkOnly);
+    }
+
+    [Fact]
+    public void ValidateEmptyDirectory_RefusesScanRootItself()
+    {
+        var validation = RemoveValidator.ValidateEmptyDirectory(_tempRoot, new[] { Root() });
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors,
+            error => error.Kind == RemoveValidator.ErrorKind.TargetIsScanRoot);
+    }
+
+    [Fact]
+    public void ValidateBrokenSymlink_CapturesParentAndLinkIdentities()
+    {
+        var link = Path.Combine(_tempRoot, "broken-link");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-target"))) return;
+
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.True(validation.RemovesLinkOnly);
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+        Assert.True(validation.ExecutionLinkIdentity.Value.LinkIdentity.IsReparsePoint);
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(
+            _tempRoot,
+            out var canonicalRoot,
+            out var canonicalError), canonicalError);
+        Assert.True(PathIdentity.Equals(
+            canonicalRoot,
+            validation.ExecutionLinkIdentity.Value.ParentIdentity.CanonicalPath));
+        Assert.Equal(validation.ExecutionLinkIdentity.Value.CanonicalPath, validation.ResolvedPath);
+    }
+
+    [Fact]
+    public void ValidateBrokenSymlink_ValidTarget_IsRefusedFromCapturedObservation()
+    {
+        var target = Path.Combine(_tempRoot, "valid-link-target");
+        var link = Path.Combine(_tempRoot, "valid-link");
+        Directory.CreateDirectory(target);
+        if (!TryCreateDirectoryLink(link, target)) return;
+
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors,
+            error => error.Kind == RemoveValidator.ErrorKind.NotASkillDirectory
+                && error.Detail.Contains("no longer broken", StringComparison.Ordinal));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+    }
+
+    [Fact]
+    public void ValidateSymlink_UsesCanonicalizedScanRootAndParent()
+    {
+        var realRoot = Path.Combine(_tempRoot, "real-link-root");
+        var linkedRoot = Path.Combine(_tempRoot, "linked-link-root");
+        Directory.CreateDirectory(realRoot);
+        if (!TryCreateDirectoryLink(linkedRoot, realRoot)) return;
+        var realLink = Path.Combine(realRoot, "agent-link");
+        var linkedPath = Path.Combine(linkedRoot, "agent-link");
+        if (!TryCreateDirectoryLink(realLink, Path.Combine(_tempRoot, "missing-agent-target"))) return;
+
+        var validation = RemoveValidator.ValidateSymlink(
+            linkedPath,
+            [new ScanRoot(linkedRoot, Scope.User, "claude")]);
+
+        Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(
+            realRoot,
+            out var canonicalRoot,
+            out var canonicalError), canonicalError);
+        Assert.True(PathIdentity.Equals(
+            Path.Combine(canonicalRoot, "agent-link"),
+            validation.ResolvedPath));
+    }
+
+    private static bool TryCreateDirectoryLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return false;
+        }
     }
 }

@@ -16,7 +16,21 @@ namespace SkillView.Ui;
 /// actions: remove, mark ignored, rescan, export.
 public sealed class CleanupScreen
 {
-    internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed);
+    internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed)
+    {
+        internal int Skipped { get; init; }
+    }
+
+    internal sealed class RemovalAttemptState
+    {
+        private int _preValidationSkipped;
+
+        internal int PreValidationSkipped =>
+            Volatile.Read(ref _preValidationSkipped);
+
+        internal void SetPreValidationSkipped(int value) =>
+            Volatile.Write(ref _preValidationSkipped, value);
+    }
 
     private readonly IApplication _app;
     private readonly RemoveService _remove;
@@ -205,6 +219,7 @@ public sealed class CleanupScreen
         async Task RunRemovalAsync(HashSet<int> selectedRows, CancellationToken cancellationToken)
         {
             var selectedCount = selectedRows.Count(index => index >= 0 && index < _candidates.Length);
+            var attemptState = new RemovalAttemptState();
             var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
             {
                 lastProgress = value;
@@ -213,7 +228,11 @@ public sealed class CleanupScreen
 
             try
             {
-                var summary = await RemoveSelectedAsync(selectedRows, cancellationToken, progress)
+                var summary = await RemoveSelectedAsync(
+                        selectedRows,
+                        cancellationToken,
+                        progress,
+                        attemptState)
                     .ConfigureAwait(false);
                 InvokeIfActive(() =>
                 {
@@ -221,7 +240,7 @@ public sealed class CleanupScreen
                     spinner.Visible = false;
                     activeOperation = null;
                     status.Text = summary.Confirmed
-                        ? $" removed {summary.Removed}, skipped/failed {summary.Failed}"
+                        ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}"
                         : " cleanup removal canceled";
                 });
             }
@@ -231,13 +250,17 @@ public sealed class CleanupScreen
                 RemovedCount += removed;
                 RemovedFileCount += lastProgress?.FilesProcessed ?? 0;
                 RemovedDirectoryCount += lastProgress?.DirectoriesProcessed ?? 0;
-                var failed = Math.Max(0, selectedCount - removed);
+                var skipped = attemptState.PreValidationSkipped;
+                var failed = CountFailedSelections(
+                    selectedCount,
+                    removed,
+                    skipped);
                 _logger.Debug("cleanup.remove", "cleanup removal canceled");
                 InvokeIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    status.Text = $" removal canceled after {removed}; skipped/failed {failed}";
+                    status.Text = $" removal canceled after {removed}; skipped {skipped}, failed {failed}";
                     if (Volatile.Read(ref closeAfterCancellation) != 0)
                     {
                         _app.RequestStop();
@@ -330,7 +353,8 @@ public sealed class CleanupScreen
     internal async Task<RemovalSummary> RemoveSelectedAsync(
         HashSet<int> checkedRows,
         CancellationToken cancellationToken = default,
-        IProgress<RemoveService.RemoveProgress>? progress = null)
+        IProgress<RemoveService.RemoveProgress>? progress = null,
+        RemovalAttemptState? attemptState = null)
     {
         var selected = checkedRows
             .Where(i => i >= 0 && i < _candidates.Length)
@@ -347,53 +371,89 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
-        var (validations, failedValidationCount) = await Task.Run(
-            () => BuildRemovalPlan(checkedRows, cancellationToken)).ConfigureAwait(false);
+        // Resolve every selected key before the first lazy validation/deletion,
+        // and publish the skip count outside this worker so cancellation can
+        // still account for duplicates when RemoveManyAsync throws.
+        var selection = CleanupClassifier.DeduplicateByPath(
+            selected,
+            cancellationToken);
+        var skippedBeforeValidation = selection.Duplicates.Length;
+        attemptState?.SetPreValidationSkipped(skippedBeforeValidation);
+        foreach (var candidate in selection.Duplicates)
+        {
+            _logger.Debug(
+                "cleanup",
+                $"skipped duplicate selected path {candidate.Path}");
+        }
 
         var report = await _remove.RemoveManyAsync(
-            validations,
+            ValidateImmediatelyBeforeRemoval(
+                selection.Unique,
+                cancellationToken),
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
+        if (skippedBeforeValidation > 0)
+        {
+            report = report with
+            {
+                TargetsSkipped = checked(
+                    report.TargetsSkipped + skippedBeforeValidation),
+            };
+        }
         var removed = report.TargetsDeleted;
-        var failed = failedValidationCount + validations.Length - removed;
+        var failed = CountFailedSelections(selected.Length, report);
         RemovedCount += removed;
         RemovedFileCount += report.FilesDeleted;
         RemovedDirectoryCount += report.DirectoriesDeleted;
-        return new RemovalSummary(removed, failed, Confirmed: true);
+        return new RemovalSummary(removed, failed, Confirmed: true)
+        {
+            Skipped = report.TargetsSkipped,
+        };
     }
 
-    private (ImmutableArray<RemoveValidator.RemoveValidation> Validations, int Failed)
-        BuildRemovalPlan(HashSet<int> checkedRows, CancellationToken cancellationToken)
+    internal static int CountFailedSelections(
+        int selectedCount,
+        RemoveService.BatchRemoveReport report) =>
+        CountFailedSelections(
+            selectedCount,
+            report.TargetsDeleted,
+            report.TargetsSkipped);
+
+    internal static int CountFailedSelections(
+        int selectedCount,
+        int removedCount,
+        int skippedCount) =>
+        Math.Max(0, selectedCount - removedCount - skippedCount);
+
+    private IEnumerable<RemoveValidator.RemoveValidation>
+        ValidateImmediatelyBeforeRemoval(
+            ImmutableArray<CleanupClassifier.Candidate> unique,
+            CancellationToken cancellationToken)
     {
-        var failed = 0;
-        var validations = ImmutableArray.CreateBuilder<RemoveValidator.RemoveValidation>();
-        for (var i = 0; i < _candidates.Length; i++)
+        foreach (var candidate in unique)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!checkedRows.Contains(i)) continue;
-            var candidate = _candidates[i];
-            // For skill-backed candidates, run full validator. Non-skill cleanup
-            // candidates need synthetic validations because they don't look like
-            // install directories, but are still safe to remove when they stay
-            // inside known scan roots.
+            // RemoveMany enumerates this sequence immediately before each
+            // target executes. Do not materialize it: deleting an earlier
+            // sibling changes the shared parent's native generation, so later
+            // link identities must be captured after that owned mutation.
             var validation = candidate.Kind switch
             {
-                CleanupClassifier.CandidateKind.BrokenSymlink => ValidateBrokenSymlink(candidate.Path),
-                CleanupClassifier.CandidateKind.EmptyDirectory => ValidateEmptyDir(candidate.Path),
+                CleanupClassifier.CandidateKind.BrokenSymlink =>
+                    RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots),
+                CleanupClassifier.CandidateKind.EmptyDirectory =>
+                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots),
                 _ when candidate.Skill is not null =>
                     RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills),
                 _ => RefuseUnsupportedCandidate(candidate),
             };
             if (!validation.Allowed || validation.RequiresSecondConfirm)
             {
-                failed++;
                 _logger.Warn("cleanup", $"skipped {candidate.Path}: {(validation.Allowed ? "needs second confirm" : "validation refused")}");
                 continue;
             }
-            validations.Add(validation);
+            yield return validation;
         }
-
-        return (validations.ToImmutable(), failed);
     }
 
     private static string FormatProgress(RemoveService.RemoveProgress progress) =>
@@ -518,101 +578,6 @@ public sealed class CleanupScreen
     ];
 
     private static string BuildHeaderText() => "Select with Space.";
-
-    private RemoveValidator.RemoveValidation ValidateEmptyDir(string path)
-    {
-        // Empty-dir candidates don't look like skills (no SKILL.md), so the
-        // standard validator would refuse. Build a scoped validation that
-        // only enforces scan-root containment + no-.git.
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in _scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (System.IO.Directory.Exists(System.IO.Path.Combine(path, ".git")))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.ContainsGitDirectory,
-                $"'{path}' contains .git"));
-        }
-        if (PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is now a symlink"));
-        }
-        if (!System.IO.Directory.Exists(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a directory"));
-        }
-        else
-        {
-            try
-            {
-                if (System.IO.Directory.EnumerateFileSystemEntries(path).Any())
-                {
-                    errors.Add(new RemoveValidator.Error(
-                        RemoveValidator.ErrorKind.NotASkillDirectory,
-                        $"'{path}' is no longer empty"));
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                errors.Add(new RemoveValidator.Error(
-                    RemoveValidator.ErrorKind.NotASkillDirectory,
-                    $"'{path}' could not be inspected: {ex.Message}"));
-            }
-        }
-
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
-    }
-
-    private RemoveValidator.RemoveValidation ValidateBrokenSymlink(string path)
-    {
-        var errors = ImmutableArray.CreateBuilder<RemoveValidator.Error>();
-        var inside = false;
-        foreach (var root in _scanRoots)
-        {
-            if (PathResolver.IsInside(path, root.Path)) { inside = true; break; }
-        }
-        if (!inside)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.OutsideKnownRoots,
-                $"'{path}' not inside any scan root"));
-        }
-        if (!PathResolver.IsSymlink(path))
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer a symlink"));
-        }
-        else if (PathResolver.Resolve(path) is not null)
-        {
-            errors.Add(new RemoveValidator.Error(
-                RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"'{path}' is no longer broken"));
-        }
-
-        return new RemoveValidator.RemoveValidation(
-            errors.ToImmutable(),
-            ImmutableArray<RemoveValidator.Warning>.Empty,
-            path,
-            ImmutableArray<string>.Empty);
-    }
 
     private static RemoveValidator.RemoveValidation RefuseUnsupportedCandidate(CleanupClassifier.Candidate candidate) =>
         new(

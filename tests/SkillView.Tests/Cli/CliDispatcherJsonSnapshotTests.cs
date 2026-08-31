@@ -325,6 +325,37 @@ public class CliDispatcherJsonSnapshotTests
     }
 
     [Fact]
+    public void Remove_DryRunWithWarnings_PreservesPreviewRuntimeErrors()
+    {
+        var validation = new RemoveValidator.RemoveValidation(
+            Errors: ImmutableArray<RemoveValidator.Error>.Empty,
+            Warnings: ImmutableArray.Create(new RemoveValidator.Warning(
+                RemoveValidator.WarningKind.HasIncomingSymlinks,
+                "incoming link found")),
+            ResolvedPath: "/p/a",
+            IncomingSymlinkPaths: ImmutableArray.Create("/p/link"));
+        var report = new RemoveService.RemoveReport(
+            Succeeded: false,
+            ResolvedPath: "/p/a",
+            FilesDeleted: 0,
+            DirectoriesDeleted: 0,
+            Errors: ImmutableArray.Create("preview enumeration failed"),
+            DryRun: true);
+        var parsed = new CliDispatcher.ParsedRemoveArgs("a", null, Yes: false, Json: true);
+
+        var doc = Parse(CliDispatcher.RenderRemoveJson(
+            report,
+            Skill("a"),
+            parsed,
+            validation));
+
+        Assert.True(doc.GetProperty("dryRun").GetBoolean());
+        Assert.Equal(1, doc.GetProperty("runtimeErrorCount").GetInt32());
+        Assert.Equal("preview enumeration failed",
+            doc.GetProperty("runtimeErrors")[0].GetString());
+    }
+
+    [Fact]
     public void Remove_JsonPreservesRuntimeErrorsWhenRemovalWasAttempted()
     {
         var validation = new RemoveValidator.RemoveValidation(

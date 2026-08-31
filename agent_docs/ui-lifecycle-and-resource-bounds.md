@@ -51,7 +51,8 @@ logging, or subprocess adapters.
   `InvokeTerminalIfActive`, and let disposal cancel and drain before any
   controls are disposed. The terminal form releases ownership if dispatch or
   the callback throws; the progress form must not release a worker that is
-  still active.
+  still active. Because C# using declarations dispose in reverse order, declare
+  the modal control first and its `ModalOperationTracker` second.
 - CLI and TUI hosts share `EntryPoint` root cancellation. CLI operations must
   propagate it through every adapter and retain a bounded command deadline.
   `ProcessRunner` whole-tree termination is followed by a five-second bounded
@@ -82,8 +83,12 @@ logging, or subprocess adapters.
   disconnects, ACL changes, and disappearing directories fail there rather
   than when the enumerable is created.
 - Removal uses the same thread-pool boundary: compact remove, the advanced
-  wizard, cleanup batches, and agent-link unlinking call the asynchronous
-  `RemoveService` APIs. Progress callbacks are throttled to 10 per second and
+  wizard, cleanup batches, and agent-link unlinking call `RemoveAsync`/
+  `RemoveManyAsync` with a root-validated `RemoveValidation`. The advanced
+  wizard also evaluates native filesystem policy off the UI thread, caches
+  results only for display, and refreshes the selected target immediately
+  before execution. If refreshed errors or warnings differ, it returns to
+  Review. Progress callbacks are throttled to 10 per second and
   immediately handed to `IApplication.Invoke`; they must not use `Progress<T>`
   and add another implicit queue. Esc cancels the active traversal, and each
   removal window cancels and drains its owned task before disposing controls.
@@ -99,8 +104,120 @@ logging, or subprocess adapters.
   displayed progress remains per-attempt. Synthetic cancellation reports mark
   cancellation explicitly and retain the exact runtime-error count even when
   the individual logged details are unavailable.
-  Traversal retains O(depth) enumerator state and no more than 128 detailed
-  runtime errors plus one omission summary.
+  Traversal retains O(depth) enumerator/handle state and no more than 128
+  detailed runtime errors plus one omission summary. Validation pins the
+  selected target's native filesystem identity and validates the captured
+  canonical deletion address. Containment capture opens the matched scan root
+  first and then opens the target directory or link parent relative to that
+  held object; target and root canonicalization must never be separate,
+  independently raceable opens. The canonical address and canonical scan roots
+  come from opened handles, not lexical normalization: Windows uses
+  `GetFinalPathNameByHandleW`, macOS requests `ATTR_CMN_FULLPATH` with
+  `fgetattrlist`, and Linux reads `/proc/self/fd`. Because Linux's unescaped
+  ` (deleted)` annotation is also legal filename text, a returned path ending
+  with it is accepted only when that name's native identity and generation
+  match the still-open descriptor; suffix text alone is not evidence that the
+  entry was unlinked. Non-destructive Unix canonicalization opens the resolved
+  directory directly so `/` is a valid scan root, while destructive helpers
+  continue refusing a filesystem-root target. Windows removal compares full
+  128-bit file IDs plus `FILE_BASIC_INFO.CreationTime`/`ChangeTime`, opens
+  enumerated children and links relative to the held parent handle with
+  `NtOpenFile` and
+  `OBJECT_ATTRIBUTES.RootDirectory`, and deletes opened handles; Unix removal
+  walks and enumerates opened directory
+  descriptors, compares device/inode identities, rejects Linux bind/filesystem
+  mounts with `openat2(RESOLVE_NO_XDEV)`, and refuses macOS device changes. The
+  same no-cross-device boundary applies while opening a selected directory or
+  link parent relative to the held scan root during validation; deletion-time
+  traversal checks alone are too late because the captured target could already
+  belong to an external mount.
+  Linux backend probes the exact `openat2` contract at startup relative to an
+  opened filesystem-root descriptor, not process CWD, and remains disabled
+  when the kernel or sandbox refuses it, before any mutation can begin. Native
+  open/stat/enumeration/delete calls retry bounded `EINTR`; each retried
+  `unlinkat` is a fresh destructive boundary with its own cancellation check,
+  while `close` is never retried. Keep
+  actual deletion on `SecureRemovalBackend` for Windows, macOS,
+  and Linux. Check cancellation immediately before each native delete and keep
+  handle cleanup in `finally` paths. On Windows, the legacy
+  `FileDispositionInfo` fallback is a second destructive call after
+  `FileDispositionInfoEx`, so it needs its own cancellation gate; its
+  `DeleteFile` field is a one-byte native `BOOLEAN`, while the API return value
+  remains a four-byte `BOOL`. The managed traversal retained for dry-run
+  counting is preview-only; an unavailable secure backend refuses real
+  deletion with an actionable environment error and never falls back to
+  `File.Delete`/`Directory.Delete`. POSIX `unlinkat` is parent-handle-relative
+  but still names its final entry, so document rather than conceal its narrow
+  final-name race for files, links, directories, and the selected root; the
+  held-directory design prevents a replacement ancestor or child directory
+  from redirecting recursive traversal, though an empty final-name replacement
+  can be removed.
+  Linux `struct stat` is architecture-specific: the secure backend explicitly
+  selects the verified little-endian x64 or ARM64 layout and stays disabled on
+  unverified architectures or endianness instead of interpreting arbitrary
+  buffer offsets. macOS likewise supports only native little-endian ARM64: its
+  unsuffixed libc symbols expose a different legacy inode ABI on x86_64, so
+  Intel and Rosetta processes fail closed. Every captured Unix object identity also compares kernel-
+  maintained change-time seconds/nanoseconds so immediate inode reuse cannot
+  make a replacement link, parent, or selected directory look like the one
+  validated earlier. A directory changed after validation is refused and must
+  be revalidated. Directory final-name checks compare the
+  current opened-descriptor stat to the named entry after traversal, because
+  deleting children legitimately changes the directory's change time.
+  Real directory execution fails closed without a pinned native identity.
+  Empty-directory cleanup is a distinct execution contract: validation pins
+  the identity and native traversal refuses immediately if it observes any
+  child, so a directory populated after validation is not recursively cleaned.
+  Real link-only execution likewise fails closed without a pinned canonical
+  parent plus native parent/link identities. Broken-link cleanup and agent
+  unlink actions revalidate both identities and delete through the opened
+  parent/object boundary rather than trusting the current pathname.
+  Cleanup batches validate lazily immediately before each target executes;
+  prevalidating sibling links is incorrect because the first unlink changes
+  their shared parent's generation and invalidates later captures.
+  Unix destructive identity capture resolves only the parent, then opens the
+  final candidate with `O_NOFOLLOW | O_DIRECTORY`; do not reuse final-following
+  canonicalization for this purpose. Review each native operation as an
+  observe/reopen/compare/delete chain and reject reconstructed child paths once
+  a parent handle exists. Every platform comparison includes both its full
+  native object ID and a change-time/generation signal for identities captured
+  during validation. Transient traversal entries rely on parent-relative open
+  plus full ID/type comparison because Windows directory-enumeration timestamps
+  are not a stable policy-generation contract. Do not scope immediate ID reuse
+  reasoning or tests to Unix. Regression coverage includes Windows
+  ancestor replacement plus a matching hard link, final-component link
+  replacement, and same-ID generation reuse on each supported OS.
+  Validation also captures an object-local policy snapshot through the held
+  directory: `SKILL.md`, `.git`, and emptiness are inspected relative to that
+  handle/descriptor and bracketed by generation checks. Canonical pathnames are
+  display/containment addresses, not substitutes for object-relative policy I/O.
+  Windows rename behavior varies by filesystem: a rename may update
+  `ChangeTime`, in which case validation must fail closed, or preserve it, in
+  which case the returned policy snapshot must still describe the held object.
+  Cross-platform ABA tests should assert those two safe outcomes rather than
+  require one volume-specific timestamp behavior.
+  Windows final-path normalization converts extended UNC paths and strips the
+  extended prefix from drive-letter paths only. Preserve volume-GUID and other
+  non-DOS extended namespaces so absolute authority paths never become relative.
+  Broken-link cleanup observes target existence relative to the held parent and
+  rechecks both parent and link identities around that observation, preventing a
+  broken-to-valid replacement from being authorized.
+  A non-mutating `remove` preview may use managed path inspection when the
+  secure backend is unavailable, but it carries no execution identity and can
+  never authorize deletion. Agent links outside inventory scan roots remain
+  blocked with explicit `--scan-root` guidance; never promote an untrusted
+  `gh skill list` path into a root automatically. Batch duplicate targets are
+  reported as skipped so cleanup summaries do not mislabel them as failures.
+  Cleanup resolves and deduplicates every selected path key before yielding the
+  first lazy validation in both TUI and CLI apply flows, while still capturing
+  each unique native identity only immediately before its removal. CLI duplicate
+  candidates are reported as skipped and do not change a successful apply into
+  an environment error. TUI removal attempt state retains that pre-validation
+  skip count when cancellation throws before a batch report is returned, so
+  canceled summaries do not reclassify duplicates as failures. The advanced remove wizard's finish-time
+  revalidation compares the captured directory/link identities and removal mode
+  as well as visible policy content; a replacement object always returns the
+  user to Review rather than inheriting the earlier confirmation.
 - Logger subscriptions are disposable. Every long-lived subscriber must retain
   and dispose its subscription. Disposal deactivates registrations that were
   already snapshotted and waits for an in-flight callback, so no callback can

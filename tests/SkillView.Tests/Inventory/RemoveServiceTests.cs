@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -130,6 +131,34 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_UnsupportedBackendPreview_SucceedsButRealRemovalRefuses()
+    {
+        var (skill, dir) = MakeSkill("unsupported-backend-preview", extraFiles: 1);
+        var validation = RemoveValidator.ValidateWithBackendAvailabilityForTests(
+            skill,
+            new[] { Root() },
+            new[] { skill },
+            allowUnpinnedPreview: true,
+            secureBackendSupported: false);
+        var service = new RemoveService(_logger);
+
+        var preview = service.Remove(
+            validation,
+            new RemoveService.Options(DryRun: true),
+            TestContext.Current.CancellationToken);
+        var real = service.Remove(
+            validation,
+            new RemoveService.Options(DryRun: false),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Succeeded, string.Join(System.Environment.NewLine, preview.Errors));
+        Assert.True(preview.DryRun);
+        Assert.False(real.Succeeded);
+        Assert.False(real.DryRun);
+        Assert.True(Directory.Exists(dir));
+    }
+
+    [Fact]
     public void RemoveMany_HappyPath_DeletesEveryValidatedTarget()
     {
         var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);
@@ -146,6 +175,23 @@ public class RemoveServiceTests : IDisposable
         Assert.False(Directory.Exists(firstDir));
         Assert.False(Directory.Exists(secondDir));
         Assert.True(report.FilesDeleted >= 4);
+    }
+
+    [Fact]
+    public void RemoveMany_DuplicateCanonicalTarget_IsReportedAsSkipped()
+    {
+        var (skill, dir) = MakeSkill("group-duplicate", extraFiles: 1);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+
+        var report = new RemoveService(_logger).RemoveMany(
+            [validation, validation],
+            new RemoveService.Options(DryRun: true),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(report.Succeeded);
+        Assert.Equal(1, report.TargetsDeleted);
+        Assert.Equal(1, report.TargetsSkipped);
+        Assert.True(Directory.Exists(dir));
     }
 
     [Fact]
@@ -268,9 +314,238 @@ public class RemoveServiceTests : IDisposable
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
         Assert.True(File.Exists(firstFile));
         Assert.True(File.Exists(secondFile));
+    }
+
+    [Fact]
+    public void Remove_TargetReplacedAfterValidation_RefusesBothObjects()
+    {
+        var (skill, dir) = MakeSkill("target-replaced");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        Assert.True(validation.Allowed);
+        Assert.NotNull(validation.ExecutionIdentity);
+
+        var original = Path.Combine(_tempRoot, "target-replaced-original");
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(dir);
+        var replacementFile = Path.Combine(dir, "replacement.txt");
+        File.WriteAllText(replacementFile, "keep replacement");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(File.Exists(Path.Combine(original, "SKILL.md")));
+        Assert.Equal("keep replacement", File.ReadAllText(replacementFile));
+    }
+
+    [Fact]
+    public void Remove_TargetReplacedByLinkAfterValidation_RefusesLinkAndBothDirectories()
+    {
+        var (skill, dir) = MakeSkill("target-replaced-by-link");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        Assert.True(validation.Allowed);
+        Assert.NotNull(validation.ExecutionIdentity);
+
+        var original = Path.Combine(_tempRoot, "target-replaced-by-link-original");
+        var external = Path.Combine(_tempRoot, "target-replaced-by-link-external");
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(external);
+        var externalFile = Path.Combine(external, "must-survive.txt");
+        File.WriteAllText(externalFile, "keep");
+        if (!TryCreateDirectoryLink(dir, external)) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.True(PathResolver.IsSymlink(dir));
+        Assert.True(File.Exists(Path.Combine(original, "SKILL.md")));
+        Assert.Equal("keep", File.ReadAllText(externalFile));
+    }
+
+    [Fact]
+    public void Remove_IdentitylessAllowedDirectory_RefusesWithoutTouchingContents()
+    {
+        var (_, dir) = MakeSkill("identityless-directory");
+        var skillFile = Path.Combine(dir, "SKILL.md");
+        var validation = new RemoveValidator.RemoveValidation(
+            ImmutableArray<RemoveValidator.Error>.Empty,
+            ImmutableArray<RemoveValidator.Warning>.Empty,
+            dir,
+            ImmutableArray<string>.Empty);
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("pinned filesystem identity", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
+        Assert.True(File.Exists(skillFile));
+    }
+
+    [Fact]
+    public void Remove_ValidatedBrokenLinkReplacedBeforeExecution_RefusesReplacement()
+    {
+        var parent = Path.Combine(_tempRoot, "broken-link-replaced");
+        Directory.CreateDirectory(parent);
+        var link = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-first"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+
+        DeleteDirectoryLink(link);
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-second"))) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
+    public void Remove_ValidatedBrokenLinkParentReplacedBeforeExecution_RefusesBothParents()
+    {
+        var parent = Path.Combine(_tempRoot, "broken-link-parent");
+        var originalParent = Path.Combine(_tempRoot, "broken-link-parent-original");
+        Directory.CreateDirectory(parent);
+        var link = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-original"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionLinkIdentity);
+
+        Directory.Move(parent, originalParent);
+        Directory.CreateDirectory(parent);
+        var replacementLink = Path.Combine(parent, "broken");
+        if (!TryCreateDirectoryLink(
+                replacementLink,
+                Path.Combine(_tempRoot, "missing-replacement"))) return;
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("parent identity changed", StringComparison.Ordinal));
+        Assert.True(PathResolver.IsSymlink(Path.Combine(originalParent, "broken")));
+        Assert.True(PathResolver.IsSymlink(replacementLink));
+    }
+
+    [Fact]
+    public void Remove_ValidatedBrokenLinkCanceledAtDeletionBoundary_PreservesLink()
+    {
+        var link = Path.Combine(_tempRoot, "broken-link-canceled");
+        if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-canceled"))) return;
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        using var cancellation = new CancellationTokenSource();
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (_, _) => cancellation.Cancel());
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
+    public void Remove_ValidatedEmptyDirectoryPopulatedBeforeExecution_DoesNotDeleteContents()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-became-populated");
+        Directory.CreateDirectory(dir);
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Assert.NotNull(validation.ExecutionIdentity);
+        Assert.True(validation.RequiresEmptyDirectory);
+        var lateFile = Path.Combine(dir, "late.txt");
+        File.WriteAllText(lateFile, "keep");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal)
+                || error.Contains("no longer empty", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(dir));
+        Assert.Equal("keep", File.ReadAllText(lateFile));
+    }
+
+    [Fact]
+    public void Remove_ValidatedEmptyDirectoryReplacedBeforeExecution_RefusesBothDirectories()
+    {
+        var dir = Path.Combine(_tempRoot, "empty-replaced");
+        var original = Path.Combine(_tempRoot, "empty-replaced-original");
+        Directory.CreateDirectory(dir);
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
+        Directory.Move(dir, original);
+        Directory.CreateDirectory(dir);
+        var replacementFile = Path.Combine(dir, "replacement.txt");
+        File.WriteAllText(replacementFile, "keep");
+
+        var report = new RemoveService(_logger).Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(report.Succeeded);
+        Assert.Contains(report.Errors,
+            error => error.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(Directory.Exists(original));
+        Assert.Equal("keep", File.ReadAllText(replacementFile));
+    }
+
+    [Fact]
+    public void Remove_DirectoryReplacedWhileObserved_DoesNotTraverseReplacement()
+    {
+        var (skill, dir) = MakeSkill("directory-swap");
+        var nested = Path.Combine(dir, "nested");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, "original.txt"), "original");
+        var external = Path.Combine(_tempRoot, "directory-swap-external");
+        Directory.CreateDirectory(external);
+        var externalFile = Path.Combine(external, "must-survive.txt");
+        File.WriteAllText(externalFile, "keep");
+        var movedOriginal = Path.Combine(_tempRoot, "directory-swap-original");
+        var swapped = false;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var service = new RemoveService(_logger, observed =>
+        {
+            if (swapped || !PathIdentity.Equals(observed, nested)) return;
+            Directory.Move(nested, movedOriginal);
+            swapped = TryCreateDirectoryLink(nested, external);
+        });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        if (!swapped) return;
+        Assert.False(report.Succeeded);
+        Assert.True(File.Exists(externalFile));
+        Assert.Equal("keep", File.ReadAllText(externalFile));
+        Assert.True(File.Exists(Path.Combine(movedOriginal, "original.txt")));
     }
 
     [Fact]
@@ -308,6 +583,100 @@ public class RemoveServiceTests : IDisposable
         Assert.Equal(1, observedEntries);
         Assert.True(Directory.Exists(dir));
         Assert.Equal(2_001, Directory.EnumerateFiles(dir).Count());
+    }
+
+    [Fact]
+    public void Remove_CancellationAtLeafDeletionBoundary_DoesNotDeleteObservedEntry()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("cancel-before-delete");
+        var skillFile = Path.Combine(dir, "SKILL.md");
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        using var cancellation = new CancellationTokenSource();
+        var deletingEntries = 0;
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (_, isDirectory) =>
+            {
+                if (isDirectory) return;
+                Interlocked.Increment(ref deletingEntries);
+                cancellation.Cancel();
+            });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.Equal(1, deletingEntries);
+        Assert.True(Directory.Exists(dir));
+        Assert.True(File.Exists(skillFile));
+    }
+
+    [Fact]
+    public void Remove_CancellationAtDirectoryDeletionBoundary_DoesNotDeleteDirectory()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("cancel-before-directory-delete");
+        var nested = Path.Combine(dir, "nested");
+        Directory.CreateDirectory(nested);
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
+        using var cancellation = new CancellationTokenSource();
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (path, isDirectory) =>
+            {
+                if (isDirectory && PathIdentity.Equals(path, canonicalNested)) cancellation.Cancel();
+            });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.Remove(validation, cancellationToken: cancellation.Token));
+
+        Assert.True(Directory.Exists(dir));
+        Assert.True(Directory.Exists(nested));
+    }
+
+    [Fact]
+    public void Remove_UnixFinalDirectoryNameReplacement_DeletesOnlyEmptyReplacement()
+    {
+        if (OperatingSystem.IsWindows() || !SecureRemovalBackend.IsSupported) return;
+        var (skill, dir) = MakeSkill("final-directory-name");
+        var nested = Path.Combine(dir, "nested");
+        var movedOriginal = Path.Combine(_tempRoot, "final-directory-name-original");
+        Directory.CreateDirectory(nested);
+        var swapped = false;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
+        var service = new RemoveService(
+            _logger,
+            entryObservedForTests: null,
+            entryDeletingForTests: (path, isDirectory) =>
+            {
+                if (swapped || !isDirectory || !PathIdentity.Equals(path, canonicalNested)) return;
+                Directory.Move(canonicalNested, movedOriginal);
+                Directory.CreateDirectory(canonicalNested);
+                swapped = true;
+            });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(swapped);
+        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.False(Directory.Exists(dir));
+        Assert.True(Directory.Exists(movedOriginal));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(50, true)]
+    [InlineData(87, true)]
+    [InlineData(5, false)]
+    public void WindowsDispositionFallback_RecognizesUnsupportedErrors(int error, bool expected)
+    {
+        Assert.Equal(expected, WindowsSecureRemovalBackend.ShouldFallbackToLegacyDisposition(error));
     }
 
     [Fact]
@@ -488,58 +857,6 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RemoveLinkAsync_DeletesOnlyObservedLink()
-    {
-        var externalFile = Path.Combine(_tempRoot, "keep.txt");
-        File.WriteAllText(externalFile, "keep");
-        var link = Path.Combine(_tempRoot, "agent-link.txt");
-        if (!TryCreateFileLink(link, externalFile)) return;
-
-        var report = await new RemoveService(_logger).RemoveLinkAsync(
-            link,
-            TestContext.Current.CancellationToken);
-
-        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
-        Assert.False(PathResolver.IsSymlink(link));
-        Assert.True(File.Exists(externalFile));
-        Assert.Equal("keep", File.ReadAllText(externalFile));
-    }
-
-    [Fact]
-    public async Task RemoveLinkAsync_AlreadyCanceledPublishesTerminalProgress()
-    {
-        var externalFile = Path.Combine(_tempRoot, "keep-canceled.txt");
-        File.WriteAllText(externalFile, "keep");
-        var link = Path.Combine(_tempRoot, "agent-link-canceled.txt");
-        if (!TryCreateFileLink(link, externalFile)) return;
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        var updates = new List<RemoveService.RemoveProgress>();
-        var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
-
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            new RemoveService(_logger).RemoveLinkAsync(
-                link,
-                cancellation.Token,
-                progress));
-
-        Assert.True(PathResolver.IsSymlink(link));
-        Assert.True(File.Exists(externalFile));
-        Assert.Collection(
-            updates,
-            update =>
-            {
-                Assert.False(update.IsCompleted);
-                Assert.False(update.IsCanceled);
-            },
-            update =>
-            {
-                Assert.False(update.IsCompleted);
-                Assert.True(update.IsCanceled);
-            });
-    }
-
-    [Fact]
     public void FailureCollector_RetainsBoundedDetailsAndExactCount()
     {
         var failures = new RemoveService.FailureCollector();
@@ -582,6 +899,46 @@ public class RemoveServiceTests : IDisposable
         Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
         Assert.False(Directory.Exists(dir));
         Assert.True(File.Exists(externalFile));
+    }
+
+    [Fact]
+    public void Remove_WindowsRootPathReplacedWithHardLinkJunction_UsesHeldParent()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var (skill, dir) = MakeSkill("relative-child-open");
+        var movedOriginal = Path.Combine(_tempRoot, "relative-child-open-original");
+        var external = Path.Combine(_tempRoot, "relative-child-open-external");
+        Directory.CreateDirectory(external);
+        var externalHardLink = Path.Combine(external, "SKILL.md");
+        if (!WindowsTestNative.CreateHardLinkW(
+                externalHardLink,
+                Path.Combine(dir, "SKILL.md"),
+                IntPtr.Zero))
+        {
+            return;
+        }
+        var swapped = false;
+        var linkCreated = false;
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var service = new RemoveService(_logger, _ =>
+        {
+            if (swapped) return;
+            swapped = true;
+            Directory.Move(dir, movedOriginal);
+            linkCreated = TryCreateDirectoryLink(dir, external);
+        });
+
+        var report = service.Remove(
+            validation,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        if (!linkCreated) return;
+        Assert.True(swapped);
+        Assert.True(report.Succeeded, string.Join(System.Environment.NewLine, report.Errors));
+        Assert.True(PathResolver.IsSymlink(dir));
+        Assert.Equal("body", File.ReadAllText(externalHardLink));
+        Assert.False(Directory.Exists(movedOriginal));
     }
 
     private static bool TryCreateDirectoryLink(string link, string target)
@@ -643,5 +1000,15 @@ public class RemoveServiceTests : IDisposable
     private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
     {
         public void Report(T value) => callback(value);
+    }
+
+    private static class WindowsTestNative
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool CreateHardLinkW(
+            string fileName,
+            string existingFileName,
+            IntPtr securityAttributes);
     }
 }

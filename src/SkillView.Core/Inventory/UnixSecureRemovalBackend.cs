@@ -1,0 +1,1723 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+namespace SkillView.Inventory;
+
+internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
+{
+    private const int MaxInterruptedAttempts = 8;
+    private const int StatBufferSize = 512;
+    private const int InitialLinuxFinalPathCapacity = 512;
+    private const int MaxLinuxFinalPathCapacity = 32_768;
+    private const string LinuxDeletedPathSuffix = " (deleted)";
+    private const int MacAttributeBufferCapacity = 8_192;
+    private const uint FileTypeMask = 0xF000;
+    private const uint DirectoryType = 0x4000;
+    private const uint SymlinkType = 0xA000;
+    private readonly Action? _directoryIdentityCapturedForTests;
+    private readonly Action? _linkTargetObservedForTests;
+    private readonly Action? _rootIdentityCapturedForTests;
+
+    internal UnixSecureRemovalBackend(
+        Action? directoryIdentityCapturedForTests = null,
+        Action? linkTargetObservedForTests = null,
+        Action? rootIdentityCapturedForTests = null)
+    {
+        _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
+        _linkTargetObservedForTests = linkTargetObservedForTests;
+        _rootIdentityCapturedForTests = rootIdentityCapturedForTests;
+    }
+
+    private static readonly PlatformSupport CurrentPlatformSupport =
+        DetectCurrentPlatformSupport();
+
+    internal static bool IsSupportedOnCurrentPlatform =>
+        CurrentPlatformSupport.IsSupported;
+
+    internal static string? UnsupportedReason => CurrentPlatformSupport.Error;
+
+    public bool TryCaptureIdentity(
+        string path,
+        out SecureFileIdentity identity,
+        out string? error)
+    {
+        identity = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var handle = OpenAbsoluteDirectory(
+                Path.Combine(resolvedParent, name),
+                out var parent,
+                out _);
+            using (parent)
+            {
+                var stat = ReadStat(handle, statBuffer.Pointer);
+                var canonicalPath = ReadFinalPath(handle);
+                identity = new SecureFileIdentity(
+                    stat.Device,
+                    stat.Inode,
+                    0,
+                    canonicalPath,
+                    IsDirectory: stat.IsDirectory,
+                    IsReparsePoint: stat.IsSymlink,
+                    stat.ChangeTimeSeconds,
+                    stat.ChangeTimeNanoseconds);
+                return true;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureDirectoryValidation(
+        string path,
+        out SecureDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var handle = OpenAbsoluteDirectory(
+                Path.Combine(resolvedParent, name),
+                out var parent,
+                out _);
+            using (parent)
+            {
+                snapshot = CaptureDirectoryValidation(handle, path, statBuffer);
+                return true;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureDirectoryValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedDirectoryValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var components = GetRelativeComponents(rootPath, path);
+            using var root = OpenDirectory(RealPath(rootPath));
+            var rootBefore = ReadStat(root, statBuffer.Pointer);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var target = OpenRelativeDirectory(
+                root,
+                components,
+                rootBefore.Device,
+                statBuffer.Pointer);
+            var directory = CaptureDirectoryValidation(target, path, statBuffer);
+            var rootIdentity = CaptureStableRootIdentity(
+                root,
+                rootBefore,
+                statBuffer);
+            snapshot = new SecureRootedDirectoryValidationSnapshot(
+                rootIdentity,
+                directory);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureLinkIdentity(
+        string path,
+        out SecureLinkIdentity identity,
+        out string? error) =>
+        TryCaptureLink(path, inspectTarget: false, out identity, out _, out error);
+
+    public bool TryCaptureLinkValidation(
+        string path,
+        out SecureLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        if (!TryCaptureLink(
+                path,
+                inspectTarget: true,
+                out var identity,
+                out var isBroken,
+                out error))
+        {
+            return false;
+        }
+        snapshot = new SecureLinkValidationSnapshot(identity, isBroken);
+        return true;
+    }
+
+    private bool TryCaptureLink(
+        string path,
+        bool inspectTarget,
+        out SecureLinkIdentity identity,
+        out bool isBroken,
+        out string? error)
+    {
+        identity = default;
+        isBroken = false;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var fullPath = Path.GetFullPath(path);
+            var name = Path.GetFileName(fullPath);
+            var parentPath = Path.GetDirectoryName(fullPath)
+                ?? throw new IOException($"path '{path}' has no parent directory");
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new IOException($"path '{path}' has no final entry name");
+            }
+
+            var resolvedParent = RealPath(parentPath);
+            using var parent = OpenDirectory(resolvedParent);
+            (identity, isBroken) = CaptureLink(
+                parent,
+                name,
+                path,
+                inspectTarget,
+                statBuffer);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCaptureLinkValidationWithinRoot(
+        string rootPath,
+        string path,
+        out SecureRootedLinkValidationSnapshot snapshot,
+        out string? error)
+    {
+        snapshot = default;
+        error = null;
+        try
+        {
+            using var statBuffer = new StatBuffer();
+            var components = GetRelativeComponents(rootPath, path);
+            var name = components[^1];
+            using var root = OpenDirectory(RealPath(rootPath));
+            var rootBefore = ReadStat(root, statBuffer.Pointer);
+            _rootIdentityCapturedForTests?.Invoke();
+            using var ownedParent = OpenRelativeParent(
+                root,
+                components,
+                rootBefore.Device,
+                statBuffer.Pointer);
+            var parent = ownedParent ?? root;
+            var (identity, isBroken) = CaptureLink(
+                parent,
+                name,
+                path,
+                inspectTarget: true,
+                statBuffer);
+            var rootIdentity = CaptureStableRootIdentity(
+                root,
+                rootBefore,
+                statBuffer);
+            snapshot = new SecureRootedLinkValidationSnapshot(
+                rootIdentity,
+                new SecureLinkValidationSnapshot(identity, isBroken));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public bool TryCanonicalizePath(
+        string path,
+        out string canonicalPath,
+        out string? error)
+    {
+        try
+        {
+            var resolvedPath = RealPath(path);
+            using var handle = OpenDirectory(resolvedPath);
+            canonicalPath = ReadFinalPath(handle);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            canonicalPath = string.Empty;
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private SecureDirectoryValidationSnapshot CaptureDirectoryValidation(
+        SafeUnixHandle handle,
+        string displayPath,
+        StatBuffer statBuffer)
+    {
+        var before = ReadStat(handle, statBuffer.Pointer);
+        if (!before.IsDirectory || before.IsSymlink)
+        {
+            throw new IOException(
+                $"'{displayPath}' is no longer a non-link directory");
+        }
+        _directoryIdentityCapturedForTests?.Invoke();
+
+        var hasSkill = TryReadFollowedStatAt(
+            handle,
+            LocalSkillScanner.SkillFileName,
+            statBuffer.Pointer,
+            out var skillStat,
+            out var skillError)
+            ? !skillStat.IsDirectory
+            : skillError is null
+                ? false
+                : throw new IOException(skillError);
+        var hasGit = TryReadFollowedStatAt(
+            handle,
+            ".git",
+            statBuffer.Pointer,
+            out var gitStat,
+            out var gitError)
+            ? gitStat.IsDirectory
+            : gitError is null
+                ? false
+                : throw new IOException(gitError);
+        var isEmpty = IsDirectoryEmpty(handle, out var enumerationError);
+        if (enumerationError is not null) throw new IOException(enumerationError);
+
+        var canonicalPath = ReadFinalPath(handle);
+        var after = ReadStat(handle, statBuffer.Pointer);
+        if (!Matches(before, after))
+        {
+            throw new IOException(
+                "selected directory changed during policy inspection");
+        }
+        return new SecureDirectoryValidationSnapshot(
+            ToSecureIdentity(after, canonicalPath),
+            hasSkill,
+            hasGit,
+            isEmpty);
+    }
+
+    private (SecureLinkIdentity Identity, bool IsBroken) CaptureLink(
+        SafeUnixHandle parent,
+        string name,
+        string displayPath,
+        bool inspectTarget,
+        StatBuffer statBuffer)
+    {
+        var parentStat = ReadStat(parent, statBuffer.Pointer);
+        if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                out var linkStat, out var statError))
+        {
+            throw new IOException(statError);
+        }
+        if (!linkStat.IsSymlink)
+        {
+            throw new IOException($"'{displayPath}' is no longer a symlink");
+        }
+
+        var isBroken = false;
+        if (inspectTarget)
+        {
+            isBroken = !TryReadFollowedStatAt(
+                parent,
+                name,
+                statBuffer.Pointer,
+                out _,
+                out var targetError);
+            if (targetError is not null) throw new IOException(targetError);
+            _linkTargetObservedForTests?.Invoke();
+            if (!TryReadStatAt(parent, name, statBuffer.Pointer,
+                    out var linkAfter, out statError)
+                || !Matches(linkStat, linkAfter))
+            {
+                throw new IOException(
+                    statError ?? "link changed during target inspection");
+            }
+        }
+
+        var canonicalParent = ReadFinalPath(parent);
+        var parentAfter = ReadStat(parent, statBuffer.Pointer);
+        if (!Matches(parentStat, parentAfter))
+        {
+            throw new IOException("link parent changed during identity capture");
+        }
+        var canonicalLink = Path.Combine(canonicalParent, name);
+        return (new SecureLinkIdentity(
+            ToSecureIdentity(parentAfter, canonicalParent),
+            ToSecureIdentity(linkStat, canonicalLink),
+            name), isBroken);
+    }
+
+    private static SecureFileIdentity CaptureStableRootIdentity(
+        SafeUnixHandle root,
+        NativeStat before,
+        StatBuffer statBuffer)
+    {
+        var canonicalRoot = ReadFinalPath(root);
+        var after = ReadStat(root, statBuffer.Pointer);
+        if (!Matches(before, after))
+        {
+            throw new IOException("scan root changed during validation");
+        }
+        return ToSecureIdentity(after, canonicalRoot);
+    }
+
+    private static string[] GetRelativeComponents(string rootPath, string path)
+    {
+        var root = Path.GetFullPath(rootPath);
+        var target = Path.GetFullPath(path);
+        if (!PathResolver.IsInside(target, root)
+            || PathIdentity.Equals(target, root))
+        {
+            throw new IOException(
+                $"target '{target}' is not a child of scan root '{root}'");
+        }
+
+        var relative = Path.GetRelativePath(root, target);
+        var components = relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        if (components.Length == 0
+            || components.Any(component => component is "." or ".."))
+        {
+            throw new IOException("refusing an invalid scan-root-relative path");
+        }
+        return components;
+    }
+
+    private static SafeUnixHandle OpenRelativeDirectory(
+        SafeUnixHandle root,
+        IReadOnlyList<string> components,
+        ulong rootDevice,
+        IntPtr statBuffer)
+    {
+        SafeUnixHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenRootBoundDirectoryAt(
+                    parent,
+                    components[index],
+                    rootDevice,
+                    statBuffer,
+                    followFinalComponent: index < components.Count - 1);
+                current?.Dispose();
+                current = next;
+            }
+            return current
+                ?? throw new IOException("scan-root-relative target is empty");
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeUnixHandle? OpenRelativeParent(
+        SafeUnixHandle root,
+        IReadOnlyList<string> components,
+        ulong rootDevice,
+        IntPtr statBuffer)
+    {
+        if (components.Count == 1) return null;
+
+        SafeUnixHandle? current = null;
+        try
+        {
+            for (var index = 0; index < components.Count - 1; index++)
+            {
+                var parent = current ?? root;
+                var next = OpenRootBoundDirectoryAt(
+                    parent,
+                    components[index],
+                    rootDevice,
+                    statBuffer,
+                    followFinalComponent: true);
+                current?.Dispose();
+                current = next;
+            }
+            return current;
+        }
+        catch
+        {
+            current?.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeUnixHandle OpenRootBoundDirectoryAt(
+        SafeUnixHandle parent,
+        string name,
+        ulong rootDevice,
+        IntPtr statBuffer,
+        bool followFinalComponent)
+    {
+        var child = OpenDirectoryAt(
+            parent,
+            name,
+            refuseNestedMount: true,
+            followFinalComponent: followFinalComponent);
+        try
+        {
+            var childStat = ReadStat(child, statBuffer);
+            if (!IsSameDevice(rootDevice, childStat.Device))
+            {
+                throw new IOException(
+                    "scan-root-relative path crosses a filesystem mount boundary");
+            }
+            return child;
+        }
+        catch
+        {
+            child.Dispose();
+            throw;
+        }
+    }
+
+    internal static bool IsSameDevice(ulong rootDevice, ulong childDevice) =>
+        rootDevice == childDevice;
+
+    public void RemoveTree(
+        string path,
+        SecureFileIdentity expectedIdentity,
+        bool requireEmptyDirectory,
+        int maxDepth,
+        Action<string> entryObserved,
+        Action<string, bool> entryDeleting,
+        Action<string, bool> entryDeleted,
+        Action<string, string> failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var canonicalPath = expectedIdentity.CanonicalPath;
+
+        SafeUnixHandle? target = null;
+        SafeUnixHandle? parent = null;
+        var frames = new Stack<DirectoryFrame>();
+        using var statBuffer = new StatBuffer();
+        try
+        {
+            target = OpenAbsoluteDirectory(canonicalPath, out parent, out var targetName);
+            var targetStat = ReadStat(target, statBuffer.Pointer);
+            if (!Matches(expectedIdentity, targetStat))
+            {
+                failure(path, "selected target identity changed after validation");
+                return;
+            }
+            if (!targetStat.IsDirectory || targetStat.IsSymlink)
+            {
+                failure(path, "selected target is no longer a non-link directory");
+                return;
+            }
+
+            frames.Push(new DirectoryFrame(
+                target,
+                parent,
+                targetName,
+                canonicalPath,
+                depth: 0,
+                ownsParent: true));
+            target = null;
+            parent = null;
+
+            while (frames.TryPeek(out var frame))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (frame.TryReadNext(out var child, out var enumerationError))
+                {
+                    if (child is null) continue;
+                    if (requireEmptyDirectory && frame.Depth == 0)
+                    {
+                        failure(frame.DisplayPath,
+                            "validated empty directory is no longer empty");
+                        return;
+                    }
+                    var childPath = Path.Combine(frame.DisplayPath, child.Value.Name);
+                    entryObserved(childPath);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (!TryReadStatAt(frame.Directory, child.Value.Name, statBuffer.Pointer,
+                            out var childStat, out var statError))
+                    {
+                        failure(childPath, statError!);
+                        frame.PreventDelete();
+                        continue;
+                    }
+                    if (child.Value.Inode != 0 && child.Value.Inode != childStat.Inode)
+                    {
+                        failure(childPath, "entry identity changed during removal");
+                        frame.PreventDelete();
+                        continue;
+                    }
+
+                    if (childStat.IsDirectory && !childStat.IsSymlink)
+                    {
+                        if (frame.Depth >= maxDepth)
+                        {
+                            failure(childPath,
+                                $"directory nesting exceeds the safety limit of {maxDepth}");
+                            frame.PreventDelete();
+                            continue;
+                        }
+                        if (childStat.Device != targetStat.Device)
+                        {
+                            failure(childPath, "cross-filesystem mount traversal refused");
+                            frame.PreventDelete();
+                            continue;
+                        }
+
+                        SafeUnixHandle? childHandle = null;
+                        try
+                        {
+                            childHandle = OpenDirectoryAt(
+                                frame.Directory,
+                                child.Value.Name,
+                                refuseNestedMount: true);
+                            var openedStat = ReadStat(childHandle, statBuffer.Pointer);
+                            if (!Matches(childStat, openedStat))
+                            {
+                                failure(childPath, "directory identity changed before it could be opened");
+                                frame.PreventDelete();
+                                continue;
+                            }
+
+                            frames.Push(new DirectoryFrame(
+                                childHandle,
+                                frame.Directory,
+                                child.Value.Name,
+                                childPath,
+                                frame.Depth + 1,
+                                ownsParent: false));
+                            childHandle = null;
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            failure(childPath, ex.Message);
+                            frame.PreventDelete();
+                        }
+                        finally
+                        {
+                            childHandle?.Dispose();
+                        }
+                        continue;
+                    }
+
+                    if (!TryReadStatAt(frame.Directory, child.Value.Name, statBuffer.Pointer,
+                            out var beforeDelete, out statError)
+                        || !Matches(childStat, beforeDelete))
+                    {
+                        failure(childPath, statError ?? "entry identity changed before deletion");
+                        frame.PreventDelete();
+                        continue;
+                    }
+
+                    entryDeleting(childPath, false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (UnlinkAtWithRetry(
+                            frame.Directory.FileDescriptor,
+                            child.Value.Name,
+                            flags: 0,
+                            cancellationToken) != 0)
+                    {
+                        failure(childPath, LastError("delete failed"));
+                        frame.PreventDelete();
+                        continue;
+                    }
+                    entryDeleted(childPath, false);
+                    continue;
+                }
+
+                if (enumerationError is not null)
+                {
+                    failure(frame.DisplayPath, enumerationError);
+                    frame.PreventDelete();
+                }
+
+                frames.Pop();
+                try
+                {
+                    if (frame.CanDelete)
+                    {
+                        var openedBeforeDelete = ReadStat(
+                            frame.Directory,
+                            statBuffer.Pointer);
+                        if (!TryReadStatAt(frame.Parent, frame.Name, statBuffer.Pointer,
+                                out var beforeDelete, out var statError)
+                            || !Matches(openedBeforeDelete, beforeDelete))
+                        {
+                            failure(frame.DisplayPath,
+                                statError ?? "directory identity changed before deletion");
+                        }
+                        else
+                        {
+                            entryDeleting(frame.DisplayPath, true);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (UnlinkAtWithRetry(
+                                    frame.Parent.FileDescriptor,
+                                    frame.Name,
+                                    UnixConstants.RemoveDirectoryFlag,
+                                    cancellationToken) != 0)
+                            {
+                                failure(frame.DisplayPath, LastError("delete directory failed"));
+                            }
+                            else
+                            {
+                                entryDeleted(frame.DisplayPath, true);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    frame.Dispose();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            failure(path, ex.Message);
+        }
+        finally
+        {
+            while (frames.Count > 0) frames.Pop().Dispose();
+            target?.Dispose();
+            parent?.Dispose();
+        }
+    }
+
+    public void RemoveLink(
+        string path,
+        SecureLinkIdentity expectedIdentity,
+        Action<string, bool> entryDeleting,
+        Action<string, bool> entryDeleted,
+        Action<string, string> failure,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SafeUnixHandle? parent = null;
+        using var statBuffer = new StatBuffer();
+        try
+        {
+            parent = OpenDirectory(expectedIdentity.ParentIdentity.CanonicalPath);
+            var parentStat = ReadStat(parent, statBuffer.Pointer);
+            if (!Matches(expectedIdentity.ParentIdentity, parentStat))
+            {
+                failure(path, "link parent identity changed after validation");
+                return;
+            }
+            if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
+                    out var identity, out var statError))
+            {
+                failure(path, statError!);
+                return;
+            }
+            if (!Matches(expectedIdentity.LinkIdentity, identity)
+                || !identity.IsSymlink)
+            {
+                failure(path, "link identity changed after validation");
+                return;
+            }
+            entryDeleting(path, false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryReadStatAt(parent, expectedIdentity.Name, statBuffer.Pointer,
+                    out var beforeDelete, out statError)
+                || !Matches(expectedIdentity.LinkIdentity, beforeDelete))
+            {
+                failure(path, statError ?? "link identity changed before deletion");
+                return;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (UnlinkAtWithRetry(
+                    parent.FileDescriptor,
+                    expectedIdentity.Name,
+                    flags: 0,
+                    cancellationToken) != 0)
+            {
+                failure(path, LastError("unlink failed"));
+                return;
+            }
+            entryDeleted(path, false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            failure(path, ex.Message);
+        }
+        finally
+        {
+            parent?.Dispose();
+        }
+    }
+
+    private static SecureFileIdentity ToSecureIdentity(
+        NativeStat stat,
+        string canonicalPath) => new(
+            stat.Device,
+            stat.Inode,
+            0,
+            canonicalPath,
+            stat.IsDirectory,
+            stat.IsSymlink,
+            stat.ChangeTimeSeconds,
+            stat.ChangeTimeNanoseconds);
+
+    private static SafeUnixHandle OpenAbsoluteDirectory(
+        string path,
+        out SafeUnixHandle parent,
+        out string name)
+    {
+        parent = OpenAbsoluteParent(path, out name);
+        try
+        {
+            return OpenDirectoryAt(parent, name, refuseNestedMount: false);
+        }
+        catch
+        {
+            parent.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeUnixHandle OpenAbsoluteParent(string path, out string name)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(fullPath)
+            ?? throw new IOException($"path '{path}' has no filesystem root");
+        var relative = Path.GetRelativePath(root, fullPath);
+        var components = relative.Split(Path.DirectorySeparatorChar,
+            StringSplitOptions.RemoveEmptyEntries);
+        if (components.Length == 0)
+        {
+            throw new IOException("refusing to remove a filesystem root");
+        }
+
+        var current = OpenDirectory(root);
+        try
+        {
+            for (var i = 0; i < components.Length - 1; i++)
+            {
+                var next = OpenDirectoryAt(
+                    current,
+                    components[i],
+                    refuseNestedMount: false);
+                current.Dispose();
+                current = next;
+            }
+            name = components[^1];
+            return current;
+        }
+        catch
+        {
+            current.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeUnixHandle OpenDirectory(string path)
+    {
+        var fd = OpenWithRetry(path, UnixConstants.DirectoryOpenFlags);
+        return CreateHandle(fd, $"open directory '{path}' failed");
+    }
+
+    private static SafeUnixHandle OpenDirectoryAt(
+        SafeUnixHandle parent,
+        string name,
+        bool refuseNestedMount,
+        bool followFinalComponent = false)
+    {
+        var openFlags = followFinalComponent
+            ? UnixConstants.DirectoryFollowOpenFlags
+            : UnixConstants.DirectoryOpenFlags;
+        int fd;
+        if (OperatingSystem.IsLinux() && refuseNestedMount)
+        {
+            var how = new OpenHow
+            {
+                Flags = unchecked((ulong)openFlags),
+                Resolve = UnixConstants.ResolveBeneath
+                    | UnixConstants.ResolveNoSymlinks
+                    | UnixConstants.ResolveNoCrossDevice,
+            };
+            fd = checked((int)OpenAt2WithRetry(
+                UnixConstants.OpenAt2SystemCall,
+                parent.FileDescriptor,
+                name,
+                ref how,
+                (nuint)Marshal.SizeOf<OpenHow>()));
+        }
+        else
+        {
+            fd = OpenAtWithRetry(
+                parent.FileDescriptor,
+                name,
+                openFlags);
+        }
+        return CreateHandle(fd, $"open directory entry '{name}' failed");
+    }
+
+    private static SafeUnixHandle CreateHandle(int fd, string detail)
+    {
+        if (fd < 0) throw new IOException($"{detail}: {LastErrorMessage()}");
+        return new SafeUnixHandle(fd);
+    }
+
+    private static string RealPath(string path)
+    {
+        var result = UnixNative.realpath(path, IntPtr.Zero);
+        if (result == IntPtr.Zero)
+        {
+            throw new IOException($"resolve '{path}' failed: {LastErrorMessage()}");
+        }
+        try
+        {
+            return Marshal.PtrToStringUTF8(result)
+                ?? throw new IOException($"resolve '{path}' returned an invalid path");
+        }
+        finally
+        {
+            UnixNative.free(result);
+        }
+    }
+
+    private static string ReadFinalPath(SafeUnixHandle handle)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            var attributes = new MacAttributeList
+            {
+                BitmapCount = UnixConstants.AttributeBitmapCount,
+                CommonAttributes = UnixConstants.AttributeCommonFullPath,
+            };
+            var buffer = new byte[MacAttributeBufferCapacity];
+            if (FGetAttrListWithRetry(
+                    handle.FileDescriptor,
+                    ref attributes,
+                    buffer,
+                    checked((nuint)buffer.Length),
+                    options: 0) != 0)
+            {
+                throw new IOException(
+                    $"resolve opened entry path failed: {LastErrorMessage()}");
+            }
+
+            const int lengthFieldOffset = 0;
+            const int referenceOffset = sizeof(uint);
+            const int referenceSize = sizeof(int) + sizeof(uint);
+            var returnedLength = BitConverter.ToUInt32(buffer, lengthFieldOffset);
+            var dataOffset = BitConverter.ToInt32(buffer, referenceOffset);
+            var dataLength = BitConverter.ToUInt32(
+                buffer,
+                referenceOffset + sizeof(int));
+            var dataStart = referenceOffset + (long)dataOffset;
+            var dataEnd = dataStart + dataLength;
+            if (returnedLength > buffer.Length
+                || returnedLength < referenceOffset + referenceSize
+                || dataStart < referenceOffset + referenceSize
+                || dataLength <= 1
+                || dataEnd > returnedLength
+                || dataEnd > buffer.Length
+                || buffer[checked((int)dataEnd - 1)] != 0)
+            {
+                throw new IOException("resolve opened entry returned an invalid path");
+            }
+
+            var path = Encoding.UTF8.GetString(
+                buffer,
+                checked((int)dataStart),
+                checked((int)dataLength - 1));
+            return Path.GetFullPath(path);
+        }
+
+        var descriptorPath = $"/proc/self/fd/{handle.FileDescriptor}";
+        var capacity = InitialLinuxFinalPathCapacity;
+        while (capacity <= MaxLinuxFinalPathCapacity)
+        {
+            var buffer = Marshal.AllocHGlobal(capacity);
+            try
+            {
+                var length = ReadLinkWithRetry(
+                    descriptorPath,
+                    buffer,
+                    checked((nuint)capacity));
+                if (length < 0)
+                {
+                    throw new IOException(
+                        $"resolve opened entry path failed: {LastErrorMessage()}");
+                }
+                if (length < capacity)
+                {
+                    var path = Marshal.PtrToStringUTF8(buffer, checked((int)length))
+                        ?? throw new IOException(
+                            "resolve opened entry returned an invalid path");
+                    if (path.EndsWith(LinuxDeletedPathSuffix, StringComparison.Ordinal)
+                        && !LinuxFinalPathNamesOpenedEntry(handle, path))
+                    {
+                        throw new IOException(
+                            "opened entry was unlinked or replaced while its identity was captured");
+                    }
+                    return Path.GetFullPath(path);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+            capacity = checked(capacity * 2);
+        }
+
+        throw new IOException(
+            $"resolved opened entry path exceeds {MaxLinuxFinalPathCapacity} bytes");
+    }
+
+    private static bool LinuxFinalPathNamesOpenedEntry(
+        SafeUnixHandle handle,
+        string path)
+    {
+        using var statBuffer = new StatBuffer();
+        var before = ReadStat(handle, statBuffer.Pointer);
+        if (FStatAtWithRetry(
+                UnixConstants.CurrentWorkingDirectory,
+                path,
+                statBuffer.Pointer,
+                UnixConstants.NoFollowFlag) != 0)
+        {
+            var nativeError = Marshal.GetLastPInvokeError();
+            if (nativeError is 2 or 20) return false;
+            throw new IOException(
+                $"verify opened entry path failed: "
+                + new Win32Exception(nativeError).Message);
+        }
+
+        var named = ParseStat(statBuffer.Pointer);
+        var after = ReadStat(handle, statBuffer.Pointer);
+        return Matches(before, named) && Matches(before, after);
+    }
+
+    private static NativeStat ReadStat(SafeUnixHandle handle, IntPtr buffer)
+    {
+        if (FStatWithRetry(handle.FileDescriptor, buffer) != 0)
+        {
+            throw new IOException($"inspect opened entry failed: {LastErrorMessage()}");
+        }
+        return ParseStat(buffer);
+    }
+
+    private static bool TryReadStatAt(
+        SafeUnixHandle parent,
+        string name,
+        IntPtr buffer,
+        out NativeStat stat,
+        out string? error)
+    {
+        if (FStatAtWithRetry(
+                parent.FileDescriptor,
+                name,
+                buffer,
+                UnixConstants.NoFollowFlag) != 0)
+        {
+            stat = default;
+            error = $"inspect entry failed: {LastErrorMessage()}";
+            return false;
+        }
+        stat = ParseStat(buffer);
+        error = null;
+        return true;
+    }
+
+    private static bool TryReadFollowedStatAt(
+        SafeUnixHandle parent,
+        string name,
+        IntPtr buffer,
+        out NativeStat stat,
+        out string? error)
+    {
+        if (FStatAtWithRetry(parent.FileDescriptor, name, buffer, flags: 0) == 0)
+        {
+            stat = ParseStat(buffer);
+            error = null;
+            return true;
+        }
+
+        var nativeError = Marshal.GetLastPInvokeError();
+        stat = default;
+        if (nativeError is 2 or 20)
+        {
+            error = null;
+            return false;
+        }
+        error = $"inspect followed entry failed: {new Win32Exception(nativeError).Message}";
+        return false;
+    }
+
+    private static bool IsDirectoryEmpty(SafeUnixHandle directory, out string? error)
+    {
+        var duplicate = DupWithRetry(directory.FileDescriptor);
+        if (duplicate < 0)
+        {
+            error = LastError("duplicate directory handle failed");
+            return false;
+        }
+        var stream = UnixNative.fdopendir(duplicate);
+        if (stream == IntPtr.Zero)
+        {
+            UnixNative.close(duplicate);
+            error = LastError("open directory stream failed");
+            return false;
+        }
+        try
+        {
+            while (true)
+            {
+                Marshal.SetLastPInvokeError(0);
+                var nativeEntry = ReadDirectoryWithRetry(stream);
+                if (nativeEntry == IntPtr.Zero)
+                {
+                    var nativeError = Marshal.GetLastPInvokeError();
+                    error = nativeError == 0
+                        ? null
+                        : new Win32Exception(nativeError).Message;
+                    return nativeError == 0;
+                }
+                string? name;
+                if (OperatingSystem.IsMacOS())
+                {
+                    var length = unchecked((ushort)Marshal.ReadInt16(nativeEntry, 18));
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 21), length);
+                }
+                else
+                {
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 19));
+                }
+                if (!string.IsNullOrEmpty(name) && name is not "." and not "..")
+                {
+                    error = null;
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            UnixNative.closedir(stream);
+        }
+    }
+
+    private static NativeStat ParseStat(IntPtr buffer)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            if (!IsMacPlatformSupported(
+                    RuntimeInformation.ProcessArchitecture,
+                    BitConverter.IsLittleEndian))
+            {
+                throw new PlatformNotSupportedException(
+                    $"The native stat layout for {RuntimeInformation.OSDescription} "
+                    + $"({RuntimeInformation.ProcessArchitecture}) is not supported.");
+            }
+            var device = unchecked((uint)Marshal.ReadInt32(buffer, 0));
+            var mode = unchecked((ushort)Marshal.ReadInt16(buffer, 4));
+            var inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
+            var changeTimeSeconds = Marshal.ReadInt64(buffer, 64);
+            var changeTimeNanoseconds = Marshal.ReadInt64(buffer, 72);
+            return new NativeStat(
+                device,
+                inode,
+                mode,
+                changeTimeSeconds,
+                changeTimeNanoseconds);
+        }
+
+        if (!OperatingSystem.IsLinux()
+            || !TryGetLinuxStatLayout(
+                RuntimeInformation.ProcessArchitecture,
+                BitConverter.IsLittleEndian,
+                out var layout))
+        {
+            throw new PlatformNotSupportedException(
+                $"The native stat layout for {RuntimeInformation.OSDescription} "
+                + $"({RuntimeInformation.ProcessArchitecture}) is not supported.");
+        }
+
+        return new NativeStat(
+            unchecked((ulong)Marshal.ReadInt64(buffer, layout.DeviceOffset)),
+            unchecked((ulong)Marshal.ReadInt64(buffer, layout.InodeOffset)),
+            unchecked((uint)Marshal.ReadInt32(buffer, layout.ModeOffset)),
+            Marshal.ReadInt64(buffer, layout.ChangeTimeSecondsOffset),
+            Marshal.ReadInt64(buffer, layout.ChangeTimeNanosecondsOffset));
+    }
+
+    internal static bool TryGetLinuxStatLayout(
+        Architecture architecture,
+        bool isLittleEndian,
+        out LinuxStatLayout layout)
+    {
+        // .NET's supported Linux x64 and ARM64 targets use the libc ABI layouts
+        // below. Refuse unknown architectures and endianness rather than reading
+        // an unverified field from the native buffer.
+        layout = (architecture, isLittleEndian) switch
+        {
+            (Architecture.X64, true) => new LinuxStatLayout(0, 8, 24, 104, 112),
+            (Architecture.Arm64, true) => new LinuxStatLayout(0, 8, 16, 104, 112),
+            _ => default,
+        };
+        return layout != default;
+    }
+
+    internal static bool IsLinuxPlatformSupported(
+        Architecture architecture,
+        bool isLittleEndian,
+        bool openAt2Available) =>
+        openAt2Available
+        && TryGetLinuxStatLayout(architecture, isLittleEndian, out _);
+
+    internal static bool IsMacPlatformSupported(
+        Architecture architecture,
+        bool isLittleEndian) =>
+        architecture == Architecture.Arm64 && isLittleEndian;
+
+    private static PlatformSupport DetectCurrentPlatformSupport()
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            return IsMacPlatformSupported(
+                RuntimeInformation.ProcessArchitecture,
+                BitConverter.IsLittleEndian)
+                ? new PlatformSupport(true, null, null)
+                : new PlatformSupport(
+                    false,
+                    "secure removal on macOS requires a native ARM64 process; "
+                    + "Intel and Rosetta processes expose a different inode ABI",
+                    null);
+        }
+
+        if (!OperatingSystem.IsLinux())
+        {
+            return new PlatformSupport(
+                false,
+                "secure removal is supported only on Windows, Linux, and native ARM64 macOS",
+                null);
+        }
+
+        var architecture = RuntimeInformation.ProcessArchitecture;
+        var isLittleEndian = BitConverter.IsLittleEndian;
+        if (!TryGetLinuxStatLayout(architecture, isLittleEndian, out _))
+        {
+            return new PlatformSupport(
+                false,
+                $"secure removal has no verified Linux stat ABI for {architecture} "
+                + $"({(isLittleEndian ? "little" : "big")}-endian)",
+                null);
+        }
+
+        var openAt2Available = ProbeOpenAt2(out var nativeError);
+        return IsLinuxPlatformSupported(architecture, isLittleEndian, openAt2Available)
+            ? new PlatformSupport(true, null, null)
+            : new PlatformSupport(
+                false,
+                "secure removal requires Linux openat2 with RESOLVE_BENEATH, "
+                + "RESOLVE_NO_SYMLINKS, and RESOLVE_NO_XDEV"
+                + (nativeError is null
+                    ? string.Empty
+                    : $"; the capability probe failed with errno {nativeError}: "
+                        + new Win32Exception(nativeError.Value).Message),
+                nativeError);
+    }
+
+    private static bool ProbeOpenAt2(out int? nativeError)
+    {
+        nativeError = null;
+        var rootDescriptor = OpenWithRetry(
+            Path.DirectorySeparatorChar.ToString(),
+            UnixConstants.DirectoryOpenFlags);
+        if (rootDescriptor < 0)
+        {
+            nativeError = Marshal.GetLastPInvokeError();
+            return false;
+        }
+        using var root = new SafeUnixHandle(rootDescriptor);
+        var how = new OpenHow
+        {
+            Flags = unchecked((ulong)UnixConstants.DirectoryOpenFlags),
+            Resolve = UnixConstants.ResolveBeneath
+                | UnixConstants.ResolveNoSymlinks
+                | UnixConstants.ResolveNoCrossDevice,
+        };
+        // Probe the exact descriptor-relative flags used during traversal, but
+        // anchor them to the stable filesystem root rather than process CWD.
+        var descriptor = OpenAt2WithRetry(
+            UnixConstants.OpenAt2SystemCall,
+            root.FileDescriptor,
+            ".",
+            ref how,
+            (nuint)Marshal.SizeOf<OpenHow>());
+        if (descriptor < 0 || descriptor > int.MaxValue)
+        {
+            nativeError = Marshal.GetLastPInvokeError();
+            return false;
+        }
+
+        using var handle = new SafeUnixHandle(checked((int)descriptor));
+        return true;
+    }
+
+    private static int OpenWithRetry(string path, int flags) =>
+        RetryOnInterrupted(
+            (Path: path, Flags: flags),
+            static state => UnixNative.open(state.Path, state.Flags));
+
+    private static int OpenAtWithRetry(int directory, string path, int flags) =>
+        RetryOnInterrupted(
+            (Directory: directory, Path: path, Flags: flags),
+            static state => UnixNative.openat(
+                state.Directory,
+                state.Path,
+                state.Flags));
+
+    private static long OpenAt2WithRetry(
+        long number,
+        int directory,
+        string path,
+        ref OpenHow how,
+        nuint size)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.syscall(number, directory, path, ref how, size);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static int FStatWithRetry(int descriptor, IntPtr buffer) =>
+        RetryOnInterrupted(
+            (Descriptor: descriptor, Buffer: buffer),
+            static state => UnixNative.fstat(state.Descriptor, state.Buffer));
+
+    private static int FStatAtWithRetry(
+        int directory,
+        string path,
+        IntPtr buffer,
+        int flags) =>
+        RetryOnInterrupted(
+            (Directory: directory, Path: path, Buffer: buffer, Flags: flags),
+            static state => UnixNative.fstatat(
+                state.Directory,
+                state.Path,
+                state.Buffer,
+                state.Flags));
+
+    private static int DupWithRetry(int descriptor) =>
+        RetryOnInterrupted(
+            descriptor,
+            static value => UnixNative.dup(value));
+
+    private static int FGetAttrListWithRetry(
+        int descriptor,
+        ref MacAttributeList attributes,
+        byte[] buffer,
+        nuint bufferSize,
+        uint options)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.fgetattrlist(
+                descriptor,
+                ref attributes,
+                buffer,
+                bufferSize,
+                options);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static nint ReadLinkWithRetry(
+        string path,
+        IntPtr buffer,
+        nuint bufferSize)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.readlink(path, buffer, bufferSize);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static IntPtr ReadDirectoryWithRetry(IntPtr directory)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            Marshal.SetLastPInvokeError(0);
+            var result = UnixNative.readdir(directory);
+            if (result != IntPtr.Zero
+                || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static int UnlinkAtWithRetry(
+        int directory,
+        string path,
+        int flags,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            // Each retry is another destructive boundary, not a continuation
+            // of the prior call, so cancellation must be checked every time.
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = UnixNative.unlinkat(directory, path, flags);
+            if (result == 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    internal static int RetryOnInterrupted(Func<int> syscall) =>
+        RetryOnInterrupted(syscall, static callback => callback());
+
+    private static int RetryOnInterrupted<TState>(
+        TState state,
+        Func<TState, int> syscall)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = syscall(state);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted)
+            {
+                return result;
+            }
+        }
+        return -1;
+    }
+
+    private static bool Matches(SecureFileIdentity expected, NativeStat actual) =>
+        expected.Volume == actual.Device
+        && expected.FileIdLow == actual.Inode
+        && expected.FileIdHigh == 0
+        && expected.IsDirectory == actual.IsDirectory
+        && expected.IsReparsePoint == actual.IsSymlink
+        && expected.ChangeTimeSeconds == actual.ChangeTimeSeconds
+        && expected.ChangeTimeNanoseconds == actual.ChangeTimeNanoseconds;
+
+    private static bool Matches(NativeStat expected, NativeStat actual) =>
+        expected.Device == actual.Device
+        && expected.Inode == actual.Inode
+        && expected.FileType == actual.FileType
+        && expected.ChangeTimeSeconds == actual.ChangeTimeSeconds
+        && expected.ChangeTimeNanoseconds == actual.ChangeTimeNanoseconds;
+
+    private static string LastError(string action) => $"{action}: {LastErrorMessage()}";
+
+    private static string LastErrorMessage() =>
+        new Win32Exception(Marshal.GetLastPInvokeError()).Message;
+
+    private readonly record struct NativeStat(
+        ulong Device,
+        ulong Inode,
+        uint Mode,
+        long ChangeTimeSeconds,
+        long ChangeTimeNanoseconds)
+    {
+        internal uint FileType => Mode & FileTypeMask;
+        internal bool IsDirectory => FileType == DirectoryType;
+        internal bool IsSymlink => FileType == SymlinkType;
+    }
+
+    internal readonly record struct LinuxStatLayout(
+        int DeviceOffset,
+        int InodeOffset,
+        int ModeOffset,
+        int ChangeTimeSecondsOffset,
+        int ChangeTimeNanosecondsOffset);
+
+    private readonly record struct DirectoryEntry(string Name, ulong Inode);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct OpenHow
+    {
+        internal ulong Flags;
+        internal ulong Mode;
+        internal ulong Resolve;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MacAttributeList
+    {
+        internal ushort BitmapCount;
+        internal ushort Reserved;
+        internal uint CommonAttributes;
+        internal uint VolumeAttributes;
+        internal uint DirectoryAttributes;
+        internal uint FileAttributes;
+        internal uint ForkAttributes;
+    }
+
+    private sealed class DirectoryFrame : IDisposable
+    {
+        private IntPtr _directoryStream;
+        private readonly bool _ownsParent;
+        private bool _finished;
+
+        internal DirectoryFrame(
+            SafeUnixHandle directory,
+            SafeUnixHandle parent,
+            string name,
+            string displayPath,
+            int depth,
+            bool ownsParent)
+        {
+            Directory = directory;
+            Parent = parent;
+            Name = name;
+            DisplayPath = displayPath;
+            Depth = depth;
+            _ownsParent = ownsParent;
+        }
+
+        internal SafeUnixHandle Directory { get; }
+        internal SafeUnixHandle Parent { get; }
+        internal string Name { get; }
+        internal string DisplayPath { get; }
+        internal int Depth { get; }
+        internal bool CanDelete { get; private set; } = true;
+
+        internal void PreventDelete() => CanDelete = false;
+
+        internal bool TryReadNext(out DirectoryEntry? entry, out string? error)
+        {
+            entry = null;
+            error = null;
+            if (_finished) return false;
+            if (_directoryStream == IntPtr.Zero)
+            {
+                var duplicate = DupWithRetry(Directory.FileDescriptor);
+                if (duplicate < 0)
+                {
+                    error = LastError("duplicate directory handle failed");
+                    _finished = true;
+                    return false;
+                }
+                _directoryStream = UnixNative.fdopendir(duplicate);
+                if (_directoryStream == IntPtr.Zero)
+                {
+                    UnixNative.close(duplicate);
+                    error = LastError("open directory stream failed");
+                    _finished = true;
+                    return false;
+                }
+            }
+
+            while (true)
+            {
+                Marshal.SetLastPInvokeError(0);
+                var nativeEntry = ReadDirectoryWithRetry(_directoryStream);
+                if (nativeEntry == IntPtr.Zero)
+                {
+                    var errno = Marshal.GetLastPInvokeError();
+                    if (errno != 0) error = new Win32Exception(errno).Message;
+                    _finished = true;
+                    return false;
+                }
+
+                string? name;
+                ulong inode;
+                if (OperatingSystem.IsMacOS())
+                {
+                    inode = unchecked((ulong)Marshal.ReadInt64(nativeEntry, 0));
+                    var nameLength = unchecked((ushort)Marshal.ReadInt16(nativeEntry, 18));
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 21), nameLength);
+                }
+                else
+                {
+                    inode = unchecked((ulong)Marshal.ReadInt64(nativeEntry, 0));
+                    name = Marshal.PtrToStringUTF8(IntPtr.Add(nativeEntry, 19));
+                }
+                if (string.IsNullOrEmpty(name) || name is "." or "..") continue;
+                entry = new DirectoryEntry(name, inode);
+                return true;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_directoryStream != IntPtr.Zero)
+            {
+                UnixNative.closedir(_directoryStream);
+                _directoryStream = IntPtr.Zero;
+            }
+            Directory.Dispose();
+            if (_ownsParent) Parent.Dispose();
+        }
+    }
+
+    private sealed class SafeUnixHandle : SafeHandleMinusOneIsInvalid
+    {
+        internal SafeUnixHandle(int fd) : base(ownsHandle: true) =>
+            SetHandle(new IntPtr(fd));
+
+        internal int FileDescriptor => handle.ToInt32();
+
+        protected override bool ReleaseHandle() => UnixNative.close(handle.ToInt32()) == 0;
+    }
+
+    private sealed class StatBuffer : IDisposable
+    {
+        internal StatBuffer() => Pointer = Marshal.AllocHGlobal(StatBufferSize);
+
+        internal IntPtr Pointer { get; private set; }
+
+        public void Dispose()
+        {
+            if (Pointer == IntPtr.Zero) return;
+            Marshal.FreeHGlobal(Pointer);
+            Pointer = IntPtr.Zero;
+        }
+    }
+
+    private static class UnixConstants
+    {
+        internal static int DirectoryOpenFlags => OperatingSystem.IsMacOS()
+            ? 0x00100000 | 0x00000100 | 0x01000000
+            : 0x00010000 | 0x00020000 | 0x00080000;
+
+        internal static int DirectoryFollowOpenFlags => OperatingSystem.IsMacOS()
+            ? 0x00100000 | 0x01000000
+            : 0x00010000 | 0x00080000;
+
+        internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
+        internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;
+        internal const int Interrupted = 4;
+        internal const ushort AttributeBitmapCount = 5;
+        internal const uint AttributeCommonFullPath = 0x08000000;
+        internal const int CurrentWorkingDirectory = -100;
+        internal const long OpenAt2SystemCall = 437;
+        internal const ulong ResolveNoCrossDevice = 0x01;
+        internal const ulong ResolveNoSymlinks = 0x04;
+        internal const ulong ResolveBeneath = 0x08;
+    }
+
+    private readonly record struct PlatformSupport(
+        bool IsSupported,
+        string? Error,
+        int? NativeError);
+
+    private static class UnixNative
+    {
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int open(string path, int flags);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int openat(int directory, string path, int flags);
+
+        [DllImport("libc", EntryPoint = "syscall", SetLastError = true)]
+        internal static extern long syscall(
+            long number,
+            int directory,
+            string path,
+            ref OpenHow how,
+            nuint size);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int fstat(int descriptor, IntPtr buffer);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int fgetattrlist(
+            int descriptor,
+            ref MacAttributeList attributes,
+            [Out] byte[] buffer,
+            nuint bufferSize,
+            uint options);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern nint readlink(string path, IntPtr buffer, nuint bufferSize);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int fstatat(int directory, string path, IntPtr buffer, int flags);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int unlinkat(int directory, string path, int flags);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int dup(int descriptor);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int close(int descriptor);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern IntPtr fdopendir(int descriptor);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern IntPtr readdir(IntPtr directory);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern int closedir(IntPtr directory);
+
+        [DllImport("libc", SetLastError = true)]
+        internal static extern IntPtr realpath(string path, IntPtr resolvedPath);
+
+        [DllImport("libc")]
+        internal static extern void free(IntPtr pointer);
+    }
+}

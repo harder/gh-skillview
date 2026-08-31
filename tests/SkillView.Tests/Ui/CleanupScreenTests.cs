@@ -11,6 +11,32 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
+    public void CountFailedSelections_DeduplicatedTarget_IsSkippedNotFailed()
+    {
+        var report = new RemoveService.BatchRemoveReport(
+            Succeeded: true,
+            TargetsDeleted: 1,
+            FilesDeleted: 1,
+            DirectoriesDeleted: 1,
+            Errors: ImmutableArray<string>.Empty,
+            DryRun: false)
+        {
+            TargetsSkipped = 1,
+        };
+
+        Assert.Equal(0, CleanupScreen.CountFailedSelections(2, report));
+    }
+
+    [Fact]
+    public void CountFailedSelections_CanceledDeduplicatedTarget_RemainsSkipped()
+    {
+        Assert.Equal(1, CleanupScreen.CountFailedSelections(
+            selectedCount: 3,
+            removedCount: 1,
+            skippedCount: 1));
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_RemovesEmptyDirectoryCandidateInsideScanRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
@@ -66,6 +92,159 @@ public sealed class CleanupScreenTests
             Assert.Equal(1, screen.RemovedFileCount);
             Assert.Equal(0, screen.RemovedDirectoryCount);
             Assert.Equal(new CleanupScreen.RemovalSummary(1, 0, Confirmed: true), summary);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task RemoveSelectedAsync_RemovesSiblingBrokenLinksWithFreshParentIdentities()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "broken-first");
+        var second = Path.Combine(root, "broken-second");
+        Directory.CreateSymbolicLink(first, Path.Combine(root, "missing-first"));
+        Directory.CreateSymbolicLink(second, Path.Combine(root, "missing-second"));
+
+        try
+        {
+            var candidates = new[] { first, second }
+                .Select(path => new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.BrokenSymlink,
+                    path,
+                    "broken symlink",
+                    Skill: null))
+                .ToImmutableArray();
+            var screen = CreateScreen(
+                candidates,
+                [new ScanRoot(root, Scope.User, null)]);
+
+            var summary = await screen.RemoveSelectedAsync(
+                [0, 1], TestContext.Current.CancellationToken);
+
+            Assert.False(PathResolver.IsSymlink(first));
+            Assert.False(PathResolver.IsSymlink(second));
+            Assert.Equal(2, screen.RemovedCount);
+            Assert.Equal(
+                new CleanupScreen.RemovalSummary(2, 0, Confirmed: true),
+                summary);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task RemoveSelectedAsync_DuplicateCandidatePath_IsSkippedBeforeValidation()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(root, "duplicate-candidate");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "SKILL.md"), "body");
+
+        try
+        {
+            var skill = Skill("duplicate-candidate", directory) with
+            {
+                ScanRoot = root,
+            };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.SourceOrphaned,
+                    directory,
+                    "source orphaned",
+                    skill),
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.Duplicate,
+                    directory,
+                    "duplicate install",
+                    skill));
+            var screen = CreateScreen(
+                candidates,
+                [new ScanRoot(root, Scope.User, null)],
+                [skill]);
+
+            var summary = await screen.RemoveSelectedAsync(
+                [0, 1], TestContext.Current.CancellationToken);
+
+            Assert.False(Directory.Exists(directory));
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(
+                new CleanupScreen.RemovalSummary(1, 0, Confirmed: true)
+                {
+                    Skipped = 1,
+                },
+                summary);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task RemoveSelectedAsync_CancellationPublishesDuplicateSkipCount()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "skillview-cleanup-ui-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(root, "cancel-duplicate");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "SKILL.md"), "body");
+        File.WriteAllText(Path.Combine(directory, "payload.txt"), "payload");
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            var skill = Skill("cancel-duplicate", directory) with
+            {
+                ScanRoot = root,
+            };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.SourceOrphaned,
+                    directory,
+                    "source orphaned",
+                    skill),
+                new CleanupClassifier.Candidate(
+                    CleanupClassifier.CandidateKind.Duplicate,
+                    directory,
+                    "duplicate install",
+                    skill));
+            var remove = new RemoveService(
+                new Logger(),
+                entryObservedForTests: null,
+                entryDeletingForTests: (_, _) => cancellation.Cancel());
+            var screen = CreateScreen(
+                candidates,
+                [new ScanRoot(root, Scope.User, null)],
+                [skill],
+                remove);
+            var attemptState = new CleanupScreen.RemovalAttemptState();
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                screen.RemoveSelectedAsync(
+                    [0, 1],
+                    cancellation.Token,
+                    progress: null,
+                    attemptState: attemptState));
+
+            Assert.Equal(1, attemptState.PreValidationSkipped);
+            Assert.Equal(1, CleanupScreen.CountFailedSelections(
+                selectedCount: 2,
+                removedCount: 0,
+                skippedCount: attemptState.PreValidationSkipped));
         }
         finally
         {
@@ -338,10 +517,11 @@ public sealed class CleanupScreenTests
     private static CleanupScreen CreateScreen(
         ImmutableArray<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<ScanRoot> scanRoots,
-        IReadOnlyList<InstalledSkill>? allSkills = null) =>
+        IReadOnlyList<InstalledSkill>? allSkills = null,
+        RemoveService? remove = null) =>
         new(
             app: null!,
-            remove: new RemoveService(new Logger()),
+            remove: remove ?? new RemoveService(new Logger()),
             logger: new Logger(),
             candidates,
             scanRoots,

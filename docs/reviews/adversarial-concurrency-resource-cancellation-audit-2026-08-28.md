@@ -10,13 +10,14 @@ Second hardening branch: `fix/resource-lifecycle-hardening-2`
 Third hardening branch: `fix/removal-lifecycle-hardening`
 Fourth hardening branch: `fix/search-metadata-hardening`
 Fifth hardening branch: `fix/final-adversarial-hardening`
-Status: Portable remediation complete. PRs #12, #13, #14, and #15 are merged.
+Sixth hardening branch: `fix/native-removal-hardening`
+Status: Portable remediation complete. PRs #12 through #16 are merged.
 The fifth batch completes install-modal ownership, root CLI cancellation and
 deadlines, bounded post-kill waiting, volume-aware path identity, Esc focus
 behavior, streaming CLI JSON, serialized static-UI tests, and bounded-resource
-stress coverage. Native handle-relative deletion for hostile same-user
-mutation remains a separate security design rather than part of this portable
-backlog.
+stress coverage. The sixth batch implements the separately designed native
+removal boundary for Windows, macOS, and Linux and records the narrower
+guarantee Unix can actually provide.
 
 ## Executive summary
 
@@ -367,7 +368,8 @@ Second-branch local verification at this checkpoint:
 Severity: **Critical**
 
 Implementation status: **Static nested-link escape completed on
-`fix/adversarial-hardening`; hostile concurrent path replacement remains open.**
+`fix/adversarial-hardening`; native identity pinning and opened-directory
+removal completed on `fix/native-removal-hardening`.**
 
 Locations:
 
@@ -447,12 +449,38 @@ and
 so substituting that API would not close the window and would also lose
 SkillView's cancellation and partial-failure behavior.
 
-Do not describe the current checks as atomic against a hostile process running
-as the same user. A stronger design requires audited native implementations
-(`openat`/`unlinkat`-style traversal on Unix and handle-relative/open-reparse-
-point deletion on Windows), plus platform-specific identity and race tests.
-This remains grouped with removal I/O work because it materially changes the
-filesystem abstraction and cross-platform test matrix.
+The native batch now pins the selected target's volume/device and file/inode
+identity during validation, applies containment and the remaining policy to
+the captured canonical deletion address, and checks the identity again after
+opening the target for execution. Windows enumerates each opened directory
+handle, verifies every child's volume and full 128-bit file ID after opening it
+with reparse-point semantics, and deletes the opened object with
+`FileDispositionInfoEx`. Renaming or replacing an ancestor pathname therefore
+cannot redirect enumeration or deletion.
+
+Unix canonicalizes the validated target, opens each path component and child
+directory with `openat(..., O_NOFOLLOW | O_DIRECTORY)`, enumerates duplicated
+opened directory descriptors, compares `st_dev`/`st_ino`, uses Linux
+`openat2(RESOLVE_NO_XDEV)` to reject bind and filesystem mounts, refuses macOS
+device changes, and deletes names relative to the held parent with `unlinkat`.
+Replacing an ancestor or an observed directory cannot redirect recursive
+traversal. Directory identity is checked again before removal.
+
+There is one narrower Unix limitation that must remain explicit. POSIX
+`unlinkat` removes a name relative to a directory descriptor; it does not
+provide a general "unlink this already-open inode" operation. A same-UID
+attacker can theoretically replace any final entry name between the final
+`fstatat` identity comparison and `unlinkat`, including a directory or the
+selected root. The operation will not follow a replacement symlink, will not
+recursively delete a replacement directory, and cannot escape through an
+ancestor, but it can unlink an empty replacement at the final name. That
+final-name interval is not fully atomic. Windows deletion is bound to the
+opened object handle. This is a
+platform capability boundary, not something another managed path check can
+close. See the Linux man-pages documentation for
+[`unlinkat`](https://man7.org/linux/man-pages/man2/unlinkat.2.html) and
+Microsoft's documentation for
+[`SetFileInformationByHandle`](https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle).
 
 ### Required remediation
 
@@ -469,6 +497,213 @@ filesystem abstraction and cross-platform test matrix.
   - Links to ancestors/cycles.
   - Links whose targets change after validation.
   - Windows directory junctions.
+  - Target replacement after validation.
+  - Child-directory replacement between observation and open.
+
+### Native-removal checkpoint
+
+`fix/native-removal-hardening` implements the platform boundary without shell
+commands or recursive managed deletion:
+
+- `RemoveValidator` records the native identity of every allowed target; an
+  identity that cannot be captured is a hard refusal rather than a downgrade.
+- Windows retains one 1 KiB enumeration buffer per active depth, opens entries
+  with reparse-point semantics, compares volume/full 128-bit file IDs, and
+  marks the opened handle for deletion. The stack and buffers remain O(depth).
+- macOS and Linux retain one opened descriptor/`DIR*` per active depth and one
+  reusable 512-byte stat buffer for the whole operation. Device/inode checks
+  bind descent to the entry actually enumerated. Linux `openat2` also refuses
+  bind mounts; macOS refuses directory device changes.
+- Cancellation is checked between entries and before descent/deletion;
+  existing throttled progress, exact partial counts, bounded errors, and batch
+  accounting remain unchanged.
+- Deterministic tests replace the selected target after validation and replace
+  an observed child directory with an external link. Both original and
+  replacement data survive; traversal reports the identity change.
+
+### PR #17 Copilot follow-up
+
+The Balanced review found nine related gaps, all accepted and addressed in the
+same native-removal batch:
+
+- Policy is now evaluated against the canonical address captured with the
+  target identity, including canonicalized scan-root comparisons.
+- Windows uses the full 128-bit `FILE_ID_128` from `FileIdInfo` and
+  `FileIdExtdDirectoryInfo`, disposes an opened child handle if identity reads
+  fail, and treats `ERROR_NOT_SUPPORTED` as a reason to try the legacy
+  disposition API.
+- Unix disposes an opened child descriptor if identity reads fail. The audit
+  and tests now correctly apply the final-name race to directories and the
+  selected root as well as non-directory leaves.
+- Identity-pinned skill removals enter the secure backend before any current-
+  path symlink branch, so a replacement link is refused rather than removed.
+- Both backends check cancellation at the last safe point before leaf and
+  directory deletion; Unix link removal does the same. Popped traversal frames
+  are disposed in `finally` blocks so cancellation at that boundary cannot
+  leak their handles.
+
+The subsequent review found one more correct gap in the cleanup-specific path:
+the UI and CLI empty-directory validators constructed allowed validations
+without an execution identity. A path replacement could therefore reach native
+recursive removal with `expectedIdentity: null`. The fix centralizes empty-
+directory validation in `RemoveValidator`, captures and canonical-policy-checks
+its identity, refuses scan roots, and marks the operation with an empty-only
+execution contract. Native traversal now refuses as soon as it observes a child
+instead of deleting it, covering both replacement and same-directory population
+after validation. `RemoveService` also refuses every real identity-less
+directory operation. Broken-symlink cleanup is now explicitly marked link-only
+and refuses if the entry changes kind before execution. Regression tests cover
+identity-less synthetic validation, population after validation, and complete
+directory replacement.
+
+The next Balanced review found three more valid object-binding and capability
+gaps:
+
+1. **Windows canonical paths were lexical.** `Path.GetFullPath` retained
+   junction/symlink ancestors even though the file identity came from an opened
+   handle. Windows now obtains the fully resolved path from that handle with
+   `GetFinalPathNameByHandleW`, and scan-root canonicalization uses the same
+   opened-handle method before policy comparison.
+2. **Link-only cleanup pinned neither the parent nor the link.** Broken-link and
+   agent-link validation now capture the canonical parent path, native parent
+   identity, final name, and native link identity. Execution reopens and verifies
+   the parent and link before deleting the descriptor-relative Unix name or the
+   exact Windows link handle. Replacement-link, replacement-parent, and
+   cancellation-boundary tests prove the wrong entry is preserved/refused.
+3. **Linux discovered missing `openat2` support after mutation began.** Backend
+   selection now probes the exact `RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS |
+   RESOLVE_NO_XDEV` request. Pre-5.6 kernels and seccomp denials disable secure
+   removal before validation, so nested traversal cannot discover the missing
+   capability only after root-level leaves were removed.
+
+A nearby analogue not called out by the review was fixed in the same pass:
+Unix previously called `realpath` and then opened that string, retaining the
+pre-open path even if a rename race changed which object was opened. Linux now
+reads the final path from `/proc/self/fd`; macOS uses the fixed-signature
+`fgetattrlist(ATTR_CMN_FULLPATH)` API with a bounded buffer and strict returned-
+offset validation. Thus all three supported operating-system families bind the
+policy address and identity to the same opened object.
+
+The first Linux CI run then exposed an additional identity subtlety: ext4
+immediately recycled the removed test symlink's inode, so device/inode alone
+accepted the replacement even though the implementation had followed the
+review literally. Unix link identity now also retains and compares `st_ctim`
+seconds/nanoseconds. Directory traversal uses the same stronger comparison
+between observations and at the destructive boundary; for the final directory
+name it compares a fresh stat of the still-open descriptor to `fstatat`, since
+deleting children legitimately changes the directory's change time. The
+verified Linux x64 and ARM64 layouts both place those fields at bytes 104/112.
+
+The following review added three more valid findings, all consequences of the
+same incomplete object-binding model:
+
+1. **Windows children were observed by handle but reopened by full path.** A
+   held directory could be renamed, its old path replaced by a junction, and a
+   matching hard link placed behind that junction. The full 128-bit file ID
+   would legitimately match while deletion removed the external hard-link name.
+   Every enumerated child and link is now opened relative to the held parent
+   with `NtOpenFile` and `OBJECT_ATTRIBUTES.RootDirectory`; display paths are no
+   longer reused as authority paths.
+2. **Unix directory capture followed the final component.** `realpath(path)`
+   allowed an empty-directory candidate swapped to a symlink to be captured as
+   its destination. Destructive capture now resolves only the parent and opens
+   the final name with `O_NOFOLLOW | O_DIRECTORY`. Final-following behavior
+   remains only in the explicitly non-destructive canonicalization operation.
+3. **Selected-directory identity omitted the new generation fields.** The prior
+   inode-reuse correction compared `st_ctim` for links and traversal
+   observations but intentionally preserved the old selected-directory behavior
+   to allow content changes after confirmation. That was the wrong safety
+   tradeoff. Selected directories and link parents now compare change time too;
+   any intervening namespace/content change causes refusal and revalidation.
+
+The durable review method is now explicit: map every native destructive path as
+observe → reopen → compare → delete, identify the exact authority object at each
+edge, and treat any pathname reconstructed after a parent handle is held as a
+red flag. The corresponding adversarial matrix combines ancestor rename and
+replacement with hard links, final-component symlink replacement, and immediate
+identifier reuse instead of testing each mechanism in isolation.
+
+Windows CI then exposed the analogous generation mistake in the updated test
+expectations: replacing a link could immediately reuse its file ID, and adding a
+child changed an empty directory without changing its file ID. Treating that as
+a Windows-only test exception would have preserved the same class of bug. The
+Windows backend now captures `FILE_BASIC_INFO.CreationTime` and `ChangeTime`
+alongside the full 128-bit ID for selected directories and validated parent/link
+identities. Transient traversal entries deliberately use parent-relative open
+plus full ID/type comparison: Windows directory-enumeration timestamps proved
+unstable across ordinary traversal, and those entries were not independently
+approved policy objects. The broader policy-boundary invariant is
+platform-neutral: an
+object ID identifies a filesystem slot, while the platform
+change-time/generation signal binds the validated incarnation occupying that
+slot.
+
+The final suppressed review body identified two additional valid policy-binding
+gaps. First, `SKILL.md` and `.git` were checked through the captured canonical
+pathname after the native identity handle had closed. An ancestor ABA swap could
+therefore present a clean replacement for policy inspection and restore the
+original, uninspected object for execution. Directory validation now returns a
+single handle-bound snapshot containing identity, canonical address, skill-file
+presence, `.git`-directory presence, and emptiness; the object generation is
+checked before and after the relative inspection. Second, brokenness was checked
+before link identity capture. Link validation now observes target existence
+relative to the held parent and rechecks both the parent and named-link identity
+around that observation, so replacing a broken link with a valid link refuses
+validation. Deterministic Unix and Windows tests exercise both ABA sequences.
+
+The analogous review also revisited Windows access masks. Native opens requested
+`FILE_WRITE_ATTRIBUTES` even though identity inspection requires read attributes
+and handle disposition requires `DELETE`; the unrelated access bit could reject
+otherwise-authorized removals and has been removed.
+
+A subsequent Linux review found that `/proc/self/fd` appends the unescaped text
+` (deleted)` to an unlinked entry, even though the same suffix is legal in a
+live filename. Final-path capture previously rejected every such suffix and
+therefore refused valid skills or scan roots with that name. The Linux backend
+now stats the returned absolute name without following its final component and
+compares the full device, inode, type, and change-time generation with the open
+descriptor before and after that lookup. A matching live name is accepted;
+an absent, replaced, or unstable name fails closed. Regression tests cover both
+the legitimate-name case and an unlinked directory colliding with a replacement
+at the annotated pathname.
+
+The next review identified four further valid boundary and portability gaps.
+First, target and scan-root canonicalization used separate opens, allowing a
+scan-root symlink ABA to make both path comparisons authorize an external
+target. Validation now opens and pins the matched scan root first, opens the
+selected directory or link parent relative to that held object, derives both
+canonical addresses from those handles, and verifies the root generation after
+policy capture. Second, cleanup prevalidated an entire batch; unlinking the
+first sibling changes their shared parent's native generation and invalidated
+the remaining link identities. Cleanup now supplies a lazy validation sequence
+that pins each candidate immediately before its removal. Third, Windows stripped
+`\\?\` from volume-GUID paths and thereby made them relative; only drive-letter
+paths now lose that prefix, while extended UNC conversion remains unchanged.
+Fourth, non-destructive Unix canonicalization routed `/` through a destructive
+parent helper that intentionally refuses filesystem roots. It now opens the
+`realpath` result directly. Regression coverage exercises root retargeting on
+Unix and Windows, sibling broken-link batches, volume-GUID normalization, and
+filesystem-root canonicalization.
+
+The following Windows review found two valid defects in the legacy disposition
+fallback. `FILE_DISPOSITION_INFO.DeleteFile` is a one-byte Win32 `BOOLEAN`, but
+the managed structure used four-byte `UnmanagedType.Bool`, so filesystems that
+require the fallback could reject the buffer size. The field is now a byte and
+its native size is regression-tested. Also, the extended and legacy
+`SetFileInformationByHandle` calls are two distinct destructive boundaries:
+cancellation can arrive while the unsupported extended call returns. The
+shared disposition state machine now checks cancellation immediately before
+both calls, with deterministic tests proving an already-canceled request makes
+no attempt and cancellation after the first failure suppresses the fallback.
+
+A broader pass found the same cancellation shape in the unsupported-platform
+symlink fallback: `File.Delete` failure could flow directly into
+`Directory.Delete`, and the synchronous caller converted cancellation into a
+normal error report. Both path-based delete attempts now have their own token
+check, and cancellation is published and rethrown. The remainder of the native
+destructive path was re-inventoried: Windows has no other disposition fallback,
+every `TryDeleteHandle` caller now supplies the operation token, and all three
+Unix `unlinkat` sites already check the token immediately before the call.
 
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
@@ -1295,12 +1530,11 @@ coordinated within their current scope:
 6. [x] Add log character/byte budgets and correct disk rotation.
 7. [x] Enforce aggregate disk retention during active-file growth and remove
    cancellation-callback execution from request/slot ownership locks.
-8. [x] Move inventory and removal I/O off the UI thread with cancellation, and
-   evaluate native handle-relative deletion for hostile same-user mutation.
-   The portable inventory/removal work is complete. The native evaluation
-   confirmed that supported .NET 10 APIs cannot make path validation and
-   deletion atomic; an audited Unix/Windows native implementation remains a
-   separate Finding 1 security follow-up rather than an implicit portable fix.
+8. [x] Move inventory and removal I/O off the UI thread with cancellation, then
+   implement the native removal boundary for hostile path replacement. Windows
+   deletion is opened-object-bound. Unix traversal is descriptor-relative and
+   identity-checked; its irreducible final-entry name interval is
+   documented above rather than represented as fully atomic.
 9. [x] Finish metadata-preview deadlines and bounded scheduling. Search
    supersession, the whole-request deadline, a per-preview deadline, and a
    global four-process ceiling are complete.
@@ -1484,5 +1718,120 @@ adding release-build overhead.
   <https://learn.microsoft.com/en-us/dotnet/api/system.console.cancelkeypress?view=net-10.0>
 - Windows file-sharing/delete behavior:
   <https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams>
+- Windows `FILE_DISPOSITION_INFO` native layout:
+  <https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_disposition_info>
+- Windows handle-based disposition API:
+  <https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle>
 - Windows/Linux case sensitivity:
   <https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity>
+
+## 2026-08-31 PR #17 comprehensive follow-up
+
+An independent Claude Opus review of commit `8300606` reported ten additional
+issues. All ten were traced through their production callers rather than
+accepted from the report at face value.
+
+1. **macOS x64 native ABI — valid, fixed fail-closed.** Apple's x86_64 headers
+   map the unsuffixed `fstat`, `fstatat`, and `readdir` symbols to the legacy
+   32-bit-inode ABI, while SkillView parses the 64-bit-inode layout. Secure Unix
+   removal now supports macOS only in a native little-endian ARM64 process and
+   throws/refuses rather than interpreting unverified bytes on Intel or under
+   Rosetta. This is preferable to adding a second ABI in the security boundary;
+   releases currently ship `osx-arm64`.
+2. **Unavailable backend also blocked dry-run — valid, fixed.** Real removal
+   remains fail-closed and now reports the backend reason as an environment
+   failure. A non-mutating `remove` preview may use managed canonicalization and
+   policy inspection when the backend is unavailable, but returns no execution
+   identity. `RemoveService` still refuses every real directory or link delete
+   without its native identity. Warning confirmation is required only for
+   execution, not for preview output.
+3. **CliList-only agent links outside roots — valid UX gap, fixed without
+   weakening policy.** Such links remain blocked, and the wizard explains that
+   the directory must be supplied with `--scan-root`. SkillView deliberately
+   does not promote a path reported by `gh skill list` into a trusted removal
+   root automatically; doing so would let discovery data redefine the deletion
+   authority boundary.
+4. **advanced-remove validation on the UI thread — valid, fixed.** Initial and
+   selection-specific evaluations now run in a modal-owned background
+   operation. Per-target results are cached only for display. Finish performs a
+   fresh background validation and returns to Review if its blocking errors,
+   warnings, resolved paths, or incoming-link content changed; only the fresh
+   native identities reach execution.
+5. **Windows directory-entry header bound — valid defence in depth, fixed.**
+   Enumeration verifies that the full 88-byte fixed header remains before any
+   field read and rejects offsets that cannot leave another complete header.
+6. **Unix `EINTR` handling — valid reliability gap, fixed.** Open, openat,
+   openat2, fstat, fstatat, dup, readdir, and unlinkat use bounded retries.
+   Every unlink retry rechecks cancellation because it is a new destructive
+   call. `close` and `closedir` are not retried.
+7. **public root-unvalidated `RemoveLinkAsync` — valid, removed.** Agent-link
+   deletion now has one route: `ValidateSymlink` followed by `RemoveAsync`.
+   Managed path deletion branches were removed; the remaining managed traversal
+   is explicitly preview-only.
+8. **dead `FindContainingRoot(canonicalizeRoots:)` branch — valid, removed.**
+   The helper now performs its only real raw-path containment role; canonical
+   containment remains part of the held-root identity capture.
+9. **cleanup duplicate accounting — valid, fixed.** `RemoveMany` logs and counts
+   canonical duplicates as skipped. Cleanup subtracts skipped targets before
+   calculating failures, so a safe deduplication is not mislabeled as a failed
+   removal.
+10. **`openat2` probe depended on CWD — valid, fixed with a qualification.**
+    Probing absolute `/` with `RESOLVE_BENEATH` would fail by contract. SkillView
+    instead opens `/` once and probes `.` relative to that descriptor using the
+    exact production resolve flags. Platform support is cached, and an
+    unavailable Linux backend includes the probe errno and message in its
+    diagnostic.
+
+Targeted regression coverage now includes the macOS architecture matrix,
+bounded `EINTR` retry, Windows fixed-header bounds, unsupported-backend preview
+versus execution behavior, outside-root agent-link messaging, and duplicate
+batch accounting. The required verification matrix remains full unit and
+integration tests, macOS/Linux/Windows CI, CodeQL, and sequential Native AOT
+publishes for both hosts.
+
+### Copilot follow-up on the comprehensive fixes
+
+The next balanced review identified two gaps in the preceding changes. Both
+were valid after tracing them through the complete workflow:
+
+1. **Finish-time validation could authorize a replacement object.** Comparing
+   only paths, errors, warnings, and incoming links meant a directory or link
+   replaced after Review could receive a new native identity and still inherit
+   the user's earlier confirmation. `HasSameSafetyContract` now compares the
+   full directory or parent/link execution identity plus the link-only and
+   empty-directory execution modes. Any authority change returns the wizard to
+   Review; the replacement's fresh identity is never executed under the old
+   confirmation.
+2. **Duplicate cleanup candidates could fail before batch deduplication.** A
+   path may appear under more than one cleanup classification. The lazy
+   sequence previously validated and removed the first candidate before seeing
+   the second, so the second failed validation instead of reaching
+   `RemoveMany`'s canonical deduplicator. Cleanup now resolves all selected
+   path keys and removes duplicates before yielding the first validation, then
+   adds those skips to the batch report. Unique candidates remain lazily pinned
+   immediately before their individual removals.
+
+### Copilot follow-up on held-root mount boundaries and canceled accounting
+
+The next balanced review exposed three related omissions. All three were valid:
+
+1. **Selected Unix directories could cross a mount below the held scan root.**
+   Validation opened each relative component with ordinary `openat`, so a Linux
+   bind mount or cross-device macOS directory could become the captured removal
+   baseline before deletion-time descent checks ran. Root-relative validation
+   now uses Linux `openat2(RESOLVE_NO_XDEV)` for every component and verifies
+   every opened component's device against the held root on both Unix platforms.
+2. **Link parents had the same mount escape.** Broken-link cleanup and agent
+   unlink validation now apply the same no-cross-device component walk before
+   issuing `ExecutionLinkIdentity`; a link inside an external mounted tree is
+   refused before it can be authorized for `unlinkat`.
+3. **Canceled TUI cleanup lost known duplicate skips.** The skip count existed
+   only inside the async iterator/report path. If cancellation threw before a
+   report returned, the outer status recomputed every non-deleted selection as a
+   failure. Per-attempt state now publishes pre-validation skips before removal
+   begins and carries them into cancellation accounting.
+
+Regression coverage uses Linux's `/proc` mount to prove both directory and link-
+parent validation refuse a mounted subtree, directly checks the macOS/Linux
+device guard, and cancels a duplicate cleanup selection at the native deletion
+boundary to prove its skip remains observable.
