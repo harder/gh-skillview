@@ -317,7 +317,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   directory is missing, empty, or cannot be probed.
 - Tests that mutate Terminal.Gui static configuration belong to the serialized
   `TerminalGuiStaticState` collection. Allocation and process stress tests
-  belong to the serialized `ResourceStress` collection.
+  belong to the serialized `ResourceStress` collection. A deadlock regression
+  test that deliberately blocks one worker must run its competing operation on
+  a dedicated `LongRunning` task; shared-pool scheduling delay under the full
+  parallel suite is not evidence about the lock ordering under test.
 - `SkillViewApp` now keeps the search shell and pane state, while
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new
