@@ -177,7 +177,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   relative to its held parent with `NtOpenFile`/`OBJECT_ATTRIBUTES.RootDirectory`,
   and deletes opened objects with
   `FileDispositionInfoEx` (falling back for `ERROR_NOT_SUPPORTED` as well as
-  invalid-function/parameter); Unix walks canonicalized paths
+  invalid-function/parameter). Treat that legacy fallback as a separate
+  destructive boundary and recheck cancellation immediately before it;
+  `FILE_DISPOSITION_INFO.DeleteFile` is a one-byte Win32 `BOOLEAN`, not the
+  four-byte `BOOL` used by the API return value. Unix walks canonicalized paths
   through `openat`, enumerates opened directory descriptors, compares
   device/inode identities, uses Linux `openat2(RESOLVE_NO_XDEV)` to reject bind
   and filesystem mounts, refuses device changes on macOS, and deletes with
@@ -195,7 +198,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles
-  even when identity inspection, callbacks, or those checks throw. Do not
+  even when identity inspection, callbacks, or those checks throw. Apply the
+  same rule to unsupported-platform path fallbacks: a failed `File.Delete`
+  followed by `Directory.Delete` is two destructive boundaries, and
+  cancellation must propagate rather than becoming an ordinary failure. Do not
   overstate the Unix guarantee: POSIX has no general
   unlink-by-descriptor operation, so the final `fstatat` → `unlinkat` name
   interval remains non-atomic for every entry, including directories and the

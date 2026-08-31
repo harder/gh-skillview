@@ -199,10 +199,16 @@ public sealed class RemoveService
                         force: true, isCompleted: true, targetsDeleted: 0);
                     return RemoveReport.Refused(target, reason);
                 }
-                TryDeleteSymlink(target);
+                TryDeleteSymlink(target, cancellationToken);
                 _logger.Info("remove", $"removed symlink {target}");
                 progressTracker.Publish(1, 1, 0, 0, target, force: true, isCompleted: true);
                 return new RemoveReport(true, target, 1, 0, ImmutableArray<string>.Empty, DryRun: false);
+            }
+            catch (OperationCanceledException)
+            {
+                progressTracker.Publish(0, 0, 0, 0, target,
+                    force: true, isCanceled: true);
+                throw;
             }
             catch (Exception ex)
             {
@@ -272,7 +278,7 @@ public sealed class RemoveService
                     if (isReparsePoint)
                     {
                         DeleteLeaf(frame.Path, expectedReparsePoint: true, options.DryRun,
-                            target, ref files, errors);
+                            target, cancellationToken, ref files, errors);
                         progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
@@ -281,7 +287,7 @@ public sealed class RemoveService
                     if (!isDirectory)
                     {
                         DeleteLeaf(frame.Path, expectedReparsePoint: false, options.DryRun,
-                            target, ref files, errors);
+                            target, cancellationToken, ref files, errors);
                         progressTracker.Publish(0, files, dirs, errors.Count, frame.Path);
                         PopAndDispose(pending);
                         continue;
@@ -341,7 +347,13 @@ public sealed class RemoveService
 
                 var completedPath = frame.Path;
                 PopAndDispose(pending);
-                DeleteDirectory(completedPath, options.DryRun, target, ref dirs, errors);
+                DeleteDirectory(
+                    completedPath,
+                    options.DryRun,
+                    target,
+                    cancellationToken,
+                    ref dirs,
+                    errors);
                 progressTracker.Publish(0, files, dirs, errors.Count, completedPath);
             }
         }
@@ -464,7 +476,7 @@ public sealed class RemoveService
                         force: true, isCompleted: true);
                     return RemoveReport.Refused(fullPath, detail);
                 }
-                TryDeleteSymlink(fullPath);
+                TryDeleteSymlink(fullPath, cancellationToken);
                 _logger.Info("remove.agent", $"unlinked {fullPath}");
                 progressTracker.Publish(1, 1, 0, 0, fullPath, force: true, isCompleted: true);
                 return new RemoveReport(
@@ -653,6 +665,7 @@ public sealed class RemoveService
         bool expectedReparsePoint,
         bool dryRun,
         string target,
+        CancellationToken cancellationToken,
         ref int files,
         FailureCollector errors)
     {
@@ -684,8 +697,15 @@ public sealed class RemoveService
 
         try
         {
-            if (isReparsePoint) TryDeleteSymlink(path);
-            else File.Delete(path);
+            if (isReparsePoint)
+            {
+                TryDeleteSymlink(path, cancellationToken);
+            }
+            else
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Delete(path);
+            }
             files++;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -698,6 +718,7 @@ public sealed class RemoveService
         string path,
         bool dryRun,
         string target,
+        CancellationToken cancellationToken,
         ref int dirs,
         FailureCollector errors)
     {
@@ -722,6 +743,7 @@ public sealed class RemoveService
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Directory.Delete(path, recursive: false);
             dirs++;
         }
@@ -796,18 +818,26 @@ public sealed class RemoveService
         }
     }
 
-    private static void TryDeleteSymlink(string path)
+    internal static void TryDeleteSymlink(
+        string path,
+        CancellationToken cancellationToken,
+        Action? primaryDeleteFailedForTests = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             File.Delete(path);
         }
         catch (UnauthorizedAccessException)
         {
+            primaryDeleteFailedForTests?.Invoke();
+            cancellationToken.ThrowIfCancellationRequested();
             Directory.Delete(path, recursive: false);
         }
         catch (IOException)
         {
+            primaryDeleteFailedForTests?.Invoke();
+            cancellationToken.ThrowIfCancellationRequested();
             Directory.Delete(path, recursive: false);
         }
 

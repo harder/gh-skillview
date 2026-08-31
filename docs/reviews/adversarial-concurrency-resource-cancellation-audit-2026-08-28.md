@@ -685,6 +685,26 @@ parent helper that intentionally refuses filesystem roots. It now opens the
 Unix and Windows, sibling broken-link batches, volume-GUID normalization, and
 filesystem-root canonicalization.
 
+The following Windows review found two valid defects in the legacy disposition
+fallback. `FILE_DISPOSITION_INFO.DeleteFile` is a one-byte Win32 `BOOLEAN`, but
+the managed structure used four-byte `UnmanagedType.Bool`, so filesystems that
+require the fallback could reject the buffer size. The field is now a byte and
+its native size is regression-tested. Also, the extended and legacy
+`SetFileInformationByHandle` calls are two distinct destructive boundaries:
+cancellation can arrive while the unsupported extended call returns. The
+shared disposition state machine now checks cancellation immediately before
+both calls, with deterministic tests proving an already-canceled request makes
+no attempt and cancellation after the first failure suppresses the fallback.
+
+A broader pass found the same cancellation shape in the unsupported-platform
+symlink fallback: `File.Delete` failure could flow directly into
+`Directory.Delete`, and the synchronous caller converted cancellation into a
+normal error report. Both path-based delete attempts now have their own token
+check, and cancellation is published and rethrown. The remainder of the native
+destructive path was re-inventoried: Windows has no other disposition fallback,
+every `TryDeleteHandle` caller now supplies the operation token, and all three
+Unix `unlinkat` sites already check the token immediately before the call.
+
 ## Finding 2: `FileLogSink.Dispose` can deadlock
 
 Severity: **High**
@@ -1698,5 +1718,9 @@ adding release-build overhead.
   <https://learn.microsoft.com/en-us/dotnet/api/system.console.cancelkeypress?view=net-10.0>
 - Windows file-sharing/delete behavior:
   <https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams>
+- Windows `FILE_DISPOSITION_INFO` native layout:
+  <https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_disposition_info>
+- Windows handle-based disposition API:
+  <https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle>
 - Windows/Linux case sensitivity:
   <https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity>

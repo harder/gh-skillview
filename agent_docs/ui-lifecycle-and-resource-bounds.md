@@ -126,7 +126,14 @@ logging, or subprocess adapters.
   disabled when the kernel or sandbox refuses it, before any mutation can begin. Keep
   actual deletion on `SecureRemovalBackend` for Windows, macOS,
   and Linux. Check cancellation immediately before each native delete and keep
-  handle cleanup in `finally` paths. POSIX `unlinkat` is parent-handle-relative
+  handle cleanup in `finally` paths. On Windows, the legacy
+  `FileDispositionInfo` fallback is a second destructive call after
+  `FileDispositionInfoEx`, so it needs its own cancellation gate; its
+  `DeleteFile` field is a one-byte native `BOOLEAN`, while the API return value
+  remains a four-byte `BOOL`. Unsupported-platform path fallbacks follow the
+  same rule: recheck cancellation before both the primary file delete and any
+  directory-delete fallback, and never translate cancellation into a normal
+  removal failure. POSIX `unlinkat` is parent-handle-relative
   but still names its final entry, so document rather than conceal its narrow
   final-name race for files, links, directories, and the selected root; the
   held-directory design prevents a replacement ancestor or child directory

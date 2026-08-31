@@ -28,6 +28,74 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
     }
 
     [Fact]
+    public void LegacyDispositionInfo_UsesNativeBooleanWidth()
+    {
+        Assert.Equal(1, WindowsSecureRemovalBackend.LegacyDispositionInfoSize);
+    }
+
+    [Fact]
+    public void TryDeleteWithFallback_AlreadyCanceled_DoesNotCallNativeBoundary()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var attempts = 0;
+
+        Assert.Throws<OperationCanceledException>(() =>
+            WindowsSecureRemovalBackend.TryDeleteWithFallback(
+                0,
+                cancellation.Token,
+                (_, _) =>
+                {
+                    attempts++;
+                    return (true, 0);
+                },
+                out _));
+
+        Assert.Equal(0, attempts);
+    }
+
+    [Fact]
+    public void TryDeleteWithFallback_CanceledAfterExtendedFailure_SkipsLegacyBoundary()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var attempts = new List<bool>();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            WindowsSecureRemovalBackend.TryDeleteWithFallback(
+                0,
+                cancellation.Token,
+                (_, useExtendedDisposition) =>
+                {
+                    attempts.Add(useExtendedDisposition);
+                    cancellation.Cancel();
+                    return (false, 50);
+                },
+                out _));
+
+        Assert.Equal([true], attempts);
+    }
+
+    [Fact]
+    public void TryDeleteWithFallback_UnsupportedExtendedCall_UsesLegacyBoundary()
+    {
+        var attempts = new List<bool>();
+
+        var deleted = WindowsSecureRemovalBackend.TryDeleteWithFallback(
+            0,
+            TestContext.Current.CancellationToken,
+            (_, useExtendedDisposition) =>
+            {
+                attempts.Add(useExtendedDisposition);
+                return useExtendedDisposition ? (false, 50) : (true, 0);
+            },
+            out var lastError);
+
+        Assert.True(deleted);
+        Assert.Equal(0, lastError);
+        Assert.Equal([true, false], attempts);
+    }
+
+    [Fact]
     public void TryCaptureIdentity_UsesFinalPathFromOpenedHandle()
     {
         if (!OperatingSystem.IsWindows()) return;

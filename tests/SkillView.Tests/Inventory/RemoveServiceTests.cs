@@ -592,6 +592,22 @@ public class RemoveServiceTests : IDisposable
     }
 
     [Fact]
+    public void TryDeleteSymlink_CanceledAfterPrimaryFailure_SkipsDirectoryFallback()
+    {
+        var directory = Path.Combine(_tempRoot, "fallback-cancellation");
+        Directory.CreateDirectory(directory);
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            RemoveService.TryDeleteSymlink(
+                directory,
+                cancellation.Token,
+                primaryDeleteFailedForTests: cancellation.Cancel));
+
+        Assert.True(Directory.Exists(directory));
+    }
+
+    [Fact]
     public void Remove_UnixFinalDirectoryNameReplacement_DeletesOnlyEmptyReplacement()
     {
         if (OperatingSystem.IsWindows() || !SecureRemovalBackend.IsSupported) return;

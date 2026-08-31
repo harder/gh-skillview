@@ -542,7 +542,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
                         entryDeleting(childPath, false);
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (!TryDeleteHandle(childHandle, out var deleteError))
+                        if (!TryDeleteHandle(
+                                childHandle,
+                                cancellationToken,
+                                out var deleteError))
                         {
                             failure(childPath, deleteError!);
                             frame.PreventDelete();
@@ -576,7 +579,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                     {
                         entryDeleting(frame.DisplayPath, true);
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (!TryDeleteHandle(frame.Directory, out var deleteError))
+                        if (!TryDeleteHandle(
+                                frame.Directory,
+                                cancellationToken,
+                                out var deleteError))
                         {
                             failure(frame.DisplayPath, deleteError!);
                         }
@@ -641,7 +647,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             }
             entryDeleting(path, false);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryDeleteHandle(handle, out var deleteError))
+            if (!TryDeleteHandle(handle, cancellationToken, out var deleteError))
             {
                 failure(path, deleteError!);
                 return;
@@ -857,42 +863,84 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             (basicInformation.FileAttributes & FileAttributeReparsePoint) != 0);
     }
 
-    private static bool TryDeleteHandle(SafeFileHandle handle, out string? error)
+    private static bool TryDeleteHandle(
+        SafeFileHandle handle,
+        CancellationToken cancellationToken,
+        out string? error)
     {
-        var extended = new FileDispositionInfoExData
-        {
-            Flags = FileDispositionDelete
-                | FileDispositionPosixSemantics
-                | FileDispositionIgnoreReadonly,
-        };
-        if (WindowsNative.SetFileInformationByHandle(
+        if (TryDeleteWithFallback(
                 handle,
-                FileDispositionInfoEx,
-                ref extended,
-                Marshal.SizeOf<FileDispositionInfoExData>()))
+                cancellationToken,
+                static (file, useExtendedDisposition) =>
+                    SetDisposition(file, useExtendedDisposition),
+                out var lastError))
         {
             error = null;
             return true;
         }
 
-        var lastError = Marshal.GetLastPInvokeError();
-        if (ShouldFallbackToLegacyDisposition(lastError))
-        {
-            var legacy = new FileDispositionInfoData { DeleteFile = true };
-            if (WindowsNative.SetFileInformationByHandle(
-                    handle,
-                    FileDispositionInfo,
-                    ref legacy,
-                    Marshal.SizeOf<FileDispositionInfoData>()))
-            {
-                error = null;
-                return true;
-            }
-            lastError = Marshal.GetLastPInvokeError();
-        }
-
         error = $"delete opened entry failed: {new Win32Exception(lastError).Message}";
         return false;
+    }
+
+    internal static bool TryDeleteWithFallback<TState>(
+        TState state,
+        CancellationToken cancellationToken,
+        Func<TState, bool, (bool Succeeded, int Error)> tryDisposition,
+        out int lastError)
+    {
+        ArgumentNullException.ThrowIfNull(tryDisposition);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = tryDisposition(state, true);
+        if (result.Succeeded)
+        {
+            lastError = 0;
+            return true;
+        }
+
+        lastError = result.Error;
+        if (!ShouldFallbackToLegacyDisposition(lastError)) return false;
+
+        // FileDispositionInfo is a second destructive native boundary, not
+        // merely error handling for FileDispositionInfoEx. Cancellation can
+        // arrive while the first call is returning, so gate the fallback too.
+        cancellationToken.ThrowIfCancellationRequested();
+        result = tryDisposition(state, false);
+        lastError = result.Error;
+        return result.Succeeded;
+    }
+
+    private static (bool Succeeded, int Error) SetDisposition(
+        SafeFileHandle handle,
+        bool useExtendedDisposition)
+    {
+        bool succeeded;
+        if (useExtendedDisposition)
+        {
+            var extended = new FileDispositionInfoExData
+            {
+                Flags = FileDispositionDelete
+                    | FileDispositionPosixSemantics
+                    | FileDispositionIgnoreReadonly,
+            };
+            succeeded = WindowsNative.SetFileInformationByHandle(
+                handle,
+                FileDispositionInfoEx,
+                ref extended,
+                Marshal.SizeOf<FileDispositionInfoExData>());
+        }
+        else
+        {
+            var legacy = new FileDispositionInfoData { DeleteFile = 1 };
+            succeeded = WindowsNative.SetFileInformationByHandle(
+                handle,
+                FileDispositionInfo,
+                ref legacy,
+                Marshal.SizeOf<FileDispositionInfoData>());
+        }
+
+        return (succeeded, succeeded ? 0 : Marshal.GetLastPInvokeError());
     }
 
     private static bool Matches(SecureFileIdentity expected, NativeIdentity actual) =>
@@ -909,6 +957,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     internal static bool ShouldFallbackToLegacyDisposition(int error) =>
         error is ErrorInvalidFunction or ErrorNotSupported or ErrorInvalidParameter;
+
+    internal static int LegacyDispositionInfoSize =>
+        Marshal.SizeOf<FileDispositionInfoData>();
 
     private static string ReadFinalPath(SafeFileHandle handle)
     {
@@ -1176,8 +1227,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     [StructLayout(LayoutKind.Sequential)]
     private struct FileDispositionInfoData
     {
-        [MarshalAs(UnmanagedType.Bool)]
-        internal bool DeleteFile;
+        // Win32 BOOLEAN is one byte; it is not the four-byte BOOL used for
+        // SetFileInformationByHandle's return value.
+        internal byte DeleteFile;
     }
 
     private static class WindowsNative
