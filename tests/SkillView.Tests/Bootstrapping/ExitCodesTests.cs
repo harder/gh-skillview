@@ -23,4 +23,7 @@ public class ExitCodesTests
 
     [Fact]
     public void NoMatchesIsTwenty() => Assert.Equal(20, ExitCodes.NoMatches);
+
+    [Fact]
+    public void CancelledIsOneHundredThirty() => Assert.Equal(130, ExitCodes.Cancelled);
 }

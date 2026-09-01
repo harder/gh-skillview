@@ -177,6 +177,11 @@ public sealed class SkillViewApp
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ExitCodes.Cancelled;
+        }
+
         TuiHelpers.SetTheme(_options.Theme);
         // MEC-based replacement for the legacy `ConfigurationManager.Enable
         // (ConfigLocations.All)`: loads library defaults → user files →
@@ -187,7 +192,7 @@ public sealed class SkillViewApp
         SkillView.Ui.Theming.WingetTuiTheme.Register(_options.Theme);
         if (cancellationToken.IsCancellationRequested)
         {
-            return ExitCodes.Success;
+            return ExitCodes.Cancelled;
         }
 
         IApplication? app = null;
@@ -210,7 +215,7 @@ public sealed class SkillViewApp
             app = _applicationFactory();
             if (runLifetime.IsCancellationRequested)
             {
-                return ExitCodes.Success;
+                return ExitCodes.Cancelled;
             }
 
             _app = app;
@@ -227,7 +232,16 @@ public sealed class SkillViewApp
                 ProbeGhAsync();
             }
 
-            await app.RunAsync(window, runLifetime.Token, HandleRunLoopException).ConfigureAwait(false);
+            try
+            {
+                await app.RunAsync(window, runLifetime.Token, HandleRunLoopException).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (runLifetime.IsCancellationRequested)
+            {
+                // Cancellation is the normal external shutdown contract for
+                // the awaitable host. Teardown still runs below, and the
+                // method reports the stable CLI-compatible exit code.
+            }
         }
         finally
         {
@@ -248,7 +262,9 @@ public sealed class SkillViewApp
             window?.Dispose();
             app?.Dispose();
         }
-        return ExitCodes.Success;
+        return cancellationToken.IsCancellationRequested
+            ? ExitCodes.Cancelled
+            : ExitCodes.Success;
     }
 
     private bool HandleRunLoopException(Exception ex)

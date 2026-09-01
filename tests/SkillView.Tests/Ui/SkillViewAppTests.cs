@@ -217,7 +217,7 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public async Task RunAsync_ReturnsSuccess_WithoutCreatingApplication_WhenAlreadyCanceled()
+    public async Task RunAsync_ReturnsCancelled_WithoutCreatingApplication_WhenAlreadyCanceled()
     {
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
         var factoryCalled = false;
@@ -235,8 +235,30 @@ public sealed class SkillViewAppTests
 
         var exitCode = await app.RunAsync(cts.Token);
 
-        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.Equal(ExitCodes.Cancelled, exitCode);
         Assert.False(factoryCalled);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReturnsCancelled_WhenCancellationWinsDuringApplicationCreation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        IApplication? created = null;
+        var app = new SkillViewApp(
+            TuiServices.Build(new Logger(LogLevel.Debug)),
+            CreateOptions(),
+            () =>
+            {
+                created = Application.Create().Init();
+                cancellation.Cancel();
+                return created;
+            },
+            probeOnRun: false);
+
+        var exitCode = await app.RunAsync(cancellation.Token);
+
+        Assert.Equal(ExitCodes.Cancelled, exitCode);
+        Assert.NotNull(created);
     }
 
     [Fact]

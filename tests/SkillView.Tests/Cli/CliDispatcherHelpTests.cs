@@ -68,6 +68,32 @@ public class CliDispatcherHelpTests
         Assert.Contains("2.4.17", stdout, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PreCanceledHelp_DoesNotPrintSuccessOutput()
+    {
+        await CliConsoleCapture.Gate.WaitAsync(TestContext.Current.CancellationToken);
+        var originalOut = Console.Out;
+        using var writer = new StringWriter();
+        Console.SetOut(writer);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        try
+        {
+            var options = ArgParser.Parse("skillview", ["--help"]);
+            var services = TuiServices.Build(new Logger(LogLevel.Info));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                CliDispatcher.RunAsync(options, services, cancellation.Token));
+            Assert.Empty(writer.ToString());
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            CliConsoleCapture.Gate.Release();
+        }
+    }
+
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string processPath, params string[] args)
     {
         await CliConsoleCapture.Gate.WaitAsync().ConfigureAwait(false);

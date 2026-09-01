@@ -27,4 +27,15 @@ public sealed class RootCancellationTests
 
         Assert.True(root.Token.IsCancellationRequested);
     }
+
+    [Fact]
+    public async Task EntryPoint_PreCanceledInvocation_ReturnsCancelledBeforeStartup()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exitCode = await EntryPoint.RunAsync(["--help"], cancellation.Token);
+
+        Assert.Equal(ExitCodes.Cancelled, exitCode);
+    }
 }

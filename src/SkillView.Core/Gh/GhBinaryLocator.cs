@@ -21,17 +21,36 @@ public sealed class GhBinaryLocator
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
+    private readonly Func<string?> _pathProvider;
+    private readonly Func<string, bool> _fileExists;
 
     public GhBinaryLocator(ProcessRunner runner, Logger logger)
+        : this(
+            runner,
+            logger,
+            () => Environment.GetEnvironmentVariable("PATH"),
+            File.Exists)
+    {
+    }
+
+    internal GhBinaryLocator(
+        ProcessRunner runner,
+        Logger logger,
+        Func<string?> pathProvider,
+        Func<string, bool> fileExists)
     {
         _runner = runner;
         _logger = logger;
+        _pathProvider = pathProvider;
+        _fileExists = fileExists;
     }
 
-    public string? FindOnPath()
+    public string? FindOnPath(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var executable = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "gh.exe" : "gh";
-        var path = Environment.GetEnvironmentVariable("PATH");
+        var path = _pathProvider();
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrEmpty(path))
         {
             return null;
@@ -39,19 +58,23 @@ public sealed class GhBinaryLocator
 
         foreach (var entry in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var candidate = Path.Combine(entry, executable);
-                if (File.Exists(candidate))
+                var exists = _fileExists(candidate);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (exists)
                 {
                     return candidate;
                 }
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // malformed PATH entry — skip
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return null;
     }
 

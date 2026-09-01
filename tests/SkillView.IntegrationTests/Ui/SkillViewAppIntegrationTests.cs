@@ -30,6 +30,38 @@ public sealed class SkillViewAppIntegrationTests
         Assert.Equal(ExitCodes.Success, exitCode);
     }
 
+    [Fact]
+    public async Task RunAsync_ExternalCancellation_ReturnsCancelledAfterTeardown()
+    {
+        var services = TuiServices.Build(new Logger(LogLevel.Debug));
+        var options = new AppOptions(
+            InvocationMode.Standalone,
+            DispatchMode.Tui,
+            Debug: false,
+            Theme: AppTheme.Default,
+            ScanRoots: [],
+            SubcommandName: null,
+            SubcommandArgs: []);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+        var app = new SkillViewApp(
+            services,
+            options,
+            () =>
+            {
+                var application = Application.Create();
+                application.Init("ansi");
+                return application;
+            },
+            probeOnRun: false);
+
+        var exitCode = await app.RunAsync(cancellation.Token);
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Equal(ExitCodes.Cancelled, exitCode);
+    }
+
     [Theory]
     [InlineData("ctrl-q-from-query")]
     [InlineData("q-from-discover-table")]

@@ -9,6 +9,20 @@ namespace SkillView.Tests.Subprocess;
 public sealed class ProcessRunnerTests
 {
     [Fact]
+    public async Task RunAsync_PreCanceledRequest_DoesNotAttemptProcessStart()
+    {
+        var runner = new ProcessRunner(new Logger(LogLevel.Debug));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            runner.RunAsync(
+                "skillview-executable-that-must-not-be-started",
+                [],
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
     public async Task RunAsync_ClosesStandardInput_ForCommandsThatWaitForEof()
     {
         var runner = new ProcessRunner(new Logger(LogLevel.Debug));

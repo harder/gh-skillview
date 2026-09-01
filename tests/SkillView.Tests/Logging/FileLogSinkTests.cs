@@ -91,11 +91,30 @@ public class FileLogSinkTests
             File.WriteAllText(Path.Combine(dir, "unrelated.txt"), "keep");
 
             using var sink = new FileLogSink(dir);
-            var count = sink.ClearAll();
+            var count = sink.ClearAll(TestContext.Current.CancellationToken);
 
             Assert.Equal(2, count);
             Assert.False(File.Exists(Path.Combine(dir, "skillview-2026-04-20.log")));
             Assert.True(File.Exists(Path.Combine(dir, "unrelated.txt")));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ClearAll_PreCanceledRequest_PreservesLogFiles()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            var logPath = Path.Combine(dir, "skillview-2026-04-20.log");
+            File.WriteAllText(logPath, "keep");
+            using var sink = new FileLogSink(dir);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                sink.ClearAll(cancellation.Token));
+            Assert.True(File.Exists(logPath));
         }
         finally { Directory.Delete(dir, true); }
     }
