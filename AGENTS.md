@@ -339,8 +339,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   startup side effects, synchronous log cleanup, environment probing, or child
   process launch; `SkillViewApp.RunAsync` also reports 130 directly rather than
   relying on `EntryPoint` to repair a success result. Propagate the root token
-  through every adapter. After process-tree termination, retain the bounded
-  parent-exit wait and observe both output drains. Never let a broad
+  through every adapter. Cancellation regressions must observe the side-effect
+  boundary they claim: use an admission seam to prove startup resources were
+  not created, drive active TUI cancellation from the event loop, and verify
+  teardown; `CancelAfter` plus a final exit-code assertion is not sufficient.
+  After process-tree termination, retain the bounded parent-exit wait and
+  observe both output drains. Never let a broad
   startup/failure catch convert `OperationCanceledException` into an ordinary
   failed result.
 - Use `PathIdentity` for path normalization, keys, equality, and containment.

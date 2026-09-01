@@ -33,6 +33,17 @@ public sealed class SkillViewAppIntegrationTests
     [Fact]
     public async Task RunAsync_ExternalCancellation_ReturnsCancelledAfterTeardown()
     {
+        IApplication? created = null;
+        IApplication? disposed = null;
+
+        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        {
+            if (ReferenceEquals(e.Value, created))
+            {
+                disposed = e.Value;
+            }
+        }
+
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
         var options = new AppOptions(
             InvocationMode.Standalone,
@@ -44,7 +55,7 @@ public sealed class SkillViewAppIntegrationTests
             SubcommandArgs: []);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken);
-        cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+        var cancellationCallbackRan = false;
         var app = new SkillViewApp(
             services,
             options,
@@ -52,14 +63,34 @@ public sealed class SkillViewAppIntegrationTests
             {
                 var application = Application.Create();
                 application.Init("ansi");
+                created = application;
+                application.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+                {
+                    cancellationCallbackRan = true;
+                    cancellation.Cancel();
+                    return false;
+                });
                 return application;
             },
             probeOnRun: false);
 
-        var exitCode = await app.RunAsync(cancellation.Token);
+        Application.InstanceDisposed += HandleDisposed;
+        try
+        {
+            var exitCode = await app
+                .RunAsync(cancellation.Token)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        Assert.True(cancellation.IsCancellationRequested);
-        Assert.Equal(ExitCodes.Cancelled, exitCode);
+            Assert.True(cancellationCallbackRan);
+            Assert.True(cancellation.IsCancellationRequested);
+            Assert.Equal(ExitCodes.Cancelled, exitCode);
+            Assert.NotNull(created);
+            Assert.Same(created, disposed);
+        }
+        finally
+        {
+            Application.InstanceDisposed -= HandleDisposed;
+        }
     }
 
     [Theory]

@@ -33,9 +33,18 @@ public sealed class RootCancellationTests
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
+        var startupResourceCreated = false;
 
-        var exitCode = await EntryPoint.RunAsync(["--help"], cancellation.Token);
+        var exitCode = await EntryPoint.RunAsync(
+            ["--help"],
+            cancellation.Token,
+            token =>
+            {
+                startupResourceCreated = true;
+                return new RootCancellation(token);
+            });
 
         Assert.Equal(ExitCodes.Cancelled, exitCode);
+        Assert.False(startupResourceCreated);
     }
 }

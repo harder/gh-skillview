@@ -13,7 +13,21 @@ public sealed class EnvironmentProbeTests
     {
         var logger = new Logger(LogLevel.Debug);
         var runner = new ProcessRunner(logger);
-        var locator = new GhBinaryLocator(runner, logger);
+        var pathReads = 0;
+        var fileProbes = 0;
+        var locator = new GhBinaryLocator(
+            runner,
+            logger,
+            pathProvider: () =>
+            {
+                pathReads++;
+                return "must-not-be-read";
+            },
+            fileExists: _ =>
+            {
+                fileProbes++;
+                return false;
+            });
         var auth = new GhAuthService(runner, logger);
         var probe = new EnvironmentProbe(locator, auth, runner, logger, logDirectory: null);
         using var cancellation = new CancellationTokenSource();
@@ -21,5 +35,7 @@ public sealed class EnvironmentProbeTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             probe.ProbeAsync(cancellation.Token));
+        Assert.Equal(0, pathReads);
+        Assert.Equal(0, fileProbes);
     }
 }

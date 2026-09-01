@@ -61,6 +61,10 @@ logging, or subprocess adapters.
   probing must check before and between `PATH` entries; and `ProcessRunner` must check the
   token before constructing/starting a child. `SkillViewApp.RunAsync` translates
   both pre-run and active-run cancellation to 130 after owned teardown.
+  Test these boundaries with observable admission hooks and event-loop-driven
+  cancellation. A final exit code or wall-clock `CancelAfter` alone does not
+  prove that startup was skipped, the active run was entered, or teardown
+  disposed its application instance.
   `ProcessRunner` whole-tree termination is followed by a five-second bounded
   parent-exit wait and observation of both output drains.
 - Use `PathIdentity.NormalizeKey`, `PathIdentity.Equals`, and
