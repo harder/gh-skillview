@@ -1193,6 +1193,30 @@ emits no success output, preserve log files on pre-canceled cleanup, use a
 nonexistent executable to prove cancellation wins before `Process.Start`, and
 exercise real ANSI-driver cancellation through Terminal.Gui teardown.
 
+### PR #19 post-merge regression-fidelity follow-up
+
+PR #19's final `Needs a closer look` review identified two tests that could
+pass without exercising the boundary named by the test. Both findings were
+valid and were selected as the next cohesive batch after merge:
+
+1. The ANSI integration test used a wall-clock `CancelAfter` before application
+   creation. A slow worker could therefore cancel during `Init`, take the
+   creation-time early return, and never enter the active run-loop catch. The
+   test now schedules cancellation from an ANSI event-loop timeout, asserts
+   that callback ran, bounds hangs separately with `Task.WaitAsync`, and
+   observes disposal of the exact created `IApplication` instance.
+2. The pre-canceled entrypoint test asserted only exit code 130. It would still
+   pass if startup allocated the root cancellation handler, logger, sink, and
+   services before cancellation reached the dispatcher. `EntryPoint` now has
+   an internal first-resource factory seam; the regression asserts that the
+   factory is never called for a pre-canceled request.
+
+The analogous cancellation-test pass found two related assertion gaps. The
+pre-canceled environment probe now proves neither `PATH` nor the filesystem is
+read, and application-creation cancellation now verifies the created
+Terminal.Gui instance is disposed on that early-return path. These are test
+fidelity changes, not new production cancellation defects.
+
 ## Finding 10: removal materializes full trees and runs on the UI thread
 
 Severity: **Medium**

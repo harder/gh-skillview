@@ -244,6 +244,16 @@ public sealed class SkillViewAppTests
     {
         using var cancellation = new CancellationTokenSource();
         IApplication? created = null;
+        IApplication? disposed = null;
+
+        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        {
+            if (ReferenceEquals(e.Value, created))
+            {
+                disposed = e.Value;
+            }
+        }
+
         var app = new SkillViewApp(
             TuiServices.Build(new Logger(LogLevel.Debug)),
             CreateOptions(),
@@ -255,10 +265,19 @@ public sealed class SkillViewAppTests
             },
             probeOnRun: false);
 
-        var exitCode = await app.RunAsync(cancellation.Token);
+        Application.InstanceDisposed += HandleDisposed;
+        try
+        {
+            var exitCode = await app.RunAsync(cancellation.Token);
 
-        Assert.Equal(ExitCodes.Cancelled, exitCode);
-        Assert.NotNull(created);
+            Assert.Equal(ExitCodes.Cancelled, exitCode);
+            Assert.NotNull(created);
+            Assert.Same(created, disposed);
+        }
+        finally
+        {
+            Application.InstanceDisposed -= HandleDisposed;
+        }
     }
 
     [Fact]

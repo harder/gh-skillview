@@ -9,16 +9,26 @@ namespace SkillView.Bootstrapping;
 /// Entrypoint projects wrap this with a two-line Program.cs.
 public static class EntryPoint
 {
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         string[] args,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        RunAsync(
+            args,
+            cancellationToken,
+            static token => new RootCancellation(token));
+
+    internal static async Task<int> RunAsync(
+        string[] args,
+        CancellationToken cancellationToken,
+        Func<CancellationToken, RootCancellation> rootCancellationFactory)
     {
         if (cancellationToken.IsCancellationRequested)
         {
             return ExitCodes.Cancelled;
         }
 
-        using var rootCancellation = new RootCancellation(cancellationToken);
+        ArgumentNullException.ThrowIfNull(rootCancellationFactory);
+        using var rootCancellation = rootCancellationFactory(cancellationToken);
         var startupStopwatch = Stopwatch.StartNew();
         string processPath;
         try
