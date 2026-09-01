@@ -69,4 +69,20 @@ public sealed class LatestRequestGateTests
         Assert.True(request.Token.IsCancellationRequested);
         Assert.False(request.IsCurrent);
     }
+
+    [Fact]
+    public void Begin_CallbackFailureDoesNotStrandReplacement()
+    {
+        using var gate = new LatestRequestGate();
+        using var first = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
+        using var registration = first.Token.Register(() =>
+            throw new InvalidOperationException("callback failed"));
+
+        using var replacement = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
+
+        Assert.True(first.Token.IsCancellationRequested);
+        Assert.False(first.IsCurrent);
+        Assert.True(replacement.IsCurrent);
+        Assert.False(replacement.Token.IsCancellationRequested);
+    }
 }

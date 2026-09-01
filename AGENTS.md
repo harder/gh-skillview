@@ -119,8 +119,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   lock. Cancellation callbacks are arbitrary user code and can synchronously
   re-enter or wait for lease release; publish the ownership transition under
   the lock, cancel outside it, and defer source disposal until cancellation
-  finishes. Capture the token value in the lease instead of dereferencing the
-  source after ownership can end.
+  finishes. Callbacks can also throw: application-owned cancellation and
+  deadline sources must use `SkillView.Threading.CancellationSource`, which
+  contains aggregate callback failures from manual, parent, and timer-driven
+  cancellation and keeps disposal from racing an active callback. Do not
+  reintroduce raw linked sources or `CancelAfter` for owned work. Capture the
+  token value in the lease instead of dereferencing the source after ownership
+  can end.
 - Route application-owned fire-and-forget work through `BackgroundTaskTracker`
   (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
   tied to their activation lifetimes and put generation/ownership checks inside

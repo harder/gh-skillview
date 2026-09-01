@@ -3,6 +3,7 @@ using System.Text;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -65,7 +66,10 @@ public sealed class CleanupScreen
 
     public void Show()
     {
-        using var lifetime = new CancellationTokenSource();
+        using var lifetime = new CancellationSource(ex =>
+            _logger.Error(
+                "cleanup.ui",
+                $"cancellation callback failed: {ex.Message}"));
         Task? activeOperation = null;
         RemoveService.RemoveProgress? lastProgress = null;
         var windowActive = 1;

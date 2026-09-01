@@ -148,6 +148,44 @@ public sealed class GhSkillListCacheTests
     }
 
     [Fact]
+    public async Task Invalidate_CallbackFailureDoesNotEscapeOrReleaseBeforeCleanup()
+    {
+        var cache = new GhSkillListCache(ttl: TimeSpan.FromMinutes(1));
+        var loaderStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var lookup = cache.GetOrLoadAsync(
+            "/usr/bin/gh",
+            null,
+            null,
+            async cancellationToken =>
+            {
+                using var registration = cancellationToken.Register(() =>
+                    throw new InvalidOperationException("callback failed"));
+                loaderStarted.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    throw new InvalidOperationException("unreachable");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationObserved.TrySetResult();
+                    throw;
+                }
+            },
+            TestContext.Current.CancellationToken);
+
+        await loaderStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var exception = Record.Exception(cache.Invalidate);
+
+        Assert.Null(exception);
+        await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => lookup);
+        Assert.False(cache.TryGet("/usr/bin/gh", null, null, out _));
+    }
+
+    [Fact]
     public async Task GetOrLoadAsync_WhenAllWaitersCancel_CancelsSharedLoad()
     {
         var cache = new GhSkillListCache(ttl: TimeSpan.FromMinutes(1));

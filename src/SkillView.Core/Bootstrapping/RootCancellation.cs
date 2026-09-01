@@ -1,3 +1,5 @@
+using SkillView.Threading;
+
 namespace SkillView.Bootstrapping;
 
 /// <summary>
@@ -6,14 +8,14 @@ namespace SkillView.Bootstrapping;
 /// </summary>
 internal sealed class RootCancellation : IDisposable
 {
-    private readonly CancellationTokenSource _source;
+    private readonly CancellationSource _source;
     private readonly ConsoleCancelEventHandler _handler;
     private bool _subscribed;
     private bool _disposed;
 
     internal RootCancellation(CancellationToken cancellationToken = default)
     {
-        _source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _source = new CancellationSource(cancellationToken);
         _handler = OnCancelKeyPress;
         try
         {
@@ -28,11 +30,7 @@ internal sealed class RootCancellation : IDisposable
 
     internal CancellationToken Token => _source.Token;
 
-    internal void RequestCancellation()
-    {
-        try { _source.Cancel(); }
-        catch (ObjectDisposedException) { }
-    }
+    internal void RequestCancellation() => _source.Cancel();
 
     public void Dispose()
     {

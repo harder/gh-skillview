@@ -1,3 +1,5 @@
+using SkillView.Threading;
+
 namespace SkillView.Ui;
 
 /// <summary>
@@ -111,8 +113,7 @@ internal sealed class SharedAsyncOperation<T>
 
         if (cancel)
         {
-            try { flight.Cancellation.Cancel(); }
-            catch (ObjectDisposedException) { }
+            flight.Cancellation.Cancel();
         }
         if (dispose)
         {
@@ -123,7 +124,7 @@ internal sealed class SharedAsyncOperation<T>
 
     private sealed class Flight
     {
-        internal CancellationTokenSource Cancellation { get; } = new();
+        internal CancellationSource Cancellation { get; } = new();
         internal TaskCompletionSource<T> Completion { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         internal bool Started { get; set; }

@@ -54,6 +54,39 @@ public sealed class ModalOperationTrackerTests
     }
 
     [Fact]
+    public async Task Dispose_CallbackFailureDoesNotSkipWorkerDrain()
+    {
+        var logger = new Logger();
+        var tracker = new ModalOperationTracker(action => action(), logger, "test.ui");
+        var cancellationObserved = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = tracker.Token.Register(() =>
+            throw new InvalidOperationException("callback failed"));
+
+        Assert.True(tracker.TryStart(async token =>
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                cancellationObserved.TrySetResult();
+                throw;
+            }
+        }));
+
+        var exception = Record.Exception(tracker.Dispose);
+
+        Assert.Null(exception);
+        await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Contains(
+            logger.Snapshot(),
+            entry => entry.Category == "test.ui"
+                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ReleaseInsideWorker_DoesNotClearOwnershipUntilWorkerReturns()
     {
         using var tracker = NewTracker();

@@ -1217,6 +1217,44 @@ read, and application-creation cancellation now verifies the created
 Terminal.Gui instance is disposed on that early-return path. These are test
 fidelity changes, not new production cancellation defects.
 
+### Post-PR #20 cancellation-callback fault reassessment
+
+PR #20 received a clean Balanced approval. With the explicit backlog complete,
+the next residual-risk pass revisited the earlier rule that cancellation must
+run outside ownership locks. That rule prevented lock inversion, but it still
+assumed callbacks could not throw. `CancellationTokenSource.Cancel()` invokes
+all callbacks and then throws their failures as an `AggregateException`.
+
+That exception could escape several application-owned boundaries:
+
+- Replacing a `LatestRequestGate` or `CancellationTokenSourceSlot` published
+  the new owner before canceling the old one. A throwing old callback prevented
+  the method from returning the new lease, leaving the published source active
+  with no owner able to release it.
+- `ModalOperationTracker.Dispose` canceled before entering its worker-drain
+  `try/finally`; a callback failure skipped both the drain and source disposal.
+- Cache invalidation, shared-operation final-waiter cleanup, workspace/modal
+  teardown, and Ctrl+C propagation could return or unwind before their required
+  cleanup completed.
+- `CancelAfter` initiated cancellation on a timer thread with no caller able to
+  observe or contain callback exceptions, turning a bad operation callback into
+  a process-level failure.
+
+The new `SkillView.Threading.CancellationSource` is the single owner for manual,
+parent-linked, and deadline cancellation. It captures aggregate callback
+failures, isolates best-effort diagnostics, returns a stable token, and defers
+resource disposal while any cancellation call is active. Root, CLI, subprocess,
+search metadata, request gates, operation slots, shared flights, modal and
+workspace lifetimes, and cleanup/remove dialogs now use that owner; no raw
+production `CancellationTokenSource` or `CancelAfter` remains outside it.
+
+Deterministic regressions cover parent and timer initiation, a diagnostic
+callback that also throws, self-disposal from a cancellation callback,
+cancel/dispose contention, replacement ownership, cache invalidation, shared
+operation cleanup, modal worker drain, workspace navigation, and metadata
+preview timeout. Callback faults are contained without weakening cancellation
+or allowing required cleanup to finish early.
+
 ## Finding 10: removal materializes full trees and runs on the UI thread
 
 Severity: **Medium**

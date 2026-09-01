@@ -8,6 +8,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
@@ -43,12 +44,12 @@ public sealed class SkillViewApp
     private IApplication? _app;
     private Window? _mainWindow;
     private IDisposable? _logSubscription;
-    private CancellationTokenSource? _runLifetime;
-    private readonly LatestRequestGate _previewRequests = new();
-    private readonly LatestRequestGate _searchRequests = new();
+    private CancellationSource? _runLifetime;
+    private readonly LatestRequestGate _previewRequests;
+    private readonly LatestRequestGate _searchRequests;
     private readonly SharedAsyncOperation<EnvironmentReport> _environmentProbe = new();
-    private CancellationTokenSource? _discoverLifetime;
-    private CancellationTokenSource? _doctorLifetime;
+    private CancellationSource? _discoverLifetime;
+    private CancellationSource? _doctorLifetime;
     private long _discoverGeneration;
     private long _doctorGeneration;
     private bool _hasEnteredRunLifecycle;
@@ -141,6 +142,8 @@ public sealed class SkillViewApp
         _options = options;
         _applicationFactory = applicationFactory;
         _probeOnRun = probeOnRun;
+        _previewRequests = new LatestRequestGate();
+        _searchRequests = new LatestRequestGate();
         _backgroundTasks = new BackgroundTaskTracker(LogUnhandledException);
         _searchAgentMetadataLoader = new SearchAgentMetadataLoader(_searchAgentMetadata, services.Logger);
         _workflows = new SkillViewWorkflowCoordinator(
@@ -197,7 +200,9 @@ public sealed class SkillViewApp
 
         IApplication? app = null;
         Window? window = null;
-        using var runLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var runLifetime = new CancellationSource(
+            cancellationToken,
+            ex => LogCancellationCallbackFailure("application", ex));
         _hasEnteredRunLifecycle = true;
         _runLifetime = runLifetime;
 
@@ -276,6 +281,13 @@ public sealed class SkillViewApp
     private void LogUnhandledException(Exception ex)
     {
         _services.Logger.Error("CRASH", $"Unhandled: {ex}");
+    }
+
+    private void LogCancellationCallbackFailure(string owner, AggregateException exception)
+    {
+        _services.Logger.Error(
+            "cancellation",
+            $"{owner} cancellation callback failed: {exception.Message}");
     }
 
     private Window BuildUi()
@@ -956,7 +968,9 @@ public sealed class SkillViewApp
     {
         if (_discoverLifetime is { IsCancellationRequested: false }) return;
         _discoverLifetime?.Dispose();
-        _discoverLifetime = CancellationTokenSource.CreateLinkedTokenSource(GetRunLifetimeToken());
+        _discoverLifetime = new CancellationSource(
+            GetRunLifetimeToken(),
+            ex => LogCancellationCallbackFailure("Discover", ex));
         Interlocked.Increment(ref _discoverGeneration);
     }
 
@@ -968,8 +982,8 @@ public sealed class SkillViewApp
         var lifetime = Interlocked.Exchange(ref _discoverLifetime, null);
         if (lifetime is not null)
         {
-            try { lifetime.Cancel(); }
-            finally { lifetime.Dispose(); }
+            lifetime.Cancel();
+            lifetime.Dispose();
         }
         if (clearBusy)
         {
@@ -978,7 +992,7 @@ public sealed class SkillViewApp
     }
 
     internal static bool TryCaptureActiveLifetimeToken(
-        CancellationTokenSource? lifetime,
+        CancellationSource? lifetime,
         out CancellationToken cancellationToken)
     {
         if (lifetime is null)
@@ -987,23 +1001,21 @@ public sealed class SkillViewApp
             return false;
         }
 
-        try
+        if (lifetime.TryGetActiveToken(out cancellationToken))
         {
-            cancellationToken = lifetime.Token;
-        }
-        catch (ObjectDisposedException)
-        {
-            cancellationToken = new CancellationToken(canceled: true);
-            return false;
+            return true;
         }
 
-        return !cancellationToken.IsCancellationRequested;
+        cancellationToken = new CancellationToken(canceled: true);
+        return false;
     }
 
     private void ActivateDoctorWorkspace()
     {
         DeactivateDoctorWorkspace(clearBusy: false);
-        _doctorLifetime = CancellationTokenSource.CreateLinkedTokenSource(GetRunLifetimeToken());
+        _doctorLifetime = new CancellationSource(
+            GetRunLifetimeToken(),
+            ex => LogCancellationCallbackFailure("Doctor", ex));
         Interlocked.Increment(ref _doctorGeneration);
     }
 
@@ -1013,8 +1025,8 @@ public sealed class SkillViewApp
         var lifetime = Interlocked.Exchange(ref _doctorLifetime, null);
         if (lifetime is not null)
         {
-            try { lifetime.Cancel(); }
-            finally { lifetime.Dispose(); }
+            lifetime.Cancel();
+            lifetime.Dispose();
         }
         if (clearBusy)
         {
@@ -2529,10 +2541,13 @@ public sealed class SkillViewApp
         if (app is not null)
         {
             using var dispatchLifetime = lifetime is null
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
-                : CancellationTokenSource.CreateLinkedTokenSource(
+                ? new CancellationSource(
                     cancellationToken,
-                    lifetime.Token);
+                    ex => LogCancellationCallbackFailure("UI dispatch", ex))
+                : new CancellationSource(
+                    cancellationToken,
+                    lifetime.Token,
+                    ex => LogCancellationCallbackFailure("UI dispatch", ex));
             return await AwaitDispatchAsync(
                     app.Invoke,
                     action,
@@ -2558,10 +2573,13 @@ public sealed class SkillViewApp
         if (app is not null)
         {
             using var dispatchLifetime = lifetime is null
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
-                : CancellationTokenSource.CreateLinkedTokenSource(
+                ? new CancellationSource(
                     cancellationToken,
-                    lifetime.Token);
+                    ex => LogCancellationCallbackFailure("owned UI dispatch", ex))
+                : new CancellationSource(
+                    cancellationToken,
+                    lifetime.Token,
+                    ex => LogCancellationCallbackFailure("owned UI dispatch", ex));
             return await AwaitOwnedDispatchAsync(
                     app.Invoke,
                     action,

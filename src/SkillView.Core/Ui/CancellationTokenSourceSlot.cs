@@ -1,3 +1,5 @@
+using SkillView.Threading;
+
 namespace SkillView.Ui;
 
 /// Coordinates one owned cancellation source across replacement, cancellation,
@@ -22,7 +24,7 @@ internal sealed class CancellationTokenSourceSlot
 
     internal Lease Replace(CancellationToken lifetime)
     {
-        var next = new SourceState(CancellationTokenSource.CreateLinkedTokenSource(lifetime));
+        var next = new SourceState(new CancellationSource(lifetime));
         SourceState? previous;
         lock (_gate)
         {
@@ -37,7 +39,7 @@ internal sealed class CancellationTokenSourceSlot
 
     internal Lease? TryBegin(CancellationToken lifetime)
     {
-        var next = new SourceState(CancellationTokenSource.CreateLinkedTokenSource(lifetime));
+        var next = new SourceState(new CancellationSource(lifetime));
         lock (_gate)
         {
             if (_active is not null)
@@ -145,9 +147,9 @@ internal sealed class CancellationTokenSourceSlot
             Interlocked.Exchange(ref _owner, null)?.Release(_state);
     }
 
-    internal sealed class SourceState(CancellationTokenSource source)
+    internal sealed class SourceState(CancellationSource source)
     {
-        internal CancellationTokenSource Source { get; } = source;
+        internal CancellationSource Source { get; } = source;
         internal bool CancellationInProgress { get; set; }
         internal bool LeaseReleased { get; set; }
         internal bool Disposed { get; set; }

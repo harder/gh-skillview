@@ -1,4 +1,5 @@
 using SkillView.Logging;
+using SkillView.Threading;
 using Terminal.Gui.App;
 
 namespace SkillView.Ui;
@@ -18,7 +19,7 @@ internal sealed class ModalOperationTracker : IDisposable
     }
 
     private readonly object _gate = new();
-    private readonly CancellationTokenSource _cancellation = new();
+    private readonly CancellationSource _cancellation;
     private readonly Action<Action> _invoke;
     private readonly Logger _logger;
     private readonly string _logCategory;
@@ -37,6 +38,10 @@ internal sealed class ModalOperationTracker : IDisposable
         _invoke = invoke;
         _logger = logger;
         _logCategory = logCategory;
+        _cancellation = new CancellationSource(ex =>
+            _logger.Error(
+                _logCategory,
+                $"cancellation callback failed: {ex.Message}"));
         Token = _cancellation.Token;
     }
 
@@ -94,11 +99,7 @@ internal sealed class ModalOperationTracker : IDisposable
         }
     }
 
-    internal void Cancel()
-    {
-        try { _cancellation.Cancel(); }
-        catch (ObjectDisposedException) { }
-    }
+    internal void Cancel() => _cancellation.Cancel();
 
     internal void InvokeIfActive(Action action)
         => InvokeIfActive(action, releaseOnFailure: false);

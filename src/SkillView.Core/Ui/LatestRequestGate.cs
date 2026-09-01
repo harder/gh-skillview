@@ -1,3 +1,5 @@
+using SkillView.Threading;
+
 namespace SkillView.Ui;
 
 /// Owns one cancellable request at a time. Beginning a newer request cancels
@@ -11,8 +13,7 @@ internal sealed class LatestRequestGate : IDisposable
 
     internal Lease Begin(CancellationToken lifetime, TimeSpan timeout)
     {
-        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
-        cancellation.CancelAfter(timeout);
+        var cancellation = new CancellationSource(lifetime, timeout);
         var next = new SourceState(cancellation);
 
         long generation;
@@ -131,9 +132,9 @@ internal sealed class LatestRequestGate : IDisposable
             Interlocked.Exchange(ref _owner, null)?.Release(_generation, _state);
     }
 
-    internal sealed class SourceState(CancellationTokenSource source)
+    internal sealed class SourceState(CancellationSource source)
     {
-        internal CancellationTokenSource Source { get; } = source;
+        internal CancellationSource Source { get; } = source;
         internal bool CancellationInProgress { get; set; }
         internal bool LeaseReleased { get; set; }
         internal bool Disposed { get; set; }

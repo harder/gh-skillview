@@ -158,6 +158,36 @@ public sealed class SearchAgentMetadataLoaderTests
     }
 
     [Fact]
+    public async Task FilterAsync_TimeoutContainsCallbackFailure()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var loader = new SearchAgentMetadataLoader(
+            new SearchAgentMetadataCache(),
+            logger,
+            maxConcurrency: 1,
+            previewTimeout: TimeSpan.FromMilliseconds(20));
+        var result = Skill("owner/repo", "demo");
+
+        var filtered = await loader.FilterAsync(
+            [result],
+            "claude-code",
+            async (_, cancellationToken) =>
+            {
+                using var registration = cancellationToken.Register(() =>
+                    throw new InvalidOperationException("callback failed"));
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("unreachable");
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(filtered);
+        Assert.Contains(
+            logger.Snapshot(),
+            entry => entry.Category == "search.agent"
+                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task FilterAsync_DoesNotCacheTransientPreviewFailure()
     {
         var cache = new SearchAgentMetadataCache();

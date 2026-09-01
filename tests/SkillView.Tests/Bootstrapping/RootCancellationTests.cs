@@ -29,6 +29,20 @@ public sealed class RootCancellationTests
     }
 
     [Fact]
+    public void ParentCancellation_CallbackFailureDoesNotEscapeRootBoundary()
+    {
+        using var parent = new CancellationTokenSource();
+        using var root = new RootCancellation(parent.Token);
+        using var registration = root.Token.Register(() =>
+            throw new InvalidOperationException("callback failed"));
+
+        var exception = Record.Exception(parent.Cancel);
+
+        Assert.Null(exception);
+        Assert.True(root.Token.IsCancellationRequested);
+    }
+
+    [Fact]
     public async Task EntryPoint_PreCanceledInvocation_ReturnsCancelledBeforeStartup()
     {
         using var cancellation = new CancellationTokenSource();

@@ -82,4 +82,19 @@ public sealed class CancellationTokenSourceSlotTests
         Assert.True(releasedInsideCallback);
         Assert.False(slot.HasActive);
     }
+
+    [Fact]
+    public void Replace_CallbackFailureDoesNotStrandReplacement()
+    {
+        var slot = new CancellationTokenSourceSlot();
+        using var first = slot.Replace(CancellationToken.None);
+        using var registration = first.Token.Register(() =>
+            throw new InvalidOperationException("callback failed"));
+
+        using var replacement = slot.Replace(CancellationToken.None);
+
+        Assert.True(first.Token.IsCancellationRequested);
+        Assert.False(replacement.Token.IsCancellationRequested);
+        Assert.True(slot.HasActive);
+    }
 }

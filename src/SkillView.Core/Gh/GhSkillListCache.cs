@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Gh.Models;
+using SkillView.Threading;
 
 namespace SkillView.Gh;
 
@@ -258,11 +259,7 @@ internal sealed class GhSkillListCache
         }
     }
 
-    private static void TryCancel(CancellationTokenSource cancellation)
-    {
-        try { cancellation.Cancel(); }
-        catch (ObjectDisposedException) { }
-    }
+    private static void TryCancel(CancellationSource cancellation) => cancellation.Cancel();
 
     private static string BuildKey(string ghPath, string? scope, string? agent) =>
         $"{ghPath}\n{scope ?? string.Empty}\n{agent ?? string.Empty}";
@@ -281,7 +278,7 @@ internal sealed class GhSkillListCache
 
     private sealed class InflightLoad(long generation)
     {
-        internal CancellationTokenSource Cancellation { get; } = new();
+        internal CancellationSource Cancellation { get; } = new();
         internal TaskCompletionSource<LoadResult> Completion { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         internal long Generation { get; } = generation;

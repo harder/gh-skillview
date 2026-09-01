@@ -5,6 +5,7 @@ using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
@@ -325,9 +326,12 @@ public sealed class SkillViewAppTests
         var app = CreateApp();
         using var window = app.BuildUiForTests();
         var discoverLifetime = app.DiscoverLifetimeForTests;
+        using var registration = discoverLifetime.Register(() =>
+            throw new InvalidOperationException("callback failed"));
 
-        app.ActivateTabForTests(destination);
+        var exception = Record.Exception(() => app.ActivateTabForTests(destination));
 
+        Assert.Null(exception);
         Assert.True(discoverLifetime.IsCancellationRequested);
         Assert.Equal(destination, app.ActiveTabForTests);
     }
@@ -335,8 +339,7 @@ public sealed class SkillViewAppTests
     [Fact]
     public void CapturedWorkspaceToken_RemainsUsableAfterSourceDisposal()
     {
-        var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
-            TestContext.Current.CancellationToken);
+        var lifetime = new CancellationSource(TestContext.Current.CancellationToken);
 
         Assert.True(SkillViewApp.TryCaptureActiveLifetimeToken(lifetime, out var captured));
         lifetime.Dispose();
@@ -354,12 +357,15 @@ public sealed class SkillViewAppTests
         var firstDiscoverLifetime = app.DiscoverLifetimeForTests;
         app.EnterDoctorForTests(CreateEnvironmentReport());
         var doctorLifetime = app.DoctorLifetimeForTests;
+        using var registration = doctorLifetime.Register(() =>
+            throw new InvalidOperationException("callback failed"));
 
         Assert.True(firstDiscoverLifetime.IsCancellationRequested);
         Assert.False(doctorLifetime.IsCancellationRequested);
 
-        app.LeaveDoctorForTests();
+        var exception = Record.Exception(app.LeaveDoctorForTests);
 
+        Assert.Null(exception);
         Assert.True(doctorLifetime.IsCancellationRequested);
         Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
         Assert.False(app.DiscoverLifetimeForTests.IsCancellationRequested);
