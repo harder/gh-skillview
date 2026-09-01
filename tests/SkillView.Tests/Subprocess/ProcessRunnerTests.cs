@@ -23,6 +23,27 @@ public sealed class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_CancellationDuringStartupLogging_PropagatesCancellation()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var runner = new ProcessRunner(logger);
+        using var cancellation = new CancellationTokenSource();
+        using var subscription = logger.Subscribe(entry =>
+        {
+            if (entry.Category == "subprocess")
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            runner.RunAsync(
+                "skillview-executable-that-must-not-be-started",
+                [],
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
     public async Task RunAsync_ClosesStandardInput_ForCommandsThatWaitForEof()
     {
         var runner = new ProcessRunner(new Logger(LogLevel.Debug));

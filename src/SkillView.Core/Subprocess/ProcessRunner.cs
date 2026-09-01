@@ -67,7 +67,7 @@ public sealed class ProcessRunner
             cancellationToken.ThrowIfCancellationRequested();
             process.Start();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.Warn("subprocess", $"failed to start {executable}: {ex.Message}");
             return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed);
