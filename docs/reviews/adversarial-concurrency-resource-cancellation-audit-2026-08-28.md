@@ -1163,6 +1163,36 @@ requests whole-tree termination, waits at most five seconds for the parent,
 observes both bounded output drains, and logs kill or wait failure without
 hanging shutdown.
 
+### Post-PR #18 cancellation-admission reassessment
+
+After the ordered backlog was completed, an analogous-path pass found four
+remaining gaps at the *start* of the cancellation lifecycle:
+
+1. A pre-canceled `EntryPoint` still created logging/services, while a
+   pre-canceled `CliDispatcher` could print help/version success or run
+   `doctor --clear-logs` because those synchronous paths never awaited the
+   propagated token.
+2. `ProcessRunner` called `Process.Start` before its first token observation.
+   An already-canceled caller could therefore launch a child only to kill it,
+   or receive a start-failure result instead of cancellation.
+3. `EnvironmentProbe` scanned every `PATH` entry before reaching a cancellable
+   subprocess.
+4. `SkillViewApp.RunAsync` returned success when cancellation was already
+   requested (or won during application creation), and could let an active-run
+   `OperationCanceledException` escape to direct callers. `EntryPoint` masked
+   part of that contract mismatch, but the awaitable host itself was wrong.
+
+The new batch closes admission before each boundary. EntryPoint returns 130
+before startup allocation, the dispatcher checks both the root and linked
+deadline tokens before routing, log cleanup accepts and checks cancellation,
+environment probing checks before and between `PATH` filesystem lookups, and `ProcessRunner`
+checks before process configuration/logging/start. The TUI host now returns 130
+for pre-run, creation-time, and active-run external cancellation after its
+existing shutdown drain. Tests lock the exit-code constant, prove canceled help
+emits no success output, preserve log files on pre-canceled cleanup, use a
+nonexistent executable to prove cancellation wins before `Process.Start`, and
+exercise real ANSI-driver cancellation through Terminal.Gui teardown.
+
 ## Finding 10: removal materializes full trees and runs on the UI thread
 
 Severity: **Medium**

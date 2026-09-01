@@ -13,6 +13,11 @@ public static class EntryPoint
         string[] args,
         CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ExitCodes.Cancelled;
+        }
+
         using var rootCancellation = new RootCancellation(cancellationToken);
         var startupStopwatch = Stopwatch.StartNew();
         string processPath;
@@ -34,6 +39,11 @@ public static class EntryPoint
         {
             Console.Error.WriteLine($"skillview: {ex.Message}");
             return ExitCodes.InvalidUsage;
+        }
+
+        if (rootCancellation.Token.IsCancellationRequested)
+        {
+            return ExitCodes.Cancelled;
         }
 
         var logger = new Logger(options.Debug ? LogLevel.Debug : LogLevel.Info);

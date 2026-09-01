@@ -35,6 +35,10 @@ public sealed class ProcessRunner
         string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
+        // Cancellation closes process admission. In particular, do not start
+        // and then immediately kill a child for an already-canceled caller.
+        cancellationToken.ThrowIfCancellationRequested();
+
         var psi = new ProcessStartInfo
         {
             FileName = executable,
@@ -50,6 +54,7 @@ public sealed class ProcessRunner
             psi.ArgumentList.Add(arg);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         _logger.Debug("subprocess", $"exec: {executable} {string.Join(' ', arguments)}");
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -59,9 +64,10 @@ public sealed class ProcessRunner
         var sw = Stopwatch.StartNew();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             process.Start();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.Warn("subprocess", $"failed to start {executable}: {ex.Message}");
             return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed);

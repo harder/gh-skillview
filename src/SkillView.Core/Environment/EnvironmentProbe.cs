@@ -35,7 +35,8 @@ public sealed class EnvironmentProbe
 
     public async Task<EnvironmentReport> ProbeAsync(CancellationToken cancellationToken = default)
     {
-        var path = _locator.FindOnPath();
+        cancellationToken.ThrowIfCancellationRequested();
+        var path = _locator.FindOnPath(cancellationToken);
         if (path is null)
         {
             _logger.Warn("env", "gh binary not found on PATH");

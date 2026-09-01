@@ -157,15 +157,18 @@ public sealed class FileLogSink : IDisposable
     }
 
     /// Delete every rotated log file. Used by `doctor --clear-logs`.
-    public int ClearAll()
+    public int ClearAll(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CloseWriterLocked();
             if (!System.IO.Directory.Exists(_directory)) return 0;
             var count = 0;
             foreach (var file in System.IO.Directory.EnumerateFiles(_directory, "skillview-*.log"))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     File.Delete(file);

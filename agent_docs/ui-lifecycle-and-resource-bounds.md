@@ -55,6 +55,12 @@ logging, or subprocess adapters.
   the modal control first and its `ModalOperationTracker` second.
 - CLI and TUI hosts share `EntryPoint` root cancellation. CLI operations must
   propagate it through every adapter and retain a bounded command deadline.
+  Treat cancellation as an admission boundary: an already-canceled entrypoint
+  must return 130 before startup resources are created; dispatcher help and
+  synchronous cleanup must not report success or mutate files; environment
+  probing must check before and between `PATH` entries; and `ProcessRunner` must check the
+  token before constructing/starting a child. `SkillViewApp.RunAsync` translates
+  both pre-run and active-run cancellation to 130 after owned teardown.
   `ProcessRunner` whole-tree termination is followed by a five-second bounded
   parent-exit wait and observation of both output drains.
 - Use `PathIdentity.NormalizeKey`, `PathIdentity.Equals`, and

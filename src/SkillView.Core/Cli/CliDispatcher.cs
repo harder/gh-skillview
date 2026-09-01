@@ -25,12 +25,14 @@ public static class CliDispatcher
         TuiServices services,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeout = TimeoutFor(options.SubcommandName);
         deadline.CancelAfter(timeout);
 
         try
         {
+            deadline.Token.ThrowIfCancellationRequested();
             return options.SubcommandName switch
             {
                 "doctor" => await DoctorAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -74,7 +76,8 @@ public static class CliDispatcher
     {
         if (options.SubcommandArgs.Contains("--clear-logs"))
         {
-            return ClearLogs(services);
+            cancellationToken.ThrowIfCancellationRequested();
+            return ClearLogs(services, cancellationToken);
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
@@ -175,14 +178,15 @@ public static class CliDispatcher
     }
 
 
-    private static int ClearLogs(TuiServices services)
+    private static int ClearLogs(TuiServices services, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (services.FileLogSink is null)
         {
             Console.Error.WriteLine("skillview: log sink not initialized; nothing to clear");
             return ExitCodes.EnvironmentError;
         }
-        var count = services.FileLogSink.ClearAll();
+        var count = services.FileLogSink.ClearAll(cancellationToken);
         Console.Out.WriteLine($"cleared {count} log file(s) from {services.LogDirectory}");
         return ExitCodes.Success;
     }

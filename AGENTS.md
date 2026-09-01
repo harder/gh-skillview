@@ -335,9 +335,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   modal run returns. Do not use a token-short-circuiting cosmetic dispatcher for
   this boundary or shutdown can release ownership while the modal is active.
 - CLI entrypoints translate Ctrl+C/external cancellation to exit code 130 and
-  apply bounded per-command deadlines. Propagate the root token through every
-  adapter. After process-tree termination, retain the bounded parent-exit wait
-  and observe both output drains.
+  apply bounded per-command deadlines. Cancellation closes admission before
+  startup side effects, synchronous log cleanup, environment probing, or child
+  process launch; `SkillViewApp.RunAsync` also reports 130 directly rather than
+  relying on `EntryPoint` to repair a success result. Propagate the root token
+  through every adapter. After process-tree termination, retain the bounded
+  parent-exit wait and observe both output drains. Never let a broad
+  startup/failure catch convert `OperationCanceledException` into an ordinary
+  failed result.
 - Use `PathIdentity` for path normalization, keys, equality, and containment.
   Do not substitute a global Windows/macOS ignore-case rule: Windows supports
   case-sensitive directories and macOS supports case-sensitive volumes. A
