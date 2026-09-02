@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using SkillView.Gh.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 
 namespace SkillView.Ui;
 
@@ -100,8 +101,13 @@ internal sealed class SearchAgentMetadataLoader
                 return;
             }
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(_previewTimeout);
+            using var timeout = new CancellationSource(
+                cancellationToken,
+                _previewTimeout,
+                CancellationCallbackReporter.For(
+                    _logger,
+                    "metadata preview",
+                    "search.agent"));
             try
             {
                 var preview = await loadPreviewAsync(result, timeout.Token).ConfigureAwait(false);

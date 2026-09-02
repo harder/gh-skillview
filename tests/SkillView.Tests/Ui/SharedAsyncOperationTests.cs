@@ -62,4 +62,31 @@ public sealed class SharedAsyncOperationTests
         releaseCleanup.SetResult();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiter);
     }
+
+    [Fact]
+    public async Task FinalWaiterCancellation_CallbackFailureDoesNotEscapeCleanup()
+    {
+        AggregateException? reported = null;
+        var shared = new SharedAsyncOperation<int>(ex => reported = ex);
+        using var callerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var waiter = shared.GetAsync(async cancellationToken =>
+        {
+            using var registration = cancellationToken.Register(() =>
+                throw new InvalidOperationException("callback failed"));
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }, callerCancellation.Token);
+
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        callerCancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiter);
+        var failure = Assert.IsType<InvalidOperationException>(
+            Assert.Single(Assert.IsType<AggregateException>(reported).InnerExceptions));
+        Assert.Equal("callback failed", failure.Message);
+    }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using SkillView.Logging;
+using SkillView.Threading;
 
 namespace SkillView.Subprocess;
 
@@ -96,7 +97,12 @@ public sealed class ProcessRunner
             // Process.Kill is asynchronous on every supported platform. Wait
             // for a bounded grace period so the parent and redirected pipes can
             // settle, but never let a wedged or unkillable child stall shutdown.
-            using (var termination = new CancellationTokenSource(_terminationWait))
+            using (var termination = new CancellationSource(
+                _terminationWait,
+                CancellationCallbackReporter.For(
+                    _logger,
+                    "termination deadline",
+                    "subprocess")))
             {
                 try
                 {

@@ -3,6 +3,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -50,8 +51,8 @@ internal sealed class UpdatesTabView : FrameView
     private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
     private int _nameW = 12;
     private long _loadGeneration;
-    private readonly CancellationTokenSourceSlot _loadCancellations = new();
-    private readonly CancellationTokenSourceSlot _operationCancellations = new();
+    private readonly CancellationOperationSlot _loadCancellations;
+    private readonly CancellationOperationSlot _operationCancellations;
 
     internal UpdatesTabView(
         Func<Action, Task> runOnUi,
@@ -73,6 +74,9 @@ internal sealed class UpdatesTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onUpdateApplied = onUpdateApplied;
         _lifetimeToken = lifetimeToken;
+        var cancellationReporter = CancellationCallbackReporter.For(logger, "updates tab");
+        _loadCancellations = new CancellationOperationSlot(cancellationReporter);
+        _operationCancellations = new CancellationOperationSlot(cancellationReporter);
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;

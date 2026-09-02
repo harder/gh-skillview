@@ -1,6 +1,7 @@
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using SkillView.Ui.Theming;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
@@ -77,7 +78,8 @@ internal sealed class RemoveConfirmModal
 
     internal Result Show()
     {
-        using var lifetime = new CancellationTokenSource();
+        using var lifetime = new CancellationSource(
+            CancellationCallbackReporter.For(_logger, "remove dialog", "remove.ui"));
         var validation = _evaluation.Items[0].Validation;
         var outcome = Outcome.Cancelled;
         RemoveService.RemoveReport? report = null;

@@ -322,7 +322,7 @@ The earlier review misses were then used as bug-family prompts rather than
 one-off patches. This found four report/code gaps:
 
 1. **Cancellation callbacks ran under ownership locks — correct and fixed.**
-   `CancellationTokenSourceSlot` and `LatestRequestGate` called `Cancel()` while
+   `CancellationOperationSlot` and `LatestRequestGate` called `Cancel()` while
    holding their private gates. `Cancel()` synchronously invokes arbitrary
    registered callbacks; a callback that waits for another thread to release
    or query the lease creates the same lock/callback inversion class that the
@@ -1216,6 +1216,92 @@ pre-canceled environment probe now proves neither `PATH` nor the filesystem is
 read, and application-creation cancellation now verifies the created
 Terminal.Gui instance is disposed on that early-return path. These are test
 fidelity changes, not new production cancellation defects.
+
+### Post-PR #20 cancellation-callback fault reassessment
+
+PR #20 received a clean Balanced approval. With the explicit backlog complete,
+the next residual-risk pass revisited the earlier rule that cancellation must
+run outside ownership locks. That rule prevented lock inversion, but it still
+assumed callbacks could not throw. `CancellationTokenSource.Cancel()` invokes
+all callbacks and then throws their failures as an `AggregateException`.
+
+That exception could escape several application-owned boundaries:
+
+- Replacing a `LatestRequestGate` or `CancellationOperationSlot` published
+  the new owner before canceling the old one. A throwing old callback prevented
+  the method from returning the new lease, leaving the published source active
+  with no owner able to release it.
+- `ModalOperationTracker.Dispose` canceled before entering its worker-drain
+  `try/finally`; a callback failure skipped both the drain and source disposal.
+- Cache invalidation, shared-operation final-waiter cleanup, workspace/modal
+  teardown, and Ctrl+C propagation could return or unwind before their required
+  cleanup completed.
+- `CancelAfter` initiated cancellation on a timer thread with no caller able to
+  observe or contain callback exceptions, turning a bad operation callback into
+  a process-level failure.
+
+The new `SkillView.Threading.CancellationSource` is the single owner for manual,
+parent-linked, and deadline cancellation. It captures aggregate callback
+failures, isolates best-effort diagnostics, returns a stable token, and defers
+resource disposal while any cancellation call is active. Root, CLI, subprocess,
+search metadata, request gates, operation slots, shared flights, modal and
+workspace lifetimes, and cleanup/remove dialogs now use that owner; no raw
+production `CancellationTokenSource` or `CancelAfter` remains outside it.
+
+Deterministic regressions cover parent and timer initiation, a diagnostic
+callback that also throws, self-disposal from a cancellation callback,
+cancel/dispose contention, replacement ownership, cache invalidation, shared
+operation cleanup, modal worker drain, workspace navigation, and metadata
+preview timeout. Callback faults are contained without weakening cancellation
+or allowing required cleanup to finish early.
+
+### Claude review follow-up on PR #21
+
+An independent Claude Code review stress-tested the new owner and confirmed its
+cancel/dispose interleavings. Its nine concrete findings were accepted:
+
+1. Root cancellation, preview/search gates, Installed/Changes/Updates operation
+   slots, the environment-probe flight, and `gh skill list` cache flights now
+   supply callback reporters instead of silently containing faults.
+2. `SkillViewApp`'s constructor-owned request gates and shared probe are assigned
+   where their logger-backed reporters are available; the earlier unexplained
+   field-initializer move is now purposeful.
+3. The unreachable `ObjectDisposedException` catch was removed. The active-
+   cancellation count prevents the owned source from being disposed during
+   `_source.Cancel()`.
+4. `Cancel()` after `Dispose()` is documented and tested as an intentional
+   no-op. Disposal closes admission and leaves an uncanceled stable token
+   uncanceled.
+5. Deadline timer creation suppresses `ExecutionContext` flow, preventing
+   command and operation deadlines from retaining ambient `AsyncLocal` or
+   `Activity` state for up to ten minutes.
+6. Callback reports include the full flattened aggregate rather than only
+   `AggregateException.Message`, preserving exception types, inner messages,
+   and stacks within the logger's existing character budget.
+7. A timeout-only constructor removes the artificial
+   `CancellationToken.None` argument from subprocess termination waits.
+8. Construction now documents why an already-canceled parent's synchronous
+   registration callback is safe before `_parentRegistrations` is assigned.
+9. `CancellationTokenSourceSlot` was renamed to `CancellationOperationSlot` to
+   describe the abstraction it now owns.
+
+The review's logging-factory simplification was also accepted as
+`CancellationCallbackReporter`, which keeps categories and full diagnostic
+formatting consistent. Two broader simplifications were rejected after tracing
+their resource and ordering consequences. `CancellationSource` continues to
+dispose its underlying CTS because disposal releases token callback
+registrations and any lazily-created wait handle; intentionally leaving it
+undisposed would weaken the repository's resource-lifetime contract for little
+code reduction. `LatestRequestGate` and `CancellationOperationSlot` retain
+their outer cancel-in-progress state because it does more than protect
+`CancellationSource.Cancel()` from disposal: it guarantees cancellation wins
+when replacement races the superseded lease's release. Removing that state
+would allow release to dispose the source first, after which the documented
+post-dispose `Cancel()` no-op could leave the superseded token uncanceled.
+
+New regressions assert both containment and reporting on every previously
+silent owner family, the post-dispose contract, and absence of ambient
+`ExecutionContext` on the deadline timer thread.
 
 ## Finding 10: removal materializes full trees and runs on the UI thread
 

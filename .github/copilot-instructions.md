@@ -37,7 +37,7 @@ dotnet test                         # full suite
 # --project SkillView.Tests — filtering the whole solution fails the run when
 # the *other* test project legitimately matches zero tests (xunit/xunit#3077).
 dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-class "SkillView.Tests.Logging.RedactorTests"      # single test class
-dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-method "*RedactorTests.RedactsGhTokens"            # single test
+dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-query "/*/SkillView.Tests.Logging/RedactorTests/RedactsGhTokens" # single test
 
 # AOT publish (Linux needs clang + zlib1g-dev):
 dotnet publish src/SkillView.App -c Release -r osx-arm64 \

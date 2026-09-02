@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Gh.Models;
+using SkillView.Threading;
 
 namespace SkillView.Gh;
 
@@ -8,14 +9,19 @@ internal sealed class GhSkillListCache
     private readonly object _gate = new();
     private readonly Func<DateTimeOffset> _now;
     private readonly TimeSpan _ttl;
+    private readonly Action<AggregateException>? _onCallbackException;
     private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, InflightLoad> _inflight = new(StringComparer.Ordinal);
     private long _generation;
 
-    internal GhSkillListCache(Func<DateTimeOffset>? now = null, TimeSpan? ttl = null)
+    internal GhSkillListCache(
+        Func<DateTimeOffset>? now = null,
+        TimeSpan? ttl = null,
+        Action<AggregateException>? onCallbackException = null)
     {
         _now = now ?? (() => DateTimeOffset.UtcNow);
         _ttl = ttl ?? TimeSpan.FromSeconds(15);
+        _onCallbackException = onCallbackException;
     }
 
     internal bool TryGet(
@@ -56,7 +62,7 @@ internal sealed class GhSkillListCache
 
             if (!_inflight.TryGetValue(key, out flight!))
             {
-                flight = new InflightLoad(_generation);
+                flight = new InflightLoad(_generation, _onCallbackException);
                 _inflight.Add(key, flight);
                 startsLoad = true;
             }
@@ -258,11 +264,7 @@ internal sealed class GhSkillListCache
         }
     }
 
-    private static void TryCancel(CancellationTokenSource cancellation)
-    {
-        try { cancellation.Cancel(); }
-        catch (ObjectDisposedException) { }
-    }
+    private static void TryCancel(CancellationSource cancellation) => cancellation.Cancel();
 
     private static string BuildKey(string ghPath, string? scope, string? agent) =>
         $"{ghPath}\n{scope ?? string.Empty}\n{agent ?? string.Empty}";
@@ -279,9 +281,11 @@ internal sealed class GhSkillListCache
         ImmutableArray<GhSkillListRecord> Records,
         bool FromCache);
 
-    private sealed class InflightLoad(long generation)
+    private sealed class InflightLoad(
+        long generation,
+        Action<AggregateException>? onCallbackException)
     {
-        internal CancellationTokenSource Cancellation { get; } = new();
+        internal CancellationSource Cancellation { get; } = new(onCallbackException);
         internal TaskCompletionSource<LoadResult> Completion { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         internal long Generation { get; } = generation;

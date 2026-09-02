@@ -37,12 +37,27 @@ logging, or subprocess adapters.
   active must restore the search text and spinner.
 - Installed, Changes, and Updates cancel superseded inventory loads. Pass their
   cancellation token through to inventory capture; do not add generation-only
-  refreshes that leave obsolete scans running. Use `CancellationTokenSourceSlot`
+  refreshes that leave obsolete scans running. Use `CancellationOperationSlot`
   so source replacement, cancellation, and lease disposal share one ownership
   boundary. Publish the transition while holding the slot/gate lock, then run
   `Cancel()` callbacks outside that lock and defer source disposal until the
   cancellation call completes. A callback can synchronously wait for lease
-  release, so calling it under the ownership lock is a real deadlock.
+  release, so calling it under the ownership lock is a real deadlock. A callback
+  can also throw; use `SkillView.Threading.CancellationSource` for every owned
+  lifetime and deadline so callback aggregates cannot abort replacement,
+  teardown, worker draining, or a timer thread. Its diagnostic callback is
+  best-effort and must not recreate the failure. Raw `CancelAfter` is unsafe for
+  this contract because no caller exists to contain a timer-thread exception.
+  Every production slot, gate, shared flight, and cache flight supplies a
+  `CancellationCallbackReporter`; the full flattened aggregate is retained in
+  the bounded logger so callback type, inner messages, and stack traces remain
+  diagnosable. Deadline timer creation suppresses `ExecutionContext` flow so a
+  long command timeout cannot pin ambient `AsyncLocal` or `Activity` state.
+  `CancellationSource.Dispose()` closes admission: `Cancel()` afterward is an
+  intentional no-op. Do not remove the slot/gate's outer cancellation-in-
+  progress bookkeeping merely because `CancellationSource` defers its own
+  disposal—the outer state also makes cancellation win a race with lease
+  release.
 - Async update/install controls stay disabled while their operation is active.
   Continue to pass cancellation into subprocess-backed services. Synchronous
   install dialogs use `ModalOperationTracker`: capture its stable token, retain

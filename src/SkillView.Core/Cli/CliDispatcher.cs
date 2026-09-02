@@ -9,6 +9,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Threading;
 using SkillView.Ui;
 using Terminal.Gui.Views;
 
@@ -26,9 +27,11 @@ public static class CliDispatcher
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeout = TimeoutFor(options.SubcommandName);
-        deadline.CancelAfter(timeout);
+        using var deadline = new CancellationSource(
+            cancellationToken,
+            timeout,
+            CancellationCallbackReporter.For(services.Logger, "CLI deadline"));
 
         try
         {

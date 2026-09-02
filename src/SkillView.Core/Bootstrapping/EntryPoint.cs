@@ -15,12 +15,12 @@ public static class EntryPoint
         RunAsync(
             args,
             cancellationToken,
-            static token => new RootCancellation(token));
+            static (token, reporter) => new RootCancellation(token, reporter));
 
     internal static async Task<int> RunAsync(
         string[] args,
         CancellationToken cancellationToken,
-        Func<CancellationToken, RootCancellation> rootCancellationFactory)
+        Func<CancellationToken, Action<AggregateException>, RootCancellation> rootCancellationFactory)
     {
         if (cancellationToken.IsCancellationRequested)
         {
@@ -28,7 +28,27 @@ public static class EntryPoint
         }
 
         ArgumentNullException.ThrowIfNull(rootCancellationFactory);
-        using var rootCancellation = rootCancellationFactory(cancellationToken);
+        Logger? callbackLogger = null;
+        void ReportCancellationCallbackFailure(AggregateException exception)
+        {
+            if (callbackLogger is not null)
+            {
+                callbackLogger.Error(
+                    "cancellation",
+                    $"root cancellation callback failed: {exception}");
+                return;
+            }
+
+            // Root cancellation is admitted before normal logging resources are
+            // created. Preserve a diagnostic if a callback fails in that narrow
+            // startup interval without creating those resources prematurely.
+            Console.Error.WriteLine(
+                $"skillview: root cancellation callback failed: {exception}");
+        }
+
+        using var rootCancellation = rootCancellationFactory(
+            cancellationToken,
+            ReportCancellationCallbackFailure);
         var startupStopwatch = Stopwatch.StartNew();
         string processPath;
         try
@@ -57,6 +77,7 @@ public static class EntryPoint
         }
 
         var logger = new Logger(options.Debug ? LogLevel.Debug : LogLevel.Info);
+        callbackLogger = logger;
         logger.Info("startup", $"SkillView invocation={options.InvocationMode} dispatch={options.DispatchMode}");
 
         // File sink is best-effort; creation failures fall back to memory-only logging.

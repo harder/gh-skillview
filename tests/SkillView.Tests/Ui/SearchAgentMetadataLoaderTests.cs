@@ -158,6 +158,48 @@ public sealed class SearchAgentMetadataLoaderTests
     }
 
     [Fact]
+    public async Task FilterAsync_TimeoutContainsCallbackFailure()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var callbackFailureLogged = new TaskCompletionSource<LogEntry>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var subscription = logger.Subscribe(entry =>
+        {
+            if (entry.Category == "search.agent"
+                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal))
+            {
+                callbackFailureLogged.TrySetResult(entry);
+            }
+        });
+        var loader = new SearchAgentMetadataLoader(
+            new SearchAgentMetadataCache(),
+            logger,
+            maxConcurrency: 1,
+            previewTimeout: TimeSpan.FromMilliseconds(20));
+        var result = Skill("owner/repo", "demo");
+
+        var filtered = await loader.FilterAsync(
+            [result],
+            "claude-code",
+            async (_, cancellationToken) =>
+            {
+                using var registration = cancellationToken.Register(() =>
+                    throw new InvalidOperationException("callback failed"));
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("unreachable");
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(filtered);
+        var callbackFailure = await callbackFailureLogged.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
+        Assert.Contains(
+            "System.InvalidOperationException: callback failed",
+            callbackFailure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FilterAsync_DoesNotCacheTransientPreviewFailure()
     {
         var cache = new SearchAgentMetadataCache();

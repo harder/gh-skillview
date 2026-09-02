@@ -3,6 +3,7 @@ using System.Text.Json;
 using SkillView.Gh.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
+using SkillView.Threading;
 
 namespace SkillView.Gh;
 
@@ -26,7 +27,8 @@ public sealed class GhSkillListAdapter
     {
         _runner = runner;
         _logger = logger;
-        _cache = new GhSkillListCache();
+        _cache = new GhSkillListCache(
+            onCallbackException: CancellationCallbackReporter.For(logger, "gh skill list cache"));
     }
 
     public async Task<ImmutableArray<GhSkillListRecord>> ListAsync(
