@@ -125,15 +125,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   finishes. Callbacks can also throw: application-owned cancellation and
   deadline sources must use `SkillView.Threading.CancellationSource`, which
   contains aggregate callback failures from manual, parent, and timer-driven
-  cancellation and keeps disposal from racing an active callback. Do not
-  reintroduce raw linked sources or `CancelAfter` for owned work. Every
-  production owner must supply a callback reporter; log the full flattened
-  aggregate through `CancellationCallbackReporter` rather than only its generic
-  message. Deadline timers must not capture ambient `ExecutionContext`.
-  Disposing a `CancellationSource` closes cancellation admission, so a later
-  `Cancel()` intentionally leaves an uncanceled stable token uncanceled. Capture
-  the token value in the lease instead of dereferencing the source after
-  ownership can end. Keep the outer cancel-in-progress state in
+  cancellation and keeps disposal from racing an active callback. Disposal
+  must reject new cancellation admission even while an earlier callback is
+  still draining, and construction must release partial parent/timer resources
+  if it fails. Do not reintroduce raw linked sources or `CancelAfter` for owned
+  work. Every production owner must supply a callback reporter; log the full
+  flattened aggregate through `CancellationCallbackReporter` rather than only
+  its generic message. Deadline timers must not capture ambient
+  `ExecutionContext`.
+  Disposing a `CancellationSource` closes cancellation admission immediately,
+  so a later `TryCancel()` returns false and intentionally leaves an uncanceled
+  stable token uncanceled. Deadline timers must stay disabled until every
+  callback-visible field is assigned; construction failures must close
+  admission and use the normal active-callback deferral protocol. Capture the
+  token value in the lease instead of dereferencing the source after ownership
+  can end. Keep the outer cancel-in-progress state in
   `LatestRequestGate` and `CancellationOperationSlot`: it preserves
   cancel-wins-over-lease-dispose ordering in addition to the source's internal
   disposal safety.

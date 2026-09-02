@@ -119,7 +119,7 @@ internal sealed class SharedAsyncOperation<T>
 
         if (cancel)
         {
-            flight.Cancellation.Cancel();
+            flight.Cancellation.TryCancel();
         }
         if (dispose)
         {

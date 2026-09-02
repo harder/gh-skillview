@@ -95,7 +95,7 @@ internal sealed class LatestRequestGate : IDisposable
         if (state is null) return;
         try
         {
-            state.Source.Cancel();
+            state.Source.TryCancel();
         }
         finally
         {

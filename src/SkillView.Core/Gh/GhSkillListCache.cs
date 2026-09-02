@@ -140,7 +140,7 @@ internal sealed class GhSkillListCache
 
         foreach (var flight in invalidated)
         {
-            TryCancel(flight.Cancellation);
+            flight.Cancellation.TryCancel();
         }
     }
 
@@ -247,7 +247,7 @@ internal sealed class GhSkillListCache
 
         if (cancel)
         {
-            TryCancel(flight.Cancellation);
+            flight.Cancellation.TryCancel();
         }
         if (dispose)
         {
@@ -263,8 +263,6 @@ internal sealed class GhSkillListCache
             _inflight.Remove(key);
         }
     }
-
-    private static void TryCancel(CancellationSource cancellation) => cancellation.Cancel();
 
     private static string BuildKey(string ghPath, string? scope, string? agent) =>
         $"{ghPath}\n{scope ?? string.Empty}\n{agent ?? string.Empty}";

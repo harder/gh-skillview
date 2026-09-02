@@ -9,6 +9,18 @@ namespace SkillView.Tests.Ui;
 public sealed class SearchAgentMetadataLoaderTests
 {
     [Fact]
+    public void Constructor_RejectsPreviewTimeoutBeyondTimerRange()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SearchAgentMetadataLoader(
+                new SearchAgentMetadataCache(),
+                new Logger(),
+                previewTimeout: TimeSpan.FromMilliseconds(uint.MaxValue)));
+
+        Assert.Equal("previewTimeout", exception.ParamName);
+    }
+
+    [Fact]
     public async Task FilterAsync_BoundsTwoHundredMetadataPreviews()
     {
         const int maxConcurrency = 4;

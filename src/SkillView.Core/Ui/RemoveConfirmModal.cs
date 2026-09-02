@@ -280,14 +280,14 @@ internal sealed class RemoveConfirmModal
         noButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            lifetime.Cancel();
+            lifetime.TryCancel();
             outcome = Outcome.Cancelled;
             _app.RequestStop();
         };
         advancedButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            lifetime.Cancel();
+            lifetime.TryCancel();
             outcome = Outcome.EscalateToWizard;
             _app.RequestStop();
         };
@@ -308,7 +308,7 @@ internal sealed class RemoveConfirmModal
                 {
                     if (operationOwnership == OperationOwnership.Running)
                     {
-                        lifetime.Cancel();
+                        lifetime.TryCancel();
                         status.Text = " canceling removal…";
                     }
                     else
@@ -317,7 +317,7 @@ internal sealed class RemoveConfirmModal
                     }
                     return;
                 }
-                lifetime.Cancel();
+                lifetime.TryCancel();
                 outcome = Outcome.Cancelled;
                 _app.RequestStop();
             }
@@ -348,7 +348,7 @@ internal sealed class RemoveConfirmModal
         finally
         {
             Interlocked.Exchange(ref dialogActive, 0);
-            lifetime.Cancel();
+            lifetime.TryCancel();
             activeOperation?.GetAwaiter().GetResult();
         }
 

@@ -51,8 +51,8 @@ public sealed class CancellationSourceTests
         var token = source.Token;
         using var registration = token.Register(source.Dispose);
 
-        source.Cancel();
-        source.Cancel();
+        source.TryCancel();
+        source.TryCancel();
 
         Assert.True(token.IsCancellationRequested);
         Assert.False(source.TryGetActiveToken(out var rejected));
@@ -67,7 +67,7 @@ public sealed class CancellationSourceTests
         using var registration = source.Token.Register(() =>
             throw new InvalidOperationException("callback failed"));
 
-        var exception = Record.Exception(source.Cancel);
+        var exception = Record.Exception(() => source.TryCancel());
 
         Assert.Null(exception);
         Assert.True(source.Token.IsCancellationRequested);
@@ -80,11 +80,57 @@ public sealed class CancellationSourceTests
         var token = source.Token;
 
         source.Dispose();
-        source.Cancel();
+        var canceled = source.TryCancel();
 
+        Assert.False(canceled);
         Assert.False(token.IsCancellationRequested);
         Assert.False(source.TryGetActiveToken(out var rejected));
         Assert.False(rejected.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task Dispose_RejectsCancellationWhileEarlierCallbackIsStillRunning()
+    {
+        var callbackEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var source = new CancellationSource();
+        var testCancellation = TestContext.Current.CancellationToken;
+        using var registration = source.Token.Register(() =>
+        {
+            callbackEntered.TrySetResult();
+            releaseCallback.Task.GetAwaiter().GetResult();
+        });
+        var firstCancellation = Task.Factory.StartNew(
+            source.TryCancel,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
+        try
+        {
+            await callbackEntered.Task.WaitAsync(testCancellation);
+
+            source.Dispose();
+
+            Assert.False(source.TryCancel());
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+        }
+
+        Assert.True(await firstCancellation.WaitAsync(testCancellation));
+    }
+
+    [Fact]
+    public void Deadline_RejectsValuesBeyondTimerRange()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new CancellationSource(TimeSpan.FromMilliseconds(uint.MaxValue)));
+
+        Assert.Equal("timeout", exception.ParamName);
     }
 
     [Fact]
@@ -117,10 +163,10 @@ public sealed class CancellationSourceTests
             var source = new CancellationSource();
             var token = source.Token;
 
-            Parallel.Invoke(source.Cancel, source.Dispose);
+            Parallel.Invoke(() => source.TryCancel(), source.Dispose);
 
             _ = token.IsCancellationRequested;
-            source.Cancel();
+            source.TryCancel();
             source.Dispose();
         }
     }

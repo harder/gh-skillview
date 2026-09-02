@@ -33,7 +33,7 @@ internal sealed class RootCancellation : IDisposable
 
     internal CancellationToken Token => _source.Token;
 
-    internal void RequestCancellation() => _source.Cancel();
+    internal void RequestCancellation() => _source.TryCancel();
 
     public void Dispose()
     {
