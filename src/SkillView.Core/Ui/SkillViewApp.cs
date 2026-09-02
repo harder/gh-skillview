@@ -559,7 +559,7 @@ public sealed class SkillViewApp
             DisposeLogSubscription();
             DetachApplicationKeyHandler();
         };
-        UpdateContextBar();
+        RefreshShellChrome();
 
         if (TuiHelpers.IsWarpTerminal)
         {
@@ -841,7 +841,7 @@ public sealed class SkillViewApp
                 }
                 break;
         }
-        UpdateContextBar();
+        RefreshShellChrome();
     }
 
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
@@ -2815,7 +2815,7 @@ public sealed class SkillViewApp
         {
             RestoreDiscoverFocus();
         }
-        UpdateContextBar();
+        RefreshShellChrome();
     }
 
     internal void ActivateTabForTests(SkillViewTab tab) => ActivateTab(tab);

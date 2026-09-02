@@ -100,8 +100,9 @@ public sealed class RemoveScreen
             // Review/Confirm markdown. Pin a percentage size (matching the
             // explicit-size pattern in InstallConfirmModal) so the Fill content
             // gets real space; the 25-col help padding still fits comfortably.
-            Width = Dim.Percent(80),
-            Height = Dim.Percent(70),
+            Width = Dim.Percent(72),
+            Height = Dim.Func(view => CalculateWizardHeight(
+                view?.SuperView?.Viewport.Height ?? 42)),
         };
         // Using declarations dispose in reverse order. Keep the operation
         // owner after the wizard declaration so cancellation and worker drain
@@ -124,7 +125,7 @@ public sealed class RemoveScreen
         var choicePicker = new OptionSelector
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(5),
             Labels = targets.Select(target => target.Title).ToArray(),
@@ -140,16 +141,16 @@ public sealed class RemoveScreen
         var evaluationSpinner = new SpinnerView
         {
             X = 0,
-            Y = Pos.AnchorEnd(1),
+            Y = 1,
             Visible = false,
             AutoSpin = false,
         };
         var evaluationStatus = new Label
         {
             X = 2,
-            Y = Pos.AnchorEnd(1),
+            Y = 1,
             Width = Dim.Fill(2),
-            Text = " checking removal safety…",
+            Text = string.Empty,
         };
         chooseStep.Add(
             choiceLabel,
@@ -557,7 +558,22 @@ public sealed class RemoveScreen
         }
 
         wizard.Initialized += (_, _) =>
-            StartEvaluation(selectedIndex, findFirstExecutable: true);
+        {
+            // Compact-remove preflight already evaluated the primary target.
+            // Render that result directly instead of launching a redundant
+            // worker that walks every alternative looking for an executable
+            // default. Alternatives are evaluated only when the user selects
+            // them, keeping expensive package validation demand-driven.
+            if (!ShouldEvaluateInitialSelection(_initialEvaluation)
+                && evaluations.TryGetValue(selectedIndex, out var initialEvaluation))
+            {
+                ApplyEvaluation(selectedIndex, initialEvaluation);
+                SetEvaluationBusy(false);
+                return;
+            }
+
+            StartEvaluation(selectedIndex, findFirstExecutable: false);
+        };
         _app.Run(wizard);
     }
 
@@ -571,6 +587,13 @@ public sealed class RemoveScreen
         var target = RemoveTargetResolver.BuildTargets(_target, _snapshot)[0];
         return RemoveWizardContent.BuildReviewMarkdown(Evaluate(target));
     }
+
+    internal static int CalculateWizardHeight(int availableHeight) =>
+        Math.Clamp(availableHeight * 58 / 100, 16, 28);
+
+    internal static bool ShouldEvaluateInitialSelection(
+        RemoveTargetEvaluation? initialEvaluation) =>
+        initialEvaluation is null;
 
     private RemoveTargetEvaluation Evaluate(
         RemoveTarget target,

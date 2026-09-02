@@ -1101,6 +1101,25 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void StatusStrip_UpdatesShortcutsWhenTabChanges()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        var installedHints = app.StatusStripForTests!.HintsForTests;
+        Assert.Contains(installedHints, hint => hint is { Key: "f", Label: "Filter" });
+        Assert.Contains(installedHints, hint => hint is { Key: "x", Label: "Remove" });
+
+        app.ForceActiveTabForTests(SkillViewTab.Changes);
+        var changesHints = app.StatusStripForTests.HintsForTests;
+        Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Open" });
+        Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });
+        Assert.Contains(changesHints, hint => hint is { Key: "d", Label: "Doctor" });
+        Assert.DoesNotContain(changesHints, hint => hint.Key is "f" or "x");
+    }
+
+    [Fact]
     public void InstalledSelectionChange_KeepsShellChromeFocusedOnFiltersInsteadOfRepeatingDetailMetadata()
     {
         var app = CreateApp();

@@ -311,6 +311,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   native inspection. Installed inventory loading and remove preflight own busy
   state independently; derive their shared spinner/footer from both owners so
   either completion cannot hide the other operation's feedback.
+  While preflight runs, mirror its status prominently in the Installed detail
+  pane as well as the footer. Seed the advanced wizard from the preflight
+  evaluation without launching another eager scan; evaluate alternative
+  removal scopes only after the user selects them.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size

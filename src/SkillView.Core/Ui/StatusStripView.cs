@@ -65,6 +65,8 @@ internal sealed class StatusStripView : View
 
     internal string LeftBadgesForTests => _leftBadges;
 
+    internal IReadOnlyList<StatusHint> HintsForTests => _hints;
+
     protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;

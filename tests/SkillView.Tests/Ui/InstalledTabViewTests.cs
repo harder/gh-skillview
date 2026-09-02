@@ -48,6 +48,7 @@ public sealed class InstalledTabViewTests
         Assert.False(view.LoadActiveForTests);
         Assert.True(view.SpinnerVisibleForTests);
         Assert.Equal(" checking removal safety…", view.FooterTextForTests);
+        Assert.Contains("## Checking removal safety…", view.DetailTextForTests);
 
         view.CancelPendingWork();
         releaseRemove.TrySetResult();
