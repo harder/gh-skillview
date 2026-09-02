@@ -192,55 +192,57 @@ internal sealed class SkillViewWorkflowCoordinator
             var listing = await _services.InstallService
                 .ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, cancellationToken)
                 .ConfigureAwait(false);
-            _invoke(() =>
-            {
-                _clearBusy();
-                if (!listing.Succeeded)
+            await _invokeAsync(
+                () =>
                 {
-                    _setStatusWithLevel(
-                        $"could not list skills in {request.Repo} (exit {listing.ExitCode}) — opening install-all",
-                        TuiHelpers.NotificationLevel.Warn);
-                    OpenInstallAllDialog(request);
-                    return;
-                }
-                if (listing.Skills.IsDefaultOrEmpty)
-                {
-                    _setStatusWithLevel(
-                        $"no skills discovered in {request.Repo}",
-                        TuiHelpers.NotificationLevel.Warn);
-                    return;
-                }
+                    _clearBusy();
+                    if (!listing.Succeeded)
+                    {
+                        _setStatusWithLevel(
+                            $"could not list skills in {request.Repo} (exit {listing.ExitCode}) — opening install-all",
+                            TuiHelpers.NotificationLevel.Warn);
+                        OpenInstallAllDialog(request);
+                        return;
+                    }
+                    if (listing.Skills.IsDefaultOrEmpty)
+                    {
+                        _setStatusWithLevel(
+                            $"no skills discovered in {request.Repo}",
+                            TuiHelpers.NotificationLevel.Warn);
+                        return;
+                    }
 
-                var picker = new RepoSkillPickerModal(
-                    app,
-                    _services.InstallService,
-                    _services.Logger,
-                    ghPath,
-                    request,
-                    listing.Skills);
-                var result = picker.Show();
-                if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
-                {
-                    _services.ListAdapter.Invalidate();
-                    var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
-                    _setStatusWithLevel(
-                        $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
-                        result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
-                    QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
-                }
-                else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
-                {
-                    _setStatusWithLevel(
-                        $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
-                        TuiHelpers.NotificationLevel.Error);
-                }
-                else
-                {
-                    // Cancelled (or nothing selected): clear the lingering
-                    // "discovering skills in …" busy status the spinner left.
-                    _setStatus($"{request.Repo}: no skills installed");
-                }
-            });
+                    var picker = new RepoSkillPickerModal(
+                        app,
+                        _services.InstallService,
+                        _services.Logger,
+                        ghPath,
+                        request,
+                        listing.Skills);
+                    var result = picker.Show();
+                    if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
+                    {
+                        _services.ListAdapter.Invalidate();
+                        var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
+                        _setStatusWithLevel(
+                            $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
+                            result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
+                        QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                    }
+                    else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
+                    {
+                        _setStatusWithLevel(
+                            $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
+                            TuiHelpers.NotificationLevel.Error);
+                    }
+                    else
+                    {
+                        // Cancelled (or nothing selected): clear the lingering
+                        // "discovering skills in …" busy status the spinner left.
+                        _setStatus($"{request.Repo}: no skills installed");
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
         }, "discover");
     }
 
@@ -262,33 +264,35 @@ internal sealed class SkillViewWorkflowCoordinator
                 snapshot.ScannedRoots,
                 options: null,
                 cancellationToken);
-            _invoke(() =>
-            {
-                _clearBusy();
-                var screen = new CleanupScreen(
-                    app,
-                    _services.RemoveService,
-                    _services.Logger,
-                    candidates,
-                    snapshot.ScannedRoots,
-                    snapshot.Skills);
-                screen.Show();
-                if (screen.RemovedCount > 0
-                    || screen.RemovedFileCount > 0
-                    || screen.RemovedDirectoryCount > 0
-                    || screen.IgnoredCount > 0)
+            await _invokeAsync(
+                () =>
                 {
-                    _services.ListAdapter.Invalidate();
-                    // Cleanup can remove or ignore skills while the user is
-                    // sitting on the Installed/Updates list. The screen runs as
-                    // a modal overlay (not a tab switch), so nothing reloads the
-                    // underlying tab on its own — refresh it here so the list
-                    // reflects what cleanup just changed.
-                    _refreshActiveTab();
-                }
+                    _clearBusy();
+                    var screen = new CleanupScreen(
+                        app,
+                        _services.RemoveService,
+                        _services.Logger,
+                        candidates,
+                        snapshot.ScannedRoots,
+                        snapshot.Skills);
+                    screen.Show();
+                    if (screen.RemovedCount > 0
+                        || screen.RemovedFileCount > 0
+                        || screen.RemovedDirectoryCount > 0
+                        || screen.IgnoredCount > 0)
+                    {
+                        _services.ListAdapter.Invalidate();
+                        // Cleanup can remove or ignore skills while the user is
+                        // sitting on the Installed/Updates list. The screen runs as
+                        // a modal overlay (not a tab switch), so nothing reloads the
+                        // underlying tab on its own — refresh it here so the list
+                        // reflects what cleanup just changed.
+                        _refreshActiveTab();
+                    }
 
-                _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
-            });
+                    _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
+                },
+                cancellationToken).ConfigureAwait(false);
         }, "cleanup");
     }
 
