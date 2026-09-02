@@ -163,7 +163,8 @@ public sealed class LocalInventoryService
             CurrentDirectory: Environment.CurrentDirectory,
             HomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             CustomRoots: options.ScanRoots,
-            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")),
+            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"),
+            PiCodingAgentDir: Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR")),
             cancellationToken);
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");

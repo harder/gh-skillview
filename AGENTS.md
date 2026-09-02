@@ -44,13 +44,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - For PTY-driven TUI testing, use an isolated temp workspace and verify
   side-effects from the shell after each destructive step. See
   `agent_docs/tui-pty-testing.md`.
-- SkillView requires `gh` 2.95.0 or newer (`GhBinaryLocator.MinimumVersion`);
-  that version guarantees the full `gh skill` surface SkillView relies on, so
+- SkillView requires `gh` 2.99.0 or newer (`GhBinaryLocator.MinimumVersion`);
+  that version guarantees the full `gh skill` surface SkillView relies on,
+  including the current Codex and Pi user-scope location rules, so
   there is no per-flag capability probe — only a single `gh skill --help`
   smoke check.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.97.0 (48 entries — gh 2.97.0 replaced `windsurf` with
-  `devin` and added `grok`, cli/cli#13987 and cli/cli#13864).
+  list as of `gh` 2.99.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
+  with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
+  makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
   nullable — only set when the on-disk config-dir convention was
   independently verified; a null path just means that agent is never
@@ -83,7 +85,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   skills installed there — keep both in sync if this default ever changes.
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.4.17`
   and Terminal.Gui.Editor `2.5.7`, the latest stable releases of each as of
-  2026-08. Test projects use `Microsoft.NET.Test.Sdk` `18.9.0`, `xunit.v3`
+  2026-09. Test projects use `Microsoft.NET.Test.Sdk` `18.9.0`, `xunit.v3`
   `4.0.0`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
@@ -420,6 +422,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   check cancellation between roots/entries. Read at most the bounded
   front-matter prefix from `SKILL.md` and reject `.skill-lock.json` files over
   the configured byte limit; do not reintroduce whole-file reads for either.
+- Keep filesystem inventory aligned with `gh skill`'s configuration-directory
+  overrides: Claude uses `CLAUDE_CONFIG_DIR/skills` and Pi uses
+  `PI_CODING_AGENT_DIR/skills` (gh 2.99+). Scan the default user root alongside
+  either override so older/manual skills remain visible, and use the same Pi
+  override when pre-checking install-agent boxes and rendering Doctor.
 - File-log aggregate retention is enforced as the active part grows, not only
   when a writer opens or rotates. Maintain incremental byte accounting and a
   bounded retry threshold for undeletable files so the fix does not enumerate

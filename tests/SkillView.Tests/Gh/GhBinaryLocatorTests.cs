@@ -60,19 +60,21 @@ public class GhBinaryLocatorTests
     }
 
     [Fact]
-    public void MinimumVersion_is_2_95_0()
+    public void MinimumVersion_is_2_99_0()
     {
         Assert.Equal(2, GhBinaryLocator.MinimumVersion.Major);
-        Assert.Equal(95, GhBinaryLocator.MinimumVersion.Minor);
+        Assert.Equal(99, GhBinaryLocator.MinimumVersion.Minor);
         Assert.Equal(0, GhBinaryLocator.MinimumVersion.Patch);
     }
 
     [Theory]
     [InlineData("2.94.0", false)]
     [InlineData("2.94.3", false)]
-    [InlineData("2.95.0", true)]
-    [InlineData("2.95.0-rc.1", true)] // SemVer strips the pre-release tag → 2.95.0
-    [InlineData("2.95.4", true)]
+    [InlineData("2.95.0", false)]
+    [InlineData("2.98.0", false)]
+    [InlineData("2.99.0", true)]
+    [InlineData("2.99.0-rc.1", true)] // SemVer strips the pre-release tag → 2.99.0
+    [InlineData("2.99.4", true)]
     [InlineData("3.0.0", true)]
     [InlineData("2.92.0", false)]
     [InlineData("2.0.0", false)]

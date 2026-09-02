@@ -46,7 +46,7 @@ public static class DoctorScreen
         sb.AppendLine("## `gh skill`");
         sb.AppendLine();
         sb.AppendLine(r.GhSkillAvailable
-            ? "✅ `gh skill` present. SkillView requires gh ≥ 2.95.0, so the full " +
+            ? "✅ `gh skill` present. SkillView requires gh ≥ 2.99.0, so the full " +
               "`skill` surface (`list`, `install --all`, `update --all`, nested-dir " +
               "discovery) is available."
             : "❌ `gh skill` subcommand not detected on this gh install.");
@@ -90,7 +90,9 @@ public static class DoctorScreen
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (string.IsNullOrEmpty(home)) return found;
-            return InstallAgentCatalog.DetectInstalledDisplayEntries(home);
+            return InstallAgentCatalog.DetectInstalledDisplayEntries(
+                home,
+                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
         }
         catch { /* best-effort */ }
         return found;

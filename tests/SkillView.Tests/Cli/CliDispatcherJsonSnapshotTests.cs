@@ -29,8 +29,8 @@ public class CliDispatcherJsonSnapshotTests
     private static EnvironmentReport SampleReport() => new()
     {
         GhPath = "/usr/bin/gh",
-        GhVersionRaw = "gh version 2.95.0",
-        GhVersion = new SemVer(2, 95, 0),
+        GhVersionRaw = "gh version 2.99.0",
+        GhVersion = new SemVer(2, 99, 0),
         GhMeetsMinimum = true,
         Auth = GhAuthStatus.Unknown,
         GhSkillAvailable = true,
@@ -71,7 +71,7 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Equal("/usr/bin/gh", doc.GetProperty("ghPath").GetString());
         Assert.True(doc.GetProperty("ghMeetsMinimum").GetBoolean());
         Assert.True(doc.GetProperty("baselineOk").GetBoolean());
-        // gh ≥ 2.94 is required, so a single availability bool replaces the
+        // gh ≥ 2.99 is required, so a single availability bool replaces the
         // old per-flag capability block.
         Assert.True(doc.GetProperty("ghSkillAvailable").GetBoolean());
         Assert.True(doc.TryGetProperty("auth", out _));

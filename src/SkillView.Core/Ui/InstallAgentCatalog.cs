@@ -12,7 +12,7 @@ internal static class InstallAgentCatalog
     // or wrong path is cosmetic, not a correctness or safety issue.
     internal sealed record Entry(string GhId, string Label, string AgentHint, string? HomeRelativePath);
 
-    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.97.0).
+    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.99.0).
     // Update this array when new agents are added to the gh skill ecosystem —
     // re-diff against `gh skill install --help` when bumping the gh minimum.
     internal static readonly ImmutableArray<Entry> Entries =
@@ -54,7 +54,7 @@ internal static class InstallAgentCatalog
         new("openclaw", "OpenClaw", "openclaw", null),
         new("opencode", "OpenCode", "opencode", Path.Combine(".config", "opencode")),
         new("openhands", "OpenHands", "openhands", ".openhands"),
-        new("pi", "Pi", "pi", null),
+        new("pi", "Pi", "pi", Path.Combine(".pi", "agent")),
         new("pochi", "Pochi", "pochi", null),
         new("qoder", "Qoder", "qoder", null),
         new("qwen-code", "Qwen Code", "qwen", ".qwen"),
@@ -88,7 +88,9 @@ internal static class InstallAgentCatalog
         return false;
     }
 
-    internal static HashSet<string> DetectInstalledGhIds(string homeDirectory)
+    internal static HashSet<string> DetectInstalledGhIds(
+        string homeDirectory,
+        string? piCodingAgentDir = null)
     {
         var found = new HashSet<string>(StringComparer.Ordinal);
         if (string.IsNullOrWhiteSpace(homeDirectory))
@@ -98,8 +100,8 @@ internal static class InstallAgentCatalog
 
         foreach (var entry in Entries)
         {
-            if (entry.HomeRelativePath is not null
-                && Directory.Exists(Path.Combine(homeDirectory, entry.HomeRelativePath)))
+            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir);
+            if (full is not null && Directory.Exists(full))
             {
                 found.Add(entry.GhId);
             }
@@ -108,7 +110,9 @@ internal static class InstallAgentCatalog
         return found;
     }
 
-    internal static List<(string Label, string Path)> DetectInstalledDisplayEntries(string homeDirectory)
+    internal static List<(string Label, string Path)> DetectInstalledDisplayEntries(
+        string homeDirectory,
+        string? piCodingAgentDir = null)
     {
         var found = new List<(string Label, string Path)>();
         if (string.IsNullOrWhiteSpace(homeDirectory))
@@ -118,12 +122,12 @@ internal static class InstallAgentCatalog
 
         foreach (var entry in Entries)
         {
-            if (entry.HomeRelativePath is null)
+            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir);
+            if (full is null)
             {
                 continue;
             }
 
-            var full = Path.Combine(homeDirectory, entry.HomeRelativePath);
             if (Directory.Exists(full))
             {
                 found.Add((entry.Label, full));
@@ -131,5 +135,21 @@ internal static class InstallAgentCatalog
         }
 
         return found;
+    }
+
+    private static string? GetHomePath(Entry entry, string homeDirectory, string? piCodingAgentDir)
+    {
+        // gh 2.99 honors PI_CODING_AGENT_DIR for all Pi user-scope skill
+        // operations. The value names Pi's configuration directory; skills
+        // live beneath its `skills` child, while this heuristic intentionally
+        // detects the configuration directory itself.
+        if (entry.GhId == "pi" && !string.IsNullOrWhiteSpace(piCodingAgentDir))
+        {
+            return piCodingAgentDir;
+        }
+
+        return entry.HomeRelativePath is null
+            ? null
+            : Path.Combine(homeDirectory, entry.HomeRelativePath);
     }
 }

@@ -20,7 +20,7 @@ public sealed record InstallRequest(string Repo, string? SkillName, bool AllowHi
 
 /// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill) and
 /// runs `gh skill install` with the flags the user has chosen. SkillView
-/// requires gh ≥ 2.95.0, so all flags (`--upstream`, `--allow-hidden-dirs`,
+/// requires gh ≥ 2.99.0, so all flags (`--upstream`, `--allow-hidden-dirs`,
 /// `--from-local`, …) are always available and shown.
 public sealed class InstallScreen
 {
@@ -556,7 +556,9 @@ public sealed class InstallScreen
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (string.IsNullOrEmpty(home)) return found;
-            return InstallAgentCatalog.DetectInstalledGhIds(home);
+            return InstallAgentCatalog.DetectInstalledGhIds(
+                home,
+                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
         }
         catch { /* best-effort detection */ }
         return found;

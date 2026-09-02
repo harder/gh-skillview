@@ -47,6 +47,25 @@ public class ScanRootResolverTests
     }
 
     [Fact]
+    public void Resolves_pi_default_user_scope_root()
+    {
+        using var temp = new TempHome();
+        var skills = Path.Combine(temp.Home, ".pi", "agent", "skills");
+        Directory.CreateDirectory(skills);
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>()));
+
+        Assert.Contains(roots, root =>
+            root.Scope == Scope.User
+            && root.AgentHint == "pi"
+            && ScanRootResolver.NormalizeKey(root.Path) == ScanRootResolver.NormalizeKey(skills));
+    }
+
+    [Fact]
     public void Resolves_project_seeds_when_inside_git()
     {
         using var temp = new TempHome();
@@ -141,6 +160,47 @@ public class ScanRootResolverTests
             .Where(r => r.AgentHint == "claude" && r.Scope == Scope.User)
             .ToArray();
         Assert.Single(claudeUserRoots);
+    }
+
+    [Fact]
+    public void Resolves_pi_user_scope_from_PI_CODING_AGENT_DIR_when_set()
+    {
+        // gh ≥ 2.99 (cli/cli#14260) writes Pi user-scope skills to
+        // $PI_CODING_AGENT_DIR/skills; the scanner must look there too.
+        using var temp = new TempHome();
+        var configDir = Path.Combine(temp.Home, "pi-config");
+        var configSkills = Path.Combine(configDir, "skills");
+        Directory.CreateDirectory(configSkills);
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>(),
+            PiCodingAgentDir: configDir));
+
+        Assert.Contains(roots, root =>
+            root.AgentHint == "pi"
+            && root.Scope == Scope.User
+            && ScanRootResolver.NormalizeKey(root.Path) == ScanRootResolver.NormalizeKey(configSkills));
+    }
+
+    [Fact]
+    public void Scans_both_default_and_PI_CODING_AGENT_DIR_pi_roots()
+    {
+        using var temp = new TempHome();
+        Directory.CreateDirectory(Path.Combine(temp.Home, ".pi", "agent", "skills"));
+        var configDir = Path.Combine(temp.Home, "pi-config");
+        Directory.CreateDirectory(Path.Combine(configDir, "skills"));
+
+        var resolver = new ScanRootResolver();
+        var roots = resolver.Resolve(new ScanRootResolver.Options(
+            CurrentDirectory: temp.Home,
+            HomeDirectory: temp.Home,
+            CustomRoots: Array.Empty<string>(),
+            PiCodingAgentDir: configDir));
+
+        Assert.Equal(2, roots.Count(root => root.AgentHint == "pi" && root.Scope == Scope.User));
     }
 
     [Fact]

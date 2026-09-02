@@ -23,6 +23,7 @@ public sealed class ScanRootResolver
         (".codex/skills", "codex"),
         (".gemini/skills", "gemini"),
         (".gemini/antigravity/skills", "antigravity"),
+        (".pi/agent/skills", "pi"),
         // `gh skill install --agent universal --scope user` (gh 2.96.0) writes
         // here — verified: `gh skill install <repo> --agent universal --scope
         // user` reports "Installed ... in ~/.agents/skills", distinct from the
@@ -36,7 +37,8 @@ public sealed class ScanRootResolver
         string CurrentDirectory,
         string HomeDirectory,
         IReadOnlyList<string> CustomRoots,
-        string? ClaudeUserConfigDir = null);
+        string? ClaudeUserConfigDir = null,
+        string? PiCodingAgentDir = null);
 
     /// Emits scan roots that actually exist on disk. `Options.CurrentDirectory`
     /// is used to probe for a git working tree.
@@ -80,6 +82,16 @@ public sealed class ScanRootResolver
         {
             var claudeConfigSkills = Path.Combine(opts.ClaudeUserConfigDir, "skills");
             TryAdd(builder, seen, claudeConfigSkills, Scope.User, "claude");
+        }
+
+        // gh ≥ 2.99 (cli/cli#14260) similarly honors PI_CODING_AGENT_DIR for
+        // Pi's user-scope skills. Keep the default ~/.pi/agent/skills root
+        // above as well: users can have legacy skills there, and gh's override
+        // is additive from SkillView's inventory perspective.
+        if (!string.IsNullOrWhiteSpace(opts.PiCodingAgentDir))
+        {
+            var piConfigSkills = Path.Combine(opts.PiCodingAgentDir, "skills");
+            TryAdd(builder, seen, piConfigSkills, Scope.User, "pi");
         }
 
         foreach (var custom in opts.CustomRoots)

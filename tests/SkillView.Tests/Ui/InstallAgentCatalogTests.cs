@@ -35,6 +35,38 @@ public sealed class InstallAgentCatalogTests : IDisposable
         Assert.Contains(found, entry => entry.Label == "Antigravity" && entry.Path == antigravityHome);
     }
 
+    [Fact]
+    public void DetectInstalledGhIds_UsesPiConfigurationOverride()
+    {
+        var piConfig = Path.Combine(_homeDirectory, "custom-pi-config");
+        Directory.CreateDirectory(piConfig);
+
+        var found = InstallAgentCatalog.DetectInstalledGhIds(_homeDirectory, piConfig);
+
+        Assert.Contains("pi", found);
+    }
+
+    [Fact]
+    public void DetectInstalledGhIds_UsesPiDefaultConfigurationDirectory()
+    {
+        Directory.CreateDirectory(Path.Combine(_homeDirectory, ".pi", "agent"));
+
+        var found = InstallAgentCatalog.DetectInstalledGhIds(_homeDirectory);
+
+        Assert.Contains("pi", found);
+    }
+
+    [Fact]
+    public void DetectInstalledDisplayEntries_ReportsPiConfigurationOverride()
+    {
+        var piConfig = Path.Combine(_homeDirectory, "custom-pi-config");
+        Directory.CreateDirectory(piConfig);
+
+        var found = InstallAgentCatalog.DetectInstalledDisplayEntries(_homeDirectory, piConfig);
+
+        Assert.Contains(found, entry => entry.Label == "Pi" && entry.Path == piConfig);
+    }
+
     public void Dispose()
     {
         try
