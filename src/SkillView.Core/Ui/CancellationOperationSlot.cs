@@ -114,7 +114,7 @@ internal sealed class CancellationOperationSlot
         if (state is null) return;
         try
         {
-            state.Source.Cancel();
+            state.Source.TryCancel();
         }
         finally
         {

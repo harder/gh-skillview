@@ -97,7 +97,7 @@ internal sealed class ModalOperationTracker : IDisposable
         }
     }
 
-    internal void Cancel() => _cancellation.Cancel();
+    internal void Cancel() => _cancellation.TryCancel();
 
     internal void InvokeIfActive(Action action)
         => InvokeIfActive(action, releaseOnFailure: false);

@@ -328,12 +328,12 @@ public sealed class CleanupScreen
                 if (activeOperation is { IsCompleted: false })
                 {
                     Interlocked.Exchange(ref closeAfterCancellation, 1);
-                    lifetime.Cancel();
+                    lifetime.TryCancel();
                     status.Text = " canceling removal…";
                     return;
                 }
 
-                lifetime.Cancel();
+                lifetime.TryCancel();
                 _app.RequestStop();
             }
         };
@@ -347,7 +347,7 @@ public sealed class CleanupScreen
         finally
         {
             Interlocked.Exchange(ref windowActive, 0);
-            lifetime.Cancel();
+            lifetime.TryCancel();
             activeOperation?.GetAwaiter().GetResult();
         }
     }

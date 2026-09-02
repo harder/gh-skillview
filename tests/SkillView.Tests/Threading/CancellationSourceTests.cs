@@ -51,8 +51,8 @@ public sealed class CancellationSourceTests
         var token = source.Token;
         using var registration = token.Register(source.Dispose);
 
-        source.Cancel();
-        source.Cancel();
+        source.TryCancel();
+        source.TryCancel();
 
         Assert.True(token.IsCancellationRequested);
         Assert.False(source.TryGetActiveToken(out var rejected));
@@ -67,7 +67,7 @@ public sealed class CancellationSourceTests
         using var registration = source.Token.Register(() =>
             throw new InvalidOperationException("callback failed"));
 
-        var exception = Record.Exception(() => source.Cancel());
+        var exception = Record.Exception(() => source.TryCancel());
 
         Assert.Null(exception);
         Assert.True(source.Token.IsCancellationRequested);
@@ -80,7 +80,7 @@ public sealed class CancellationSourceTests
         var token = source.Token;
 
         source.Dispose();
-        var canceled = source.Cancel();
+        var canceled = source.TryCancel();
 
         Assert.False(canceled);
         Assert.False(token.IsCancellationRequested);
@@ -103,7 +103,7 @@ public sealed class CancellationSourceTests
             releaseCallback.Task.GetAwaiter().GetResult();
         });
         var firstCancellation = Task.Factory.StartNew(
-            source.Cancel,
+            source.TryCancel,
             CancellationToken.None,
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default);
@@ -114,7 +114,7 @@ public sealed class CancellationSourceTests
 
             source.Dispose();
 
-            Assert.False(source.Cancel());
+            Assert.False(source.TryCancel());
         }
         finally
         {
@@ -125,7 +125,7 @@ public sealed class CancellationSourceTests
     }
 
     [Fact]
-    public void Deadline_RejectsValuesBeyondTimerRangeBeforeCreatingResources()
+    public void Deadline_RejectsValuesBeyondTimerRange()
     {
         var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
             new CancellationSource(TimeSpan.FromMilliseconds(uint.MaxValue)));
@@ -163,10 +163,10 @@ public sealed class CancellationSourceTests
             var source = new CancellationSource();
             var token = source.Token;
 
-            Parallel.Invoke(() => source.Cancel(), source.Dispose);
+            Parallel.Invoke(() => source.TryCancel(), source.Dispose);
 
             _ = token.IsCancellationRequested;
-            source.Cancel();
+            source.TryCancel();
             source.Dispose();
         }
     }

@@ -261,7 +261,7 @@ public sealed class SkillViewApp
             _backgroundTasks.StopAccepting();
             DeactivateDoctorWorkspace(clearBusy: false);
             DeactivateDiscoverWorkspace(clearBusy: false);
-            runLifetime.Cancel();
+            runLifetime.TryCancel();
             CancelCurrentPreview();
             await _backgroundTasks.DrainAsync().ConfigureAwait(false);
             DisposeLogSubscription();
@@ -983,7 +983,7 @@ public sealed class SkillViewApp
         var lifetime = Interlocked.Exchange(ref _discoverLifetime, null);
         if (lifetime is not null)
         {
-            lifetime.Cancel();
+            lifetime.TryCancel();
             lifetime.Dispose();
         }
         if (clearBusy)
@@ -1026,7 +1026,7 @@ public sealed class SkillViewApp
         var lifetime = Interlocked.Exchange(ref _doctorLifetime, null);
         if (lifetime is not null)
         {
-            lifetime.Cancel();
+            lifetime.TryCancel();
             lifetime.Dispose();
         }
         if (clearBusy)

@@ -134,10 +134,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   its generic message. Deadline timers must not capture ambient
   `ExecutionContext`.
   Disposing a `CancellationSource` closes cancellation admission immediately,
-  so a later `Cancel()` intentionally leaves an uncanceled stable token
-  uncanceled. Capture
-  the token value in the lease instead of dereferencing the source after
-  ownership can end. Keep the outer cancel-in-progress state in
+  so a later `TryCancel()` returns false and intentionally leaves an uncanceled
+  stable token uncanceled. Deadline timers must stay disabled until every
+  callback-visible field is assigned; construction failures must close
+  admission and use the normal active-callback deferral protocol. Capture the
+  token value in the lease instead of dereferencing the source after ownership
+  can end. Keep the outer cancel-in-progress state in
   `LatestRequestGate` and `CancellationOperationSlot`: it preserves
   cancel-wins-over-lease-dispose ordering in addition to the source's internal
   disposal safety.

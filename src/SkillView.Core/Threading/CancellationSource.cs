@@ -17,7 +17,6 @@ internal sealed class CancellationSource : IDisposable
     private readonly Action<AggregateException>? _onCallbackException;
     private int _activeCancellations;
     private bool _disposeRequested;
-    private bool _resourcesDisposed;
 
     internal CancellationSource(Action<AggregateException>? onCallbackException = null)
         : this([], timeout: null, onCallbackException)
@@ -59,8 +58,7 @@ internal sealed class CancellationSource : IDisposable
         TimeSpan? timeout,
         Action<AggregateException>? onCallbackException)
     {
-        if (timeout is { } value
-            && (value <= TimeSpan.Zero || value > MaxSupportedTimeout))
+        if (timeout is { } value && !IsSupportedTimeout(value))
         {
             throw new ArgumentOutOfRangeException(nameof(timeout));
         }
@@ -73,7 +71,6 @@ internal sealed class CancellationSource : IDisposable
             ? Array.Empty<CancellationTokenRegistration>()
             : new CancellationTokenRegistration[parents.Count];
         var registrationCount = 0;
-        Timer? deadlineTimer = null;
         try
         {
             foreach (var parent in parents)
@@ -81,32 +78,22 @@ internal sealed class CancellationSource : IDisposable
                 if (parent.CanBeCanceled)
                 {
                     // UnsafeRegister invokes synchronously when a parent is already
-                    // canceled. That can enter Cancel before _parentRegistrations is
+                    // canceled. That can enter TryCancel before _parentRegistrations is
                     // assigned, but this instance cannot be disposed or observed by
                     // external code until construction returns.
-                    registrations[registrationCount++] = parent.UnsafeRegister(
-                        static state => ((CancellationSource)state!).Cancel(),
+                    var registration = parent.UnsafeRegister(
+                        static state => ((CancellationSource)state!).TryCancel(),
                         this);
+                    registrations[registrationCount++] = registration;
                     if (Token.IsCancellationRequested)
                     {
                         break;
                     }
                 }
             }
-
-            if (timeout is { } dueTime && !Token.IsCancellationRequested)
-            {
-                deadlineTimer = CreateDeadlineTimer(dueTime);
-                if (Token.IsCancellationRequested)
-                {
-                    deadlineTimer.Dispose();
-                    deadlineTimer = null;
-                }
-            }
         }
         catch
         {
-            deadlineTimer?.Dispose();
             for (var index = 0; index < registrationCount; index++)
             {
                 registrations[index].Dispose();
@@ -121,7 +108,35 @@ internal sealed class CancellationSource : IDisposable
             _ when registrationCount == registrations.Length => registrations,
             _ => registrations[..registrationCount],
         };
-        _deadlineTimer = deadlineTimer;
+        _deadlineTimer = null;
+
+        if (timeout is not { } dueTime || Token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            // Keep the timer disabled until all callback-visible fields are
+            // assigned. If creation or arming fails, Dispose uses the normal
+            // active-cancellation deferral protocol rather than racing a
+            // parent or timer callback from a partially built owner.
+            _deadlineTimer = CreateDisabledDeadlineTimer();
+            if (!_deadlineTimer.Change(dueTime, Timeout.InfiniteTimeSpan))
+            {
+                throw new InvalidOperationException("The cancellation deadline could not be scheduled.");
+            }
+            if (Token.IsCancellationRequested)
+            {
+                _deadlineTimer.Dispose();
+                _deadlineTimer = null;
+            }
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     internal CancellationToken Token { get; }
@@ -137,13 +152,16 @@ internal sealed class CancellationSource : IDisposable
         }
     }
 
+    internal static bool IsSupportedTimeout(TimeSpan timeout) =>
+        timeout > TimeSpan.Zero && timeout <= MaxSupportedTimeout;
+
     /// <summary>
     /// Requests cancellation unless this owner was already disposed. Disposal
     /// closes cancellation admission, so canceling an uncanceled disposed owner
     /// is intentionally a no-op and leaves its stable token uncanceled.
     /// </summary>
     /// <returns><see langword="true"/> when cancellation was admitted.</returns>
-    internal bool Cancel()
+    internal bool TryCancel()
     {
         lock (_gate)
         {
@@ -169,9 +187,11 @@ internal sealed class CancellationSource : IDisposable
             lock (_gate)
             {
                 _activeCancellations--;
-                if (_disposeRequested && _activeCancellations == 0 && !_resourcesDisposed)
+                if (_disposeRequested && _activeCancellations == 0)
                 {
-                    _resourcesDisposed = true;
+                    // Dispose closes admission before observing the count, so
+                    // the admitted call that reaches zero is the unique owner
+                    // of physical resource disposal.
                     dispose = true;
                 }
             }
@@ -196,9 +216,8 @@ internal sealed class CancellationSource : IDisposable
             }
 
             _disposeRequested = true;
-            if (_activeCancellations == 0 && !_resourcesDisposed)
+            if (_activeCancellations == 0)
             {
-                _resourcesDisposed = true;
                 dispose = true;
             }
         }
@@ -237,7 +256,7 @@ internal sealed class CancellationSource : IDisposable
         _source.Dispose();
     }
 
-    private Timer CreateDeadlineTimer(TimeSpan dueTime)
+    private Timer CreateDisabledDeadlineTimer()
     {
         if (ExecutionContext.IsFlowSuppressed())
         {
@@ -250,9 +269,9 @@ internal sealed class CancellationSource : IDisposable
         }
 
         Timer CreateTimer() => new(
-            static state => ((CancellationSource)state!).Cancel(),
+            static state => ((CancellationSource)state!).TryCancel(),
             this,
-            dueTime,
+            Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
     }
 }

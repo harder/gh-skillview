@@ -1296,10 +1296,10 @@ registrations and any lazily-created wait handle; intentionally leaving it
 undisposed would weaken the repository's resource-lifetime contract for little
 code reduction. `LatestRequestGate` and `CancellationOperationSlot` retain
 their outer cancel-in-progress state because it does more than protect
-`CancellationSource.Cancel()` from disposal: it guarantees cancellation wins
+`CancellationSource.TryCancel()` from disposal: it guarantees cancellation wins
 when replacement races the superseded lease's release. Removing that state
 would allow release to dispose the source first, after which the documented
-post-dispose `Cancel()` no-op could leave the superseded token uncanceled.
+post-dispose `TryCancel()` refusal could leave the superseded token uncanceled.
 
 New regressions assert both containment and reporting on every previously
 silent owner family, the post-dispose contract, and absence of ambient
@@ -1314,9 +1314,11 @@ three related resource-lifetime gaps selected as the next batch:
 1. `Dispose()` closed cancellation only after `_resourcesDisposed` became true.
    When disposal raced a callback already in progress, `_disposeRequested` was
    true but resources correctly remained live until that callback returned. A
-   second `Cancel()` could therefore enter after disposal, contrary to the
-   documented admission contract. Cancellation now returns whether it was
-   admitted and rejects new calls as soon as disposal is requested. A
+   second cancellation request could therefore enter after disposal, contrary
+   to the documented admission contract and `TryGetActiveToken`. The underlying
+   source was already canceled, so this repeated request did not rerun callbacks
+   or change user-visible cancellation behavior. `TryCancel()` now reports
+   admission and rejects new calls as soon as disposal is requested. A
    deterministic regression holds the first callback open across disposal and
    proves the second request is refused.
 2. The timeout check covered only non-positive values. `Timer` also rejects
@@ -1324,10 +1326,52 @@ three related resource-lifetime gaps selected as the next batch:
    registration could leave a partially constructed owner reachable from the
    parent token. The complete timer range is now validated before any resource
    acquisition.
-3. Construction now rolls back any deadline timer, parent registrations, and
-   the underlying source if a later allocation fails. If parent cancellation
-   wins during construction, registration stops and no needless deadline timer
-   is retained for an owner that is already canceled.
+3. Construction now rolls back parent registrations if linking fails. Every
+   callback-visible field is assigned before the deadline timer is armed; a
+   timer creation/arming failure closes admission through normal deferred
+   disposal instead of bypassing active-callback accounting. If parent
+   cancellation wins during construction, registration stops and no needless
+   deadline timer is retained for an owner that is already canceled.
+
+### Independent Claude review of PR #22
+
+An independent Claude Code Opus review confirmed the concurrency behavior with
+approximately 1,900 barrier-synchronized construction, parent, deadline,
+cancellation, disposal, and throwing-callback races. Its recommendations were
+reassessed as follows:
+
+1. **Canceled-parent timer retention regression — accepted.** A five-minute
+   deadline previously rooted an abandoned owner even when its parent was
+   already canceled. A serialized `WeakReference` regression now proves the
+   owner is collectible immediately; a revert that recreates the timer fails.
+2. **Admission wording — accepted.** The repeat cancellation was an underlying
+   CTS no-op, not a user-visible shutdown correction. The audit and PR describe
+   it as contract consistency between disposal, `TryGetActiveToken`, and the
+   renamed `TryCancel` boundary.
+3. **Redundant `_resourcesDisposed` state — accepted.** Closing admission with
+   `_disposeRequested` makes the call that observes the active count reach zero
+   the unique physical disposer. The third flag and dead conjuncts were removed,
+   with that uniqueness invariant documented at the transition.
+4. **Construction rollback protocol — accepted and strengthened.** Parent
+   registrations use an honest post-registration count. The deadline timer is
+   created disabled only after parent fields are assigned, then armed. A timer
+   creation or arming failure calls normal `Dispose`, so admitted callbacks
+   drain before physical resources are released.
+5. **Fractional upper timer bound — not adopted.** SkillView intentionally uses
+   a conservative `TimeSpan` bound rather than depending on `Timer` truncating a
+   fractional millisecond at the approximately 49.7-day maximum. No production
+   deadline approaches that boundary.
+6. **Injected metadata timeout validation — accepted.** The loader validates
+   through the cancellation owner's shared range predicate at construction, so
+   an oversized injected timeout cannot fault a whole search from inside a
+   per-result worker.
+7. **Overstated test name — accepted.** The range test no longer claims to
+   observe resource creation; the new retention regression covers the actual
+   resource behavior.
+8. **Cancellation naming — accepted.** The owner method is now `TryCancel`,
+   whose Boolean means admission was open, while request/operation gates retain
+   `Cancel`, whose Boolean means an active owner existed. The cache's void
+   `TryCancel` wrapper was removed.
 
 ## Finding 10: removal materializes full trees and runs on the UI thread
 

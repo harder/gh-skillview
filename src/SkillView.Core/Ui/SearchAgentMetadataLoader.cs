@@ -31,7 +31,7 @@ internal sealed class SearchAgentMetadataLoader
         ArgumentOutOfRangeException.ThrowIfLessThan(maxConcurrency, 1);
 
         var effectiveTimeout = previewTimeout ?? DefaultPreviewTimeout;
-        if (effectiveTimeout <= TimeSpan.Zero)
+        if (!CancellationSource.IsSupportedTimeout(effectiveTimeout))
         {
             throw new ArgumentOutOfRangeException(nameof(previewTimeout));
         }
