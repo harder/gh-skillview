@@ -38,10 +38,8 @@ internal sealed class ModalOperationTracker : IDisposable
         _invoke = invoke;
         _logger = logger;
         _logCategory = logCategory;
-        _cancellation = new CancellationSource(ex =>
-            _logger.Error(
-                _logCategory,
-                $"cancellation callback failed: {ex.Message}"));
+        _cancellation = new CancellationSource(
+            CancellationCallbackReporter.For(_logger, _logCategory, _logCategory));
         Token = _cancellation.Token;
     }
 

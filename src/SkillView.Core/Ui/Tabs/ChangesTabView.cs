@@ -35,7 +35,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private long _loadGeneration;
-    private readonly CancellationTokenSourceSlot _loadCancellations = new();
+    private readonly CancellationOperationSlot _loadCancellations;
 
     internal ChangesTabView(
         Func<Action, Task> runOnUi,
@@ -45,7 +45,8 @@ internal sealed class ChangesTabView : FrameView
         Action onActivateDoctor,
         Action onLeaveTab,
         Action? onStateChange = null,
-        CancellationToken lifetimeToken = default)
+        CancellationToken lifetimeToken = default,
+        Action<AggregateException>? onCancellationCallbackException = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -55,6 +56,7 @@ internal sealed class ChangesTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onStateChange = onStateChange;
         _lifetimeToken = lifetimeToken;
+        _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;

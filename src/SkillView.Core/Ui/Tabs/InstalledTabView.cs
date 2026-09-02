@@ -61,8 +61,8 @@ internal sealed class InstalledTabView : FrameView
     private int _agentsW = 8;
     private FocusTarget _lastFocusedTarget = FocusTarget.Table;
     private long _loadGeneration;
-    private readonly CancellationTokenSourceSlot _loadCancellations = new();
-    private readonly CancellationTokenSourceSlot _removeCancellations = new();
+    private readonly CancellationOperationSlot _loadCancellations;
+    private readonly CancellationOperationSlot _removeCancellations;
     private int _loadActive;
     private int _removeActive;
     private string? _idleStatusMessage;
@@ -76,7 +76,8 @@ internal sealed class InstalledTabView : FrameView
         Action onGoToSearch,
         Action? onStateChange = null,
         Func<string?, CancellationToken, Task<InventorySnapshot>>? scopedSnapshotLoader = null,
-        CancellationToken lifetimeToken = default)
+        CancellationToken lifetimeToken = default,
+        Action<AggregateException>? onCancellationCallbackException = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -87,6 +88,8 @@ internal sealed class InstalledTabView : FrameView
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
         _lifetimeToken = lifetimeToken;
+        _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
+        _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;

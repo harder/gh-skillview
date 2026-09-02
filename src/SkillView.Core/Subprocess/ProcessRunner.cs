@@ -98,11 +98,11 @@ public sealed class ProcessRunner
             // for a bounded grace period so the parent and redirected pipes can
             // settle, but never let a wedged or unkillable child stall shutdown.
             using (var termination = new CancellationSource(
-                CancellationToken.None,
                 _terminationWait,
-                ex => _logger.Error(
-                    "subprocess",
-                    $"termination deadline callback failed: {ex.Message}")))
+                CancellationCallbackReporter.For(
+                    _logger,
+                    "termination deadline",
+                    "subprocess")))
             {
                 try
                 {

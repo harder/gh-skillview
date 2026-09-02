@@ -3,12 +3,12 @@ using Xunit;
 
 namespace SkillView.Tests.Ui;
 
-public sealed class CancellationTokenSourceSlotTests
+public sealed class CancellationOperationSlotTests
 {
     [Fact]
     public void Replace_CancelsPreviousLeaseAndKeepsReplacementActive()
     {
-        var slot = new CancellationTokenSourceSlot();
+        var slot = new CancellationOperationSlot();
         using var first = slot.Replace(CancellationToken.None);
 
         using var second = slot.Replace(CancellationToken.None);
@@ -23,7 +23,7 @@ public sealed class CancellationTokenSourceSlotTests
     {
         for (var i = 0; i < 1_000; i++)
         {
-            var slot = new CancellationTokenSourceSlot();
+            var slot = new CancellationOperationSlot();
             var lease = slot.Replace(CancellationToken.None);
 
             Parallel.Invoke(() => slot.Cancel(), lease.Dispose);
@@ -37,7 +37,7 @@ public sealed class CancellationTokenSourceSlotTests
     {
         for (var i = 0; i < 1_000; i++)
         {
-            var slot = new CancellationTokenSourceSlot();
+            var slot = new CancellationOperationSlot();
             var first = slot.Replace(CancellationToken.None);
 
             Parallel.Invoke(
@@ -54,7 +54,7 @@ public sealed class CancellationTokenSourceSlotTests
     [Fact]
     public void TryBegin_AllowsOnlyOneActiveOperation()
     {
-        var slot = new CancellationTokenSourceSlot();
+        var slot = new CancellationOperationSlot();
         using var first = slot.TryBegin(CancellationToken.None);
 
         using var rejected = slot.TryBegin(CancellationToken.None);
@@ -66,7 +66,7 @@ public sealed class CancellationTokenSourceSlotTests
     [Fact]
     public void Cancel_DoesNotHoldSlotLockWhileRunningCallbacks()
     {
-        var slot = new CancellationTokenSourceSlot();
+        var slot = new CancellationOperationSlot();
         var lease = slot.Replace(CancellationToken.None);
         var releasedInsideCallback = false;
         using var registration = lease.Token.Register(() =>
@@ -86,7 +86,8 @@ public sealed class CancellationTokenSourceSlotTests
     [Fact]
     public void Replace_CallbackFailureDoesNotStrandReplacement()
     {
-        var slot = new CancellationTokenSourceSlot();
+        AggregateException? reported = null;
+        var slot = new CancellationOperationSlot(ex => reported = ex);
         using var first = slot.Replace(CancellationToken.None);
         using var registration = first.Token.Register(() =>
             throw new InvalidOperationException("callback failed"));
@@ -96,5 +97,8 @@ public sealed class CancellationTokenSourceSlotTests
         Assert.True(first.Token.IsCancellationRequested);
         Assert.False(replacement.Token.IsCancellationRequested);
         Assert.True(slot.HasActive);
+        var failure = Assert.IsType<InvalidOperationException>(
+            Assert.Single(Assert.IsType<AggregateException>(reported).InnerExceptions));
+        Assert.Equal("callback failed", failure.Message);
     }
 }

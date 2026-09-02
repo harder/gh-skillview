@@ -66,10 +66,8 @@ public sealed class CleanupScreen
 
     public void Show()
     {
-        using var lifetime = new CancellationSource(ex =>
-            _logger.Error(
-                "cleanup.ui",
-                $"cancellation callback failed: {ex.Message}"));
+        using var lifetime = new CancellationSource(
+            CancellationCallbackReporter.For(_logger, "cleanup dialog", "cleanup.ui"));
         Task? activeOperation = null;
         RemoveService.RemoveProgress? lastProgress = null;
         var windowActive = 1;

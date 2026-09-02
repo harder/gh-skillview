@@ -8,12 +8,18 @@ namespace SkillView.Ui;
 internal sealed class LatestRequestGate : IDisposable
 {
     private readonly object _gate = new();
+    private readonly Action<AggregateException>? _onCallbackException;
     private SourceState? _active;
     private long _generation;
 
+    internal LatestRequestGate(Action<AggregateException>? onCallbackException = null)
+    {
+        _onCallbackException = onCallbackException;
+    }
+
     internal Lease Begin(CancellationToken lifetime, TimeSpan timeout)
     {
-        var cancellation = new CancellationSource(lifetime, timeout);
+        var cancellation = new CancellationSource(lifetime, timeout, _onCallbackException);
         var next = new SourceState(cancellation);
 
         long generation;

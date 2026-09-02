@@ -83,7 +83,10 @@ public sealed class ModalOperationTrackerTests
         Assert.Contains(
             logger.Snapshot(),
             entry => entry.Category == "test.ui"
-                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal));
+                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal)
+                && entry.Message.Contains(
+                    "System.InvalidOperationException: callback failed",
+                    StringComparison.Ordinal));
     }
 
     [Fact]

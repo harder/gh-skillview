@@ -22,6 +22,13 @@ internal sealed class CancellationSource : IDisposable
     }
 
     internal CancellationSource(
+        TimeSpan timeout,
+        Action<AggregateException>? onCallbackException = null)
+        : this([], timeout, onCallbackException)
+    {
+    }
+
+    internal CancellationSource(
         CancellationToken parent,
         Action<AggregateException>? onCallbackException = null)
         : this([parent], timeout: null, onCallbackException)
@@ -65,6 +72,10 @@ internal sealed class CancellationSource : IDisposable
         {
             if (parent.CanBeCanceled)
             {
+                // UnsafeRegister invokes synchronously when a parent is already
+                // canceled. That can enter Cancel before _parentRegistrations is
+                // assigned, but this instance cannot be disposed or observed by
+                // external code until construction returns.
                 registrations[registrationCount++] = parent.UnsafeRegister(
                     static state => ((CancellationSource)state!).Cancel(),
                     this);
@@ -79,11 +90,7 @@ internal sealed class CancellationSource : IDisposable
 
         if (timeout is { } dueTime)
         {
-            _deadlineTimer = new Timer(
-                static state => ((CancellationSource)state!).Cancel(),
-                this,
-                dueTime,
-                Timeout.InfiniteTimeSpan);
+            _deadlineTimer = CreateDeadlineTimer(dueTime);
         }
     }
 
@@ -100,6 +107,11 @@ internal sealed class CancellationSource : IDisposable
         }
     }
 
+    /// <summary>
+    /// Requests cancellation unless this owner was already disposed. Disposal
+    /// closes cancellation admission, so canceling an uncanceled disposed owner
+    /// is intentionally a no-op and leaves its stable token uncanceled.
+    /// </summary>
     internal void Cancel()
     {
         lock (_gate)
@@ -119,11 +131,6 @@ internal sealed class CancellationSource : IDisposable
         catch (AggregateException ex)
         {
             callbackException = ex.Flatten();
-        }
-        catch (ObjectDisposedException)
-        {
-            // A concurrent owner disposal won the race before cancellation
-            // entered the source. The stable token remains safe to inspect.
         }
         finally
         {
@@ -196,5 +203,24 @@ internal sealed class CancellationSource : IDisposable
             registration.Dispose();
         }
         _source.Dispose();
+    }
+
+    private Timer CreateDeadlineTimer(TimeSpan dueTime)
+    {
+        if (ExecutionContext.IsFlowSuppressed())
+        {
+            return CreateTimer();
+        }
+
+        using (ExecutionContext.SuppressFlow())
+        {
+            return CreateTimer();
+        }
+
+        Timer CreateTimer() => new(
+            static state => ((CancellationSource)state!).Cancel(),
+            this,
+            dueTime,
+            Timeout.InfiniteTimeSpan);
     }
 }

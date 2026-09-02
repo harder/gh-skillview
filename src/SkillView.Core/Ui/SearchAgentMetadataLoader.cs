@@ -104,9 +104,10 @@ internal sealed class SearchAgentMetadataLoader
             using var timeout = new CancellationSource(
                 cancellationToken,
                 _previewTimeout,
-                ex => _logger.Error(
-                    "search.agent",
-                    $"metadata cancellation callback failed: {ex.Message}"));
+                CancellationCallbackReporter.For(
+                    _logger,
+                    "metadata preview",
+                    "search.agent"));
             try
             {
                 var preview = await loadPreviewAsync(result, timeout.Token).ConfigureAwait(false);

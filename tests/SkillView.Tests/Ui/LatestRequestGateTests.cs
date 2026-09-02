@@ -73,7 +73,8 @@ public sealed class LatestRequestGateTests
     [Fact]
     public void Begin_CallbackFailureDoesNotStrandReplacement()
     {
-        using var gate = new LatestRequestGate();
+        AggregateException? reported = null;
+        using var gate = new LatestRequestGate(ex => reported = ex);
         using var first = gate.Begin(CancellationToken.None, TimeSpan.FromMinutes(1));
         using var registration = first.Token.Register(() =>
             throw new InvalidOperationException("callback failed"));
@@ -84,5 +85,8 @@ public sealed class LatestRequestGateTests
         Assert.False(first.IsCurrent);
         Assert.True(replacement.IsCurrent);
         Assert.False(replacement.Token.IsCancellationRequested);
+        var failure = Assert.IsType<InvalidOperationException>(
+            Assert.Single(Assert.IsType<AggregateException>(reported).InnerExceptions));
+        Assert.Equal("callback failed", failure.Message);
     }
 }

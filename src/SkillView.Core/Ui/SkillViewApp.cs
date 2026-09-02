@@ -47,7 +47,7 @@ public sealed class SkillViewApp
     private CancellationSource? _runLifetime;
     private readonly LatestRequestGate _previewRequests;
     private readonly LatestRequestGate _searchRequests;
-    private readonly SharedAsyncOperation<EnvironmentReport> _environmentProbe = new();
+    private readonly SharedAsyncOperation<EnvironmentReport> _environmentProbe;
     private CancellationSource? _discoverLifetime;
     private CancellationSource? _doctorLifetime;
     private long _discoverGeneration;
@@ -142,8 +142,12 @@ public sealed class SkillViewApp
         _options = options;
         _applicationFactory = applicationFactory;
         _probeOnRun = probeOnRun;
-        _previewRequests = new LatestRequestGate();
-        _searchRequests = new LatestRequestGate();
+        _previewRequests = new LatestRequestGate(
+            CancellationCallbackReporter.For(services.Logger, "preview request"));
+        _searchRequests = new LatestRequestGate(
+            CancellationCallbackReporter.For(services.Logger, "search request"));
+        _environmentProbe = new SharedAsyncOperation<EnvironmentReport>(
+            CancellationCallbackReporter.For(services.Logger, "environment probe"));
         _backgroundTasks = new BackgroundTaskTracker(LogUnhandledException);
         _searchAgentMetadataLoader = new SearchAgentMetadataLoader(_searchAgentMetadata, services.Logger);
         _workflows = new SkillViewWorkflowCoordinator(
@@ -202,7 +206,7 @@ public sealed class SkillViewApp
         Window? window = null;
         using var runLifetime = new CancellationSource(
             cancellationToken,
-            ex => LogCancellationCallbackFailure("application", ex));
+            CancellationCallbackReporter.For(_services.Logger, "application"));
         _hasEnteredRunLifecycle = true;
         _runLifetime = runLifetime;
 
@@ -281,13 +285,6 @@ public sealed class SkillViewApp
     private void LogUnhandledException(Exception ex)
     {
         _services.Logger.Error("CRASH", $"Unhandled: {ex}");
-    }
-
-    private void LogCancellationCallbackFailure(string owner, AggregateException exception)
-    {
-        _services.Logger.Error(
-            "cancellation",
-            $"{owner} cancellation callback failed: {exception.Message}");
     }
 
     private Window BuildUi()
@@ -457,7 +454,9 @@ public sealed class SkillViewApp
             onStateChange: RefreshShellChrome,
             // Scope cycle (`G`) pushes `--scope` down to `gh skill list`.
             scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
-            lifetimeToken: GetRunLifetimeToken())
+            lifetimeToken: GetRunLifetimeToken(),
+            onCancellationCallbackException:
+                CancellationCallbackReporter.For(_services.Logger, "installed tab"))
         {
             X = 0,
             Y = 2,
@@ -511,7 +510,9 @@ public sealed class SkillViewApp
                 enterDoctor: EnterDoctor),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,
-            lifetimeToken: GetRunLifetimeToken())
+            lifetimeToken: GetRunLifetimeToken(),
+            onCancellationCallbackException:
+                CancellationCallbackReporter.For(_services.Logger, "changes tab"))
         {
             X = 0,
             Y = 2,
@@ -970,7 +971,7 @@ public sealed class SkillViewApp
         _discoverLifetime?.Dispose();
         _discoverLifetime = new CancellationSource(
             GetRunLifetimeToken(),
-            ex => LogCancellationCallbackFailure("Discover", ex));
+            CancellationCallbackReporter.For(_services.Logger, "Discover"));
         Interlocked.Increment(ref _discoverGeneration);
     }
 
@@ -1015,7 +1016,7 @@ public sealed class SkillViewApp
         DeactivateDoctorWorkspace(clearBusy: false);
         _doctorLifetime = new CancellationSource(
             GetRunLifetimeToken(),
-            ex => LogCancellationCallbackFailure("Doctor", ex));
+            CancellationCallbackReporter.For(_services.Logger, "Doctor"));
         Interlocked.Increment(ref _doctorGeneration);
     }
 
@@ -2543,11 +2544,11 @@ public sealed class SkillViewApp
             using var dispatchLifetime = lifetime is null
                 ? new CancellationSource(
                     cancellationToken,
-                    ex => LogCancellationCallbackFailure("UI dispatch", ex))
+                    CancellationCallbackReporter.For(_services.Logger, "UI dispatch"))
                 : new CancellationSource(
                     cancellationToken,
                     lifetime.Token,
-                    ex => LogCancellationCallbackFailure("UI dispatch", ex));
+                    CancellationCallbackReporter.For(_services.Logger, "UI dispatch"));
             return await AwaitDispatchAsync(
                     app.Invoke,
                     action,
@@ -2575,11 +2576,11 @@ public sealed class SkillViewApp
             using var dispatchLifetime = lifetime is null
                 ? new CancellationSource(
                     cancellationToken,
-                    ex => LogCancellationCallbackFailure("owned UI dispatch", ex))
+                    CancellationCallbackReporter.For(_services.Logger, "owned UI dispatch"))
                 : new CancellationSource(
                     cancellationToken,
                     lifetime.Token,
-                    ex => LogCancellationCallbackFailure("owned UI dispatch", ex));
+                    CancellationCallbackReporter.For(_services.Logger, "owned UI dispatch"));
             return await AwaitOwnedDispatchAsync(
                     app.Invoke,
                     action,

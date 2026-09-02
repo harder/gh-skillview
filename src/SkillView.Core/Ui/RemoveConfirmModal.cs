@@ -78,10 +78,8 @@ internal sealed class RemoveConfirmModal
 
     internal Result Show()
     {
-        using var lifetime = new CancellationSource(ex =>
-            _logger.Error(
-                "remove.ui",
-                $"cancellation callback failed: {ex.Message}"));
+        using var lifetime = new CancellationSource(
+            CancellationCallbackReporter.For(_logger, "remove dialog", "remove.ui"));
         var validation = _evaluation.Items[0].Validation;
         var outcome = Outcome.Cancelled;
         RemoveService.RemoveReport? report = null;

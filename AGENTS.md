@@ -98,8 +98,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `dotnet test` mode. See `agent_docs/running-tests.md` for the resulting
   command-syntax changes: `--project` is now required (bare/positional project
   paths no longer work), and filtered runs need xunit's MTP-native
-  `--filter-namespace`/`--filter-class`/`--filter-method`/`--filter-trait`/
-  `--filter-query` flags passed straight to `dotnet test` — xunit's older
+  `--filter-namespace`/`--filter-class`/`--filter-trait` flags passed straight
+  to `dotnet test`. For one exact method, use xunit's query filter, for example
+  `--filter-query "/*/Namespace/Class/Method"`; with the current xunit 4.0.0
+  integration, `--filter-method` can silently select zero tests even when the
+  discovered fully qualified name matches. xunit's older
   single-dash console-runner flags (`-namespace`, `-trait`, ...) and the
   platform's own `--treenode-filter` are silently rejected by `dotnet test`'s
   MTP handshake here and report "Zero tests ran" instead of erroring loudly.
@@ -123,9 +126,17 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   deadline sources must use `SkillView.Threading.CancellationSource`, which
   contains aggregate callback failures from manual, parent, and timer-driven
   cancellation and keeps disposal from racing an active callback. Do not
-  reintroduce raw linked sources or `CancelAfter` for owned work. Capture the
-  token value in the lease instead of dereferencing the source after ownership
-  can end.
+  reintroduce raw linked sources or `CancelAfter` for owned work. Every
+  production owner must supply a callback reporter; log the full flattened
+  aggregate through `CancellationCallbackReporter` rather than only its generic
+  message. Deadline timers must not capture ambient `ExecutionContext`.
+  Disposing a `CancellationSource` closes cancellation admission, so a later
+  `Cancel()` intentionally leaves an uncanceled stable token uncanceled. Capture
+  the token value in the lease instead of dereferencing the source after
+  ownership can end. Keep the outer cancel-in-progress state in
+  `LatestRequestGate` and `CancellationOperationSlot`: it preserves
+  cancel-wins-over-lease-dispose ordering in addition to the source's internal
+  disposal safety.
 - Route application-owned fire-and-forget work through `BackgroundTaskTracker`
   (`SkillViewApp.RunOwnedTask` / `RunBackground`). Keep Discover/Doctor work
   tied to their activation lifetimes and put generation/ownership checks inside

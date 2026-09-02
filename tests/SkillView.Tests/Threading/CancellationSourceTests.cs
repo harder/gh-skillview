@@ -74,6 +74,42 @@ public sealed class CancellationSourceTests
     }
 
     [Fact]
+    public void CancelAfterDispose_IsNoOpAndLeavesStableTokenUncanceled()
+    {
+        var source = new CancellationSource();
+        var token = source.Token;
+
+        source.Dispose();
+        source.Cancel();
+
+        Assert.False(token.IsCancellationRequested);
+        Assert.False(source.TryGetActiveToken(out var rejected));
+        Assert.False(rejected.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task Deadline_DoesNotCaptureAmbientExecutionContext()
+    {
+        var ambient = new AsyncLocal<string?>();
+        ambient.Value = "caller context";
+        var observed = new TaskCompletionSource<string?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var source = new CancellationSource(
+            TimeSpan.FromMilliseconds(10),
+            _ => observed.TrySetResult(ambient.Value));
+        using var registration = source.Token.UnsafeRegister(
+            static _ => throw new InvalidOperationException("callback failed"),
+            state: null);
+
+        ambient.Value = null;
+        var deadlineContext = await observed.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(deadlineContext);
+        Assert.True(source.IsCancellationRequested);
+    }
+
+    [Fact]
     public void CancelAndDispose_AreSafeUnderContention()
     {
         for (var iteration = 0; iteration < 1_000; iteration++)

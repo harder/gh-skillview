@@ -150,7 +150,10 @@ public sealed class GhSkillListCacheTests
     [Fact]
     public async Task Invalidate_CallbackFailureDoesNotEscapeOrReleaseBeforeCleanup()
     {
-        var cache = new GhSkillListCache(ttl: TimeSpan.FromMinutes(1));
+        AggregateException? reported = null;
+        var cache = new GhSkillListCache(
+            ttl: TimeSpan.FromMinutes(1),
+            onCallbackException: ex => reported = ex);
         var loaderStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -183,6 +186,9 @@ public sealed class GhSkillListCacheTests
         await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => lookup);
         Assert.False(cache.TryGet("/usr/bin/gh", null, null, out _));
+        var failure = Assert.IsType<InvalidOperationException>(
+            Assert.Single(Assert.IsType<AggregateException>(reported).InnerExceptions));
+        Assert.Equal("callback failed", failure.Message);
     }
 
     [Fact]

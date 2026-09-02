@@ -13,9 +13,12 @@ internal sealed class RootCancellation : IDisposable
     private bool _subscribed;
     private bool _disposed;
 
-    internal RootCancellation(CancellationToken cancellationToken = default)
+    internal RootCancellation(
+        CancellationToken cancellationToken,
+        Action<AggregateException> onCallbackException)
     {
-        _source = new CancellationSource(cancellationToken);
+        ArgumentNullException.ThrowIfNull(onCallbackException);
+        _source = new CancellationSource(cancellationToken, onCallbackException);
         _handler = OnCancelKeyPress;
         try
         {

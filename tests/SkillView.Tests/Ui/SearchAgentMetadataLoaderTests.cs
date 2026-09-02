@@ -161,6 +161,16 @@ public sealed class SearchAgentMetadataLoaderTests
     public async Task FilterAsync_TimeoutContainsCallbackFailure()
     {
         var logger = new Logger(LogLevel.Debug);
+        var callbackFailureLogged = new TaskCompletionSource<LogEntry>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var subscription = logger.Subscribe(entry =>
+        {
+            if (entry.Category == "search.agent"
+                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal))
+            {
+                callbackFailureLogged.TrySetResult(entry);
+            }
+        });
         var loader = new SearchAgentMetadataLoader(
             new SearchAgentMetadataCache(),
             logger,
@@ -181,10 +191,12 @@ public sealed class SearchAgentMetadataLoaderTests
             TestContext.Current.CancellationToken);
 
         Assert.Empty(filtered);
+        var callbackFailure = await callbackFailureLogged.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
         Assert.Contains(
-            logger.Snapshot(),
-            entry => entry.Category == "search.agent"
-                && entry.Message.Contains("cancellation callback failed", StringComparison.Ordinal));
+            "System.InvalidOperationException: callback failed",
+            callbackFailure.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

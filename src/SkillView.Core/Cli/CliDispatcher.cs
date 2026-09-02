@@ -31,9 +31,7 @@ public static class CliDispatcher
         using var deadline = new CancellationSource(
             cancellationToken,
             timeout,
-            ex => services.Logger.Error(
-                "cancellation",
-                $"CLI deadline callback failed: {ex.Message}"));
+            CancellationCallbackReporter.For(services.Logger, "CLI deadline"));
 
         try
         {

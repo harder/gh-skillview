@@ -10,7 +10,13 @@ namespace SkillView.Ui;
 internal sealed class SharedAsyncOperation<T>
 {
     private readonly object _gate = new();
+    private readonly Action<AggregateException>? _onCallbackException;
     private Flight? _active;
+
+    internal SharedAsyncOperation(Action<AggregateException>? onCallbackException = null)
+    {
+        _onCallbackException = onCallbackException;
+    }
 
     internal async Task<T> GetAsync(
         Func<CancellationToken, Task<T>> operation,
@@ -23,7 +29,7 @@ internal sealed class SharedAsyncOperation<T>
         var startsOperation = false;
         lock (_gate)
         {
-            flight = _active ??= new Flight();
+            flight = _active ??= new Flight(_onCallbackException);
             if (!flight.Started)
             {
                 flight.Started = true;
@@ -122,9 +128,9 @@ internal sealed class SharedAsyncOperation<T>
         return finalOperation;
     }
 
-    private sealed class Flight
+    private sealed class Flight(Action<AggregateException>? onCallbackException)
     {
-        internal CancellationSource Cancellation { get; } = new();
+        internal CancellationSource Cancellation { get; } = new(onCallbackException);
         internal TaskCompletionSource<T> Completion { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         internal bool Started { get; set; }

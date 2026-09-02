@@ -14,9 +14,14 @@ product failure.
 
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,
-`--filter-class`, `--filter-not-class`, `--filter-method`, `--filter-not-method`,
-`--filter-trait`, `--filter-not-trait`, or `--filter-query "query"` for the
-query-filter language. Do **not** use xunit's older single-dash console-runner
+`--filter-class`, `--filter-not-class`, `--filter-trait`,
+`--filter-not-trait`, or `--filter-query "query"` for the query-filter language.
+For a single exact method, use a four-segment query such as
+`--filter-query "/*/SkillView.Tests.Ui/SearchAgentMetadataLoaderTests/FilterAsync_TimeoutContainsCallbackFailure"`.
+On the current .NET 10/xunit 4.0.0 integration, both simple and fully qualified
+`--filter-method` values have been observed to reach the runner but silently
+select zero tests; do not count such a run as verification. Do **not** use
+xunit's older single-dash console-runner
 flags (`-namespace`, `-trait`, `-class`, `-method`, `-filter`) with `dotnet test`
 — those are only recognized when running the built dll directly (`dotnet exec` /
 the standalone runner); `dotnet test`'s MTP handshake doesn't know about them and

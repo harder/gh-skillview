@@ -6,10 +6,16 @@ namespace SkillView.Ui;
 /// and lease disposal. Ownership transitions run under one gate, while
 /// cancellation callbacks run outside it; disposal is deferred until an
 /// in-progress cancellation finishes.
-internal sealed class CancellationTokenSourceSlot
+internal sealed class CancellationOperationSlot
 {
     private readonly object _gate = new();
+    private readonly Action<AggregateException>? _onCallbackException;
     private SourceState? _active;
+
+    internal CancellationOperationSlot(Action<AggregateException>? onCallbackException = null)
+    {
+        _onCallbackException = onCallbackException;
+    }
 
     internal bool HasActive
     {
@@ -24,7 +30,7 @@ internal sealed class CancellationTokenSourceSlot
 
     internal Lease Replace(CancellationToken lifetime)
     {
-        var next = new SourceState(new CancellationSource(lifetime));
+        var next = new SourceState(new CancellationSource(lifetime, _onCallbackException));
         SourceState? previous;
         lock (_gate)
         {
@@ -39,7 +45,7 @@ internal sealed class CancellationTokenSourceSlot
 
     internal Lease? TryBegin(CancellationToken lifetime)
     {
-        var next = new SourceState(new CancellationSource(lifetime));
+        var next = new SourceState(new CancellationSource(lifetime, _onCallbackException));
         lock (_gate)
         {
             if (_active is not null)
@@ -131,10 +137,10 @@ internal sealed class CancellationTokenSourceSlot
 
     internal sealed class Lease : IDisposable
     {
-        private CancellationTokenSourceSlot? _owner;
+        private CancellationOperationSlot? _owner;
         private readonly SourceState _state;
 
-        internal Lease(CancellationTokenSourceSlot owner, SourceState state)
+        internal Lease(CancellationOperationSlot owner, SourceState state)
         {
             _owner = owner;
             _state = state;
