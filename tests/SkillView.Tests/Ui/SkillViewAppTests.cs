@@ -42,8 +42,8 @@ public sealed class SkillViewAppTests
     private static EnvironmentReport CreateEnvironmentReport() => new()
     {
         GhPath = "/usr/bin/gh",
-        GhVersionRaw = "gh version 2.95.0",
-        GhVersion = new SemVer(2, 95, 0),
+        GhVersionRaw = "gh version 2.99.0",
+        GhVersion = new SemVer(2, 99, 0),
         GhMeetsMinimum = true,
         Auth = GhAuthStatus.Unknown,
         GhSkillAvailable = true,

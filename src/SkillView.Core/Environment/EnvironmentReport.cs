@@ -5,7 +5,7 @@ namespace SkillView.Diagnostics;
 /// Composite environment snapshot used by Doctor (CLI + TUI) and startup
 /// checks. Built by `EnvironmentProbe`.
 ///
-/// SkillView requires gh ≥ 2.95.0 (see <see cref="GhBinaryLocator.MinimumVersion"/>),
+/// SkillView requires gh ≥ 2.99.0 (see <see cref="GhBinaryLocator.MinimumVersion"/>),
 /// which guarantees the full `gh skill` surface — `list`/`install --all`/
 /// `update --all` and their flags — so there is no per-flag capability probe:
 /// meeting the minimum implies the feature set.

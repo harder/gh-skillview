@@ -23,7 +23,7 @@ mv skillview-darwin-arm64 /usr/local/bin/skillview
 skillview
 ```
 
-SkillView requires **GitHub CLI 2.95.0 or newer** — 2.94.0 first shipped the full `gh skill` surface (`skill list`, `install --all`, `update --all`, nested-directory discovery), and 2.95.0 made `gh skill update` atomic and in-place ([cli/cli#13449](https://github.com/cli/cli/pull/13449)), which SkillView's Updates tab relies on. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
+SkillView requires **GitHub CLI 2.99.0 or newer**. That release retains the atomic, in-place `gh skill update` behavior SkillView's Updates tab needs, fixes Codex user-scope installs to use `~/.agents/skills`, and honors Pi's `PI_CODING_AGENT_DIR`. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
 
 It ships as both:
 
@@ -73,11 +73,11 @@ SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to t
 
 ## Requirements
 
-- **GitHub CLI** `gh` **2.95.0 or newer**
+- **GitHub CLI** `gh` **2.99.0 or newer**
 - a working `gh` setup; `gh auth login` is recommended
 - a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 
-`gh skill` is still in preview and subject to change. SkillView probes the installed `gh` binary and only enables features whose flags are actually available.
+`gh skill` is still in preview and subject to change. SkillView verifies the installed `gh` version and runs a `gh skill --help` smoke check; its 2.99.0 minimum guarantees the `gh skill` interface it uses.
 
 ## Install
 
@@ -309,6 +309,19 @@ skillview update --all --dry-run --json
 skillview cleanup --candidates --json
 ```
 
+### Agent configuration directories
+
+The inventory follows the user-level skill locations used by GitHub CLI. It
+also honors `CLAUDE_CONFIG_DIR` for Claude Code and, with GitHub CLI 2.99.0 or
+newer, `PI_CODING_AGENT_DIR` for Pi. SkillView keeps the conventional default
+locations in its scan as well, so older or manually managed skills remain
+visible for review and cleanup.
+
+`gh skill publish` is an upstream authoring command that validates a local
+skills repository and creates a GitHub release. It deliberately remains a raw
+`gh` workflow because it can create repository metadata and releases; use
+`gh skill publish --dry-run` to validate before publishing.
+
 ## Troubleshooting
 
 SkillView keeps a rotating file log and redacts sensitive values before writing.
@@ -384,9 +397,10 @@ dotnet test --no-build
 ```
 
 The repo currently pins Terminal.Gui `2.4.17` (Terminal.Gui.Editor `2.5.7`) and
-uses xUnit v3 test APIs like `TestContext`; if you pulled package changes, run
-`dotnet restore` before building so stale package assets do not leave the test
-projects on xUnit 2.x.
+xUnit `4.0.0`. The release uses only stable package versions; the newer
+Terminal.Gui development builds are intentionally not consumed. If you pulled
+package changes, run `dotnet restore` before building so stale package assets
+do not leave the test projects on xUnit 2.x.
 
 There is no separate lint step. Build warnings and code-style violations are treated as errors.
 

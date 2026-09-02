@@ -123,7 +123,9 @@ internal sealed class InstallConfirmModal
         var agentsLabel = new Label { X = 1, Y = 6, Text = "Agents:" };
         var home = Environment.GetEnvironmentVariable("HOME")
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var preChecked = InstallAgentCatalog.DetectInstalledGhIds(home ?? string.Empty);
+        var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
+            home ?? string.Empty,
+            Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {

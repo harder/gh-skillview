@@ -9,15 +9,13 @@ namespace SkillView.Gh;
 /// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
-    /// Minimum supported `gh`. 2.94.0 first shipped the full `gh skill` surface
-    /// SkillView relies on (`skill list`, `install --all`, `update --all`,
-    /// nested-dir discovery), but 2.95.0 (cli/cli#13449) fixes a data-loss bug
-    /// where `gh skill update` could relocate namespaced skills and delete the
-    /// original install directory — and SkillView's Updates tab drives
-    /// `gh skill update --all`. The minimum is therefore 2.95.0 so every user
-    /// gets the atomic in-place update path. Meeting this minimum guarantees the
-    /// feature set, so SkillView does not probe individual flags.
-    public static readonly SemVer MinimumVersion = new(2, 95, 0);
+    /// Minimum supported `gh`. 2.95.0 fixed atomic in-place skill updates
+    /// (cli/cli#13449), which SkillView's Updates tab relies on. 2.99.0 adds
+    /// the compatible Pi configuration override and Codex user-skill location
+    /// corrections (cli/cli#14260 and cli/cli#14154). The minimum is therefore
+    /// 2.99.0. Meeting it guarantees the supported feature set, so SkillView
+    /// does not probe each individual `gh skill` flag.
+    public static readonly SemVer MinimumVersion = new(2, 99, 0);
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;

@@ -13,7 +13,7 @@ using Terminal.Gui.Views;
 namespace SkillView.Ui;
 
 /// Per-repo discovery picker. Given a repo's already-discovered skills
-/// (from `gh skill install <repo>` run non-interactively — gh ≥ 2.95.0,
+/// (from `gh skill install <repo>` run non-interactively — gh ≥ 2.99.0,
 /// cli/cli#13548), shows a checklist so the user installs a chosen subset
 /// instead of the blunt all-or-one choices. Selecting every skill collapses
 /// to a single `gh skill install <repo> --all`; a subset installs each by name.
@@ -145,7 +145,9 @@ internal sealed class RepoSkillPickerModal
         var agentsLabel = new Label { X = 1, Y = Pos.AnchorEnd(6), Text = "Agents:" };
         var home = Environment.GetEnvironmentVariable("HOME")
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var preChecked = InstallAgentCatalog.DetectInstalledGhIds(home ?? string.Empty);
+        var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
+            home ?? string.Empty,
+            Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {
