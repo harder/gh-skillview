@@ -11,7 +11,9 @@ Third hardening branch: `fix/removal-lifecycle-hardening`
 Fourth hardening branch: `fix/search-metadata-hardening`
 Fifth hardening branch: `fix/final-adversarial-hardening`
 Sixth hardening branch: `fix/native-removal-hardening`
-Status: Portable remediation complete. PRs #12 through #16 are merged.
+Status: Portable remediation and the documented SkillView backlog are complete.
+PRs #12 through #21 are merged; the post-PR #21 cancellation-owner lifecycle
+follow-up is implemented on `fix/cancellation-source-lifecycle`.
 The fifth batch completes install-modal ownership, root CLI cancellation and
 deadlines, bounded post-kill waiting, volume-aware path identity, Esc focus
 behavior, streaming CLI JSON, serialized static-UI tests, and bounded-resource
@@ -710,7 +712,7 @@ Unix `unlinkat` sites already check the token immediately before the call.
 Severity: **High**
 
 Status: **Fixed in `df62a22` / PR #11.** The replay/attach race described in
-Finding 13 remains deferred.
+Finding 13 was subsequently completed on `fix/adversarial-hardening` / PR #12.
 
 Locations:
 
@@ -1302,6 +1304,30 @@ post-dispose `Cancel()` no-op could leave the superseded token uncanceled.
 New regressions assert both containment and reporting on every previously
 silent owner family, the post-dispose contract, and absence of ambient
 `ExecutionContext` on the deadline timer thread.
+
+### Post-PR #21 cancellation-owner lifecycle follow-up
+
+With the explicit SkillView backlog complete, the next residual-risk pass
+revisited construction and disposal of the new cancellation owner. It found
+three related resource-lifetime gaps selected as the next batch:
+
+1. `Dispose()` closed cancellation only after `_resourcesDisposed` became true.
+   When disposal raced a callback already in progress, `_disposeRequested` was
+   true but resources correctly remained live until that callback returned. A
+   second `Cancel()` could therefore enter after disposal, contrary to the
+   documented admission contract. Cancellation now returns whether it was
+   admitted and rejects new calls as soon as disposal is requested. A
+   deterministic regression holds the first callback open across disposal and
+   proves the second request is refused.
+2. The timeout check covered only non-positive values. `Timer` also rejects
+   values above `uint.MaxValue - 1` milliseconds; discovering that after parent
+   registration could leave a partially constructed owner reachable from the
+   parent token. The complete timer range is now validated before any resource
+   acquisition.
+3. Construction now rolls back any deadline timer, parent registrations, and
+   the underlying source if a later allocation fails. If parent cancellation
+   wins during construction, registration stops and no needless deadline timer
+   is retained for an owner that is already canceled.
 
 ## Finding 10: removal materializes full trees and runs on the UI thread
 

@@ -53,11 +53,14 @@ logging, or subprocess adapters.
   the bounded logger so callback type, inner messages, and stack traces remain
   diagnosable. Deadline timer creation suppresses `ExecutionContext` flow so a
   long command timeout cannot pin ambient `AsyncLocal` or `Activity` state.
-  `CancellationSource.Dispose()` closes admission: `Cancel()` afterward is an
-  intentional no-op. Do not remove the slot/gate's outer cancellation-in-
-  progress bookkeeping merely because `CancellationSource` defers its own
-  disposal—the outer state also makes cancellation win a race with lease
-  release.
+  `CancellationSource.Dispose()` closes admission immediately, including while
+  an earlier callback is still draining: `Cancel()` afterward is an intentional
+  no-op. Construction validates the complete timer range before registering
+  parents and rolls back partial parent registrations, timers, and source state
+  if a later allocation fails. Do not remove the slot/gate's outer
+  cancellation-in-progress bookkeeping merely because `CancellationSource`
+  defers its own disposal—the outer state also makes cancellation win a race
+  with lease release.
 - Async update/install controls stay disabled while their operation is active.
   Continue to pass cancellation into subprocess-backed services. Synchronous
   install dialogs use `ModalOperationTracker`: capture its stable token, retain

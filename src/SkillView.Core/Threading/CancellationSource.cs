@@ -7,8 +7,11 @@ namespace SkillView.Threading;
 /// </summary>
 internal sealed class CancellationSource : IDisposable
 {
+    private static readonly TimeSpan MaxSupportedTimeout =
+        TimeSpan.FromMilliseconds(uint.MaxValue - 1L);
+
     private readonly object _gate = new();
-    private readonly CancellationTokenSource _source = new();
+    private readonly CancellationTokenSource _source;
     private readonly CancellationTokenRegistration[] _parentRegistrations;
     private readonly Timer? _deadlineTimer;
     private readonly Action<AggregateException>? _onCallbackException;
@@ -56,11 +59,13 @@ internal sealed class CancellationSource : IDisposable
         TimeSpan? timeout,
         Action<AggregateException>? onCallbackException)
     {
-        if (timeout is { } value && value <= TimeSpan.Zero)
+        if (timeout is { } value
+            && (value <= TimeSpan.Zero || value > MaxSupportedTimeout))
         {
             throw new ArgumentOutOfRangeException(nameof(timeout));
         }
 
+        _source = new CancellationTokenSource();
         _onCallbackException = onCallbackException;
         Token = _source.Token;
 
@@ -68,30 +73,55 @@ internal sealed class CancellationSource : IDisposable
             ? Array.Empty<CancellationTokenRegistration>()
             : new CancellationTokenRegistration[parents.Count];
         var registrationCount = 0;
-        foreach (var parent in parents)
+        Timer? deadlineTimer = null;
+        try
         {
-            if (parent.CanBeCanceled)
+            foreach (var parent in parents)
             {
-                // UnsafeRegister invokes synchronously when a parent is already
-                // canceled. That can enter Cancel before _parentRegistrations is
-                // assigned, but this instance cannot be disposed or observed by
-                // external code until construction returns.
-                registrations[registrationCount++] = parent.UnsafeRegister(
-                    static state => ((CancellationSource)state!).Cancel(),
-                    this);
+                if (parent.CanBeCanceled)
+                {
+                    // UnsafeRegister invokes synchronously when a parent is already
+                    // canceled. That can enter Cancel before _parentRegistrations is
+                    // assigned, but this instance cannot be disposed or observed by
+                    // external code until construction returns.
+                    registrations[registrationCount++] = parent.UnsafeRegister(
+                        static state => ((CancellationSource)state!).Cancel(),
+                        this);
+                    if (Token.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if (timeout is { } dueTime && !Token.IsCancellationRequested)
+            {
+                deadlineTimer = CreateDeadlineTimer(dueTime);
+                if (Token.IsCancellationRequested)
+                {
+                    deadlineTimer.Dispose();
+                    deadlineTimer = null;
+                }
             }
         }
+        catch
+        {
+            deadlineTimer?.Dispose();
+            for (var index = 0; index < registrationCount; index++)
+            {
+                registrations[index].Dispose();
+            }
+            _source.Dispose();
+            throw;
+        }
+
         _parentRegistrations = registrationCount switch
         {
             0 => [],
             _ when registrationCount == registrations.Length => registrations,
             _ => registrations[..registrationCount],
         };
-
-        if (timeout is { } dueTime)
-        {
-            _deadlineTimer = CreateDeadlineTimer(dueTime);
-        }
+        _deadlineTimer = deadlineTimer;
     }
 
     internal CancellationToken Token { get; }
@@ -112,13 +142,14 @@ internal sealed class CancellationSource : IDisposable
     /// closes cancellation admission, so canceling an uncanceled disposed owner
     /// is intentionally a no-op and leaves its stable token uncanceled.
     /// </summary>
-    internal void Cancel()
+    /// <returns><see langword="true"/> when cancellation was admitted.</returns>
+    internal bool Cancel()
     {
         lock (_gate)
         {
-            if (_resourcesDisposed)
+            if (_disposeRequested)
             {
-                return;
+                return false;
             }
             _activeCancellations++;
         }
@@ -151,6 +182,7 @@ internal sealed class CancellationSource : IDisposable
                 DisposeResources();
             }
         }
+        return true;
     }
 
     public void Dispose()
