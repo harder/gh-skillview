@@ -189,7 +189,7 @@ internal sealed class InstalledTabView : FrameView
             var row = _table.GetSelectedRow();
             if (row >= 0 && row < _rows.Count)
             {
-                _detail.Text = RenderDetail(_rows[row]);
+                RefreshSelectedDetail();
                 _onStateChange?.Invoke();
             }
         };
@@ -555,9 +555,7 @@ internal sealed class InstalledTabView : FrameView
         RecomputeColumnWidths();
         BuildTableSource();
         RefreshOperationStatus();
-        _detail.Text = _rows.Count == 0
-            ? "(no matches)"
-            : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
+        RefreshSelectedDetail();
         _onStateChange?.Invoke();
     }
 
@@ -763,6 +761,7 @@ internal sealed class InstalledTabView : FrameView
         }
 
         SetSpinnerActive(false);
+        RefreshSelectedDetail();
         if (_idleStatusMessage is not null)
         {
             _footer.Text = _idleStatusMessage;
@@ -770,6 +769,15 @@ internal sealed class InstalledTabView : FrameView
         }
 
         RefreshFooter();
+    }
+
+    private void RefreshSelectedDetail()
+    {
+        if (_snapshot is null || Volatile.Read(ref _removeActive) != 0)
+        {
+            return;
+        }
+
         _detail.Text = _rows.Count == 0
             ? "(no matches)"
             : RenderDetail(_rows[Math.Clamp(_table.GetSelectedRow(), 0, _rows.Count - 1)]);
@@ -809,6 +817,8 @@ internal sealed class InstalledTabView : FrameView
     internal bool TableHasFocusForTests => _table.HasFocus;
 
     internal void SendFilterKeyForTests(Key key) => _filterField.NewKeyDownEvent(key);
+
+    internal void SetFilterTextForTests(string text) => _filterField.Text = text;
 
     internal bool RemoveActiveForTests => Volatile.Read(ref _removeActive) != 0;
 

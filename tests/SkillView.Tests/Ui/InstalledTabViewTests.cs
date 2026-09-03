@@ -56,6 +56,84 @@ public sealed class InstalledTabViewTests
     }
 
     [Fact]
+    public async Task SelectionAndFilterChanges_DoNotClearActiveRemoveFeedback()
+    {
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemove = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeStarted.TrySetResult();
+                await releaseRemove.Task.WaitAsync(cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkills("frontend-design", "backend-design"));
+
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        view.SetSelectedRowForTests(1);
+        Assert.Contains("## Checking removal safety…", view.DetailTextForTests);
+
+        view.SetFilterTextForTests("backend");
+        Assert.Contains("## Checking removal safety…", view.DetailTextForTests);
+
+        view.CancelPendingWork();
+        releaseRemove.TrySetResult();
+        await operations["installed.remove"];
+    }
+
+    [Fact]
+    public async Task RemoveCompletion_RestoresDetailWhenInventoryFailureRemainsInFooter()
+    {
+        var removeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new ConcurrentDictionary<string, Task>();
+        var view = new InstalledTabView(
+            runOnUi: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            runTask: (operation, name) => operations[name] = operation(),
+            snapshotLoader: static _ => throw new InvalidOperationException("scan failed"),
+            onRemove: async (_, _, cancellationToken) =>
+            {
+                removeStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            },
+            onLeaveTab: static () => { },
+            onGoToSearch: static () => { });
+        view.LoadSeeded(SnapshotWithSkill(
+            name: "frontend-design",
+            packageSource: "owner/repo",
+            agentIds: ["claude"]));
+
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await view.LoadAsync();
+        Assert.Contains("## Checking removal safety…", view.DetailTextForTests);
+
+        view.CancelPendingWork();
+        await operations["installed.remove"];
+
+        Assert.Equal(" inventory load failed: scan failed", view.FooterTextForTests);
+        Assert.Contains("# frontend-design", view.DetailTextForTests);
+        Assert.DoesNotContain("Checking removal safety", view.DetailTextForTests);
+    }
+
+    [Fact]
     public async Task RemoveCompletion_DoesNotClearActiveInventoryFeedback()
     {
         var inventoryStarted = new TaskCompletionSource(
@@ -402,6 +480,13 @@ public sealed class InstalledTabViewTests
         onRemove: static (_, _, _) => Task.CompletedTask,
         onLeaveTab: static () => { },
         onGoToSearch: static () => { });
+
+    private static InventorySnapshot SnapshotWithSkills(string firstName, string secondName)
+    {
+        var first = SnapshotWithSkill(firstName, "owner/repo", "claude");
+        var second = SnapshotWithSkill(secondName, "owner/repo", "claude");
+        return first with { Skills = first.Skills.Add(second.Skills[0]) };
+    }
 
     private static InventorySnapshot SnapshotWithSkill(
         string name,
