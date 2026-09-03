@@ -311,6 +311,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   native inspection. Installed inventory loading and remove preflight own busy
   state independently; derive their shared spinner/footer from both owners so
   either completion cannot hide the other operation's feedback.
+  While preflight runs, mirror its status prominently in the Installed detail
+  pane as well as the footer, and do not let selection/filter refreshes
+  overwrite that owned detail state. When preflight ends, restore the selected
+  detail even when an inventory error remains in the footer. Seed the advanced
+  wizard from the preflight evaluation without launching another eager scan;
+  evaluate alternative removal scopes only after the user selects them.
 - Use `Logger.SubscribeWithReplay` whenever a consumer needs retained history
   plus live entries. Do not recreate snapshot-then-subscribe logic. Preserve
   the logger's message/total-character budgets and the file sink's date+size
@@ -356,8 +362,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - Awaiting dispatch of an entire synchronous modal needs the stronger owned
   dispatch contract: cancellation may reject a callback that is still queued,
   but once that callback starts the background owner must wait until the nested
-  modal run returns. Do not use a token-short-circuiting cosmetic dispatcher for
-  this boundary or shutdown can release ownership while the modal is active.
+  modal run returns. Stage background-completed modal launches for the next
+  `IApplication.Iteration`; a worker-thread `IApplication.Invoke` callback runs
+  inside Terminal.Gui's `TimedEvents` lock, and running the modal there
+  deadlocks any modal worker that reports progress through `Invoke`. Do not use
+  a token-short-circuiting cosmetic dispatcher for this boundary or shutdown
+  can release ownership while the modal is active.
 - CLI entrypoints translate Ctrl+C/external cancellation to exit code 130 and
   apply bounded per-command deadlines. Cancellation closes admission before
   startup side effects, synchronous log cleanup, environment probing, or child

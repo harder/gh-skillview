@@ -549,6 +549,7 @@ public sealed class SkillViewAppTests
 
         var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
             callback => queued = callback,
+            callback => callback(),
             () => callbackRan = true,
             lifetime.Token);
         Assert.NotNull(queued);
@@ -570,6 +571,7 @@ public sealed class SkillViewAppTests
         Action? queued = null;
         var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
             callback => queued = callback,
+            callback => callback(),
             () =>
             {
                 entered.Set();
@@ -598,6 +600,103 @@ public sealed class SkillViewAppTests
 
         await callback;
         Assert.True(await dispatch);
+    }
+
+    [Fact]
+    public async Task AwaitOwnedDispatchAsync_StagesModalAfterDispatchCallbackReturns()
+    {
+        Action? queued = null;
+        Action? nextIteration = null;
+        var callbackRan = false;
+
+        var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
+            callback => queued = callback,
+            callback => nextIteration = callback,
+            () => callbackRan = true,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(queued);
+        queued();
+
+        Assert.NotNull(nextIteration);
+        Assert.False(callbackRan);
+        Assert.False(dispatch.IsCompleted);
+
+        nextIteration();
+
+        Assert.True(await dispatch);
+        Assert.True(callbackRan);
+    }
+
+    [Fact]
+    public async Task AwaitOwnedDispatchAsync_ReleasesTimedEventsLockBeforeModalWork()
+    {
+        var timedEvents = new TimedEvents();
+        Action? nextIteration = null;
+        var workerQueuedProgress = false;
+
+        var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
+            callback => timedEvents.Add(
+                TimeSpan.Zero,
+                () =>
+                {
+                    callback();
+                    return false;
+                }),
+            callback => nextIteration = callback,
+            () =>
+            {
+                var worker = Task.Factory.StartNew(
+                    () =>
+                    {
+                        timedEvents.Add(TimeSpan.Zero, () => false);
+                        workerQueuedProgress = true;
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
+
+                Assert.True(worker.Wait(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            },
+            TestContext.Current.CancellationToken);
+
+        timedEvents.RunTimers();
+
+        Assert.NotNull(nextIteration);
+        Assert.False(dispatch.IsCompleted);
+
+        nextIteration();
+
+        Assert.True(await dispatch);
+        Assert.True(workerQueuedProgress);
+    }
+
+    [Fact]
+    public async Task AwaitOwnedDispatchAsync_CancellationRejectsStagedModal()
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        Action? queued = null;
+        Action? nextIteration = null;
+        var callbackRan = false;
+
+        var dispatch = SkillViewApp.AwaitOwnedDispatchAsync(
+            callback => queued = callback,
+            callback => nextIteration = callback,
+            () => callbackRan = true,
+            lifetime.Token);
+
+        Assert.NotNull(queued);
+        queued();
+        Assert.NotNull(nextIteration);
+
+        lifetime.Cancel();
+
+        Assert.False(await dispatch);
+        nextIteration();
+        Assert.False(callbackRan);
     }
 
     [Fact]
@@ -1098,6 +1197,25 @@ public sealed class SkillViewAppTests
         // Switch back to Discover should also update
         app.ForceActiveTabForTests(SkillViewTab.Discover);
         Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
+    }
+
+    [Fact]
+    public void StatusStrip_UpdatesShortcutsWhenTabChanges()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        var installedHints = app.StatusStripForTests!.HintsForTests;
+        Assert.Contains(installedHints, hint => hint is { Key: "f", Label: "Filter" });
+        Assert.Contains(installedHints, hint => hint is { Key: "x", Label: "Remove" });
+
+        app.ForceActiveTabForTests(SkillViewTab.Changes);
+        var changesHints = app.StatusStripForTests.HintsForTests;
+        Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Open" });
+        Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });
+        Assert.Contains(changesHints, hint => hint is { Key: "d", Label: "Doctor" });
+        Assert.DoesNotContain(changesHints, hint => hint.Key is "f" or "x");
     }
 
     [Fact]

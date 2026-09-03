@@ -134,10 +134,20 @@ logging, or subprocess adapters.
   Render that feedback from both owners (with remove preflight taking display
   precedence), so a load completion cannot hide an active remove and a remove
   completion cannot hide an active load.
+  Mirror remove-preflight feedback in the Installed detail pane so it remains
+  prominent on tall terminals. The advanced wizard must render the seeded
+  primary evaluation immediately and evaluate other scopes only when selected;
+  do not launch an eager second pass over all alternatives when the wizard opens.
   Dispatching the compact/wizard decision uses a start-aware owned callback:
   cancellation rejects it while it is queued, but cannot complete its owner
   after the callback has entered the synchronous nested modal loop. This keeps
   app shutdown from draining the background task before the modal returns.
+  Any synchronous modal opened after background work must also be staged for
+  the next `IApplication.Iteration`; worker-thread `IApplication.Invoke`
+  callbacks run inside Terminal.Gui's `TimedEvents` callback lock, so starting
+  a nested modal directly there deadlocks its background progress/completion
+  callbacks when they call `Invoke`. Keep cleanup, installed removal, and repo
+  discovery on the shared owned-and-next-iteration dispatch path.
   Partial cancellation counts still trigger inventory invalidation/rescan.
   `BatchProgressAdapter` retains the latest aggregate snapshot so the outer
   cancellation boundary cannot replace mid-target file/directory counts with

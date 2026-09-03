@@ -8,6 +8,29 @@ namespace SkillView.Tests.Ui;
 
 public sealed class RemoveScreenTests
 {
+    [Theory]
+    [InlineData(24, 16)]
+    [InlineData(42, 24)]
+    [InlineData(80, 28)]
+    public void CalculateWizardHeight_IsCompactButRetainsUsableMinimum(
+        int availableHeight,
+        int expected)
+    {
+        Assert.Equal(expected, RemoveScreen.CalculateWizardHeight(availableHeight));
+    }
+
+    [Fact]
+    public void SeededPrimaryEvaluation_DoesNotRequestAnotherEagerPass()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "skillview-seeded-remove", "demo");
+        var evaluation = Evaluation(
+            RemoveTargetKind.CurrentInstall,
+            Validation(path));
+
+        Assert.False(RemoveScreen.ShouldEvaluateInitialSelection(evaluation));
+        Assert.True(RemoveScreen.ShouldEvaluateInitialSelection(null));
+    }
+
     [Fact]
     public void HasSameSafetyContract_RejectsChangedDirectoryOrLinkAuthority()
     {
