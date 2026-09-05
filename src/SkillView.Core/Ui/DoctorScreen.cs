@@ -46,7 +46,7 @@ public static class DoctorScreen
         sb.AppendLine("## `gh skill`");
         sb.AppendLine();
         sb.AppendLine(r.GhSkillAvailable
-            ? "✅ `gh skill` present. SkillView requires gh ≥ 2.99.0, so the full " +
+            ? "✅ `gh skill` present. SkillView requires gh ≥ 2.97.0, so the full " +
               "`skill` surface (`list`, `install --all`, `update --all`, nested-dir " +
               "discovery) is available."
             : "❌ `gh skill` subcommand not detected on this gh install.");

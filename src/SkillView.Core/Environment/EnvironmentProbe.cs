@@ -8,7 +8,7 @@ namespace SkillView.Diagnostics;
 /// `EnvironmentReport`. Each probe tolerates the previous failing — a missing
 /// `gh` yields an empty report rather than throwing.
 ///
-/// SkillView requires gh ≥ 2.99.0, which guarantees the full `gh skill`
+/// SkillView requires gh ≥ 2.97.0, which guarantees the full `gh skill`
 /// surface, so there is no per-flag capability probe — a single
 /// `gh skill --help` smoke check confirms the command is present.
 public sealed class EnvironmentProbe

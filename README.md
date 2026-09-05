@@ -23,7 +23,7 @@ mv skillview-darwin-arm64 /usr/local/bin/skillview
 skillview
 ```
 
-SkillView requires **GitHub CLI 2.99.0 or newer**. That release retains the atomic, in-place `gh skill update` behavior SkillView's Updates tab needs, fixes Codex user-scope installs to use `~/.agents/skills`, and honors Pi's `PI_CODING_AGENT_DIR`. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
+SkillView requires **GitHub CLI 2.97.0 or newer**. It needs 2.95.0's atomic, in-place `gh skill update` behavior and the Devin and Grok agent hosts added in 2.97.0. GitHub CLI 2.99.0 additionally corrects Codex user-scope installs to `~/.agents/skills` and honors Pi's `PI_CODING_AGENT_DIR`; those fixes improve placement and inventory discovery but are not a hard requirement. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
 
 It ships as both:
 
@@ -73,11 +73,12 @@ SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to t
 
 ## Requirements
 
-- **GitHub CLI** `gh` **2.99.0 or newer**
+- **GitHub CLI** `gh` **2.97.0 or newer**
 - a working `gh` setup; `gh auth login` is recommended
 - a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 
-`gh skill` is still in preview and subject to change. SkillView verifies the installed `gh` version and runs a `gh skill --help` smoke check; its 2.99.0 minimum guarantees the `gh skill` interface it uses.
+`gh skill` is still in preview and subject to change. SkillView verifies the installed `gh` version and runs a `gh skill --help` smoke check; its 2.97.0 minimum guarantees the `gh skill` interface it uses.
+The currently validated `gh` release is **2.100.0**.
 
 ## Install
 

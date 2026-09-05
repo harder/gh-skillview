@@ -98,6 +98,8 @@ public class GhCliContractTests
 
         Assert.Contains("--agent", output, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--scope", output, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("devin", output, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("grok", output, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

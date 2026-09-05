@@ -5,7 +5,7 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill update`. SkillView requires gh ≥ 2.99.0, so `--dry-run`,
+/// Wraps `gh skill update`. SkillView requires gh ≥ 2.97.0, so `--dry-run`,
 /// `--all`, `--force`, and `--unpin` are all guaranteed; flags emit
 /// unconditionally and positional skill names pass straight through.
 ///

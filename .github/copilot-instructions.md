@@ -199,12 +199,12 @@ These rules govern all changes — they are the project's architectural invarian
 
 ## Key upstream dependencies and gating
 
-- **`gh` minimum**: v2.92.0. Hard-enforced in `GhBinaryLocator.MinimumVersion`.
-- **`gh skill list --json`** (cli/cli#13215): not yet landed. `GhSkillListAdapter` is gated on `capabilities.HasSkillList` — flips automatically when `gh` adds the flags.
-- **`gh skill update --yes`**: not in v2.92.0. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
-- **`gh skill install --repo-path`** (community discussion #192851): gated on `capabilities.SupportsRepoPath`.
-- **Terminal.Gui v2**: defaulted via `SkillView.Core.csproj` to
-  `2.4.2-develop.53`. Keep the modern `Application.Create().Init()` +
+- **`gh` minimum**: v2.97.0. Hard-enforced in `GhBinaryLocator.MinimumVersion`; it supplies the full 48-host install selector, including Devin and Grok.
+- **`gh skill list --json`**: shipped in v2.94.0. `GhSkillListAdapter` uses it as the primary inventory source.
+- **`gh skill update --yes`**: not supported; `--all` is the non-interactive update path. The `UpdateScreen` has guardrails for the interactive-prompt quirk.
+- **Custom install directory**: `gh skill install --dir` is the supported destination override; SkillView does not use a `--repo-path` capability.
+- **Terminal.Gui v2**: defaulted via `SkillView.Core.csproj` to `2.4.17`.
+  Keep the modern `Application.Create().Init()` +
   `IApplication.Dispose()` lifecycle, tie async UI work to app/dialog lifetime
   cancellation, and track any real remaining framework workarounds with
   `// TODO(tg2): upstream`. `SkillView.GhExtension` still retains its current

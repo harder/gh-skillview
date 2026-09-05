@@ -44,13 +44,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - For PTY-driven TUI testing, use an isolated temp workspace and verify
   side-effects from the shell after each destructive step. See
   `agent_docs/tui-pty-testing.md`.
-- SkillView requires `gh` 2.99.0 or newer (`GhBinaryLocator.MinimumVersion`);
+- SkillView requires `gh` 2.97.0 or newer (`GhBinaryLocator.MinimumVersion`);
   that version guarantees the full `gh skill` surface SkillView relies on,
-  including the current Codex and Pi user-scope location rules, so
+  including its current Devin and Grok agent selectors, so
   there is no per-flag capability probe — only a single `gh skill --help`
   smoke check.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.99.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
+  list as of `gh` 2.100.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and

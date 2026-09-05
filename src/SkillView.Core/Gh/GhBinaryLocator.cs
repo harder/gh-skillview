@@ -10,12 +10,14 @@ namespace SkillView.Gh;
 public sealed class GhBinaryLocator
 {
     /// Minimum supported `gh`. 2.95.0 fixed atomic in-place skill updates
-    /// (cli/cli#13449), which SkillView's Updates tab relies on. 2.99.0 adds
-    /// the compatible Pi configuration override and Codex user-skill location
-    /// corrections (cli/cli#14260 and cli/cli#14154). The minimum is therefore
-    /// 2.99.0. Meeting it guarantees the supported feature set, so SkillView
-    /// does not probe each individual `gh skill` flag.
-    public static readonly SemVer MinimumVersion = new(2, 99, 0);
+    /// (cli/cli#13449), which SkillView's Updates tab relies on. 2.97.0 then
+    /// added the Devin and Grok agent hosts (cli/cli#13987 and cli/cli#13864),
+    /// both exposed by SkillView's install selector. The minimum is therefore
+    /// 2.97.0. The Codex and Pi location corrections in 2.99.0 improve
+    /// placement and inventory discovery, but are not required to use the
+    /// supported command surface. Meeting this minimum guarantees that surface,
+    /// so SkillView does not probe each individual `gh skill` flag.
+    public static readonly SemVer MinimumVersion = new(2, 97, 0);
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;

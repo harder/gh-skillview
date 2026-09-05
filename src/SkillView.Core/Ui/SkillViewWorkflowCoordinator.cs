@@ -170,7 +170,7 @@ internal sealed class SkillViewWorkflowCoordinator
         }
     }
 
-    /// Discover the skills a repo offers (gh ≥ 2.99.0, cli/cli#13548) and let
+    /// Discover the skills a repo offers (gh ≥ 2.97.0, cli/cli#13548) and let
     /// the user pick a subset to install via <see cref="RepoSkillPickerModal"/>.
     /// Discovery is a read-only `gh skill install <repo>` (no skill, no --all)
     /// run off the UI thread; on success the populated picker opens. If

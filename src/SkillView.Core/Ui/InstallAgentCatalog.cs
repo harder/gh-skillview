@@ -12,7 +12,7 @@ internal static class InstallAgentCatalog
     // or wrong path is cosmetic, not a correctness or safety issue.
     internal sealed record Entry(string GhId, string Label, string AgentHint, string? HomeRelativePath);
 
-    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.99.0).
+    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.100.0).
     // Update this array when new agents are added to the gh skill ecosystem —
     // re-diff against `gh skill install --help` when bumping the gh minimum.
     internal static readonly ImmutableArray<Entry> Entries =
