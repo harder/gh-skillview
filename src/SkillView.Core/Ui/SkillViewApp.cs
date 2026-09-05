@@ -559,7 +559,7 @@ public sealed class SkillViewApp
             DisposeLogSubscription();
             DetachApplicationKeyHandler();
         };
-        UpdateContextBar();
+        RefreshShellChrome();
 
         if (TuiHelpers.IsWarpTerminal)
         {
@@ -841,7 +841,7 @@ public sealed class SkillViewApp
                 }
                 break;
         }
-        UpdateContextBar();
+        RefreshShellChrome();
     }
 
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
@@ -2583,6 +2583,7 @@ public sealed class SkillViewApp
                     CancellationCallbackReporter.For(_services.Logger, "owned UI dispatch"));
             return await AwaitOwnedDispatchAsync(
                     app.Invoke,
+                    callback => StageForNextIteration(app, callback),
                     action,
                     dispatchLifetime.Token)
                 .ConfigureAwait(false);
@@ -2643,28 +2644,40 @@ public sealed class SkillViewApp
 
     internal static async Task<bool> AwaitOwnedDispatchAsync(
         Action<Action> dispatch,
+        Action<Action> stageForNextIteration,
         Action action,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(dispatch);
+        ArgumentNullException.ThrowIfNull(stageForNextIteration);
         ArgumentNullException.ThrowIfNull(action);
         if (cancellationToken.IsCancellationRequested)
         {
             return false;
         }
 
-        // 0 = queued, 1 = callback started, 2 = canceled before start.
-        // Cancellation may reject a queued callback, but once the callback has
-        // begun the owner must wait for it to return before releasing state the
-        // callback still uses (notably a nested modal run loop).
+        // 0 = queued, 1 = staged for the next iteration, 2 = callback started,
+        // 3 = canceled before start. IApplication.Invoke runs worker-thread
+        // callbacks as TimedEvents callbacks. Starting a synchronous modal in
+        // that callback holds Terminal.Gui's timer lock for the entire nested
+        // run, deadlocking any modal worker that reports progress via Invoke.
+        // Stage the modal for the next main-loop iteration so the timer callback
+        // returns and releases that lock first.
         var dispatchState = 0;
         var completion = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = cancellationToken.Register(() =>
         {
-            if (Interlocked.CompareExchange(ref dispatchState, 2, 0) == 0)
+            var state = Volatile.Read(ref dispatchState);
+            while (state is 0 or 1)
             {
-                completion.TrySetResult(false);
+                var observed = Interlocked.CompareExchange(ref dispatchState, 3, state);
+                if (observed == state)
+                {
+                    completion.TrySetResult(false);
+                    return;
+                }
+                state = observed;
             }
         });
 
@@ -2678,8 +2691,24 @@ public sealed class SkillViewApp
 
             try
             {
-                action();
-                completion.TrySetResult(true);
+                stageForNextIteration(() =>
+                {
+                    if (Interlocked.CompareExchange(ref dispatchState, 2, 1) != 1)
+                    {
+                        completion.TrySetResult(false);
+                        return;
+                    }
+
+                    try
+                    {
+                        action();
+                        completion.TrySetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        completion.TrySetException(ex);
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -2688,6 +2717,17 @@ public sealed class SkillViewApp
         });
 
         return await completion.Task.ConfigureAwait(false);
+    }
+
+    private static void StageForNextIteration(IApplication app, Action action)
+    {
+        void RunOnce(object? sender, EventArgs args)
+        {
+            app.Iteration -= RunOnce;
+            action();
+        }
+
+        app.Iteration += RunOnce;
     }
 
     private bool ShouldAutoOpenInstalledOnStartup(InventorySnapshot snapshot) =>
@@ -2815,7 +2855,7 @@ public sealed class SkillViewApp
         {
             RestoreDiscoverFocus();
         }
-        UpdateContextBar();
+        RefreshShellChrome();
     }
 
     internal void ActivateTabForTests(SkillViewTab tab) => ActivateTab(tab);
