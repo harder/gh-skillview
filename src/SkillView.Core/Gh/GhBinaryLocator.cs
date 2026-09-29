@@ -5,7 +5,7 @@ using SkillView.Subprocess;
 
 namespace SkillView.Gh;
 
-/// Locates the `gh` binary on PATH, records its version, and reports whether
+/// Locates the `gh` binary, records its version, and reports whether
 /// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
@@ -22,6 +22,8 @@ public sealed class GhBinaryLocator
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
     private readonly Func<string?> _pathProvider;
+    private readonly Func<string?> _extensionGhPathProvider;
+    private readonly Func<string?> _extensionFlagProvider;
     private readonly Func<string, bool> _fileExists;
 
     public GhBinaryLocator(ProcessRunner runner, Logger logger)
@@ -29,7 +31,9 @@ public sealed class GhBinaryLocator
             runner,
             logger,
             () => Environment.GetEnvironmentVariable("PATH"),
-            File.Exists)
+            File.Exists,
+            () => Environment.GetEnvironmentVariable("GH_PATH"),
+            () => Environment.GetEnvironmentVariable("GH_EXTENSION"))
     {
     }
 
@@ -37,17 +41,38 @@ public sealed class GhBinaryLocator
         ProcessRunner runner,
         Logger logger,
         Func<string?> pathProvider,
-        Func<string, bool> fileExists)
+        Func<string, bool> fileExists,
+        Func<string?>? extensionGhPathProvider = null,
+        Func<string?>? extensionFlagProvider = null)
     {
         _runner = runner;
         _logger = logger;
         _pathProvider = pathProvider;
         _fileExists = fileExists;
+        _extensionGhPathProvider = extensionGhPathProvider ?? (() => null);
+        _extensionFlagProvider = extensionFlagProvider ?? (() => null);
     }
 
     public string? FindOnPath(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        // gh 2.101+ passes the exact invoking executable to extensions. This
+        // also works when the parent gh was launched by absolute path and its
+        // directory is absent from PATH. Older gh versions fall back to PATH.
+        if (_extensionFlagProvider() == "1")
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var extensionGhPath = _extensionGhPathProvider();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!string.IsNullOrWhiteSpace(extensionGhPath) &&
+                Path.IsPathFullyQualified(extensionGhPath) &&
+                _fileExists(extensionGhPath))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return extensionGhPath;
+            }
+        }
+
         var executable = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "gh.exe" : "gh";
         var path = _pathProvider();
         cancellationToken.ThrowIfCancellationRequested();

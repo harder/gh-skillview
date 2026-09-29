@@ -78,7 +78,9 @@ SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to t
 - a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
 
 `gh skill` is still in preview and subject to change. SkillView verifies the installed `gh` version and runs a `gh skill --help` smoke check; its 2.97.0 minimum guarantees the `gh skill` interface it uses.
-The currently validated `gh` release is **2.100.0**.
+The currently validated `gh` release is **2.101.0**. When launched as a `gh`
+extension by that version or newer, SkillView uses the host-provided `GH_PATH`
+to invoke the same CLI executable, even if its directory is absent from `PATH`.
 
 ## Install
 
@@ -397,8 +399,8 @@ dotnet build
 dotnet test --no-build
 ```
 
-The repo currently pins Terminal.Gui `2.4.17` (Terminal.Gui.Editor `2.5.7`) and
-xUnit `4.0.0`. The release uses only stable package versions; the newer
+The repo currently pins Terminal.Gui `2.5.0` (Terminal.Gui.Editor `2.5.7`) and
+xUnit `4.0.1`. The release uses only stable package versions; the newer
 Terminal.Gui development builds are intentionally not consumed. If you pulled
 package changes, run `dotnet restore` before building so stale package assets
 do not leave the test projects on xUnit 2.x.

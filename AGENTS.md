@@ -49,8 +49,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   including its current Devin and Grok agent selectors, so
   there is no per-flag capability probe — only a single `gh skill --help`
   smoke check.
+- When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
+  environment value over PATH discovery so subprocesses use the same CLI host.
+  Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the
+  standalone app continue to resolve through PATH.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.100.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
+  list as of `gh` 2.101.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
@@ -83,10 +87,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   (`--dir` overrides `--agent` entirely). `ScanRootResolver.UserSeeds` has a
   matching `.agents/skills` entry so the inventory scan actually discovers
   skills installed there — keep both in sync if this default ever changes.
-- Current package compatibility: SkillView is pinned to Terminal.Gui `2.4.17`
+- Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.0`
   and Terminal.Gui.Editor `2.5.7`, the latest stable releases of each as of
-  2026-09. Test projects use `Microsoft.NET.Test.Sdk` `18.9.0`, `xunit.v3`
-  `4.0.0`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
+  2026-09. Test projects use `Microsoft.NET.Test.Sdk` `18.10.1`, `xunit.v3`
+  `4.0.1`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
@@ -401,11 +405,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
-- Terminal.Gui `2.4.17` remains compatible with the modern
+- Terminal.Gui `2.5.0` remains compatible with the modern
   `Application.Create().Init()` lifecycle; the local
   `UnconditionalSuppressMessage` workaround and temporary App-level warning mask
   stay removed after a verification publish proved the App entrypoint no longer
-  needs them.
+  needs them. Its planned API breaks remove legacy `ConfigurationManager`, make
+  `View.Text` nonvirtual, and move `IAcceptTarget` to `Terminal.Gui.Input`; keep
+  using `TuiConfigurationBuilder` and check these boundaries on later upgrades.
 - CI's standalone AOT smoke publish now promotes `IL2026`, `IL3050`, and
   `IL3053` to errors for `SkillView.App`; keep the gh extension's project-level
   suppression local until that host gets its separate re-evaluation.
@@ -414,7 +420,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   intentionally centralizing whole-screen actions (search/install/open/logs,
   installed-screen filter/sort/remove, cleanup actions, etc.), not because of
   the old `TableView` type-to-search swallowing bug.
-- On Terminal.Gui `2.4.17`, `TableView.CollectionNavigator = null` is the
+- On Terminal.Gui `2.5.0`, `TableView.CollectionNavigator = null` is the
   supported way to disable type-to-search. Treat `#5232` as the fix for the old
   printable-key swallowing behavior and prefer this documented path over the old
   custom matcher workaround.
@@ -422,7 +428,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `TerminalEscapeSanitizer` is now the shared UI-layer guard for remote preview
   markdown, search metadata, installed-skill detail markdown, cleanup/remove
   summaries, and rendered log text.
-- Terminal.Gui `2.4.17` enables bracketed-paste mode. SkillView does not need
+- Terminal.Gui `2.5.0` enables bracketed-paste mode. SkillView does not need
   custom handling for it: editable `TextField` inputs accept terminal-native
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered

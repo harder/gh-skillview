@@ -8,6 +8,36 @@ namespace SkillView.Tests.Gh;
 public class GhBinaryLocatorTests
 {
     [Fact]
+    public void FindOnPath_PrefersGhPathSuppliedByExtensionHost()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var hostPath = Path.GetFullPath("gh-from-host");
+        var locator = new GhBinaryLocator(
+            new ProcessRunner(logger), logger,
+            pathProvider: () => "ignored-path",
+            fileExists: path => path == hostPath,
+            extensionGhPathProvider: () => hostPath,
+            extensionFlagProvider: () => "1");
+
+        Assert.Equal(hostPath, locator.FindOnPath(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void FindOnPath_IgnoresGhPathOutsideExtensionHost()
+    {
+        var logger = new Logger(LogLevel.Debug);
+        var hostPath = Path.GetFullPath("gh-from-host");
+        var locator = new GhBinaryLocator(
+            new ProcessRunner(logger), logger,
+            pathProvider: () => "path-entry",
+            fileExists: path => path == hostPath,
+            extensionGhPathProvider: () => hostPath,
+            extensionFlagProvider: () => null);
+
+        Assert.Null(locator.FindOnPath(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public void FindOnPath_CancellationDuringPathReadStopsBeforeFileProbe()
     {
         var logger = new Logger(LogLevel.Debug);

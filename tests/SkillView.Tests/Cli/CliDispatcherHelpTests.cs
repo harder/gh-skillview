@@ -65,7 +65,7 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("Terminal.Gui", stdout, StringComparison.Ordinal);
-        Assert.Contains("2.4.17", stdout, StringComparison.Ordinal);
+        Assert.Contains("2.5.0", stdout, StringComparison.Ordinal);
     }
 
     [Fact]
