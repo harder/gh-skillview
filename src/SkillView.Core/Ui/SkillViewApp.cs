@@ -778,7 +778,7 @@ public sealed class SkillViewApp
     }
 
     internal static bool IsUnconditionalQuitKey(Key key) =>
-        key.KeyCode == (KeyCode.Q | KeyCode.CtrlMask);
+        (key.KeyCode & ~KeyCode.AltMask) == (KeyCode.Q | KeyCode.CtrlMask);
 
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place

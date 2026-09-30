@@ -105,6 +105,12 @@ global shortcuts like `d`, `u`, `c`, or `I`, first send `Esc`. `Ctrl+Q` is the
 unconditional quit path and works without leaving the field; plain `q` quits
 only when a top-level read-only view has focus.
 
+In a baseline headless PTY, Terminal.Gui can hold a bare Esc byte and combine
+it with the next key as Alt+key, even after a delay. Use Tab to leave the query
+field when a scripted walkthrough needs a separate focus change. The opt-in
+PTY test covers Esc followed by Ctrl+Q; SkillView accepts the resulting
+Ctrl+Alt+Q as quit.
+
 ### 2. Search works even when naive detectors say it failed
 
 The reliable sign is the log line:

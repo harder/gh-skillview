@@ -133,6 +133,39 @@ public sealed class SkillViewAppIntegrationTests
         Assert.Equal(ExitCodes.Success, exitCode);
     }
 
+    [Fact]
+    public async Task RunAsync_RapidTabSwitches_ThenQuit_CompletesWithoutTimeout()
+    {
+        var services = TuiServices.Build(new Logger(LogLevel.Debug));
+        var options = new AppOptions(
+            InvocationMode.Standalone,
+            DispatchMode.Tui,
+            Debug: false,
+            Theme: AppTheme.Default,
+            ScanRoots: [],
+            SubcommandName: null,
+            SubcommandArgs: []);
+        var keys = new List<Key> { new(KeyCode.Esc) };
+        for (var index = 0; index < 10; index++)
+        {
+            keys.Add(new Key('2'));
+            keys.Add(new Key('3'));
+            keys.Add(new Key('1'));
+        }
+        keys.Add(new Key(KeyCode.Q | KeyCode.CtrlMask));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var app = new SkillViewApp(
+            services,
+            options,
+            () => CreateAnsiAppWithInput(keys),
+            probeOnRun: false);
+
+        var exitCode = await app.RunAsync(timeout.Token);
+
+        Assert.False(timeout.IsCancellationRequested);
+        Assert.Equal(ExitCodes.Success, exitCode);
+    }
+
     private static IApplication CreateAnsiApp()
     {
         var app = Application.Create();

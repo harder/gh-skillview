@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
@@ -211,10 +212,11 @@ public sealed class LocalInventoryService
 
         // Build a key→record index for the scan output.
         var scanIndex = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
+        var caseSensitivityByParent = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var s in scanned)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            scanIndex[PathIdentity.NormalizeKey(s.ResolvedPath)] = s;
+            scanIndex[NormalizeMergeKey(s.ResolvedPath, caseSensitivityByParent)] = s;
         }
 
         var outputBuilder = ImmutableArray.CreateBuilder<InstalledSkill>(scanned.Length + ghRecords.Length);
@@ -223,7 +225,7 @@ public sealed class LocalInventoryService
         foreach (var rec in ghRecords)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var key = ResolveKey(rec);
+            var key = ResolveKey(rec, caseSensitivityByParent);
             if (key is not null && scanIndex.TryGetValue(key, out var match))
             {
                 outputBuilder.Add(match with { Provenance = Provenance.Both });
@@ -290,10 +292,58 @@ public sealed class LocalInventoryService
         return builder.ToImmutable();
     }
 
-    private static string? ResolveKey(GhSkillListRecord rec)
+    private static string? ResolveKey(
+        GhSkillListRecord rec,
+        Dictionary<string, bool> caseSensitivityByParent)
     {
         var path = rec.ResolvedPath ?? rec.Path;
-        return string.IsNullOrEmpty(path) ? null : PathIdentity.NormalizeKey(path);
+        return string.IsNullOrEmpty(path)
+            ? null
+            : NormalizeMergeKey(path, caseSensitivityByParent);
+    }
+
+    private static string NormalizeMergeKey(
+        string path,
+        Dictionary<string, bool> caseSensitivityByParent)
+    {
+        // gh and the filesystem scanner can spell the same existing install
+        // through different ancestor symlinks (notably /var and /private/var
+        // on macOS). Resolve those aliases for inventory matching only; keep
+        // the original paths in the records for display and removal policy.
+        var normalized = PathIdentity.Normalize(path);
+        if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        {
+            var resolved = UnixNative.realpath(normalized, IntPtr.Zero);
+            if (resolved != IntPtr.Zero)
+            {
+                try
+                {
+                    normalized = Marshal.PtrToStringUTF8(resolved) ?? normalized;
+                }
+                finally
+                {
+                    UnixNative.free(resolved);
+                }
+            }
+        }
+
+        var parent = Path.GetDirectoryName(normalized) ?? normalized;
+        if (!caseSensitivityByParent.TryGetValue(parent, out var caseSensitive))
+        {
+            caseSensitive = PathIdentity.IsCaseSensitive(normalized);
+            caseSensitivityByParent[parent] = caseSensitive;
+        }
+
+        return PathIdentity.NormalizeKey(normalized, caseSensitive);
+    }
+
+    private static class UnixNative
+    {
+        [DllImport("libc")]
+        internal static extern IntPtr realpath(string path, IntPtr resolvedPath);
+
+        [DllImport("libc")]
+        internal static extern void free(IntPtr pointer);
     }
 
     internal static Scope? ParseScope(string? scope)

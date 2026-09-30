@@ -14,7 +14,7 @@ public sealed class PtyStartupTests
             StringComparison.OrdinalIgnoreCase);
 
     [Fact]
-    public void BuiltBinary_StartsInsidePty_AndRendersSearchView()
+    public void BuiltBinary_StartsInsidePty_AndEscapeThenCtrlQQuits()
     {
         if (!ShouldRun)
         {
@@ -88,6 +88,17 @@ public sealed class PtyStartupTests
             }
 
             Assert.True(ready, $"SkillView did not reach PTY startup readiness. stderr: {stderr}");
+
+            // Some terminals send a bare Escape key. Follow it with Ctrl+Q
+            // after the parser's normal escape-sequence timeout to verify the
+            // documented quit path still works through the real PTY driver.
+            process.StandardInput.Write("\u001b");
+            process.StandardInput.Flush();
+            Thread.Sleep(150);
+            process.StandardInput.Write("\u0011");
+            process.StandardInput.Flush();
+            Assert.True(process.WaitForExit(5000), "SkillView did not quit after Escape then Ctrl+Q.");
+            Assert.Equal(0, process.ExitCode);
         }
         finally
         {
