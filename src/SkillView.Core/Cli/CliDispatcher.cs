@@ -1442,7 +1442,9 @@ public static class CliDispatcher
                 kinds = a["--candidates=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
                 continue;
             }
-            if (a == "--candidates" && i + 1 < args.Count)
+            if (a == "--candidates"
+                && i + 1 < args.Count
+                && !args[i + 1].StartsWith("-", StringComparison.Ordinal))
             {
                 kinds = args[++i].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
                 continue;

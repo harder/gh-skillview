@@ -1292,6 +1292,8 @@ public sealed class SkillViewAppTests
     {
         Assert.True(SkillViewApp.IsUnconditionalQuitKey(
             new Key(KeyCode.Q | KeyCode.CtrlMask)));
+        Assert.True(SkillViewApp.IsUnconditionalQuitKey(
+            new Key(KeyCode.Q | KeyCode.CtrlMask | KeyCode.AltMask)));
         Assert.False(SkillViewApp.IsUnconditionalQuitKey(new Key('q')));
     }
 }

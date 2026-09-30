@@ -450,7 +450,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - Keep the main shell's contextual header, inline busy indicators, quit routing,
   cancellation ownership, and memory bounds aligned with
   `agent_docs/ui-lifecycle-and-resource-bounds.md`. In particular, `Ctrl+Q`
-  must quit from text fields, subprocess capture and caches must stay bounded,
+  must quit from text fields; the ANSI driver can report bare Esc followed by
+  Ctrl+Q as Ctrl+Alt+Q, which must also quit. Keep the opt-in PTY quit regression.
+  Subprocess capture and caches must stay bounded,
   and superseded preview/inventory work must be canceled.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future

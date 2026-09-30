@@ -56,6 +56,37 @@ public class LocalInventoryServiceMergeTests
     }
 
     [Fact]
+    public void Ancestor_symlink_aliases_collapse_to_one_install_on_unix()
+    {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux()) return;
+
+        var root = Directory.CreateTempSubdirectory("skillview-merge-alias-");
+        try
+        {
+            var target = Path.Combine(root.FullName, "target");
+            var alias = Path.Combine(root.FullName, "alias");
+            var skill = Path.Combine(target, "foo");
+            Directory.CreateDirectory(skill);
+            Directory.CreateSymbolicLink(alias, target);
+
+            var scanned = ImmutableArray.Create(Scan("foo", skill));
+            var gh = ImmutableArray.Create(new GhSkillListRecord
+            {
+                Name = "foo",
+                Path = Path.Combine(alias, "foo"),
+            });
+
+            var merged = LocalInventoryService.Merge(scanned, gh);
+
+            Assert.Equal(Provenance.Both, Assert.Single(merged).Provenance);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Cli_only_records_surface_as_CliList_provenance()
     {
         var gh = ImmutableArray.Create(new GhSkillListRecord

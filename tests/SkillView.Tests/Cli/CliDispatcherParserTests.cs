@@ -175,6 +175,15 @@ public class CliDispatcherParserTests
     }
 
     [Fact]
+    public void Cleanup_BareCandidatesDoesNotConsumeJsonFlag()
+    {
+        var p = CliDispatcher.ParseCleanupArgs(new[] { "--candidates", "--json" });
+
+        Assert.Null(p.KindFilter);
+        Assert.True(p.Json);
+    }
+
+    [Fact]
     public void Cleanup_OutputPathCaptured()
     {
         var p = CliDispatcher.ParseCleanupArgs(new[] { "--output", "/tmp/report.txt" });
