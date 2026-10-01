@@ -1,107 +1,33 @@
 # gh-skillview
 
-`gh-skillview` is a Terminal UI and CLI for discovering, previewing, installing, updating, removing, and cleaning up AI agent skills built on top of [`gh skill`](https://cli.github.com/manual/gh_skill).
-
-## Download and run
-
-**Recommended: install it as a GitHub CLI extension**
-
-```bash
-gh extension install harder/gh-skillview
-gh skillview
-```
-
-**Or run it as a standalone binary**
-
-1. Download the right `skillview-<os>-<arch>[.exe]` asset from the [latest release](https://github.com/harder/gh-skillview/releases).
-2. On macOS or Linux, make it executable and put it on your `PATH`.
-3. Run `skillview`.
-
-```bash
-chmod +x skillview-darwin-arm64
-mv skillview-darwin-arm64 /usr/local/bin/skillview
-skillview
-```
-
-SkillView requires **GitHub CLI 2.97.0 or newer**. It needs 2.95.0's atomic, in-place `gh skill update` behavior and the Devin and Grok agent hosts added in 2.97.0. GitHub CLI 2.99.0 additionally corrects Codex user-scope installs to `~/.agents/skills` and honors Pi's `PI_CODING_AGENT_DIR`; those fixes improve placement and inventory discovery but are not a hard requirement. Standalone releases are Native AOT and self-contained, so they do **not** need a separate .NET runtime.
-
-It ships as both:
-
-1. a GitHub CLI extension: `gh skillview`
-2. a standalone binary: `skillview`
-
-SkillView does **not** replace `gh skill`. It gives developers a faster full-screen workflow for the common cases, plus a scriptable CLI for inventory and maintenance tasks that are easier to reason about with SkillView's safety checks and JSON output.
+`gh-skillview` helps you find, inspect, install, update, and safely remove agent skills. Use it as a full-screen terminal app or from scripts with its command-line interface.
 
 [![CI](https://github.com/harder/gh-skillview/actions/workflows/ci.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/ci.yml)
 [![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 
-![SkillView screenshot](img/skillview.png)
-
-## Why this exists
-
-`gh skill` is powerful, but once you start working with a lot of skills it helps to have:
-
-- a tabbed workspace where Discover, Installed, and Changes live side-by-side
-- a persistent right pane with a compact summary, rendered `SKILL.md`, and logs
-- guided install and update flows instead of memorizing flags
-- a unified view of installed skills across project, user, and custom roots
-- safe remove and cleanup workflows for duplicates, broken symlinks, residue, and malformed installs
-- a CLI you can script without giving up the interactive TUI
-
-## SkillView vs raw `gh skill`
-
-SkillView complements `gh skill`; it does not try to replace every low-level command.
-
-| If you need to... | Reach for... | Why |
-|---|---|---|
-| browse and compare skills quickly | **SkillView TUI** | tabbed Discover/Installed/Changes layout with a compact summary + preview pane, batch updates, and staged install/remove flows |
-| script inventory and maintenance | **SkillView CLI** | JSON output, stable exit codes, and remove/cleanup safety checks |
-| experiment with an upstream flag the app does not surface yet | **raw `gh skill`** | direct access to the newest preview behavior without waiting for SkillView UI/CLI affordances |
-| check your environment is set up correctly | **`skillview doctor`** | verifies `gh` version, `gh skill`, auth, and scan roots |
-
-## What SkillView wraps
-
-SkillView builds on GitHub CLI's preview `gh skill` support. If you are new to the underlying commands, start with these docs:
-
-- [`gh skill`](https://cli.github.com/manual/gh_skill)
-- [`gh skill search`](https://cli.github.com/manual/gh_skill_search)
-- [`gh skill preview`](https://cli.github.com/manual/gh_skill_preview)
-- [`gh skill install`](https://cli.github.com/manual/gh_skill_install)
-- [`gh skill update`](https://cli.github.com/manual/gh_skill_update)
-- [Agent Skills specification](https://agentskills.io/specification)
-
-## Requirements
-
-- **GitHub CLI** `gh` **2.97.0 or newer**
-- a working `gh` setup; `gh auth login` is recommended
-- a terminal with normal ANSI TUI support; truecolor (24-bit) terminals get the full warm palette, others fall back to the nearest 256-color match
-
-`gh skill` is still in preview and subject to change. SkillView verifies the installed `gh` version and runs a `gh skill --help` smoke check; its 2.97.0 minimum guarantees the `gh skill` interface it uses.
-The currently validated `gh` release is **2.101.0**. When launched as a `gh`
-extension by that version or newer, SkillView uses the host-provided `GH_PATH`
-to invoke the same CLI executable, even if its directory is absent from `PATH`.
-
 ## Install
 
-### Install as a GitHub CLI extension
+You need [GitHub CLI](https://cli.github.com/) **2.97.0 or newer**. Sign in with `gh auth login` to search and install skills.
 
-This is the primary install path.
+### GitHub CLI extension (recommended)
+
+Install once, then start SkillView with `gh skillview`:
 
 ```bash
 gh extension install harder/gh-skillview
 gh skillview
 ```
 
-Upgrade later with:
+Update it later with:
 
 ```bash
 gh extension upgrade harder/gh-skillview
 ```
 
-### Install as a standalone binary
+### Standalone app
 
-Download the right asset from the [latest release](https://github.com/harder/gh-skillview/releases), place it on your `PATH`, and run `skillview`.
+Download the binary for your computer from the [latest release](https://github.com/harder/gh-skillview/releases):
 
 | Platform | Asset |
 |---|---|
@@ -110,13 +36,23 @@ Download the right asset from the [latest release](https://github.com/harder/gh-
 | Linux x64 | `skillview-linux-amd64` |
 | macOS ARM64 | `skillview-darwin-arm64` |
 
+On Windows, save the `.exe` in a directory on your `PATH`. On macOS or Linux, make it executable and move it to a directory on your `PATH`. For example, on Apple silicon:
+
+```bash
+chmod +x skillview-darwin-arm64
+mkdir -p "$HOME/.local/bin"
+mv skillview-darwin-arm64 "$HOME/.local/bin/skillview"
+```
+
+If `~/.local/bin` is not already on your `PATH`, add it before running `skillview`.
+
 Release binaries are Native AOT and self-contained. You do not need a separate .NET runtime to use them.
 
 Homebrew and WinGet scaffolding exists in the release workflow, but those channels are dark-launch only and are not public install paths yet.
 
 ## Quick start
 
-Launch the TUI:
+Start the full-screen app:
 
 ```bash
 gh skillview
@@ -128,7 +64,7 @@ or:
 skillview
 ```
 
-A few good first commands:
+Or try these commands:
 
 ```bash
 skillview --help
@@ -139,6 +75,18 @@ skillview list --json
 skillview update --dry-run
 skillview cleanup
 ```
+
+Use `gh skillview` instead of `skillview` when installed as a GitHub CLI extension. Run `skillview --help` for all commands and options.
+
+## What you can do
+
+- Find and preview skills before installing them.
+- See skills across project, user, and custom locations in one Installed view.
+- Review available updates and apply them individually or in batches.
+- Remove skills and clean up duplicates, broken links, and leftover files with safety checks.
+- Use the same workflows from scripts with JSON output and stable exit codes.
+
+![SkillView screenshot](img/skillview.png)
 
 ## How to use SkillView
 
@@ -161,7 +109,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 
 Each tab preserves its own state (filter text, selection, sort, marks) when you switch away and back.
 
-### Main view workflow
+### Find and install a skill
 
 The main "discover and inspect" loop:
 
@@ -171,7 +119,7 @@ The main "discover and inspect" loop:
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
 5. Press `i` to stage an install, or `I` for the advanced wizard.
 
-The same operations are available from the CLI.
+The same operations are available from the CLI; see [CLI usage](#cli-usage).
 
 ### Keyboard reference
 
@@ -312,19 +260,6 @@ skillview update --all --dry-run --json
 skillview cleanup --candidates --json
 ```
 
-### Agent configuration directories
-
-The inventory follows the user-level skill locations used by GitHub CLI. It
-also honors `CLAUDE_CONFIG_DIR` for Claude Code and, with GitHub CLI 2.99.0 or
-newer, `PI_CODING_AGENT_DIR` for Pi. SkillView keeps the conventional default
-locations in its scan as well, so older or manually managed skills remain
-visible for review and cleanup.
-
-`gh skill publish` is an upstream authoring command that validates a local
-skills repository and creates a GitHub release. It deliberately remains a raw
-`gh` workflow because it can create repository metadata and releases; use
-`gh skill publish --dry-run` to validate before publishing.
-
 ## Troubleshooting
 
 SkillView keeps a rotating file log and redacts sensitive values before writing.
@@ -346,6 +281,14 @@ If you open a bug, include:
 3. the exact command or TUI flow
 4. whether `gh auth status` is healthy
 5. the relevant debug log excerpt if you have one
+
+## Technical details
+
+SkillView uses GitHub CLI's preview `gh skill` commands. It checks that `gh` is version **2.97.0 or newer** and runs `gh skill --help` before enabling the app. Version 2.99.0 added support for Pi's `PI_CODING_AGENT_DIR` and corrected Codex's user-scope install location. When GitHub CLI 2.101.0 or newer starts SkillView as an extension, SkillView uses the host-provided `GH_PATH` so subprocesses run through that same CLI executable. The TUI needs a terminal with ANSI support; truecolor terminals display the full palette, while other terminals use a simpler palette.
+
+SkillView complements `gh skill` and does not surface every upstream option. Use the raw commands when you need a feature the app does not expose yet. Start with the GitHub CLI docs for [`gh skill`](https://cli.github.com/manual/gh_skill), [search](https://cli.github.com/manual/gh_skill_search), [preview](https://cli.github.com/manual/gh_skill_preview), [install](https://cli.github.com/manual/gh_skill_install), and [update](https://cli.github.com/manual/gh_skill_update). The upstream [`gh skill publish`](https://cli.github.com/manual/gh_skill_publish) command creates a GitHub release; use it directly when publishing a skills repository.
+
+The inventory follows GitHub CLI's user-level skill locations and also honors `CLAUDE_CONFIG_DIR` for Claude Code and `PI_CODING_AGENT_DIR` for Pi. It continues to scan conventional default locations so manually managed skills remain visible.
 
 ## For developers
 
