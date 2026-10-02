@@ -34,7 +34,7 @@ jobs:
             ext: ''
           - rid: osx-arm64
             asset_name: darwin-arm64
-            os: macos-14
+            os: macos-15
             ext: ''
     runs-on: ${{ matrix.os }}
     permissions:
