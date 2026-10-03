@@ -78,6 +78,21 @@ skillview cleanup
 
 Use `gh skillview` instead of `skillview` when installed as a GitHub CLI extension. Run `skillview --help` for all commands and options.
 
+## Screenshots
+
+![Discover skills](docs/media/animations/g1-discover.gif)
+
+![Installed skills](docs/media/animations/g2-installed.gif)
+
+| | |
+|---|---|
+| ![Discover](docs/media/screenshots/01-discover.png) | ![Preview](docs/media/screenshots/02-preview.png) |
+| ![Install](docs/media/screenshots/03-install-dialog.png) | ![Installed](docs/media/screenshots/05-installed.png) |
+| ![Remove](docs/media/screenshots/06-remove-confirm.png) | ![Cleanup](docs/media/screenshots/08-cleanup.png) |
+| ![Doctor](docs/media/screenshots/09-doctor.png) | ![Help](docs/media/screenshots/10-help.png) |
+
+More animations: [remove](docs/media/animations/g6-remove.gif), [cleanup](docs/media/animations/g3-changes-cleanup.gif), [doctor and help](docs/media/animations/g4-doctor-help.gif).
+
 ## What you can do
 
 - Find and preview skills before installing them.
