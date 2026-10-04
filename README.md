@@ -2,6 +2,8 @@
 
 `gh-skillview` helps you find, preview, install, update, and safely remove agent skills. Use its full-screen terminal app or scriptable CLI.
 
+[Website](https://skillview.dev/) · [Documentation](https://skillview.dev/docs.html)
+
 [![CI](https://github.com/harder/gh-skillview/actions/workflows/ci.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/ci.yml)
 [![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
