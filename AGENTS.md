@@ -38,6 +38,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - Keep this file and `agent_docs/` up to date as new durable agent-facing
   workflow or testing lessons are discovered. Put short repo-wide rules here;
   put detailed procedures in a focused file under `agent_docs/`.
+- Documentation screenshots and GIFs live under `assets/screenshots/` and
+  `assets/animations/`. Use relative links from Markdown; keep the README
+  selective and put detailed user guidance in `docs/usage.md` and developer
+  guidance in `CONTRIBUTING.md`.
 - Prefer the built `skillview` host binary over `dotnet run` for PTY-driven TUI
   automation. `dotnet run` can add first-run noise and long startup delays,
   especially with sandboxed `HOME`.
