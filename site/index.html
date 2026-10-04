@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151b">
+  <meta name="description" content="SkillView makes GitHub agent skills easier to discover, inspect, install, and maintain from your terminal.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SkillView — a better view of your agent skills">
+  <meta property="og:description" content="Discover, preview, install, and maintain gh skill skills in a beautiful terminal UI and a scriptable CLI.">
+  <meta property="og:image" content="https://skillview.com/media/01-discover.png">
+  <meta property="og:url" content="https://skillview.com/">
+  <title>SkillView — a better view of your agent skills</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="SkillView home"><span class="brand-mark" aria-hidden="true">✳</span><span>skill<span class="brand-light">view</span><span class="brand-dot">.</span></span></a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#features">Features</a>
+        <a href="#tour">Tour</a>
+        <a href="docs.html">Docs</a>
+        <a class="nav-github" href="https://github.com/harder/gh-skillview">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+      <a class="header-cta" href="#install">Get started <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main id="main">
+      <section class="hero section-wrap" aria-labelledby="hero-title">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> THE TERMINAL COMPANION FOR <code>gh skill</code></p>
+          <h1 id="hero-title">Your skills.<br><em>In focus.</em></h1>
+          <p class="hero-description">Find the right agent skill, read it before you install it, and keep your collection in shape. All without leaving the terminal.</p>
+          <div class="hero-install" aria-label="Install SkillView in one command">
+            <div class="hero-install-heading"><span>ONE LINE TO INSTALL</span><span>GH CLI 2.97+</span></div>
+            <div class="hero-install-line"><span class="command-prompt" aria-hidden="true">$</span><code>gh extension install harder/gh-skillview</code><button type="button" class="copy-button" data-copy="gh extension install harder/gh-skillview" aria-label="Copy extension install command">Copy</button></div>
+          </div>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#install">Install options <span aria-hidden="true">↗</span></a>
+            <a class="button button-quiet" href="#tour">See it in action <span aria-hidden="true">↓</span></a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="terminal-window hero-terminal">
+            <div class="terminal-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-title">gh skillview <span class="terminal-path">/ discover</span></span><span class="terminal-key">↵</span></div>
+            <img src="media/02-preview.png" width="1280" height="775" alt="SkillView showing Terraform search results and a selected skill preview" fetchpriority="high">
+          </div>
+          <span class="hero-note"><span aria-hidden="true">↳</span> DISCOVER · INSPECT · INSTALL</span>
+        </div>
+      </section>
+
+      <div class="ticker" aria-hidden="true"><div class="ticker-inner"><span>DISCOVER</span><span class="ticker-star">✳</span><span>PREVIEW</span><span class="ticker-star">✳</span><span>INSTALL</span><span class="ticker-star">✳</span><span>MAINTAIN</span><span class="ticker-star">✳</span><span>DISCOVER</span><span class="ticker-star">✳</span><span>PREVIEW</span><span class="ticker-star">✳</span><span>INSTALL</span><span class="ticker-star">✳</span><span>MAINTAIN</span></div></div>
+
+      <section class="intro section-wrap section-space" id="features" aria-labelledby="intro-title">
+        <div class="section-label"><span class="label-number">01 / THE IDEA</span><span class="label-rule"></span><span>More signal. Less friction.</span></div>
+        <div class="intro-grid">
+          <h2 id="intro-title">Good skills deserve<br><span class="serif-accent">a better view.</span></h2>
+          <div class="intro-copy"><p>Agent skills are easy to collect and harder to keep track of. SkillView puts discovery, context, and maintenance together in one keyboard-first workspace.</p><p>Use the full-screen interface when you want to explore. Reach for the CLI when you want to automate.</p></div>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">⌕</span><span class="feature-index">01 — FIND</span><h3>Explore with context</h3><p>Search public skills, narrow results by owner or agent, and inspect a skill’s content before making a choice.</p></article>
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">◇</span><span class="feature-index">02 — ACT</span><h3>Install with intent</h3><p>Choose where a skill goes and which agents use it. Review the plan before SkillView hands it to <code>gh skill</code>.</p></article>
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">↺</span><span class="feature-index">03 — MAINTAIN</span><h3>Keep things tidy</h3><p>See what’s installed, check for updates, review cleanup candidates, and inspect your environment with Doctor.</p></article>
+        </div>
+      </section>
+
+      <section class="tour section-space" id="tour" aria-labelledby="tour-title">
+        <div class="section-wrap">
+          <div class="section-label"><span class="label-number">02 / INSIDE THE TERMINAL</span><span class="label-rule"></span><span>A quick look around.</span></div>
+          <div class="tour-heading"><h2 id="tour-title">Built for the way<br><span class="serif-accent">you actually work.</span></h2><p>One place to move from “what is this?” to “yes, I want it”—and keep tabs on it later.</p></div>
+          <div class="showcase">
+            <div class="showcase-media terminal-window"><div class="terminal-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-title" id="showcase-window-title">gh skillview / discover</span><span class="terminal-key">⌘</span></div><img id="showcase-image" src="media/g1-discover.gif" width="1200" height="675" alt="Animated SkillView Discover screen showing a search and preview" loading="lazy"></div>
+            <div class="showcase-controls" role="group" aria-label="SkillView tour">
+              <button class="showcase-tab is-active" type="button" data-image="media/g1-discover.gif" data-alt="Animated SkillView Discover screen showing a search and preview" data-title="gh skillview / discover" aria-pressed="true"><span class="tab-count">01</span><span><strong>Discover &amp; preview</strong><small>Look inside before installing.</small></span><span aria-hidden="true">↗</span></button>
+              <button class="showcase-tab" type="button" data-image="media/03-install-dialog.png" data-alt="SkillView install dialog with scope and agent choices" data-title="gh skillview / install" aria-pressed="false"><span class="tab-count">02</span><span><strong>Choose the destination</strong><small>Scope, agents, and install options.</small></span><span aria-hidden="true">↗</span></button>
+              <button class="showcase-tab" type="button" data-image="media/05-installed.png" data-alt="SkillView Installed view listing local skills and details" data-title="gh skillview / installed" aria-pressed="false"><span class="tab-count">03</span><span><strong>Know what’s installed</strong><small>Browse and inspect local skills.</small></span><span aria-hidden="true">↗</span></button>
+              <button class="showcase-tab" type="button" data-image="media/08-cleanup.png" data-alt="SkillView Cleanup view showing candidates for review" data-title="gh skillview / cleanup" aria-pressed="false"><span class="tab-count">04</span><span><strong>Clean up confidently</strong><small>Review candidates before removal.</small></span><span aria-hidden="true">↗</span></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow section-wrap section-space" aria-labelledby="workflow-title">
+        <div class="section-label"><span class="label-number">03 / TWO WAYS TO WORK</span><span class="label-rule"></span><span>Same tool. Your workflow.</span></div>
+        <div class="workflow-grid">
+          <div class="workflow-copy"><h2 id="workflow-title">Beautifully visual.<br><span class="serif-accent">Seriously useful.</span></h2><p>The TUI gives you room to explore and review. The CLI gives scripts the same essential workflows with JSON output and useful exit codes.</p><a class="text-link" href="docs.html#cli">Explore CLI commands <span aria-hidden="true">↗</span></a></div>
+          <div class="code-panel"><div class="code-panel-top"><span><span class="code-prompt">●</span> SKILLVIEW / CLI</span><button type="button" class="copy-button" data-copy="skillview doctor --json&#10;skillview search terraform&#10;skillview list --json&#10;skillview update --dry-run" aria-label="Copy CLI examples">Copy</button></div><pre><code><span class="code-comment"># Check your setup</span>
+<span class="code-dollar">$</span> skillview doctor --json
+
+<span class="code-comment"># Find and inspect skills</span>
+<span class="code-dollar">$</span> skillview search terraform
+
+<span class="code-comment"># Inventory and maintenance</span>
+<span class="code-dollar">$</span> skillview list --json
+<span class="code-dollar">$</span> skillview update --dry-run</code></pre><div class="code-panel-bottom"><span>Readable by humans. Useful in scripts.</span><span class="terminal-cursor" aria-hidden="true">▌</span></div></div>
+        </div>
+      </section>
+
+      <section class="install-section" id="install" aria-labelledby="install-title"><div class="section-wrap install-grid"><div><div class="section-label"><span class="label-number">04 / GET STARTED</span><span class="label-rule"></span><span>One command away.</span></div><h2 id="install-title">Ready when<br><span class="serif-accent">you are.</span></h2><p>SkillView needs GitHub CLI 2.97.0 or newer. Sign in with <code>gh auth login</code> to search and install skills.</p><a class="text-link" href="docs.html#install">Installation details <span aria-hidden="true">↗</span></a></div><div class="install-card"><span class="install-card-label">RECOMMENDED · GITHUB CLI EXTENSION</span><div class="install-command"><code>gh extension install harder/gh-skillview</code><button type="button" class="copy-button" data-copy="gh extension install harder/gh-skillview" aria-label="Copy extension install command">Copy</button></div><div class="install-command"><code>gh skillview</code><button type="button" class="copy-button" data-copy="gh skillview" aria-label="Copy launch command">Copy</button></div><p>Prefer a standalone binary? <a href="https://github.com/harder/gh-skillview/releases/latest">Download the latest release <span aria-hidden="true">↗</span></a></p></div></div></section>
+
+      <section class="author section-wrap section-space" aria-labelledby="author-title"><div class="section-label"><span class="label-number">05 / THE HUMAN BEHIND IT</span><span class="label-rule"></span><span>Made with curiosity.</span></div><div class="author-card"><div class="author-photo"><img src="kevin-harder.webp" alt="Kevin Harder" width="300" height="300" loading="lazy"></div><div><p class="author-kicker">CREATED BY KEVIN HARDER</p><h2 id="author-title">Making terminal tools<br>look good and feel easy.</h2><p>Kevin Harder is a software engineer who builds practical, approachable tools. He made SkillView to simplify finding and managing agent skills.</p><div class="author-links"><a href="https://kevinharder.com"><strong>kevinharder.com <span aria-hidden="true">↗</span></strong><small>Learn more about Kevin</small></a><a href="https://harder.dev"><strong>harder.dev <span aria-hidden="true">↗</span></strong><small>Explore Kevin’s projects at Harder Labs</small></a></div></div></div></section>
+    </main>
+
+    <footer class="site-footer"><div class="section-wrap footer-inner"><div><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">✳</span><span>skill<span class="brand-light">view</span><span class="brand-dot">.</span></span></a><p>A clearer way to work with agent skills.</p></div><div class="footer-links"><a href="docs.html">Documentation</a><a href="https://github.com/harder/gh-skillview">Source on GitHub</a><a href="https://github.com/harder/gh-skillview/blob/main/CONTRIBUTING.md">Contribute</a><a href="https://github.com/harder/gh-skillview/blob/main/LICENSE">MIT License</a></div><div class="footer-note">Made by <a href="https://kevinharder.com">Kevin Harder</a><br>with <a href="https://harder.dev">Harder Labs</a>.</div></div><div class="section-wrap footer-bottom"><span>© <span data-year>2026</span> Kevin Harder</span><span>Built for the terminal. Hosted on GitHub Pages.</span></div></footer>
+  </div>
+</body>
+</html>

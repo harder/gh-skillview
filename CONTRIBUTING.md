@@ -47,6 +47,7 @@ SkillView uses GitHub CLI's preview `gh skill` commands. It checks for `gh` 2.97
 | `tests/SkillView.Tests/` | xUnit coverage for unit and screen-level tests |
 | `tests/SkillView.IntegrationTests/` | In-process Terminal.Gui ANSI-driver smoke tests |
 | `.github/workflows/` | CI, contract tests, and release workflows |
+| `site/` | Static product website source and dependency-free build script |
 
 ### Build and test
 
@@ -80,3 +81,18 @@ dotnet publish src/SkillView.App -c Release -r osx-arm64 \
 ```
 
 On Linux, install `clang` and `zlib1g-dev` first.
+
+### Website
+
+The product website lives in `site/`. Its build script copies selected media
+from `assets/` into an ignored `dist/skillview-site/` output folder, so the
+repository keeps one source copy of each screenshot and GIF.
+
+```bash
+python site/build.py
+python -m http.server 8000 --directory dist/skillview-site
+```
+
+Open `http://localhost:8000` to preview it. The Pages workflow builds and
+publishes this output on site or media changes to `main`. The custom domain is
+configured in the repository's GitHub Pages settings.

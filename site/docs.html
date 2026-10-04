@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151b">
+  <meta name="description" content="Install SkillView and learn its terminal UI, CLI, keyboard shortcuts, and troubleshooting basics.">
+  <title>Documentation — SkillView</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="SkillView home"><span class="brand-mark" aria-hidden="true">✳</span><span>skill<span class="brand-light">view</span><span class="brand-dot">.</span></span></a>
+      <nav class="nav" aria-label="Main navigation"><a href="index.html#features">Features</a><a href="index.html#tour">Tour</a><a href="docs.html" aria-current="page">Docs</a><a class="nav-github" href="https://github.com/harder/gh-skillview">GitHub <span aria-hidden="true">↗</span></a></nav>
+      <a class="header-cta" href="index.html#install">Get started <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main">
+      <div class="section-wrap docs-hero"><p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span> SKILLVIEW / FIELD GUIDE</p><h1>Make yourself<br><span class="serif-accent">at home.</span></h1><p>From your first search to a clean inventory, here’s what you need to get moving.</p></div>
+      <div class="section-wrap docs-layout">
+        <aside class="docs-sidebar" aria-label="Documentation sections"><strong>ON THIS PAGE</strong><a href="#install">Install</a><a href="#first-run">First run</a><a href="#tui">The TUI</a><a href="#shortcuts">Shortcuts</a><a href="#cli">CLI commands</a><a href="#troubleshooting">Troubleshooting</a><a href="#more">More resources</a></aside>
+        <div class="docs-content">
+          <section id="install"><h2>Install SkillView</h2><p>You need <a href="https://cli.github.com/">GitHub CLI</a> version 2.97.0 or newer. For search and installation, authenticate with <code>gh auth login</code>.</p><h3>Recommended: GitHub CLI extension</h3><pre><code>gh extension install harder/gh-skillview
+gh skillview</code></pre><p>Update it later with <code>gh extension upgrade harder/gh-skillview</code>.</p><h3>Standalone app</h3><p>Download a self-contained binary from the <a href="https://github.com/harder/gh-skillview/releases/latest">latest release</a> and put it on your <code>PATH</code>. No separate .NET runtime is needed.</p><table class="docs-table"><thead><tr><th>Platform</th><th>Release asset</th></tr></thead><tbody><tr><td>Windows x64</td><td><code>skillview-windows-amd64.exe</code></td></tr><tr><td>Windows ARM64</td><td><code>skillview-windows-arm64.exe</code></td></tr><tr><td>Linux x64</td><td><code>skillview-linux-amd64</code></td></tr><tr><td>macOS ARM64</td><td><code>skillview-darwin-arm64</code></td></tr></tbody></table><p>On macOS and Linux, make the downloaded file executable with <code>chmod +x &lt;downloaded-file&gt;</code>.</p></section>
+          <section id="first-run"><h2>Your first five minutes</h2><ol><li>Launch the app with <code>gh skillview</code> or <code>skillview</code>.</li><li>Search for a topic or skill and browse the Discover results.</li><li>Select a result to read its <code>SKILL.md</code> before installing.</li><li>Press <kbd>i</kbd> to review a standard install, or <kbd>I</kbd> for more options.</li><li>Open Installed with <kbd>2</kbd> to see your local skills.</li></ol><figure class="docs-visual"><img src="media/g2-installed.gif" alt="Animated SkillView Installed screen showing local skills and their details" width="1200" height="675" loading="lazy"></figure></section>
+          <section id="tui"><h2>Find your way around</h2><p>SkillView has three main tabs: <strong>Discover</strong> for finding and previewing skills, <strong>Installed</strong> for your local inventory, and <strong>Changes</strong> for maintenance tasks. Doctor and Cleanup are available on demand.</p><p>Selection updates the details pane, so you can inspect what you are about to install or remove. Removal and cleanup flows present a review step before changing files.</p><p class="notice">Tip: press <kbd>?</kbd> or <kbd>F1</kbd> in the app for the complete shortcut guide.</p></section>
+          <section id="shortcuts"><h2>Essential shortcuts</h2><table class="docs-table"><thead><tr><th>Keys</th><th>Action</th></tr></thead><tbody><tr><td><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td><td>Discover / Installed / Changes</td></tr><tr><td><kbd>/</kbd></td><td>Focus search</td></tr><tr><td><kbd>i</kbd> / <kbd>I</kbd></td><td>Standard / advanced install</td></tr><tr><td><kbd>x</kbd></td><td>Review removal of selected skill</td></tr><tr><td><kbd>c</kbd> / <kbd>d</kbd></td><td>Cleanup / Doctor</td></tr><tr><td><kbd>?</kbd> / <kbd>F1</kbd></td><td>Full help</td></tr><tr><td><kbd>Ctrl+Q</kbd></td><td>Quit from anywhere</td></tr></tbody></table></section>
+          <section id="cli"><h2>Work from the command line</h2><p>Add a subcommand to run SkillView without the full-screen interface. Use <code>gh skillview</code> in place of <code>skillview</code> when installed as an extension.</p><pre><code>skillview doctor
+skillview search terraform
+skillview preview OWNER/REPO SKILL
+skillview install OWNER/REPO SKILL
+skillview list --json
+skillview update --dry-run
+skillview cleanup</code></pre><p>Commands that support <code>--json</code> can feed scripts and AI agents. Run <code>skillview --help</code> for flags and options. Put global flags such as <code>--scan-root</code> before the subcommand:</p><pre><code>skillview --scan-root /path/to/skills list --json</code></pre></section>
+          <section id="troubleshooting"><h2>When something feels off</h2><p>Run <code>skillview doctor</code> to inspect your GitHub CLI path, version, authentication, detected agent homes, and log location. In the TUI, press <kbd>d</kbd>.</p><p>For a bug report, include <code>skillview --version</code>, your OS and terminal, the command or flow you used, and whether <code>gh auth status</code> succeeds. Run with <code>--debug</code> if you need a more detailed log.</p></section>
+          <section id="more"><h2>Go deeper</h2><p>The repository’s <a href="https://github.com/harder/gh-skillview/blob/main/docs/usage.md">complete usage guide</a> covers every shortcut, CLI flags, exit codes, configuration, and troubleshooting. For development setup and tests, see <a href="https://github.com/harder/gh-skillview/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p><p>SkillView is open source under the <a href="https://github.com/harder/gh-skillview/blob/main/LICENSE">MIT License</a>. Browse the <a href="https://github.com/harder/gh-skillview">source on GitHub</a> or visit <a href="https://kevinharder.com">Kevin Harder</a> and <a href="https://harder.dev">Harder Labs</a>.</p></section>
+        </div>
+      </div>
+    </main>
+    <footer class="site-footer"><div class="section-wrap footer-inner"><div><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">✳</span><span>skill<span class="brand-light">view</span><span class="brand-dot">.</span></span></a><p>A clearer way to work with agent skills.</p></div><div class="footer-links"><a href="./">Home</a><a href="https://github.com/harder/gh-skillview">Source on GitHub</a><a href="https://github.com/harder/gh-skillview/blob/main/CONTRIBUTING.md">Contribute</a><a href="https://github.com/harder/gh-skillview/blob/main/LICENSE">MIT License</a></div><div class="footer-note">Made by <a href="https://kevinharder.com">Kevin Harder</a><br>with <a href="https://harder.dev">Harder Labs</a>.</div></div><div class="section-wrap footer-bottom"><span>© <span data-year>2026</span> Kevin Harder</span><span>Built for the terminal. Hosted on GitHub Pages.</span></div></footer>
+  </div>
+</body>
+</html>

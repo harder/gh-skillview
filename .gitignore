@@ -58,6 +58,7 @@ implementation-plan.md
 PHASE*_UX_ISSUES.md
 dist/
 .DS_Store
+__pycache__/
 
 # Local Claude Code settings (machine-specific permissions)
 .claude/settings.local.json
