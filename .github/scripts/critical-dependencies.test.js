@@ -18,10 +18,11 @@ test('reads package properties and the enforced GitHub CLI minimum', () => {
 
 test('creates assigned, deduplicated issues with useful checks for new releases', async () => {
   const issues = [];
+  const comments = new Map();
   const outputs = [];
   let labelExists = false;
   const github = {
-    paginate: async () => issues,
+    paginate: async (method, args) => (await method(args)).data,
     rest: {
       issues: {
         getLabel: async () => {
@@ -29,6 +30,7 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
         },
         createLabel: async () => { labelExists = true; },
         listForRepo: async () => ({ data: issues }),
+        listComments: async ({ issue_number }) => ({ data: comments.get(issue_number) || [] }),
         create: async ({ title, body, labels, assignees }) => {
           const number = issues.length + 1;
           const issue = { number, title, body, labels, assignees, html_url: `https://example.invalid/${number}` };
@@ -76,7 +78,12 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   ]]);
   await monitor(args);
   assert.equal(issues.length, 2);
-  assert.deepEqual(outputs[1], ['new-issues', []]);
+  assert.deepEqual(outputs[1], ['new-issues', outputs[0][1]]);
+  comments.set(1, [{ body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  comments.set(2, [{ body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  await monitor(args);
+  assert.equal(issues.length, 2);
+  assert.deepEqual(outputs[2], ['new-issues', []]);
 });
 
 test('release summaries distinguish direct gh skill notes from unrelated skill content', () => {

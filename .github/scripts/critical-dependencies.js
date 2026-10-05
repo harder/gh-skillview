@@ -2,6 +2,7 @@ const fs = require('node:fs');
 
 const LABEL = 'critical-dependency';
 const TERMINAL_GUI_REPO = 'Terminal.Gui';
+const ASSESSMENT_MARKER = '<!-- skillview-copilot-assessment-v1 -->';
 
 function versionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
@@ -111,9 +112,17 @@ async function createOnce(github, core, owner, repo, title, body) {
   const issues = await github.paginate(github.rest.issues.listForRepo, {
     owner, repo, labels: LABEL, state: 'all', per_page: 100,
   });
-  if (issues.some(issue => !issue.pull_request && issue.title === title)) {
+  const existing = issues.find(issue => !issue.pull_request && issue.title === title);
+  if (existing) {
     core.info(`Already tracked: ${title}`);
-    return null;
+    const comments = await github.paginate(github.rest.issues.listComments, {
+      owner, repo, issue_number: existing.number, per_page: 100,
+    });
+    // A prior monitor run can create an issue, then fail during a later
+    // dependency check before the assessment matrix is emitted. Retry that
+    // issue until a validated assessment comment is actually published.
+    return comments.some(comment => comment.body?.includes(ASSESSMENT_MARKER))
+      ? null : existing.number;
   }
   const { data: issue } = await github.rest.issues.create({
     owner, repo, title, body, labels: [LABEL], assignees: [owner],
