@@ -48,6 +48,36 @@ function suggestedChecks(notes, kind) {
     : '- Compare upstream changes with SkillView adapters and add focused tests for any affected behavior.';
 }
 
+function releaseHighlights(notes, kind) {
+  const paragraphs = (notes || '').split(/\n\s*\n/).map(item => item.trim()).filter(Boolean);
+  const pattern = kind === 'gh'
+    ? /\bgh skills?\b|\bskill (?:search|install|update|list|preview)\b/i
+    : /terminal\.gui|keyboard|input|layout|scroll|render|thread|cancel|aot|trim/i;
+  const matches = [];
+  for (let index = 0; index < paragraphs.length && matches.length < 5; index++) {
+    if (!pattern.test(paragraphs[index])) continue;
+    let detail = paragraphs[index];
+    if (/^See https:\/\/github\.com\//.test(paragraphs[index + 1] || '')) {
+      detail += `\n${paragraphs[++index]}`;
+    }
+    matches.push(detail.slice(0, 1000));
+  }
+  return matches.length
+    ? matches.map(item => `> ${item.replace(/\n/g, '\n> ')}`).join('\n\n')
+    : 'No directly relevant entry was found in the published release notes; inspect the upstream diff.';
+}
+
+function releaseOverview(notes) {
+  const security = /## Security\b/i.test(notes || '')
+    ? '- Security section present; review all advisories in the linked upstream notes.'
+    : '- No security section identified in the published notes.';
+  const changed = (notes || '').split('\n')
+    .filter(line => /^\s*[-*]\s+/.test(line) && !/chore\(deps\)|@dependabot/i.test(line))
+    .slice(0, 8)
+    .map(line => line.trim().replace(/@(?=[A-Za-z0-9-]+)/g, ''));
+  return [security, ...changed].join('\n');
+}
+
 async function stableNugetVersion(packageName, fetchImpl) {
   const response = await fetchImpl(`https://api.nuget.org/v3-flatcontainer/${packageName.toLowerCase()}/index.json`, {
     signal: AbortSignal.timeout(15000),
@@ -78,15 +108,16 @@ async function createOnce(github, core, owner, repo, title, body) {
   });
   if (issues.some(issue => !issue.pull_request && issue.title === title)) {
     core.info(`Already tracked: ${title}`);
-    return;
+    return null;
   }
   const { data: issue } = await github.rest.issues.create({
     owner, repo, title, body, labels: [LABEL], assignees: [owner],
   });
   core.info(`Created ${issue.html_url}`);
+  return issue.number;
 }
 
-async function checkTerminalGui(github, core, owner, repo, project, fetchImpl) {
+async function checkTerminalGui(github, core, owner, repo, project, fetchImpl, newIssues) {
   const packages = [
     ['Terminal.Gui', propertyVersion(project, 'TerminalGuiVersion')],
     ['Terminal.Gui.Editor', propertyVersion(project, 'TerminalGuiEditorVersion')],
@@ -102,7 +133,7 @@ async function checkTerminalGui(github, core, owner, repo, project, fetchImpl) {
     }
     const release = releases.find(item => !item.draft && item.tag_name.toLowerCase() === `v${latest}`);
     const notes = release?.body || '';
-    await createOnce(github, core, owner, repo,
+    const number = await createOnce(github, core, owner, repo,
       `${packageName} ${latest} compatibility review`, `
 SkillView pins **${packageName} ${current}**; NuGet now has **${latest}**.
 
@@ -111,33 +142,70 @@ SkillView pins **${packageName} ${current}**; NuGet now has **${latest}**.
 - Find the Dependabot PR and review both Terminal.Gui packages together when appropriate.
 - Run locked tests and all four Native AOT publishes; check the extension's remaining trim suppressions.
 - Exercise keyboard selection, scrolling, resizing, install dialogs, and shutdown in a real terminal.
-- Ask Copilot to review the update PR using \`.github/copilot-instructions.md\` and propose focused compatibility tests.
+
+### Release overview
+${releaseOverview(notes)}
+
+### Potentially relevant release notes
+${releaseHighlights(notes, 'terminal-gui')}
+
+### Compatibility status
+**Needs verification.** This alert does not claim the new version is compatible or breaking. Copilot will add a separate evidence-based assessment; validate it with tests and human review.
 
 Suggested checks from release notes:
 ${suggestedChecks(notes, 'terminal-gui')}
 `.trim());
+    if (number) newIssues.push({ number, kind: 'terminal-gui', version: latest });
   }
 }
 
-async function checkGitHubCli(github, core, owner, repo, locator) {
+async function checkGitHubCli(github, core, owner, repo, locator, newIssues) {
   const minimum = minimumGhVersion(locator);
   const { data: release } = await github.rest.repos.getLatestRelease({ owner: 'cli', repo: 'cli' });
   if (release.draft || release.prerelease || !versionParts(release.tag_name)) {
     throw new Error(`Unexpected GitHub CLI latest release: ${release.tag_name}`);
   }
-  await createOnce(github, core, owner, repo,
+  const number = await createOnce(github, core, owner, repo,
     `GitHub CLI ${release.tag_name} compatibility review`, `
 [GitHub CLI ${release.tag_name}](${release.html_url}) is available. SkillView currently requires **gh ${minimum}+**.
 
+- [Upstream release notes](${release.html_url})
 - Run the required contract tests against gh ${minimum} and ${release.tag_name.slice(1)}.
 - Compare \`gh skill --help\`, search/preview/install/update/list flags, and JSON output with SkillView's adapters.
 - Diff \`gh skill install --help\` agent selectors against \`InstallAgentCatalog\` and its tests.
 - Check extension launch, \`GH_PATH\`, authentication, install defaults, and any release-note changes to \`gh skill\`.
-- Update the minimum only when a needed behavior requires it. Ask Copilot to propose focused tests or fixes; keep changes under human review.
+- Update the minimum only when a needed behavior requires it.
+
+### Release overview
+${releaseOverview(release.body)}
+
+### Skill-related release notes
+${releaseHighlights(release.body, 'gh')}
+
+### Compatibility status
+**Needs verification.** The scheduled contract tests cover command shape and key flags, not every interactive search/install path. Copilot will add a separate evidence-based assessment; validate it with tests and human review.
 
 Suggested checks from release notes:
 ${suggestedChecks(release.body, 'gh')}
 `.trim());
+  if (number) newIssues.push({ number, kind: 'gh', version: release.tag_name });
+}
+
+async function requestedReassessment(github, context, owner, repo) {
+  const raw = context.eventName === 'workflow_dispatch' && context.payload?.inputs?.issue_number;
+  if (!raw) return null;
+  if (!/^[1-9]\d*$/.test(raw)) throw new Error('issue_number must be a positive issue number');
+  const number = Number(raw);
+  if (!Number.isSafeInteger(number)) throw new Error('issue_number is too large');
+  const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number });
+  if (issue.pull_request || !issue.labels?.some(label => label.name === LABEL)) {
+    throw new Error(`Issue #${number} is not a critical-dependency issue`);
+  }
+  const gh = /^GitHub CLI (v\d+\.\d+\.\d+) compatibility review$/.exec(issue.title);
+  if (gh) return { number, kind: 'gh', version: gh[1] };
+  const gui = /^Terminal\.Gui(?:\.Editor)? (\d+\.\d+\.\d+) compatibility review$/.exec(issue.title);
+  if (gui) return { number, kind: 'terminal-gui', version: gui[1] };
+  throw new Error(`Issue #${number} has an unexpected critical-dependency title`);
 }
 
 module.exports = async ({
@@ -146,12 +214,21 @@ module.exports = async ({
   locator = fs.readFileSync('src/SkillView.Core/Gh/GhBinaryLocator.cs', 'utf8'),
 }) => {
   const { owner, repo } = context.repo;
+  const newIssues = [];
   await ensureLabel(github, owner, repo);
-  await checkTerminalGui(github, core, owner, repo, project, fetchImpl);
-  await checkGitHubCli(github, core, owner, repo, locator);
+  await checkTerminalGui(github, core, owner, repo, project, fetchImpl, newIssues);
+  await checkGitHubCli(github, core, owner, repo, locator, newIssues);
+  const reassessment = await requestedReassessment(github, context, owner, repo);
+  if (reassessment && !newIssues.some(issue => issue.number === reassessment.number)) {
+    newIssues.push(reassessment);
+  }
+  core.setOutput?.('new-issues', JSON.stringify(newIssues));
 };
 
 module.exports.compareVersions = compareVersions;
 module.exports.propertyVersion = propertyVersion;
 module.exports.minimumGhVersion = minimumGhVersion;
 module.exports.suggestedChecks = suggestedChecks;
+module.exports.releaseHighlights = releaseHighlights;
+module.exports.releaseOverview = releaseOverview;
+module.exports.requestedReassessment = requestedReassessment;

@@ -48,7 +48,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `.github/workflows/critical-dependencies.yml` checks stable NuGet releases
   of Terminal.Gui and Terminal.Gui.Editor and the latest GitHub CLI release.
   Its tested script opens deduplicated, assigned compatibility issues with
-  release links and concrete checks. It does not change the `gh` minimum or
+  release highlights and concrete checks. A read-only Copilot CLI job adds a
+  separately labeled assessment through a publisher job; this is provisional
+  evidence, not a compatibility verdict. Manual dispatch accepts an existing
+  labeled issue number for reassessment. It does not change the `gh` minimum or
   merge package PRs automatically. Update its parsers/tests if version storage
   changes.
 - `ci.yml` checks Actions syntax, the dependency monitor, the static site,

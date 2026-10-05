@@ -8,7 +8,7 @@ each project. `AGENTS.md` is the project-wide source of build and safety rules.
 | `ci.yml` | `main`, PR, manual | Action lint, monitor tests, dependency review, site check, three-OS tests, and four-RID AOT smoke |
 | `codeql.yml` | `main`, PR, weekly, manual | C# and GitHub Actions security analysis |
 | `contract-tests.yml` | Daily, manual | Required live `gh` tests at the 2.97.0 minimum and latest release; open an assigned issue on failure |
-| `critical-dependencies.yml` | Daily, manual | Check stable Terminal.Gui packages and latest GitHub CLI; open deduplicated, assigned review issues |
+| `critical-dependencies.yml` | Daily, manual | Check stable Terminal.Gui packages and latest GitHub CLI; open deduplicated, assigned review issues with release highlights, then add a bounded Copilot assessment |
 | `pages.yml` | Site changes, manual | Build and deploy `site/` to GitHub Pages |
 | `release.yml` | `v*` tag, manual | Build, attest, verify, and publish release assets; optionally generate package manifests |
 
@@ -16,6 +16,15 @@ Dependabot checks NuGet weekly, GitHub Actions weekly, and `global.json` monthly
 Terminal.Gui packages are grouped for joint review. The workflow Action pins are
 full commit SHAs; the version comments show the release each SHA represents.
 The dependency monitor's source and tests are in `.github/scripts/`.
+For each newly opened issue, the monitor includes upstream release highlights,
+directly relevant skill changes, and an explicit unverified compatibility status.
+The Copilot CLI reads the issue, upstream notes, and SkillView code with read-only
+tools. A separate job posts its assessment as a marked issue comment; the model
+cannot write to GitHub. The workflow uses GitHub Actions' short-lived token with
+`copilot-requests: write`, which bills a personal repository to its owner's
+Copilot seat. A Copilot failure leaves the factual alert intact and fails the
+workflow visibly. Manually dispatch with `issue_number` to assess an existing
+`critical-dependency` issue. Reruns never create duplicate assessment comments.
 
 ## Release pipeline
 
