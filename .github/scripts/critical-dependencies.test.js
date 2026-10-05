@@ -79,11 +79,16 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   await monitor(args);
   assert.equal(issues.length, 2);
   assert.deepEqual(outputs[1], ['new-issues', outputs[0][1]]);
-  comments.set(1, [{ body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
-  comments.set(2, [{ body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  comments.set(2, [{ user: { login: 'another-user' }, body: '<!-- skillview-copilot-assessment-v1 -->\nSpoofed marker' }]);
+  await monitor(args);
+  assert.deepEqual(outputs[2], ['new-issues', [
+    { number: 2, kind: 'gh', version: 'v2.102.0' },
+  ]]);
+  comments.set(2, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
   await monitor(args);
   assert.equal(issues.length, 2);
-  assert.deepEqual(outputs[2], ['new-issues', []]);
+  assert.deepEqual(outputs[3], ['new-issues', []]);
 });
 
 test('release summaries distinguish direct gh skill notes from unrelated skill content', () => {

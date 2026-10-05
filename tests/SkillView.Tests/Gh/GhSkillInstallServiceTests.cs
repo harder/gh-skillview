@@ -148,10 +148,10 @@ public class GhSkillInstallServiceTests
     }
 
     [Fact]
-    public void BuildListArgs_VersionConcatenatedAndHiddenDirsFlag()
+    public void BuildListArgs_VersionUsesPinAndHiddenDirsFlag()
     {
         var args = GhSkillInstallService.BuildListArgs("owner/repo", "v1.2.0", allowHiddenDirs: true);
-        Assert.Equal(new[] { "skill", "install", "--allow-hidden-dirs", "--", "owner/repo@v1.2.0" }, args);
+        Assert.Equal(new[] { "skill", "install", "--allow-hidden-dirs", "--pin=v1.2.0", "--", "owner/repo" }, args);
         Assert.DoesNotContain("--all", args);
     }
 

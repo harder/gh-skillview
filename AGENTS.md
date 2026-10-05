@@ -102,7 +102,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `--upstream` is a boolean flag (use a checkbox in the TUI); it does not
   accept a URL value, which would become an unintended positional argument.
   A version suffix belongs on a skill selector, never the repository name;
-  use `--pin=<ref>` for an entire-repository ref.
+  use `--pin=<ref>` for an entire-repository ref, including discovery listing.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
   environment value over PATH discovery so subprocesses use the same CLI host.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { extractAssessment } = require('./critical-dependency-assessment.js');
+const { extractAssessment, isOwnedAssessmentComment } = require('./critical-dependency-assessment.js');
 
 const valid = `### What changed
 The upstream release fixes a reported security flaw in interactive skill search.
@@ -25,4 +25,11 @@ test('rejects a tool trace and incomplete sections', () => {
   assert.equal(extractAssessment(valid.replace('### Focused follow-up', '### Follow-up')), null);
   assert.equal(extractAssessment(valid.replace('**Likely compatible**', 'Probably fine')), null);
   assert.equal(extractAssessment(valid + ' extra'.repeat(500)), null);
+});
+
+test('only the Actions bot owns a marked assessment', () => {
+  const body = '<!-- skillview-copilot-assessment-v1 -->';
+  assert.equal(isOwnedAssessmentComment({ user: { login: 'github-actions[bot]' }, body }), true);
+  assert.equal(isOwnedAssessmentComment({ user: { login: 'another-user' }, body }), false);
+  assert.equal(isOwnedAssessmentComment({ user: { login: 'github-actions[bot]' }, body: 'other comment' }), false);
 });

@@ -110,10 +110,14 @@ public sealed class GhSkillInstallService
         {
             args.Add("--allow-hidden-dirs");
         }
+        if (!string.IsNullOrEmpty(version))
+        {
+            args.Add($"--pin={version}");
+        }
         // Repository names can come from search results. Keep them after the
         // option terminator so a flag-like result cannot change gh's behavior.
         args.Add("--");
-        args.Add(string.IsNullOrEmpty(version) ? repo : $"{repo}@{version}");
+        args.Add(repo);
         return args;
     }
 

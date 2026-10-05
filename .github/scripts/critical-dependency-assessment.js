@@ -1,4 +1,10 @@
 const fs = require('node:fs');
+const ASSESSMENT_MARKER = '<!-- skillview-copilot-assessment-v1 -->';
+
+function isOwnedAssessmentComment(comment) {
+  return comment?.user?.login === 'github-actions[bot]' &&
+    comment.body?.includes(ASSESSMENT_MARKER) === true;
+}
 
 const headings = [
   '### What changed',
@@ -41,4 +47,4 @@ if (require.main === module) {
   fs.writeFileSync(output, `${assessment}\n`);
 }
 
-module.exports = { extractAssessment };
+module.exports = { ASSESSMENT_MARKER, isOwnedAssessmentComment, extractAssessment };
