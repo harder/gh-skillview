@@ -25,6 +25,8 @@ test('rejects a tool trace and incomplete sections', () => {
   assert.equal(extractAssessment(valid.replace('### Focused follow-up', '### Follow-up')), null);
   assert.equal(extractAssessment(valid.replace('**Likely compatible**', 'Probably fine')), null);
   assert.equal(extractAssessment(valid + ' extra'.repeat(500)), null);
+  assert.equal(extractAssessment(valid.replace('The upstream release fixes', '**Unknown**: the upstream release fixes').replace('**Likely compatible**', 'Probably fine')), null);
+  assert.equal(extractAssessment(valid.replace('The upstream release fixes', '**Unknown**: the upstream release fixes')), null);
 });
 
 test('only the Actions bot owns a marked assessment', () => {

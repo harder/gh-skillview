@@ -20,6 +20,15 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   const issues = [];
   const comments = new Map();
   const outputs = [];
+  const completeAssessment = `<!-- skillview-copilot-assessment-v1 -->
+### What changed
+The upstream release has a published security fix affecting interactive skill search.
+### SkillView impact
+SkillView's installer adapter passes repository selectors to the GitHub CLI process.
+### Compatibility assessment
+**Likely compatible.** Contract tests are still needed to verify the new release.
+### Focused follow-up
+Run the contract suite and inspect the installer argument boundary before closing.`;
   let labelExists = false;
   const github = {
     paginate: async (method, args) => (await method(args)).data,
@@ -79,13 +88,15 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   await monitor(args);
   assert.equal(issues.length, 2);
   assert.deepEqual(outputs[1], ['new-issues', outputs[0][1]]);
-  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nMalformed assessment' }]);
   comments.set(2, [{ user: { login: 'another-user' }, body: '<!-- skillview-copilot-assessment-v1 -->\nSpoofed marker' }]);
   await monitor(args);
   assert.deepEqual(outputs[2], ['new-issues', [
+    { number: 1, kind: 'terminal-gui', version: '2.5.1' },
     { number: 2, kind: 'gh', version: 'v2.102.0' },
   ]]);
-  comments.set(2, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nComplete assessment' }]);
+  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: completeAssessment }]);
+  comments.set(2, [{ user: { login: 'github-actions[bot]' }, body: completeAssessment }]);
   await monitor(args);
   assert.equal(issues.length, 2);
   assert.deepEqual(outputs[3], ['new-issues', []]);

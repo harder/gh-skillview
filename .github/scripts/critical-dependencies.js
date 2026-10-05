@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const { isOwnedAssessmentComment } = require('./critical-dependency-assessment.js');
+const { isOwnedAssessmentComment, extractAssessment } = require('./critical-dependency-assessment.js');
 
 const LABEL = 'critical-dependency';
 const TERMINAL_GUI_REPO = 'Terminal.Gui';
@@ -121,7 +121,8 @@ async function createOnce(github, core, owner, repo, title, body) {
     // A prior monitor run can create an issue, then fail during a later
     // dependency check before the assessment matrix is emitted. Retry that
     // issue until a validated assessment comment is actually published.
-    return comments.some(isOwnedAssessmentComment)
+    return comments.some(comment => isOwnedAssessmentComment(comment) &&
+      extractAssessment(comment.body) !== null)
       ? null : existing.number;
   }
   const { data: issue } = await github.rest.issues.create({

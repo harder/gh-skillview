@@ -28,7 +28,6 @@ function extractAssessment(raw) {
     if (index <= previous) return null;
     previous = index;
   }
-  if (!/\*\*(Likely compatible|Potential break|Unknown)\.?\*\*/.test(assessment)) return null;
   const sections = headings.map((heading, index) => {
     const from = assessment.indexOf(heading) + heading.length;
     const to = index + 1 < headings.length
@@ -36,6 +35,10 @@ function extractAssessment(raw) {
     return assessment.slice(from, to).trim();
   });
   if (sections.some(section => section.length < 15)) return null;
+  const statuses = [...assessment.matchAll(/\*\*(Likely compatible|Potential break|Unknown)\.?\*\*/g)];
+  if (statuses.length !== 1 || !/^\*\*(Likely compatible|Potential break|Unknown)\.?\*\*/.test(sections[2])) {
+    return null;
+  }
   return assessment;
 }
 
