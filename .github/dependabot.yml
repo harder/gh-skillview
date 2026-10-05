@@ -1,16 +1,41 @@
 version: 2
 updates:
-  - package-ecosystem: "nuget"
-    directory: "/"
+  # A root NuGet scan discovers all five nested project files. Keep the two
+  # Terminal.Gui packages together while reviewing their API changes manually.
+  - package-ecosystem: nuget
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Chicago
+    allow:
+      - dependency-type: all
+    assignees: [harder]
     open-pull-requests-limit: 10
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
     groups:
-      github-actions:
-        patterns:
-          - "*"
+      terminal-gui:
+        patterns: ["Terminal.Gui", "Terminal.Gui.Editor"]
+      test-platform:
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+      timezone: America/Chicago
+    assignees: [harder]
+    open-pull-requests-limit: 10
+    groups:
+      github-maintained:
+        patterns: ["actions/*", "github/*"]
+
+  # global.json is a dependency too; keep SDK roll-forwards reviewable.
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: monthly
+    assignees: [harder]
+    open-pull-requests-limit: 5

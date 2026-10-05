@@ -6,15 +6,35 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
 
 concurrency:
   group: release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate release tag and reject published reruns
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release already exists for $RELEASE_TAG; use a new tag instead of replacing published bytes." >&2
+            exit 1
+          fi
+
   build:
+    needs: preflight
     name: Build ${{ matrix.rid }}
     strategy:
       fail-fast: false
@@ -43,7 +63,7 @@ jobs:
       attestations: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Linux AOT toolchain
         if: runner.os == 'Linux'
@@ -51,9 +71,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Determine version
         id: version
@@ -67,7 +89,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --locked-mode
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
@@ -81,6 +103,7 @@ jobs:
           dotnet publish src/SkillView.App/SkillView.App.csproj \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true \
+            -p:RestoreLockedMode=true \
             -p:Version=${{ steps.version.outputs.version }} \
             -o dist/app
 
@@ -90,8 +113,23 @@ jobs:
           dotnet publish src/SkillView.GhExtension/SkillView.GhExtension.csproj \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true \
+            -p:RestoreLockedMode=true \
             -p:Version=${{ steps.version.outputs.version }} \
             -o dist/ext
+
+      - name: Smoke-test exact release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in "dist/app/skillview${{ matrix.ext }}" "dist/ext/gh-skillview${{ matrix.ext }}"; do
+            test -s "$binary"
+            output=$("$binary" --version)
+            echo "$output"
+            [[ "$output" == *"${{ steps.version.outputs.version }}"* ]] || {
+              echo "Release binary has an unexpected version: $output" >&2
+              exit 1
+            }
+          done
 
       - name: Stage release assets
         shell: bash
@@ -120,13 +158,13 @@ jobs:
           [System.IO.File]::WriteAllText($sumsFile, $content, [System.Text.Encoding]::ASCII)
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: |
             dist/out/skillview-${{ matrix.asset_name }}${{ matrix.ext }}
             dist/out/gh-skillview-${{ matrix.asset_name }}${{ matrix.ext }}
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-${{ matrix.rid }}
           path: dist/out/*
@@ -136,17 +174,39 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
+          pattern: dist-*
           path: artifacts/
           merge-multiple: true
 
-      - name: List downloaded artifacts
-        run: ls -lh artifacts/
+      - name: Verify the complete asset set and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            skillview-windows-amd64.exe skillview-windows-arm64.exe
+            skillview-linux-amd64 skillview-darwin-arm64
+            gh-skillview-windows-amd64.exe gh-skillview-windows-arm64.exe
+            gh-skillview-linux-amd64 gh-skillview-darwin-arm64
+            SHA256SUMS-windows-amd64.txt SHA256SUMS-windows-arm64.txt
+            SHA256SUMS-linux-amd64.txt SHA256SUMS-darwin-arm64.txt
+          )
+          mapfile -t actual < <(find artifacts -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          if [[ "${actual[*]}" != "${wanted[*]}" ]]; then
+            printf 'Expected:\n%s\nActual:\n%s\n' "${wanted[*]}" "${actual[*]}" >&2
+            exit 1
+          fi
+          for file in "${expected[@]}"; do test -s "artifacts/$file"; done
+          (cd artifacts && for sums in SHA256SUMS-*.txt; do sha256sum --check "$sums"; done)
 
       - name: Compose release notes
         env:
@@ -186,7 +246,7 @@ jobs:
           EOF
 
       - name: Publish release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: |
             artifacts/skillview-*
@@ -196,27 +256,45 @@ jobs:
           generate_release_notes: true
           append_body: true
           fail_on_unmatched_files: true
+          overwrite_files: false
+          draft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Publish completed draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          count=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
+          if [ "$count" -ne 12 ]; then
+            echo "Expected 12 published assets, found $count" >&2
+            exit 1
+          fi
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
   # Dark-launch scaffold only. Generates a formula from the currently shipped
   # Unix release assets but does not commit or push to a tap yet.
   publish-homebrew:
     needs: [build, release]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.HOMEBREW_TAP_ENABLED == 'true' }}
     env:
       RELEASE_REF: ${{ github.ref_name }}
       RELEASE_REPO: ${{ github.repository }}
       HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Download release artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: dist-*
-          path: artifacts/
-          merge-multiple: true
+      - name: Download and verify published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          gh release download "$RELEASE_REF" --repo "$RELEASE_REPO" --dir artifacts
+          (cd artifacts && for sums in SHA256SUMS-*.txt; do sha256sum --check "$sums"; done)
 
       - name: Generate formula
         shell: bash
@@ -238,7 +316,7 @@ jobs:
           printf 'Dark-launch only: generated formula for %s (target tap: %s)\n' "${RELEASE_REF}" "${HOMEBREW_TAP_REPO:-harder/homebrew-tap}"
 
       - name: Upload generated formula
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: homebrew-formula-${{ github.ref_name }}
           path: generated/homebrew/skillview.rb
@@ -249,20 +327,35 @@ jobs:
   publish-winget:
     needs: [build, release]
     runs-on: windows-latest
+    timeout-minutes: 10
     if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.WINGET_ENABLED == 'true' }}
     env:
       RELEASE_REF: ${{ github.ref_name }}
       RELEASE_REPO: ${{ github.repository }}
       WINGET_PACKAGE_ID: harder.SkillView
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Download Windows release artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: dist-win-*
-          path: artifacts/
-          merge-multiple: true
+      - name: Download published Windows assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          gh release download $env:RELEASE_REF --repo $env:RELEASE_REPO --pattern '*windows*' --dir artifacts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify published Windows checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts/SHA256SUMS-windows-*.txt | ForEach-Object {
+            Get-Content $_.FullName | ForEach-Object {
+              $parts = $_ -split '\s+', 2
+              $name = $parts[1].TrimStart('*')
+              $actual = (Get-FileHash (Join-Path artifacts $name) -Algorithm SHA256).Hash
+              if ($actual -ne $parts[0]) { throw "Checksum mismatch: $name" }
+            }
+          }
 
       - name: Generate manifests
         shell: pwsh
@@ -291,21 +384,23 @@ jobs:
           Write-Host "Dark-launch only: generated WinGet manifests for $env:WINGET_PACKAGE_ID $version"
 
       - name: Upload generated WinGet manifests
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: winget-manifests-${{ github.ref_name }}
           path: generated/winget/*
           retention-days: 30
 
   notify-failure:
-    needs: [build, release, publish-homebrew, publish-winget]
+    needs: [preflight, build, release, publish-homebrew, publish-winget]
     if: failure()
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     env:
       RELEASE_REF: ${{ github.ref_name }}
     steps:
       - name: Create failure issue
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const title = `Release workflow failed on ${process.env.RELEASE_REF}`;
@@ -334,6 +429,6 @@ jobs:
                 '',
                 `- Workflow run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
                 '- Workflow guide: `.github/workflows/README.md`',
-                '- Rollback runbook: `docs/runbooks/release-rollback.md` *(planned backlog item #8)*'
+                '- Rollback runbook: `docs/runbooks/release-rollback.md`'
               ].join('\n')
             });

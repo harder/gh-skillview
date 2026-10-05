@@ -2,11 +2,11 @@ name: contract-tests
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '17 6 * * *'
   workflow_dispatch:
     inputs:
       gh_version:
-        description: 'Override gh version (e.g., 2.101.0 or latest)'
+        description: 'Override the latest lane only (e.g., 2.102.0); the minimum lane always runs'
         required: false
 
 permissions:
@@ -15,28 +15,36 @@ permissions:
 jobs:
   contract:
     name: gh ${{ matrix.gh-version }} contract tests
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - gh-version: '2.101.0'
-            required: true
+          - gh-version: '2.97.0'
           - gh-version: 'latest'
-            required: false
     runs-on: ubuntu-latest
-    continue-on-error: ${{ !matrix.required }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Install gh ${{ matrix.gh-version }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_VERSION_OVERRIDE: ${{ inputs.gh_version }}
         run: |
-          VERSION="${{ inputs.gh_version || matrix.gh-version }}"
+          VERSION="${{ matrix.gh-version }}"
+          if [ "$VERSION" = latest ] && [ -n "$GH_VERSION_OVERRIDE" ]; then
+            VERSION="$GH_VERSION_OVERRIDE"
+          fi
+          if [ "$VERSION" != latest ] && ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid gh version: $VERSION" >&2
+            exit 1
+          fi
           if [ "$VERSION" = "latest" ]; then
             # Install latest from GitHub's own apt repo
             (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
@@ -64,7 +72,7 @@ jobs:
         run: gh auth status
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --locked-mode
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
@@ -77,3 +85,33 @@ jobs:
           dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
             --configuration Release --no-build \
             --filter-trait "Category=Contract"
+
+  notify-failure:
+    needs: contract
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Create or reuse compatibility issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = 'GitHub CLI contract tests failed';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            if (issues.some(issue => !issue.pull_request && issue.title === title)) return;
+            await github.rest.issues.create({
+              owner, repo, title, assignees: [owner],
+              body: [
+                'A required SkillView contract test failed against the minimum supported or newest GitHub CLI.',
+                '',
+                `- [Failed workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId})`,
+                '- Compare `gh skill` flags, agent selectors, JSON output, and installation behavior.',
+                '- Review whether `GhBinaryLocator.MinimumVersion` or `InstallAgentCatalog` needs an update.',
+                '- Keep this issue open until both required lanes pass.',
+              ].join('\n'),
+            });

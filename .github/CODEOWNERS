@@ -1,0 +1,6 @@
+# Maintainer review for safety-critical code and automation.
+/.github/ @harder
+/src/SkillView.Core/Inventory/ @harder
+/src/SkillView.Core/Gh/ @harder
+/src/SkillView.Core/Ui/ @harder
+/packaging/ @harder
