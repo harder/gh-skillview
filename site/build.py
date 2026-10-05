@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 OUTPUT = ROOT / "dist" / "skillview-site"
 
-PAGES = ("index.html", "docs.html", "styles.css", "app.js", "favicon.svg", "kevin-harder.webp", "robots.txt", "sitemap.xml")
+PAGES = ("index.html", "docs.html", "styles.css", "app.js", "favicon.svg", "robots.txt", "sitemap.xml")
 MEDIA = {
     "g1-discover.gif": ROOT / "assets" / "animations" / "g1-discover.gif",
     "g2-installed.gif": ROOT / "assets" / "animations" / "g2-installed.gif",
