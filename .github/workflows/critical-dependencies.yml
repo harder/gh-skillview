@@ -78,6 +78,13 @@ jobs:
             > copilot-raw-output.md
           node .github/scripts/critical-dependency-assessment.js \
             copilot-raw-output.md copilot-assessment.md
+      - name: Preserve Copilot output for failed assessment diagnosis
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: critical-assessment-debug-${{ matrix.number }}
+          path: copilot-raw-output.md
+          retention-days: 1
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: critical-assessment-${{ matrix.number }}
