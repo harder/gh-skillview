@@ -613,6 +613,21 @@ public static class CliDispatcher
         TuiServices services,
         CancellationToken cancellationToken)
     {
+        for (var i = 0; i < options.SubcommandArgs.Count; i++)
+        {
+            var arg = options.SubcommandArgs[i];
+            var oldValueForm = arg.StartsWith("--upstream=", StringComparison.Ordinal);
+            var oldSeparatedForm = arg == "--upstream" && i + 1 < options.SubcommandArgs.Count &&
+                (options.SubcommandArgs[i + 1].StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                 options.SubcommandArgs[i + 1].StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 options.SubcommandArgs[i + 1].StartsWith("git@", StringComparison.OrdinalIgnoreCase));
+            if (oldValueForm || oldSeparatedForm)
+            {
+                Console.Error.WriteLine("skillview: --upstream is a flag and does not accept a URL");
+                return ExitCodes.InvalidUsage;
+            }
+        }
+
         var parsed = ParseInstallArgs(options.SubcommandArgs);
         if (parsed.Repo is null)
         {
@@ -620,7 +635,7 @@ public static class CliDispatcher
             Console.Error.WriteLine(
                 "usage: skillview install <owner/repo>[@<ref>] [<skill>|--all] [--agent <id>]..." +
                 " [--scope project|user|custom] [--path <dir>] [--version <ref>] [--pin]" +
-                " [--force] [--upstream <url>] [--from-local]" +
+                " [--force] [--upstream] [--from-local]" +
                 " [--allow-hidden-dirs] [--json]");
             return ExitCodes.InvalidUsage;
         }
@@ -703,7 +718,7 @@ public static class CliDispatcher
         string? Path,
         bool Pin,
         bool Force,
-        string? Upstream,
+        bool Upstream,
         bool FromLocal,
         bool AllowHiddenDirs,
         bool Json,
@@ -711,10 +726,10 @@ public static class CliDispatcher
 
     internal static ParsedInstallArgs ParseInstallArgs(IReadOnlyList<string> args)
     {
-        string? version = null, scope = null, path = null, upstream = null;
+        string? version = null, scope = null, path = null;
         var agents = new List<string>();
         var positional = new List<string>();
-        bool pin = false, force = false, fromLocal = false, allowHidden = false, json = false, all = false;
+        bool pin = false, force = false, upstream = false, fromLocal = false, allowHidden = false, json = false, all = false;
 
         for (var i = 0; i < args.Count; i++)
         {
@@ -733,8 +748,7 @@ public static class CliDispatcher
             if (a == "--scope" && i + 1 < args.Count) { scope = args[++i]; continue; }
             if (a.StartsWith("--path=", StringComparison.Ordinal)) { path = a["--path=".Length..]; continue; }
             if (a == "--path" && i + 1 < args.Count) { path = args[++i]; continue; }
-            if (a.StartsWith("--upstream=", StringComparison.Ordinal)) { upstream = a["--upstream=".Length..]; continue; }
-            if (a == "--upstream" && i + 1 < args.Count) { upstream = args[++i]; continue; }
+            if (a == "--upstream") { upstream = true; continue; }
             if (a.StartsWith("--", StringComparison.Ordinal)) continue;
             positional.Add(a);
         }

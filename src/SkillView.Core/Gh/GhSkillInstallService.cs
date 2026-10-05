@@ -28,7 +28,7 @@ public sealed class GhSkillInstallService
         string? Version = null,
         bool Pin = false,
         bool Overwrite = false,
-        string? Upstream = null,
+        bool Upstream = false,
         bool AllowHiddenDirs = false,
         bool FromLocal = false,
         bool All = false);
@@ -278,10 +278,9 @@ public sealed class GhSkillInstallService
             args.Add("--force");
         }
 
-        if (!string.IsNullOrEmpty(options.Upstream))
+        if (options.Upstream)
         {
             args.Add("--upstream");
-            args.Add(options.Upstream);
         }
 
         if (options.AllowHiddenDirs)

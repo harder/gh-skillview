@@ -99,6 +99,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   takes a ref value, so emit `--pin=<ref>` and require a version when pinning;
   a bare `--pin` could consume the option separator. Keep SkillView's boundary
   even while supporting older `gh` releases.
+  `--upstream` is a boolean flag (use a checkbox in the TUI); it does not
+  accept a URL value, which would become an unintended positional argument.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
   environment value over PATH discovery so subprocesses use the same CLI host.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the

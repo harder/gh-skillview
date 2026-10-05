@@ -125,27 +125,18 @@ public sealed class InstallScreen
             Text = "→ blank uses the latest release",
         };
 
-        // `--upstream` overrides the recorded source URL. gh ≥ 2.95 is
-        // required, so every flag here is guaranteed and always shown.
-        var upstreamLabel = new Label { Text = "Upstream   :", X = 0, Y = 3 };
-        var upstreamField = new TextField
+        // gh uses a boolean flag to install from the upstream source when a
+        // republished skill is detected; it does not accept an override URL.
+        var upstreamBox = new CheckBox
         {
-            X = 13,
+            X = 0,
             Y = 3,
-            Width = 40,
-            Text = string.Empty,
-        };
-        TuiHelpers.ConfigureTextInput(upstreamField, SkillViewStyling.DialogSchemeName);
-        var upstreamHint = new Label
-        {
-            X = Pos.Right(upstreamField) + 2,
-            Y = 3,
-            Text = "(override recorded source URL)",
+            Text = "Use _upstream source for republished skill",
         };
 
         sourceFrame.Add(skillLabel, skillField, skillHint,
             versionLabel, versionField, pinBox, versionResolved,
-            upstreamLabel, upstreamField, upstreamHint);
+            upstreamBox);
 
         // ── WHERE ──────────────────────────────────────────────────────
         var whereFrame = new FrameView
@@ -317,7 +308,7 @@ public sealed class InstallScreen
                 Version: NullIfEmpty(versionField.Text),
                 Pin: pinBox.Value == CheckState.Checked,
                 Overwrite: forceBox.Value == CheckState.Checked,
-                Upstream: NullIfEmpty(upstreamField.Text),
+                Upstream: upstreamBox.Value == CheckState.Checked,
                 AllowHiddenDirs: allowHiddenBox.Value == CheckState.Checked,
                 FromLocal: fromLocalBox.Value == CheckState.Checked);
         }
@@ -352,7 +343,7 @@ public sealed class InstallScreen
         versionField.TextChanged += (_, _) => Refresh();
         pinBox.ValueChanged += (_, _) => Refresh();
         skillField.TextChanged += (_, _) => Refresh();
-        upstreamField.TextChanged += (_, _) => Refresh();
+        upstreamBox.ValueChanged += (_, _) => Refresh();
         pathField.TextChanged += (_, _) => Refresh();
         scopeSelector.ValueChanged += (_, _) => Refresh();
         forceBox.ValueChanged += (_, _) => Refresh();
@@ -369,7 +360,7 @@ public sealed class InstallScreen
             agentsLabel, agentsView, agentsHint,
             forceBox,
             previewLabel, status, spinner,
-            upstreamLabel, upstreamField, upstreamHint,
+            upstreamBox,
             allowHiddenBox, fromLocalBox);
         foreach (var cb in agentBoxes) TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, cb);
 

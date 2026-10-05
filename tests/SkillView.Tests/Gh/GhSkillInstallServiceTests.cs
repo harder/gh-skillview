@@ -80,14 +80,15 @@ public class GhSkillInstallServiceTests
     }
 
     [Fact]
-    public void BuildArgs_UpstreamEmittedWhenProvided()
+    public void BuildArgs_UpstreamIsBooleanFlagBeforeSelectorBoundary()
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", null,
-            new GhSkillInstallService.Options(Upstream: "https://x.test/upstream.git"));
+            new GhSkillInstallService.Options(Upstream: true));
         Assert.Contains("--upstream", args);
         var idx = args.ToList().IndexOf("--upstream");
-        Assert.Equal("https://x.test/upstream.git", args[idx + 1]);
+        Assert.Equal("--", args[idx + 1]);
+        Assert.Equal("o/r", args[idx + 2]);
     }
 
     [Fact]
