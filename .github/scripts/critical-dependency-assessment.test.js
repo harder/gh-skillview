@@ -24,4 +24,5 @@ test('rejects a tool trace and incomplete sections', () => {
   assert.equal(extractAssessment('Reading files first.\nview path: dependency-issue.md'), null);
   assert.equal(extractAssessment(valid.replace('### Focused follow-up', '### Follow-up')), null);
   assert.equal(extractAssessment(valid.replace('**Likely compatible**', 'Probably fine')), null);
+  assert.equal(extractAssessment(valid + ' extra'.repeat(500)), null);
 });

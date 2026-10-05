@@ -15,6 +15,7 @@ function extractAssessment(raw) {
   if (start < 0) return null;
   const assessment = raw.slice(start).trim();
   if (assessment.length < 200 || assessment.length > 10000) return null;
+  if (assessment.split(/\s+/).length > 500) return null;
   let previous = -1;
   for (const heading of headings) {
     const index = assessment.indexOf(heading);
