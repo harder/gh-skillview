@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
           copilot -p "$(cat .github/scripts/critical-dependency-prompt.md)" -s \
             --available-tools=read --allow-tool=read --disable-builtin-mcps \
-            --no-ask-user --no-auto-update --max-ai-credits=20 \
+            --no-ask-user --no-auto-update --max-ai-credits=30 \
             > copilot-assessment.md
           test -s copilot-assessment.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
