@@ -106,11 +106,14 @@ public sealed class GhSkillInstallService
         // Deliberately no skill name and no `--all`: that combination triggers
         // gh's non-interactive "list available skills" path (cli/cli#13548).
         var args = new List<string> { "skill", "install" };
-        args.Add(string.IsNullOrEmpty(version) ? repo : $"{repo}@{version}");
         if (allowHiddenDirs)
         {
             args.Add("--allow-hidden-dirs");
         }
+        // Repository names can come from search results. Keep them after the
+        // option terminator so a flag-like result cannot change gh's behavior.
+        args.Add("--");
+        args.Add(string.IsNullOrEmpty(version) ? repo : $"{repo}@{version}");
         return args;
     }
 
@@ -228,23 +231,6 @@ public sealed class GhSkillInstallService
     {
         var args = new List<string> { "skill", "install" };
 
-        // Versioned install uses the `owner/repo@<ref>` shorthand, mirroring
-        // `gh skill preview`. Keeps the adapter surface consistent across
-        // remote-operation commands.
-        if (!string.IsNullOrEmpty(options.Version))
-        {
-            args.Add($"{repo}@{options.Version}");
-        }
-        else
-        {
-            args.Add(repo);
-        }
-
-        if (!string.IsNullOrEmpty(skillName))
-        {
-            args.Add(skillName);
-        }
-
         // `gh skill install <repo> --all` installs every discovered skill
         // without prompting (gh 2.94.0, cli/cli#13471). Mutually exclusive
         // with a skill-name argument; callers pass one or the other.
@@ -300,6 +286,17 @@ public sealed class GhSkillInstallService
         if (options.FromLocal)
         {
             args.Add("--from-local");
+        }
+
+        // The repository and skill selector can originate from search results.
+        // gh 2.102.0 fixed this same option-injection boundary in its own
+        // interactive search flow. Place all trusted flags first, then `--`
+        // before the untrusted positional arguments.
+        args.Add("--");
+        args.Add(string.IsNullOrEmpty(options.Version) ? repo : $"{repo}@{options.Version}");
+        if (!string.IsNullOrEmpty(skillName))
+        {
+            args.Add(skillName);
         }
 
         return args;

@@ -15,7 +15,7 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "vercel-labs/skills", skillName: null, new GhSkillInstallService.Options());
-        Assert.Equal(new[] { "skill", "install", "vercel-labs/skills" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "vercel-labs/skills" }, args);
     }
 
     [Fact]
@@ -23,7 +23,7 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "owner/repo", "render-md", new GhSkillInstallService.Options());
-        Assert.Equal(new[] { "skill", "install", "owner/repo", "render-md" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo", "render-md" }, args);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", skillName: null, new GhSkillInstallService.Options(All: true));
-        Assert.Equal(new[] { "skill", "install", "o/r", "--all" }, args);
+        Assert.Equal(new[] { "skill", "install", "--all", "--", "o/r" }, args);
     }
 
     [Fact]
@@ -136,15 +136,31 @@ public class GhSkillInstallServiceTests
         // The bare repo (no skill, no --all) is what triggers gh's
         // non-interactive listing path.
         var args = GhSkillInstallService.BuildListArgs("owner/repo", version: null, allowHiddenDirs: false);
-        Assert.Equal(new[] { "skill", "install", "owner/repo" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo" }, args);
     }
 
     [Fact]
     public void BuildListArgs_VersionConcatenatedAndHiddenDirsFlag()
     {
         var args = GhSkillInstallService.BuildListArgs("owner/repo", "v1.2.0", allowHiddenDirs: true);
-        Assert.Equal(new[] { "skill", "install", "owner/repo@v1.2.0", "--allow-hidden-dirs" }, args);
+        Assert.Equal(new[] { "skill", "install", "--allow-hidden-dirs", "--", "owner/repo@v1.2.0" }, args);
         Assert.DoesNotContain("--all", args);
+    }
+
+    [Fact]
+    public void BuildArgs_KeepsFlagLikeSearchValuesAfterOptionTerminator()
+    {
+        var args = GhSkillInstallService.BuildArgs(
+            "--dir=/tmp/untrusted", "--force",
+            new GhSkillInstallService.Options(Agents: new[] { "universal" }, Scope: "user"));
+
+        Assert.Equal(new[]
+        {
+            "skill", "install", "--agent", "universal", "--scope", "user",
+            "--", "--dir=/tmp/untrusted", "--force",
+        }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "--dir=/tmp/untrusted" },
+            GhSkillInstallService.BuildListArgs("--dir=/tmp/untrusted", null, false));
     }
 
     [Fact]
