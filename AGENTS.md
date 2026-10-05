@@ -68,6 +68,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `.github/copilot-instructions.md` links here and contains only advice for
   Copilot review/coding automation. Keep general project facts and durable
   invariants in this file or focused `agent_docs/` guides.
+- GitHub's repository ruleset `Copilot review on every PR` targets all base
+  branches and requests Copilot review on new PRs, draft PRs, and new pushes.
+  This is a GitHub setting, not a workflow file. GitHub only starts a review
+  when the PR author has access and sufficient Copilot premium requests;
+  Copilot feedback does not replace human review of safety-critical changes.
 
 ## Critical agent notes
 

@@ -48,5 +48,8 @@ intermediate files. Linux AOT requires `clang` and `zlib1g-dev`.
 - Release immutability once all assets and checks are validated.
 - A `main` ruleset requiring PR review and passing CI checks; allow the
   maintainer to merge reviewed dependency PRs, not bots to bypass checks.
+- The `Copilot review on every PR` branch ruleset targeting all branches,
+  with automatic review of drafts and new pushes. GitHub only requests a
+  review when the author is eligible and has premium requests available.
 
 `agent_docs/release-engineering.md` contains release development notes.

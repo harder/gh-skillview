@@ -67,6 +67,6 @@ they disagree with an old comment, issue, or generated summary.
 - Keep bot-generated suggestions concrete: name affected SkillView code paths,
   expected behavior, and a test that would detect a regression. Do not invent
   breaking changes from a version number alone.
-- If GitHub's automated Copilot review is enabled, apply these instructions to
-  its comments too. A human maintainer retains the decision to merge releases
-  and dependency updates.
+- The repository's `Copilot review on every PR` ruleset requests review on
+  drafts and new pushes too. Apply these instructions to its comments; a human
+  maintainer retains the decision to merge releases and dependency updates.
