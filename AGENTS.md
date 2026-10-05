@@ -23,15 +23,51 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## How
 
+- Install the SDK selected by `global.json`, then run `dotnet restore --locked-mode`.
+  NuGet lock files are committed for all five projects and cover `win-x64`,
+  `win-arm64`, `linux-x64`, and `osx-arm64`. Change dependencies with an
+  intentional `dotnet restore --force-evaluate`, commit the lock-file diff,
+  and confirm locked restore again.
 - Build/style verification: `dotnet build`
 - Full tests: `dotnet test --no-build`
 - Run product publish commands sequentially. The App and gh-extension publishes
   share `SkillView.Core` intermediate/output files, so parallel publishes can
   race while writing `SkillView.Core.deps.json` and cause false build failures.
 - Integration tests only: `dotnet test --project tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj` (a bare project path no longer works under the .NET 10 SDK's `dotnet test` runner)
-- Launch TUI: `src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview`
+- Launch TUI with the built `src/SkillView.App` executable for the current RID.
 - For CLI global flags such as `--scan-root`, pass them **before** the
   subcommand: `skillview --scan-root /tmp/root list --json`
+
+## Automation and dependencies
+
+- `.github/dependabot.yml` scans NuGet projects, GitHub Actions, and the .NET
+  SDK in `global.json`. It groups the two Terminal.Gui packages for joint
+  review, leaves unrelated third-party Actions separate, and assigns update
+  PRs to the maintainer. Verify a Dependabot PR with locked restore, tests,
+  and affected AOT hosts before merging.
+- `.github/workflows/critical-dependencies.yml` checks stable NuGet releases
+  of Terminal.Gui and Terminal.Gui.Editor and the latest GitHub CLI release.
+  Its tested script opens deduplicated, assigned compatibility issues with
+  release links and concrete checks. It does not change the `gh` minimum or
+  merge package PRs automatically. Update its parsers/tests if version storage
+  changes.
+- `ci.yml` checks Actions syntax, the dependency monitor, the static site,
+  dependency diffs, .NET tests on Linux/macOS/Windows, and four native AOT
+  targets. `codeql.yml` analyzes C# and Actions. `contract-tests.yml` tests
+  both the minimum supported `gh` and the latest `gh`; both lanes are required
+  and failures create a follow-up issue.
+- `release.yml` uses locked restore, tests, AOT publishes, version and checksum
+  checks, provenance attestations, a complete-asset check, and a draft release
+  before publication. Published tag reruns are refused. Homebrew and WinGet
+  jobs remain opt-in artifact generation and consume published release bytes.
+- Workflow Actions are pinned to full commit SHAs. Update the SHA and version
+  comment together after checking the upstream release. Keep permissions at
+  workflow or job minimums; issue writers need `issues: write`, releases need
+  `contents: write`, and provenance needs `id-token: write` and
+  `attestations: write`.
+- `.github/copilot-instructions.md` links here and contains only advice for
+  Copilot review/coding automation. Keep general project facts and durable
+  invariants in this file or focused `agent_docs/` guides.
 
 ## Critical agent notes
 
@@ -92,8 +128,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   matching `.agents/skills` entry so the inventory scan actually discovers
   skills installed there — keep both in sync if this default ever changes.
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.0`
-  and Terminal.Gui.Editor `2.5.7`, the latest stable releases of each as of
-  2026-09. Test projects use `Microsoft.NET.Test.Sdk` `18.10.1`, `xunit.v3`
+  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.10.1`, `xunit.v3`
   `4.0.1`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and

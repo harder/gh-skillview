@@ -17,7 +17,8 @@ class Skillview < Formula
   end
 
   def install
-    bin.install "skillview" => "skillview"
+    asset = OS.mac? ? "skillview-darwin-arm64" : "skillview-linux-amd64"
+    bin.install asset => "skillview"
   end
 
   test do
