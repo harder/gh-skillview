@@ -87,6 +87,14 @@ test('release summaries distinguish direct gh skill notes from unrelated skill c
   assert.match(monitor.releaseHighlights('No CLI changes.', 'gh'), /No directly relevant entry/);
 });
 
+test('release highlights keep adjacent unrelated bullets out of skill excerpts', () => {
+  const notes = '## Changes\n\n* New repository skill content\n* Fix `gh skill search` option injection\n\nSee https://github.com/cli/cli/security/advisories/GHSA-qcwj-mr2r-2cx7\n\n* Update auth flow';
+  const highlight = monitor.releaseHighlights(notes, 'gh');
+  assert.match(highlight, /gh skill search/);
+  assert.match(highlight, /GHSA-qcwj-mr2r-2cx7/);
+  assert.doesNotMatch(highlight, /repository skill content|Update auth flow/);
+});
+
 test('manual reassessment accepts only labeled dependency issues with known titles', async () => {
   const github = { rest: { issues: { get: async () => ({ data: {
     title: 'GitHub CLI v2.102.0 compatibility review',

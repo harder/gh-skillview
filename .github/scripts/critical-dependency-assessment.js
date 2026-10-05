@@ -21,7 +21,7 @@ function extractAssessment(raw) {
     if (index <= previous) return null;
     previous = index;
   }
-  if (!/\*\*(Likely compatible|Potential break|Unknown)\*\*/.test(assessment)) return null;
+  if (!/\*\*(Likely compatible|Potential break|Unknown)\.?\*\*/.test(assessment)) return null;
   const sections = headings.map((heading, index) => {
     const from = assessment.indexOf(heading) + heading.length;
     const to = index + 1 < headings.length

@@ -93,7 +93,7 @@ jobs:
 
   publish-assessment:
     needs: [monitor, copilot-assessment]
-    if: needs.copilot-assessment.result == 'success'
+    if: always() && needs.monitor.result == 'success' && needs.monitor.outputs.new-issues != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:

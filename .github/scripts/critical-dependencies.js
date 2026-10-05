@@ -49,7 +49,12 @@ function suggestedChecks(notes, kind) {
 }
 
 function releaseHighlights(notes, kind) {
-  const paragraphs = (notes || '').split(/\n\s*\n/).map(item => item.trim()).filter(Boolean);
+  const paragraphs = (notes || '').split(/\n\s*\n/)
+    // Release notes often put several bullets in one Markdown paragraph.
+    // Keep each bullet separate so an unrelated neighbor is not called a
+    // SkillView-relevant change.
+    .flatMap(item => item.split(/(?=^\s*[-*]\s+)/m))
+    .map(item => item.trim()).filter(Boolean);
   const pattern = kind === 'gh'
     ? /\bgh skills?\b|\bskill (?:search|install|update|list|preview)\b/i
     : /terminal\.gui|keyboard|input|layout|scroll|render|thread|cancel|aot|trim/i;

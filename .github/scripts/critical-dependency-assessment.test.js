@@ -16,6 +16,8 @@ Run a read-only search and check install argument construction before merging.`;
 
 test('accepts a complete assessment after Copilot planning text', () => {
   assert.equal(extractAssessment('Reading files first.\nview path: dependency-issue.md\n\n' + valid), valid);
+  const punctuated = valid.replace('**Likely compatible**', '**Likely compatible.**');
+  assert.equal(extractAssessment(punctuated), punctuated);
 });
 
 test('rejects a tool trace and incomplete sections', () => {
