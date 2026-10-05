@@ -229,6 +229,10 @@ public sealed class GhSkillInstallService
         string? skillName,
         Options options)
     {
+        if (options.Pin && string.IsNullOrWhiteSpace(options.Version))
+        {
+            throw new ArgumentException("Pin requires a version ref", nameof(options));
+        }
         var args = new List<string> { "skill", "install" };
 
         // `gh skill install <repo> --all` installs every discovered skill
@@ -264,7 +268,9 @@ public sealed class GhSkillInstallService
 
         if (options.Pin)
         {
-            args.Add("--pin");
+            // --pin takes a ref value. Use the equals form so it cannot
+            // consume the later `--` option boundary as that value.
+            args.Add($"--pin={options.Version}");
         }
 
         if (options.Overwrite)
@@ -293,7 +299,7 @@ public sealed class GhSkillInstallService
         // interactive search flow. Place all trusted flags first, then `--`
         // before the untrusted positional arguments.
         args.Add("--");
-        args.Add(string.IsNullOrEmpty(options.Version) ? repo : $"{repo}@{options.Version}");
+        args.Add(string.IsNullOrEmpty(options.Version) || options.Pin ? repo : $"{repo}@{options.Version}");
         if (!string.IsNullOrEmpty(skillName))
         {
             args.Add(skillName);

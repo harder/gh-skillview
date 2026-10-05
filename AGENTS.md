@@ -95,8 +95,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `GhSkillInstallService.BuildArgs` and `BuildListArgs` must place trusted
   flags before `--`, with repository and skill selectors after it. Search
   results can supply those selectors; GitHub CLI 2.102.0 fixed an option
-  injection in its own interactive `gh skill search` install path. Keep
-  SkillView's boundary even while supporting older `gh` releases.
+  injection in its own interactive `gh skill search` install path. `--pin`
+  takes a ref value, so emit `--pin=<ref>` and require a version when pinning;
+  a bare `--pin` could consume the option separator. Keep SkillView's boundary
+  even while supporting older `gh` releases.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
   environment value over PATH discovery so subprocesses use the same CLI host.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the

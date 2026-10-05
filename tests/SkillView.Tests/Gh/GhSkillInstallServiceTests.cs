@@ -71,9 +71,12 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", null,
-            new GhSkillInstallService.Options(Pin: true, Overwrite: true));
-        Assert.Contains("--pin", args);
+            new GhSkillInstallService.Options(Version: "v2.0.0", Pin: true, Overwrite: true));
+        Assert.Contains("--pin=v2.0.0", args);
         Assert.Contains("--force", args);
+        Assert.Equal("o/r", args[^1]);
+        Assert.Throws<ArgumentException>(() => GhSkillInstallService.BuildArgs(
+            "o/r", null, new GhSkillInstallService.Options(Pin: true)));
     }
 
     [Fact]

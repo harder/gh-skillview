@@ -73,10 +73,11 @@ jobs:
         run: |
           set -euo pipefail
           copilot -p "$(cat .github/scripts/critical-dependency-prompt.md)" -s \
-            --available-tools=read --allow-tool=read --disable-builtin-mcps \
+            --available-tools=view --allow-tool=view --disable-builtin-mcps \
             --no-ask-user --no-auto-update --max-ai-credits=30 \
-            > copilot-assessment.md
-          test -s copilot-assessment.md
+            > copilot-raw-output.md
+          node .github/scripts/critical-dependency-assessment.js \
+            copilot-raw-output.md copilot-assessment.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: critical-assessment-${{ matrix.number }}
@@ -93,8 +94,10 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.monitor.outputs.new-issues) }}
     permissions:
+      contents: read
       issues: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: critical-assessment-${{ matrix.number }}
@@ -107,19 +110,22 @@ jobs:
             const fs = require('node:fs');
             const { owner, repo } = context.repo;
             const issue_number = Number(process.env.ISSUE_NUMBER);
-            const assessment = fs.readFileSync('copilot-assessment.md', 'utf8').trim();
+            const { extractAssessment } = require('./.github/scripts/critical-dependency-assessment.js');
+            const assessment = extractAssessment(fs.readFileSync('copilot-assessment.md', 'utf8'));
             if (!Number.isSafeInteger(issue_number) || issue_number <= 0 ||
-                assessment.length < 80 || assessment.length > 10000) {
+                !assessment) {
               throw new Error('Invalid Copilot assessment output');
             }
             const marker = '<!-- skillview-copilot-assessment-v1 -->';
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number, per_page: 100,
             });
-            if (comments.some(item => item.body?.includes(marker))) return;
-            await github.rest.issues.createComment({
-              owner, repo, issue_number,
-              body: `${marker}\n## Copilot compatibility assessment\n\n` +
+            const body = `${marker}\n## Copilot compatibility assessment\n\n` +
                 '> Automated analysis of upstream notes and SkillView source. Verify conclusions before changing dependencies or minimum versions.\n\n' +
-                assessment,
-            });
+                assessment;
+            const existing = comments.find(item => item.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

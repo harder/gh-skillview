@@ -625,6 +625,12 @@ public static class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
+        if (parsed.Pin && string.IsNullOrWhiteSpace(parsed.Version))
+        {
+            Console.Error.WriteLine("skillview: --pin requires --version <ref> or OWNER/REPO@<ref>");
+            return ExitCodes.InvalidUsage;
+        }
+
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
