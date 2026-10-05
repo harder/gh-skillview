@@ -92,7 +92,7 @@ public class CliDispatcherParserTests
             "acme/repo@v1", "render-md",
             "--agent=claude", "--agent", "cursor",
             "--scope", "user", "--pin", "--force", "--from-local",
-            "--upstream=https://git/example",
+            "--upstream",
             "--allow-hidden-dirs", "--json",
         });
         Assert.Equal("acme/repo", p.Repo);
@@ -104,7 +104,7 @@ public class CliDispatcherParserTests
         Assert.True(p.Force);
         Assert.True(p.FromLocal);
         Assert.True(p.AllowHiddenDirs);
-        Assert.Equal("https://git/example", p.Upstream);
+        Assert.True(p.Upstream);
         Assert.True(p.Json);
     }
 

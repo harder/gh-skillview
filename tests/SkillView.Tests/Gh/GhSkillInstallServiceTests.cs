@@ -15,7 +15,7 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "vercel-labs/skills", skillName: null, new GhSkillInstallService.Options());
-        Assert.Equal(new[] { "skill", "install", "vercel-labs/skills" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "vercel-labs/skills" }, args);
     }
 
     [Fact]
@@ -23,17 +23,21 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "owner/repo", "render-md", new GhSkillInstallService.Options());
-        Assert.Equal(new[] { "skill", "install", "owner/repo", "render-md" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo", "render-md" }, args);
     }
 
     [Fact]
-    public void BuildArgs_VersionIsConcatenatedWithAt()
+    public void BuildArgs_VersionAppliesToSkillOrPinsEntireRepo()
     {
-        var args = GhSkillInstallService.BuildArgs(
-            "owner/repo", skillName: null,
+        var named = GhSkillInstallService.BuildArgs(
+            "owner/repo", skillName: "render-md",
             new GhSkillInstallService.Options(Version: "v2.0.0"));
-        Assert.Contains("owner/repo@v2.0.0", args);
-        Assert.DoesNotContain("--version", args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo", "render-md@v2.0.0" }, named);
+
+        var entireRepo = GhSkillInstallService.BuildArgs(
+            "owner/repo", skillName: null,
+            new GhSkillInstallService.Options(Version: "v2.0.0", All: true));
+        Assert.Equal(new[] { "skill", "install", "--all", "--pin=v2.0.0", "--", "owner/repo" }, entireRepo);
     }
 
     [Fact]
@@ -71,20 +75,24 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", null,
-            new GhSkillInstallService.Options(Pin: true, Overwrite: true));
-        Assert.Contains("--pin", args);
+            new GhSkillInstallService.Options(Version: "v2.0.0", Pin: true, Overwrite: true));
+        Assert.Contains("--pin=v2.0.0", args);
         Assert.Contains("--force", args);
+        Assert.Equal("o/r", args[^1]);
+        Assert.Throws<ArgumentException>(() => GhSkillInstallService.BuildArgs(
+            "o/r", null, new GhSkillInstallService.Options(Pin: true)));
     }
 
     [Fact]
-    public void BuildArgs_UpstreamEmittedWhenProvided()
+    public void BuildArgs_UpstreamIsBooleanFlagBeforeSelectorBoundary()
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", null,
-            new GhSkillInstallService.Options(Upstream: "https://x.test/upstream.git"));
+            new GhSkillInstallService.Options(Upstream: true));
         Assert.Contains("--upstream", args);
         var idx = args.ToList().IndexOf("--upstream");
-        Assert.Equal("https://x.test/upstream.git", args[idx + 1]);
+        Assert.Equal("--", args[idx + 1]);
+        Assert.Equal("o/r", args[idx + 2]);
     }
 
     [Fact]
@@ -116,7 +124,7 @@ public class GhSkillInstallServiceTests
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", skillName: null, new GhSkillInstallService.Options(All: true));
-        Assert.Equal(new[] { "skill", "install", "o/r", "--all" }, args);
+        Assert.Equal(new[] { "skill", "install", "--all", "--", "o/r" }, args);
     }
 
     [Fact]
@@ -136,15 +144,31 @@ public class GhSkillInstallServiceTests
         // The bare repo (no skill, no --all) is what triggers gh's
         // non-interactive listing path.
         var args = GhSkillInstallService.BuildListArgs("owner/repo", version: null, allowHiddenDirs: false);
-        Assert.Equal(new[] { "skill", "install", "owner/repo" }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo" }, args);
     }
 
     [Fact]
-    public void BuildListArgs_VersionConcatenatedAndHiddenDirsFlag()
+    public void BuildListArgs_VersionUsesPinAndHiddenDirsFlag()
     {
         var args = GhSkillInstallService.BuildListArgs("owner/repo", "v1.2.0", allowHiddenDirs: true);
-        Assert.Equal(new[] { "skill", "install", "owner/repo@v1.2.0", "--allow-hidden-dirs" }, args);
+        Assert.Equal(new[] { "skill", "install", "--allow-hidden-dirs", "--pin=v1.2.0", "--", "owner/repo" }, args);
         Assert.DoesNotContain("--all", args);
+    }
+
+    [Fact]
+    public void BuildArgs_KeepsFlagLikeSearchValuesAfterOptionTerminator()
+    {
+        var args = GhSkillInstallService.BuildArgs(
+            "--dir=/tmp/untrusted", "--force",
+            new GhSkillInstallService.Options(Agents: new[] { "universal" }, Scope: "user"));
+
+        Assert.Equal(new[]
+        {
+            "skill", "install", "--agent", "universal", "--scope", "user",
+            "--", "--dir=/tmp/untrusted", "--force",
+        }, args);
+        Assert.Equal(new[] { "skill", "install", "--", "--dir=/tmp/untrusted" },
+            GhSkillInstallService.BuildListArgs("--dir=/tmp/untrusted", null, false));
     }
 
     [Fact]

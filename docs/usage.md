@@ -15,7 +15,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 | **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
-| **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and capability-gated options (hidden-dir scanning, upstream, local installs). | `I` from a Discover result, or **Advanced…** from the compact modal |
+| **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
 | **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
 | **Cleanup view** | Finds duplicates, broken symlinks, residue, and other cleanup candidates; remove or ignore them in batches. | `c` |

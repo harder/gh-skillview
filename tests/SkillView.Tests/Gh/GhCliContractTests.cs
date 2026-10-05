@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Logging;
@@ -131,5 +132,25 @@ public class GhCliContractTests
         // gh ≥ 2.94 ships `gh skill list --json` — SkillView's primary inventory source.
         Assert.True(result.Succeeded, $"gh skill list --help exited {result.ExitCode}");
         Assert.Contains("--json", result.StdOut, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GhSkillListJson_UsesExpectedFieldSetAndReturnsArray()
+    {
+        if (!ShouldRun) return;
+        var path = GhPath();
+        Assert.NotNull(path);
+
+        var logger = new Logger(LogLevel.Debug);
+        var runner = new ProcessRunner(logger);
+        var result = await runner.RunAsync(path!, new[]
+        {
+            "skill", "list", "--json",
+            "skillName,agentHosts,path,pinned,scope,sourceURL,version",
+        }, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, $"gh skill list --json exited {result.ExitCode}: {result.StdErr}");
+        using var document = JsonDocument.Parse(result.StdOut);
+        Assert.Equal(JsonValueKind.Array, document.RootElement.ValueKind);
     }
 }

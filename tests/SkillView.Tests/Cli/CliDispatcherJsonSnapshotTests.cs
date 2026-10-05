@@ -207,7 +207,7 @@ public class CliDispatcherJsonSnapshotTests
             Path: null,
             Pin: true,
             Force: false,
-            Upstream: null,
+            Upstream: false,
             FromLocal: false,
             AllowHiddenDirs: false,
             Json: true,

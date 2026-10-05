@@ -1,0 +1,7 @@
+# actionlint v1.7.12 predates GitHub's Copilot Requests token permission.
+# Keep every other workflow check active, and remove this exception when
+# actionlint adds the permission to its schema.
+paths:
+  .github/workflows/critical-dependencies.yml:
+    ignore:
+      - '^unknown permission scope "copilot-requests"\.'

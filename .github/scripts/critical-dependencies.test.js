@@ -18,9 +18,20 @@ test('reads package properties and the enforced GitHub CLI minimum', () => {
 
 test('creates assigned, deduplicated issues with useful checks for new releases', async () => {
   const issues = [];
+  const comments = new Map();
+  const outputs = [];
+  const completeAssessment = `<!-- skillview-copilot-assessment-v1 -->
+### What changed
+The upstream release has a published security fix affecting interactive skill search.
+### SkillView impact
+SkillView's installer adapter passes repository selectors to the GitHub CLI process.
+### Compatibility assessment
+**Likely compatible.** Contract tests are still needed to verify the new release.
+### Focused follow-up
+Run the contract suite and inspect the installer argument boundary before closing.`;
   let labelExists = false;
   const github = {
-    paginate: async () => issues,
+    paginate: async (method, args) => (await method(args)).data,
     rest: {
       issues: {
         getLabel: async () => {
@@ -28,8 +39,10 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
         },
         createLabel: async () => { labelExists = true; },
         listForRepo: async () => ({ data: issues }),
+        listComments: async ({ issue_number }) => ({ data: comments.get(issue_number) || [] }),
         create: async ({ title, body, labels, assignees }) => {
-          const issue = { title, body, labels, assignees, html_url: `https://example.invalid/${issues.length + 1}` };
+          const number = issues.length + 1;
+          const issue = { number, title, body, labels, assignees, html_url: `https://example.invalid/${number}` };
           issues.push(issue);
           return { data: issue };
         },
@@ -41,7 +54,7 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
         }] }),
         getLatestRelease: async () => ({ data: {
           tag_name: 'v2.102.0', html_url: 'https://example.invalid/gh',
-          body: 'Improve gh skill JSON output.', draft: false, prerelease: false,
+          body: '## Security\n\nInteractive `gh skill search` fixed option injection.\n\nSee https://github.com/cli/cli/security/advisories/GHSA-qcwj-mr2r-2cx7\n\n## What\'s Changed\n\n* Fix auth handling', draft: false, prerelease: false,
         } }),
       },
     },
@@ -54,7 +67,7 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   });
   const args = {
     github, context: { repo: { owner: 'harder', repo: 'gh-skillview' } },
-    core: { info: () => {} }, project, locator, fetchImpl,
+    core: { info: () => {}, setOutput: (key, value) => outputs.push([key, JSON.parse(value)]) }, project, locator, fetchImpl,
   };
 
   await monitor(args);
@@ -65,9 +78,59 @@ test('creates assigned, deduplicated issues with useful checks for new releases'
   ]);
   assert.ok(issues.every(issue => issue.assignees[0] === 'harder' && issue.labels[0] === 'critical-dependency'));
   assert.match(issues[0].body, /keyboard shortcuts/);
-  assert.match(issues[1].body, /JSON inventory\/search output/);
+  assert.match(issues[1].body, /Interactive `gh skill search` fixed option injection/);
+  assert.match(issues[1].body, /GHSA-qcwj-mr2r-2cx7/);
+  assert.match(issues[1].body, /Needs verification/);
+  assert.deepEqual(outputs[0], ['new-issues', [
+    { number: 1, kind: 'terminal-gui', version: '2.5.1' },
+    { number: 2, kind: 'gh', version: 'v2.102.0' },
+  ]]);
   await monitor(args);
   assert.equal(issues.length, 2);
+  assert.deepEqual(outputs[1], ['new-issues', outputs[0][1]]);
+  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: '<!-- skillview-copilot-assessment-v1 -->\nMalformed assessment' }]);
+  comments.set(2, [{ user: { login: 'another-user' }, body: '<!-- skillview-copilot-assessment-v1 -->\nSpoofed marker' }]);
+  await monitor(args);
+  assert.deepEqual(outputs[2], ['new-issues', [
+    { number: 1, kind: 'terminal-gui', version: '2.5.1' },
+    { number: 2, kind: 'gh', version: 'v2.102.0' },
+  ]]);
+  comments.set(1, [{ user: { login: 'github-actions[bot]' }, body: completeAssessment }]);
+  comments.set(2, [{ user: { login: 'github-actions[bot]' }, body: completeAssessment }]);
+  await monitor(args);
+  assert.equal(issues.length, 2);
+  assert.deepEqual(outputs[3], ['new-issues', []]);
+});
+
+test('release summaries distinguish direct gh skill notes from unrelated skill content', () => {
+  const notes = '## Security\n\nInteractive `gh skill search` changed.\n\nSee https://example.invalid/advisory\n\n* Add a skill for recordings';
+  assert.match(monitor.releaseHighlights(notes, 'gh'), /gh skill search/);
+  assert.doesNotMatch(monitor.releaseHighlights(notes, 'gh'), /recordings/);
+  assert.match(monitor.releaseOverview(notes), /Security section present/);
+  assert.match(monitor.releaseHighlights('No CLI changes.', 'gh'), /No directly relevant entry/);
+});
+
+test('release highlights keep adjacent unrelated bullets out of skill excerpts', () => {
+  const notes = '## Changes\n\n* New repository skill content\n* Fix `gh skill search` option injection\n\nSee https://github.com/cli/cli/security/advisories/GHSA-qcwj-mr2r-2cx7\n\n* Update auth flow';
+  const highlight = monitor.releaseHighlights(notes, 'gh');
+  assert.match(highlight, /gh skill search/);
+  assert.match(highlight, /GHSA-qcwj-mr2r-2cx7/);
+  assert.doesNotMatch(highlight, /repository skill content|Update auth flow/);
+});
+
+test('manual reassessment accepts only labeled dependency issues with known titles', async () => {
+  const github = { rest: { issues: { get: async () => ({ data: {
+    title: 'GitHub CLI v2.102.0 compatibility review',
+    labels: [{ name: 'critical-dependency' }],
+  } }) } } };
+  const context = { eventName: 'workflow_dispatch', payload: { inputs: { issue_number: '31' } } };
+  assert.deepEqual(await monitor.requestedReassessment(github, context, 'harder', 'gh-skillview'),
+    { number: 31, kind: 'gh', version: 'v2.102.0' });
+  context.payload.inputs.issue_number = '31; echo unsafe';
+  await assert.rejects(() => monitor.requestedReassessment(github, context, 'harder', 'gh-skillview'), /positive issue number/);
+  context.payload.inputs.issue_number = '31';
+  github.rest.issues.get = async () => ({ data: { title: 'Other issue', labels: [] } });
+  await assert.rejects(() => monitor.requestedReassessment(github, context, 'harder', 'gh-skillview'), /not a critical-dependency issue/);
 });
 
 test('fails visibly when a critical version cannot be determined', async () => {

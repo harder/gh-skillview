@@ -67,6 +67,10 @@ they disagree with an old comment, issue, or generated summary.
 - Keep bot-generated suggestions concrete: name affected SkillView code paths,
   expected behavior, and a test that would detect a regression. Do not invent
   breaking changes from a version number alone.
+- For critical-dependency assessments, distinguish published release facts,
+  source-code inference, and observed test results. A release-note keyword or
+  passing help/flag contract test cannot establish full compatibility. Cite
+  upstream advisories and name any untested interactive or TUI paths.
 - If GitHub's automated Copilot review is enabled, apply these instructions to
   its comments too. A human maintainer retains the decision to merge releases
   and dependency updates.

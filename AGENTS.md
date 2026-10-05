@@ -48,7 +48,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - `.github/workflows/critical-dependencies.yml` checks stable NuGet releases
   of Terminal.Gui and Terminal.Gui.Editor and the latest GitHub CLI release.
   Its tested script opens deduplicated, assigned compatibility issues with
-  release links and concrete checks. It does not change the `gh` minimum or
+  release highlights and concrete checks. A read-only Copilot CLI job adds a
+  separately labeled assessment through a publisher job; this is provisional
+  evidence, not a compatibility verdict. Manual dispatch accepts an existing
+  labeled issue number for reassessment. It does not change the `gh` minimum or
   merge package PRs automatically. Update its parsers/tests if version storage
   changes.
 - `ci.yml` checks Actions syntax, the dependency monitor, the static site,
@@ -89,6 +92,17 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   including its current Devin and Grok agent selectors, so
   there is no per-flag capability probe — only a single `gh skill --help`
   smoke check.
+- `GhSkillInstallService.BuildArgs` and `BuildListArgs` must place trusted
+  flags before `--`, with repository and skill selectors after it. Search
+  results can supply those selectors; GitHub CLI 2.102.0 fixed an option
+  injection in its own interactive `gh skill search` install path. `--pin`
+  takes a ref value, so emit `--pin=<ref>` and require a version when pinning;
+  a bare `--pin` could consume the option separator. Keep SkillView's boundary
+  even while supporting older `gh` releases.
+  `--upstream` is a boolean flag (use a checkbox in the TUI); it does not
+  accept a URL value, which would become an unintended positional argument.
+  A version suffix belongs on a skill selector, never the repository name;
+  use `--pin=<ref>` for an entire-repository ref, including discovery listing.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
   environment value over PATH discovery so subprocesses use the same CLI host.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the

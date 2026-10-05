@@ -28,7 +28,7 @@ public sealed class GhSkillInstallService
         string? Version = null,
         bool Pin = false,
         bool Overwrite = false,
-        string? Upstream = null,
+        bool Upstream = false,
         bool AllowHiddenDirs = false,
         bool FromLocal = false,
         bool All = false);
@@ -106,11 +106,18 @@ public sealed class GhSkillInstallService
         // Deliberately no skill name and no `--all`: that combination triggers
         // gh's non-interactive "list available skills" path (cli/cli#13548).
         var args = new List<string> { "skill", "install" };
-        args.Add(string.IsNullOrEmpty(version) ? repo : $"{repo}@{version}");
         if (allowHiddenDirs)
         {
             args.Add("--allow-hidden-dirs");
         }
+        if (!string.IsNullOrEmpty(version))
+        {
+            args.Add($"--pin={version}");
+        }
+        // Repository names can come from search results. Keep them after the
+        // option terminator so a flag-like result cannot change gh's behavior.
+        args.Add("--");
+        args.Add(repo);
         return args;
     }
 
@@ -226,24 +233,14 @@ public sealed class GhSkillInstallService
         string? skillName,
         Options options)
     {
+        if (options.Pin && string.IsNullOrWhiteSpace(options.Version))
+        {
+            throw new ArgumentException("Pin requires a version ref", nameof(options));
+        }
+        // gh accepts @VERSION only on a skill selector. Installing an entire
+        // repository at a ref must use --pin instead.
+        var effectivePin = options.Pin || (!string.IsNullOrEmpty(options.Version) && string.IsNullOrEmpty(skillName));
         var args = new List<string> { "skill", "install" };
-
-        // Versioned install uses the `owner/repo@<ref>` shorthand, mirroring
-        // `gh skill preview`. Keeps the adapter surface consistent across
-        // remote-operation commands.
-        if (!string.IsNullOrEmpty(options.Version))
-        {
-            args.Add($"{repo}@{options.Version}");
-        }
-        else
-        {
-            args.Add(repo);
-        }
-
-        if (!string.IsNullOrEmpty(skillName))
-        {
-            args.Add(skillName);
-        }
 
         // `gh skill install <repo> --all` installs every discovered skill
         // without prompting (gh 2.94.0, cli/cli#13471). Mutually exclusive
@@ -276,9 +273,11 @@ public sealed class GhSkillInstallService
             args.Add(options.Path);
         }
 
-        if (options.Pin)
+        if (effectivePin)
         {
-            args.Add("--pin");
+            // --pin takes a ref value. Use the equals form so it cannot
+            // consume the later `--` option boundary as that value.
+            args.Add($"--pin={options.Version}");
         }
 
         if (options.Overwrite)
@@ -286,10 +285,9 @@ public sealed class GhSkillInstallService
             args.Add("--force");
         }
 
-        if (!string.IsNullOrEmpty(options.Upstream))
+        if (options.Upstream)
         {
             args.Add("--upstream");
-            args.Add(options.Upstream);
         }
 
         if (options.AllowHiddenDirs)
@@ -300,6 +298,18 @@ public sealed class GhSkillInstallService
         if (options.FromLocal)
         {
             args.Add("--from-local");
+        }
+
+        // The repository and skill selector can originate from search results.
+        // gh 2.102.0 fixed this same option-injection boundary in its own
+        // interactive search flow. Place all trusted flags first, then `--`
+        // before the untrusted positional arguments.
+        args.Add("--");
+        args.Add(repo);
+        if (!string.IsNullOrEmpty(skillName))
+        {
+            args.Add(string.IsNullOrEmpty(options.Version) || effectivePin
+                ? skillName : $"{skillName}@{options.Version}");
         }
 
         return args;
