@@ -233,6 +233,9 @@ public sealed class GhSkillInstallService
         {
             throw new ArgumentException("Pin requires a version ref", nameof(options));
         }
+        // gh accepts @VERSION only on a skill selector. Installing an entire
+        // repository at a ref must use --pin instead.
+        var effectivePin = options.Pin || (!string.IsNullOrEmpty(options.Version) && string.IsNullOrEmpty(skillName));
         var args = new List<string> { "skill", "install" };
 
         // `gh skill install <repo> --all` installs every discovered skill
@@ -266,7 +269,7 @@ public sealed class GhSkillInstallService
             args.Add(options.Path);
         }
 
-        if (options.Pin)
+        if (effectivePin)
         {
             // --pin takes a ref value. Use the equals form so it cannot
             // consume the later `--` option boundary as that value.
@@ -298,10 +301,11 @@ public sealed class GhSkillInstallService
         // interactive search flow. Place all trusted flags first, then `--`
         // before the untrusted positional arguments.
         args.Add("--");
-        args.Add(string.IsNullOrEmpty(options.Version) || options.Pin ? repo : $"{repo}@{options.Version}");
+        args.Add(repo);
         if (!string.IsNullOrEmpty(skillName))
         {
-            args.Add(skillName);
+            args.Add(string.IsNullOrEmpty(options.Version) || effectivePin
+                ? skillName : $"{skillName}@{options.Version}");
         }
 
         return args;

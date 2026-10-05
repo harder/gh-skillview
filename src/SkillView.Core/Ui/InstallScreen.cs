@@ -319,8 +319,10 @@ public sealed class InstallScreen
             var hasVersion = !string.IsNullOrWhiteSpace(versionField.Text);
             pinBox.Enabled = hasVersion;
             if (!hasVersion) pinBox.Value = CheckState.UnChecked;
+            var effectivePin = hasVersion &&
+                (pinBox.Value == CheckState.Checked || string.IsNullOrWhiteSpace(skillField.Text));
             versionResolved.Text = hasVersion
-                ? $"→ will install ref '{versionField.Text!.Trim()}'" + (pinBox.Value == CheckState.Checked ? " (pinned)" : "")
+                ? $"→ will install ref '{versionField.Text!.Trim()}'" + (effectivePin ? " (pinned)" : "")
                 : "→ blank uses the latest release";
 
             // Custom-path enable

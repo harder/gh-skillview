@@ -27,13 +27,17 @@ public class GhSkillInstallServiceTests
     }
 
     [Fact]
-    public void BuildArgs_VersionIsConcatenatedWithAt()
+    public void BuildArgs_VersionAppliesToSkillOrPinsEntireRepo()
     {
-        var args = GhSkillInstallService.BuildArgs(
-            "owner/repo", skillName: null,
+        var named = GhSkillInstallService.BuildArgs(
+            "owner/repo", skillName: "render-md",
             new GhSkillInstallService.Options(Version: "v2.0.0"));
-        Assert.Contains("owner/repo@v2.0.0", args);
-        Assert.DoesNotContain("--version", args);
+        Assert.Equal(new[] { "skill", "install", "--", "owner/repo", "render-md@v2.0.0" }, named);
+
+        var entireRepo = GhSkillInstallService.BuildArgs(
+            "owner/repo", skillName: null,
+            new GhSkillInstallService.Options(Version: "v2.0.0", All: true));
+        Assert.Equal(new[] { "skill", "install", "--all", "--pin=v2.0.0", "--", "owner/repo" }, entireRepo);
     }
 
     [Fact]
