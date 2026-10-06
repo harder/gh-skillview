@@ -345,49 +345,22 @@ jobs:
           gh release download $env:RELEASE_REF --repo $env:RELEASE_REPO --pattern '*windows*' --dir artifacts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Verify published Windows checksums
+      - name: Verify release assets and generate submission manifests
         shell: pwsh
         run: |
-          Get-ChildItem artifacts/SHA256SUMS-windows-*.txt | ForEach-Object {
-            Get-Content $_.FullName | ForEach-Object {
-              $parts = $_ -split '\s+', 2
-              $name = $parts[1].TrimStart('*')
-              $actual = (Get-FileHash (Join-Path artifacts $name) -Algorithm SHA256).Hash
-              if ($actual -ne $parts[0]) { throw "Checksum mismatch: $name" }
-            }
-          }
+          ./packaging/winget/New-WinGetManifest.ps1 `
+            -ReleaseRef $env:RELEASE_REF `
+            -AssetsDir artifacts `
+            -OutputDir generated/winget `
+            -Repository $env:RELEASE_REPO
 
-      - name: Generate manifests
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path generated/winget | Out-Null
-          $version = $env:RELEASE_REF.Substring(1)
-          $urlX64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-windows-amd64.exe"
-          $urlArm64 = "https://github.com/$env:RELEASE_REPO/releases/download/$env:RELEASE_REF/skillview-windows-arm64.exe"
-          $shaX64 = (Get-FileHash artifacts/skillview-windows-amd64.exe -Algorithm SHA256).Hash
-          $shaArm64 = (Get-FileHash artifacts/skillview-windows-arm64.exe -Algorithm SHA256).Hash
-
-          (Get-Content packaging/winget/harder.SkillView.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
-            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.yaml
-
-          (Get-Content packaging/winget/harder.SkillView.locale.en-US.yaml.tmpl -Raw).Replace('{{VERSION}}', $version) |
-            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.locale.en-US.yaml
-
-          ((Get-Content packaging/winget/harder.SkillView.installer.yaml.tmpl -Raw).
-            Replace('{{VERSION}}', $version).
-            Replace('{{URL_WIN_X64}}', $urlX64).
-            Replace('{{SHA_WIN_X64}}', $shaX64).
-            Replace('{{URL_WIN_ARM64}}', $urlArm64).
-            Replace('{{SHA_WIN_ARM64}}', $shaArm64)) |
-            Set-Content generated/winget/$env:WINGET_PACKAGE_ID.installer.yaml
-
-          Write-Host "Dark-launch only: generated WinGet manifests for $env:WINGET_PACKAGE_ID $version"
+          Write-Host "Dark-launch only: generated WinGet manifests for $env:WINGET_PACKAGE_ID $env:RELEASE_REF"
 
       - name: Upload generated WinGet manifests
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: winget-manifests-${{ github.ref_name }}
-          path: generated/winget/*
+          path: generated/winget/manifests/
           retention-days: 30
 
   notify-failure:

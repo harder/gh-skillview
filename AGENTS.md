@@ -448,6 +448,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
+  `packaging/winget/New-WinGetManifest.ps1` verifies published Windows assets
+  against their checksums and renders copy-ready multi-file manifests. Keep
+  the standalone WinGet package portable, its command alias `skillview`, and
+  its `GitHub.cli >= 2.97.0` dependency in sync with the product contract.
 - Terminal.Gui `2.5.0` supports `Application.Create().Init()`. Keep using
   `TuiConfigurationBuilder` and check the documented lifecycle, `View.Text`,
   and `IAcceptTarget` API changes before a later package upgrade.

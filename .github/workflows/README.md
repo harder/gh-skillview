@@ -43,7 +43,9 @@ failure issue. See `docs/runbooks/release-rollback.md` for recovery.
 Stable-tag Homebrew and WinGet jobs are opt-in via `HOMEBREW_TAP_ENABLED` and
 `WINGET_ENABLED`. They download **published** release assets and generate
 formula/manifests as workflow artifacts. They do not push to a tap or submit
-to WinGet. `HOMEBREW_TAP_REPO` records the intended tap name.
+to WinGet. The WinGet job verifies all Windows release checksums and renders a
+copy-ready manifest tree; see `packaging/winget/README.md`. `HOMEBREW_TAP_REPO`
+records the intended tap name.
 
 Manual `workflow_dispatch` exercises release packaging without publishing a
 GitHub Release. Keep the two product publishes sequential: they share core
