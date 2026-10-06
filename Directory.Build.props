@@ -14,9 +14,9 @@
     <Company>SkillView</Company>
     <Authors>Kevin Harder</Authors>
     <Product>SkillView</Product>
-    <!-- Local/dev builds default to 0.1.0; the release workflow overrides this with
+    <!-- Local/dev builds default to 1.0.0; the release workflow overrides this with
          -p:Version=<tag> so shipped binaries report the actual release version. -->
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Version Condition="'$(Version)' == ''">1.0.0</Version>
     <VersionCore>$(Version.Split('-')[0])</VersionCore>
     <AssemblyVersion>$(VersionCore).0</AssemblyVersion>
     <FileVersion>$(VersionCore).0</FileVersion>
