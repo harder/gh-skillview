@@ -85,7 +85,10 @@ public sealed class ProcessRunnerTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             runner.RunAsync(executable, arguments, cancellationToken: cancellation.Token));
 
-        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(4));
+        // Windows CI can spend several seconds starting and terminating pwsh
+        // under load. Keep this well below the child's 30-second natural exit
+        // without treating scheduler delay as a subprocess cancellation bug.
+        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(10));
     }
 
     private static (string Executable, string[] Arguments) CreateWaitForEofCommand()

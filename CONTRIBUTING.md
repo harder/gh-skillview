@@ -6,18 +6,17 @@ Thanks for helping improve SkillView. Report bugs and feature requests in [GitHu
 
 Build requirements:
 
-- .NET SDK `10.0.100` or newer in the same feature band
+- the .NET SDK selected by [`global.json`](global.json)
 - on Linux AOT publish: `clang` and `zlib1g-dev`
 
 ### Architecture
 
-SkillView is intentionally small and explicit:
+SkillView uses explicit composition and shared services:
 
 - **3 production projects**: `SkillView.Core`, `SkillView.App`, `SkillView.GhExtension`
 - **2 test projects**: `SkillView.Tests`, `SkillView.IntegrationTests`
 - shared logic lives in `SkillView.Core`
 - both executables call the same entry point
-- no DI container
 - Native AOT-safe code paths by default
 
 Execution flow:
@@ -31,9 +30,16 @@ Program.cs
      -> TUI: SkillViewApp.RunAsync(...)
 ```
 
-The TUI is a single Terminal.Gui `Window` that hosts a persistent shell: `TabBarView`, `ContextBarView`, and `StatusStripView`. The primary workflows live in embedded `DiscoverTabView`, `InstalledTabView`, and `ChangesTabView` instances under `src/SkillView.Core/Ui/Tabs/`; `SkillViewApp` coordinates tab activation and shared shell state while those views own their workspace layouts. Temporary drill-in workspaces such as `UpdatesTabView` and `DoctorTabView` are still embedded views, but they are not part of the persistent three-tab shell. Tab activation flips `Visible` flags; no nested `Application.Run` subloops are used for the primary workflows. Escalation paths (advanced install wizard, remove wizard, cleanup) keep their modal `Application.Run` semantics intentionally.
+The TUI has a persistent Discover, Installed, and Changes shell. `SkillViewApp`
+owns that shell and its application lifetime; `SkillViewWorkflowCoordinator`
+orchestrates install, update, inventory, remove, cleanup, and Doctor work.
+Views under `src/SkillView.Core/Ui/Tabs/` render the primary and temporary
+workspaces. Advanced install, remove, and cleanup flows use owned modals.
+See the [architecture guide](docs/architecture.md) for the current boundaries.
 
-SkillView uses GitHub CLI's preview `gh skill` commands. It checks for `gh` 2.97.0 or newer and runs `gh skill --help` before enabling the app. GitHub CLI 2.99.0 added support for Pi's `PI_CODING_AGENT_DIR` and corrected Codex's user-scope install location. When GitHub CLI 2.101.0 or newer starts SkillView as an extension, SkillView uses the host-provided `GH_PATH` so subprocesses run through that same CLI executable.
+SkillView requires GitHub CLI 2.97.0 or newer and checks `gh skill --help`
+before enabling the app. When launched as an extension by GitHub CLI 2.101.0
+or newer, it uses the host-provided `GH_PATH` for subprocesses.
 
 ### Project layout
 
@@ -52,18 +58,18 @@ SkillView uses GitHub CLI's preview `gh skill` commands. It checks for `gh` 2.97
 ### Build and test
 
 ```bash
-dotnet restore
+dotnet restore --locked-mode
 dotnet build
 dotnet test --no-build
 ```
 
-The repo currently pins Terminal.Gui `2.5.0` (Terminal.Gui.Editor `2.5.7`) and
-xUnit `4.0.1`. The release uses only stable package versions; the newer
-Terminal.Gui development builds are intentionally not consumed. If you pulled
-package changes, run `dotnet restore` before building so stale package assets
-do not leave the test projects on xUnit 2.x.
+NuGet lock files are committed for all projects. After intentionally changing
+package versions, run `dotnet restore --force-evaluate`, commit the lock-file
+changes, and confirm `dotnet restore --locked-mode` still passes. See
+[`agent_docs/running-tests.md`](agent_docs/running-tests.md) for filtered tests.
 
-There is no separate lint step. Build warnings and code-style violations are treated as errors.
+CI also verifies formatting with `dotnet format SkillView.sln --no-restore
+--verify-no-changes`, lints GitHub Actions, and checks the static site.
 
 ### Run locally
 

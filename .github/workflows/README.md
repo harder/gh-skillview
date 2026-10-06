@@ -55,7 +55,11 @@ intermediate files. Linux AOT requires `clang` and `zlib1g-dev`.
   scanning where available.
 - GitHub Pages from Actions with custom domain `skillview.dev`.
 - Release immutability once all assets and checks are validated.
-- A `main` ruleset requiring PR review and passing CI checks; allow the
-  maintainer to merge reviewed dependency PRs, not bots to bypass checks.
+- `ProtectMain` targets the default branch and requests Copilot review on new
+  pull requests. As currently configured, it does not request another review
+  on new pushes or drafts, and it does not require a pull request or passing
+  checks before updating `main`. Enable those rules in repository settings if
+  they should become merge requirements; workflow files alone cannot enforce
+  them.
 
 `agent_docs/release-engineering.md` contains release development notes.

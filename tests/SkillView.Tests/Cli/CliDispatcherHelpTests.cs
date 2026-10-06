@@ -24,6 +24,8 @@ public class CliDispatcherHelpTests
         Assert.DoesNotContain("`--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs`", stdout);
         Assert.Contains("Homebrew and WinGet scaffolding", stdout);
         Assert.Contains("automation-friendly", stdout);
+        Assert.Contains("SkillView requires `gh` 2.97.0 or newer", stdout);
+        Assert.DoesNotContain("capability-gated flags", stdout);
         Assert.Contains("| `130` | Canceled by the caller or Ctrl+C |", stdout);
     }
 
