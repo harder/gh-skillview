@@ -120,7 +120,7 @@ public static class CliDispatcher
         sb.AppendLine($"gh version    : {r.GhVersionRaw ?? "(unknown)"}");
         sb.AppendLine($"gh minimum    : {GhBinaryLocator.MinimumVersion}{(r.GhMeetsMinimum ? " ✓" : " ✗ too old")}");
         sb.AppendLine($"gh auth       : {AuthSummary(r.Auth)}");
-        sb.AppendLine($"gh skill      : {(r.GhSkillAvailable ? "present (gh ≥ 2.95 — full skill surface)" : "(not detected)")}");
+        sb.AppendLine($"gh skill      : {(r.GhSkillAvailable ? "present" : "(not detected)")}");
         sb.AppendLine($"debug         : {options.Debug}");
         sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
         sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
@@ -168,9 +168,8 @@ public static class CliDispatcher
         writer.WriteEndArray();
         writer.WriteEndObject();
 
-        // gh ≥ 2.95 is required, so the full `gh skill` flag surface is
-        // guaranteed once the command is present — a single availability
-        // bool replaces the old per-flag capability probe.
+        // The minimum supported gh version guarantees the required command
+        // surface; the smoke check records whether `gh skill` is available.
         writer.WriteBoolean("ghSkillAvailable", r.GhSkillAvailable);
 
         writer.WriteStartArray("scanRoots");
@@ -1692,7 +1691,7 @@ public static class CliDispatcher
 
             | Subcommand | Purpose | Key options |
             | --- | --- | --- |
-            | `doctor` | Inspect `gh`, auth state, capability probes, log path, and scan roots. | `--json`, `--clear-logs` |
+            | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and scan roots. | `--json`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
@@ -1725,7 +1724,7 @@ public static class CliDispatcher
 
             ## Notes
 
-            - SkillView only emits capability-gated flags when the installed `gh` build supports them.
+            - SkillView requires `gh` 2.97.0 or newer and checks that `gh skill` is available.
             - `--debug` is the only global flag accepted after a subcommand. Put other global flags before the subcommand.
             - `SKILLVIEW_LOG=debug` is the environment-variable alternative to `--debug`.
             - Homebrew and WinGet scaffolding exists in the release workflow, but those channels are still dark-launch only and are not public install paths yet.

@@ -1,6 +1,6 @@
 # Running tests
 
-The solution runs on xunit v3/v4's `dotnet test` integration with the .NET 10 SDK's
+The solution runs on xunit v4's `dotnet test` integration with the .NET 10 SDK's
 `Microsoft.Testing.Platform` runner (opted in via `global.json`'s `test.runner`).
 A bare project path (e.g. `dotnet test tests/Foo/Foo.csproj`) no longer works —
 pass `--project <path>` explicitly, or run `dotnet test` from the repo root to
@@ -18,7 +18,7 @@ product failure.
 `--filter-not-trait`, or `--filter-query "query"` for the query-filter language.
 For a single exact method, use a four-segment query such as
 `--filter-query "/*/SkillView.Tests.Ui/SearchAgentMetadataLoaderTests/FilterAsync_TimeoutContainsCallbackFailure"`.
-On the current .NET 10/xunit 4.0.0 integration, both simple and fully qualified
+On the current .NET 10/xunit 4.0.1 integration, both simple and fully qualified
 `--filter-method` values have been observed to reach the runner but silently
 select zero tests; do not count such a run as verification. Do **not** use
 xunit's older single-dash console-runner
@@ -40,7 +40,7 @@ flags instead.
   2.97.0) and the latest GitHub CLI release. A manual version override applies
   only to the latest lane. A failure opens an assigned compatibility issue.
   Keep the minimum lane equal to the app's hard minimum.
-- **Automation checks:** `node --test .github/scripts/critical-dependencies.test.js`,
+- **Automation checks:** `node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js`,
   `python site/build.py`, and `node --check site/app.js`. CI also runs
   `actionlint` and dependency review for PRs.
 - For PTY-driven TUI checks, prefer the built binary and follow `agent_docs/tui-pty-testing.md`.

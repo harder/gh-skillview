@@ -13,7 +13,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
 | **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
-| **Doctor** | Full-screen environment report: `gh` path/version, auth state, detected capabilities, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
+| **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
@@ -103,7 +103,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 
 | Command | What it is for |
 |---|---|
-| `skillview doctor` | Inspect environment, auth, capabilities, and log paths |
+| `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
 | `skillview rescan` | Re-run inventory capture and print a summary |
 | `skillview search <query>` | Search public repositories for skills |
@@ -123,6 +123,15 @@ skillview install github/awesome-copilot git-commit --agent claude-code --scope 
 skillview update --dry-run
 skillview cleanup --apply --yes
 ```
+
+For `install`, use `--agent <id>` to choose an agent and `--scope project|user|custom`
+to choose the destination scope. `--path <dir>` selects a custom directory;
+`--all` installs every skill found in a repository. To install a specific ref,
+pass `--version <ref>` or use `OWNER/REPO@<ref>` as shorthand. Add `--pin` only
+when a ref is supplied; for an entire repository, `OWNER/REPO@<ref> --all --pin`
+pins that ref. `--upstream` is a switch for a republished skill's declared
+upstream source, not a URL argument. Run `skillview --help` for the
+complete option list.
 
 ### Global flags
 
@@ -162,7 +171,7 @@ SkillView's CLI is designed to be automation-friendly when you want higher-level
 - Prefer `--json` on commands that support it: `doctor`, `list`, `search`, `preview`, `install`, `update`, `remove`, and `cleanup`.
 - Use exit codes as the control surface for scripts: `0` success, `2` invalid usage, `10` environment/setup problems, `20` no matches, `130` canceled.
 - Put global flags like `--scan-root` and `--theme` **before** the subcommand; only `--debug` is accepted after the subcommand.
-- `skillview doctor --json` is the fastest way for an agent or script to confirm `gh` version, auth state, capability probes, and log location before attempting an install/update flow.
+- `skillview doctor --json` reports the `gh` version, auth state, `gh skill` availability, and log location before an install or update flow.
 
 Examples:
 

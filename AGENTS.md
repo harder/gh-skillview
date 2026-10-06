@@ -148,23 +148,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
   exact Terminal.Gui version string — update both alongside any bump.
-- xunit was bumped 3.x → 4.0.0 (2026-08); the project didn't use any of the
-  now-obsolete parallelization APIs (`ParallelizeTestCollections`,
-  `[CollectionBehavior]`) so no test-code migration was needed. That bump also
-  triggered a required `global.json` change: `.NET 10 SDK` removed the legacy
-  VSTest-bridge `dotnet test` path entirely, so `global.json` now sets
-  `"test": {"runner": "Microsoft.Testing.Platform"}` to opt into the new MTP
-  `dotnet test` mode. See `agent_docs/running-tests.md` for the resulting
-  command-syntax changes: `--project` is now required (bare/positional project
-  paths no longer work), and filtered runs need xunit's MTP-native
-  `--filter-namespace`/`--filter-class`/`--filter-trait` flags passed straight
-  to `dotnet test`. For one exact method, use xunit's query filter, for example
-  `--filter-query "/*/Namespace/Class/Method"`; with the current xunit 4.0.0
-  integration, `--filter-method` can silently select zero tests even when the
-  discovered fully qualified name matches. xunit's older
-  single-dash console-runner flags (`-namespace`, `-trait`, ...) and the
-  platform's own `--treenode-filter` are silently rejected by `dotnet test`'s
-  MTP handshake here and report "Zero tests ran" instead of erroring loudly.
+- `global.json` selects `Microsoft.Testing.Platform` for xunit 4.0.1. Pass
+  `--project` for a specific project and use xunit's MTP-native
+  `--filter-namespace`/`--filter-class`/`--filter-trait` options for filtered
+  runs. For an exact method, use `--filter-query
+  "/*/Namespace/Class/Method"`. `--filter-method`, older single-dash xunit
+  flags, and `--treenode-filter` can silently select zero tests here. See
+  `agent_docs/running-tests.md` for examples.
 - `src/SkillView.Core/SkillView.Core.csproj` owns the default
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
@@ -458,25 +448,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   release workflow only generates Homebrew / WinGet artifacts when the repo
   variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
   explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
-- Terminal.Gui `2.5.0` remains compatible with the modern
-  `Application.Create().Init()` lifecycle; the local
-  `UnconditionalSuppressMessage` workaround and temporary App-level warning mask
-  stay removed after a verification publish proved the App entrypoint no longer
-  needs them. Its planned API breaks remove legacy `ConfigurationManager`, make
-  `View.Text` nonvirtual, and move `IAcceptTarget` to `Terminal.Gui.Input`; keep
-  using `TuiConfigurationBuilder` and check these boundaries on later upgrades.
+- Terminal.Gui `2.5.0` supports `Application.Create().Init()`. Keep using
+  `TuiConfigurationBuilder` and check the documented lifecycle, `View.Text`,
+  and `IAcceptTarget` API changes before a later package upgrade.
 - CI's standalone AOT smoke publish now promotes `IL2026`, `IL3050`, and
   `IL3053` to errors for `SkillView.App`; keep the gh extension's project-level
   suppression local until that host gets its separate re-evaluation.
 - Prefer `KeyBindings` for view-local command remaps like table preview
   shortcuts. Keep the current window/table `KeyDown` routing where the app is
   intentionally centralizing whole-screen actions (search/install/open/logs,
-  installed-screen filter/sort/remove, cleanup actions, etc.), not because of
-  the old `TableView` type-to-search swallowing bug.
+  installed-screen filter/sort/remove, cleanup actions, etc.).
 - On Terminal.Gui `2.5.0`, `TableView.CollectionNavigator = null` is the
-  supported way to disable type-to-search. Treat `#5232` as the fix for the old
-  printable-key swallowing behavior and prefer this documented path over the old
-  custom matcher workaround.
+  supported way to disable type-to-search. Do not restore the custom matcher.
 - Sanitize untrusted text before assigning it to preview/detail/log panes.
   `TerminalEscapeSanitizer` is now the shared UI-layer guard for remote preview
   markdown, search metadata, installed-skill detail markdown, cleanup/remove

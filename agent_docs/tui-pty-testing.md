@@ -125,9 +125,8 @@ Screen text can mislead because:
 - result tables truncate repo names
 - old frames remain in the PTY buffer
 
-For startup smoke detection, accept the current `Search:` label as well as the
-older `Query:` label so a harmless UI copy change does not masquerade as an
-event-loop failure.
+For startup smoke detection, wait for the `Search:` field rather than relying
+on a transient status message.
 
 ### 3. Modal screens need unique wait conditions
 

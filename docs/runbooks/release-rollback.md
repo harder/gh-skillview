@@ -31,12 +31,6 @@ For a published release that must be withdrawn:
 gh release delete <tag> --repo harder/gh-skillview --cleanup-tag -y
 ```
 
-Example:
-
-```bash
-gh release delete v0.2.3 --repo harder/gh-skillview --cleanup-tag -y
-```
-
 After deletion:
 
 1. Confirm the release is gone:
