@@ -18,9 +18,20 @@ logging, or subprocess adapters.
 - `Ctrl+Q` is unconditional and must be handled before printable-key routing.
   Plain `q` is a top-level quit shortcut; `Esc` means leave field, back, or close.
 - Layouts below 80×24 show `TerminalSizeGuardView` instead of overlapping panes.
+- Configure every skill/maintenance table with `TuiHelpers.ConfigureTableNavigation`.
+  Terminal.Gui 2.5.0 lets Up/Down bubble at row boundaries or on empty tables;
+  consume those endpoint keys so a held arrow cannot move focus into another
+  control. Preserve Tab and normal in-list navigation, including key aliases.
+- Installed scope cycling must recapture inventory for Custom and All as well
+  as User and Project when a scoped loader is present. A previous `gh skill
+  list --scope` query may have narrowed the saved snapshot.
 
 ## Lifetime and memory rules
 
+- Dispose the application in a `finally` that still runs if window disposal or
+  earlier shutdown work throws. The driver owns terminal mouse and paste modes;
+  a view-disposal exception must not skip its terminal restoration. Retain the
+  exception in the crash log and cover both run-loop and disposal failures.
 - `LatestRequestGate` owns Discover preview cancellation. A new preview cancels
   the previous request, and every completion checks `Lease.IsCurrent` before
   updating UI. Search cancels previews both when the search starts and when its

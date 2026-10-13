@@ -97,6 +97,7 @@ internal sealed class UpdatesTabView : FrameView
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
+        TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
 
         _preview = new Markdown

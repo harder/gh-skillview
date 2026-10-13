@@ -12,6 +12,49 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public void ScopeCycle_ReloadsFullInventoryAfterServerSideFiltering()
+    {
+        var snapshot = SnapshotWithSkill("user-skill", null) with
+        {
+            Skills =
+            [
+                SnapshotWithSkill("user-skill", null).Skills[0],
+                SnapshotWithSkill("project-skill", null).Skills[0] with { Scope = Scope.Project },
+                SnapshotWithSkill("custom-skill", null).Skills[0] with { Scope = Scope.Custom },
+            ],
+        };
+        var requestedScopes = new List<string?>();
+        using var view = new InstalledTabView(
+            action => { action(); return Task.CompletedTask; },
+            (operation, _) => operation().GetAwaiter().GetResult(),
+            _ => Task.FromResult(snapshot),
+            (_, _, _) => Task.CompletedTask,
+            () => { }, () => { },
+            scopedSnapshotLoader: (scope, _) =>
+            {
+                requestedScopes.Add(scope);
+                return Task.FromResult(snapshot with
+                {
+                    Skills = snapshot.Skills.Where(s => scope is null
+                        || (scope == "user" ? s.Scope == Scope.User : s.Scope == Scope.Project))
+                        .ToImmutableArray(),
+                });
+            });
+        view.LoadSeeded(snapshot);
+        view.FocusList();
+
+        view.NewKeyDownEvent(new Key('G'));
+        Assert.Equal(["user-skill"], view.VisibleSkillNamesForTests);
+        view.NewKeyDownEvent(new Key('G'));
+        Assert.Equal(["project-skill"], view.VisibleSkillNamesForTests);
+        view.NewKeyDownEvent(new Key('G'));
+        Assert.Equal(["custom-skill"], view.VisibleSkillNamesForTests);
+        view.NewKeyDownEvent(new Key('G'));
+        Assert.Equal(["custom-skill", "project-skill", "user-skill"], view.VisibleSkillNamesForTests);
+        Assert.Equal(new string?[] { "user", "project", null, null }, requestedScopes);
+    }
+
+    [Fact]
     public async Task InventoryCompletion_DoesNotClearActiveRemoveFeedback()
     {
         var removeStarted = new TaskCompletionSource(

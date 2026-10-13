@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using SkillView.Bootstrapping;
+using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Ui;
 using Terminal.Gui.App;
@@ -10,6 +12,80 @@ namespace SkillView.IntegrationTests.Ui;
 
 public sealed class SkillViewAppIntegrationTests
 {
+    [Fact]
+    public async Task RunAsync_AnsiInstalledList_HandlesRepeatedArrowsBeyondBothEnds()
+    {
+        const int count = 40;
+        var snapshot = InventorySnapshot.Empty with
+        {
+            Skills = Enumerable.Range(0, count).Select(i => new InstalledSkill
+            {
+                Name = $"skill-{i:D3}",
+                ResolvedPath = $"/skills/skill-{i:D3}",
+                ScanRoot = "/skills",
+                Scope = Scope.User,
+                Agents = [],
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.FsScan,
+                Ignored = false,
+                IsSymlinked = false,
+                InstalledAt = null,
+            }).ToImmutableArray(),
+        };
+        SkillViewApp? skillview = null;
+        var step = 0;
+        var boundaryChecked = false;
+        var options = new AppOptions(
+            InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []);
+        skillview = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), options, () =>
+        {
+            var terminal = Application.Create().Init("ansi");
+            terminal.Driver!.SetScreenSize(120, 36);
+            terminal.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                var installed = skillview!.InstalledTabForTests!;
+                if (step == 0)
+                {
+                    installed.LoadSeeded(snapshot);
+                    skillview.ForceActiveTabForTests(SkillViewTab.Installed);
+                    installed.FocusList();
+                }
+                if (step < count + 10)
+                {
+                    terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorDown));
+                }
+                else if (step < 2 * (count + 10))
+                {
+                    if (step == count + 10)
+                    {
+                        Assert.Equal("skill-039", installed.GetSelectedSkill()?.Name);
+                        Assert.True(installed.TableHasFocusForTests);
+                    }
+                    terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorUp));
+                }
+                else
+                {
+                    Assert.Equal("skill-000", installed.GetSelectedSkill()?.Name);
+                    Assert.True(installed.TableHasFocusForTests);
+                    boundaryChecked = true;
+                    terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Q | KeyCode.CtrlMask));
+                    return false;
+                }
+                step++;
+                return true;
+            });
+            return terminal;
+        }, probeOnRun: false);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        var exitCode = await skillview.RunAsync(deadline.Token);
+
+        Assert.True(boundaryChecked);
+        Assert.False(deadline.IsCancellationRequested);
+        Assert.Equal(ExitCodes.Success, exitCode);
+    }
+
     [Fact]
     public async Task RunAsync_WithAnsiDriverAndSingleTick_ReturnsSuccess()
     {

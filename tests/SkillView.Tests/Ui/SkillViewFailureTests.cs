@@ -1,0 +1,64 @@
+using SkillView.Bootstrapping;
+using SkillView.Logging;
+using SkillView.Ui;
+using Terminal.Gui.App;
+using Xunit;
+
+namespace SkillView.Tests.Ui;
+
+[Collection(TestCollections.TerminalGuiStaticState)]
+public sealed class SkillViewFailureTests
+{
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_DisposesApplicationAfterUiFailure(bool failDuringDisposal)
+    {
+        IApplication? terminal = null;
+        var disposed = false;
+        var failureReached = false;
+        var failure = new InvalidOperationException("injected UI failure");
+        var logger = new Logger(LogLevel.Debug);
+        var skillview = new SkillViewApp(TuiServices.Build(logger), new AppOptions(
+            InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []),
+            () =>
+            {
+                terminal = Application.Create().Init();
+                terminal.Driver!.SetScreenSize(120, 36);
+                terminal.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+                {
+                    failureReached = true;
+                    if (failDuringDisposal)
+                    {
+                        terminal.TopRunnableView!.Disposing += (_, _) => throw failure;
+                        terminal.RequestStop();
+                        return false;
+                    }
+                    throw failure;
+                });
+                return terminal;
+            }, probeOnRun: false);
+
+        void OnDisposed(object? sender, EventArgs<IApplication> args)
+        {
+            if (ReferenceEquals(terminal, args.Value)) disposed = true;
+        }
+
+        Application.InstanceDisposed += OnDisposed;
+        try
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var exception = await Record.ExceptionAsync(() => skillview.RunAsync(deadline.Token));
+            Assert.True(failureReached);
+            Assert.False(deadline.IsCancellationRequested);
+            Assert.Same(failure, exception);
+            Assert.True(disposed);
+            Assert.Contains(logger.Snapshot(), entry => entry.Message.Contains("injected UI failure", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Application.InstanceDisposed -= OnDisposed;
+            if (!disposed) terminal?.Dispose();
+        }
+    }
+}
