@@ -43,6 +43,7 @@ public sealed record InstalledSkill
     /// tool (e.g. `npx skills`) that wrote a `.skill-lock.json`. Null for
     /// installs not recorded in any lockfile.
     public SkillPackage? Package { get; init; }
+    public ImmutableArray<SkillPackage> OwnershipClaims { get; init; } = [];
 
     /// Disagreements remain visible; they must not silently authorize maintenance.
     public ImmutableArray<string> MetadataConflicts { get; init; } = [];

@@ -19,6 +19,8 @@ public sealed class TuiServices
     public required GhSkillPreviewService PreviewService { get; init; }
     public required GhSkillInstallService InstallService { get; init; }
     public required GhSkillUpdateService UpdateService { get; init; }
+    public SkillView.Maintenance.SkillUpdateCoordinator MaintenanceUpdates =>
+        new(InstallService, UpdateService, ListAdapter, Logger, Runner);
     public required GhSkillListAdapter ListAdapter { get; init; }
     public required ScanRootResolver ScanRootResolver { get; init; }
     public required LocalSkillScanner Scanner { get; init; }

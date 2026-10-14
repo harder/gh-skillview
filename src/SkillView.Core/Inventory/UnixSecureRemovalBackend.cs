@@ -38,6 +38,229 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     internal static string? UnsupportedReason => CurrentPlatformSupport.Error;
 
+    // Non-destructive payload reads reject special files and final symlinks
+    // before creating a stream. O_NONBLOCK prevents FIFO admission from hanging.
+    internal static FileStream OpenRegularFileForSnapshot(string path, out int? unixMode)
+    {
+        using var buffer = new StatBuffer();
+        var flags = OperatingSystem.IsMacOS()
+            ? 0x00000100 | 0x01000000 | 0x00000004
+            : 0x00020000 | 0x00080000 | 0x00000800;
+        var descriptor = OpenWithRetry(path, flags);
+        if (descriptor < 0) throw new IOException(LastError("open payload file failed"));
+        using var native = new SafeUnixHandle(descriptor);
+        var identity = ReadStat(native, buffer.Pointer);
+        if (identity.FileType != 0x8000) throw new IOException("payload entry is not a regular file");
+        unixMode = (int)(identity.Mode & 0xFFF);
+        var handle = new SafeFileHandle(new IntPtr(descriptor), ownsHandle: true);
+        native.SetHandleAsInvalid();
+        try { return new FileStream(handle, FileAccess.Read); }
+        catch { handle.Dispose(); throw; }
+    }
+
+    internal static OwnedDirectoryLease OpenOwnedDirectory(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var canonicalParent = RealPath(Path.GetDirectoryName(full) ?? throw new IOException("payload directory has no parent"));
+        var handle = OpenAbsoluteDirectory(Path.Combine(canonicalParent, Path.GetFileName(full)), out var parent, out _);
+        parent.Dispose();
+        try
+        {
+            var canonical = ReadFinalPath(handle);
+            var backend = new UnixSecureRemovalBackend();
+            return new OwnedDirectoryLease(token =>
+            {
+                token.ThrowIfCancellationRequested();
+                if (!PathIdentity.Equals(ReadFinalPath(handle), canonical))
+                    throw new IOException("owned staging directory was moved; retained for review");
+                using var buffer = new StatBuffer();
+                return backend.CaptureDirectoryValidation(handle, canonical, buffer);
+            }, handle.Dispose);
+        }
+        catch { handle.Dispose(); throw; }
+    }
+
+    internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var buffer = new StatBuffer();
+        var full = Path.GetFullPath(path);
+        var canonicalParent = RealPath(Path.GetDirectoryName(full) ?? throw new IOException("payload directory has no parent"));
+        using var root = OpenAbsoluteDirectory(Path.Combine(canonicalParent, Path.GetFileName(full)), out var parent, out var rootName);
+        using var rootParent = parent;
+        var rootBefore = ReadStat(root, buffer.Pointer);
+        var canonical = ReadFinalPath(root);
+        var observations = new List<(string Path, NativeStat Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
+        var frames = new Stack<(DirectoryFrame Frame, NativeStat Before, string Relative)>();
+        frames.Push((new DirectoryFrame(root, parent, rootName, canonical, 0, ownsParent: false, ownsDirectory: false), rootBefore, ""));
+        try
+        {
+            while (frames.TryPeek(out var current))
+            {
+                token.ThrowIfCancellationRequested();
+                if (!current.Frame.TryReadNext(out var entry, out var error))
+                {
+                    if (error is not null) throw new IOException(error);
+                    if (!Matches(current.Before, ReadStat(current.Frame.Directory, buffer.Pointer)))
+                        throw new IOException("payload directory changed during comparison");
+                    frames.Pop().Frame.Dispose();
+                    continue;
+                }
+                token.ThrowIfCancellationRequested();
+                if (entry is null) continue;
+                if (!TryReadStatAt(current.Frame.Directory, entry.Value.Name, buffer.Pointer,
+                        out var before, out var statError))
+                    throw new IOException(statError ?? "payload entry disappeared during comparison");
+                if (entry.Value.Inode != 0 && entry.Value.Inode != before.Inode)
+                    throw new IOException("payload entry changed before it could be opened");
+                if (before.Device != rootBefore.Device) throw new IOException("cross-filesystem payload traversal refused");
+                var relative = current.Relative + entry.Value.Name;
+                if (observations.Count >= 10_000) throw new IOException("payload entry limit exceeded");
+                observations.Add((relative, before, null, null));
+                if (before.IsSymlink)
+                {
+                    var bytes = new byte[32 * 1024];
+                    token.ThrowIfCancellationRequested();
+                    var length = ReadLinkAtWithRetry(current.Frame.Directory.FileDescriptor, entry.Value.Name, bytes);
+                    if (length < 0 || length >= bytes.Length) throw new IOException("payload link inspection failed or exceeded limit");
+                    observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)length))), null);
+                    observe(new(relative, "link", null, null, bytes.AsSpan(0, (int)length).ToArray(),
+                        Encoding.UTF8.GetString(bytes, 0, (int)length)));
+                    token.ThrowIfCancellationRequested();
+                    if (!TryReadStatAt(current.Frame.Directory, entry.Value.Name, buffer.Pointer, out var after, out _)
+                        || !Matches(before, after)) throw new IOException("payload link changed during comparison");
+                }
+                else if (before.IsDirectory)
+                {
+                    if (current.Frame.Depth >= maxDepth) throw new IOException("payload depth limit exceeded");
+                    SafeUnixHandle? child = OpenDirectoryAt(current.Frame.Directory, entry.Value.Name, refuseNestedMount: true);
+                    try
+                    {
+                        var opened = ReadStat(child, buffer.Pointer);
+                        if (!Matches(before, opened)) throw new IOException("payload directory changed before open");
+                        observe(new(relative, "directory", null, (int)(opened.Mode & 0xFFF), null, null));
+                        frames.Push((new DirectoryFrame(child, current.Frame.Directory, entry.Value.Name, relative,
+                            current.Frame.Depth + 1, ownsParent: false), opened, relative + "/"));
+                        child = null;
+                    }
+                    finally { child?.Dispose(); }
+                }
+                else
+                {
+                    if (before.FileType != 0x8000) throw new IOException("payload entry is not a regular file");
+                    using var child = OpenPayloadFile(current.Frame.Directory, entry.Value.Name);
+                    var opened = ReadStat(child, buffer.Pointer);
+                    if (!Matches(before, opened)) throw new IOException("payload file changed before open");
+                    var duplicate = DupWithRetry(child.FileDescriptor);
+                    if (duplicate < 0) throw new IOException("duplicate payload handle failed");
+                    using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
+                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null))
+                        ?? throw new IOException("payload file evidence is missing");
+                    observations[^1] = (relative, before, null, evidence);
+                    token.ThrowIfCancellationRequested();
+                    if (!Matches(opened, ReadStat(child, buffer.Pointer))) throw new IOException("payload file changed during comparison");
+                }
+            }
+            // File writes do not necessarily change their parent directory.
+            // Recheck every observed entry relative to the still-held root,
+            // including closed descendant frames, before publishing hashes.
+            var knownDirectories = observations.Where(item => item.Identity.IsDirectory)
+                .ToDictionary(item => item.Path, item => item.Identity, StringComparer.Ordinal);
+            foreach (var observation in observations)
+            {
+                token.ThrowIfCancellationRequested();
+                var parts = observation.Path.Split('/');
+                using var heldParent = OpenPayloadParent(root, parts[..^1], knownDirectories, rootBefore, buffer.Pointer, token);
+                if (!TryReadStatAt(heldParent, parts[^1], buffer.Pointer, out var actual, out _)
+                    || !Matches(observation.Identity, actual))
+                    throw new IOException("payload entry changed before snapshot completion");
+                if (observation.FileEvidence is { } expectedFile)
+                {
+                    using var file = OpenPayloadFile(heldParent, parts[^1]);
+                    if (!Matches(observation.Identity, ReadStat(file, buffer.Pointer)))
+                        throw new IOException("payload file changed before completion verification");
+                    var duplicate = DupWithRetry(file.FileDescriptor);
+                    if (duplicate < 0) throw new IOException("duplicate payload file failed");
+                    using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
+                    SecurePayloadWalker.VerifyContent(stream, expectedFile, token);
+                    if (!Matches(observation.Identity, ReadStat(file, buffer.Pointer)))
+                        throw new IOException("payload file changed during completion verification");
+                }
+                if (observation.LinkHash is { } expectedLink)
+                {
+                    var bytes = new byte[32 * 1024];
+                    var count = ReadLinkAtWithRetry(heldParent.FileDescriptor, parts[^1], bytes);
+                    if (count < 0 || count >= bytes.Length
+                        || expectedLink != Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)count))))
+                        throw new IOException("payload link changed before snapshot completion");
+                }
+            }
+            if (!Matches(rootBefore, ReadStat(root, buffer.Pointer)))
+                throw new IOException("payload root changed before snapshot completion");
+            return ToSecureIdentity(rootBefore, canonical);
+        }
+        finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
+    }
+
+    private static SafeUnixHandle OpenPayloadFile(SafeUnixHandle directory, string name)
+    {
+        var flags = OperatingSystem.IsMacOS()
+            ? 0x00000100 | 0x01000000 | 0x00000004
+            : 0x00020000 | 0x00080000 | 0x00000800;
+        int descriptor;
+        if (OperatingSystem.IsLinux())
+        {
+            var how = new OpenHow
+            {
+                Flags = (ulong)flags,
+                Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
+            };
+            descriptor = checked((int)OpenAt2WithRetry(UnixConstants.OpenAt2SystemCall,
+                directory.FileDescriptor, name, ref how, (nuint)Marshal.SizeOf<OpenHow>()));
+        }
+        else descriptor = OpenAtWithRetry(directory.FileDescriptor, name, flags);
+        return CreateHandle(descriptor, "open payload file failed");
+    }
+
+    private static SafeUnixHandle OpenPayloadParent(SafeUnixHandle root, string[] parts,
+        IReadOnlyDictionary<string, NativeStat> known, NativeStat rootBefore, IntPtr buffer, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var current = CreateHandle(DupWithRetry(root.FileDescriptor), "duplicate payload root failed");
+        try
+        {
+            if (!Matches(rootBefore, ReadStat(current, buffer))) throw new IOException("payload root changed");
+            var relative = "";
+            foreach (var part in parts)
+            {
+                token.ThrowIfCancellationRequested();
+                var next = OpenDirectoryAt(current, part, refuseNestedMount: true);
+                try
+                {
+                    relative += relative.Length == 0 ? part : "/" + part;
+                    if (!known.TryGetValue(relative, out var expected) || !Matches(expected, ReadStat(next, buffer)))
+                        throw new IOException("payload ancestor changed before snapshot completion");
+                }
+                catch { next.Dispose(); throw; }
+                current.Dispose();
+                current = next;
+            }
+            return current;
+        }
+        catch { current.Dispose(); throw; }
+    }
+
+    private static nint ReadLinkAtWithRetry(int directory, string name, byte[] buffer)
+    {
+        for (var attempt = 0; attempt < MaxInterruptedAttempts; attempt++)
+        {
+            var result = UnixNative.readlinkat(directory, name, buffer, (nuint)buffer.Length);
+            if (result >= 0 || Marshal.GetLastPInvokeError() != UnixConstants.Interrupted) return result;
+        }
+        return -1;
+    }
+
     public bool TryCaptureIdentity(
         string path,
         out SecureFileIdentity identity,
@@ -1522,6 +1745,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         private IntPtr _directoryStream;
         private readonly bool _ownsParent;
+        private readonly bool _ownsDirectory;
         private bool _finished;
 
         internal DirectoryFrame(
@@ -1530,7 +1754,8 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             string name,
             string displayPath,
             int depth,
-            bool ownsParent)
+            bool ownsParent,
+            bool ownsDirectory = true)
         {
             Directory = directory;
             Parent = parent;
@@ -1538,6 +1763,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             DisplayPath = displayPath;
             Depth = depth;
             _ownsParent = ownsParent;
+            _ownsDirectory = ownsDirectory;
         }
 
         internal SafeUnixHandle Directory { get; }
@@ -1611,7 +1837,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 UnixNative.closedir(_directoryStream);
                 _directoryStream = IntPtr.Zero;
             }
-            Directory.Dispose();
+            if (_ownsDirectory) Directory.Dispose();
             if (_ownsParent) Parent.Dispose();
         }
     }
@@ -1669,6 +1895,9 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static class UnixNative
     {
+        [DllImport("libc", SetLastError = true)]
+        internal static extern nint readlinkat(int directory, string name, [Out] byte[] buffer, nuint size);
+
         [DllImport("libc", SetLastError = true)]
         internal static extern int open(string path, int flags);
 

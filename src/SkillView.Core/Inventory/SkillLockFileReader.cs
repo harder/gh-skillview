@@ -38,7 +38,14 @@ public sealed class SkillLockFileReader
         IEnumerable<string> scanRootPaths,
         CancellationToken cancellationToken)
     {
-        var builder = ImmutableDictionary.CreateBuilder<string, SkillPackage>(StringComparer.Ordinal);
+        return LoadObservations(scanRootPaths, cancellationToken).GroupBy(entry => entry.Name, StringComparer.Ordinal)
+            .ToImmutableDictionary(group => group.Key, group => group.First().Package, StringComparer.Ordinal);
+    }
+
+    internal ImmutableArray<PackageObservation> LoadObservations(IEnumerable<string> scanRootPaths,
+        CancellationToken cancellationToken)
+    {
+        var builder = ImmutableArray.CreateBuilder<PackageObservation>();
         var seenLockfiles = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var root in scanRootPaths)
@@ -86,7 +93,7 @@ public sealed class SkillLockFileReader
 
     private void TryReadInto(
         string path,
-        ImmutableDictionary<string, SkillPackage>.Builder builder,
+        ImmutableArray<PackageObservation>.Builder builder,
         HashSet<string> seen,
         CancellationToken cancellationToken)
     {
@@ -145,7 +152,7 @@ public sealed class SkillLockFileReader
     private void ReadDocumentInto(
         string path,
         JsonDocument doc,
-        ImmutableDictionary<string, SkillPackage>.Builder builder,
+        ImmutableArray<PackageObservation>.Builder builder,
         CancellationToken cancellationToken)
     {
         if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
@@ -161,9 +168,12 @@ public sealed class SkillLockFileReader
             if (entry.Value.ValueKind != JsonValueKind.Object) continue;
             var pkg = ParseEntry(entry.Value);
             if (pkg is null) continue;
-            // First lockfile wins on conflict — agents-skill-lock is
-            // typically the canonical one; per-agent shadows are rare.
-            builder.TryAdd(entry.Name, pkg);
+            pkg = pkg with
+            {
+                LockFilePath = path,
+                InstallationRoot = Path.Combine(Path.GetDirectoryName(path)!, "skills")
+            };
+            builder.Add(new(entry.Name, pkg));
             added++;
         }
         _logger.Info("inventory.lockfile", $"{path}: {added} skill(s) tagged");
@@ -188,3 +198,5 @@ public sealed class SkillLockFileReader
         el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String &&
         DateTimeOffset.TryParse(v.GetString(), out var d) ? d : null;
 }
+
+internal sealed record PackageObservation(string Name, SkillPackage Package);

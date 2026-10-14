@@ -9,6 +9,22 @@ namespace SkillView.Tests.Subprocess;
 public sealed class ProcessRunnerTests
 {
     [Fact]
+    public async Task RunAsync_EnvironmentOverridesAreChildOnly()
+    {
+        const string name = "SKILLVIEW_STAGE_TEST";
+        var parent = System.Environment.GetEnvironmentVariable(name);
+        var command = OperatingSystem.IsWindows()
+            ? ("pwsh", new[] { "-NoProfile", "-Command", "[Console]::Write($env:SKILLVIEW_STAGE_TEST)" })
+            : ("/bin/sh", new[] { "-c", "printf '%s' \"$SKILLVIEW_STAGE_TEST\"" });
+        var result = await new ProcessRunner(new Logger()).RunAsync(command.Item1, command.Item2,
+            cancellationToken: TestContext.Current.CancellationToken,
+            environment: new Dictionary<string, string> { [name] = "private-stage" });
+        Assert.True(result.Succeeded, result.StdErr);
+        Assert.Equal("private-stage", result.StdOut);
+        Assert.Equal(parent, System.Environment.GetEnvironmentVariable(name));
+    }
+
+    [Fact]
     public async Task RunAsync_PreCanceledRequest_DoesNotAttemptProcessStart()
     {
         var runner = new ProcessRunner(new Logger(LogLevel.Debug));
@@ -70,6 +86,33 @@ public sealed class ProcessRunnerTests
         Assert.InRange(result.StdOut.Length, limit, limit + 80);
         Assert.Contains("output truncated after 128 characters", result.StdErr);
         Assert.InRange(result.StdErr.Length, limit, limit + 80);
+    }
+
+    [Fact]
+    public async Task RunAsync_CanceledUpdateRetainsBothStreamsAfterTermination()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), "skillview-output-ready-" + Guid.NewGuid().ToString("N"));
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            var command = OperatingSystem.IsWindows()
+                ? ("pwsh", new[] { "-NoProfile", "-Command",
+                    "[Console]::Out.WriteLine('Updated first'); [Console]::Out.Flush(); " +
+                    "[Console]::Error.WriteLine('second pending'); [Console]::Error.Flush(); " +
+                    "[IO.File]::WriteAllText('" + marker.Replace("'", "''", StringComparison.Ordinal) + "','ready'); Start-Sleep -Seconds 30" })
+                : ("/bin/sh", new[] { "-c", "printf '%s\\n' 'Updated first'; printf '%s\\n' 'second pending' >&2; printf ready > \"$1\"; sleep 30", "skillview", marker });
+            var task = new ProcessRunner(new Logger(), terminationWait: TimeSpan.FromSeconds(2)).RunAsync(
+                command.Item1, command.Item2, cancellationToken: cancellation.Token, retainCancellationOutput: true);
+            using var admissionDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!File.Exists(marker)) await Task.Delay(10, admissionDeadline.Token);
+            cancellation.Cancel();
+            var result = await task;
+            Assert.True(result.Cancelled);
+            Assert.Equal(130, result.ExitCode);
+            Assert.Contains("Updated first", result.StdOut);
+            Assert.Contains("second pending", result.StdErr);
+        }
+        finally { cancellation.Cancel(); if (File.Exists(marker)) File.Delete(marker); }
     }
 
     [Fact]

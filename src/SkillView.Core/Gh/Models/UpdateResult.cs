@@ -17,24 +17,37 @@ public sealed record UpdateResult
     public required string? ErrorMessage { get; init; }
     public required IReadOnlyList<string> CommandLine { get; init; }
     public required ImmutableArray<UpdateEntry> Entries { get; init; }
+    public bool Cancelled { get; init; }
+    public bool ReconciliationPartial { get; init; }
+    public bool MutationAttempted { get; init; }
+    public ImmutableArray<UpdateNotice> Notices { get; init; } = [];
+    public ImmutableArray<InstallationUpdateOutcome> Outcomes { get; init; } = [];
 
     public static UpdateResult Failure(
         bool dryRun,
         int exitCode,
         string stdErr,
-        IReadOnlyList<string> commandLine) =>
+        IReadOnlyList<string> commandLine,
+        string stdOut = "") =>
         new()
         {
             DryRun = dryRun,
             Succeeded = false,
             ExitCode = exitCode,
-            StdOut = string.Empty,
+            StdOut = stdOut,
             StdErr = stdErr,
             ErrorMessage = stdErr,
             CommandLine = commandLine,
             Entries = ImmutableArray<UpdateEntry>.Empty,
         };
 }
+
+public sealed record UpdateNotice(string Stream, string Text);
+
+public sealed record InstallationUpdateOutcome(string InstallationId, string Path,
+    string Status, string? BeforeFingerprint, string? AfterFingerprint,
+    ImmutableArray<string> ChangedFiles, int ChangedFileCount,
+    ImmutableArray<string> Exposures, string? Message);
 
 /// One row from a `gh skill update`(--dry-run) body. `Status` is a loose
 /// classification (`updated`, `up-to-date`, `pinned`, `skipped`, `failed`,

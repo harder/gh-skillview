@@ -12,7 +12,7 @@ public class GhSkillUpdateServiceTests
     public void BuildArgs_MinimalNoOptions()
     {
         var args = GhSkillUpdateService.BuildArgs(new GhSkillUpdateService.Options());
-        Assert.Equal(new[] { "skill", "update" }, args);
+        Assert.Equal(new[] { "skill", "update", "--all" }, args);
     }
 
     [Fact]
@@ -20,22 +20,21 @@ public class GhSkillUpdateServiceTests
     {
         var args = GhSkillUpdateService.BuildArgs(
             new GhSkillUpdateService.Options(Skills: new[] { "render-md", "fetch-url" }));
-        Assert.Equal(new[] { "skill", "update", "render-md", "fetch-url" }, args);
+        Assert.Equal(new[] { "skill", "update", "--all", "--", "render-md", "fetch-url" }, args);
     }
 
     [Fact]
-    public void BuildArgs_EmptySkillsAreSkipped()
+    public void BuildArgs_BlankSelectorsAreRefused()
     {
-        var args = GhSkillUpdateService.BuildArgs(
-            new GhSkillUpdateService.Options(Skills: new[] { "", "  ", "real-one" }));
-        Assert.Equal(new[] { "skill", "update", "real-one" }, args);
+        Assert.Throws<ArgumentException>(() => GhSkillUpdateService.BuildArgs(
+            new GhSkillUpdateService.Options(Skills: new[] { "", "real-one" })));
     }
 
     [Fact]
     public void BuildArgs_AllEmittedWhenSet()
     {
         Assert.DoesNotContain("--all",
-            GhSkillUpdateService.BuildArgs(new GhSkillUpdateService.Options(All: false)));
+            GhSkillUpdateService.BuildArgs(new GhSkillUpdateService.Options(All: false, ConfirmApply: false)));
         Assert.Contains("--all",
             GhSkillUpdateService.BuildArgs(new GhSkillUpdateService.Options(All: true)));
     }
@@ -71,8 +70,27 @@ public class GhSkillUpdateServiceTests
                 Skills: new[] { "s1" },
                 All: true, DryRun: true, Force: true, Unpin: true));
         Assert.Equal(
-            new[] { "skill", "update", "--all", "--dry-run", "--force", "--unpin", "s1" },
+            new[] { "skill", "update", "--all", "--dry-run", "--force", "--unpin", "--", "s1" },
             args);
+    }
+
+    [Fact]
+    public void BuildArgs_ExactDirectoryAndOptionLikeSelectorRemainData()
+    {
+        var args = GhSkillUpdateService.BuildArgs(new GhSkillUpdateService.Options(
+            Skills: ["--force"], Directory: "/skills", All: false));
+        Assert.Equal(new[] { "skill", "update", "--all", "--dir", "/skills", "--", "--force" }, args);
+    }
+
+    [Fact]
+    public void ParseEntries_CurrentGhFormatsSeparateAvailabilityAndCompletion()
+    {
+        var entries = GhSkillUpdateService.ParseEntries("  • demo (team/repo) abc > def [v2]\nUpdated demo\n", true);
+        Assert.Equal(new[] { "available", "updated" }, entries.Select(e => e.Status));
+        Assert.Equal("abc", entries[0].FromVersion);
+        Assert.Equal("team/repo", entries[0].Repo);
+        var notices = GhSkillUpdateService.ParseEntries("⊘ demo is pinned to v1 (skipped)\n! Skipping other: inaccessible remote\n", true);
+        Assert.Equal(new[] { "pinned", "skipped" }, notices.Select(e => e.Status));
     }
 
     [Fact]

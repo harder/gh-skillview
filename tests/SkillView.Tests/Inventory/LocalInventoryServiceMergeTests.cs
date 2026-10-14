@@ -9,6 +9,26 @@ namespace SkillView.Tests.Inventory;
 public class LocalInventoryServiceMergeTests
 {
     [Fact]
+    public void OwnershipKeepsBothContextualLocksAndLeavesUnrelatedCopyUnowned()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "owners");
+        var roots = new[] { Path.Combine(root, "one", "skills"), Path.Combine(root, "two", "skills") };
+        var packages = roots.Select((path, index) => new PackageObservation("demo",
+            new SkillPackage($"owner{index}/repo", "github", null, null, null)
+            { InstallationRoot = path, LockFilePath = Path.Combine(Path.GetDirectoryName(path)!, ".skill-lock.json") })).ToImmutableArray();
+        var enriched = LocalInventoryService.EnrichOwnership([
+            Scan("demo", Path.Combine(roots[0], "demo")),
+            Scan("demo", Path.Combine(roots[1], "demo")),
+            Scan("demo", Path.Combine(root, "custom", "demo"))], packages, TestContext.Current.CancellationToken);
+        Assert.Equal("owner0/repo", enriched[0].Package!.Source);
+        Assert.Equal("owner1/repo", enriched[1].Package!.Source);
+        Assert.Single(enriched[0].OwnershipClaims);
+        Assert.Single(enriched[1].OwnershipClaims);
+        Assert.Null(enriched[2].Package);
+        Assert.Empty(enriched[2].OwnershipClaims);
+    }
+
+    [Fact]
     public void MergeWithCancellation_HonorsPreCanceledToken()
     {
         using var cancellation = new CancellationTokenSource();

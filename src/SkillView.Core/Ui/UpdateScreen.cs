@@ -23,45 +23,49 @@ public static class UpdateScreen
         sb.AppendLine();
         if (!result.Succeeded)
         {
-            sb.AppendLine($"### ⛔ Failed");
-            sb.AppendLine();
-            if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
-            {
-                AppendFencedBlock(sb, result.ErrorMessage);
-            }
-            return sb.ToString();
+            sb.AppendLine("### ⛔ Failed or refused");
+            if (!string.IsNullOrWhiteSpace(result.ErrorMessage)) AppendFencedBlock(sb, result.ErrorMessage);
         }
-        if (dryRun && result.Entries.Length > 0)
+        if (!result.Outcomes.IsDefaultOrEmpty)
+        {
+            sb.AppendLine("| Installation | Outcome | Evidence |");
+            sb.AppendLine("| --- | --- | --- |");
+            foreach (var outcome in result.Outcomes)
+            {
+                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(outcome.Path)} | " +
+                    $"{MarkdownTableFormatter.FormatTableCell(outcome.Status)} | " +
+                    $"{MarkdownTableFormatter.FormatTableCell(outcome.Message ?? outcome.ChangedFileCount + " changed file(s)")} |");
+                foreach (var exposure in outcome.Exposures)
+                    sb.AppendLine($"Affected exposure: {MarkdownTableFormatter.FormatCodeSpan(exposure)}  ");
+            }
+            sb.AppendLine();
+        }
+        if (result.Entries.Length > 0)
         {
             sb.AppendLine("| Skill | Status | Change |");
             sb.AppendLine("| --- | --- | --- |");
             foreach (var entry in result.Entries)
             {
                 var change = string.IsNullOrWhiteSpace(entry.FromVersion) && string.IsNullOrWhiteSpace(entry.ToVersion)
-                    ? "—"
-                    : MarkdownTableFormatter.FormatCodeSpan($"{entry.FromVersion ?? "?"} -> {entry.ToVersion ?? "?"}");
-                sb.AppendLine(
-                    $"| {MarkdownTableFormatter.FormatCodeSpan(entry.Name)} | " +
-                    $"{MarkdownTableFormatter.FormatTableCell(entry.Status)} | " +
-                    $"{change} |");
+                    ? "—" : MarkdownTableFormatter.FormatCodeSpan($"{entry.FromVersion ?? "?"} -> {entry.ToVersion ?? "?"}");
+                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(entry.Name)} | " +
+                    $"{MarkdownTableFormatter.FormatTableCell(entry.Status)} | {change} |");
             }
-            if (!string.IsNullOrWhiteSpace(result.StdOut))
-            {
-                sb.AppendLine();
-                sb.AppendLine("### Raw output");
-                sb.AppendLine();
-                AppendFencedBlock(sb, result.StdOut);
-            }
-            return sb.ToString();
+            sb.AppendLine();
         }
-        if (string.IsNullOrWhiteSpace(result.StdOut))
+        if (!string.IsNullOrWhiteSpace(result.StdOut))
         {
-            sb.AppendLine(dryRun
-                ? "_No updates available for the selected skill(s)._"
-                : "_Completed with no output._");
-            return sb.ToString();
+            sb.AppendLine("### Standard output");
+            AppendFencedBlock(sb, result.StdOut);
         }
-        AppendFencedBlock(sb, result.StdOut);
+        if (!string.IsNullOrWhiteSpace(result.StdErr))
+        {
+            sb.AppendLine("### Notices and errors");
+            AppendFencedBlock(sb, result.StdErr);
+        }
+        if (result.Outcomes.IsDefaultOrEmpty && string.IsNullOrWhiteSpace(result.StdOut)
+            && string.IsNullOrWhiteSpace(result.StdErr))
+            sb.AppendLine("_Completed with no output; availability was not independently established._");
         return sb.ToString();
     }
 
