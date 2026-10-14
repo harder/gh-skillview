@@ -651,6 +651,11 @@ public static class CliDispatcher
         w.WriteString("payloadRelationship", result.PayloadRelationship);
         w.WriteString("leftFingerprint", result.LeftFingerprint);
         w.WriteString("rightFingerprint", result.RightFingerprint);
+        w.WriteString("leftObjectStateFingerprint", result.LeftObjectStateFingerprint);
+        w.WriteString("rightObjectStateFingerprint", result.RightObjectStateFingerprint);
+        if (result.LeftRootUnixMode is { } leftMode) w.WriteNumber("leftRootUnixMode", leftMode); else w.WriteNull("leftRootUnixMode");
+        if (result.RightRootUnixMode is { } rightMode) w.WriteNumber("rightRootUnixMode", rightMode); else w.WriteNull("rightRootUnixMode");
+        w.WriteString("objectEvidenceContract", "native IDs, generations and observed Unix modes; full ACL/xattr/alternate-stream metadata is not attested");
         w.WriteBoolean("complete", result.Complete);
         w.WriteBoolean("requiresExposureMigration", result.RequiresExposureMigration);
         w.WriteNumber("differingFileCount", result.DifferingFileCount);

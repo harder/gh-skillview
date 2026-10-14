@@ -1,0 +1,86 @@
+{
+  "batch": "4d",
+  "date": "2026-10-14",
+  "baseCommit": "cf578f7971a4be69cd2fe4c45b813fb4f063d373",
+  "scope": "M08/M14/M15 read-only object continuity and stricter backup publication; apply/undo remain subsequent work",
+  "localVerification": {
+    "sdk": "10.0.402",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "testsPassed": 1069,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "formatVerified": true,
+    "siteBuildPassed": true,
+    "sequentialAppAndExtensionNativeAotPublishesPassed": true,
+    "standaloneTrimWarningsAreErrors": true,
+    "backupHistoryRegressionBothNativeHostsPassed": true
+  },
+  "independentReview": {
+    "review": "source review and final delta re-review clear",
+    "focusedTestsPassed": 61,
+    "failed": 0,
+    "skipped": 0,
+    "remainingFindings": 0
+  },
+  "nativeRuntimeProof": [
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/objects/app/skillview",
+      "nativeSha256": "64119e8cf79b2eed70f62575b706656504be4daad74463a8a29cb1fcb0fab1c7",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "sameBytesDistinctObjects": true,
+      "readOnlyObjectEvidenceStable": true,
+      "identicalContentReplacementObserved": true,
+      "unixRootModesRespected": true,
+      "metadataCoverageExplicit": true,
+      "comparisonCreatedNoMaintenanceState": true,
+      "payloadBytesUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/objects/app/skillview",
+      "nativeSha256": "64119e8cf79b2eed70f62575b706656504be4daad74463a8a29cb1fcb0fab1c7",
+      "gh": "/opt/homebrew/bin/gh",
+      "sameBytesDistinctObjects": true,
+      "readOnlyObjectEvidenceStable": true,
+      "identicalContentReplacementObserved": true,
+      "unixRootModesRespected": true,
+      "metadataCoverageExplicit": true,
+      "comparisonCreatedNoMaintenanceState": true,
+      "payloadBytesUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/objects/ext/gh-skillview",
+      "nativeSha256": "a6a382d8fbaafeb22f8a1073a286cd47292fc13f77febe597edc6929bada5909",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "sameBytesDistinctObjects": true,
+      "readOnlyObjectEvidenceStable": true,
+      "identicalContentReplacementObserved": true,
+      "unixRootModesRespected": true,
+      "metadataCoverageExplicit": true,
+      "comparisonCreatedNoMaintenanceState": true,
+      "payloadBytesUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/objects/ext/gh-skillview",
+      "nativeSha256": "a6a382d8fbaafeb22f8a1073a286cd47292fc13f77febe597edc6929bada5909",
+      "gh": "/opt/homebrew/bin/gh",
+      "sameBytesDistinctObjects": true,
+      "readOnlyObjectEvidenceStable": true,
+      "identicalContentReplacementObserved": true,
+      "unixRootModesRespected": true,
+      "metadataCoverageExplicit": true,
+      "comparisonCreatedNoMaintenanceState": true,
+      "payloadBytesUnchanged": true
+    }
+  ],
+  "compatibility": {
+    "archiveSchema1Unchanged": true,
+    "rawContentFingerprintsUnchanged": true,
+    "comparisonJsonAdditiveProperties": true,
+    "completeMetadataAttestation": false
+  },
+  "ci": {
+    "status": "pending PR",
+    "required": "three test platforms and both hosts on four native AOT targets"
+  }
+}

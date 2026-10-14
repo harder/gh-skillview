@@ -512,6 +512,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
   remote content and is separate from Terminal.Gui's pasted-input sanitization.
+- Payload equality and native object continuity are separate evidence.
+  `PayloadSnapshot.ObjectStateFingerprint` retains full native IDs/generations
+  for the root and every observed leaf/directory, plus observed Unix modes.
+  Backup capture rechecks both raw bytes and this evidence before publishing a
+  captured journal. It is not a full ACL/xattr/alternate-stream attestation;
+  metadata-aware recovery needs its own admission/revalidation contract.
+  Root Unix modes are reported separately from the schema-1 archive fingerprint
+  so old archive/history verification remains compatible.
 - Keep local inventory I/O off the Terminal.Gui thread. Scanner, cleanup
   classification, root resolution, and package-lock enrichment must accept and
   check cancellation between roots/entries. Read at most the bounded

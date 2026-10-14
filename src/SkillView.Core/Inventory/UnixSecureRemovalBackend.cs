@@ -85,7 +85,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         catch { handle.Dispose(); throw; }
     }
 
-    internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
+    internal static NativePayloadRoot WalkPayload(string path, int maxDepth,
         Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -131,7 +131,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     if (length < 0 || length >= bytes.Length) throw new IOException("payload link inspection failed or exceeded limit");
                     observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)length))), null);
                     observe(new(relative, "link", null, null, bytes.AsSpan(0, (int)length).ToArray(),
-                        Encoding.UTF8.GetString(bytes, 0, (int)length)));
+                        Encoding.UTF8.GetString(bytes, 0, (int)length), ToSecureIdentity(before, "")));
                     token.ThrowIfCancellationRequested();
                     if (!TryReadStatAt(current.Frame.Directory, entry.Value.Name, buffer.Pointer, out var after, out _)
                         || !Matches(before, after)) throw new IOException("payload link changed during comparison");
@@ -144,7 +144,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     {
                         var opened = ReadStat(child, buffer.Pointer);
                         if (!Matches(before, opened)) throw new IOException("payload directory changed before open");
-                        observe(new(relative, "directory", null, (int)(opened.Mode & 0xFFF), null, null));
+                        observe(new(relative, "directory", null, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, "")));
                         frames.Push((new DirectoryFrame(child, current.Frame.Directory, entry.Value.Name, relative,
                             current.Frame.Depth + 1, ownsParent: false), opened, relative + "/"));
                         child = null;
@@ -160,7 +160,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     var duplicate = DupWithRetry(child.FileDescriptor);
                     if (duplicate < 0) throw new IOException("duplicate payload handle failed");
                     using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
-                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null))
+                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, "")))
                         ?? throw new IOException("payload file evidence is missing");
                     observations[^1] = (relative, before, null, evidence);
                     token.ThrowIfCancellationRequested();
@@ -203,7 +203,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             }
             if (!Matches(rootBefore, ReadStat(root, buffer.Pointer)))
                 throw new IOException("payload root changed before snapshot completion");
-            return ToSecureIdentity(rootBefore, canonical);
+            return new NativePayloadRoot(ToSecureIdentity(rootBefore, canonical), (int)(rootBefore.Mode & 0xFFF));
         }
         finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
     }

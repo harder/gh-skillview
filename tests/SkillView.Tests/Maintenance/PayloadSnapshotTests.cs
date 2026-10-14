@@ -154,6 +154,71 @@ public sealed class PayloadSnapshotTests : IDisposable
         Assert.Equal("unrelated", File.ReadAllText(Path.Combine(owned, "keep")));
     }
 
+    [Fact]
+    public void NativeObjectState_IsStableAcrossReadOnlyCaptures()
+    {
+        WriteSkill();
+        var first = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        var second = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        Assert.NotNull(first.ObjectStateFingerprint);
+        Assert.Equal(64, first.ObjectStateFingerprint.Length);
+        Assert.Equal(first.ObjectStateFingerprint, second.ObjectStateFingerprint);
+        Assert.Equal(first.RootIdentity, second.RootIdentity);
+        Assert.Equal(first.Entries.Length, first.Objects.Length);
+        Assert.All(first.Objects, item => Assert.NotEqual(0UL, item.Identity.FileIdLow | item.Identity.FileIdHigh));
+    }
+
+    [Fact]
+    public void SameBytesInSeparateCopies_DoNotImplySameNativeObjects()
+    {
+        WriteSkill();
+        var other = Directory.CreateTempSubdirectory("skillview-object-copy-");
+        try
+        {
+            File.Copy(Path.Combine(_root, "SKILL.md"), Path.Combine(other.FullName, "SKILL.md"));
+            var first = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+            var second = PayloadSnapshot.Capture(other.FullName, TestContext.Current.CancellationToken);
+            Assert.Equal(first.Fingerprint, second.Fingerprint);
+            Assert.NotEqual(first.ObjectStateFingerprint, second.ObjectStateFingerprint);
+        }
+        finally { other.Delete(true); }
+    }
+
+    [Fact]
+    public void SameContentFileReplacement_ChangesNativeObjectState()
+    {
+        WriteSkill();
+        var file = Path.Combine(_root, "resource");
+        File.WriteAllText(file, "same bytes");
+        var first = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        var replacement = Path.Combine(_root, "replacement");
+        File.WriteAllText(replacement, "same bytes");
+        File.Move(replacement, file, overwrite: true);
+        var second = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        Assert.Equal(first.Fingerprint, second.Fingerprint);
+        Assert.NotEqual(first.ObjectStateFingerprint, second.ObjectStateFingerprint);
+        Assert.NotEqual(Assert.Single(first.Objects, item => item.Path == "resource").Identity,
+            Assert.Single(second.Objects, item => item.Path == "resource").Identity);
+    }
+
+    [Fact]
+    public void UnixRootMode_IsObservedSeparatelyFromArchivePayloadHash()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        WriteSkill();
+        var original = File.GetUnixFileMode(_root);
+        try
+        {
+            var first = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+            File.SetUnixFileMode(_root, original ^ UnixFileMode.OtherExecute);
+            var second = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+            Assert.Equal(first.Fingerprint, second.Fingerprint);
+            Assert.NotEqual(first.RootUnixMode, second.RootUnixMode);
+            Assert.NotEqual(first.ObjectStateFingerprint, second.ObjectStateFingerprint);
+        }
+        finally { File.SetUnixFileMode(_root, original); }
+    }
+
     private void WriteSkill(string metadata = "") => File.WriteAllText(Path.Combine(_root, "SKILL.md"),
         "---\nname: demo\ndescription: Demo\n" + metadata + "---\nBody\n");
 }

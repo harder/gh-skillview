@@ -8,7 +8,13 @@ public sealed record SkillComparisonResult(string LeftInstallationId, string Rig
     string SourceRelationship, string RevisionRelationship, string ContextRelationship,
     string PayloadRelationship, string? LeftFingerprint, string? RightFingerprint,
     ImmutableArray<string> DifferingFiles, int DifferingFileCount, bool Complete,
-    bool RequiresExposureMigration, string Recommendation, ImmutableArray<string> Diagnostics);
+    bool RequiresExposureMigration, string Recommendation, ImmutableArray<string> Diagnostics)
+{
+    public string? LeftObjectStateFingerprint { get; init; }
+    public string? RightObjectStateFingerprint { get; init; }
+    public int? LeftRootUnixMode { get; init; }
+    public int? RightRootUnixMode { get; init; }
+}
 
 /// Explicit, bounded comparison. Routine inventory does not hash or query sources.
 public sealed class SkillComparisonService
@@ -26,6 +32,8 @@ public sealed class SkillComparisonService
         var a = results[0].Snapshot;
         var b = results[1].Snapshot;
         var inspected = a is not null && b is not null;
+        if (inspected && a!.RootUnixMode != b!.RootUnixMode)
+            diagnostics = diagnostics.Add("Root Unix modes differ; equal file bytes do not establish matching root permissions.");
         var changedTracking = inspected && (!TrackingMatches(left, a!) || !TrackingMatches(right, b!));
         if (changedTracking) diagnostics = diagnostics.Add("Inventory tracking changed; refresh before planning.");
         await InspectionSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -45,7 +53,7 @@ public sealed class SkillComparisonService
             : differences.IsEmpty ? "installer-metadata-only" : "different-payloads";
         var migration = complete && inventoryComplete && !aliases && differences.IsEmpty && source == "same-source"
             && revision == "same-recorded-revision" && left.Validity == ValidityState.Valid
-            && right.Validity == ValidityState.Valid && !left.AllOwnershipClaims.Any() && !right.AllOwnershipClaims.Any();
+            && right.Validity == ValidityState.Valid && a!.RootUnixMode == b!.RootUnixMode && !left.AllOwnershipClaims.Any() && !right.AllOwnershipClaims.Any();
         var recommendation = !complete ? "Resolve incomplete inspection before comparing or planning changes."
             : aliases ? "These observations identify one physical address; preserve all exposures."
             : source is "different-origins" or "different-source-subpaths" ? "Keep origins distinct; matching names or bytes do not transfer ownership."
@@ -55,7 +63,13 @@ public sealed class SkillComparisonService
             : "Compare instructions, scripts, resources and permissions; preserve differences until their disposition is explicit.";
         return new(left.InstallationId, right.InstallationId, source, revision, context, payload,
             a?.Fingerprint, b?.Fingerprint, differences.Take(128).ToImmutableArray(), differences.Length,
-            complete, migration, recommendation, diagnostics);
+            complete, migration, recommendation, diagnostics)
+        {
+            LeftObjectStateFingerprint = a?.ObjectStateFingerprint,
+            RightObjectStateFingerprint = b?.ObjectStateFingerprint,
+            LeftRootUnixMode = a?.RootUnixMode,
+            RightRootUnixMode = b?.RootUnixMode
+        };
     }
 
     internal static string SourceRelationship(InstalledSkill left, InstalledSkill right)

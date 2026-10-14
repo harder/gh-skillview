@@ -1,13 +1,15 @@
 namespace SkillView.Inventory;
 
 internal readonly record struct NativePayloadItem(string RelativePath, string Kind,
-    Stream? Content, int? UnixMode, byte[]? LinkBytes, string? LinkTarget);
+    Stream? Content, int? UnixMode, byte[]? LinkBytes, string? LinkTarget, SecureFileIdentity Identity);
+
+internal readonly record struct NativePayloadRoot(SecureFileIdentity Identity, int? UnixMode);
 
 internal readonly record struct PayloadFileEvidence(string Hash, long Bytes);
 
 internal static class SecurePayloadWalker
 {
-    internal static SecureFileIdentity Walk(string path, int maxDepth,
+    internal static NativePayloadRoot Walk(string path, int maxDepth,
         Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

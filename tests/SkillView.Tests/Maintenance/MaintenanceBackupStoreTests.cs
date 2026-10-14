@@ -216,6 +216,43 @@ public sealed class MaintenanceBackupStoreTests : IDisposable
     }
 
     [Fact]
+    public void SameContentReplacementBetweenInspectionAndArchive_RemainsIncomplete()
+    {
+        var target = Target();
+        var file = Path.Combine(target.ResolvedPath, "SKILL.md");
+        var expected = File.ReadAllBytes(file);
+        var store = new MaintenanceBackupStore(State, _ => { }, () =>
+        {
+            var replacement = Path.Combine(_temporary.FullName, "replacement");
+            File.WriteAllBytes(replacement, expected);
+            File.Move(replacement, file, overwrite: true);
+        });
+        Assert.Throws<IOException>(() => store.Capture(target, TestContext.Current.CancellationToken));
+        Assert.Single(Directory.EnumerateFiles(State, "*.creating.json"));
+        Assert.Empty(Directory.EnumerateFiles(State, "*.captured.json"));
+        Assert.Equal(expected, File.ReadAllBytes(file));
+    }
+
+    [Fact]
+    public void RootModeChangeBetweenInspectionAndArchive_RemainsIncomplete()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var target = Target();
+        var original = File.GetUnixFileMode(target.ResolvedPath);
+        try
+        {
+            var store = new MaintenanceBackupStore(State, _ => { }, () =>
+            {
+                if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(target.ResolvedPath, original ^ UnixFileMode.OtherExecute);
+            });
+            Assert.Throws<IOException>(() => store.Capture(target, TestContext.Current.CancellationToken));
+            Assert.Single(Directory.EnumerateFiles(State, "*.creating.json"));
+            Assert.Empty(Directory.EnumerateFiles(State, "*.captured.json"));
+        }
+        finally { File.SetUnixFileMode(target.ResolvedPath, original); }
+    }
+
+    [Fact]
     public void ChangedSourceRetainsCreatingJournalAndNeverPublishesCapturedEvidence()
     {
         var target = Target();
