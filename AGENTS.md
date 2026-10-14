@@ -147,13 +147,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   matching `.agents/skills` entry so the inventory scan actually discovers
   skills installed there — keep both in sync if this default ever changes.
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.0`
-  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.10.1`, `xunit.v3`
-  `4.0.1`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
+  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
+  `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
   exact Terminal.Gui version string — update both alongside any bump.
-- `global.json` selects `Microsoft.Testing.Platform` for xunit 4.0.1. Pass
+- `global.json` selects `Microsoft.Testing.Platform` for xunit 4. Pass
   `--project` for a specific project and use xunit's MTP-native
   `--filter-namespace`/`--filter-class`/`--filter-trait` options for filtered
   runs. For an exact method, use `--filter-query
@@ -541,6 +541,46 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   config resolution explicitly; Windows defaults to `APPDATA/GitHub CLI`, and
   XDG_CONFIG_HOME has precedence there too. Never mutate the parent environment.
   Shared gh/Vercel schema-3 lock entries are source evidence, not exclusive owners.
+- Owner mutation policy must inspect every `AllOwnershipClaims` entry and
+  `OwnershipDiagnostics`, never only the compatibility `Package` projection.
+  Diagnostic, entry, root and file bounds must retain global incomplete coverage
+  when evidence is omitted; exhausting a reporting budget cannot authorize work.
+- gh's global registry is keyed by `InstallName` (possibly `namespace/name`),
+  while its installer materializes flat `skill.Name` directories. Resolve actual
+  remote selectors before collision checks; unresolved paths, ambiguous names,
+  truncated capture or incomplete tabular discovery cannot authorize a write.
+  Keep explicit truncation facts on `ProcessResult` instead of parsing a marker.
+- Project/custom updates with explicit `--dir` isolate incidental global writes
+  in a separate private mutation home. Shared-directory updates must keep their
+  original registry context, including redirected roots and namespaced records,
+  and match the current source/subpath/tree/pin before launching gh. Every native
+  registry writer needs a schema/extension guard immediately before launch.
+  This guard is preflight protection; coordinated journals in the maintenance
+  plan layer must provide the stronger multi-writer preservation contract.
+- Install admission must retain the original destination owner records across
+  discovery awaits, revalidate them after the final placement probe, and inspect
+  canonical contexts alongside lexical aliases. Normalize relative child HOME,
+  XDG and agent config paths against the captured child working directory.
+  Directory canonicalization cannot canonicalize a regular lockfile: deduplicate
+  those through its canonical parent plus final name. Broken exposure links also
+  need parent/name matching so aliases cannot hide contextual ownership.
+- Shared update admission uses entry fingerprints so an earlier target's update
+  does not invalidate an unrelated target. gh's typed lock writer adds required
+  empty strings and removes optional empty strings; normalize only those known
+  equivalent representations. Keep whole-file fingerprints for discovery-time
+  install admission and migration review. Repository descriptions can contain
+  unescaped newlines: stage a recorded source path into an empty private root,
+  inspect exactly one materialized skill, and verify its path/tree instead of
+  relaxing the listing's write-authority checks.
+- Compare revisions by evidence domain. An authored version, Git tree, owner
+  payload hash and distributor version are distinct facts; equivalent Git-tree
+  evidence must not become incomparable just because one copy also has a lock
+  claim. Missing evidence is unknown. Recheck contextual record fingerprints
+  before recommending a migration, and suppress it when coverage is partial.
+- Local inventory/comparison must suppress gh's update notifiers and telemetry
+  through child-only `GH_NO_UPDATE_NOTIFIER`, `GH_NO_EXTENSION_UPDATE_NOTIFIER`
+  and `GH_TELEMETRY=false`. A successful local command can otherwise spawn
+  `send-telemetry`; include that child in offline trace assertions.
 
 - `agent_docs/running-tests.md` — standard verification commands, UI-focused
   test filters, and opt-in `gh` contract-test workflow details.

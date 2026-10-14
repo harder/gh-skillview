@@ -133,8 +133,9 @@ public static class CleanupClassifier
                 result.Add(new Candidate(
                     CandidateKind.BrokenSymlink,
                     skill.ResolvedPath,
-                    $"symlink target missing",
-                    skill));
+                    skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
+                        ? "symlink target missing; contextual ownership requires a coordinated maintenance plan" : "symlink target missing",
+                    skill, ReviewOnly: skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty));
                 continue;
             }
 
@@ -270,11 +271,27 @@ public static class CleanupClassifier
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
                     if (empty)
                     {
+                        var leaf = Path.GetFileName(child);
+                        var observation = new InstalledSkill
+                        {
+                            Name = leaf,
+                            ResolvedPath = resolved,
+                            ScanRoot = root.Path,
+                            Scope = root.Scope,
+                            Agents = [new("unknown", child, PathResolver.IsSymlink(child), DiscoveryRoot: root.Path)],
+                            FrontMatter = SkillFrontMatter.Empty,
+                            Validity = ValidityState.MissingSkillMd,
+                            Provenance = Provenance.FsScan,
+                            Ignored = false,
+                            IsSymlinked = false,
+                            InstalledAt = null
+                        };
+                        var protectedOwner = snapshot.IsPartial || snapshot.OwnershipRecords.Any(record => record.Describes(observation));
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
                             resolved,
                             $"empty directory under scan root '{root.Path}'",
-                            Skill: null));
+                            Skill: null, ReviewOnly: protectedOwner));
                     }
                 }
             }

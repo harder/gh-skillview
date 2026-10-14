@@ -47,6 +47,24 @@ public sealed class RemoveTargetResolverTests : IDisposable
     }
 
     [Fact]
+    public void Evaluate_OwnedAgentLinkRequiresCoordinatedPlan()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var canonical = MakeSkillDir("owned");
+        var link = Path.Combine(_tempRoot, "agent-owned");
+        Directory.CreateSymbolicLink(link, canonical);
+        var skill = MakeSkill(canonical, "owned", agents: [new("claude", link, true)])
+            with
+        { OwnershipClaims = [new("owner/repo", "github", null, null, null)] };
+        var snapshot = Snapshot(skill);
+        var target = Assert.Single(RemoveTargetResolver.BuildTargets(skill, snapshot), item => item.Kind == RemoveTargetKind.AgentSymlink);
+        var evaluation = RemoveTargetResolver.Evaluate(target, snapshot);
+        Assert.False(evaluation.CanExecute);
+        Assert.Contains(evaluation.Errors, error => error.Kind == RemoveValidator.ErrorKind.OwnerRecordNeedsPlan);
+        Assert.True(Directory.Exists(link));
+    }
+
+    [Fact]
     public void Evaluate_AgentLinkOutsideScanRoots_IsExplicitlyRefused()
     {
         if (OperatingSystem.IsWindows()) return;

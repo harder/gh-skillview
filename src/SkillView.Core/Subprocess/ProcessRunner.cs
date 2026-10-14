@@ -15,6 +15,15 @@ public sealed class ProcessRunner
     private readonly TimeSpan _terminationWait;
     private readonly IReadOnlyDictionary<string, string>? _environment;
 
+    internal string? GetEffectiveEnvironmentVariable(string name, IReadOnlyDictionary<string, string>? overrides = null)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var local = overrides?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
+        if (local?.Key is not null) return local.Value.Value;
+        var configured = _environment?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
+        return configured?.Key is not null ? configured.Value.Value : Environment.GetEnvironmentVariable(name);
+    }
+
     public ProcessRunner(
         Logger logger,
         int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream,
@@ -150,7 +159,7 @@ public sealed class ProcessRunner
                 catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException) { }
                 return new ProcessResult(executable, arguments, 130,
                     stdout.ToString(), stderr.ToString(), sw.Elapsed)
-                { Cancelled = true };
+                { Cancelled = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
             }
             throw;
         }
@@ -163,7 +172,8 @@ public sealed class ProcessRunner
             process.ExitCode,
             stdout.ToString(),
             stderr.ToString(),
-            sw.Elapsed);
+            sw.Elapsed)
+        { StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
 
         _logger.Debug("subprocess",
             $"exit={result.ExitCode} dur={result.Duration.TotalMilliseconds:F0}ms {executable}");
@@ -202,6 +212,7 @@ public sealed class ProcessRunner
         private readonly int _limit;
         private readonly StringBuilder _buffer;
         private bool _truncated;
+        internal bool Truncated { get { lock (_gate) return _truncated; } }
 
         internal BoundedTextBuffer(int limit)
         {

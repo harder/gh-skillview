@@ -45,6 +45,7 @@ public static class CliDispatcher
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "install" => await InstallAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "update" => await UpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "--help" or "-h" or "help" => PrintHelp(options),
@@ -67,7 +68,7 @@ public static class CliDispatcher
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "rescan" or "search" => TimeSpan.FromMinutes(2),
+        "list" or "rescan" or "search" or "compare" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
@@ -259,7 +260,7 @@ public static class CliDispatcher
             (string? scope, string? agent, string? path, List<string> scanRoots)? listOptions = null,
             CancellationToken cancellationToken = default)
     {
-        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken, includeAuthentication: false).ConfigureAwait(false);
         var scanRoots = new List<string>(options.ScanRoots);
         string? scope = null, agent = null;
         var allowHidden = options.SubcommandArgs.Contains("--allow-hidden-dirs");
@@ -321,7 +322,7 @@ public static class CliDispatcher
         w.WriteStartObject();
         w.WriteString("capturedAt", snapshot.CapturedAt.ToString("O"));
         w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
-        w.WriteNumber("schemaVersion", 2);
+        w.WriteNumber("schemaVersion", 3);
         w.WriteBoolean("partial", snapshot.IsPartial);
         w.WriteStartArray("inaccessiblePaths");
         foreach (var path in snapshot.Diagnostics.InaccessiblePaths) w.WriteStringValue(path);
@@ -338,6 +339,10 @@ public static class CliDispatcher
             w.WriteEndArray();
             w.WriteEndObject();
         }
+        w.WriteEndArray();
+
+        w.WriteStartArray("ownerRecords");
+        foreach (var owner in snapshot.OwnershipRecords) WriteOwnerRecord(w, owner);
         w.WriteEndArray();
 
         w.WriteStartArray("scannedRoots");
@@ -373,8 +378,38 @@ public static class CliDispatcher
             w.WriteString("sourcePath", skill.FrontMatter.GithubPath);
             w.WriteString("pinnedRef", skill.FrontMatter.PinnedRef);
             w.WriteString("localSourcePath", skill.FrontMatter.LocalPath);
+            var sourceIdentity = skill.SourceIdentity;
+            w.WriteStartObject("sourceIdentity");
+            w.WriteString("id", sourceIdentity.Key);
+            w.WriteString("provider", sourceIdentity.Provider);
+            w.WriteString("origin", sourceIdentity.Origin);
+            w.WriteString("subpath", sourceIdentity.Subpath);
+            w.WriteString("evidence", sourceIdentity.Evidence);
+            w.WriteBoolean("conflicted", sourceIdentity.Conflicted);
+            w.WriteEndObject();
+            var revision = skill.Revision;
+            w.WriteStartObject("revision");
+            w.WriteString("authoredVersion", revision.AuthoredVersion);
+            w.WriteString("repositoryRef", revision.RepositoryRef);
+            w.WriteString("recordedTree", revision.RecordedTree);
+            w.WriteString("pinnedRef", revision.PinnedRef);
+            w.WriteString("payloadFingerprint", revision.PayloadFingerprint);
+            w.WriteString("ownerRecordedHash", revision.OwnerRecordedHash);
+            w.WriteString("ownerHashKind", revision.OwnerHashKind);
+            w.WriteString("distributorVersion", revision.DistributorVersion);
+            w.WriteEndObject();
+            w.WriteStartObject("physicalInstallation");
+            w.WriteString("id", skill.InstallationId);
+            w.WriteString("path", skill.ResolvedPath);
+            w.WriteString("materialization", skill.PhysicalInstallation.Materialization);
+            w.WriteBoolean("nativeIdentityCaptured", false);
+            w.WriteEndObject();
+            w.WriteStartArray("ownerRecords");
+            foreach (var owner in skill.OwnershipClaims)
+                WriteOwnerRecord(w, owner);
+            w.WriteEndArray();
             w.WriteStartArray("diagnostics");
-            foreach (var diagnostic in skill.FrontMatter.Diagnostics.Concat(skill.MetadataConflicts)) w.WriteStringValue(diagnostic);
+            foreach (var diagnostic in skill.FrontMatter.Diagnostics.Concat(skill.MetadataConflicts).Concat(skill.OwnershipDiagnostics)) w.WriteStringValue(diagnostic);
             w.WriteEndArray();
             w.WriteStartArray("agents");
             foreach (var a in skill.Agents)
@@ -386,6 +421,11 @@ public static class CliDispatcher
                 w.WriteString("scope", a.Scope?.ToString());
                 w.WriteString("context", a.Context);
                 w.WriteString("discoveryRoot", a.DiscoveryRoot);
+                w.WriteString("profile", a.Profile);
+                w.WriteString("agentVersion", a.AgentVersion);
+                if (a.Enabled is { } enabled) w.WriteBoolean("enabled", enabled); else w.WriteNull("enabled");
+                w.WriteString("loadingRule", a.LoadingRule);
+                w.WriteString("activeSessionState", "unknown");
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -395,6 +435,118 @@ public static class CliDispatcher
 
         w.WriteEndObject();
     }
+
+    private static void WriteOwnerRecord(Utf8JsonWriter w, SkillPackage owner)
+    {
+        w.WriteStartObject();
+        w.WriteString("provider", owner.Provider);
+        w.WriteString("recordPath", owner.LockFilePath);
+        w.WriteString("recordFingerprint", owner.RecordFingerprint);
+        w.WriteString("entryFingerprint", owner.EntryFingerprint);
+        w.WriteString("contextRoot", owner.ContextRoot);
+        w.WriteString("installationRoot", owner.InstallationRoot);
+        w.WriteStartArray("coveredRoots");
+        foreach (var root in owner.CoveredRoots) w.WriteStringValue(root);
+        w.WriteEndArray();
+        w.WriteString("selector", owner.Selector);
+        w.WriteString("source", owner.Source);
+        w.WriteString("sourceType", owner.SourceType);
+        w.WriteString("sourceUrl", owner.SourceUrl);
+        w.WriteString("sourcePath", owner.SkillPath);
+        w.WriteString("repositoryRef", owner.RepositoryRef);
+        w.WriteString("pinnedRef", owner.PinnedRef);
+        w.WriteString("distributorVersion", owner.PackageVersion);
+        w.WriteString("contentHash", owner.ContentHash);
+        w.WriteString("hashKind", owner.HashKind);
+        w.WriteString("installationMode", owner.InstallationMode);
+        w.WriteBoolean("exclusiveOwner", owner.IsExclusiveOwner);
+        w.WriteBoolean("readOnly", owner.ReadOnly);
+        w.WriteString("diagnostic", owner.Diagnostic);
+        if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
+        w.WriteEndObject();
+    }
+
+    private static async Task<int> CompareAsync(AppOptions options, TuiServices services, CancellationToken token)
+    {
+        var parsed = ParseComparisonArgs(options.SubcommandArgs);
+        if (parsed.Error is not null)
+        {
+            Console.Error.WriteLine($"skillview: {parsed.Error}");
+            return ExitCodes.InvalidUsage;
+        }
+        // Comparison uses offline inventory and never performs auth or remote
+        // update checks. gh list supplements filesystem facts when available.
+        var snapshot = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
+            new LocalInventoryService.Options(options.ScanRoots, AllowHiddenDirs: false), token).ConfigureAwait(false);
+        InstalledSkill[] Match(string path) => snapshot.Skills.Where(skill => PathIdentity.Equals(skill.ResolvedPath, path)
+            || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path))).ToArray();
+        var left = Match(parsed.LeftPath!);
+        var right = Match(parsed.RightPath!);
+        if (left.Length != 1 || right.Length != 1)
+        {
+            Console.Error.WriteLine("skillview: each comparison path must identify one captured installation; include its --scan-root before compare");
+            return ExitCodes.NoMatches;
+        }
+        var result = await new SkillView.Maintenance.SkillComparisonService().CompareAsync(left[0], right[0], token,
+            inventoryComplete: !snapshot.IsPartial).ConfigureAwait(false);
+        if (parsed.Json) Console.WriteLine(RenderComparisonJson(result));
+        else
+        {
+            Console.WriteLine($"source: {result.SourceRelationship} · revision: {result.RevisionRelationship}");
+            Console.WriteLine($"payload: {result.PayloadRelationship} · contexts: {result.ContextRelationship}");
+            Console.WriteLine(result.Recommendation);
+            foreach (var path in result.DifferingFiles) Console.WriteLine("  " + SkillView.Ui.TerminalEscapeSanitizer.Sanitize(path));
+            Console.WriteLine($"{result.DifferingFileCount} differing file(s); complete: {result.Complete}");
+            foreach (var diagnostic in result.Diagnostics) Console.Error.WriteLine(SkillView.Ui.TerminalEscapeSanitizer.Sanitize(diagnostic));
+        }
+        return result.Complete ? ExitCodes.Success : ExitCodes.UserError;
+    }
+
+    internal sealed record ParsedComparisonArgs(string? LeftPath, string? RightPath, bool Json, string? Error);
+
+    internal static ParsedComparisonArgs ParseComparisonArgs(IReadOnlyList<string> args)
+    {
+        string? left = null, right = null, error = null;
+        var json = false;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] == "--json") { json = true; continue; }
+            if (args[i] is "--path" or "--other-path" && i + 1 < args.Count && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                if (args[i] == "--path") left = args[++i]; else right = args[++i];
+                continue;
+            }
+            error = $"unsupported or incomplete compare argument: {args[i]}";
+        }
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            error = "compare requires --path <installation> and --other-path <installation>";
+        return new(left, right, json, error);
+    }
+
+    internal static string RenderComparisonJson(SkillView.Maintenance.SkillComparisonResult result) => RenderJson(w =>
+    {
+        w.WriteStartObject();
+        w.WriteNumber("schemaVersion", 1);
+        w.WriteString("leftInstallationId", result.LeftInstallationId);
+        w.WriteString("rightInstallationId", result.RightInstallationId);
+        w.WriteString("sourceRelationship", result.SourceRelationship);
+        w.WriteString("revisionRelationship", result.RevisionRelationship);
+        w.WriteString("contextRelationship", result.ContextRelationship);
+        w.WriteString("payloadRelationship", result.PayloadRelationship);
+        w.WriteString("leftFingerprint", result.LeftFingerprint);
+        w.WriteString("rightFingerprint", result.RightFingerprint);
+        w.WriteBoolean("complete", result.Complete);
+        w.WriteBoolean("requiresExposureMigration", result.RequiresExposureMigration);
+        w.WriteNumber("differingFileCount", result.DifferingFileCount);
+        w.WriteString("recommendation", result.Recommendation);
+        w.WriteStartArray("differingFiles");
+        foreach (var path in result.DifferingFiles) w.WriteStringValue(path);
+        w.WriteEndArray();
+        w.WriteStartArray("diagnostics");
+        foreach (var diagnostic in result.Diagnostics) w.WriteStringValue(diagnostic);
+        w.WriteEndArray();
+        w.WriteEndObject();
+    });
 
     private static async Task<int> SearchAsync(
         AppOptions options,
@@ -1818,6 +1970,7 @@ public static class CliDispatcher
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
             | `install OWNER/REPO [SKILL]` | Install one skill, or every skill in the repo with `--all`, then rescan inventory. | `--all`, `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--from-local`, `--allow-hidden-dirs`, `--json` |
             | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
+            | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 

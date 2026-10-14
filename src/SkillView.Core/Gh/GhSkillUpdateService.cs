@@ -5,6 +5,7 @@ using SkillView.Subprocess;
 using SkillView.Inventory.Models;
 using System.Text.RegularExpressions;
 using SkillView.Ui;
+using SkillView.Maintenance;
 
 namespace SkillView.Gh;
 
@@ -19,6 +20,8 @@ namespace SkillView.Gh;
 /// from the parsed textual result.
 public sealed class GhSkillUpdateService
 {
+    internal string? EffectiveHome => _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
+        ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
 
@@ -36,7 +39,8 @@ public sealed class GhSkillUpdateService
         bool Unpin = false,
         string? Directory = null,
         bool ConfirmApply = true,
-        IReadOnlyList<InstalledSkill>? Targets = null);
+        IReadOnlyList<InstalledSkill>? Targets = null,
+        IReadOnlyDictionary<string, string>? ProcessEnvironment = null);
 
     public async Task<UpdateResult> UpdateAsync(
         string ghPath,
@@ -45,8 +49,20 @@ public sealed class GhSkillUpdateService
     {
         options ??= new Options();
         var args = BuildArgs(options);
+        if (!options.DryRun)
+        {
+            try
+            {
+                GhSharedLockGuard.ValidateCapturedOwners(options.Targets, cancellationToken);
+                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken,
+                    _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment));
+                GhSharedLockGuard.ValidateUpdateRecords(records, options.Targets);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { return UpdateResult.Failure(false, 2, ex.Message, args); }
+        }
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
-            retainCancellationOutput: true).ConfigureAwait(false);
+            retainCancellationOutput: true, environment: options.ProcessEnvironment).ConfigureAwait(false);
         if (!result.Succeeded)
             _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
         var entries = ParseEntries(result.StdOut, options.DryRun).AddRange(ParseEntries(result.StdErr, options.DryRun));
@@ -142,6 +158,7 @@ public sealed class GhSkillUpdateService
 
     private static UpdateEntry? TryClassify(string line, bool dryRun = false)
     {
+        if (line == "All skills are up to date.") return null;
         var completion = Regex.Match(line, @"^Updated (?<name>\S+)$", RegexOptions.CultureInvariant);
         if (completion.Success) return new UpdateEntry { Name = completion.Groups["name"].Value, Status = "updated" };
         var transition = Regex.Match(line, @"^(?<name>\S+) \((?<repo>[^)]+)\) (?<from>\S*) > (?<to>\S+) \[[^]]+\]$", RegexOptions.CultureInvariant);

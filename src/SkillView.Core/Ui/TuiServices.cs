@@ -31,7 +31,8 @@ public sealed class TuiServices
 
     public static TuiServices Build(Logger logger, FileLogSink? fileLogSink = null, string? logDirectory = null)
     {
-        var runner = new ProcessRunner(logger);
+        var runner = new ProcessRunner(logger, environment: new Dictionary<string, string>
+        { ["GH_NO_UPDATE_NOTIFIER"] = "1", ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1", ["GH_TELEMETRY"] = "false" });
         var locator = new GhBinaryLocator(runner, logger);
         var auth = new GhAuthService(runner, logger);
         var dir = logDirectory ?? LogPaths.Resolve();

@@ -29,6 +29,17 @@ public class LocalInventoryServiceMergeTests
     }
 
     [Fact]
+    public void EmptyGhTrackingDoesNotInventChangedFilesystemMetadata()
+    {
+        var skill = Scan("demo", Path.Combine(Path.GetTempPath(), "demo"));
+        var merged = Assert.Single(LocalInventoryService.Merge([skill],
+            [new GhSkillListRecord { Name = "demo", Path = skill.ResolvedPath, Version = "", Repo = "", GithubTreeSha = "" }]));
+        Assert.Null(merged.FrontMatter.Upstream);
+        Assert.Null(merged.FrontMatter.GithubRef);
+        Assert.Null(merged.TreeSha);
+    }
+
+    [Fact]
     public void MergeWithCancellation_HonorsPreCanceledToken()
     {
         using var cancellation = new CancellationTokenSource();

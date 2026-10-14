@@ -160,6 +160,31 @@ public class CleanupClassifierTests : IDisposable
         Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
     }
 
+    [Fact]
+    public void MissingPayloadOwnerRecordsAndOwnedBrokenLinksRequireReview()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "demo")).FullName;
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = _tempRoot, Selector = "demo" };
+        var broken = Skill("broken", validity: ValidityState.BrokenSymlink) with { OwnershipClaims = [claim] };
+        var snapshot = Snapshot(false, broken) with { OwnershipRecords = [claim] };
+        var candidates = CleanupClassifier.Classify(snapshot, [new(_tempRoot, Scope.User, null)]);
+        Assert.True(Assert.Single(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.BrokenSymlink).ReviewOnly);
+        Assert.True(Assert.Single(candidates, candidate => candidate.Path == empty).ReviewOnly);
+        Assert.True(Directory.Exists(empty));
+        if (!OperatingSystem.IsWindows())
+        {
+            var alias = _tempRoot + "-alias";
+            try
+            {
+                Directory.CreateSymbolicLink(alias, _tempRoot);
+                var aliased = CleanupClassifier.Classify(snapshot, [new(alias, Scope.User, null)]);
+                Assert.True(Assert.Single(aliased, candidate => candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory).ReviewOnly);
+            }
+            finally { if (Directory.Exists(alias)) Directory.Delete(alias); }
+        }
+    }
+
     // --- Phase 9 edge cases ---------------------------------------------
 
     [Fact]

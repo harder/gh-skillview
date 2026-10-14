@@ -44,6 +44,16 @@ public sealed record InstalledSkill
     /// installs not recorded in any lockfile.
     public SkillPackage? Package { get; init; }
     public ImmutableArray<SkillPackage> OwnershipClaims { get; init; } = [];
+    public IEnumerable<SkillPackage> AllOwnershipClaims => OwnershipClaims.IsDefaultOrEmpty
+        ? Package is { } package ? [package] : [] : OwnershipClaims;
+    public ImmutableArray<string> OwnershipDiagnostics { get; init; } = [];
+    public string? PayloadFingerprint { get; init; }
+    public SkillSourceIdentity SourceIdentity => SkillSourceIdentity.From(this);
+    public SkillRevision Revision => new(FrontMatter.Version, FrontMatter.GithubRef ?? Package?.RepositoryRef,
+        TreeSha ?? (Package?.HashKind == "recorded-git-tree" ? Package.ContentHash : null),
+        FrontMatter.PinnedRef ?? Package?.PinnedRef, PayloadFingerprint, Package?.ContentHash, Package?.HashKind, Package?.PackageVersion);
+    public PhysicalSkillInstallation PhysicalInstallation => new(InstallationId, ResolvedPath,
+        Validity == ValidityState.BrokenSymlink ? "broken-link" : "directory", OwnershipClaims);
 
     /// Disagreements remain visible; they must not silently authorize maintenance.
     public ImmutableArray<string> MetadataConflicts { get; init; } = [];

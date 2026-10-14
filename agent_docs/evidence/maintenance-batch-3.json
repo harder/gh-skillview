@@ -1,0 +1,150 @@
+{
+  "baseline": "b4b2c80ebe59741752f7cd005f9af3a15eeb3100",
+  "sdk": "10.0.402",
+  "implementedFoundations": [
+    "M03 explicit full-payload comparison",
+    "M09 contextual user/project/XDG owner facts",
+    "M11 source/physical/exposure/revision models",
+    "M20 compare CLI",
+    "M21 offline inventory/comparison and adversarial writer checks"
+  ],
+  "remaining": [
+    "M10 discovery/catalog",
+    "M08 backups/dispositions",
+    "M13-M15 repair/migration/journal and coordinated writers",
+    "M12/M16 native owners/loading",
+    "M17-M20 desired state/adoption/diagnostics/maintenance UI"
+  ],
+  "fullSuite": {
+    "passed": 951,
+    "failed": 0,
+    "skipped": 0
+  },
+  "build": "zero warnings/errors",
+  "format": "dotnet format SkillView.sln --no-restore --verify-no-changes passed after formatter",
+  "nativeAot": "App and extension osx-arm64 publish passed; App IL2026/IL3050/IL3053 promoted to errors. Fresh platform CI required before merge.",
+  "runtimeProof": [
+    {
+      "gh": "gh version 2.97.0 (2026-07-31)",
+      "nativeHost": "standalone native AOT osx-arm64",
+      "listSchemaVersion": 3,
+      "sharedOwnerCorroborated": true,
+      "equivalentGitTreeDomains": true,
+      "sharedUpdateChangedOneCopy": true,
+      "customUpdatePreservedSharedRecord": true,
+      "collidingInstallRefusedWithoutMutation": true,
+      "contextualProjectAndXdgInstallRefused": true,
+      "aliasedProjectOwnerProtected": true,
+      "multiTargetSharedUpdateRetainedUnrelatedEntryEvidence": true,
+      "unsupportedSharedWritesPreservedBytes": true,
+      "completePayloadExtraDetected": true,
+      "contextualRevisionsDistinguished": true,
+      "offlineComparisonTrace": [
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/home/.agents/skills",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/custom",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/one/.agents/skills",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/two/.agents/skills"
+      ]
+    },
+    {
+      "gh": "gh version 2.102.0 (2026-09-30)",
+      "nativeHost": "standalone native AOT osx-arm64",
+      "listSchemaVersion": 3,
+      "sharedOwnerCorroborated": true,
+      "equivalentGitTreeDomains": true,
+      "sharedUpdateChangedOneCopy": true,
+      "customUpdatePreservedSharedRecord": true,
+      "collidingInstallRefusedWithoutMutation": true,
+      "contextualProjectAndXdgInstallRefused": true,
+      "aliasedProjectOwnerProtected": true,
+      "multiTargetSharedUpdateRetainedUnrelatedEntryEvidence": true,
+      "unsupportedSharedWritesPreservedBytes": true,
+      "completePayloadExtraDetected": true,
+      "contextualRevisionsDistinguished": true,
+      "offlineComparisonTrace": [
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/home/.agents/skills",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/custom",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/one/.agents/skills",
+        "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir <fixture>/two/.agents/skills"
+      ]
+    }
+  ],
+  "independentReview": {
+    "model": "Astra",
+    "remainingActionableFindings": 0,
+    "acceptedFindings": [
+      "every retained owner claim gates mutation rather than first Package projection",
+      "all native registry writers guarded with effective child home",
+      "project records cannot claim arbitrary scan roots",
+      "owner revision domains and fingerprints checked",
+      "launch-time shared schema and selector checks",
+      "all diagnostic/budget omissions retain incomplete coverage",
+      "isolate project/custom incidental global writes",
+      "equivalent Git-tree evidence merges into one domain",
+      "contradictory owner provenance stays a conflict",
+      "resolve bare/inline-version aliases to namespaced registry selectors",
+      "explicit capture truncation/schema completeness gates listing authority",
+      "unresolved explicit paths cannot borrow unrelated discovered selectors",
+      "flat gh materialization and namespaced registry mapping",
+      "redirected shared roots preserve actual registry context",
+      "blank gh fields normalize to absent metadata",
+      "gh telemetry suppressed in child environment",
+      "Copilot: destination-scoped project and XDG install ownership, stale shared record absence, every owner pin/version, documentation spacing",
+      "canonical project discovery and parent/name matching preserve ownership through aliases and broken links",
+      "relative child environment roots resolve against captured working directory",
+      "Git redirected worktrees, CWD fallback and supported legacy Codex/Pi placements",
+      "entry fingerprints survive unrelated gh rewrites and known missing/empty string normalization",
+      "repository multiline descriptions cannot be used as an unambiguous update selector protocol; stage and inspect exact recorded source path",
+      "retain unmatched owner records and protect empty-directory cleanup and agent unlink",
+      "up-to-date summary is a notice, never a parsed update"
+    ]
+  },
+  "lockBounds": {
+    "files": 128,
+    "entries": 4096,
+    "fileBytes": 1048576,
+    "aggregateBytes": 16777216,
+    "roots": 256,
+    "projectAncestorDepth": 8,
+    "diagnostics": 128
+  },
+  "comparisonBounds": {
+    "concurrentInspections": 2,
+    "reportedDifferences": 128,
+    "ownerClaims": 128
+  },
+  "limitations": [
+    "Preflight/change detection is not an atomic transaction with external writers",
+    "Existing selector reinstall and unresolved path imports require upcoming coordinated maintenance plans",
+    "Unsupported native owner schemas remain read-only",
+    "Profile/version/enabled/loading and active-session state stay unknown when not observed"
+  ],
+  "upstream": {
+    "ghInstaller": "https://github.com/cli/cli/blob/v2.102.0/internal/skills/installer/installer.go",
+    "ghLock": "https://github.com/cli/cli/blob/v2.102.0/internal/skills/lockfile/lockfile.go",
+    "vercelProjectLock": "https://github.com/vercel-labs/skills/blob/13e4063a1cf913f5606d57d42ab83a86f5001e04/src/local-lock.ts",
+    "vercelAgents": "https://github.com/vercel-labs/skills/blob/13e4063a1cf913f5606d57d42ab83a86f5001e04/src/agents.ts",
+    "ghEnvironment": "https://cli.github.com/manual/gh_help_environment"
+  },
+  "proofCommand": "python3 agent_docs/evidence/prove-maintenance-batch-3.py --app /path/to/native/skillview --gh /path/to/gh-2.97 --gh /path/to/current-gh --output /tmp/batch3-proof.json",
+  "dependencyCheck": {
+    "source": "https://api.nuget.org/v3-flatcontainer/{package}/index.json",
+    "versionsAlreadyCurrent": {
+      "Terminal.Gui": "2.5.0",
+      "Terminal.Gui.Editor": "2.5.7",
+      "YamlDotNet": "18.1.0",
+      "Microsoft.NET.Test.Sdk": "18.11.0",
+      "xunit.v3": "4.0.2",
+      "xunit.runner.visualstudio": "4.0.1"
+    },
+    "newUpdateRequired": false
+  },
+  "installPlacementBounds": {
+    "agents": 128,
+    "pathDirectories": 256,
+    "executableExtensions": 32,
+    "canonicalAncestorDepth": 128
+  }
+}
