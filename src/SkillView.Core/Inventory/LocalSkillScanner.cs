@@ -38,12 +38,7 @@ public sealed class LocalSkillScanner
         _candidateObservedForTests = candidateObservedForTests;
         _enumerateEntries = enumerateEntriesForTests
             ?? (path => Directory.EnumerateFileSystemEntries(path).GetEnumerator());
-        _openMetadata = openMetadataForTests ?? (path =>
-        {
-            if (!SecureRemovalBackend.IsSupported) throw new IOException("Native regular-file inspection is unavailable.");
-            return OperatingSystem.IsWindows() ? WindowsSecureRemovalBackend.OpenRegularFileForSnapshot(path)
-                : UnixSecureRemovalBackend.OpenRegularFileForSnapshot(path, out _);
-        });
+        _openMetadata = openMetadataForTests ?? RegularFileInspection.Open;
     }
 
     public sealed record Options(bool AllowHiddenDirs = false);
@@ -144,6 +139,13 @@ public sealed class LocalSkillScanner
                 if (!opts.AllowHiddenDirs && leaf.StartsWith('.'))
                 {
                     if (locations is { Count: < 128 }) locations.Add(new(child, "excluded", "Hidden entry; use --allow-hidden-dirs to observe it."));
+                    try
+                    {
+                        if ((File.GetAttributes(child) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                        { inaccessible?.Add(child); complete = false; }
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    { inaccessible?.Add(child); complete = false; }
                     continue;
                 }
                 var linked = PathResolver.IsSymlink(child);

@@ -214,7 +214,7 @@ Native manager manifests, bundled resources and effective loading policies
 remain in M12/M16; this batch does not infer those from placement alone. The
 recoverable repair/journal, desired-state and maintenance UI batches remain.
 
-Batch 3b local verification: warning-free build, 970 tests passed, solution
+Batch 3b local verification: warning-free build, 975 tests passed, solution
 format verification, and sequential standalone/extension native AOT publishes.
 Disposable runtime fixtures pass on gh 2.97.0 and 2.102.0, including redirected
 Git workspaces, profiles, namespaces, aliases and partial-coverage cleanup
@@ -228,3 +228,12 @@ A new all-platform test distinguishes dangling links from live containers; the
 existing container test also runs on Windows. Final native fixtures prove
 identity-pinned dangling-link cleanup on both supported gh hosts. Fresh CI is
 required for the corrected head.
+
+All four subsequent Copilot findings are addressed: metadata inspection has its
+own verified-ABI capability, hidden directory/link omissions make coverage
+partial independently of location-table bounds, startup uses the coordinator
+capture path, and Git initialization/discovery share an isolated context. Final
+independent re-review passed 115 focused tests. Linux AOT CI now denies openat2
+with EPERM and ENOSYS in fresh processes, requiring valid metadata and owner
+lock observations alongside unchanged payloads after a native removal refusal.
+The private gh protocol fixture tests capability separation, not gh semantics.

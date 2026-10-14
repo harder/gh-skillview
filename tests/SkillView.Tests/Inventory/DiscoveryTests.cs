@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Bootstrapping;
 using SkillView.Gh;
 using SkillView.Inventory;
@@ -115,8 +116,23 @@ public sealed class DiscoveryTests : IDisposable
         var project = DirectoryAt("redirected");
         var logger = new Logger();
         var runner = new ProcessRunner(logger, environment: new Dictionary<string, string>
-        { ["GIT_DIR"] = Path.Combine(project, ".git"), ["GIT_WORK_TREE"] = project });
-        var initialized = await new ProcessRunner(logger).RunAsync("git", ["init", "--quiet", project],
+        {
+            ["GIT_DIR"] = Path.Combine(project, ".git"),
+            ["GIT_WORK_TREE"] = project,
+            ["GIT_COMMON_DIR"] = Path.Combine(project, ".git"),
+            ["GIT_CONFIG_COUNT"] = "0",
+            ["GIT_OBJECT_DIRECTORY"] = Path.Combine(project, ".git", "objects"),
+            ["GIT_INDEX_FILE"] = Path.Combine(project, ".git", "index"),
+            ["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = "",
+            ["GIT_CONFIG_PARAMETERS"] = "",
+            ["GIT_TEMPLATE_DIR"] = DirectoryAt("empty-git-template"),
+            ["GIT_CONFIG"] = Path.Combine(project, "config"),
+            ["GIT_CONFIG_GLOBAL"] = Path.Combine(project, "global-config"),
+            ["GIT_CONFIG_SYSTEM"] = Path.Combine(project, "system-config"),
+            ["GIT_CONFIG_NOSYSTEM"] = "1"
+        },
+            defaultWorkingDirectory: project);
+        var initialized = await runner.RunAsync("git", ["init", "--quiet", project],
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(initialized.Succeeded, initialized.StdErr);
         var root = DirectoryAt("redirected/.claude/skills");
@@ -264,6 +280,51 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Contains(locations, location => location.State == "unsupported");
         Assert.Contains(locations, location => location.State == "excluded");
         Assert.NotEmpty(incomplete);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(128)]
+    public void HiddenNamespacesMakeCoveragePartialEvenWhenLocationReportingIsFull(int retainedLocations)
+    {
+        var root = DirectoryAt("skills");
+        SkillAt("skills/visible", "visible");
+        SkillAt("skills/.hidden/secret", "secret");
+        var incomplete = new List<string>();
+        var locations = Enumerable.Range(0, retainedLocations).Select(_ => new DiscoveryLocation("retained", "excluded", "test")).ToList();
+        var roots = new[] { new ScanRoot(root, Scope.Custom, null) };
+        var skills = new LocalSkillScanner(new Logger()).ScanWithCancellation(roots, null,
+            TestContext.Current.CancellationToken, incomplete, locations);
+        Assert.Equal("visible", Assert.Single(skills).Name);
+        Assert.Contains(Path.Combine(root, ".hidden"), incomplete);
+        var snapshot = InventorySnapshot.Empty with
+        {
+            Skills = skills,
+            ScannedRoots = [.. roots],
+            UsedGhSkillList = true,
+            Providers = [new("gh", true, [root], DateTimeOffset.UtcNow)],
+            Diagnostics = new() { InaccessiblePaths = incomplete.ToImmutableArray(), Locations = locations.ToImmutableArray() }
+        };
+        Assert.True(snapshot.IsPartial);
+        Assert.DoesNotContain(CleanupClassifier.Classify(snapshot, roots), candidate =>
+            candidate.Kind is CleanupClassifier.CandidateKind.Untracked or CleanupClassifier.CandidateKind.SourceOrphaned);
+        incomplete.Clear();
+        Assert.Equal(2, new LocalSkillScanner(new Logger()).ScanWithCancellation(roots, new(AllowHiddenDirs: true),
+            TestContext.Current.CancellationToken, incomplete).Length);
+        Assert.Empty(incomplete);
+    }
+
+    [Fact]
+    public void HiddenRegularFilesDoNotOmitSkillDiscoveryCoverage()
+    {
+        var root = DirectoryAt("skills");
+        SkillAt("skills/visible", "visible");
+        File.WriteAllText(Path.Combine(root, ".metadata"), "container metadata");
+        var incomplete = new List<string>();
+        var skills = new LocalSkillScanner(new Logger()).ScanWithCancellation([new(root, Scope.Custom, null)], null,
+            TestContext.Current.CancellationToken, incomplete);
+        Assert.Equal("visible", Assert.Single(skills).Name);
+        Assert.Empty(incomplete);
     }
 
     [Fact]

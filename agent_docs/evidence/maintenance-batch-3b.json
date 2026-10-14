@@ -6,7 +6,7 @@
     "M21 bounded and adversarial inventory verification"
   ],
   "fullSuite": {
-    "passed": 970,
+    "passed": 975,
     "failed": 0,
     "skipped": 0
   },
@@ -71,8 +71,13 @@
       "missing explicit discovery paths report incomplete coverage",
       "physical ancestors of nested workspace aliases remain discoverable",
       "macOS physical/lexical context assertions use native alias equality",
-      "Windows dangling directory links require target resolution before linked-container classification"
-    ]
+      "Windows dangling directory links require target resolution before linked-container classification",
+      "metadata inspection ABI capability independent of destructive Linux openat2 capability",
+      "hidden directory/link omissions mark coverage incomplete outside the location reporting cap",
+      "startup TUI capture reuses coordinator workspace/profile forwarding",
+      "Git initialization and discovery use the same isolated child context"
+    ],
+    "finalFocusedTestsPassed": 115
   },
   "sources": {
     "ghPlacementVersion": "v2.102.0",
@@ -85,5 +90,14 @@
     "Recoverable repair/journal, desired state and maintenance UI remain later batches",
     "Native physical keys are observational; execution still requires fresh native validation"
   ],
-  "updateRegression": "Batch 3 shared/exact/custom update and ownership runtime proof passed with both gh 2.97.0 and 2.102.0 on this batch host before the final discovery-only edge fixes."
+  "updateRegression": "Batch 3 shared/exact/custom update and ownership runtime proof passed with both gh 2.97.0 and 2.102.0 on this batch host before the final discovery-only edge fixes.",
+  "linuxCapabilityProof": {
+    "script": "prove-metadata-without-openat2.py",
+    "fixture": "private gh inventory protocol fixture; not a real gh contract",
+    "denials": [
+      "EPERM",
+      "ENOSYS"
+    ],
+    "requires": "Linux AOT CI must verify valid skill metadata and owner lock parsing, with destructive removal refused and initial fixture bytes unchanged"
+  }
 }

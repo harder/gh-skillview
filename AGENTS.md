@@ -1,5 +1,14 @@
 # AGENTS.md
 
+- Read-only skill and lock metadata uses `RegularFileInspection`, whose verified
+  native ABI check is independent of destructive traversal support. Linux hosts
+  without `openat2` may inspect regular metadata while removal stays disabled.
+  CI's Linux AOT job proves this with both EPERM and ENOSYS seccomp denials.
+- Hidden directory/link exclusions make inventory coverage partial independently
+  of the bounded location table. Skipped regular metadata files do not omit
+  skill discovery. Startup TUI capture must use the workflow coordinator so
+  workspace/profile options match later rescans.
+
 ## Repo
 
 `gh-skillview` is a .NET 10 / Terminal.Gui v2 terminal UI and CLI for browsing,

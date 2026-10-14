@@ -4,6 +4,7 @@ using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
+using SkillView.Inventory;
 using SkillView.Logging;
 using SkillView.Threading;
 using Terminal.Gui.App;
@@ -157,6 +158,43 @@ public sealed class SkillViewAppTests
     public void ShouldOpenInstalledOnStartup_ReturnsFalse_ForEmptyInventory()
     {
         Assert.False(SkillViewApp.ShouldOpenInstalledOnStartup(InventorySnapshot.Empty));
+    }
+
+    [Fact]
+    public async Task StartupInventoryRetainsWorkspaceAndNamedProfileOptions()
+    {
+        var temporary = Directory.CreateTempSubdirectory("skillview-startup-discovery-");
+        try
+        {
+            var workspace = Directory.CreateDirectory(Path.Combine(temporary.FullName, "workspace")).FullName;
+            var profile = Directory.CreateDirectory(Path.Combine(temporary.FullName, "profile")).FullName;
+            var workspaceSkill = Directory.CreateDirectory(Path.Combine(workspace, ".claude", "skills", "workspace-demo")).FullName;
+            var profileSkill = Directory.CreateDirectory(Path.Combine(profile, "profile-demo")).FullName;
+            File.WriteAllText(Path.Combine(workspaceSkill, "SKILL.md"), "---\nname: workspace-demo\ndescription: Test\n---\nBody\n");
+            File.WriteAllText(Path.Combine(profileSkill, "SKILL.md"), "---\nname: profile-demo\ndescription: Test\n---\nBody\n");
+            var home = Directory.CreateDirectory(Path.Combine(temporary.FullName, "home")).FullName;
+            var environment = new Dictionary<string, string>
+            {
+                ["HOME"] = home,
+                ["USERPROFILE"] = home,
+                ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, ".claude"),
+                ["PI_CODING_AGENT_DIR"] = Path.Combine(home, ".pi"),
+                ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
+                ["GIT_DIR"] = Path.Combine(home, ".git"),
+                ["GIT_WORK_TREE"] = home,
+                ["GIT_COMMON_DIR"] = Path.Combine(home, ".git"),
+                ["GIT_CONFIG_COUNT"] = "0"
+            };
+            var services = TuiServices.Build(new Logger(), processEnvironment: environment, workingDirectory: home);
+            var options = CreateOptions() with
+            { WorkspaceDirectories = [workspace], Profiles = [new ScanRootResolver.AgentProfileRoot("claude", profile, "work")] };
+            var app = new SkillViewApp(services, options);
+            var snapshot = await app.CaptureStartupInventoryAsync(CreateEnvironmentReport() with { GhPath = null }, TestContext.Current.CancellationToken);
+            Assert.Equal(["profile-demo", "workspace-demo"], snapshot.Skills.Select(skill => skill.Name));
+            Assert.Equal("work", Assert.Single(snapshot.Skills[0].Agents).Profile);
+            Assert.True(SkillViewApp.ShouldOpenInstalledOnStartup(snapshot));
+        }
+        finally { temporary.Delete(true); }
     }
 
     [Fact]

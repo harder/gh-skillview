@@ -236,10 +236,7 @@ public sealed class SkillLockFileReader(Logger logger)
     internal static byte[] ReadBytes(string path, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (!SecureRemovalBackend.IsSupported) throw new IOException("native regular-file inspection unavailable");
-        using var stream = OperatingSystem.IsWindows()
-            ? WindowsSecureRemovalBackend.OpenRegularFileForSnapshot(path)
-            : UnixSecureRemovalBackend.OpenRegularFileForSnapshot(path, out _);
+        using var stream = RegularFileInspection.Open(path);
         var buffer = ArrayPool<byte>.Shared.Rent(MaxFileBytes + 1);
         try
         {
