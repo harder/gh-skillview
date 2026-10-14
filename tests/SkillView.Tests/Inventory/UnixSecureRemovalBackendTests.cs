@@ -80,6 +80,22 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
             architecture,
             isLittleEndian: true,
             openAt2Available: false));
+        // Inspection uses only open/fstat and remains available with this ABI
+        // even when the stronger destructive traversal capability is absent.
+        Assert.True(UnixSecureRemovalBackend.TryGetLinuxStatLayout(architecture, true, out _));
+    }
+
+    [Fact]
+    public void RegularFileInspectionRetainsSpecialFileAndFinalLinkRefusals()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var path = Path.Combine(_tempRoot, "metadata");
+        File.WriteAllText(path, "content");
+        using (var stream = RegularFileInspection.Open(path)) Assert.Equal(7, stream.Length);
+        var link = Path.Combine(_tempRoot, "link");
+        File.CreateSymbolicLink(link, path);
+        Assert.Throws<IOException>(() => RegularFileInspection.Open(link));
+        Assert.Throws<IOException>(() => RegularFileInspection.Open(_tempRoot));
     }
 
     [Fact]

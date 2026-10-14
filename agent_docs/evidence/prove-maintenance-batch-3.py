@@ -32,7 +32,7 @@ for gh in args.gh:
         workspace.mkdir()
         shared = home / '.agents' / 'skills'
         custom = root / 'custom'
-        env = os.environ.copy()
+        env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_TOKEN=auth, GH_EXTENSION='1', GH_PATH=str(gh),
                    GH_CONFIG_DIR=str(root / 'gh-config'), XDG_STATE_HOME=str(root / 'state'),
                    XDG_CACHE_HOME=str(root / 'cache'), XDG_CONFIG_HOME=str(root / 'config'),

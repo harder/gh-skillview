@@ -50,6 +50,33 @@ public sealed class GhSharedLockGuardTests
     }
 
     [Fact]
+    public async Task RelativeUpdateHomeIsGuardedInTheActualChildWorkingDirectory()
+    {
+        var root = Directory.CreateTempSubdirectory("skillview-relative-update-home-");
+        try
+        {
+            foreach (var name in new[] { "home", "override" })
+            {
+                var directory = Directory.CreateDirectory(Path.Combine(root.FullName, name, ".agents"));
+                File.WriteAllText(Path.Combine(directory.FullName, ".skill-lock.json"), "{\"version\":99,\"skills\":{}}");
+            }
+            var homeKey = OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME";
+            var logger = new Logger();
+            var updater = new GhSkillUpdateService(new(logger, environment: new Dictionary<string, string> { [homeKey] = "home" },
+                defaultWorkingDirectory: root.FullName), logger);
+            Assert.Equal(Path.Combine(root.FullName, "home"), updater.EffectiveHome);
+            foreach (var environment in new IReadOnlyDictionary<string, string>?[] { null, new Dictionary<string, string> { [homeKey] = "override" } })
+            {
+                var result = await updater.UpdateAsync(Path.Combine(root.FullName, "does-not-exist"), new(ProcessEnvironment: environment),
+                    TestContext.Current.CancellationToken);
+                Assert.False(result.MutationAttempted);
+                Assert.Contains("unsupported", result.ErrorMessage, StringComparison.Ordinal);
+            }
+        }
+        finally { root.Delete(true); }
+    }
+
+    [Fact]
     public async Task SupportedSameSelectorRecordCannotBeReplacedByCustomInstall()
     {
         var home = Directory.CreateTempSubdirectory("skillview-record-collision-");

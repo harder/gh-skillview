@@ -44,7 +44,7 @@ public sealed class GhSkillInstallService
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
-        options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? Environment.CurrentDirectory) };
+        options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? _runner.EffectiveWorkingDirectory) };
         var args = BuildArgs(repo, skillName, options);
         try
         {

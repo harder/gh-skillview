@@ -295,7 +295,7 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.Equal("duplicate candidate path", skipped.GetProperty("reason").GetString());
     }
 
-    private static async Task<(int ExitCode, string Stdout, string Stderr)> RunCliAsync(string processPath, params string[] args)
+    private async Task<(int ExitCode, string Stdout, string Stderr)> RunCliAsync(string processPath, params string[] args)
     {
         await CliConsoleCapture.Gate.WaitAsync().ConfigureAwait(false);
         var originalOut = Console.Out;
@@ -308,7 +308,19 @@ public class CliDispatcherErrorTests : IDisposable
         try
         {
             var options = ArgParser.Parse(processPath, args);
-            var services = TuiServices.Build(new Logger(LogLevel.Info));
+            var home = Directory.CreateDirectory(Path.Combine(_tempRoot, "fixture-home")).FullName;
+            var services = TuiServices.Build(new Logger(LogLevel.Info), processEnvironment: new Dictionary<string, string>
+            {
+                ["HOME"] = home,
+                ["USERPROFILE"] = home,
+                ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
+                ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, "claude"),
+                ["PI_CODING_AGENT_DIR"] = Path.Combine(home, "pi"),
+                ["GIT_DIR"] = Path.Combine(_tempRoot, ".git"),
+                ["GIT_WORK_TREE"] = _tempRoot,
+                ["GIT_COMMON_DIR"] = Path.Combine(_tempRoot, ".git"),
+                ["GIT_CONFIG_COUNT"] = "0"
+            }, workingDirectory: _tempRoot);
             var exitCode = await CliDispatcher.RunAsync(options, services).ConfigureAwait(false);
             return (exitCode, stdoutWriter.ToString(), stderrWriter.ToString());
         }

@@ -92,7 +92,7 @@ public static class DoctorScreen
             if (string.IsNullOrEmpty(home)) return found;
             return InstallAgentCatalog.DetectInstalledDisplayEntries(
                 home,
-                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
+                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"), Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
         }
         catch { /* best-effort */ }
         return found;

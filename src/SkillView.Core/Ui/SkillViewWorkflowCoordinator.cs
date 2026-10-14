@@ -531,12 +531,12 @@ internal sealed class SkillViewWorkflowCoordinator
         return await _getOrProbeReport(cancellationToken).ConfigureAwait(false);
     }
 
-    private Task<InventorySnapshot> CaptureInventoryAsync(
+    internal Task<InventorySnapshot> CaptureInventoryAsync(
         EnvironmentReport report, CancellationToken cancellationToken, string? scopeFilter = null) =>
         _services.InventoryService.CaptureAsync(
             report.GhPath,
             new LocalInventoryService.Options(
-                ScanRoots: _options.ScanRoots,
+                ScanRoots: _options.ScanRoots, WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles,
                 AllowHiddenDirs: false,
                 FilterScope: scopeFilter),
             cancellationToken);

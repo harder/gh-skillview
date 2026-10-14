@@ -83,7 +83,7 @@ public class ScanRootResolverTests
     }
 
     [Fact]
-    public void Skips_project_seeds_outside_git()
+    public void Observes_current_directory_project_conventions_outside_git()
     {
         using var temp = new TempHome();
         var repo = Path.Combine(temp.Home, "not-a-repo");
@@ -95,7 +95,7 @@ public class ScanRootResolverTests
             HomeDirectory: temp.Home,
             CustomRoots: Array.Empty<string>()));
 
-        Assert.DoesNotContain(roots, r => r.Scope == Scope.Project);
+        Assert.Contains(roots, r => r.Scope == Scope.Project && r.Context == repo);
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class ScanRootResolverTests
     }
 
     [Fact]
-    public void Deduplicates_overlapping_roots()
+    public void Preserves_distinct_scope_observations_for_overlapping_roots()
     {
         using var temp = new TempHome();
         var claude = Path.Combine(temp.Home, ".claude", "skills");
@@ -232,8 +232,10 @@ public class ScanRootResolverTests
             HomeDirectory: temp.Home,
             CustomRoots: new[] { claude }));
 
-        var normalized = roots.Select(r => ScanRootResolver.NormalizeKey(r.Path)).ToArray();
+        var normalized = roots.Select(r => (ScanRootResolver.NormalizeKey(r.Path), r.Scope, r.AgentHint, r.Profile)).ToArray();
         Assert.Equal(normalized.Length, normalized.Distinct().Count());
+        Assert.Contains(roots, root => root.Scope == Scope.User);
+        Assert.Contains(roots, root => root.Scope == Scope.Custom);
     }
 
     private sealed class TempHome : IDisposable

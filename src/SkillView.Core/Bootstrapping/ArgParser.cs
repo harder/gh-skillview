@@ -14,6 +14,8 @@ public static class ArgParser
         var debug = Environment.GetEnvironmentVariable("SKILLVIEW_LOG")?.Equals("debug", StringComparison.OrdinalIgnoreCase) ?? false;
         var theme = ParseTheme(Environment.GetEnvironmentVariable("SKILLVIEW_THEME"));
         var scanRoots = new List<string>();
+        var workspaces = new List<string>();
+        var profiles = new List<SkillView.Inventory.ScanRootResolver.AgentProfileRoot>();
         string? subcommand = null;
         var subcommandArgs = new List<string>();
 
@@ -58,6 +60,28 @@ public static class ArgParser
                 continue;
             }
 
+            if (arg is "--workspace" or "--profile" || arg.StartsWith("--workspace=", StringComparison.Ordinal) || arg.StartsWith("--profile=", StringComparison.Ordinal))
+            {
+                var equals = arg.IndexOf('=');
+                var flag = equals < 0 ? arg : arg[..equals];
+                var value = equals >= 0 ? arg[(equals + 1)..] : ++i < args.Length ? args[i] : throw new ArgumentException(flag + " requires a value");
+                if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException(flag + " requires a nonblank value");
+                if (flag == "--workspace") workspaces.Add(value);
+                else
+                {
+                    var split = value.IndexOf('=');
+                    if (split <= 0 || split == value.Length - 1) throw new ArgumentException("--profile requires agent[:name]=skills-directory");
+                    var identity = value[..split].Split(':', 2);
+                    if (!SkillView.Gh.GhPlacementCatalog.Entries.Any(entry => entry.Id == SkillView.Inventory.AgentIdentity.Normalize(identity[0])))
+                        throw new ArgumentException("Unknown profile agent: " + identity[0]);
+                    if (identity.Length == 2 && (string.IsNullOrWhiteSpace(identity[1]) || identity[1].Length > 128 || identity[1].Any(char.IsControl)))
+                        throw new ArgumentException("Profile name must be nonblank, at most 128 characters and contain no control characters");
+                    profiles.Add(new(identity[0], value[(split + 1)..], identity.Length == 2 ? identity[1] : null));
+                }
+                if (workspaces.Count > 32 || profiles.Count > 32) throw new ArgumentException("Workspace/profile limit exceeded (32 each)");
+                continue;
+            }
+
             if (arg == "--scan-root")
             {
                 if (i + 1 >= args.Length)
@@ -80,7 +104,8 @@ public static class ArgParser
             theme,
             scanRoots,
             subcommand,
-            subcommandArgs);
+            subcommandArgs)
+        { WorkspaceDirectories = workspaces, Profiles = profiles };
     }
 
     internal static AppTheme ParseTheme(string? value) =>

@@ -279,7 +279,7 @@ public static class CliDispatcher
                 scanRoots,
                 allowHidden,
                 FilterScope: scope,
-                FilterAgent: agent)
+                FilterAgent: agent, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles)
         , cancellationToken).ConfigureAwait(false);
     }
 
@@ -341,6 +341,15 @@ public static class CliDispatcher
         }
         w.WriteEndArray();
 
+        w.WriteStartArray("discoveryLocations");
+        foreach (var location in snapshot.Diagnostics.Locations)
+        {
+            w.WriteStartObject();
+            w.WriteString("path", location.Path); w.WriteString("state", location.State); w.WriteString("reason", location.Reason);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
         w.WriteStartArray("ownerRecords");
         foreach (var owner in snapshot.OwnershipRecords) WriteOwnerRecord(w, owner);
         w.WriteEndArray();
@@ -352,6 +361,8 @@ public static class CliDispatcher
             w.WriteString("path", r.Path);
             w.WriteString("scope", r.Scope.ToString());
             w.WriteString("agentHint", r.AgentHint);
+            w.WriteString("profile", r.Profile);
+            w.WriteString("context", r.Context);
             w.WriteEndObject();
         }
         w.WriteEndArray();
@@ -477,7 +488,7 @@ public static class CliDispatcher
         // Comparison uses offline inventory and never performs auth or remote
         // update checks. gh list supplements filesystem facts when available.
         var snapshot = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
-            new LocalInventoryService.Options(options.ScanRoots, AllowHiddenDirs: false), token).ConfigureAwait(false);
+            new LocalInventoryService.Options(options.ScanRoots, AllowHiddenDirs: false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
         InstalledSkill[] Match(string path) => snapshot.Skills.Where(skill => PathIdentity.Equals(skill.ResolvedPath, path)
             || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path))).ToArray();
         var left = Match(parsed.LeftPath!);
@@ -850,7 +861,7 @@ public static class CliDispatcher
         var preSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots,
+                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
                 AllowHiddenDirs: parsed.AllowHiddenDirs),
             cancellationToken
         ).ConfigureAwait(false);
@@ -878,7 +889,7 @@ public static class CliDispatcher
         var postSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots,
+                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
                 AllowHiddenDirs: parsed.AllowHiddenDirs),
             cancellationToken
         ).ConfigureAwait(false);
@@ -985,7 +996,7 @@ public static class CliDispatcher
         var preSnapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots,
+                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
                 AllowHiddenDirs: false),
             cancellationToken
         ).ConfigureAwait(false);
@@ -1040,7 +1051,7 @@ public static class CliDispatcher
             try
             {
                 var postSnapshot = await services.InventoryService.CaptureAsync(report.GhPath,
-                    new Inventory.LocalInventoryService.Options(ScanRoots: options.ScanRoots, AllowHiddenDirs: false),
+                    new Inventory.LocalInventoryService.Options(ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles, AllowHiddenDirs: false),
                     reconciliation.Token).ConfigureAwait(false);
                 added = InventoryDiff(preSnapshot, postSnapshot);
                 changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
@@ -1420,7 +1431,7 @@ public static class CliDispatcher
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots,
+                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
                 AllowHiddenDirs: false),
             cancellationToken
         ).ConfigureAwait(false);
@@ -1616,11 +1627,11 @@ public static class CliDispatcher
         CancellationToken cancellationToken)
     {
         var parsed = ParseCleanupArgs(options.SubcommandArgs);
-        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken, includeAuthentication: false).ConfigureAwait(false);
         var snapshot = await services.InventoryService.CaptureAsync(
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots,
+                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
                 AllowHiddenDirs: false),
             cancellationToken
         ).ConfigureAwait(false);
@@ -1679,7 +1690,7 @@ public static class CliDispatcher
             }
         }
 
-        if (parsed.Json) WriteCleanupJson(candidates, applied, duplicateSkips, parsed);
+        if (parsed.Json) WriteCleanupJson(candidates, applied, duplicateSkips, parsed, snapshot);
         else WriteCleanupText(candidates, applied, duplicateSkips, parsed);
 
         if (parsed.Output is not null)
@@ -1803,8 +1814,8 @@ public static class CliDispatcher
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
         IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
-        ParsedCleanupArgs p)
-        => WriteJson(w => WriteCleanupJson(w, candidates, applied, duplicateSkips, p));
+        ParsedCleanupArgs p, InventorySnapshot? snapshot = null)
+        => WriteJson(w => WriteCleanupJson(w, candidates, applied, duplicateSkips, p, snapshot));
 
     internal static string RenderCleanupJson(
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
@@ -1823,10 +1834,14 @@ public static class CliDispatcher
         IReadOnlyList<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> applied,
         IReadOnlyList<CleanupClassifier.Candidate> duplicateSkips,
-        ParsedCleanupArgs p)
+        ParsedCleanupArgs p, InventorySnapshot? snapshot = null)
     {
         w.WriteStartObject();
         w.WriteBoolean("apply", p.Apply);
+        w.WriteBoolean("partial", snapshot?.IsPartial ?? false);
+        w.WriteStartArray("inaccessiblePaths");
+        foreach (var path in snapshot?.Diagnostics.InaccessiblePaths ?? []) w.WriteStringValue(path);
+        w.WriteEndArray();
         w.WriteNumber("candidates", candidates.Count);
         w.WriteStartArray("entries");
         foreach (var c in candidates)
@@ -1958,6 +1973,8 @@ public static class CliDispatcher
             | `--debug` | Enable debug logging. This flag works before or after the subcommand and streams logs to stderr in CLI mode. |
             | `--theme <name>` | Select the TUI theme. Supported values are `default` and `high-contrast`. You can also set `SKILLVIEW_THEME`. |
             | `--scan-root <path>` | Add a custom scan root. Repeat this flag to scan multiple roots. |
+            | `--workspace <path>` | Observe known project skill directories in another workspace. Repeat for a collection. |
+            | `--profile <agent[:name]=skills-directory>` | Observe an explicit agent profile without guessing enabled state. |
 
             ## Subcommands
 

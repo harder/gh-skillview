@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Inventory;
+using SkillView.Gh;
 
 namespace SkillView.Ui;
 
@@ -10,61 +11,73 @@ internal static class InstallAgentCatalog
     // never shown in the Doctor "detected agents" table. It never gates the
     // actual `gh skill install` call (that only ever sends GhId), so a null
     // or wrong path is cosmetic, not a correctness or safety issue.
-    internal sealed record Entry(string GhId, string Label, string AgentHint, string? HomeRelativePath);
+    internal sealed record Entry(string GhId, string Label, string AgentHint)
+    {
+        internal string? HomeRelativePath
+        {
+            get
+            {
+                if (GhId == "codex") return ".codex"; // Native legacy/config detection, not gh's shared placement.
+                if (GhId == "amp") return Path.Combine(".config", "amp"); // Native config, never inferred from shared skills.
+                var path = GhPlacementCatalog.Entries.Single(entry => entry.Id == GhId).UserDirectory;
+                return path is ".agents/skills" or ".config/agents/skills" ? null : Path.GetDirectoryName(path);
+            }
+        }
+    }
 
     // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.101.0).
     // Update this array when new agents are added to the gh skill ecosystem —
     // re-diff against `gh skill install --help` when bumping the gh minimum.
     internal static readonly ImmutableArray<Entry> Entries =
     [
-        new("claude-code", "Claude", "claude", ".claude"),
-        new("github-copilot", "Copilot", "copilot", ".copilot"),
-        new("cursor", "Cursor", "cursor", ".cursor"),
-        new("codex", "Codex", "codex", ".codex"),
-        new("gemini-cli", "Gemini", "gemini", ".gemini"),
-        new("antigravity", "Antigravity", "antigravity", Path.Combine(".gemini", "antigravity")),
-        new("antigravity-cli", "Antigravity CLI", "antigravity-cli", null),
-        new("antigravity2.0", "Antigravity 2.0", "antigravity2.0", null),
-        new("adal", "AdaL", "adal", null),
-        new("amp", "Amp", "amp", Path.Combine(".config", "amp")),
-        new("augment", "Augment", "augment", null),
-        new("bob", "IBM Bob", "bob", null),
-        new("cline", "Cline", "cline", null),
-        new("codebuddy", "CodeBuddy", "codebuddy", null),
-        new("command-code", "Command Code", "command", null),
-        new("continue", "Continue", "continue", ".continue"),
-        new("cortex", "Cortex Code", "cortex", null),
-        new("crush", "Crush", "crush", null),
-        new("deepagents", "Deep Agents", "deepagents", null),
-        new("devin", "Devin", "devin", null),
-        new("droid", "Droid", "droid", ".factory"),
-        new("firebender", "Firebender", "firebender", null),
-        new("goose", "Goose", "goose", Path.Combine(".config", "goose")),
-        new("grok", "Grok", "grok", null),
-        new("iflow-cli", "iFlow CLI", "iflow", ".iflow"),
-        new("junie", "Junie", "junie", null),
-        new("kilo", "Kilo Code", "kilo", null),
-        new("kimi-cli", "Kimi Code CLI", "kimi", null),
-        new("kiro-cli", "Kiro CLI", "kiro", ".kiro"),
-        new("kode", "Kode", "kode", null),
-        new("mcpjam", "MCPJam", "mcpjam", null),
-        new("mistral-vibe", "Mistral Vibe", "mistral-vibe", null),
-        new("mux", "Mux", "mux", null),
-        new("neovate", "Neovate", "neovate", null),
-        new("openclaw", "OpenClaw", "openclaw", null),
-        new("opencode", "OpenCode", "opencode", Path.Combine(".config", "opencode")),
-        new("openhands", "OpenHands", "openhands", ".openhands"),
-        new("pi", "Pi", "pi", Path.Combine(".pi", "agent")),
-        new("pochi", "Pochi", "pochi", null),
-        new("qoder", "Qoder", "qoder", null),
-        new("qwen-code", "Qwen Code", "qwen", ".qwen"),
-        new("replit", "Replit", "replit", null),
-        new("roo", "Roo Code", "roo", null),
-        new("trae", "Trae", "trae", null),
-        new("trae-cn", "Trae CN", "trae-cn", null),
-        new("universal", "Universal", "universal", null),
-        new("warp", "Warp", "warp", null),
-        new("zencoder", "Zencoder", "zencoder", null),
+        new("claude-code", "Claude", "claude"),
+        new("github-copilot", "Copilot", "copilot"),
+        new("cursor", "Cursor", "cursor"),
+        new("codex", "Codex", "codex"),
+        new("gemini-cli", "Gemini", "gemini"),
+        new("antigravity", "Antigravity", "antigravity"),
+        new("antigravity-cli", "Antigravity CLI", "antigravity-cli"),
+        new("antigravity2.0", "Antigravity 2.0", "antigravity2.0"),
+        new("adal", "AdaL", "adal"),
+        new("amp", "Amp", "amp"),
+        new("augment", "Augment", "augment"),
+        new("bob", "IBM Bob", "bob"),
+        new("cline", "Cline", "cline"),
+        new("codebuddy", "CodeBuddy", "codebuddy"),
+        new("command-code", "Command Code", "command"),
+        new("continue", "Continue", "continue"),
+        new("cortex", "Cortex Code", "cortex"),
+        new("crush", "Crush", "crush"),
+        new("deepagents", "Deep Agents", "deepagents"),
+        new("devin", "Devin", "devin"),
+        new("droid", "Droid", "droid"),
+        new("firebender", "Firebender", "firebender"),
+        new("goose", "Goose", "goose"),
+        new("grok", "Grok", "grok"),
+        new("iflow-cli", "iFlow CLI", "iflow"),
+        new("junie", "Junie", "junie"),
+        new("kilo", "Kilo Code", "kilo"),
+        new("kimi-cli", "Kimi Code CLI", "kimi"),
+        new("kiro-cli", "Kiro CLI", "kiro"),
+        new("kode", "Kode", "kode"),
+        new("mcpjam", "MCPJam", "mcpjam"),
+        new("mistral-vibe", "Mistral Vibe", "mistral-vibe"),
+        new("mux", "Mux", "mux"),
+        new("neovate", "Neovate", "neovate"),
+        new("openclaw", "OpenClaw", "openclaw"),
+        new("opencode", "OpenCode", "opencode"),
+        new("openhands", "OpenHands", "openhands"),
+        new("pi", "Pi", "pi"),
+        new("pochi", "Pochi", "pochi"),
+        new("qoder", "Qoder", "qoder"),
+        new("qwen-code", "Qwen Code", "qwen"),
+        new("replit", "Replit", "replit"),
+        new("roo", "Roo Code", "roo"),
+        new("trae", "Trae", "trae"),
+        new("trae-cn", "Trae CN", "trae-cn"),
+        new("universal", "Universal", "universal"),
+        new("warp", "Warp", "warp"),
+        new("zencoder", "Zencoder", "zencoder"),
     ];
 
     internal static ImmutableArray<string> GhIds => Entries.Select(entry => entry.GhId).ToImmutableArray();
@@ -90,7 +103,7 @@ internal static class InstallAgentCatalog
 
     internal static HashSet<string> DetectInstalledGhIds(
         string homeDirectory,
-        string? piCodingAgentDir = null)
+        string? piCodingAgentDir = null, string? claudeConfigDir = null)
     {
         var found = new HashSet<string>(StringComparer.Ordinal);
         if (string.IsNullOrWhiteSpace(homeDirectory))
@@ -100,7 +113,7 @@ internal static class InstallAgentCatalog
 
         foreach (var entry in Entries)
         {
-            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir);
+            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir, claudeConfigDir);
             if (full is not null && Directory.Exists(full))
             {
                 found.Add(entry.GhId);
@@ -112,7 +125,7 @@ internal static class InstallAgentCatalog
 
     internal static List<(string Label, string Path)> DetectInstalledDisplayEntries(
         string homeDirectory,
-        string? piCodingAgentDir = null)
+        string? piCodingAgentDir = null, string? claudeConfigDir = null)
     {
         var found = new List<(string Label, string Path)>();
         if (string.IsNullOrWhiteSpace(homeDirectory))
@@ -122,7 +135,7 @@ internal static class InstallAgentCatalog
 
         foreach (var entry in Entries)
         {
-            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir);
+            var full = GetHomePath(entry, homeDirectory, piCodingAgentDir, claudeConfigDir);
             if (full is null)
             {
                 continue;
@@ -137,8 +150,9 @@ internal static class InstallAgentCatalog
         return found;
     }
 
-    private static string? GetHomePath(Entry entry, string homeDirectory, string? piCodingAgentDir)
+    private static string? GetHomePath(Entry entry, string homeDirectory, string? piCodingAgentDir, string? claudeConfigDir)
     {
+        if (entry.GhId == "claude-code" && !string.IsNullOrWhiteSpace(claudeConfigDir)) return claudeConfigDir;
         // gh 2.99 honors PI_CODING_AGENT_DIR for all Pi user-scope skill
         // operations. The value names Pi's configuration directory; skills
         // live beneath its `skills` child, while this heuristic intentionally

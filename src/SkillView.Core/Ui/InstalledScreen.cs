@@ -140,7 +140,7 @@ public static class InstalledScreen
             sb.AppendLine();
             sb.AppendLine(desc);
         }
-        foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts))
+        foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts).Concat(s.OwnershipDiagnostics))
             sb.AppendLine($"- ⚠️ {MarkdownTableFormatter.FormatTableCell(diagnostic)}");
         if (s.Agents.Length > 0)
         {
@@ -159,6 +159,9 @@ public static class InstalledScreen
                 sb.AppendLine();
                 sb.Append("  Path: ");
                 sb.AppendLine(MarkdownTableFormatter.FormatCodeSpan(a.Path));
+                if (a.Profile is { } profile) sb.AppendLine("  Profile: " + MarkdownTableFormatter.FormatTableCell(profile));
+                if (a.Scope is { } scope) sb.AppendLine("  Scope: " + scope);
+                if (a.Context is { } context) sb.AppendLine("  Context: " + MarkdownTableFormatter.FormatCodeSpan(context));
                 sb.AppendLine();
             }
         }

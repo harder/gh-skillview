@@ -96,7 +96,7 @@ internal static class GhPlacementCatalog
             .GroupBy(PathIdentity.NormalizeKey, StringComparer.Ordinal).Select(group => group.First()).ToArray();
     }
 
-    private static async Task<string> ProjectRootAsync(ProcessRunner runner, GhSkillInstallService.Options options,
+    internal static async Task<string> ProjectRootAsync(ProcessRunner runner, GhSkillInstallService.Options options,
         string workingDirectory, CancellationToken token)
     {
         // gh resolves Git's top level under its effective child environment,

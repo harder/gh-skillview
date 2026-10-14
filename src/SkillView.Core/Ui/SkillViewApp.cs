@@ -1159,13 +1159,7 @@ public sealed class SkillViewApp
             var report = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
             _ghPath = report.GhPath;
 
-            var snapshot = await _services.InventoryService.CaptureAsync(
-                report.GhPath,
-                new LocalInventoryService.Options(
-                    ScanRoots: _options.ScanRoots,
-                    AllowHiddenDirs: false),
-                cancellationToken
-            ).ConfigureAwait(false);
+            var snapshot = await CaptureStartupInventoryAsync(report, cancellationToken).ConfigureAwait(false);
 
             Invoke(() =>
             {
@@ -1216,6 +1210,9 @@ public sealed class SkillViewApp
             SetDefaultStatus($"gh {report.GhVersion} — press '/' to search, 'd' for Doctor");
         }, "probe");
     }
+
+    internal Task<InventorySnapshot> CaptureStartupInventoryAsync(EnvironmentReport report, CancellationToken cancellationToken) =>
+        _workflows.CaptureInventoryAsync(report, cancellationToken);
 
     private async Task<EnvironmentReport> GetOrProbeEnvironmentAsync(CancellationToken cancellationToken)
     {

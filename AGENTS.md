@@ -1,5 +1,14 @@
 # AGENTS.md
 
+- Read-only skill and lock metadata uses `RegularFileInspection`, whose verified
+  native ABI check is independent of destructive traversal support. Linux hosts
+  without `openat2` may inspect regular metadata while removal stays disabled.
+  CI's Linux AOT job proves this with both EPERM and ENOSYS seccomp denials.
+- Hidden directory/link exclusions make inventory coverage partial independently
+  of the bounded location table. Skipped regular metadata files do not omit
+  skill discovery. Startup TUI capture must use the workflow coordinator so
+  workspace/profile options match later rescans.
+
 ## Repo
 
 `gh-skillview` is a .NET 10 / Terminal.Gui v2 terminal UI and CLI for browsing,
@@ -78,6 +87,24 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   invariants in this file or focused `agent_docs/` guides.
 
 ## Critical agent notes
+
+- `GhPlacementCatalog` is the authority for gh placement paths. Filesystem
+  discovery and UI/Doctor detection derive from it, retaining explicitly
+  documented native/legacy paths separately. Shared `.agents` placements are
+  not evidence that every compatible agent is installed or enabled.
+- Namespace scanning stops at skill payloads and stays bounded to 8 levels,
+  8,192 entries, 2,048 enumerated directories and 16 MiB of aggregate metadata
+  (+1 overflow observation byte). Charge each successful read even when a later
+  read fails. Child container links are not traversed; omitted, inaccessible or
+  unsupported coverage remains partial and cannot support orphan conclusions.
+- Inventory uses the same captured child CWD and effective HOME/config/state
+  values as gh. Retain physical workspace observations alongside Git's actual
+  redirected context. Native directory keys and broken-entry parent/name keys
+  merge aliases on every supported OS; preserve original paths for policy.
+- Mutating CLI fixtures must isolate HOME/USERPROFILE, state and CWD, and
+  neutralize inherited Git redirection. Use explicit private GIT_DIR/WORK_TREE/
+  COMMON_DIR and GIT_CONFIG_COUNT=0, or strip inherited GIT_* before configuring
+  a dedicated private redirected-worktree fixture.
 
 - Keep this file and `agent_docs/` up to date as new durable agent-facing
   workflow or testing lessons are discovered. Put short repo-wide rules here;

@@ -173,7 +173,7 @@ public static class CleanupClassifier
                     CandidateKind.HiddenNestedResidue,
                     skill.ResolvedPath,
                     "lives inside a hidden ancestor directory",
-                    skill));
+                    skill, ReviewOnly: true));
                 continue;
             }
 
@@ -302,6 +302,7 @@ public static class CleanupClassifier
 
     private static bool WasCovered(InventorySnapshot snapshot, InstalledSkill skill)
     {
+        if (snapshot.IsPartial) return false;
         // Older in-memory callers have no provider records. Production captures
         // carry explicit coverage; failed or excluded roots establish no absence.
         if (snapshot.Providers.IsEmpty) return snapshot.UsedGhSkillList;

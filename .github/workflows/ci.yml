@@ -125,3 +125,6 @@ jobs:
           test -s 'dist/ext/gh-skillview${{ matrix.ext }}'
           'dist/app/skillview${{ matrix.ext }}' --version
           'dist/ext/gh-skillview${{ matrix.ext }}' --version
+      - name: Inspect metadata with openat2 denied; retain removal refusal
+        if: runner.os == 'Linux'
+        run: python3 agent_docs/evidence/prove-metadata-without-openat2.py --app dist/app/skillview

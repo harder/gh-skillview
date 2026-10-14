@@ -38,10 +38,15 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     internal static string? UnsupportedReason => CurrentPlatformSupport.Error;
 
+    internal static bool IsRegularFileInspectionSupported => OperatingSystem.IsLinux()
+        ? TryGetLinuxStatLayout(RuntimeInformation.ProcessArchitecture, BitConverter.IsLittleEndian, out _)
+        : OperatingSystem.IsMacOS() && IsMacPlatformSupported(RuntimeInformation.ProcessArchitecture, BitConverter.IsLittleEndian);
+
     // Non-destructive payload reads reject special files and final symlinks
     // before creating a stream. O_NONBLOCK prevents FIFO admission from hanging.
     internal static FileStream OpenRegularFileForSnapshot(string path, out int? unixMode)
     {
+        if (!IsRegularFileInspectionSupported) throw new IOException("Native regular-file inspection has no verified ABI on this platform.");
         using var buffer = new StatBuffer();
         var flags = OperatingSystem.IsMacOS()
             ? 0x00000100 | 0x01000000 | 0x00000004

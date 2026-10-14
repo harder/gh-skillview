@@ -147,7 +147,7 @@ internal sealed class RepoSkillPickerModal
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
             home ?? string.Empty,
-            Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
+            Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"), Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {

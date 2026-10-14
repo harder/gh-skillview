@@ -14,6 +14,8 @@ public sealed class ProcessRunner
     private readonly int _maxCapturedCharsPerStream;
     private readonly TimeSpan _terminationWait;
     private readonly IReadOnlyDictionary<string, string>? _environment;
+    private readonly string? _defaultWorkingDirectory;
+    internal string EffectiveWorkingDirectory => _defaultWorkingDirectory ?? Environment.CurrentDirectory;
 
     internal string? GetEffectiveEnvironmentVariable(string name, IReadOnlyDictionary<string, string>? overrides = null)
     {
@@ -28,7 +30,7 @@ public sealed class ProcessRunner
         Logger logger,
         int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream,
         TimeSpan? terminationWait = null,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null, string? defaultWorkingDirectory = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCapturedCharsPerStream, 1);
         var resolvedTerminationWait = terminationWait ?? DefaultTerminationWait;
@@ -40,6 +42,7 @@ public sealed class ProcessRunner
         _maxCapturedCharsPerStream = maxCapturedCharsPerStream;
         _terminationWait = resolvedTerminationWait;
         _environment = environment;
+        _defaultWorkingDirectory = defaultWorkingDirectory is null ? null : Path.GetFullPath(defaultWorkingDirectory);
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -62,7 +65,7 @@ public sealed class ProcessRunner
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
-            WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
+            WorkingDirectory = workingDirectory ?? EffectiveWorkingDirectory,
         };
         foreach (var arg in arguments)
         {
