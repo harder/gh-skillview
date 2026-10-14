@@ -205,6 +205,14 @@ internal sealed partial class UnixSecureRemovalBackend
     {
         private SafeFileHandle? _barrier;
         internal override string CanonicalPath => canonical;
+        internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token)
+        {
+            ValidateLocation(token);
+            NativeStateDirectory.CheckName(name);
+            if (source is not UnixDirectoryMove move) throw new IOException("Directory relocation platform mismatch.");
+            move.Move(root, name, canonical, token);
+            ValidateLocation(token);
+        }
         internal override void ValidateLocation(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();

@@ -89,3 +89,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, test
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+For reversible relocation of a standalone custom-directory copy, see [Quarantine and undo](docs/quarantine-and-undo.md).

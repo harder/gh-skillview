@@ -143,3 +143,8 @@ jobs:
         run: |
           python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/object-app-proof.json
           python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/object-extension-proof.json
+      - name: Prove standalone quarantine and undo using native hosts
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
+          python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json

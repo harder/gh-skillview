@@ -552,6 +552,22 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   exposures when reconciling inventory. Frontmatter uses bounded YAML events;
   do not replace it with reflection-based deserialization or alias expansion.
 
+- Standalone quarantine/undo uses a same-volume native exclusive directory rename,
+  prepared/completion journals, and held root/parent/object evidence. Keep it limited
+  to explicitly reviewed standalone custom-directory copies; never add archive
+  extraction, overwrite, cross-volume copy/delete, or automatic ambiguous recovery.
+  Resolve discovered exposure destinations even when links are dangling, relative
+  or aliased, and check subtree overlap at source, retained and original addresses
+  before publishing prepared journals. Include link entry addresses as well as
+  intended destinations, and refuse configured/scanned roots inside a relocation
+  boundary even when empty or expected absent. See `docs/quarantine-and-undo.md`.
+  Quarantine retains live ACLs/links and does not
+  isolate content or attest agent session state.
+- Unix directory enumeration must open a fresh cursor relative to the held
+  directory (`openat` of `.`), not `dup` the directory descriptor: duplicated
+  descriptors share the enumeration offset and make repeated policy/payload
+  inspections incorrectly see EOF. Preserve this in both emptiness and traversal.
+
 ## Progressive disclosure
 
 - Product updates use `TuiServices.MaintenanceUpdates`, carrying physical targets

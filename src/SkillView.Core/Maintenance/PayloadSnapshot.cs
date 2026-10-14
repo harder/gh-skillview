@@ -37,8 +37,13 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token) =>
         CaptureCore(path, token, null, strictMetadata: false);
 
+    internal static PayloadSnapshot CaptureEvidence(string path,
+        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot> walk,
+        CancellationToken token) => CaptureCore(path, token, null, strictMetadata: false, walk: walk);
+
     private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation,
-        Action<NativePayloadItem, PayloadEntry>? sink = null, bool strictMetadata = true)
+        Action<NativePayloadItem, PayloadEntry>? sink = null, bool strictMetadata = true,
+        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot>? walk = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var root = System.IO.Path.GetFullPath(path);
@@ -46,7 +51,8 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         var objects = ImmutableArray.CreateBuilder<PayloadObjectEvidence>();
         long totalBytes = 0;
         SkillView.Inventory.Models.SkillFrontMatter? frontMatter = null;
-        var identity = SecurePayloadWalker.Walk(root, MaxDepth, item =>
+        var nativeWalk = walk ?? ((depth, callback, token) => SecurePayloadWalker.Walk(root, depth, callback, token));
+        var identity = nativeWalk(MaxDepth, item =>
         {
             var evidence = Observe(item);
             observation?.Invoke(item.RelativePath, item.Kind);

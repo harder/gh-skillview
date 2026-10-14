@@ -48,6 +48,7 @@ public static class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "--help" or "-h" or "help" => PrintHelp(options),
@@ -71,7 +72,7 @@ public static class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" => TimeSpan.FromMinutes(10),
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -477,6 +478,89 @@ public static class CliDispatcher
         w.WriteString("diagnostic", owner.Diagnostic);
         if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
         w.WriteEndObject();
+    }
+
+    private static async Task<int> QuarantineAsync(AppOptions options, TuiServices services, CancellationToken token)
+    {
+        var command = options.SubcommandName;
+        string? path = null, id = null, expected = null;
+        var json = false; var execute = false; var standalone = false;
+        var args = options.SubcommandArgs;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] == "--json") { json = true; continue; }
+            if (args[i] == "--yes" && command != "quarantine-history") { execute = true; continue; }
+            if (args[i] == "--standalone" && command == "quarantine") { standalone = true; continue; }
+            if (i + 1 < args.Count && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                if (args[i] == "--path" && command == "quarantine" && path is null && id is null) { path = args[++i]; continue; }
+                if (args[i] == "--install-id" && command == "quarantine" && path is null && id is null) { id = args[++i]; continue; }
+                if (args[i] == "--id" && command == "undo" && id is null) { id = args[++i]; continue; }
+                if (args[i] == "--expect" && command == "quarantine" && expected is null) { expected = args[++i]; continue; }
+            }
+            Console.Error.WriteLine("skillview: unsupported or incomplete quarantine/undo argument");
+            return ExitCodes.InvalidUsage;
+        }
+        if (command == "quarantine" && ((path is null) == (id is null)
+                || path is not null && string.IsNullOrWhiteSpace(path) || id is not null && string.IsNullOrWhiteSpace(id)
+                || execute && (!standalone || !SkillView.Maintenance.QuarantineStore.ValidHash(expected!)))
+            || command == "undo" && !SkillView.Maintenance.QuarantineStore.ValidId(id!)
+            || expected is not null && !SkillView.Maintenance.QuarantineStore.ValidHash(expected))
+        {
+            Console.Error.WriteLine("skillview: quarantine needs one --path/--install-id; apply needs --yes --standalone --expect <preview fingerprint>. Undo needs --id <operation ID>.");
+            return ExitCodes.InvalidUsage;
+        }
+        try
+        {
+            if (path is not null) path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory);
+            var inventory = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
+                new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
+            var backupRoot = SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner);
+            var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger);
+            IReadOnlyList<SkillView.Maintenance.QuarantineResult> results;
+            if (command == "quarantine-history") results = await Task.Run(() => store.History(inventory, token), token).ConfigureAwait(false);
+            else if (command == "undo") results = [await Task.Run(() => store.Undo(id!, inventory, execute, token), token).ConfigureAwait(false)];
+            else
+            {
+                var selected = inventory.Skills.Where(skill => id is not null ? skill.InstallationId == id : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
+                if (selected.Length != 1) throw new IOException("Select one captured standalone payload; put its --scan-root before quarantine.");
+                if (execute) results = [await Task.Run(() => store.Apply(selected[0], inventory, expected!, standalone, token), token).ConfigureAwait(false)];
+                else
+                {
+                    var preview = await Task.Run(() => store.Preview(selected[0], inventory, token), token).ConfigureAwait(false);
+                    results = [new(preview.Id, "preview", true, false, false, preview.OriginalPath,
+                        Path.Combine(store.Root, preview.Id, "payload"), preview.ReviewFingerprint,
+                        "Preview only: relocate this standalone directory on the same filesystem. Retains live permissions and links; agent sessions were not observed. Apply requires --yes --standalone --expect <reviewFingerprint>.")];
+                }
+            }
+            if (json) WriteJson(w =>
+            {
+                w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("preview", !execute && command != "quarantine-history");
+                w.WriteBoolean("securityIsolation", false); w.WriteString("sessionState", "unknown");
+                w.WriteStartArray("operations"); foreach (var result in results) WriteQuarantineResult(w, result);
+                w.WriteEndArray(); w.WriteEndObject();
+            });
+            else foreach (var result in results) Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
+                $"{result.Id}  {result.Status}  {result.OriginalPath}\nReview: {result.ReviewFingerprint}\n{result.Message}"));
+            return results.Any(result => result.Canceled) ? ExitCodes.Cancelled
+                : command == "quarantine-history" ? results.Any(result => result.Status is "prepared" or "undo-prepared" or "needs-inspection" or "unrecognized") ? ExitCodes.UserError : ExitCodes.Success
+                : results.All(result => result.Succeeded) ? ExitCodes.Success : ExitCodes.UserError;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException)
+        {
+            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
+            else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
+            return ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
+        }
+    }
+
+    private static void WriteQuarantineResult(Utf8JsonWriter w, SkillView.Maintenance.QuarantineResult result)
+    {
+        w.WriteStartObject(); w.WriteString("id", result.Id); w.WriteString("status", result.Status);
+        w.WriteBoolean("succeeded", result.Succeeded); w.WriteBoolean("mutationObserved", result.MutationObserved);
+        w.WriteBoolean("canceled", result.Canceled); w.WriteString("originalPath", result.OriginalPath);
+        w.WriteString("retainedPath", result.RetainedPath); w.WriteString("reviewFingerprint", result.ReviewFingerprint);
+        w.WriteString("message", result.Message); w.WriteEndObject();
     }
 
     private static async Task<int> HistoryAsync(AppOptions options, TuiServices services, CancellationToken token)
@@ -2099,6 +2183,9 @@ public static class CliDispatcher
             | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
+            | `quarantine` | Preview relocation of one standalone custom-directory copy. Apply requires a reviewed fingerprint and explicit confirmation. | `--path` or `--install-id`, `--yes --standalone --expect`, `--json` |
+            | `undo` | Preview or restore an unchanged quarantined directory to its vacant original location. | `--id`, `--yes`, `--json` |
+            | `quarantine-history` | Inspect recorded relocation states; incomplete operations require inspection. | `--json` |
             | `history` | Verify retained backup journals and every payload blob; reports interrupted, orphaned and corrupt evidence without extracting it. | `--id`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |

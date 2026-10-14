@@ -447,3 +447,49 @@ site checks. Independent source review/re-review is clear and61 affected tests
 independently passed. Both native hosts passed object-evidence proofs with
 gh2.97.0/2.102.0 and backup/history regression proofs. Fresh platform CI remains
 required before merge. See `evidence/maintenance-batch-4d.json`.
+
+## Batch 4e: finish the standalone quarantine/undo milestone
+
+The user narrowed this round to one usable quarantine/undo workflow, then stop.
+PR #50 merged at af80737d3a025fb37fbcae086b8b2626be7b555f after CI38635536531,
+CodeQL38635536377 and 1069 tests on all three test platforms. Its object-evidence
+proof passed for both hosts on all four native targets; Copilot had no findings.
+
+This batch adds CLI preview, fingerprint-bound explicit quarantine, undo preview,
+undo and recorded history for a standalone custom-directory copy. It preserves
+the live directory with a same-volume exclusive native rename and durable
+prepared/completion journals. No archive extraction, replacement, recursive
+copy/delete fallback or manager-record edits occur. Root/parent generations,
+object continuity, payload evidence, known ownership, configured roots and
+original-slot vacancy gate execution. Native policy and repeated held-directory
+inspection are tested, including the fresh Unix enumeration cursor requirement.
+
+The workflow and its limits are documented in `../docs/quarantine-and-undo.md`.
+Interrupted or ambiguous operations remain inspectable but are not automatically
+recovered; even a pre-rename cancellation after undo preparation requires
+inspection. This is relocation rather than security isolation, and agent session
+state remains unknown. The proof uses only disposable custom skill fixtures.
+
+This finishes the agreed maintenance milestone. Broader M08/M13–M15 owner-aware
+repair/consolidation and generic plan/apply, remaining agent UX/doctor work and
+complete metadata attestation remain follow-ups. They are not represented as
+implemented by this batch. The original macOS native crash has not been reproduced.
+
+Copilot review found two consumer gaps: dangling links activated by undo and
+separately discovered subtree skills. Both now gate relocation/undo before journal
+admission using bounded intended-address resolution and canonical overlap checks.
+Six regressions and native refusal proofs cover the fixes, including ambiguous
+alias-parent traversal refusal. Independent re-review validates the final fixes.
+
+A second Copilot pass identified a nested-root outward link: its destination
+was outside the move while its entry was inside. Consumer admission now checks
+both the canonical parent/final-name entry address and intended destination,
+with an isolated regression preserving the external payload and original link.
+
+The final independent policy review also protects configured/scanned roots within
+either relocation boundary, even empty or expected absent, including root aliases.
+Three fixtures and a native empty-root refusal proof cover this case.
+
+Entry-address checks strip a trailing directory separator before identifying the
+final entry, preserving an outward root link as a link entry. A trailing-root
+regression and native refusal proof cover that spelling.
