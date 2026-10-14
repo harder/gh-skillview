@@ -317,18 +317,27 @@ public sealed class MaintenanceBackupStoreTests : IDisposable
     {
         var target = Target();
         var moved = Path.Combine(_temporary.FullName, "moved-state");
-        var changed = false;
+        var attempted = false;
+        var moveSucceeded = false;
         var store = new MaintenanceBackupStore(State, _ =>
         {
-            if (changed) return;
-            changed = true;
+            if (attempted) return;
+            attempted = true;
             Directory.Move(State, moved);
+            moveSucceeded = true;
         });
         var before = PayloadSnapshot.Capture(target.ResolvedPath, TestContext.Current.CancellationToken);
         Assert.Throws<IOException>(() => store.Capture(target, TestContext.Current.CancellationToken));
-        Assert.True(changed);
-        Assert.Single(Directory.EnumerateFiles(moved, "*.creating.json"));
-        Assert.Empty(Directory.EnumerateFiles(moved, "*.captured.json"));
+        Assert.True(attempted);
+        // Windows can refuse the rename while the exclusive archive handle is
+        // open; Unix can move it, after which publication must refuse.
+        var retained = moveSucceeded ? moved : State;
+        Assert.True(Directory.Exists(retained));
+        Assert.False(Directory.Exists(moveSucceeded ? State : moved));
+        if (!moveSucceeded) Assert.True(OperatingSystem.IsWindows());
+        Assert.Single(Directory.EnumerateFiles(retained, "*.creating.json"));
+        Assert.Single(Directory.EnumerateFiles(retained, "*.svbackup"));
+        Assert.Empty(Directory.EnumerateFiles(retained, "*.captured.json"));
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(target.ResolvedPath, TestContext.Current.CancellationToken).Fingerprint);
     }
 

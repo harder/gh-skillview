@@ -111,5 +111,14 @@
     "https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile",
     "https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching",
     "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers"
+  ],
+  "firstCI": {
+    "run": 38612962296,
+    "windowsFinding": "The test assumed a parent directory move always succeeds despite its exclusive archive handle. Both native refusal and detected movement are valid safe outcomes; regression corrected without weakening the evidence requirements.",
+    "macosTestsPassed": 1005,
+    "linuxAndMacNativeProofPassed": true
+  },
+  "followUps": [
+    "M21: replace legacy Unix descriptor dup calls with atomic CLOEXEC duplication and verify child-process lifetimes."
   ]
 }

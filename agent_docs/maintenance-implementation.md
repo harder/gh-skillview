@@ -279,3 +279,12 @@ real shared registry. Native proof runs in all four AOT CI targets. Linux and
 Windows execution plus required CI are pending before merge. Reproduction,
 binary hashes, accepted findings and primary OS sources are in
 `agent_docs/evidence/maintenance-batch-4a.json`.
+
+First batch4a CI passed macOS tests and Linux/macOS native proofs but exposed a
+Windows-only test assumption: an exclusive open archive can prevent moving its
+parent. The regression now proves both safe outcomes explicitly: native refusal
+retains incomplete evidence at the original state address, or successful movement
+is detected before captured publication. Both require the attempted boundary,
+creating record, retained archive, no captured record and unchanged source.
+A separate M21 follow-up will make every legacy Unix native descriptor duplication
+CLOEXEC atomically; the backup writer's borrowed handle is already protected.
