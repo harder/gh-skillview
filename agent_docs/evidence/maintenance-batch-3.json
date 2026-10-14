@@ -114,5 +114,17 @@
     "vercelAgents": "https://github.com/vercel-labs/skills/blob/13e4063a1cf913f5606d57d42ab83a86f5001e04/src/agents.ts",
     "ghEnvironment": "https://cli.github.com/manual/gh_help_environment"
   },
-  "proofCommand": "python3 agent_docs/evidence/prove-maintenance-batch-3.py --app /path/to/native/skillview --gh /path/to/gh-2.97 --gh /path/to/current-gh --output /tmp/batch3-proof.json"
+  "proofCommand": "python3 agent_docs/evidence/prove-maintenance-batch-3.py --app /path/to/native/skillview --gh /path/to/gh-2.97 --gh /path/to/current-gh --output /tmp/batch3-proof.json",
+  "dependencyCheck": {
+    "source": "https://api.nuget.org/v3-flatcontainer/{package}/index.json",
+    "versionsAlreadyCurrent": {
+      "Terminal.Gui": "2.5.0",
+      "Terminal.Gui.Editor": "2.5.7",
+      "YamlDotNet": "18.1.0",
+      "Microsoft.NET.Test.Sdk": "18.11.0",
+      "xunit.v3": "4.0.2",
+      "xunit.runner.visualstudio": "4.0.1"
+    },
+    "newUpdateRequired": false
+  }
 }

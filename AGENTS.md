@@ -147,13 +147,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   matching `.agents/skills` entry so the inventory scan actually discovers
   skills installed there — keep both in sync if this default ever changes.
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.0`
-  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.10.1`, `xunit.v3`
-  `4.0.1`, and `xunit.runner.visualstudio` `4.0.0`. If tests fail to compile on
+  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
+  `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
   exact Terminal.Gui version string — update both alongside any bump.
-- `global.json` selects `Microsoft.Testing.Platform` for xunit 4.0.1. Pass
+- `global.json` selects `Microsoft.Testing.Platform` for xunit 4. Pass
   `--project` for a specific project and use xunit's MTP-native
   `--filter-namespace`/`--filter-class`/`--filter-trait` options for filtered
   runs. For an exact method, use `--filter-query

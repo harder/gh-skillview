@@ -162,6 +162,6 @@ originating Codex chat. No installed user skills are test targets.
   differences. Final offline traces contain only `gh skill list`; no auth, remote
   API, installer/updater or telemetry child was launched during comparison.
 - Platform CI, including Windows tests and every AOT RID, is required before merge.
-- A fresh NuGet check found test SDK18.11.0, xunit.v3 4.0.2 and VS runner4.0.1;
-  production Terminal.Gui2.5.0/Editor2.5.7/YamlDotNet18.1.0 remain current stable.
-  Test-tooling updates will receive their own reviewed batch before discovery.
+- A fresh NuGet/project-file comparison confirms all dependencies are current
+  stable: Terminal.Gui2.5.0, Editor2.5.7, YamlDotNet18.1.0, test SDK18.11.0,
+  xunit.v3 4.0.2 and VS runner4.0.1. No further dependency update is needed.
