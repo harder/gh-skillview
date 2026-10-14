@@ -127,14 +127,20 @@
     "storeEntries": 4096
   },
   "platformCI": {
-    "status": "pending PR",
+    "status": "all passed",
     "required": true,
+    "head": "42705101520a6fe6e7a4551132a4dec02027c292",
+    "run": 38629955734,
+    "codeql": 38629955648,
+    "testsPassedPerPlatform": 1055,
     "nativeProofForBothHosts": [
       "linux-x64",
       "osx-arm64",
       "win-x64",
       "win-arm64"
-    ]
+    ],
+    "pullRequest": 48,
+    "mergeCommit": "5a0db7c3f93d5459fb62ab377bd9734d2684eb94"
   },
   "remaining": "M08/M13-M15 dispositions, metadata-complete preservation, repair/relink/consolidation and verified recovery remain subsequent batches. M12/M16 and M17-M20 plus final M21 acceptance also remain.",
   "copilotFinding": {

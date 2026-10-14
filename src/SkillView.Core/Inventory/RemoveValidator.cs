@@ -206,7 +206,7 @@ public static class RemoveValidator
             || previewHasGitDirectory is true)
         {
             errors.Add(new Error(ErrorKind.ContainsGitDirectory,
-                $"'{resolved}' contains a .git directory — looks like an in-place clone"));
+                $"'{resolved}' contains a .git metadata entry — looks like a repository or linked worktree"));
         }
 
         // Never-delete: the scan root itself.
@@ -528,7 +528,8 @@ public static class RemoveValidator
 
             hasSkillFile = File.Exists(
                 Path.Combine(resolvedPath, LocalSkillScanner.SkillFileName));
-            hasGitDirectory = Directory.Exists(Path.Combine(resolvedPath, ".git"));
+            try { _ = File.GetAttributes(Path.Combine(resolvedPath, ".git")); hasGitDirectory = true; }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }
             return true;
         }
         catch (Exception ex) when (ex is IOException

@@ -184,7 +184,7 @@ public sealed class TerminalEscapeSanitizerTests
 
         Assert.DoesNotContain("ContainsGitDirectory", summary);
         Assert.DoesNotContain("HasIncomingSymlinks", summary);
-        Assert.Contains("git clone", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("repository or worktree", summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("link", summary, StringComparison.OrdinalIgnoreCase);
     }
 

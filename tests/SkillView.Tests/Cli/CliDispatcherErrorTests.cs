@@ -200,6 +200,30 @@ public class CliDispatcherErrorTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemoveGitfileRefusesBothPreviewAndExecutionWithoutDeletingFiles(bool execute)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "gitfile-skills")).FullName;
+        var payload = Directory.CreateDirectory(Path.Combine(root, "gitfile-skill")).FullName;
+        const string markdown = "---\nname: gitfile-skill\ndescription: Fixture\n---\nBody\n";
+        File.WriteAllText(Path.Combine(payload, "SKILL.md"), markdown);
+        const string marker = "gitdir: ../repository/.git/worktrees/gitfile-skill\n";
+        File.WriteAllText(Path.Combine(payload, ".git"), marker);
+        var arguments = new List<string> { "--scan-root", root, "remove", "gitfile-skill", "--json" };
+        if (execute) arguments.Add("--yes");
+        var (code, output, _) = await RunCliAsync("skillview", arguments.ToArray());
+        Assert.Equal(ExitCodes.UserError, code);
+        using var result = JsonDocument.Parse(output);
+        Assert.False(result.RootElement.GetProperty("allowed").GetBoolean());
+        Assert.Contains(result.RootElement.GetProperty("errors").EnumerateArray(), row => row.GetProperty("kind").GetString() == "ContainsGitDirectory");
+        Assert.Equal(0, result.RootElement.GetProperty("filesDeleted").GetInt32());
+        Assert.Empty(result.RootElement.GetProperty("runtimeErrors").EnumerateArray());
+        Assert.Equal(markdown, File.ReadAllText(Path.Combine(payload, "SKILL.md")));
+        Assert.Equal(marker, File.ReadAllText(Path.Combine(payload, ".git")));
+    }
+
+    [Theory]
     [InlineData("universal")]
     [InlineData("claude")]
     [InlineData("pi")]

@@ -24,6 +24,8 @@ internal readonly record struct SecureLinkIdentity(
 internal readonly record struct SecureDirectoryValidationSnapshot(
     SecureFileIdentity Identity,
     bool HasSkillFile,
+    // Legacy field name: any .git entry protects the repository/worktree,
+    // including gitfiles and broken links, without following their targets.
     bool HasGitDirectory,
     bool IsEmpty);
 
