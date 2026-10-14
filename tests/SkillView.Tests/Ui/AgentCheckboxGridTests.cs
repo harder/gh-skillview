@@ -8,7 +8,7 @@ namespace SkillView.Tests.Ui;
 public sealed class AgentCheckboxGridTests
 {
     private static InstallAgentCatalog.Entry Entry(string ghId, string label) =>
-        new(ghId, label, ghId, null);
+        new(ghId, label, ghId);
 
     [Fact]
     public void Build_EmptyEntries_ReturnsSingleRowLayout()

@@ -29,10 +29,13 @@ public sealed class TuiServices
     public required FileLogSink? FileLogSink { get; init; }
     public required string LogDirectory { get; init; }
 
-    public static TuiServices Build(Logger logger, FileLogSink? fileLogSink = null, string? logDirectory = null)
+    public static TuiServices Build(Logger logger, FileLogSink? fileLogSink = null, string? logDirectory = null,
+        IReadOnlyDictionary<string, string>? processEnvironment = null, string? workingDirectory = null)
     {
-        var runner = new ProcessRunner(logger, environment: new Dictionary<string, string>
-        { ["GH_NO_UPDATE_NOTIFIER"] = "1", ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1", ["GH_TELEMETRY"] = "false" });
+        var childEnvironment = new Dictionary<string, string>
+        { ["GH_NO_UPDATE_NOTIFIER"] = "1", ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1", ["GH_TELEMETRY"] = "false" };
+        if (processEnvironment is not null) foreach (var (key, value) in processEnvironment) childEnvironment[key] = value;
+        var runner = new ProcessRunner(logger, environment: childEnvironment, defaultWorkingDirectory: workingDirectory ?? Environment.CurrentDirectory);
         var locator = new GhBinaryLocator(runner, logger);
         var auth = new GhAuthService(runner, logger);
         var dir = logDirectory ?? LogPaths.Resolve();
@@ -40,7 +43,7 @@ public sealed class TuiServices
         var list = new GhSkillListAdapter(runner, logger);
         var resolver = new ScanRootResolver();
         var scanner = new LocalSkillScanner(logger);
-        var inventory = new LocalInventoryService(resolver, scanner, list, logger);
+        var inventory = new LocalInventoryService(resolver, scanner, list, logger, runner);
         return new TuiServices
         {
             Logger = logger,

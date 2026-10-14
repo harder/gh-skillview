@@ -9,4 +9,8 @@ public sealed record AppOptions(
     IReadOnlyList<string> ScanRoots,
     string? SubcommandName,
     IReadOnlyList<string> SubcommandArgs
-);
+)
+{
+    public IReadOnlyList<string> WorkspaceDirectories { get; init; } = [];
+    public IReadOnlyList<SkillView.Inventory.ScanRootResolver.AgentProfileRoot> Profiles { get; init; } = [];
+}

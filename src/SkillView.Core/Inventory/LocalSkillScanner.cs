@@ -19,6 +19,7 @@ public sealed class LocalSkillScanner
     private readonly Logger _logger;
     private readonly Action<string>? _candidateObservedForTests;
     private readonly Func<string, IEnumerator<string>> _enumerateEntries;
+    private readonly Func<string, Stream> _openMetadata;
 
     public LocalSkillScanner(Logger logger) : this(
         logger,
@@ -30,12 +31,19 @@ public sealed class LocalSkillScanner
     internal LocalSkillScanner(
         Logger logger,
         Action<string>? candidateObservedForTests,
-        Func<string, IEnumerator<string>>? enumerateEntriesForTests = null)
+        Func<string, IEnumerator<string>>? enumerateEntriesForTests = null,
+        Func<string, Stream>? openMetadataForTests = null)
     {
         _logger = logger;
         _candidateObservedForTests = candidateObservedForTests;
         _enumerateEntries = enumerateEntriesForTests
             ?? (path => Directory.EnumerateFileSystemEntries(path).GetEnumerator());
+        _openMetadata = openMetadataForTests ?? (path =>
+        {
+            if (!SecureRemovalBackend.IsSupported) throw new IOException("Native regular-file inspection is unavailable.");
+            return OperatingSystem.IsWindows() ? WindowsSecureRemovalBackend.OpenRegularFileForSnapshot(path)
+                : UnixSecureRemovalBackend.OpenRegularFileForSnapshot(path, out _);
+        });
     }
 
     public sealed record Options(bool AllowHiddenDirs = false);
@@ -49,16 +57,18 @@ public sealed class LocalSkillScanner
         IReadOnlyList<ScanRoot> roots,
         Options? options,
         CancellationToken cancellationToken,
-        ICollection<string>? inaccessiblePaths = null)
+        ICollection<string>? inaccessiblePaths = null,
+        ICollection<DiscoveryLocation>? locations = null)
     {
         options ??= new Options();
         var byResolved = new Dictionary<string, Builder>(StringComparer.Ordinal);
         var caseSensitivityByParent = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var budget = new ScanBudget();
 
         foreach (var root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken, inaccessiblePaths);
+            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken, inaccessiblePaths, budget, locations);
         }
 
         var builder = ImmutableArray.CreateBuilder<InstalledSkill>(byResolved.Count);
@@ -78,67 +88,109 @@ public sealed class LocalSkillScanner
         return builder.ToImmutable();
     }
 
-    private void ScanRoot(
-        ScanRoot root,
-        Options opts,
-        Dictionary<string, Builder> acc,
-        Dictionary<string, bool> caseSensitivityByParent,
-        CancellationToken cancellationToken,
-        ICollection<string>? inaccessiblePaths)
-    {
-        // `EnumerateFileSystemEntries` includes broken symlinks, which
-        // `EnumerateDirectories` silently skips on POSIX when stat fails.
-        // Broken symlinks should surface, not disappear.
-        IEnumerator<string>? children = null;
-        try
-        {
-            children = _enumerateEntries(root.Path);
-        }
-        catch (IOException ex)
-        {
-            inaccessiblePaths?.Add(root.Path);
-            _logger.Warn("inventory.scan", $"enumerate {root.Path} failed: {ex.Message}");
-            return;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            inaccessiblePaths?.Add(root.Path);
-            _logger.Warn("inventory.scan", $"enumerate {root.Path} denied: {ex.Message}");
-            return;
-        }
+    public const int MaxScanEntries = 8192;
+    public const int MaxScanDepth = 8;
+    public const int MaxScanDirectories = 2048;
+    public const int MaxMetadataBytes = 16 * 1024 * 1024;
 
+    private sealed class ScanBudget
+    {
+        internal int Entries;
+        internal int Directories;
+        internal int MetadataBytes;
+        internal bool Exhausted;
+    }
+
+    private void ScanRoot(ScanRoot root, Options opts, Dictionary<string, Builder> acc,
+        Dictionary<string, bool> caseSensitivityByParent, CancellationToken cancellationToken,
+        ICollection<string>? inaccessiblePaths, ScanBudget budget,
+        ICollection<DiscoveryLocation>? locations) =>
+        Walk(root.Path, 0, root, opts, acc, caseSensitivityByParent, cancellationToken, inaccessiblePaths, budget, locations);
+
+    private (bool Found, bool Complete) Walk(string directory, int depth, ScanRoot root, Options opts,
+        Dictionary<string, Builder> acc, Dictionary<string, bool> caseSensitivityByParent,
+        CancellationToken token, ICollection<string>? inaccessible, ScanBudget budget,
+        ICollection<DiscoveryLocation>? locations)
+    {
+        token.ThrowIfCancellationRequested();
+        if (budget.Exhausted || depth >= MaxScanDepth || ++budget.Directories > MaxScanDirectories)
+        {
+            budget.Exhausted |= budget.Directories > MaxScanDirectories;
+            inaccessible?.Add(directory);
+            Record("budget-exceeded", "Namespace traversal limit reached.");
+            return (false, false);
+        }
+        var found = false;
+        var complete = true;
         try
         {
+            using var entries = _enumerateEntries(directory);
             while (true)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                bool hasNext;
-                try
+                token.ThrowIfCancellationRequested();
+                if (budget.Exhausted) return (found, false);
+                if (!entries.MoveNext()) break;
+                if (++budget.Entries > MaxScanEntries)
                 {
-                    hasNext = children.MoveNext();
+                    budget.Exhausted = true;
+                    inaccessible?.Add(root.Path);
+                    Record("budget-exceeded", "Aggregate entry limit reached.");
+                    return (found, false);
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    inaccessiblePaths?.Add(root.Path);
-                    _logger.Warn("inventory.scan", $"enumerate {root.Path} failed: {ex.Message}");
-                    return;
-                }
-
-                if (!hasNext) return;
-                var child = children.Current;
+                var child = entries.Current;
                 _candidateObservedForTests?.Invoke(child);
-                cancellationToken.ThrowIfCancellationRequested();
+                token.ThrowIfCancellationRequested();
                 var leaf = Path.GetFileName(child);
-                if (!opts.AllowHiddenDirs && leaf.StartsWith('.')) continue;
-                // Ignore plain files at the scan root: skills are directories.
-                var isSymlink = PathResolver.IsSymlink(child);
-                if (!Directory.Exists(child) && !isSymlink) continue;
-                ConsiderCandidate(root, child, acc, caseSensitivityByParent, cancellationToken);
+                if (!opts.AllowHiddenDirs && leaf.StartsWith('.'))
+                {
+                    if (locations is { Count: < 128 }) locations.Add(new(child, "excluded", "Hidden entry; use --allow-hidden-dirs to observe it."));
+                    continue;
+                }
+                var linked = PathResolver.IsSymlink(child);
+                if (!Directory.Exists(child) && !linked) continue;
+                if (linked && Directory.Exists(child) && !File.Exists(Path.Combine(child, SkillFileName)))
+                {
+                    inaccessible?.Add(child);
+                    if (locations is { Count: < 128 }) locations.Add(new(child, "unsupported", "Linked container is not traversed; add its target as an explicit scan root."));
+                    complete = false;
+                    continue;
+                }
+                if (File.Exists(Path.Combine(child, SkillFileName)) || linked)
+                {
+                    ConsiderCandidate(root, child, acc, caseSensitivityByParent, token, budget, inaccessible);
+                    found = true;
+                    if (budget.Exhausted)
+                    {
+                        Record("budget-exceeded", "Aggregate metadata byte limit reached.");
+                        return (found, false);
+                    }
+                    continue;
+                }
+                var nested = Walk(child, depth + 1, root, opts, acc, caseSensitivityByParent, token, inaccessible, budget, locations);
+                complete &= nested.Complete;
+                if (nested.Found)
+                {
+                    found = true;
+                    if (locations is { Count: < 128 }) locations.Add(new(child, "container", "Namespace/package container; payloads are its skill descendants."));
+                }
+                else if (nested.Complete)
+                {
+                    ConsiderCandidate(root, child, acc, caseSensitivityByParent, token, budget, inaccessible);
+                    found = true;
+                }
             }
+            return (found, complete);
         }
-        finally
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            children.Dispose();
+            inaccessible?.Add(directory);
+            _logger.Warn("inventory.scan", $"enumerate {directory} failed: {ex.Message}");
+            Record("inaccessible", ex.Message);
+            return (found, false);
+        }
+        void Record(string state, string reason)
+        {
+            if (locations is { Count: < 128 }) locations.Add(new(directory, state, reason));
         }
     }
 
@@ -147,7 +199,7 @@ public sealed class LocalSkillScanner
         string candidatePath,
         Dictionary<string, Builder> acc,
         Dictionary<string, bool> caseSensitivityByParent,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ScanBudget budget, ICollection<string>? inaccessiblePaths = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var isSymlink = PathResolver.IsSymlink(candidatePath);
@@ -175,7 +227,7 @@ public sealed class LocalSkillScanner
         {
             try
             {
-                var content = ReadBoundedPrefix(skillMdPath, cancellationToken);
+                var content = ReadBoundedPrefix(skillMdPath, cancellationToken, budget);
                 var (_, parsed, parsedFence) = FrontMatterParser.Parse(content);
                 if (!parsedFence)
                 {
@@ -191,13 +243,14 @@ public sealed class LocalSkillScanner
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                inaccessiblePaths?.Add(skillMdPath);
                 _logger.Warn("inventory.scan", $"read {skillMdPath} failed: {ex.Message}");
                 validity = ValidityState.UnparsableFrontMatter;
             }
         }
 
         var ignored = File.Exists(Path.Combine(resolved, IgnoreMarkerName));
-        var resolvedKey = NormalizeKey(resolved, caseSensitivityByParent);
+        var resolvedKey = NormalizeKey(OwnershipPath.CanonicalCandidate(resolved) ?? resolved, caseSensitivityByParent);
 
         if (!acc.TryGetValue(resolvedKey, out var entry))
         {
@@ -229,28 +282,29 @@ public sealed class LocalSkillScanner
         var agentId = fm.Name is not null
             ? root.AgentHint ?? "unknown"
             : root.AgentHint ?? "unknown";
-        entry.AgentMemberships.Add(new AgentMembership(AgentIdentity.Normalize(agentId), candidatePath, isSymlink, root.Scope, DiscoveryRoot: root.Path));
+        entry.AgentMemberships.Add(new AgentMembership(AgentIdentity.Normalize(agentId), candidatePath, isSymlink, root.Scope, Context: root.Context ?? Path.GetDirectoryName(root.Path), DiscoveryRoot: root.Path, Profile: root.Profile, LoadingRule: "filesystem-placement; effective loading unknown"));
     }
 
-    private static string ReadBoundedPrefix(string path, CancellationToken cancellationToken)
+    private string ReadBoundedPrefix(string path, CancellationToken cancellationToken, ScanBudget budget)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(MaxFrontMatterPrefixBytes);
         try
         {
-            using var stream = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete,
-                bufferSize: 8 * 1024,
-                FileOptions.SequentialScan);
+            using var stream = _openMetadata(path);
             var total = 0;
-            while (total < MaxFrontMatterPrefixBytes)
+            var limit = Math.Min(MaxFrontMatterPrefixBytes, MaxMetadataBytes - budget.MetadataBytes + 1);
+            while (total < limit)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var read = stream.Read(buffer, total, MaxFrontMatterPrefixBytes - total);
+                var read = stream.Read(buffer, total, limit - total);
                 if (read == 0) break;
                 total += read;
+                budget.MetadataBytes += read;
+                if (budget.MetadataBytes > MaxMetadataBytes)
+                {
+                    budget.Exhausted = true;
+                    throw new IOException("Aggregate skill metadata byte limit reached; remaining skills are unobserved.");
+                }
             }
             cancellationToken.ThrowIfCancellationRequested();
             return Encoding.UTF8.GetString(buffer, 0, total);
@@ -281,21 +335,27 @@ public sealed class LocalSkillScanner
         Dictionary<string, Builder> acc,
         Dictionary<string, bool> caseSensitivityByParent)
     {
-        var key = NormalizeKey(candidatePath, caseSensitivityByParent);
-        if (acc.ContainsKey(key)) return;
-        acc[key] = new Builder
+        var address = OwnershipPath.EntryAddress(candidatePath) ?? candidatePath;
+        var key = NormalizeKey(address, caseSensitivityByParent);
+        if (!acc.TryGetValue(key, out var entry))
         {
-            Name = Path.GetFileName(candidatePath) ?? candidatePath,
-            ResolvedPath = candidatePath,
-            ScanRoot = root.Path,
-            Scope = root.Scope,
-            FrontMatter = SkillFrontMatter.Empty,
-            Validity = ValidityState.BrokenSymlink,
-            Ignored = false,
-            InstalledAt = null,
-            IsSymlinked = true,
-            AgentMemberships = { new AgentMembership(AgentIdentity.Normalize(root.AgentHint ?? "unknown"), candidatePath, true, root.Scope, DiscoveryRoot: root.Path) },
-        };
+            entry = new Builder
+            {
+                Name = Path.GetFileName(candidatePath) ?? candidatePath,
+                ResolvedPath = candidatePath,
+                ScanRoot = root.Path,
+                Scope = root.Scope,
+                FrontMatter = SkillFrontMatter.Empty,
+                Validity = ValidityState.BrokenSymlink,
+                Ignored = false,
+                InstalledAt = null,
+                IsSymlinked = true,
+            };
+            acc.Add(key, entry);
+        }
+        entry.AgentMemberships.Add(new AgentMembership(AgentIdentity.Normalize(root.AgentHint ?? "unknown"), candidatePath,
+            true, root.Scope, Context: root.Context ?? Path.GetDirectoryName(root.Path), DiscoveryRoot: root.Path,
+            Profile: root.Profile, LoadingRule: "filesystem-placement; broken exposure"));
     }
 
     private static string NormalizeKey(

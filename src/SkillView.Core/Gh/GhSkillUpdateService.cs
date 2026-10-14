@@ -20,8 +20,15 @@ namespace SkillView.Gh;
 /// from the parsed textual result.
 public sealed class GhSkillUpdateService
 {
-    internal string? EffectiveHome => _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
-        ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    internal string EffectiveHome => ResolveHome(null);
+
+    private string ResolveHome(IReadOnlyDictionary<string, string>? environment)
+    {
+        var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", environment)
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrWhiteSpace(home)) throw new IOException("Cannot establish gh's global lockfile home.");
+        return Path.GetFullPath(home, _runner.EffectiveWorkingDirectory);
+    }
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
 
@@ -54,8 +61,7 @@ public sealed class GhSkillUpdateService
             try
             {
                 GhSharedLockGuard.ValidateCapturedOwners(options.Targets, cancellationToken);
-                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken,
-                    _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment));
+                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, ResolveHome(options.ProcessEnvironment));
                 GhSharedLockGuard.ValidateUpdateRecords(records, options.Targets);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

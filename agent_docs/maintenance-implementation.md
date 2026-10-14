@@ -178,3 +178,45 @@ originating Codex chat. No installed user skills are test targets.
   alias protections have regression tests. Repository descriptions can contain
   unescaped newlines; updates stage the recorded source path and inspect the
   materialized payload instead of guessing a selector from those descriptions.
+
+## Batch 3 merge
+
+PR [44](https://github.com/harder/gh-skillview/pull/44) merged as
+`a50e7b2e3738b1d057398f6654043cfb6cb66362`. Reviewed head
+`2f23a1dce632e98c7a54d65ab158b0c611fc1d05` passed all 951 tests on
+Linux, macOS and Windows, four AOT targets, and CodeQL (CI 38587538990,
+CodeQL 38587539210). Native JSON also preserves an unmatched owner's pin,
+distributor version and covered paths with the documented no-matches exit 20.
+
+## Batch 3b discovery
+
+M10 discovery foundations now share gh's 48-agent placement catalog across
+filesystem scanning, installation and Doctor detection. Native/legacy Copilot,
+Gemini and OpenCode project roots remain explicit observation conventions;
+Codex and Amp retain separate native config detection. Shared directories do
+not identify which individual agents are installed or enabled.
+
+The scanner walks bounded namespace/package containers and stops at skill
+payloads. It rejects child container links, special metadata files, and unlimited
+prefix reads. Bounds cover aggregate entries, enumerated directories, namespace
+depth and metadata bytes; partial reads before I/O failures still consume the
+byte budget. Omitted coverage cannot produce orphan cleanup recommendations.
+
+Global `--workspace` flags add an explicit workspace collection. Named
+`--profile agent[:name]=skills-directory` flags preserve alternative profile
+exposures without inferring enabled state. Physical CWD/worktree ancestor
+observations coexist with gh's actual Git context under its effective child
+environment. Relative HOME/config/state paths use that same captured CWD.
+Windows and Unix alias keys merge physical observations while retaining their
+original display/removal-policy paths.
+
+Native manager manifests, bundled resources and effective loading policies
+remain in M12/M16; this batch does not infer those from placement alone. The
+recoverable repair/journal, desired-state and maintenance UI batches remain.
+
+Batch 3b local verification: warning-free build, 969 tests passed, solution
+format verification, and sequential standalone/extension native AOT publishes.
+Disposable runtime fixtures pass on gh 2.97.0 and 2.102.0, including redirected
+Git workspaces, profiles, namespaces, aliases and partial-coverage cleanup
+refusals. The preceding shared/exact update runtime proof also passed on this
+batch host. Platform CI and final independent review are required before merge.

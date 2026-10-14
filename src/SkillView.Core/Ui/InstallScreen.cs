@@ -551,7 +551,7 @@ public sealed class InstallScreen
             if (string.IsNullOrEmpty(home)) return found;
             return InstallAgentCatalog.DetectInstalledGhIds(
                 home,
-                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"));
+                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"), Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
         }
         catch { /* best-effort detection */ }
         return found;

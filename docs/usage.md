@@ -253,3 +253,24 @@ metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
 removal of an unowned chosen install remains available through the Installed workflow.
 An incomplete scan is marked in the Installed footer and Changes summary.
+
+Observe another workspace or a named agent profile with global flags before
+`list`, other CLI commands, or the TUI:
+
+```sh
+skillview --workspace /work/project-a --workspace /work/project-b list --json
+skillview --profile claude:work=/profiles/work/skills list --json
+```
+
+Workspace discovery observes known skill directories in the selected directory
+and bounded ancestors inside its worktree. It also observes gh's actual project
+context when Git environment variables redirect the CLI. Profile paths name
+skills directories; they preserve the profile label without changing agent
+configuration or claiming that the agent has loaded the skill.
+
+Namespace containers are reported separately from their skill payloads. List
+JSON includes `discoveryLocations` for containers, hidden exclusions, unsupported
+linked containers and scan limits. Add a linked container's target as an explicit
+`--scan-root` to inspect it. Incomplete scans retain `partial: true`; cleanup JSON
+also includes that flag and inaccessible locations. Hidden residue and name
+collisions require review.

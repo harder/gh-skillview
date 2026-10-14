@@ -7,4 +7,8 @@ public sealed record ScanRoot(
     string Path,
     Scope Scope,
     string? AgentHint
-);
+)
+{
+    public string? Profile { get; init; }
+    public string? Context { get; init; }
+}

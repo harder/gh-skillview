@@ -1,11 +1,11 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Subprocess;
 
 namespace SkillView.Inventory;
 
@@ -20,25 +20,29 @@ public sealed class LocalInventoryService
     private readonly GhSkillListAdapter _listAdapter;
     private readonly SkillLockFileReader _lockReader;
     private readonly Logger _logger;
+    private readonly ProcessRunner _contextRunner;
 
     public LocalInventoryService(
         ScanRootResolver resolver,
         LocalSkillScanner scanner,
         GhSkillListAdapter listAdapter,
-        Logger logger)
+        Logger logger, ProcessRunner? contextRunner = null)
     {
         _resolver = resolver;
         _scanner = scanner;
         _listAdapter = listAdapter;
         _lockReader = new SkillLockFileReader(logger);
         _logger = logger;
+        _contextRunner = contextRunner ?? new ProcessRunner(logger);
     }
 
     public sealed record Options(
         IReadOnlyList<string> ScanRoots,
         bool AllowHiddenDirs,
         string? FilterScope = null,
-        string? FilterAgent = null);
+        string? FilterAgent = null,
+        IReadOnlyList<string>? WorkspaceDirectories = null,
+        IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null);
 
     public async Task<InventorySnapshot> CaptureAsync(
         string? ghPath,
@@ -51,7 +55,20 @@ public sealed class LocalInventoryService
         // Terminal.Gui thread and make every stage cancellation-aware. Run the
         // gh inventory call concurrently so a slow disk does not add its full
         // latency to a slow subprocess.
-        var localTask = Task.Run(() => CaptureLocal(options, cancellationToken), cancellationToken);
+        var localTask = Task.Run(async () =>
+        {
+            string? activeProject = null;
+            string? contextError = null;
+            var currentDirectory = _contextRunner.EffectiveWorkingDirectory;
+            try
+            {
+                activeProject = await GhPlacementCatalog.ProjectRootAsync(_contextRunner,
+                    new(WorkingDirectory: currentDirectory), currentDirectory, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { contextError = ex.Message; }
+            return CaptureLocal(options, cancellationToken, activeProject, contextError, currentDirectory);
+        }, cancellationToken);
 
         // `gh skill list` is the primary inventory source (gh ≥ 2.95 is
         // required, so it's always available); the filesystem scan above
@@ -148,6 +165,7 @@ public sealed class LocalInventoryService
             GhListDuration = gh.Duration,
             BrokenSymlinksFound = brokenCount,
             InaccessiblePaths = local.InaccessiblePaths,
+            Locations = local.Locations,
         };
 
         return new InventorySnapshot
@@ -176,34 +194,41 @@ public sealed class LocalInventoryService
         return new GhCapture(records.Records, stopwatch.Elapsed, records.Succeeded, records.Error);
     }
 
-    private LocalCapture CaptureLocal(Options options, CancellationToken cancellationToken)
+    private LocalCapture CaptureLocal(Options options, CancellationToken cancellationToken, string? activeProject, string? contextError, string currentDirectory)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var inaccessible = new List<string>();
+        if (contextError is not null) inaccessible.Add("gh project context unobserved: " + contextError);
+        string? EnvironmentPath(string name) => _contextRunner.GetEffectiveEnvironmentVariable(name) is { Length: > 0 } value
+            ? Path.GetFullPath(value, currentDirectory) : null;
+        var home = EnvironmentPath(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var roots = _resolver.ResolveWithCancellation(new ScanRootResolver.Options(
-            CurrentDirectory: Environment.CurrentDirectory,
-            HomeDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            CurrentDirectory: currentDirectory,
+            HomeDirectory: home,
             CustomRoots: options.ScanRoots,
-            ClaudeUserConfigDir: Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"),
-            PiCodingAgentDir: Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR")),
-            cancellationToken);
+            ClaudeUserConfigDir: EnvironmentPath("CLAUDE_CONFIG_DIR"),
+            PiCodingAgentDir: EnvironmentPath("PI_CODING_AGENT_DIR"),
+            WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles, GhProjectDirectory: activeProject),
+            cancellationToken, inaccessible);
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
         var fsSw = Stopwatch.StartNew();
-        var inaccessible = new List<string>();
+        var locations = new List<DiscoveryLocation>();
         var scanned = _scanner.ScanWithCancellation(
             roots,
             new LocalSkillScanner.Options(options.AllowHiddenDirs),
-            cancellationToken, inaccessible);
+            cancellationToken, inaccessible, locations);
         var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(
             roots.Select(root => root.Path),
-            cancellationToken, diagnostics: lockDiagnostics);
+            cancellationToken, new(home, EnvironmentPath("XDG_STATE_HOME")), diagnostics: lockDiagnostics);
         fsSw.Stop();
         _logger.Info(
             "inventory",
             $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
         return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray(),
-            lockDiagnostics.ToImmutableArray());
+            lockDiagnostics.ToImmutableArray(), locations.ToImmutableArray());
     }
 
     internal static ImmutableArray<InstalledSkill> EnrichOwnership(ImmutableArray<InstalledSkill> skills,
@@ -272,7 +297,8 @@ public sealed class LocalInventoryService
         ImmutableArray<PackageObservation> Packages,
         TimeSpan Duration,
         ImmutableArray<string> InaccessiblePaths,
-        ImmutableArray<LockReadDiagnostic> LockDiagnostics);
+        ImmutableArray<LockReadDiagnostic> LockDiagnostics,
+        ImmutableArray<DiscoveryLocation> Locations);
 
     private sealed record GhCapture(
         ImmutableArray<GhSkillListRecord> Records,
@@ -362,7 +388,7 @@ public sealed class LocalInventoryService
             Pinned = a.Pinned || b.Pinned,
         };
         var memberships = first.Agents.Concat(next.Agents)
-            .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope))
+            .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope, agent.Profile))
             .Select(group => group.OrderByDescending(agent => agent.IsSymlink)
                 .ThenByDescending(agent => agent.DiscoveryRoot is not null).First() with
             { AgentId = group.Key.Item1 })
@@ -420,22 +446,7 @@ public sealed class LocalInventoryService
         // through different ancestor symlinks (notably /var and /private/var
         // on macOS). Resolve those aliases for inventory matching only; keep
         // the original paths in the records for display and removal policy.
-        var normalized = PathIdentity.Normalize(path);
-        if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-        {
-            var resolved = UnixNative.realpath(normalized, IntPtr.Zero);
-            if (resolved != IntPtr.Zero)
-            {
-                try
-                {
-                    normalized = Marshal.PtrToStringUTF8(resolved) ?? normalized;
-                }
-                finally
-                {
-                    UnixNative.free(resolved);
-                }
-            }
-        }
+        var normalized = OwnershipPath.CanonicalCandidate(path) ?? OwnershipPath.EntryAddress(path) ?? PathIdentity.Normalize(path);
 
         var parent = Path.GetDirectoryName(normalized) ?? normalized;
         if (!caseSensitivityByParent.TryGetValue(parent, out var caseSensitive))
@@ -447,14 +458,7 @@ public sealed class LocalInventoryService
         return PathIdentity.NormalizeKey(normalized, caseSensitive);
     }
 
-    private static class UnixNative
-    {
-        [DllImport("libc")]
-        internal static extern IntPtr realpath(string path, IntPtr resolvedPath);
 
-        [DllImport("libc")]
-        internal static extern void free(IntPtr pointer);
-    }
 
     internal static Scope? ParseScope(string? scope)
     {

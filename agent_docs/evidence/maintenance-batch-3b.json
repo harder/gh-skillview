@@ -1,0 +1,86 @@
+{
+  "baseline": "a50e7b2e3738b1d057398f6654043cfb6cb66362",
+  "sdk": "10.0.402",
+  "scope": [
+    "M10 discovery/catalog/context foundations",
+    "M21 bounded and adversarial inventory verification"
+  ],
+  "fullSuite": {
+    "passed": 969,
+    "failed": 0,
+    "skipped": 0
+  },
+  "build": "zero warnings/errors",
+  "format": "solution verify-no-changes passed",
+  "nativeAot": "App and extension osx-arm64 publishes passed; App IL2026/IL3050/IL3053 promoted to errors",
+  "runtimeProof": [
+    {
+      "gh": "gh version 2.97.0 (2026-07-31)",
+      "nativeHost": "standalone native AOT osx-arm64",
+      "redirectedLocalInstallObserved": true,
+      "monorepoAndLegacyWorkspaceRootsObserved": true,
+      "namedProfileContextPreserved": true,
+      "namespaceContainersSeparated": true,
+      "physicalAliasesMerged": true,
+      "depthBudgetReportsPartialCoverage": true,
+      "incompleteCoverageCannotRecommendOrphanCleanup": true
+    },
+    {
+      "gh": "gh version 2.102.0 (2026-09-30)",
+      "nativeHost": "standalone native AOT osx-arm64",
+      "redirectedLocalInstallObserved": true,
+      "monorepoAndLegacyWorkspaceRootsObserved": true,
+      "namedProfileContextPreserved": true,
+      "namespaceContainersSeparated": true,
+      "physicalAliasesMerged": true,
+      "depthBudgetReportsPartialCoverage": true,
+      "incompleteCoverageCannotRecommendOrphanCleanup": true
+    }
+  ],
+  "bounds": {
+    "workspaces": 32,
+    "profiles": 32,
+    "profileNameCharacters": 128,
+    "rootProbes": 4096,
+    "roots": 256,
+    "gitAncestors": 128,
+    "projectAncestors": 32,
+    "namespaceDepth": 8,
+    "entries": 8192,
+    "enumeratedDirectories": 2048,
+    "metadataPrefixBytes": 65536,
+    "aggregateMetadataBytes": 16777216,
+    "overflowObservationBytes": 1,
+    "locationDiagnostics": 128
+  },
+  "independentReview": {
+    "model": "Astra",
+    "remainingActionableFindings": 0,
+    "acceptedFindings": [
+      "retain native/legacy Copilot, Gemini and OpenCode project observation paths",
+      "preserve native Amp detection without inferring consumers from shared placement",
+      "preserve broken-link aliases/profile/context exposures",
+      "all32 accepted workspaces are observed",
+      "resolve actual Git context under effective child environment",
+      "normalize relative update home at classification and process admission",
+      "native Windows alias merge keys",
+      "isolate destructive tests and neutralize inherited Git redirects",
+      "charge each successful metadata read even if a later read fails",
+      "missing explicit discovery paths report incomplete coverage",
+      "physical ancestors of nested workspace aliases remain discoverable",
+      "macOS physical/lexical context assertions use native alias equality"
+    ]
+  },
+  "sources": {
+    "ghPlacementVersion": "v2.102.0",
+    "gemini": "https://geminicli.com/docs/cli/using-agent-skills/",
+    "opencode": "https://opencode.ai/docs/skills/"
+  },
+  "limitations": [
+    "Placement observations do not imply enabled or effective agent loading",
+    "Native manifests, plugin caches and bundled resources remain M12/M16",
+    "Recoverable repair/journal, desired state and maintenance UI remain later batches",
+    "Native physical keys are observational; execution still requires fresh native validation"
+  ],
+  "updateRegression": "Batch 3 shared/exact/custom update and ownership runtime proof passed with both gh 2.97.0 and 2.102.0 on this batch host before the final discovery-only edge fixes."
+}

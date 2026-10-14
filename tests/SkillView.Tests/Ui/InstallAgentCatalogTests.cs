@@ -15,6 +15,19 @@ public sealed class InstallAgentCatalogTests : IDisposable
     }
 
     [Fact]
+    public void DetectInstalledAgents_PreservesNativeAmpAndClaudeOverrideWithoutInferringSharedConsumers()
+    {
+        Directory.CreateDirectory(Path.Combine(_homeDirectory, ".config", "amp"));
+        Directory.CreateDirectory(Path.Combine(_homeDirectory, ".config", "agents"));
+        var claude = Path.Combine(_homeDirectory, "claude-profile");
+        Directory.CreateDirectory(claude);
+        var found = InstallAgentCatalog.DetectInstalledGhIds(_homeDirectory, claudeConfigDir: claude);
+        Assert.Contains("amp", found);
+        Assert.Contains("claude-code", found);
+        Assert.DoesNotContain("kimi-cli", found);
+    }
+
+    [Fact]
     public void DetectInstalledGhIds_UsesAgentHomeDirectories_NotSkillsDirectories()
     {
         Directory.CreateDirectory(Path.Combine(_homeDirectory, ".copilot"));

@@ -43,9 +43,12 @@ public sealed record ScanDiagnostics
 
     /// Broken symlinks encountered during scanning.
     public int BrokenSymlinksFound { get; init; }
+    public ImmutableArray<DiscoveryLocation> Locations { get; init; } = [];
 
     public static ScanDiagnostics Empty { get; } = new();
 }
+
+public sealed record DiscoveryLocation(string Path, string State, string Reason);
 
 /// An observation can establish absence only within its successfully covered roots.
 public sealed record ProviderObservation(

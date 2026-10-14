@@ -536,7 +536,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _services.InventoryService.CaptureAsync(
             report.GhPath,
             new LocalInventoryService.Options(
-                ScanRoots: _options.ScanRoots,
+                ScanRoots: _options.ScanRoots, WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles,
                 AllowHiddenDirs: false,
                 FilterScope: scopeFilter),
             cancellationToken);

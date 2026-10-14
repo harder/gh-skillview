@@ -20,7 +20,7 @@ for gh in args.gh:
  with tempfile.TemporaryDirectory(prefix='skillview-batch2-proof-') as temp:
   root=Path(temp);home=root/'home';workspace=root/'workspace';home.mkdir();workspace.mkdir()
   roots=[root/'first',root/'second']
-  env=os.environ.copy();env.update(HOME=str(home),USERPROFILE=str(home),GH_TOKEN=auth,GH_PATH=str(gh),GH_EXTENSION='1',GH_CONFIG_DIR=str(root/'gh-config'),XDG_CACHE_HOME=str(root/'cache'),XDG_STATE_HOME=str(root/'state'),XDG_CONFIG_HOME=str(root/'config'),XDG_DATA_HOME=str(root/'data'),APPDATA=str(root/'appdata'),LOCALAPPDATA=str(root/'localappdata'),GH_NO_UPDATE_NOTIFIER='1',GH_NO_EXTENSION_UPDATE_NOTIFIER='1')
+  env={key:value for key,value in os.environ.items() if not key.startswith('GIT_')};env.update(HOME=str(home),USERPROFILE=str(home),GH_TOKEN=auth,GH_PATH=str(gh),GH_EXTENSION='1',GH_CONFIG_DIR=str(root/'gh-config'),XDG_CACHE_HOME=str(root/'cache'),XDG_STATE_HOME=str(root/'state'),XDG_CONFIG_HOME=str(root/'config'),XDG_DATA_HOME=str(root/'data'),APPDATA=str(root/'appdata'),LOCALAPPDATA=str(root/'localappdata'),GH_NO_UPDATE_NOTIFIER='1',GH_NO_EXTENSION_UPDATE_NOTIFIER='1',GH_TELEMETRY='false')
   for directory in roots:
    r=subprocess.run([str(gh),'skill','install','--dir',str(directory),'--pin=33789149b9def6b66ddf247438a79fac94e22074','--','cli/cli','skills/gh-skill'],env=env,cwd=workspace,capture_output=True,text=True,timeout=120)
    assert r.returncode==0,r.stderr
