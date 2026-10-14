@@ -54,6 +54,9 @@ for gh in args.gh or [None]:
         first.joinpath('link').symlink_to(outside, target_is_directory=True)
         if os.name != 'nt':
             first.joinpath('resource.bin').chmod(0o500)
+            first.joinpath(' ').write_text('whitespace fixture')
+            first.joinpath('  ').mkdir()
+            first.joinpath('  ', ' ').write_text('nested whitespace fixture')
 
         def snapshot():
             rows = []
@@ -157,7 +160,8 @@ for gh in args.gh or [None]:
                             otherInstalledPayloadCannotBeState=True, missingConfiguredAgentRootCannotBeState=True,
                             rawFlowMetadataArchivedByteExact=True, sharedRegistryUnchanged=True,
                             historyVerifiedEveryBlob=True, historyLeftEvidenceUnchanged=True,
-                            corruptArchiveDidNotHideVerifiedPeer=True, incompleteAndOrphanedHistoryVisible=True))
+                            corruptArchiveDidNotHideVerifiedPeer=True, incompleteAndOrphanedHistoryVisible=True,
+                            whitespaceOnlyUnixNamesRoundTripped=os.name != 'nt'))
 assert digest(shared) == shared_before
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))

@@ -44,6 +44,24 @@ public sealed class MaintenanceBackupHistoryTests : IDisposable
         Assert.Equal(payload.Fingerprint, PayloadSnapshot.CaptureEvidence(record.Path, Token).Fingerprint);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WhitespaceOnlyUnixPayloadNamesRoundTrip(bool directory)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var first = Capture();
+        var path = Path.Combine(first.Path, " ");
+        if (directory) path = Path.Combine(Directory.CreateDirectory(path).FullName, "  ");
+        File.WriteAllText(path, "whitespace fixture");
+        var target = Assert.Single(new LocalSkillScanner(new Logger()).Scan([new(Path.GetDirectoryName(first.Path)!, Scope.Custom, null)]));
+        var record = new MaintenanceBackupStore(State).Capture(target, Token);
+        var entry = Assert.Single(new MaintenanceBackupStore(State).ReadHistory(Token), entry => entry.Id == record.Id);
+        Assert.Equal("verified", entry.Status);
+        Assert.Equal(record.BeforeFingerprint, PayloadSnapshot.CaptureEvidence(first.Path, Token).Fingerprint);
+        Assert.Equal("whitespace fixture", File.ReadAllText(path));
+    }
+
     [Fact]
     public void MissingStateRefusesWithoutCreatingEvenAncestors()
     {

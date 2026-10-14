@@ -157,7 +157,7 @@ public sealed partial class MaintenanceBackupStore
         {
             token.ThrowIfCancellationRequested();
             CheckProperties(row, ["path", "kind", "hash", "bytes", "unixMode", "blob", "blobBytes"]);
-            var path = RequiredString(row, "path");
+            var path = NullableString(row, "path") ?? throw new IOException("Payload path is not a string.");
             if (path.Length > 32_768 || path.StartsWith('/') || path.Split('/').Any(part => part is "" or "." or "..") || path.Contains('\0'))
                 throw new IOException("Unsafe archive payload path.");
             var kind = RequiredString(row, "kind");

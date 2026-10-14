@@ -7,10 +7,10 @@
     "sdk": "10.0.402",
     "buildWarnings": 0,
     "buildErrors": 0,
-    "testsPassed": 1053,
+    "testsPassed": 1055,
     "testsFailed": 0,
     "testsSkipped": 0,
-    "historyCases": 25,
+    "historyCases": 27,
     "historyCliCases": 6,
     "formatVerified": true,
     "siteBuildPassed": true,
@@ -19,8 +19,8 @@
   },
   "nativeRuntimeProof": [
     {
-      "nativeHost": "/private/tmp/skillview-maintenance/history/app-final2/skillview",
-      "nativeSha256": "a3fd293ddbcfa7dc53c4a1d03b4c037c36dd83bbc87c0ae4f28a238a572a724c",
+      "nativeHost": "/private/tmp/skillview-maintenance/history/app-copilot/skillview",
+      "nativeSha256": "01cea60a81fe4b92356430fd15728617556392eef782f461eec5a86c2af8f0d8",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -35,11 +35,12 @@
       "historyVerifiedEveryBlob": true,
       "historyLeftEvidenceUnchanged": true,
       "corruptArchiveDidNotHideVerifiedPeer": true,
-      "incompleteAndOrphanedHistoryVisible": true
+      "incompleteAndOrphanedHistoryVisible": true,
+      "whitespaceOnlyUnixNamesRoundTripped": true
     },
     {
-      "nativeHost": "/private/tmp/skillview-maintenance/history/app-final2/skillview",
-      "nativeSha256": "a3fd293ddbcfa7dc53c4a1d03b4c037c36dd83bbc87c0ae4f28a238a572a724c",
+      "nativeHost": "/private/tmp/skillview-maintenance/history/app-copilot/skillview",
+      "nativeSha256": "01cea60a81fe4b92356430fd15728617556392eef782f461eec5a86c2af8f0d8",
       "gh": "/opt/homebrew/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -54,11 +55,12 @@
       "historyVerifiedEveryBlob": true,
       "historyLeftEvidenceUnchanged": true,
       "corruptArchiveDidNotHideVerifiedPeer": true,
-      "incompleteAndOrphanedHistoryVisible": true
+      "incompleteAndOrphanedHistoryVisible": true,
+      "whitespaceOnlyUnixNamesRoundTripped": true
     },
     {
-      "nativeHost": "/private/tmp/skillview-maintenance/history/ext-final2/gh-skillview",
-      "nativeSha256": "271cc8f3098f405cb5b004e78e9b3c3e361c893f08442be6978b7ec8dcb591a8",
+      "nativeHost": "/private/tmp/skillview-maintenance/history/ext-copilot/gh-skillview",
+      "nativeSha256": "fe6d3f66ac5124f01d41a7b94c62cd0ed8d0895825036c0b3597e6db528fb799",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -73,11 +75,12 @@
       "historyVerifiedEveryBlob": true,
       "historyLeftEvidenceUnchanged": true,
       "corruptArchiveDidNotHideVerifiedPeer": true,
-      "incompleteAndOrphanedHistoryVisible": true
+      "incompleteAndOrphanedHistoryVisible": true,
+      "whitespaceOnlyUnixNamesRoundTripped": true
     },
     {
-      "nativeHost": "/private/tmp/skillview-maintenance/history/ext-final2/gh-skillview",
-      "nativeSha256": "271cc8f3098f405cb5b004e78e9b3c3e361c893f08442be6978b7ec8dcb591a8",
+      "nativeHost": "/private/tmp/skillview-maintenance/history/ext-copilot/gh-skillview",
+      "nativeSha256": "fe6d3f66ac5124f01d41a7b94c62cd0ed8d0895825036c0b3597e6db528fb799",
       "gh": "/opt/homebrew/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -92,7 +95,8 @@
       "historyVerifiedEveryBlob": true,
       "historyLeftEvidenceUnchanged": true,
       "corruptArchiveDidNotHideVerifiedPeer": true,
-      "incompleteAndOrphanedHistoryVisible": true
+      "incompleteAndOrphanedHistoryVisible": true,
+      "whitespaceOnlyUnixNamesRoundTripped": true
     }
   ],
   "independentReview": {
@@ -107,7 +111,9 @@
       "Share a1GiB manifest/blob verification work budget across all records, charging before reads and retaining failed-record charges.",
       "Malformed retained paths must classify as corrupt without consuming cancellation or aggregate-quota refusal."
     ],
-    "independentFocusedHistoryTestsPassedBeforeFinalBudgetAndPathCases": 23
+    "independentFocusedHistoryTestsPassedBeforeFinalBudgetAndPathCases": 23,
+    "finalPreWhitespaceFocusedHistoryTestsPassed": 25,
+    "whitespaceFixRereview": "clear"
   },
   "limits": {
     "archiveBytes": 295698432,
@@ -130,5 +136,18 @@
       "win-arm64"
     ]
   },
-  "remaining": "M08/M13-M15 dispositions, metadata-complete preservation, repair/relink/consolidation and verified recovery remain subsequent batches. M12/M16 and M17-M20 plus final M21 acceptance also remain."
+  "remaining": "M08/M13-M15 dispositions, metadata-complete preservation, repair/relink/consolidation and verified recovery remain subsequent batches. M12/M16 and M17-M20 plus final M21 acceptance also remain.",
+  "copilotFinding": {
+    "comment": 4275616911,
+    "thread": "PRRT_kwDOSKLicM6sfuef",
+    "fix": "Preserve non-null whitespace-only Unix entry paths while retaining structural traversal/type/depth/length checks.",
+    "baselineNativeProof": "Previous nativehost reported valid whitespace payload as corrupt; updated nativeproof and two round-trip regressions pass."
+  },
+  "initialCI": {
+    "head": "e4dadfd351af8a52e9d77219d7575e2173c2f51b",
+    "run": 38627565766,
+    "codeql": 38627565816,
+    "allPassed": true,
+    "sourceFixRequiresFreshCI": true
+  }
 }

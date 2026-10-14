@@ -367,3 +367,12 @@ Verification means byte consistency of raw payload evidence. It is not
 authentication against a same-user writer, ACL/xattr/root-mode restoration, or
 in-place replacement authority. M08/M13-M15 recovery, dispositions, relinking
 and consolidation still require subsequent plan/apply work.
+
+Initial PR #48 head e4dadfd passed CI38627565766/CodeQL38627565816 and all
+four native targets. Copilot then found a valid Unix whitespace-only payload
+name incorrectly rejected by the reader's generic required-string helper. The
+old native host reproduced this as a corrupt result for intact evidence. Payload
+path admission now preserves whitespace while keeping structural checks; two
+round-trip regressions and both native-host proofs cover whitespace files,
+directories and children. Independent re-review is clear; full suite1055 passed
+with zero failures/skips. Fresh CI is required for this production fix.
