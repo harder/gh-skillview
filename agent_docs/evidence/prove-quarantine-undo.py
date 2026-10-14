@@ -50,8 +50,11 @@ for gh in args.gh or [None]:
         original_mode = payload.joinpath('data').stat().st_mode
         original = payload.joinpath('SKILL.md').read_bytes()
 
-        def run(command, *arguments, ok=True):
-            process = subprocess.run([str(app), '--scan-root', str(skills), command, *map(str, arguments), '--json'],
+        def run(command, *arguments, ok=True, extra_root=None):
+            discovery = ['--scan-root', str(skills)]
+            if extra_root:
+                discovery += ['--scan-root', str(extra_root)]
+            process = subprocess.run([str(app), *discovery, command, *map(str, arguments), '--json'],
                                      env=env, cwd=root, capture_output=True, text=True, timeout=120)
             assert (process.returncode == 0) == ok, (process.returncode, process.stdout, process.stderr)
             return json.loads(process.stdout)
@@ -60,6 +63,19 @@ for gh in args.gh or [None]:
         run('quarantine', '--path', payload, ok=False)
         assert payload.exists() and not root.joinpath('state').exists()
         exposure.unlink()
+        nested_root = payload / 'agents'
+        nested_root.mkdir()
+        external = root / 'outside' / 'foo'
+        external.mkdir(parents=True)
+        external.joinpath('SKILL.md').write_text('---\nname: foo\ndescription: External\n---\nBody\n')
+        outward = nested_root / 'foo'
+        outward.symlink_to(external, target_is_directory=True)
+        run('quarantine', '--path', payload, extra_root=nested_root, ok=False)
+        assert payload.exists() and outward.is_dir() and not root.joinpath('state').exists()
+        outward.unlink()
+        run('quarantine', '--path', payload, extra_root=nested_root, ok=False)
+        assert payload.exists() and not root.joinpath('state').exists()
+        nested_root.rmdir()
         preview = run('quarantine', '--path', payload)['operations'][0]
         assert preview['status'] == 'preview' and not preview['mutationObserved']
         assert not root.joinpath('state').exists(), 'Preview created state'
@@ -114,7 +130,8 @@ for gh in args.gh or [None]:
                             occupiedRestorePathPreserved=True, completeJournalHistory=True,
                             securityIsolationClaimed=False, archiveExtractionUsed=False,
                             subtreeQuarantineConsumerRefused=True, danglingUndoDestinationRefused=True,
-                            subtreeUndoConsumerRefused=True))
+                            subtreeUndoConsumerRefused=True, outwardNestedRootRefused=True,
+                            emptyNestedRootRefused=True))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
 print(json.dumps(results, indent=2))

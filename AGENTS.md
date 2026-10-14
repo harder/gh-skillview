@@ -558,7 +558,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   extraction, overwrite, cross-volume copy/delete, or automatic ambiguous recovery.
   Resolve discovered exposure destinations even when links are dangling, relative
   or aliased, and check subtree overlap at source, retained and original addresses
-  before publishing prepared journals. See `docs/quarantine-and-undo.md`.
+  before publishing prepared journals. Include link entry addresses as well as
+  intended destinations, and refuse configured/scanned roots inside a relocation
+  boundary even when empty or expected absent. See `docs/quarantine-and-undo.md`.
   Quarantine retains live ACLs/links and does not
   isolate content or attest agent session state.
 - Unix directory enumeration must open a fresh cursor relative to the held

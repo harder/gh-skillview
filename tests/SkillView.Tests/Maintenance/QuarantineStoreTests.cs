@@ -262,4 +262,41 @@ public sealed class QuarantineStoreTests : IDisposable
         }
     }
 
+    [Fact]
+    public void NestedRootOutwardLinkRefusesQuarantineBeforePreparedJournal()
+    {
+        var agents = Directory.CreateDirectory(Path.Combine(Payload, "agents")).FullName;
+        additionalRoots.Add(new(agents, Scope.User, "claude"));
+        var outside = Directory.CreateDirectory(Path.Combine(temporary.FullName, "outside", "foo")).FullName;
+        File.WriteAllText(Path.Combine(outside, "SKILL.md"), "---\nname: foo\ndescription: External\n---\nBody\n");
+        var link = Path.Combine(agents, "foo"); Directory.CreateSymbolicLink(link, outside);
+        var inventory = Inventory(); var target = Assert.Single(inventory.Skills, skill => skill.Name == "demo");
+        Assert.Contains(inventory.Skills, skill => skill.Agents.Any(agent => agent.Path == link));
+        Assert.Throws<IOException>(() => Store.Preview(target, inventory, Token));
+        Assert.False(Directory.Exists(State)); Assert.True(Directory.Exists(link));
+        Assert.Equal("---\nname: foo\ndescription: External\n---\nBody\n", File.ReadAllText(Path.Combine(outside, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData("existing")]
+    [InlineData("missing")]
+    [InlineData("alias")]
+    public void ConfiguredNestedAgentRootRefusesQuarantineEvenWithoutSkills(string kind)
+    {
+        var root = Path.Combine(Payload, "agents");
+        if (kind != "missing") Directory.CreateDirectory(root);
+        if (kind == "alias")
+        {
+            var alias = Path.Combine(temporary.FullName, "agent-root-alias");
+            Directory.CreateSymbolicLink(alias, root); root = alias;
+        }
+        var inventory = Inventory() with
+        {
+            ConfiguredRoots = [new(Skills, Scope.Custom, null), new(root, Scope.User, "claude")]
+        };
+        var target = Assert.Single(inventory.Skills);
+        Assert.Throws<IOException>(() => Store.Preview(target, inventory, Token));
+        Assert.False(Directory.Exists(State)); Assert.True(Directory.Exists(Payload));
+    }
+
 }

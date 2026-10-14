@@ -480,3 +480,12 @@ separately discovered subtree skills. Both now gate relocation/undo before journ
 admission using bounded intended-address resolution and canonical overlap checks.
 Six regressions and native refusal proofs cover the fixes, including ambiguous
 alias-parent traversal refusal. Independent re-review validates the final fixes.
+
+A second Copilot pass identified a nested-root outward link: its destination
+was outside the move while its entry was inside. Consumer admission now checks
+both the canonical parent/final-name entry address and intended destination,
+with an isolated regression preserving the external payload and original link.
+
+The final independent policy review also protects configured/scanned roots within
+either relocation boundary, even empty or expected absent, including root aliases.
+Three fixtures and a native empty-root refusal proof cover this case.

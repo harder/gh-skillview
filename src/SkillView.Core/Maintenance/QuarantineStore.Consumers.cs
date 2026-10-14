@@ -9,6 +9,15 @@ internal sealed partial class QuarantineStore
         CancellationToken token, InstalledSkill? selected = null)
     {
         var boundary = ResolveExposureAddress(boundaryPath, token);
+        foreach (var root in inventory.ConfiguredRoots.Concat(inventory.ScannedRoots))
+        {
+            token.ThrowIfCancellationRequested();
+            var entry = OwnershipPath.EntryAddress(root.Path)
+                ?? throw new IOException("Configured discovery root entry cannot be inspected.");
+            var destination = ResolveExposureAddress(root.Path, token);
+            if (PathIdentity.IsInside(entry, boundary) || PathIdentity.IsInside(destination, boundary))
+                throw new IOException("Relocation would move or activate a configured discovery root; review its placement first.");
+        }
         foreach (var skill in inventory.Skills)
         {
             token.ThrowIfCancellationRequested();
@@ -17,8 +26,11 @@ internal sealed partial class QuarantineStore
             foreach (var path in skill.Agents.Select(agent => agent.Path).Prepend(skill.ResolvedPath))
             {
                 token.ThrowIfCancellationRequested();
+                var entryAddress = OwnershipPath.EntryAddress(path)
+                    ?? throw new IOException("Discovered exposure entry address cannot be inspected.");
                 var address = ResolveExposureAddress(path, token);
-                if (PathIdentity.IsInside(address, boundary) || PathIdentity.IsInside(boundary, address))
+                if (PathIdentity.IsInside(entryAddress, boundary) || PathIdentity.IsInside(boundary, entryAddress)
+                    || PathIdentity.IsInside(address, boundary) || PathIdentity.IsInside(boundary, address))
                     throw new IOException("A discovered installation/exposure overlaps the relocated directory or original destination; review its consumers before proceeding.");
             }
         }

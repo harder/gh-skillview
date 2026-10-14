@@ -7,7 +7,7 @@
     "sdk": "10.0.402",
     "buildWarnings": 0,
     "buildErrors": 0,
-    "testsPassed": 1103,
+    "testsPassed": 1107,
     "testsFailed": 0,
     "testsSkipped": 0,
     "formatVerified": true,
@@ -16,19 +16,21 @@
     "standaloneTrimWarningsAreErrors": true
   },
   "independentReview": {
-    "review": "clear after Copilot findings, six consumer regressions and independent final re-review",
-    "affectedTestsPassed": 87,
+    "review": "clear after entry/destination and configured-root fixes; two independent final reviews clear",
+    "affectedTestsPassed": 91,
     "failed": 0,
     "skipped": 0,
     "remainingFindings": 0,
-    "finalQuarantineTestsPassed": 22,
+    "finalQuarantineTestsPassed": 26,
     "previousAffectedRunPassed": 86,
-    "copilotFindingsAddressed": 2
+    "copilotFindingsAddressed": 3,
+    "independentFindingsAddressed": 1,
+    "additionalIndependentReviewer": "consumer_final_review: source and policy re-review clear"
   },
   "nativeRuntimeProof": [
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
-      "nativeSha256": "20df5b0017a972e1bf1a439ad62708d5a17ae3151f6312aa42bae0457132c932",
+      "nativeSha256": "25cd7968c0b4937c23d1d0f96212358c58ab75d03ba46fe961121339fe295273",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -43,11 +45,13 @@
       "archiveExtractionUsed": false,
       "subtreeQuarantineConsumerRefused": true,
       "danglingUndoDestinationRefused": true,
-      "subtreeUndoConsumerRefused": true
+      "subtreeUndoConsumerRefused": true,
+      "outwardNestedRootRefused": true,
+      "emptyNestedRootRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
-      "nativeSha256": "20df5b0017a972e1bf1a439ad62708d5a17ae3151f6312aa42bae0457132c932",
+      "nativeSha256": "25cd7968c0b4937c23d1d0f96212358c58ab75d03ba46fe961121339fe295273",
       "gh": "/opt/homebrew/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -62,11 +66,13 @@
       "archiveExtractionUsed": false,
       "subtreeQuarantineConsumerRefused": true,
       "danglingUndoDestinationRefused": true,
-      "subtreeUndoConsumerRefused": true
+      "subtreeUndoConsumerRefused": true,
+      "outwardNestedRootRefused": true,
+      "emptyNestedRootRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
-      "nativeSha256": "503fbe99b19bbb1ee2b5ce52b9cb6f2a05756fa06bb8bd731ebbdd354bb97736",
+      "nativeSha256": "b26b7b637c47d41462980b03ae32e242813fcb750757404a91b904d3d4949270",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -81,11 +87,13 @@
       "archiveExtractionUsed": false,
       "subtreeQuarantineConsumerRefused": true,
       "danglingUndoDestinationRefused": true,
-      "subtreeUndoConsumerRefused": true
+      "subtreeUndoConsumerRefused": true,
+      "outwardNestedRootRefused": true,
+      "emptyNestedRootRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
-      "nativeSha256": "503fbe99b19bbb1ee2b5ce52b9cb6f2a05756fa06bb8bd731ebbdd354bb97736",
+      "nativeSha256": "b26b7b637c47d41462980b03ae32e242813fcb750757404a91b904d3d4949270",
       "gh": "/opt/homebrew/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -100,7 +108,9 @@
       "archiveExtractionUsed": false,
       "subtreeQuarantineConsumerRefused": true,
       "danglingUndoDestinationRefused": true,
-      "subtreeUndoConsumerRefused": true
+      "subtreeUndoConsumerRefused": true,
+      "outwardNestedRootRefused": true,
+      "emptyNestedRootRefused": true
     }
   ],
   "limits": [
@@ -127,6 +137,10 @@
     "initialHead": "b890317350b7794adbc78c4f6dfe71bb520206b2",
     "initialRunId": 38652240085,
     "initialTestsPerPlatform": 1097,
-    "initialAllEightNativeProofsPassed": true
+    "initialAllEightNativeProofsPassed": true,
+    "secondHead": "3f89f59473c37f5f9051941c8bf9c68bf3c42e78",
+    "secondRunId": 38654014519,
+    "secondTestsPerPlatform": 1103,
+    "secondAllEightNativeProofsPassed": true
   }
 }
