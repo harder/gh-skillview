@@ -10,7 +10,7 @@ each project. `AGENTS.md` is the project-wide source of build and safety rules.
 | `contract-tests.yml` | Daily, manual | Required live `gh` tests at the 2.97.0 minimum and latest release; open an assigned issue on failure |
 | `critical-dependencies.yml` | Daily, manual | Check stable Terminal.Gui packages and latest GitHub CLI; open deduplicated, assigned review issues with release highlights, then add a bounded Copilot assessment |
 | `pages.yml` | Site changes, manual | Build and deploy `site/` to GitHub Pages |
-| `release.yml` | `v*` tag, manual | Build, attest, verify, and publish release assets; optionally generate package manifests |
+| `release.yml` | `v*` tag, manual | Build, attest, verify, and publish release assets; generate a stable-release Homebrew formula and optionally generate WinGet manifests |
 
 Dependabot checks NuGet weekly, GitHub Actions weekly, and `global.json` monthly.
 Terminal.Gui packages are grouped for joint review. The workflow Action pins are
@@ -40,12 +40,15 @@ published asset count, then makes the release public. Do not re-run a published
 tag to replace binaries; cut a corrected tag. A failed job opens or reuses a
 failure issue. See `docs/runbooks/release-rollback.md` for recovery.
 
-Stable-tag Homebrew and WinGet jobs are opt-in via `HOMEBREW_TAP_ENABLED` and
-`WINGET_ENABLED`. They download **published** release assets and generate
-formula/manifests as workflow artifacts. They do not push to a tap or submit
-to WinGet. The WinGet job verifies all Windows release checksums and renders a
-copy-ready manifest tree; see `packaging/winget/README.md`. `HOMEBREW_TAP_REPO`
-records the intended tap name.
+Every stable-tag release verifies published macOS ARM64 and Linux x64 assets
+against their checksums and uploads a generated Homebrew formula. The separate
+`harder/homebrew-tap` workflow checks for a new stable release hourly, opens
+a formula PR, dispatches the tap's macOS and Linux validation, and merges only
+the exact tested commit. Use its manual **Update SkillView formula** dispatch
+to check immediately after a release. No cross-repository token is needed.
+WinGet generation remains opt-in through `WINGET_ENABLED`; it verifies Windows
+checksums and uploads a copy-ready manifest tree, but does not submit upstream.
+See `packaging/winget/README.md`.
 
 Manual `workflow_dispatch` exercises release packaging without publishing a
 GitHub Release. Keep the two product publishes sequential: they share core

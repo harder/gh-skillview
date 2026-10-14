@@ -63,8 +63,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and failures create a follow-up issue.
 - `release.yml` uses locked restore, tests, AOT publishes, version and checksum
   checks, provenance attestations, a complete-asset check, and a draft release
-  before publication. Published tag reruns are refused. Homebrew and WinGet
-  jobs remain opt-in artifact generation and consume published release bytes.
+  before publication. Published tag reruns are refused. Stable releases also
+  generate a verified Homebrew formula artifact; the tap polls releases and
+  validates formula PRs on macOS and Linux before merging. WinGet generation
+  remains opt-in.
 - Workflow Actions are pinned to full commit SHAs. Update the SHA and version
   comment together after checking the upstream release. Keep permissions at
   workflow or job minimums; issue writers need `issues: write`, releases need
@@ -446,10 +448,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `SkillViewWorkflowCoordinator` owns install/update/installed/remove/cleanup/
   doctor orchestration plus the shared inventory capture/rescan flow. Put new
   workflow-level behavior there unless it truly belongs to the search shell.
-- Package-manager dark-launch scaffolding lives under `packaging/` and the
-  release workflow only generates Homebrew / WinGet artifacts when the repo
-  variables (`HOMEBREW_TAP_ENABLED`, `HOMEBREW_TAP_REPO`, `WINGET_ENABLED`) are
-  explicitly enabled. It does not push to a tap repo or submit to WinGet yet.
+- The stable release workflow always generates a Homebrew formula artifact from
+  verified published binaries using `packaging/homebrew/render_formula.py`.
+  The separate `harder/homebrew-tap` repository checks the latest stable
+  release hourly, opens a formula PR, dispatches validation on macOS ARM64 and
+  Linux x64, and merges only the exact validated commit. It needs no
+  cross-repository secret. WinGet generation remains gated by `WINGET_ENABLED`
+  and does not submit to `microsoft/winget-pkgs`.
   `packaging/winget/New-WinGetManifest.ps1` verifies published Windows assets
   against their checksums and renders copy-ready multi-file manifests. Keep
   the standalone WinGet package portable, its command alias `skillview`, and
@@ -506,8 +511,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   test filters, and opt-in `gh` contract-test workflow details.
 - `agent_docs/release-engineering.md` — release workflow, asset naming, AOT RID
   matrix, and attestation conventions.
-- `docs/runbooks/release-rollback.md` — rollback steps for live GitHub Releases
-  and the current Homebrew / WinGet dark-launch artifacts.
+- `docs/runbooks/release-rollback.md` — rollback steps for GitHub Releases,
+  the live Homebrew tap, and WinGet manifest artifacts.
 - `agent_docs/tui-pty-testing.md` — sandboxed PTY workflow, synchronization
   strategy, verification scripts, and known pitfalls for terminal UI testing.
 - `agent_docs/ui-lifecycle-and-resource-bounds.md` — shell conventions,

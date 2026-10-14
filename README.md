@@ -23,6 +23,15 @@ gh skillview
 
 Update later with `gh extension upgrade harder/gh-skillview`.
 
+### Homebrew (macOS Apple Silicon and Linux x64)
+
+```bash
+brew install harder/tap/skillview
+skillview
+```
+
+This installs the standalone app and its `gh` dependency. Run `brew upgrade harder/tap/skillview` for future releases.
+
 ### Standalone app
 
 Download the binary for your platform from the [latest release](https://github.com/harder/gh-skillview/releases):
@@ -75,7 +84,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, test
 
 ## Built with
 
-[Terminal.Gui](https://github.com/gui-cs/Terminal.Gui), [GitHub CLI](https://cli.github.com/), and [.NET 10](https://dotnet.microsoft.com/).
+[Terminal.Gui](https://github.com/tui-cs/Terminal.Gui), [GitHub CLI](https://cli.github.com/), and [.NET 10](https://dotnet.microsoft.com/).
 
 ## License
 

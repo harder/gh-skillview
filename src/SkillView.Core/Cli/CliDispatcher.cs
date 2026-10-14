@@ -1727,7 +1727,8 @@ public static class CliDispatcher
             - SkillView requires `gh` 2.97.0 or newer and checks that `gh skill` is available.
             - `--debug` is the only global flag accepted after a subcommand. Put other global flags before the subcommand.
             - `SKILLVIEW_LOG=debug` is the environment-variable alternative to `--debug`.
-            - Homebrew and WinGet scaffolding exists in the release workflow, but those channels are still dark-launch only and are not public install paths yet.
+            - On Apple Silicon macOS and x86_64 Linux, install the standalone app with `brew install harder/tap/skillview`.
+            - WinGet manifests are generated for release review, but are not submitted automatically.
 
             ## Exit codes
 

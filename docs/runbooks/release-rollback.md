@@ -5,7 +5,8 @@ Use this runbook when a `release.yml` run publishes a bad `gh-skillview` / `skil
 ## Scope
 
 - **Live channel today:** GitHub Releases published by `.github/workflows/release.yml`
-- **Dark-launch only today:** Homebrew / WinGet generation jobs (`publish-homebrew`, `publish-winget`) create artifacts but do **not** publish externally yet
+- **Live Homebrew channel:** `harder/homebrew-tap` follows stable releases after validating the formula on macOS ARM64 and Linux x64
+- **Dark-launch only:** `publish-winget` generates artifacts but does **not** submit upstream
 
 ## Triage first
 
@@ -14,7 +15,8 @@ Use this runbook when a `release.yml` run publishes a bad `gh-skillview` / `skil
    - a failed build with no release published
    - an unpublished draft release with incomplete assets
    - a published GitHub Release with bad binaries or metadata
-   - only generated Homebrew / WinGet artifacts from dark-launch jobs
+   - a Homebrew formula PR or merged tap update
+   - only generated WinGet artifacts
 3. Capture the run URL and note the affected ref/tag in the failure issue, if one exists.
 
 ## GitHub Release rollback
@@ -61,20 +63,24 @@ If `build` failed or the workflow stopped before the `release` job published ass
 3. Re-run the workflow on the existing tag only if no release was published.
    If it was live, cut a new tag after the fix.
 
-## Homebrew / WinGet dark-launch rollback
+## Homebrew tap rollback
 
-Today these jobs only generate artifacts:
+`publish-homebrew` uploads a verified formula artifact. The separate tap
+workflow opens a formula PR for each newer stable release and merges it only
+after its macOS and Linux checks pass.
 
-- `publish-homebrew` uploads a generated formula artifact
-- `publish-winget` uploads generated manifest artifacts
+1. If the tap PR has not merged, close it or fix its formula, then rerun the
+   tap validation. The existing published formula remains available.
+2. If the formula has merged and is bad, revert that tap commit and let tap CI
+   validate the revert. Inspect the release binaries before republishing.
+3. Do not edit or reuse the published release's bytes. Fix the cause and
+   publish a new SkillView version, then manually dispatch the tap's
+   **Update SkillView formula** workflow to check it promptly.
 
-There is no external tap push or WinGet submission yet, so rollback is just:
+## WinGet artifact rollback
 
-1. Treat the generated artifacts as disposable.
-2. Do not promote or reuse artifacts from the failed run.
-3. Keep the gating repo variables disabled until the next validation pass if the scaffold itself was the problem.
-
-No public Homebrew or WinGet rollback is needed until those channels are activated.
+`publish-winget` only uploads generated manifest artifacts. Discard artifacts
+from a failed run and keep `WINGET_ENABLED` disabled until the fix is verified.
 
 ## After rollback
 
@@ -83,7 +89,8 @@ No public Homebrew or WinGet rollback is needed until those channels are activat
 3. Note whether the rollback was:
    - release deletion only
    - release deletion plus commit revert/fix
-   - dark-launch artifact discard only
+   - Homebrew tap revert or PR closure
+   - WinGet artifact discard only
 4. If the failure exposed a missing safeguard, update:
    - `.github/workflows/release.yml`
    - `.github/workflows/README.md`
