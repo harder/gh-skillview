@@ -662,3 +662,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `fcntl` has two fixed arguments, so its minimum-fd variadic value belongs on
   the stack after six padded integer argument slots. Verify flags before stream
   or fdopendir admission and child-exec behavior, not just directory stream flags.
+
+- Read-only maintenance history must use native existing-only opens; never
+  create a missing state root, lock or archive to inspect it. Retain strict quota
+  enumeration for capture, but report unsafe history leaves individually without
+  following them or hiding verified peers. ZIP parsing must consume the same
+  bounded immutable bytes whose comment-free end record and stored central
+  entries were validated. Capture a file length once, validate it, and allocate
+  only from that value. Keep raw evidence verification separate from restore
+  authority; archive schema1 omits ACL/xattr/root-mode/owner restoration.

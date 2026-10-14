@@ -306,3 +306,20 @@ linked containers and scan limits. Add a linked container's target as an explici
 `--scan-root` to inspect it. Incomplete scans retain `partial: true`; cleanup JSON
 also includes that flag and inaccessible locations. Hidden residue and name
 collisions require review.
+
+### Verify backup history
+
+Run `skillview history --json` to verify retained backup evidence, or
+`skillview history --id <backup-id> --json` for one recorded ID. Verification
+checks both journals, the archive hash, every payload blob, modes, directory
+relationships and complete payload fingerprint. The command performs no remote
+check and does not extract or replace any installed skill.
+
+Statuses are `verified`, `incomplete`, `orphaned`, `corrupt` and `unrecognized`.
+Evidence remains on disk in every case. Exit0 means selected records verified;
+exit1 means retained evidence needs review; exit20 means the requested ID was
+not found. Missing or unsafe state, an active writer or an inspection quota
+refusal returns exit10 without creating state. Invalid arguments return exit2.
+A verified schema1 archive preserves file bytes, entry Unix modes and link bytes;
+it does not yet support in-place restore or preserve ACLs, extended attributes,
+root permissions or manager registries.

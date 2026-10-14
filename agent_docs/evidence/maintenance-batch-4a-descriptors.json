@@ -101,7 +101,14 @@
     }
   ],
   "platformCI": {
-    "status": "pending PR"
+    "status": "all passed",
+    "head": "1bc0e2d6698a938664842b426caad204037fec61",
+    "run": 38621616883,
+    "codeql": 38621616839,
+    "testsPassedPerPlatform": 1022,
+    "pullRequest": 47,
+    "mergeCommit": "f6b34db2ca1797ba1d20e7d7f10bed920d14da7b",
+    "copilotOpenFindings": 0
   },
   "primarySources": [
     "https://man7.org/linux/man-pages/man2/F_DUPFD.2const.html",

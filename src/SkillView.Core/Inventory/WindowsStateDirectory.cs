@@ -10,7 +10,8 @@ namespace SkillView.Inventory;
 internal sealed partial class WindowsSecureRemovalBackend
 {
     [SupportedOSPlatform("windows")]
-    internal static NativeStateDirectory OpenStateDirectory(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null)
+    internal static NativeStateDirectory OpenStateDirectory(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null,
+        bool allowCreate = true)
     {
         var full = Path.GetFullPath(path);
         if (PathIdentity.Equals(full, Path.GetPathRoot(full)!)) throw new IOException("State cannot be a filesystem root.");
@@ -20,6 +21,7 @@ internal sealed partial class WindowsSecureRemovalBackend
         while (!Directory.Exists(cursor))
         {
             token.ThrowIfCancellationRequested();
+            if (!allowCreate) throw new DirectoryNotFoundException("Maintenance state does not exist; history creates no files.");
             if (missing.Count >= 32) throw new IOException("State directory creation depth exceeded.");
             missing.Push(Path.GetFileName(cursor));
             cursor = Path.GetDirectoryName(cursor) ?? throw new IOException("State has no existing ancestor.");
@@ -48,7 +50,7 @@ internal sealed partial class WindowsSecureRemovalBackend
             }
             var exclusions = new WindowsStateExclusions(excluded, pinned);
             var canonical = OwnershipPath.CanonicalCandidate(cursor) ?? throw new IOException("Cannot canonicalize state ancestor.");
-            var parent = StateNative.CreateFileW(ToExtendedPath(canonical), 0xC0000000,
+            var parent = StateNative.CreateFileW(ToExtendedPath(canonical), allowCreate ? 0xC0000000u : 0x80000000u,
                 ShareRead | ShareWrite | ShareDelete, IntPtr.Zero, OpenExisting,
                 BackupSemantics | OpenReparsePoint | 0x80000000, IntPtr.Zero);
             if (parent.IsInvalid) { parent.Dispose(); throw new IOException("Cannot open writable state ancestor: " + new Win32Exception(Marshal.GetLastPInvokeError()).Message); }
@@ -76,7 +78,7 @@ internal sealed partial class WindowsSecureRemovalBackend
     }
 
     private static SafeFileHandle CreateStateEntryAt(SafeFileHandle parent, string name, bool directory,
-        bool openIf, byte[] descriptor, bool exclusive, CancellationToken token)
+        bool openIf, byte[] descriptor, bool exclusive, CancellationToken token, bool existingOnly = false)
     {
         NativeStateDirectory.CheckName(name);
         var text = Marshal.StringToHGlobalUni(name);
@@ -105,9 +107,9 @@ internal sealed partial class WindowsSecureRemovalBackend
             var options = FileOpenForBackupIntent | FileSynchronousIoNonAlert | FileOpenReparsePoint | 2u
                 | (directory ? FileDirectoryFile : FileNonDirectoryFile);
             token.ThrowIfCancellationRequested();
-            var status = StateNative.NtCreateFile(out rawHandle, 0x001201BF, ref attributes, out _, IntPtr.Zero,
+            var status = StateNative.NtCreateFile(out rawHandle, existingOnly ? 0x00120089u : 0x001201BFu, ref attributes, out _, IntPtr.Zero,
                 0x80, exclusive ? 0u : ShareRead | ShareWrite | ShareDelete,
-                openIf ? 3u : 2u, options, IntPtr.Zero, 0);
+                existingOnly ? 1u : openIf ? 3u : 2u, options, IntPtr.Zero, 0);
             if (status < 0) throw new IOException("Create/open relative state entry failed: "
                 + new Win32Exception((int)WindowsNative.RtlNtStatusToDosError(status)).Message);
             var handle = new SafeFileHandle(rawHandle, ownsHandle: true); rawHandle = IntPtr.Zero;
@@ -258,7 +260,14 @@ internal sealed partial class WindowsSecureRemovalBackend
             try { CheckWindowsPrivateState(handle, user); return new FileStream(handle, FileAccess.ReadWrite); }
             catch { handle.Dispose(); throw; }
         }
-        internal override IEnumerable<(string Name, long Bytes)> EnumerateFiles(CancellationToken token)
+        internal override FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token)
+        {
+            ValidateLocation(token);
+            var handle = CreateStateEntryAt(root, name, false, false, descriptor, exclusive: true, token, existingOnly: true);
+            try { CheckWindowsPrivateState(handle, user); return new FileStream(handle, FileAccess.Read); }
+            catch { handle.Dispose(); throw; }
+        }
+        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
         {
             ValidateLocation(token);
             using var frame = new DirectoryFrame(root, canonical, ReadIdentity(root), 0, ownsDirectory: false);
@@ -269,17 +278,26 @@ internal sealed partial class WindowsSecureRemovalBackend
                 { if (error is not null) throw new IOException(error); yield break; }
                 if (entry is null) continue;
                 if ((entry.Value.Attributes & (FileAttributeDirectory | FileAttributeReparsePoint)) != 0)
-                    throw new IOException("Unexpected directory/link in state.");
+                { yield return (entry.Value.Name, 0, "Unexpected directory/link in state."); continue; }
                 // The exclusive writer lock is already verified as zero length.
-                if (entry.Value.Name == "writer.lock") { yield return (entry.Value.Name, 0); continue; }
-                using var child = OpenEntryAt(root, entry.Value.Name, null, false, requestDeleteAccess: false, requestReadAccess: true);
-                var identity = ReadIdentity(child);
-                if (identity.IsDirectory || identity.IsReparsePoint || identity.FileIdLow != entry.Value.FileIdLow
-                    || identity.FileIdHigh != entry.Value.FileIdHigh || WindowsNative.GetFileType(child) != 1)
-                    throw new IOException("State entry identity/type changed.");
-                using var stream = new FileStream(child, FileAccess.Read);
-                yield return (entry.Value.Name, stream.Length);
+                if (entry.Value.Name == "writer.lock") { yield return (entry.Value.Name, 0, null); continue; }
+                yield return ObserveEntry(entry.Value);
             }
+        }
+        private (string Name, long Bytes, string? Error) ObserveEntry(DirectoryEntry entry)
+        {
+            try
+            {
+                using var child = OpenEntryAt(root, entry.Name, null, false, requestDeleteAccess: false, requestReadAccess: true);
+                var identity = ReadIdentity(child);
+                if (identity.IsDirectory || identity.IsReparsePoint || identity.FileIdLow != entry.FileIdLow
+                    || identity.FileIdHigh != entry.FileIdHigh || WindowsNative.GetFileType(child) != 1)
+                    return (entry.Name, 0, "State entry identity/type changed.");
+                using var stream = new FileStream(child, FileAccess.Read);
+                return (entry.Name, stream.Length, null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { return (entry.Name, 0, ex.Message); }
         }
         internal override void FlushPublication(CancellationToken token)
         {

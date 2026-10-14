@@ -128,7 +128,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             .ToImmutableArray();
     }
 
-    private static string Digest(ImmutableArray<PayloadEntry> entries, bool normalized)
+    internal static string Digest(ImmutableArray<PayloadEntry> entries, bool normalized)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var entry in entries)
