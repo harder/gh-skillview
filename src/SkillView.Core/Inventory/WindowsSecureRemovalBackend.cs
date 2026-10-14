@@ -99,7 +99,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         catch { handle.Dispose(); throw; }
     }
 
-    internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
+    internal static NativePayloadRoot WalkPayload(string path, int maxDepth,
         Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -150,14 +150,14 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                         token.ThrowIfCancellationRequested();
                         var bytes = ReadReparseData(child);
                         observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), null);
-                        observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes)));
+                        observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes), ToSecureIdentity(before, "")));
                     }
                     else if (isDirectory)
                     {
                         if (current.Frame.Depth >= maxDepth) throw new IOException("payload depth limit exceeded");
                         var childFingerprint = inspector.CaptureDirectoryFingerprint(child, relative, token);
                         directoryFingerprints[relative] = childFingerprint;
-                        observe(new(relative, "directory", null, null, null, null));
+                        observe(new(relative, "directory", null, null, null, null, ToSecureIdentity(before, "")));
                         frames.Push((new DirectoryFrame(child, relative, before, current.Frame.Depth + 1), relative + "/", childFingerprint));
                         child = null;
                     }
@@ -165,7 +165,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                     {
                         if (WindowsNative.GetFileType(child) != 1) throw new IOException("payload entry is not a disk file");
                         using var stream = new FileStream(child, FileAccess.Read);
-                        var evidence = observe(new(relative, "file", stream, null, null, null))
+                        var evidence = observe(new(relative, "file", stream, null, null, null, ToSecureIdentity(before, "")))
                             ?? throw new IOException("payload file evidence is missing");
                         observations[^1] = (relative, before, null, evidence);
                         token.ThrowIfCancellationRequested();
@@ -208,7 +208,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
             if (rootFingerprint != inspector.CaptureDirectoryFingerprint(root, canonical, token))
                 throw new IOException("payload root contents changed before snapshot completion");
             if (!Matches(rootBefore, ReadIdentity(root))) throw new IOException("payload root changed before snapshot completion");
-            return ToSecureIdentity(rootBefore, canonical);
+            return new NativePayloadRoot(ToSecureIdentity(rootBefore, canonical), null);
         }
         finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
     }

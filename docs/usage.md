@@ -181,6 +181,12 @@ payload fingerprints, affected exposures and partial/canceled status. A disk cha
 does not prove that an already-running agent session has reloaded the skill.
 
 Use `compare --path <left> --other-path <right> --json` to inspect two exact copies.
+JSON also reports native object/generation fingerprints and observed root Unix
+modes separately from file-content fingerprints. Separate copies can have equal
+bytes and different native fingerprints. These observations do not attest full
+ACLs, extended attributes or Windows alternate streams; recovery needs further
+metadata validation. Different observed root modes prevent a consolidation
+candidate even when the file bytes match.
 Pass their `--scan-root` flags before the subcommand when needed. Comparison stays
 offline and reports source, revision, context and whole-payload differences
 separately. Unknown evidence and changed owner records require a refresh; identical

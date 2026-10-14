@@ -13,6 +13,12 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     string ComparisonFingerprint, ImmutableArray<PayloadEntry> Entries)
 {
     public SkillView.Inventory.Models.SkillFrontMatter? FrontMatter { get; init; }
+    /// Native object and generation evidence is distinct from payload equality.
+    /// It does not attest complete ACL/xattr/alternate-stream metadata.
+    public string? ObjectStateFingerprint { get; init; }
+    public int? RootUnixMode { get; init; }
+    internal SecureFileIdentity? RootIdentity { get; init; }
+    internal ImmutableArray<PayloadObjectEvidence> Objects { get; init; } = [];
 
     public const int MaxEntries = 10_000;
     public const long MaxBytes = 256L * 1024 * 1024;
@@ -37,6 +43,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         cancellationToken.ThrowIfCancellationRequested();
         var root = System.IO.Path.GetFullPath(path);
         var entries = ImmutableArray.CreateBuilder<PayloadEntry>();
+        var objects = ImmutableArray.CreateBuilder<PayloadObjectEvidence>();
         long totalBytes = 0;
         SkillView.Inventory.Models.SkillFrontMatter? frontMatter = null;
         var identity = SecurePayloadWalker.Walk(root, MaxDepth, item =>
@@ -46,12 +53,21 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             return evidence;
         }, cancellationToken);
         var ordered = entries.OrderBy(e => e.Path, StringComparer.Ordinal).ToImmutableArray();
-        return new(identity.CanonicalPath, Digest(ordered, false), Digest(ordered, true), ordered) { FrontMatter = frontMatter };
+        var objectEvidence = objects.OrderBy(item => item.Path, StringComparer.Ordinal).ToImmutableArray();
+        return new(identity.Identity.CanonicalPath, Digest(ordered, false), Digest(ordered, true), ordered)
+        {
+            FrontMatter = frontMatter,
+            RootIdentity = identity.Identity,
+            RootUnixMode = identity.UnixMode,
+            Objects = objectEvidence,
+            ObjectStateFingerprint = DigestObjects(identity, objectEvidence, cancellationToken)
+        };
 
         PayloadFileEvidence? Observe(NativePayloadItem item)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entries.Count >= MaxEntries) throw new IOException("payload entry limit exceeded");
+            objects.Add(new(item.RelativePath, item.Identity, item.UnixMode));
             if (item.Kind == "link")
             {
                 var hash = Convert.ToHexString(SHA256.HashData(item.LinkBytes ?? []));
@@ -116,6 +132,34 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         }
     }
 
+    private static string DigestObjects(NativePayloadRoot root, ImmutableArray<PayloadObjectEvidence> objects, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData("SkillView.native-object-evidence.v1"u8);
+        Append("", root.Identity, root.UnixMode);
+        foreach (var item in objects)
+        {
+            token.ThrowIfCancellationRequested();
+            Append(item.Path, item.Identity, item.UnixMode);
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+
+        void Append(string path, SecureFileIdentity identity, int? mode)
+        {
+            using var bytes = new MemoryStream();
+            using (var writer = new BinaryWriter(bytes, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(path); writer.Write(identity.Volume); writer.Write(identity.FileIdLow); writer.Write(identity.FileIdHigh);
+                writer.Write(identity.IsDirectory); writer.Write(identity.IsReparsePoint);
+                writer.Write(identity.ChangeTimeSeconds); writer.Write(identity.ChangeTimeNanoseconds);
+                writer.Write(identity.WindowsCreationTime); writer.Write(identity.WindowsChangeTime);
+                writer.Write(mode ?? -1);
+            }
+            hash.AppendData(bytes.GetBuffer().AsSpan(0, (int)bytes.Length));
+        }
+    }
+
     public static ImmutableArray<string> Differences(PayloadSnapshot before, PayloadSnapshot after,
         bool ignoreInstallerMetadata = true)
     {
@@ -146,3 +190,5 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 }
+
+internal sealed record PayloadObjectEvidence(string Path, SecureFileIdentity Identity, int? UnixMode);

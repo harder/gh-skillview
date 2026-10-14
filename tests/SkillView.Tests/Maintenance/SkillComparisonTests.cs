@@ -39,6 +39,43 @@ public sealed class SkillComparisonTests : IDisposable
     }
 
     [Fact]
+    public async Task ComparisonSeparatesEqualBytesFromObjectEvidenceInJson()
+    {
+        var result = await new SkillComparisonService().CompareAsync(Install("one"), Install("two"),
+            TestContext.Current.CancellationToken);
+        Assert.True(result.Complete);
+        Assert.Equal("byte-identical", result.PayloadRelationship);
+        Assert.NotNull(result.LeftObjectStateFingerprint);
+        Assert.NotEqual(result.LeftObjectStateFingerprint, result.RightObjectStateFingerprint);
+        using var json = System.Text.Json.JsonDocument.Parse(SkillView.Cli.CliDispatcher.RenderComparisonJson(result));
+        Assert.Equal(result.LeftObjectStateFingerprint, json.RootElement.GetProperty("leftObjectStateFingerprint").GetString());
+        Assert.Equal(result.RightObjectStateFingerprint, json.RootElement.GetProperty("rightObjectStateFingerprint").GetString());
+        Assert.Contains("not attested", json.RootElement.GetProperty("objectEvidenceContract").GetString());
+    }
+
+    [Fact]
+    public async Task DifferentUnixRootModesDoNotBecomeConsolidationCandidates()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var left = Install("one");
+        var right = Install("two");
+        var original = File.GetUnixFileMode(right.ResolvedPath);
+        try
+        {
+            File.SetUnixFileMode(left.ResolvedPath, original);
+            var baseline = await new SkillComparisonService().CompareAsync(left, right, TestContext.Current.CancellationToken);
+            Assert.True(baseline.RequiresExposureMigration);
+            File.SetUnixFileMode(right.ResolvedPath, original ^ UnixFileMode.OtherExecute);
+            var result = await new SkillComparisonService().CompareAsync(left, right, TestContext.Current.CancellationToken);
+            Assert.True(result.Complete);
+            Assert.Equal("byte-identical", result.PayloadRelationship);
+            Assert.NotEqual(result.LeftRootUnixMode, result.RightRootUnixMode);
+            Assert.False(result.RequiresExposureMigration);
+        }
+        finally { File.SetUnixFileMode(right.ResolvedPath, original); }
+    }
+
+    [Fact]
     public async Task DifferentOriginsNeverBecomeConsolidationCandidates()
     {
         var result = await new SkillComparisonService().CompareAsync(Install("one", "author/first"), Install("two", "author/second"),

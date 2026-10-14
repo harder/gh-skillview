@@ -411,3 +411,39 @@ site checks passed. Both native hosts passed the real-worktree/broken-link proof
 with gh2.97.0 and2.102.0, plus backup/history regression proofs. Independent review
 and re-review are clear;72 focused tests independently passed. Fresh platform CI
 is required before merge. See `evidence/maintenance-batch-4c.json`.
+
+Final PR #49 head1b326aa passed CI38633124149 and CodeQL38633124170:1061 tests
+on all three test platforms and both-host worktree proofs on all four AOT targets.
+Copilot reported zero findings. Merged atcf578f7971a4be69cd2fe4c45b813fb4f063d373.
+
+## Batch 4d: separate native continuity from payload equality
+
+A raw payload hash can remain equal after a same-content file replacement, and
+the schema-1 archive hash omits the root Unix mode. Bounded native inspection now
+retains the root and every entry's full object ID and generation, including both
+Windows file-ID halves and CreationTime/ChangeTime, plus observed Unix modes.
+A separate object-state fingerprint is deterministic across read-only captures.
+It is distinct for separate copies and changes when observed objects/generations
+change. The existing native walk's held-parent, leaf-link, cancellation, content
+and completion revalidation contracts remain in effect.
+
+Backup publication requires unchanged raw payload, address and native object
+evidence between inspection and archive traversal. Same-content replacement and
+root-mode changes leave an incomplete creating journal rather than captured
+evidence. Archive/history schema1 remains unchanged; no extraction or new restore
+authority is introduced. Compare JSON exposes native fingerprints and root modes,
+and differing root modes prevent consolidation candidacy.
+
+This evidence does not attest every ACL/xattr/alternate stream or external hardlink
+relationship. Moving an original directory can preserve live metadata, but
+already-open handles and hardlinks can still edit it. A private Windows parent
+also does not necessarily make retained broad-ACL descendants private. Recovery
+plans must distinguish preservation from immutability and explicitly bound their
+metadata/topology admission before apply or undo. Quarantine/undo and the remaining
+M08/M13-M15 acceptance work continue after this batch.
+
+Local verification:1069 full tests passed, zero failures/skips, clean build/format/
+site checks. Independent source review/re-review is clear and61 affected tests
+independently passed. Both native hosts passed object-evidence proofs with
+gh2.97.0/2.102.0 and backup/history regression proofs. Fresh platform CI remains
+required before merge. See `evidence/maintenance-batch-4d.json`.

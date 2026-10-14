@@ -13,8 +13,12 @@ namespace SkillView.Maintenance;
 public sealed partial class MaintenanceBackupStore(string root)
 {
     private readonly Action<string>? _entryArchivedForTests;
-    internal MaintenanceBackupStore(string root, Action<string> entryArchivedForTests) : this(root) =>
+    private readonly Action? _beforeArchiveForTests;
+    internal MaintenanceBackupStore(string root, Action<string> entryArchivedForTests, Action? beforeArchiveForTests = null) : this(root)
+    {
         _entryArchivedForTests = entryArchivedForTests;
+        _beforeArchiveForTests = beforeArchiveForTests;
+    }
     public const long MaxStoredBytes = 1024L * 1024 * 1024;
     public const int MaxStoreEntries = 4096;
     private const int MaxManifestBytes = 16 * 1024 * 1024;
@@ -55,6 +59,7 @@ public sealed partial class MaintenanceBackupStore(string root)
         WriteJournal(record, id + ".creating.json", owner, token);
         try
         {
+            _beforeArchiveForTests?.Invoke();
             using (var file = owner.OpenFile(archiveName, writerLock: false, token))
             {
                 var blobs = new Dictionary<string, (string Name, long Bytes)>(StringComparer.Ordinal);
@@ -72,7 +77,8 @@ public sealed partial class MaintenanceBackupStore(string root)
                         else CopyVerified(item.Content!, destination, entry, token);
                         _entryArchivedForTests?.Invoke(entry.Path);
                     }, token);
-                    if (observed.Fingerprint != before.Fingerprint || observed.Path != before.Path)
+                    if (observed.Fingerprint != before.Fingerprint || observed.Path != before.Path
+                        || observed.ObjectStateFingerprint != before.ObjectStateFingerprint)
                         throw new IOException("Payload changed during backup; no replacement is authorized.");
                     using var manifest = archive.CreateEntry("manifest.json", CompressionLevel.NoCompression).Open();
                     using var bounded = new BoundedWriteStream(manifest, MaxManifestBytes);
