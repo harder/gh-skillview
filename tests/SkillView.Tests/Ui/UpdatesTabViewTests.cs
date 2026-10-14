@@ -206,6 +206,40 @@ public sealed class UpdatesTabViewTests
         Assert.Equal("loaded", selectedSkillAtCallback!.Name);
     }
 
+    [Fact]
+    public async Task MarkedSelectionPreservesPhysicalIdentityEvenWhenAllBoxIsChecked()
+    {
+        var first = SnapshotWithSkill("demo").Skills[0];
+        var second = first with { ResolvedPath = "/another/demo", Scope = Scope.Project };
+        GhSkillUpdateService.Options? captured = null;
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) => { captured = options; return Task.FromResult(SuccessfulDryRun()); });
+        await view.LoadAsync();
+        view.AllBoxForTests.Value = CheckState.Checked;
+        view.MarkRowForTests(1);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: true);
+        Assert.NotNull(captured);
+        Assert.False(captured.All);
+        Assert.Equal(second.InstallationId, Assert.Single(captured.Targets!).InstallationId);
+    }
+
+    [Fact]
+    public async Task CurrentRowShortcutPreservesItsPhysicalTarget()
+    {
+        var first = SnapshotWithSkill("demo").Skills[0];
+        var second = first with { ResolvedPath = "/another/demo", Scope = Scope.Project };
+        GhSkillUpdateService.Options? captured = null;
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) => { captured = options; return Task.FromResult(SuccessfulDryRun()); });
+        await view.LoadAsync();
+        view.AllBoxForTests.Value = CheckState.Checked;
+        view.SelectRowForTests(1);
+        view.UpdateCurrentRowForTests();
+        Assert.NotNull(captured);
+        Assert.False(captured.All);
+        Assert.Equal(second.InstallationId, Assert.Single(captured.Targets!).InstallationId);
+    }
+
     private static UpdatesTabView CreateUpdatesTab(
         Func<Task<InventorySnapshot>> snapshotLoader,
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>>? updateRunner = null)

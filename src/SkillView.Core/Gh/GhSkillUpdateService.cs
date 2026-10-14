@@ -2,6 +2,9 @@ using System.Collections.Immutable;
 using SkillView.Gh.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
+using SkillView.Inventory.Models;
+using System.Text.RegularExpressions;
+using SkillView.Ui;
 
 namespace SkillView.Gh;
 
@@ -30,7 +33,10 @@ public sealed class GhSkillUpdateService
         bool All = false,
         bool DryRun = false,
         bool Force = false,
-        bool Unpin = false);
+        bool Unpin = false,
+        string? Directory = null,
+        bool ConfirmApply = true,
+        IReadOnlyList<InstalledSkill>? Targets = null);
 
     public async Task<UpdateResult> UpdateAsync(
         string ghPath,
@@ -39,23 +45,24 @@ public sealed class GhSkillUpdateService
     {
         options ??= new Options();
         var args = BuildArgs(options);
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
+            retainCancellationOutput: true).ConfigureAwait(false);
         if (!result.Succeeded)
-        {
             _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
-            return UpdateResult.Failure(options.DryRun, result.ExitCode, result.StdErr.Trim(), args);
-        }
-
+        var entries = ParseEntries(result.StdOut, options.DryRun).AddRange(ParseEntries(result.StdErr, options.DryRun));
         return new UpdateResult
         {
             DryRun = options.DryRun,
-            Succeeded = true,
-            ExitCode = 0,
+            Succeeded = result.Succeeded,
+            ExitCode = result.ExitCode,
             StdOut = result.StdOut,
             StdErr = result.StdErr,
-            ErrorMessage = null,
+            Cancelled = result.Cancelled,
+            MutationAttempted = !options.DryRun,
+            ErrorMessage = result.Succeeded ? null : result.Cancelled ? "Update canceled; partial changes may exist." : result.StdErr.Trim(),
             CommandLine = args,
-            Entries = ParseEntries(result.StdOut),
+            Entries = entries,
+            Notices = ParseNotices(result.StdOut, "stdout").AddRange(ParseNotices(result.StdErr, "stderr")),
         };
     }
 
@@ -63,7 +70,7 @@ public sealed class GhSkillUpdateService
     {
         var args = new List<string> { "skill", "update" };
 
-        if (options.All)
+        if (options.All || options.ConfirmApply)
         {
             args.Add("--all");
         }
@@ -83,11 +90,20 @@ public sealed class GhSkillUpdateService
             args.Add("--unpin");
         }
 
+        if (options.Directory is not null)
+        {
+            if (string.IsNullOrWhiteSpace(options.Directory)) throw new ArgumentException("Update directory must not be empty.");
+            args.Add("--dir");
+            args.Add(options.Directory);
+        }
+
         if (options.Skills is { Count: > 0 } skills)
         {
+            args.Add("--");
             foreach (var s in skills)
             {
-                if (string.IsNullOrWhiteSpace(s)) continue;
+                if (string.IsNullOrWhiteSpace(s) || s.Any(char.IsControl))
+                    throw new ArgumentException("Update selectors must be nonblank and contain no control characters.");
                 args.Add(s);
             }
         }
@@ -105,7 +121,7 @@ public sealed class GhSkillUpdateService
     /// Anything we can't classify is attached with Status = "unknown" so the
     /// UI / CLI still shows the row. When `--json` lands, switch to structured
     /// parsing.
-    internal static ImmutableArray<UpdateEntry> ParseEntries(string stdout)
+    internal static ImmutableArray<UpdateEntry> ParseEntries(string stdout, bool dryRun = false)
     {
         if (string.IsNullOrWhiteSpace(stdout)) return ImmutableArray<UpdateEntry>.Empty;
 
@@ -113,18 +129,40 @@ public sealed class GhSkillUpdateService
         var builder = ImmutableArray.CreateBuilder<UpdateEntry>();
         foreach (var raw in lines)
         {
-            var line = raw.TrimStart(' ', '\t', '-', '*', '•');
+            var line = (TerminalEscapeSanitizer.Sanitize(raw) ?? string.Empty).TrimStart(' ', '\t', '-', '*', '•', '✓', '✔', '!', '⊘', '✗');
             if (line.Length == 0) continue;
             if (line.StartsWith('#')) continue;
 
-            var entry = TryClassify(line);
+            var entry = TryClassify(line, dryRun);
             if (entry is not null) builder.Add(entry);
+            if (builder.Count >= 4096) break;
         }
         return builder.ToImmutable();
     }
 
-    private static UpdateEntry? TryClassify(string line)
+    private static UpdateEntry? TryClassify(string line, bool dryRun = false)
     {
+        var completion = Regex.Match(line, @"^Updated (?<name>\S+)$", RegexOptions.CultureInvariant);
+        if (completion.Success) return new UpdateEntry { Name = completion.Groups["name"].Value, Status = "updated" };
+        var transition = Regex.Match(line, @"^(?<name>\S+) \((?<repo>[^)]+)\) (?<from>\S*) > (?<to>\S+) \[[^]]+\]$", RegexOptions.CultureInvariant);
+        if (transition.Success) return new UpdateEntry
+        {
+            Name = transition.Groups["name"].Value,
+            Repo = transition.Groups["repo"].Value,
+            FromVersion = transition.Groups["from"].Value,
+            ToVersion = transition.Groups["to"].Value,
+            Status = "available",
+        };
+        var reinstall = Regex.Match(line, @"^(?<name>\S+) \((?<repo>[^)]+)\) (?<sha>\S+) \(reinstall\) \[[^]]+\]$", RegexOptions.CultureInvariant);
+        if (reinstall.Success) return new UpdateEntry { Name = reinstall.Groups["name"].Value, Repo = reinstall.Groups["repo"].Value, Status = "restore-available" };
+        var pin = Regex.Match(line, @"^(?<name>\S+) is pinned to .+ \(skipped\)$", RegexOptions.CultureInvariant);
+        if (pin.Success) return new UpdateEntry { Name = pin.Groups["name"].Value, Status = "pinned" };
+        var skipped = Regex.Match(line, @"^(?:Skipping (?<name>\S+)|(?<name>\S+) has no GitHub metadata)", RegexOptions.CultureInvariant);
+        if (skipped.Success) return new UpdateEntry { Name = skipped.Groups["name"].Value.TrimEnd(':'), Status = "skipped" };
+        var missing = Regex.Match(line, @"^Skill (?<name>\S+) not found in ", RegexOptions.CultureInvariant);
+        if (missing.Success) return new UpdateEntry { Name = missing.Groups["name"].Value, Status = "source-unavailable" };
+        var failed = Regex.Match(line, @"^Failed to update (?<name>[^:]+):", RegexOptions.CultureInvariant);
+        if (failed.Success) return new UpdateEntry { Name = failed.Groups["name"].Value, Status = "failed" };
         // "Updating foo from v1 to v2" / "would update foo v1 → v2"
         foreach (var arrow in new[] { "→", "->", " to " })
         {
@@ -142,7 +180,7 @@ public sealed class GhSkillUpdateService
                     Name = name,
                     FromVersion = fromV,
                     ToVersion = toV,
-                    Status = "updated",
+                    Status = dryRun ? "available" : "updated",
                 };
             }
         }
@@ -165,6 +203,10 @@ public sealed class GhSkillUpdateService
 
         return null;
     }
+
+    private static ImmutableArray<UpdateNotice> ParseNotices(string text, string stream) =>
+        text.Replace("\r\n", "\n").Split('\n').Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(512).Select(line => new UpdateNotice(stream, line.Length > 4096 ? line[..4096] : line)).ToImmutableArray();
 
     private static (string Name, string? Version) SplitLastVersion(string s)
     {

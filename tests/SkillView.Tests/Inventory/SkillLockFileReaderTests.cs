@@ -18,6 +18,24 @@ public sealed class SkillLockFileReaderTests : IDisposable
     }
 
     [Fact]
+    public void ObservationsRetainEverySameNameOwnerInItsOwnContext()
+    {
+        var roots = new[] { "one", "two" }.Select(name => Path.Combine(_tempRoot, name, "skills")).ToArray();
+        foreach (var root in roots)
+        {
+            Directory.CreateDirectory(root);
+            var owner = Path.GetFileName(Path.GetDirectoryName(root));
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(root)!, SkillLockFileReader.FileName),
+                "{\"skills\":{\"sample\":{\"source\":\"" + owner + "/repo\",\"sourceType\":\"github\"}}}");
+        }
+        var observations = new SkillLockFileReader(new Logger()).LoadObservations(roots, TestContext.Current.CancellationToken)
+            .Where(entry => entry.Name == "sample").ToArray();
+        Assert.Equal(2, observations.Length);
+        Assert.Equal(["one/repo", "two/repo"], observations.Select(entry => entry.Package.Source));
+        Assert.Equal(roots, observations.Select(entry => entry.Package.InstallationRoot));
+    }
+
+    [Fact]
     public void LoadFromRoots_ReadsValidBoundedManifest()
     {
         var skills = Path.Combine(_tempRoot, "agent", "skills");

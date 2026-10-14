@@ -519,6 +519,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
+- Product updates use `TuiServices.MaintenanceUpdates`, carrying physical targets
+  rather than names alone. Keep `--dir` rooted at the verified containing skills
+  directory and gh noninteractive confirmation separate from target selection.
+  Local drift refuses replacement even with force until an explicit recoverable
+  repair disposition exists. Preserve both streams and post-attempt verification
+  on failure/cancellation. See `agent_docs/maintenance-implementation.md`.
+- Payload snapshots read entries relative to held native roots, treating links as
+  leaves and rejecting special files. Recheck all observed entries/ancestors at
+  completion; Windows also needs every directory's immediate-entry manifest because
+  its ChangeTime alone may miss a later sibling edit. Staging cleanup retains the
+  originally opened directory lease; never recapture a replacement by path.
+- Package claims are contextual observations. Do not use the legacy name-map
+  lock reader in production or assign a global same-name owner to an unrelated
+  installation. Retain all claims; unresolved conflicts must block mutation.
+
 - `agent_docs/running-tests.md` — standard verification commands, UI-focused
   test filters, and opt-in `gh` contract-test workflow details.
 - `agent_docs/release-engineering.md` — release workflow, asset naming, AOT RID

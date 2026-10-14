@@ -807,6 +807,11 @@ public static class CliDispatcher
         CancellationToken cancellationToken)
     {
         var parsed = ParseUpdateArgs(options.SubcommandArgs);
+        if (parsed.Error is not null)
+        {
+            Console.Error.WriteLine($"skillview: {parsed.Error}");
+            return ExitCodes.InvalidUsage;
+        }
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
@@ -814,12 +819,13 @@ public static class CliDispatcher
             return ExitCodes.EnvironmentError;
         }
 
-        if (!parsed.All && parsed.Skills.Count == 0 && !parsed.DryRun)
+        if (!parsed.All && parsed.Skills.Count == 0 && !parsed.DryRun
+            && parsed.Path is null && parsed.InstallationId is null)
         {
             Console.Error.WriteLine("skillview: update requires at least one skill, --all, or --dry-run");
             Console.Error.WriteLine(
                 "usage: skillview update [<skill>]... [--all] [--dry-run] [--force] [--unpin]" +
-                " [--json]");
+                " [--path <path> | --install-id <id>] [--json]");
             return ExitCodes.InvalidUsage;
         }
 
@@ -832,56 +838,81 @@ public static class CliDispatcher
             cancellationToken
         ).ConfigureAwait(false);
 
+        bool MatchesSelector(InstalledSkill skill, string name) => name == skill.Name
+            || skill.Agents.Any(agent => agent.DiscoveryRoot is not null
+                && name == Path.GetRelativePath(agent.DiscoveryRoot, agent.Path).Replace(Path.DirectorySeparatorChar, '/'));
+        var selected = preSnapshot.Skills.AsEnumerable();
+        if (parsed.Skills.Count > 0)
+            selected = selected.Where(skill => parsed.Skills.Any(name => MatchesSelector(skill, name)));
+        if (parsed.Path is not null)
+            selected = selected.Where(skill => PathIdentity.Equals(skill.ResolvedPath, parsed.Path)
+                || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, parsed.Path)));
+        if (parsed.InstallationId is not null)
+            selected = selected.Where(skill => string.Equals(skill.InstallationId, parsed.InstallationId, StringComparison.OrdinalIgnoreCase));
+        var targets = selected.ToArray();
+        if (targets.Length == 0)
+        {
+            Console.Error.WriteLine("skillview: no physical installations match the selection");
+            return ExitCodes.NoMatches;
+        }
+        if (parsed.Path is null && parsed.InstallationId is null && parsed.Skills.Count > 0
+            && parsed.Skills.Any(name => targets.Where(target => MatchesSelector(target, name))
+                .Select(target => target.InstallationId).Distinct(StringComparer.Ordinal).Count() > 1))
+        {
+            Console.Error.WriteLine("skillview: a name matches multiple installations; select --path or --install-id");
+            return ExitCodes.UserError;
+        }
+
         var updateOptions = new GhSkillUpdateService.Options(
             Skills: parsed.Skills,
             All: parsed.All,
             DryRun: parsed.DryRun,
             Force: parsed.Force,
-            Unpin: parsed.Unpin);
+            Unpin: parsed.Unpin,
+            Targets: targets);
 
-        var result = await services.UpdateService.UpdateAsync(
+        var result = await services.MaintenanceUpdates.UpdateAsync(
             report.GhPath!,
             updateOptions,
             cancellationToken
         ).ConfigureAwait(false);
 
-        if (!result.Succeeded)
-        {
-            if (parsed.Json) WriteUpdateJson(result, parsed, Array.Empty<InstalledSkill>(), Array.Empty<UpdateDiffEntry>());
-            else
-            {
-                Console.Error.WriteLine($"skillview: update failed (exit {result.ExitCode}): {result.ErrorMessage}");
-                if (!string.IsNullOrWhiteSpace(result.StdErr)) Console.Error.WriteLine(result.StdErr.TrimEnd());
-            }
-            return result.ExitCode == 0 ? ExitCodes.UserError : ExitCodes.EnvironmentError;
-        }
-
-        // For dry-run we don't re-scan (no mutation); skip the diff.
-        IReadOnlyList<InstalledSkill> added;
-        IReadOnlyList<UpdateDiffEntry> changed;
-        if (parsed.DryRun)
-        {
-            added = Array.Empty<InstalledSkill>();
-            changed = Array.Empty<UpdateDiffEntry>();
-        }
-        else
+        IReadOnlyList<InstalledSkill> added = Array.Empty<InstalledSkill>();
+        IReadOnlyList<UpdateDiffEntry> changed = Array.Empty<UpdateDiffEntry>();
+        if (!parsed.DryRun && result.MutationAttempted)
         {
             services.ListAdapter.Invalidate();
-            var postSnapshot = await services.InventoryService.CaptureAsync(
-                report.GhPath,
-                new Inventory.LocalInventoryService.Options(
-                    ScanRoots: options.ScanRoots,
-                    AllowHiddenDirs: false),
-                cancellationToken
-            ).ConfigureAwait(false);
-            added = InventoryDiff(preSnapshot, postSnapshot);
-            changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
+            // Cancellation stops mutations but must not discard their evidence.
+            using var reconciliation = new SkillView.Threading.CancellationSource(TimeSpan.FromSeconds(10),
+                SkillView.Threading.CancellationCallbackReporter.For(services.Logger, "update reconciliation"));
+            try
+            {
+                var postSnapshot = await services.InventoryService.CaptureAsync(report.GhPath,
+                    new Inventory.LocalInventoryService.Options(ScanRoots: options.ScanRoots, AllowHiddenDirs: false),
+                    reconciliation.Token).ConfigureAwait(false);
+                added = InventoryDiff(preSnapshot, postSnapshot);
+                changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
+                if (postSnapshot.IsPartial) result = result with
+                { ReconciliationPartial = true, Notices = result.Notices.Add(new("reconciliation", "Post-update inventory is partial; per-target payload outcomes are retained.")) };
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                result = result with
+                {
+                    Succeeded = false,
+                    ExitCode = result.Cancelled ? 130 : 2,
+                    ErrorMessage = "Post-update inventory reconciliation incomplete; per-target evidence retained.",
+                    Notices = result.Notices.Add(new("reconciliation", ex.Message))
+                };
+            }
         }
+        if (cancellationToken.IsCancellationRequested)
+            result = result with { Cancelled = true, Succeeded = false, ExitCode = 130 };
 
         if (parsed.Json) WriteUpdateJson(result, parsed, added, changed);
         else WriteUpdateText(result, parsed, added, changed);
 
-        return ExitCodes.Success;
+        return result.ExitCode;
     }
 
     internal record ParsedUpdateArgs(
@@ -890,15 +921,31 @@ public static class CliDispatcher
         bool DryRun,
         bool Force,
         bool Unpin,
-        bool Json);
+        bool Json,
+        string? Path = null,
+        string? InstallationId = null,
+        string? Error = null);
 
     internal static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
     {
         var skills = new List<string>();
         bool all = false, dryRun = false, force = false, unpin = false, json = false;
+        string? path = null, installationId = null, error = null;
+        bool positionals = false;
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
+            if (positionals) { skills.Add(a); continue; }
+            if (a == "--") { positionals = true; continue; }
+            if (a.StartsWith("--path=", StringComparison.Ordinal)) { path = a[7..]; continue; }
+            if (a.StartsWith("--install-id=", StringComparison.Ordinal)) { installationId = a[13..]; continue; }
+            if (a is "--path" or "--install-id")
+            {
+                if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                { error = $"{a} requires a value"; continue; }
+                if (a == "--path") path = args[++i]; else installationId = args[++i];
+                continue;
+            }
             // `--json` selects SkillView's own machine-readable output; it is
             // not passed to `gh skill update` (which has no --json flag).
             if (a == "--json") { json = true; continue; }
@@ -906,10 +953,12 @@ public static class CliDispatcher
             if (a == "--dry-run") { dryRun = true; continue; }
             if (a == "--force") { force = true; continue; }
             if (a == "--unpin") { unpin = true; continue; }
-            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
+            if (a.StartsWith("-", StringComparison.Ordinal)) { error = $"unsupported update flag: {a}"; continue; }
             skills.Add(a);
         }
-        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, json);
+        if (path is not null && string.IsNullOrWhiteSpace(path)) error = "--path must not be empty";
+        if (installationId is not null && string.IsNullOrWhiteSpace(installationId)) error = "--install-id must not be empty";
+        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, json, path, installationId, error);
     }
 
     /// Per-skill TreeSha delta: skills present at the same ResolvedPath in
@@ -955,6 +1004,9 @@ public static class CliDispatcher
         var header = p.DryRun ? "dry-run" : "update";
         Console.Out.WriteLine($"{header}: exit {r.ExitCode}");
         if (!string.IsNullOrWhiteSpace(r.StdOut)) Console.Out.WriteLine(r.StdOut.TrimEnd());
+        if (!string.IsNullOrWhiteSpace(r.StdErr)) Console.Error.WriteLine(r.StdErr.TrimEnd());
+        foreach (var outcome in r.Outcomes)
+            Console.Out.WriteLine($"  {outcome.Status}: {outcome.Path} · {outcome.Message ?? outcome.ChangedFileCount + " changed file(s)"}");
 
         if (r.Entries.Length > 0)
         {
@@ -1024,6 +1076,41 @@ public static class CliDispatcher
         IReadOnlyList<UpdateDiffEntry> changed)
     {
         w.WriteStartObject();
+        w.WriteNumber("schemaVersion", 2);
+        w.WriteString("stdout", r.StdOut);
+        w.WriteString("stderr", r.StdErr);
+        w.WriteBoolean("canceled", r.Cancelled);
+        w.WriteBoolean("mutationAttempted", r.MutationAttempted);
+        w.WriteBoolean("partial", r.ReconciliationPartial || !r.Succeeded || r.Outcomes.Any(o => o.Status is "failed" or "refused" or "canceled" or "not-attempted" or "skipped" or "untracked" or "verification-incomplete" or "source-unavailable" or "availability-unknown"));
+        w.WriteStartArray("outcomes");
+        foreach (var outcome in r.Outcomes)
+        {
+            w.WriteStartObject();
+            w.WriteString("installationId", outcome.InstallationId);
+            w.WriteString("path", outcome.Path);
+            w.WriteString("status", outcome.Status);
+            w.WriteString("beforeFingerprint", outcome.BeforeFingerprint);
+            w.WriteString("afterFingerprint", outcome.AfterFingerprint);
+            w.WriteString("message", outcome.Message);
+            w.WriteNumber("changedFileCount", outcome.ChangedFileCount);
+            w.WriteStartArray("changedFiles");
+            foreach (var file in outcome.ChangedFiles) w.WriteStringValue(file);
+            w.WriteEndArray();
+            w.WriteStartArray("exposures");
+            foreach (var exposure in outcome.Exposures) w.WriteStringValue(exposure);
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+        w.WriteStartArray("notices");
+        foreach (var notice in r.Notices)
+        {
+            w.WriteStartObject();
+            w.WriteString("stream", notice.Stream);
+            w.WriteString("text", notice.Text);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
         w.WriteBoolean("dryRun", r.DryRun);
         w.WriteBoolean("succeeded", r.Succeeded);
         w.WriteNumber("exitCode", r.ExitCode);
@@ -1730,7 +1817,7 @@ public static class CliDispatcher
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
             | `install OWNER/REPO [SKILL]` | Install one skill, or every skill in the repo with `--all`, then rescan inventory. | `--all`, `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--from-local`, `--allow-hidden-dirs`, `--json` |
-            | `update [SKILL...]` | Dry-run or apply updates for one or many installed skills. `--all` is non-interactive and skips metadata-less skills. | `--all`, `--dry-run`, `--force`, `--unpin`, `--json` |
+            | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 

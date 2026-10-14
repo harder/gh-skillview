@@ -488,7 +488,7 @@ public sealed class SkillViewApp
             runOnUi: runOnUi,
             runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            updateRunner: (ghPath, options, token) => _services.UpdateService.UpdateAsync(ghPath, options, token),
+            updateRunner: (ghPath, options, token) => _services.MaintenanceUpdates.UpdateAsync(ghPath, options, token),
             ghPathProvider: () => _ghPath,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,

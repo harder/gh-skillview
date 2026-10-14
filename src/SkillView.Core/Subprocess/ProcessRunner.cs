@@ -34,7 +34,8 @@ public sealed class ProcessRunner
         string executable,
         IReadOnlyList<string> arguments,
         string? workingDirectory = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool retainCancellationOutput = false)
     {
         // Cancellation closes process admission. In particular, do not start
         // and then immediately kill a child for an already-canceled caller.
@@ -127,6 +128,22 @@ public sealed class ProcessRunner
             catch (OperationCanceledException) { }
             catch (ObjectDisposedException) { }
             catch (IOException) { }
+            if (retainCancellationOutput)
+            {
+                // Once the canceled readers quiesce, retain bytes already in
+                // the pipes/reader buffers under an independent bounded drain.
+                using var retention = new CancellationSource(_terminationWait,
+                    CancellationCallbackReporter.For(_logger, "canceled output retention", "subprocess"));
+                try
+                {
+                    await Task.WhenAll(DrainAsync(process.StandardOutput, stdout, retention.Token),
+                        DrainAsync(process.StandardError, stderr, retention.Token)).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException) { }
+                return new ProcessResult(executable, arguments, 130,
+                    stdout.ToString(), stderr.ToString(), sw.Elapsed)
+                { Cancelled = true };
+            }
             throw;
         }
 

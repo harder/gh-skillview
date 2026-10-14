@@ -65,6 +65,184 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         _fingerprintEnumerationAdmittedForTests = fingerprintEnumerationAdmittedForTests;
     }
 
+    internal static FileStream OpenRegularFileForSnapshot(string path)
+    {
+        var handle = WindowsNative.CreateFileW(ToExtendedPath(path), 0x80000000,
+            ShareRead | ShareWrite | ShareDelete, IntPtr.Zero, OpenExisting,
+            OpenReparsePoint | BackupSemantics, IntPtr.Zero);
+        try
+        {
+            if (handle.IsInvalid) throw new IOException($"open payload file failed: {LastErrorMessage()}");
+            var identity = ReadIdentity(handle);
+            if (identity.IsDirectory || identity.IsReparsePoint || WindowsNative.GetFileType(handle) != 1)
+                throw new IOException("payload entry is not a regular non-link disk file");
+            return new FileStream(handle, FileAccess.Read);
+        }
+        catch { handle.Dispose(); throw; }
+    }
+
+    internal static OwnedDirectoryLease OpenOwnedDirectory(string path)
+    {
+        var handle = OpenEntry(path, directory: true, enumerateDirectory: true);
+        try
+        {
+            var canonical = ReadFinalPath(handle);
+            var backend = new WindowsSecureRemovalBackend();
+            return new OwnedDirectoryLease(token =>
+            {
+                token.ThrowIfCancellationRequested();
+                if (!PathIdentity.Equals(ReadFinalPath(handle), canonical))
+                    throw new IOException("owned staging directory was moved; retained for review");
+                return backend.CaptureDirectoryValidation(handle, canonical, token);
+            }, handle.Dispose);
+        }
+        catch { handle.Dispose(); throw; }
+    }
+
+    internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
+        Action<NativePayloadItem> observe, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var root = OpenEntry(path, directory: true, enumerateDirectory: true);
+        var rootBefore = ReadIdentity(root);
+        if (!rootBefore.IsDirectory || rootBefore.IsReparsePoint)
+            throw new IOException("payload root is not a non-link directory");
+        var canonical = ReadFinalPath(root);
+        var observations = new List<(string Path, NativeIdentity Identity, string? LinkHash)>();
+        var inspector = new WindowsSecureRemovalBackend();
+        var directoryFingerprints = new Dictionary<string, string>(StringComparer.Ordinal);
+        var frames = new Stack<(DirectoryFrame Frame, string Relative, string Fingerprint)>();
+        var rootFingerprint = inspector.CaptureDirectoryFingerprint(root, canonical, token);
+        directoryFingerprints[""] = rootFingerprint;
+        frames.Push((new DirectoryFrame(root, canonical, rootBefore, 0, ownsDirectory: false), "", rootFingerprint));
+        try
+        {
+            while (frames.TryPeek(out var current))
+            {
+                token.ThrowIfCancellationRequested();
+                if (!current.Frame.TryReadNext(out var entry, out var error))
+                {
+                    if (error is not null) throw new IOException(error);
+                    if (!Matches(current.Frame.Identity, ReadIdentity(current.Frame.Directory))
+                        || current.Fingerprint != inspector.CaptureDirectoryFingerprint(current.Frame.Directory, current.Relative, token))
+                        throw new IOException("payload directory changed during comparison");
+                    frames.Pop().Frame.Dispose();
+                    continue;
+                }
+                token.ThrowIfCancellationRequested();
+                if (entry is null) continue;
+                var relative = current.Relative + entry.Value.Name;
+                var isDirectory = (entry.Value.Attributes & FileAttributeDirectory) != 0;
+                var isReparse = (entry.Value.Attributes & FileAttributeReparsePoint) != 0;
+                SafeFileHandle? child = OpenEntryAt(current.Frame.Directory, entry.Value.Name,
+                    directory: null, enumerateDirectory: isDirectory && !isReparse,
+                    requestDeleteAccess: false, requestReadAccess: !isDirectory && !isReparse);
+                try
+                {
+                    var before = ReadIdentity(child);
+                    if (before.FileIdLow != entry.Value.FileIdLow || before.FileIdHigh != entry.Value.FileIdHigh
+                        || before.IsDirectory != isDirectory || before.IsReparsePoint != isReparse)
+                        throw new IOException("payload entry changed before it could be opened");
+                    if (observations.Count >= 10_000) throw new IOException("payload entry limit exceeded");
+                    observations.Add((relative, before, null));
+                    if (isReparse)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var bytes = ReadReparseData(child);
+                        observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)));
+                        observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes)));
+                    }
+                    else if (isDirectory)
+                    {
+                        if (current.Frame.Depth >= maxDepth) throw new IOException("payload depth limit exceeded");
+                        var childFingerprint = inspector.CaptureDirectoryFingerprint(child, relative, token);
+                        directoryFingerprints[relative] = childFingerprint;
+                        observe(new(relative, "directory", null, null, null, null));
+                        frames.Push((new DirectoryFrame(child, relative, before, current.Frame.Depth + 1), relative + "/", childFingerprint));
+                        child = null;
+                    }
+                    else
+                    {
+                        if (WindowsNative.GetFileType(child) != 1) throw new IOException("payload entry is not a disk file");
+                        using var stream = new FileStream(child, FileAccess.Read);
+                        observe(new(relative, "file", stream, null, null, null));
+                        token.ThrowIfCancellationRequested();
+                        if (!Matches(before, ReadIdentity(child))) throw new IOException("payload file changed during comparison");
+                        // The stream owns the handle; all identity checks ran before its disposal.
+                        child = null;
+                    }
+                    if (child is not null && !Matches(before, ReadIdentity(child)))
+                        throw new IOException("payload link changed during comparison");
+                }
+                finally { child?.Dispose(); }
+            }
+            var knownDirectories = observations.Where(item => item.Identity.IsDirectory && !item.Identity.IsReparsePoint)
+                .ToDictionary(item => item.Path, item => item.Identity, StringComparer.Ordinal);
+            foreach (var observation in observations)
+            {
+                token.ThrowIfCancellationRequested();
+                var parts = observation.Path.Split('/');
+                using var heldParent = OpenPayloadParent(root, parts[..^1], knownDirectories, token);
+                using var entry = OpenEntryAt(heldParent, parts[^1], directory: null,
+                    enumerateDirectory: observation.Identity.IsDirectory && !observation.Identity.IsReparsePoint, requestDeleteAccess: false);
+                if (!Matches(observation.Identity, ReadIdentity(entry)))
+                    throw new IOException("payload entry changed before snapshot completion");
+                if (observation.Identity.IsDirectory && !observation.Identity.IsReparsePoint
+                    && directoryFingerprints[observation.Path] != inspector.CaptureDirectoryFingerprint(entry, observation.Path, token))
+                    throw new IOException("payload directory contents changed before snapshot completion");
+                if (observation.LinkHash is { } expectedLink
+                    && expectedLink != Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(ReadReparseData(entry))))
+                    throw new IOException("payload link changed before snapshot completion");
+            }
+            if (rootFingerprint != inspector.CaptureDirectoryFingerprint(root, canonical, token))
+                throw new IOException("payload root contents changed before snapshot completion");
+            if (!Matches(rootBefore, ReadIdentity(root))) throw new IOException("payload root changed before snapshot completion");
+            return ToSecureIdentity(rootBefore, canonical);
+        }
+        finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
+    }
+
+    private static SafeFileHandle OpenPayloadParent(SafeFileHandle root, string[] parts,
+        IReadOnlyDictionary<string, NativeIdentity> known, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        // A zero-component parent remains held by the caller; duplicate its
+        // native handle instead of reopening its pathname.
+        if (!WindowsNative.DuplicateHandle(WindowsNative.GetCurrentProcess(), root,
+                WindowsNative.GetCurrentProcess(), out var current, 0, false, 2))
+            throw new IOException($"duplicate payload root failed: {LastErrorMessage()}");
+        try
+        {
+            var relative = "";
+            foreach (var part in parts)
+            {
+                token.ThrowIfCancellationRequested();
+                var next = OpenEntryAt(current, part, directory: true, enumerateDirectory: false, requestDeleteAccess: false);
+                try
+                {
+                    relative += relative.Length == 0 ? part : "/" + part;
+                    if (!known.TryGetValue(relative, out var expected) || !Matches(expected, ReadIdentity(next)))
+                        throw new IOException("payload ancestor changed before snapshot completion");
+                }
+                catch { next.Dispose(); throw; }
+                current.Dispose();
+                current = next;
+            }
+            return current;
+        }
+        catch { current.Dispose(); throw; }
+    }
+
+    private static byte[] ReadReparseData(SafeFileHandle child)
+    {
+        var buffer = new byte[MaxReparseDataBytes];
+        if (!WindowsNative.DeviceIoControl(child, FsctlGetReparsePoint,
+                IntPtr.Zero, 0, buffer, (uint)buffer.Length, out var returned, IntPtr.Zero))
+            throw new IOException($"inspect reparse data failed: {LastErrorMessage()}");
+        if (returned < 8 || returned > buffer.Length) throw new IOException("invalid reparse data length");
+        return buffer.AsSpan(0, (int)returned).ToArray();
+    }
+
     public bool TryCaptureIdentity(
         string path,
         out SecureFileIdentity identity,
@@ -846,11 +1024,13 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         bool? directory,
         bool enumerateDirectory,
         bool openReparsePoint = true,
-        bool requestDeleteAccess = true)
+        bool requestDeleteAccess = true,
+        bool requestReadAccess = false)
     {
         ValidateRelativeEntryName(name);
         var desiredAccess = FileReadAttributes | SynchronizeAccess;
         if (requestDeleteAccess) desiredAccess |= DeleteAccess;
+        if (requestReadAccess) desiredAccess |= 0x00000001;
         if (enumerateDirectory) desiredAccess |= FileListDirectory;
         var openOptions = FileOpenForBackupIntent
             | FileSynchronousIoNonAlert;
@@ -1365,6 +1545,18 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private static class WindowsNative
     {
+        [DllImport("kernel32.dll")]
+        internal static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool DuplicateHandle(IntPtr sourceProcess, SafeFileHandle source,
+            IntPtr targetProcess, out SafeFileHandle duplicate, uint access,
+            [MarshalAs(UnmanagedType.Bool)] bool inherit, uint options);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern uint GetFileType(SafeFileHandle handle);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool DeviceIoControl(

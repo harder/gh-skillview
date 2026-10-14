@@ -99,19 +99,7 @@ public sealed class LocalInventoryService
         // Enrich with package-bundle metadata from any `.skill-lock.json`
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
         // written by `npx skills`). Free signal — best-effort.
-        var packages = local.Packages;
-        if (!packages.IsEmpty)
-        {
-            var enriched = ImmutableArray.CreateBuilder<InstalledSkill>(merged.Length);
-            foreach (var skill in merged)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                enriched.Add(packages.TryGetValue(skill.Name, out var package)
-                    ? skill with { Package = package }
-                    : skill);
-            }
-            merged = enriched.MoveToImmutable();
-        }
+        merged = EnrichOwnership(merged, local.Packages, cancellationToken);
 
         if (!string.IsNullOrEmpty(options.FilterScope))
         {
@@ -190,7 +178,7 @@ public sealed class LocalInventoryService
             roots,
             new LocalSkillScanner.Options(options.AllowHiddenDirs),
             cancellationToken, inaccessible);
-        var packages = _lockReader.LoadFromRootsWithCancellation(
+        var packages = _lockReader.LoadObservations(
             roots.Select(root => root.Path),
             cancellationToken);
         fsSw.Stop();
@@ -200,10 +188,36 @@ public sealed class LocalInventoryService
         return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray());
     }
 
+    internal static ImmutableArray<InstalledSkill> EnrichOwnership(ImmutableArray<InstalledSkill> skills,
+        ImmutableArray<PackageObservation> packages, CancellationToken cancellationToken)
+    {
+
+        if (!packages.IsEmpty)
+        {
+            var enriched = ImmutableArray.CreateBuilder<InstalledSkill>(skills.Length);
+            foreach (var skill in skills)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var claims = packages.Where(entry => entry.Name == skill.Name && entry.Package.Describes(skill))
+                    .Select(entry => entry.Package).ToImmutableArray();
+                enriched.Add(claims.IsEmpty ? skill : skill with
+                {
+                    Package = claims[0],
+                    OwnershipClaims = claims,
+                    MetadataConflicts = claims.Length > 1
+                        ? skill.MetadataConflicts.Add("Multiple owner records: " + string.Join(", ", claims.Select(p => p.LockFilePath)))
+                        : skill.MetadataConflicts
+                });
+            }
+            return enriched.MoveToImmutable();
+        }
+        return skills;
+    }
+
     private sealed record LocalCapture(
         ImmutableArray<ScanRoot> Roots,
         ImmutableArray<InstalledSkill> Scanned,
-        ImmutableDictionary<string, SkillPackage> Packages,
+        ImmutableArray<PackageObservation> Packages,
         TimeSpan Duration,
         ImmutableArray<string> InaccessiblePaths);
 

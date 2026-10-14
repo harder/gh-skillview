@@ -10,4 +10,5 @@ public sealed record ProcessResult(
 )
 {
     public bool Succeeded => ExitCode == 0;
+    public bool Cancelled { get; init; }
 }

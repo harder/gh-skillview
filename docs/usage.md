@@ -133,6 +133,20 @@ pins that ref. `--upstream` is a switch for a republished skill's declared
 upstream source, not a URL argument. Run `skillview --help` for the
 complete option list.
 
+For `update`, select an exact installation with `--path <installed-directory>`
+or `--install-id <id>` from `list --json`. A name shared by several installations
+requires one of these selectors. `--all` selects the captured inventory; in the
+Updates tab, applying marked rows still applies only those rows. `--agent` and
+`--scope` are install options and are rejected for updates.
+
+Updates preserve exact pins unless `--unpin` is explicit. Before applying, SkillView
+compares the complete payload against its recorded upstream tree, including scripts,
+extra files, links and Unix permissions. Local changes are refused even with `--force`.
+This release does not yet offer backup-and-replace or merging local edits.
+Update JSON schema 2 retains both gh output streams, per-installation outcomes,
+payload fingerprints, affected exposures and partial/canceled status. A disk change
+does not prove that an already-running agent session has reloaded the skill.
+
 ### Global flags
 
 ```bash

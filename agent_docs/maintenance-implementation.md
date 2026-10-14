@@ -9,11 +9,13 @@ originating Codex chat. No installed user skills are test targets.
 ## Batches
 
 1. Inventory facts and removal classification: M01, M02, M04; protective portion
-   of M03 and foundations for M11/M12. Implemented; independent review clean; PR/CI pending.
-2. Exact updates and complete results: M05–M08, including local-change protection.
+   of M03 and foundations for M11/M12. Merged as PR #42, a0721245.
+2. Exact updates and complete results: M05–M07 and protective portions of M08/M09.
+   Local changes refuse replacement; explicit dispositions, durable backups and
+   recovery complete M08 in batch 4.
 3. Sources, lock ownership, bounded payload comparison and discovery: remainder
    of M03, M09–M11.
-4. Recoverable repair plans, relinking and consolidation: M13–M15.
+4. Recoverable repair plans, relinking and consolidation: M13–M15 and remaining M08.
 5. Native owners and agent visibility: M12 and M16.
 6. Desired state, adoption, skill diagnostics and maintenance UI/CLI: M17–M20.
 7. M21 contract/adversarial verification accompanies every batch, followed by a
@@ -65,3 +67,36 @@ originating Codex chat. No installed user skills are test targets.
 - Windows CI run 38511388030 passed all 867 tests after the safety fix. The
   new link regressions require actual Windows symlink support rather than
   silently returning when unavailable.
+- Final batch 1 CI run 38511755536 passed every platform/AOT check. PR #42
+  merged at a0721245d0681e43688fdc463d4521b78d2a3857.
+
+## Batch 2 evidence
+
+- Product update paths retain selected physical records and use a freshly verified
+  containing directory plus basename selector. Confirmation passes gh `--all`
+  without expanding the selected physical set. Ambiguous CLI names refuse;
+  `--path` and `--install-id` select exact copies.
+- Native AOT CLI fixtures under gh 2.97.0 and 2.102.0 exercised an actual available
+  update from cli/cli commit 33789149b9def6b66ddf247438a79fac94e22074. The selected
+  ID changed, the other copy stayed byte/mode identical, and `--force --unpin`
+  refused a local extra without attempting mutation. Both streams survive JSON.
+- Opt-in contracts also reconstruct the recorded immutable tree when the installed
+  branch ref has moved. A ref whose payload changed cannot masquerade as the base.
+- Complete bounded payload fingerprints cover every file, directory, Unix mode
+  and link leaf. Installer-owned metadata is separately normalized; authored
+  content and comments remain comparison evidence. Native reads remain relative
+  to held roots; completion rechecks entries, ancestors and Windows directory
+  manifests. This is change detection, not an atomic filesystem snapshot.
+- Cancellation kills/drains the child and preserves captured streams; every
+  attempted mutation gets independent bounded verification and inventory invalidation.
+  Partial inventory never erases per-target evidence.
+- Independent reviews found and corrected targeting, cancellation, metadata
+  normalization, moving-ref, staging cleanup, late-edit, malformed-provider,
+  partial reporting and contextual ownership issues. Final source review is clean.
+- Native CLI proof exposed global lock ownership leaking by name into custom
+  copies. Production now retains all contextual claims and associates each by
+  physical/exposure containment. Competing claims remain conflicts. Additional
+  lock schemas/locations are deliberately left for batch 3.
+- Tests and reproducible runtime evidence are recorded in
+  `agent_docs/evidence/maintenance-batch-2.json`; the proof script accepts explicit
+  app/gh paths and uses disposable roots. Windows native execution is required CI.

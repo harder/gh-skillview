@@ -73,6 +73,33 @@ public sealed class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_CanceledUpdateRetainsBothStreamsAfterTermination()
+    {
+        var marker = Path.Combine(Path.GetTempPath(), "skillview-output-ready-" + Guid.NewGuid().ToString("N"));
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            var command = OperatingSystem.IsWindows()
+                ? ("pwsh", new[] { "-NoProfile", "-Command",
+                    "[Console]::Out.WriteLine('Updated first'); [Console]::Out.Flush(); " +
+                    "[Console]::Error.WriteLine('second pending'); [Console]::Error.Flush(); " +
+                    "[IO.File]::WriteAllText('" + marker.Replace("'", "''", StringComparison.Ordinal) + "','ready'); Start-Sleep -Seconds 30" })
+                : ("/bin/sh", new[] { "-c", "printf '%s\\n' 'Updated first'; printf '%s\\n' 'second pending' >&2; printf ready > \"$1\"; sleep 30", "skillview", marker });
+            var task = new ProcessRunner(new Logger(), terminationWait: TimeSpan.FromSeconds(2)).RunAsync(
+                command.Item1, command.Item2, cancellationToken: cancellation.Token, retainCancellationOutput: true);
+            using var admissionDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!File.Exists(marker)) await Task.Delay(10, admissionDeadline.Token);
+            cancellation.Cancel();
+            var result = await task;
+            Assert.True(result.Cancelled);
+            Assert.Equal(130, result.ExitCode);
+            Assert.Contains("Updated first", result.StdOut);
+            Assert.Contains("second pending", result.StdErr);
+        }
+        finally { cancellation.Cancel(); if (File.Exists(marker)) File.Delete(marker); }
+    }
+
+    [Fact]
     public async Task RunAsync_CancellationTerminatesWithinBoundedWait()
     {
         var runner = new ProcessRunner(

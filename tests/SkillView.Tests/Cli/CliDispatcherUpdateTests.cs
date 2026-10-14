@@ -7,6 +7,34 @@ namespace SkillView.Tests.Cli;
 
 public class CliDispatcherUpdateTests
 {
+    [Theory]
+    [InlineData("--agent")]
+    [InlineData("--scope")]
+    public void Update_UnsupportedSelectorFlagRefuses(string flag)
+    {
+        Assert.NotNull(CliDispatcher.ParseUpdateArgs([flag, "demo"]).Error);
+    }
+
+    [Fact]
+    public void Update_ExactTargetAndOptionTerminatorArePreserved()
+    {
+        var args = CliDispatcher.ParseUpdateArgs(["--path", "/skills/demo", "--install-id=abc", "--", "--demo"]);
+        Assert.Null(args.Error);
+        Assert.Equal("/skills/demo", args.Path);
+        Assert.Equal("abc", args.InstallationId);
+        Assert.Equal(["--demo"], args.Skills);
+    }
+
+    [Fact]
+    public void PackageOwnershipDoesNotLeakToSameNameOutsideLockContext()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "context", "skills");
+        var package = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = root };
+        Assert.True(package.Describes(Skill("demo", Path.Combine(root, "demo"), null, null)));
+        Assert.False(package.Describes(Skill("demo", Path.Combine(Path.GetTempPath(), "custom", "demo"), null, null)));
+    }
+
     private static InstalledSkill Skill(string name, string path, string? version, string? treeSha) => new()
     {
         Name = name,

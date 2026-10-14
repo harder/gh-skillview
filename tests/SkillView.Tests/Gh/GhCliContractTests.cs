@@ -62,6 +62,92 @@ public class GhCliContractTests
     }
 
     [Fact]
+    public async Task GhUpdate_SelectedPhysicalCopyChanges_OtherCopyAndLocalExtrasAreProtected()
+    {
+        if (!ShouldRun) return;
+        var ghPath = GhPath();
+        Assert.NotNull(ghPath);
+        var root = Directory.CreateTempSubdirectory("skillview-exact-update-contract-");
+        try
+        {
+            var logger = new Logger();
+            var runner = new ProcessRunner(logger);
+            var installer = new GhSkillInstallService(runner, logger);
+            var roots = new[] { Path.Combine(root.FullName, "first"), Path.Combine(root.FullName, "second") };
+            foreach (var directory in roots)
+            {
+                var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
+                    new GhSkillInstallService.Options(Path: directory, Version: "33789149b9def6b66ddf247438a79fac94e22074", Pin: true),
+                    TestContext.Current.CancellationToken);
+                Assert.True(installed.Succeeded, installed.StdErr);
+            }
+            var skills = new SkillView.Inventory.LocalSkillScanner(logger).Scan(roots.Select(directory =>
+                new SkillView.Inventory.Models.ScanRoot(directory, SkillView.Inventory.Models.Scope.Custom, null)).ToArray());
+            Assert.Equal(2, skills.Length);
+            var selected = skills.Single(skill => SkillView.Inventory.PathIdentity.Equals(skill.ScanRoot, roots[0]));
+            var other = skills.Single(skill => skill.InstallationId != selected.InstallationId);
+            var otherBefore = SkillView.Maintenance.PayloadSnapshot.Capture(other.ResolvedPath, TestContext.Current.CancellationToken);
+            var coordinator = new SkillView.Maintenance.SkillUpdateCoordinator(installer,
+                new GhSkillUpdateService(runner, logger), new GhSkillListAdapter(runner, logger), logger);
+            var result = await coordinator.UpdateAsync(ghPath!, new GhSkillUpdateService.Options(
+                Targets: [selected], Unpin: true), TestContext.Current.CancellationToken);
+            Assert.True(result.Succeeded, result.ErrorMessage + " " + string.Join("; ", result.Outcomes.Select(o => o.Message)));
+            Assert.Equal("changed", Assert.Single(result.Outcomes).Status);
+            Assert.Contains("Updated gh-skill", result.StdOut);
+            var otherAfter = SkillView.Maintenance.PayloadSnapshot.Capture(other.ResolvedPath, TestContext.Current.CancellationToken);
+            Assert.Equal(otherBefore.Fingerprint, otherAfter.Fingerprint);
+            File.WriteAllText(Path.Combine(other.ResolvedPath, "custom.txt"), "preserve");
+            var customBefore = SkillView.Maintenance.PayloadSnapshot.Capture(other.ResolvedPath, TestContext.Current.CancellationToken);
+            var refused = await coordinator.UpdateAsync(ghPath!, new GhSkillUpdateService.Options(
+                Targets: [other], Force: true, Unpin: true), TestContext.Current.CancellationToken);
+            Assert.False(refused.Succeeded);
+            Assert.False(refused.MutationAttempted);
+            Assert.Contains("Local changes protected", Assert.Single(refused.Outcomes).Message);
+            Assert.Equal(customBefore.Fingerprint,
+                SkillView.Maintenance.PayloadSnapshot.Capture(other.ResolvedPath, TestContext.Current.CancellationToken).Fingerprint);
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task GhUpdate_MovedBranchRef_ReconstructsRecordedImmutableBase()
+    {
+        if (!ShouldRun) return;
+        var ghPath = GhPath();
+        Assert.NotNull(ghPath);
+        var root = Directory.CreateTempSubdirectory("skillview-recorded-base-contract-");
+        try
+        {
+            var logger = new Logger();
+            var runner = new ProcessRunner(logger);
+            var installer = new GhSkillInstallService(runner, logger);
+            var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
+                new GhSkillInstallService.Options(Path: root.FullName,
+                    Version: "33789149b9def6b66ddf247438a79fac94e22074", Pin: true), TestContext.Current.CancellationToken);
+            Assert.True(installed.Succeeded, installed.StdErr);
+            var skillPath = Directory.EnumerateDirectories(root.FullName).Single();
+            var markdown = Path.Combine(skillPath, "SKILL.md");
+            var text = File.ReadAllText(markdown);
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"(?m)^([ \t]+github-ref:).*$", "$1 refs/heads/trunk");
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"(?m)^[ \t]+github-pinned:.*\n", "");
+            File.WriteAllText(markdown, text);
+            var target = Assert.Single(new SkillView.Inventory.LocalSkillScanner(logger).Scan(
+                [new SkillView.Inventory.Models.ScanRoot(root.FullName, SkillView.Inventory.Models.Scope.Custom, null)]));
+            Assert.False(target.Pinned);
+            Assert.Equal("refs/heads/trunk", target.FrontMatter.GithubRef);
+            var result = await new SkillView.Maintenance.SkillUpdateCoordinator(installer,
+                new GhSkillUpdateService(runner, logger), new GhSkillListAdapter(runner, logger), logger, runner)
+                .UpdateAsync(ghPath!, new GhSkillUpdateService.Options(Targets: [target]), TestContext.Current.CancellationToken);
+            Assert.True(result.Succeeded, result.ErrorMessage + " " + string.Join("; ", result.Outcomes.Select(o => o.Message)));
+            Assert.Equal("changed", Assert.Single(result.Outcomes).Status);
+            Assert.Contains("Updated gh-skill", result.StdOut);
+        }
+        finally { root.Delete(true); }
+    }
+
+    [Fact]
     public async Task GhVersion_ProducesParseableOutput()
     {
         if (!ShouldRun) return;

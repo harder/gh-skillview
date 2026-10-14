@@ -9,4 +9,13 @@ public sealed record SkillPackage(
     string? SourceUrl,
     DateTimeOffset? InstalledAt,
     DateTimeOffset? UpdatedAt
-);
+)
+{
+    public string? LockFilePath { get; init; }
+    public string? InstallationRoot { get; init; }
+
+    /// A same-name lock entry is evidence only within its installation context.
+    public bool Describes(InstalledSkill skill) => InstallationRoot is { } root
+        && (PathIdentity.IsInside(skill.ResolvedPath, root)
+            || skill.Agents.Any(agent => PathIdentity.IsInside(agent.Path, root)));
+}

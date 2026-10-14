@@ -1,0 +1,129 @@
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
+using SkillView.Inventory;
+using YamlDotNet.Core;
+
+namespace SkillView.Maintenance;
+
+public sealed record PayloadEntry(string Path, string Kind, string ContentHash,
+    string ComparisonHash, long Bytes, int? UnixMode, string? LinkTarget);
+
+public sealed record PayloadSnapshot(string Path, string Fingerprint,
+    string ComparisonFingerprint, ImmutableArray<PayloadEntry> Entries)
+{
+    public SkillView.Inventory.Models.SkillFrontMatter? FrontMatter { get; init; }
+
+    public const int MaxEntries = 10_000;
+    public const long MaxBytes = 256L * 1024 * 1024;
+    public const int MaxDepth = 32;
+    public const int MaxSkillBytes = 2 * 1024 * 1024;
+
+    public static PayloadSnapshot Capture(string path, CancellationToken cancellationToken = default) =>
+        CaptureCore(path, cancellationToken, null);
+
+    internal static PayloadSnapshot CaptureWithObservationForTests(string path, Action<string, string> observation,
+        CancellationToken cancellationToken) => CaptureCore(path, cancellationToken, observation);
+
+    private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var root = System.IO.Path.GetFullPath(path);
+        var entries = ImmutableArray.CreateBuilder<PayloadEntry>();
+        long totalBytes = 0;
+        SkillView.Inventory.Models.SkillFrontMatter? frontMatter = null;
+        var identity = SecurePayloadWalker.Walk(root, MaxDepth, item =>
+        {
+            Observe(item);
+            observation?.Invoke(item.RelativePath, item.Kind);
+        }, cancellationToken);
+        var ordered = entries.OrderBy(e => e.Path, StringComparer.Ordinal).ToImmutableArray();
+        return new(identity.CanonicalPath, Digest(ordered, false), Digest(ordered, true), ordered) { FrontMatter = frontMatter };
+
+        void Observe(NativePayloadItem item)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entries.Count >= MaxEntries) throw new IOException("payload entry limit exceeded");
+            if (item.Kind == "link")
+            {
+                var hash = Convert.ToHexString(SHA256.HashData(item.LinkBytes ?? []));
+                entries.Add(new(item.RelativePath, "link", hash, hash, 0, item.UnixMode, item.LinkTarget));
+                return;
+            }
+            if (item.Kind == "directory")
+            {
+                entries.Add(new(item.RelativePath, "directory", "", "", 0, item.UnixMode, null));
+                return;
+            }
+            var stream = item.Content ?? throw new IOException("native payload file stream is missing");
+            if (!stream.CanSeek) throw new IOException("payload contains a non-regular file");
+            var initialLength = stream.Length;
+            if (initialLength > MaxBytes - totalBytes) throw new IOException("payload byte limit exceeded");
+            using var hashBuilder = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            using var skillBytes = item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
+            var buffer = new byte[64 * 1024];
+            long readBytes = 0;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var count = stream.Read(buffer);
+                if (count == 0) break;
+                readBytes += count;
+                totalBytes += count;
+                if (totalBytes > MaxBytes || (skillBytes is not null && readBytes > MaxSkillBytes))
+                    throw new IOException("payload byte limit exceeded");
+                hashBuilder.AppendData(buffer.AsSpan(0, count));
+                skillBytes?.Write(buffer, 0, count);
+            }
+            if (readBytes != initialLength || stream.Length != initialLength)
+                throw new IOException("payload changed during comparison");
+            var rawHash = Convert.ToHexString(hashBuilder.GetHashAndReset());
+            var comparison = rawHash;
+            if (skillBytes is not null)
+            {
+                try
+                {
+                    var text = new UTF8Encoding(false, true).GetString(skillBytes.GetBuffer(), 0, (int)skillBytes.Length);
+                    var (_, parsedMetadata, parsed) = FrontMatterParser.Parse(text);
+                    if (!parsed) throw new IOException("invalid frontmatter during payload comparison");
+                    frontMatter = parsedMetadata;
+                    comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                        InstallerMetadataNormalizer.Normalize(text))));
+                }
+                catch (Exception ex) when (ex is YamlException or DecoderFallbackException)
+                { throw new IOException("invalid frontmatter encoding or YAML during comparison", ex); }
+            }
+            entries.Add(new(item.RelativePath, "file", rawHash, comparison, readBytes, item.UnixMode, null));
+        }
+    }
+
+    public static ImmutableArray<string> Differences(PayloadSnapshot before, PayloadSnapshot after,
+        bool ignoreInstallerMetadata = true)
+    {
+        var left = before.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
+        var right = after.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
+        return left.Keys.Concat(right.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
+            .Where(path => !left.TryGetValue(path, out var a) || !right.TryGetValue(path, out var b)
+                || a.Kind != b.Kind || a.UnixMode != b.UnixMode
+                || (ignoreInstallerMetadata ? a.ComparisonHash != b.ComparisonHash : a.ContentHash != b.ContentHash))
+            .ToImmutableArray();
+    }
+
+    private static string Digest(ImmutableArray<PayloadEntry> entries, bool normalized)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var entry in entries)
+        {
+            using var buffer = new MemoryStream();
+            using (var writer = new BinaryWriter(buffer, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(entry.Path);
+                writer.Write(entry.Kind);
+                writer.Write(normalized ? entry.ComparisonHash : entry.ContentHash);
+                writer.Write(entry.UnixMode ?? -1);
+            }
+            hash.AppendData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
+}

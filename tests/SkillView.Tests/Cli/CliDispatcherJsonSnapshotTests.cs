@@ -265,6 +265,33 @@ public class CliDispatcherJsonSnapshotTests
     // --- remove ----------------------------------------------------------
 
     [Fact]
+    public void Update_PartialReconciliationRetainsBothStreamsAndPayloadEvidence()
+    {
+        var result = new UpdateResult
+        {
+            DryRun = false,
+            Succeeded = true,
+            ExitCode = 0,
+            StdOut = "Updated demo",
+            StdErr = "source notice",
+            ErrorMessage = null,
+            CommandLine = [],
+            Entries = [],
+            MutationAttempted = true,
+            ReconciliationPartial = true,
+            Outcomes = [new("id", "/skills/demo", "changed", "before", "after", ["script.sh"], 1, [], null)]
+        };
+        var parsed = new CliDispatcher.ParsedUpdateArgs([], false, false, false, false, true);
+        var doc = Parse(CliDispatcher.RenderUpdateJson(result, parsed, [], []));
+        Assert.Equal(2, doc.GetProperty("schemaVersion").GetInt32());
+        Assert.True(doc.GetProperty("partial").GetBoolean());
+        Assert.True(doc.GetProperty("mutationAttempted").GetBoolean());
+        Assert.Equal("Updated demo", doc.GetProperty("stdout").GetString());
+        Assert.Equal("source notice", doc.GetProperty("stderr").GetString());
+        Assert.Equal("after", doc.GetProperty("outcomes")[0].GetProperty("afterFingerprint").GetString());
+    }
+
+    [Fact]
     public void Remove_JsonIncludesValidationErrorsAndWarnings()
     {
         var validation = new RemoveValidator.RemoveValidation(

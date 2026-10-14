@@ -263,6 +263,10 @@ internal sealed class UpdatesTabView : FrameView
     private bool IsCurrentLoad(long loadGeneration) =>
         Interlocked.Read(ref _loadGeneration) == loadGeneration;
 
+    internal CheckBox UnpinBoxForTests => _unpinBox;
+    internal void MarkRowForTests(int row) => _wrapper?.CheckedRows.Add(row);
+    internal void SelectRowForTests(int row) => _table.SetSelection(0, row, false);
+    internal void UpdateCurrentRowForTests() => UpdateCurrentRow();
     internal CheckBox AllBoxForTests => _allBox;
     internal Button DryRunButtonForTests => _dryRunButton;
     internal string StatusTextForTests => _status.Text.ToString();
@@ -383,13 +387,15 @@ internal sealed class UpdatesTabView : FrameView
             return;
         }
         var allChecked = !batchOnly && _allBox.Value == CheckState.Checked;
-        var marked = _wrapper is null
-            ? new List<string>()
+        var selected = _wrapper is null
+            ? new List<InstalledSkill>()
             : Enumerable.Range(0, _skills.Count)
                 .Where(i => _wrapper.CheckedRows.Contains(i))
-                .Select(i => _skills[i].Name)
+                .Select(i => _skills[i])
                 .ToList();
 
+        var marked = selected.Select(s => s.Name).ToList();
+        var targets = allChecked ? _skills : selected;
         if (!allChecked && marked.Count == 0)
         {
             _status.Text = dryRun
@@ -414,7 +420,8 @@ internal sealed class UpdatesTabView : FrameView
             All: allChecked,
             DryRun: dryRun,
             Force: _forceBox.Value == CheckState.Checked,
-            Unpin: _unpinBox.Value == CheckState.Checked);
+            Unpin: _unpinBox.Value == CheckState.Checked,
+            Targets: targets);
 
         try
         {
@@ -429,11 +436,12 @@ internal sealed class UpdatesTabView : FrameView
                 SetBusy(false);
                 SetOperationControlsEnabled(true);
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, allChecked, marked);
+                if (!dryRun && result.MutationAttempted) _onUpdateApplied();
                 if (dryRun)
                 {
                     _status.Text = result.Succeeded
                         ? (string.IsNullOrWhiteSpace(result.StdOut)
-                            ? " dry-run complete · no updates available"
+                            ? " check complete · inspect per-installation outcomes"
                             : $" dry-run complete · {result.Entries.Length} entries parsed")
                         : $" dry-run failed (exit {result.ExitCode}): {TuiHelpers.ErrorSnippet(result.ErrorMessage)}";
                 }
@@ -441,11 +449,12 @@ internal sealed class UpdatesTabView : FrameView
                 {
                     // gh 2.94 skips metadata-less skills under --all; surface
                     // the count so success isn't mistaken for "all updated".
-                    var skipped = result.Entries.Count(e => e.Status == "skipped");
+                    var skipped = result.Outcomes.Count(e => e.Status is "skipped" or "pinned" or "untracked" or "source-unavailable");
+                    var changed = result.Outcomes.Count(e => e.Status == "changed");
                     _status.Text = skipped > 0
-                        ? $" update succeeded · {skipped} skipped (no metadata)"
-                        : " update succeeded";
-                    _onUpdateApplied();
+                        ? $" completed · {changed} changed · {skipped} retained/skipped · inspect outcomes"
+                        : $" completed · {changed} changed · inspect outcomes";
+
                 }
                 else
                 {
