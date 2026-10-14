@@ -107,7 +107,7 @@
       "Share a1GiB manifest/blob verification work budget across all records, charging before reads and retaining failed-record charges.",
       "Malformed retained paths must classify as corrupt without consuming cancellation or aggregate-quota refusal."
     ],
-    "independentFocusedHistoryTestsPassedBeforeFinalPathCase": 24
+    "independentFocusedHistoryTestsPassedBeforeFinalBudgetAndPathCases": 23
   },
   "limits": {
     "archiveBytes": 295698432,
