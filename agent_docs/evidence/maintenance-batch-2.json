@@ -15,7 +15,7 @@
     "M09 current project/global/XDG schemas"
   ],
   "fullSuite": {
-    "passed": 900,
+    "passed": 904,
     "failed": 0,
     "skipped": 0
   },
@@ -31,6 +31,7 @@
       "exactIdChangedOneCopy": true,
       "unselectedCopyUnchanged": true,
       "forcePreservedLocalExtra": true,
+      "refusalPreservedSharedLock": true,
       "jsonSchemaVersion": 2,
       "retainedStdout": true,
       "retainedStderr": true,
@@ -43,6 +44,7 @@
       "exactIdChangedOneCopy": true,
       "unselectedCopyUnchanged": true,
       "forcePreservedLocalExtra": true,
+      "refusalPreservedSharedLock": true,
       "jsonSchemaVersion": 2,
       "retainedStdout": true,
       "retainedStderr": true,
@@ -80,15 +82,24 @@
       "partial reconciliation",
       "staging namespace collisions",
       "all contextual lock claims",
-      "Windows file generation does not prove unchanged content; completion rehash on every platform"
+      "Windows file generation does not prove unchanged content; completion rehash on every platform",
+      "gh --dir staging also writes global interoperability lock; isolate child home/state",
+      "Windows GH auth config precedence",
+      "Windows proof fixture USERPROFILE isolation"
     ]
   },
-  "windowsNativeExecution": "Initial CI38518641460 exposed unchanged file generation after same-length rewrite; content rehash fix awaiting required rerun",
+  "windowsNativeExecution": "CI38519371372 passed all900 tests and AOT targets after content rehash fix; staging/fixture isolation followup requires newCI",
   "proofCommand": "python3 agent_docs/evidence/prove-maintenance-batch-2.py --app /path/to/published/skillview --gh /path/to/gh-2.97 --gh /path/to/current-gh --output /tmp/batch2-proof.json",
   "limitations": [
     "Whole-tree snapshot is change detection, not atomic",
     "Local drift currently refuses; explicit replacement/backups arrive in batch4",
     "Native package mutations remain owner-aware refusals",
     "Agent active-session state is unknown"
-  ]
+  ],
+  "compatibilityEvidence": {
+    "ghInstallerSharedLock": "https://github.com/cli/cli/blob/v2.102.0/internal/skills/installer/installer.go",
+    "ghLockSchema": "https://github.com/cli/cli/blob/v2.102.0/internal/skills/lockfile/lockfile.go",
+    "authConfiguration": "https://cli.github.com/manual/gh_help_environment",
+    "sharedLockSchemaIsNotExclusiveOwnership": "M09 next batch must distinguish shared gh/Vercel interoperability evidence from native package ownership; shared-root update is conservatively refused until resolved"
+  }
 }

@@ -31,7 +31,8 @@ public sealed class GhSkillInstallService
         bool Upstream = false,
         bool AllowHiddenDirs = false,
         bool FromLocal = false,
-        bool All = false);
+        bool All = false,
+        IReadOnlyDictionary<string, string>? ProcessEnvironment = null);
 
     public async Task<InstallResult> InstallAsync(
         string ghPath,
@@ -42,7 +43,8 @@ public sealed class GhSkillInstallService
     {
         options ??= new Options();
         var args = BuildArgs(repo, skillName, options);
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
+            environment: options.ProcessEnvironment).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");

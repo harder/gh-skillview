@@ -39,7 +39,8 @@ public class GhCliContractTests
         try
         {
             var logger = new Logger();
-            var runner = new ProcessRunner(logger);
+            var runner = new ProcessRunner(logger, environment:
+                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
             var result = await runner.RunAsync(ghPath!,
                 ["skill", "install", "--dir", root.FullName, "--pin=v2.102.0", "--", "cli/cli", "skills/gh-skill"],
                 cancellationToken: TestContext.Current.CancellationToken);
@@ -71,7 +72,8 @@ public class GhCliContractTests
         try
         {
             var logger = new Logger();
-            var runner = new ProcessRunner(logger);
+            var runner = new ProcessRunner(logger, environment:
+                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
             var installer = new GhSkillInstallService(runner, logger);
             var roots = new[] { Path.Combine(root.FullName, "first"), Path.Combine(root.FullName, "second") };
             foreach (var directory in roots)
@@ -88,7 +90,7 @@ public class GhCliContractTests
             var other = skills.Single(skill => skill.InstallationId != selected.InstallationId);
             var otherBefore = SkillView.Maintenance.PayloadSnapshot.Capture(other.ResolvedPath, TestContext.Current.CancellationToken);
             var coordinator = new SkillView.Maintenance.SkillUpdateCoordinator(installer,
-                new GhSkillUpdateService(runner, logger), new GhSkillListAdapter(runner, logger), logger);
+                new GhSkillUpdateService(runner, logger), new GhSkillListAdapter(runner, logger), logger, runner);
             var result = await coordinator.UpdateAsync(ghPath!, new GhSkillUpdateService.Options(
                 Targets: [selected], Unpin: true), TestContext.Current.CancellationToken);
             Assert.True(result.Succeeded, result.ErrorMessage + " " + string.Join("; ", result.Outcomes.Select(o => o.Message)));
@@ -119,13 +121,15 @@ public class GhCliContractTests
         try
         {
             var logger = new Logger();
-            var runner = new ProcessRunner(logger);
+            var runner = new ProcessRunner(logger, environment:
+                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
             var installer = new GhSkillInstallService(runner, logger);
             var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
                 new GhSkillInstallService.Options(Path: root.FullName,
                     Version: "33789149b9def6b66ddf247438a79fac94e22074", Pin: true), TestContext.Current.CancellationToken);
             Assert.True(installed.Succeeded, installed.StdErr);
-            var skillPath = Directory.EnumerateDirectories(root.FullName).Single();
+            var skillPath = Directory.EnumerateDirectories(root.FullName)
+                .Single(directory => Path.GetFileName(directory) != ".fixture");
             var markdown = Path.Combine(skillPath, "SKILL.md");
             var text = File.ReadAllText(markdown);
             text = System.Text.RegularExpressions.Regex.Replace(text,

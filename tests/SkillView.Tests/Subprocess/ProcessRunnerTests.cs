@@ -9,6 +9,22 @@ namespace SkillView.Tests.Subprocess;
 public sealed class ProcessRunnerTests
 {
     [Fact]
+    public async Task RunAsync_EnvironmentOverridesAreChildOnly()
+    {
+        const string name = "SKILLVIEW_STAGE_TEST";
+        var parent = System.Environment.GetEnvironmentVariable(name);
+        var command = OperatingSystem.IsWindows()
+            ? ("pwsh", new[] { "-NoProfile", "-Command", "[Console]::Write($env:SKILLVIEW_STAGE_TEST)" })
+            : ("/bin/sh", new[] { "-c", "printf '%s' \"$SKILLVIEW_STAGE_TEST\"" });
+        var result = await new ProcessRunner(new Logger()).RunAsync(command.Item1, command.Item2,
+            cancellationToken: TestContext.Current.CancellationToken,
+            environment: new Dictionary<string, string> { [name] = "private-stage" });
+        Assert.True(result.Succeeded, result.StdErr);
+        Assert.Equal("private-stage", result.StdOut);
+        Assert.Equal(parent, System.Environment.GetEnvironmentVariable(name));
+    }
+
+    [Fact]
     public async Task RunAsync_PreCanceledRequest_DoesNotAttemptProcessStart()
     {
         var runner = new ProcessRunner(new Logger(LogLevel.Debug));

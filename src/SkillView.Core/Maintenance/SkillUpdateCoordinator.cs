@@ -105,6 +105,7 @@ public sealed class SkillUpdateCoordinator(
                         Directory.CreateDirectory(staging);
                         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(staging, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                         stagingOwner = OwnedDirectoryLease.Open(staging);
+                        var stageEnvironment = CreateStagingEnvironment(staging);
                         var refDestination = Path.Combine(staging, "current-ref");
                         var recordedRef = ShortRef(target.FrontMatter.GithubRef);
                         var listing = await installer.ListRepoSkillsAsync(ghPath, repository,
@@ -121,7 +122,8 @@ public sealed class SkillUpdateCoordinator(
                         if (sourceSelector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\')))
                             throw new IOException("Unsafe repository skill selector.");
                         var staged = await installer.InstallAsync(ghPath, repository, sourceSelector,
-                            new GhSkillInstallService.Options(Path: refDestination, Version: recordedRef, Pin: true),
+                            new GhSkillInstallService.Options(Path: refDestination, Version: recordedRef, Pin: true,
+                                ProcessEnvironment: stageEnvironment),
                             cancellationToken).ConfigureAwait(false);
                         if (!staged.Succeeded) throw new IOException($"Cannot stage recorded base: {staged.ErrorMessage}");
                         var stagedPath = Path.Combine(refDestination, sourceSelector.Replace('/', Path.DirectorySeparatorChar));
@@ -137,7 +139,8 @@ public sealed class SkillUpdateCoordinator(
                             // recognized installer metadata follow the actual supported host.
                             var materialized = Path.Combine(staging, "materialized-base");
                             var import = await installer.InstallAsync(ghPath, rawBase, null,
-                                new GhSkillInstallService.Options(Path: materialized, FromLocal: true, All: true),
+                                new GhSkillInstallService.Options(Path: materialized, FromLocal: true, All: true,
+                                    ProcessEnvironment: stageEnvironment),
                                 cancellationToken).ConfigureAwait(false);
                             if (!import.Succeeded) throw new IOException($"Cannot materialize recorded tree: {import.ErrorMessage}");
                             var basePaths = Directory.EnumerateDirectories(materialized).Take(2).ToArray();
@@ -249,6 +252,40 @@ public sealed class SkillUpdateCoordinator(
 
     private static string ShortRef(string value) => value.StartsWith("refs/heads/", StringComparison.Ordinal)
         ? value[11..] : value.StartsWith("refs/tags/", StringComparison.Ordinal) ? value[10..] : value;
+
+    internal static IReadOnlyDictionary<string, string> CreateStagingEnvironment(string staging)
+    {
+        // gh installs write ~/.agents/.skill-lock.json even with --dir. Keep
+        // all staging state private while explicitly retaining the user's auth
+        // configuration location; never change the parent process environment.
+        var originalHome = Environment.GetEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var config = ResolveGhConfigDirectory(originalHome, Environment.GetEnvironmentVariable("GH_CONFIG_DIR"),
+            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME"), Environment.GetEnvironmentVariable("APPDATA"),
+            OperatingSystem.IsWindows());
+        var home = Path.Combine(staging, "private-home");
+        Directory.CreateDirectory(home);
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["HOME"] = home,
+            ["USERPROFILE"] = home,
+            ["GH_CONFIG_DIR"] = Path.GetFullPath(config),
+            ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
+            ["XDG_CACHE_HOME"] = Path.Combine(home, "cache"),
+            ["XDG_CONFIG_HOME"] = Path.Combine(home, "config"),
+            ["XDG_DATA_HOME"] = Path.Combine(home, "data"),
+            ["APPDATA"] = Path.Combine(home, "appdata"),
+            ["LOCALAPPDATA"] = Path.Combine(home, "localappdata"),
+            ["GH_NO_UPDATE_NOTIFIER"] = "1",
+            ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1"
+        };
+    }
+
+    internal static string ResolveGhConfigDirectory(string home, string? explicitDirectory,
+        string? xdgDirectory, string? appData, bool windows) => !string.IsNullOrWhiteSpace(explicitDirectory)
+        ? explicitDirectory : !string.IsNullOrWhiteSpace(xdgDirectory) ? Path.Combine(xdgDirectory, "gh")
+        : windows && !string.IsNullOrWhiteSpace(appData) ? Path.Combine(appData, "GitHub CLI")
+        : Path.Combine(home, ".config", "gh");
 
     private static void AppendBounded(StringBuilder destination, string text)
     {

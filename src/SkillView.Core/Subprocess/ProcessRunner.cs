@@ -13,11 +13,13 @@ public sealed class ProcessRunner
     private readonly Logger _logger;
     private readonly int _maxCapturedCharsPerStream;
     private readonly TimeSpan _terminationWait;
+    private readonly IReadOnlyDictionary<string, string>? _environment;
 
     public ProcessRunner(
         Logger logger,
         int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream,
-        TimeSpan? terminationWait = null)
+        TimeSpan? terminationWait = null,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCapturedCharsPerStream, 1);
         var resolvedTerminationWait = terminationWait ?? DefaultTerminationWait;
@@ -28,6 +30,7 @@ public sealed class ProcessRunner
         _logger = logger;
         _maxCapturedCharsPerStream = maxCapturedCharsPerStream;
         _terminationWait = resolvedTerminationWait;
+        _environment = environment;
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -35,7 +38,8 @@ public sealed class ProcessRunner
         IReadOnlyList<string> arguments,
         string? workingDirectory = null,
         CancellationToken cancellationToken = default,
-        bool retainCancellationOutput = false)
+        bool retainCancellationOutput = false,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         // Cancellation closes process admission. In particular, do not start
         // and then immediately kill a child for an already-canceled caller.
@@ -55,6 +59,10 @@ public sealed class ProcessRunner
         {
             psi.ArgumentList.Add(arg);
         }
+        if (_environment is not null)
+            foreach (var (name, value) in _environment) psi.Environment[name] = value;
+        if (environment is not null)
+            foreach (var (name, value) in environment) psi.Environment[name] = value;
 
         cancellationToken.ThrowIfCancellationRequested();
         _logger.Debug("subprocess", $"exec: {executable} {string.Join(' ', arguments)}");

@@ -106,3 +106,15 @@ originating Codex chat. No installed user skills are test targets.
   by its originally observed byte count. A Windows regression restores ChangeTime,
   proves unchanged full identity, and requires a content-change refusal. Local
   full suite after this fix: 900 passed; independent re-review clean.
+- CI run 38519371372 executed the Windows identity-preserving regressions and
+  passed all 900 tests and every platform/AOT check after the rehash fix.
+- Source inspection confirmed gh `--dir` installs also write the shared
+  `~/.agents/.skill-lock.json`. Comparison staging and mutating contract fixtures
+  now use per-child private HOME/USERPROFILE and XDG state; original gh auth config
+  resolution is preserved with gh's documented precedence, including Windows
+  `APPDATA/GitHub CLI`. Parent environment stays unchanged. Native proof verifies
+  the shared lock is byte-identical after a local-drift refusal on both gh versions.
+- The current full local suite passes 904 tests. Shared gh/Vercel schema-3 records
+  are interoperability evidence, not proof of exclusive native package ownership;
+  resolving that distinction remains M09 in batch 3. This batch conservatively
+  refuses updates when such a contextual claim is present.
