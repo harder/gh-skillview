@@ -252,7 +252,6 @@ public sealed class DiscoveryTests : IDisposable
     [Fact]
     public void LinkedContainersAndHiddenLocationsReportUnobservedContent()
     {
-        if (OperatingSystem.IsWindows()) return;
         var root = DirectoryAt("skills");
         var outside = DirectoryAt("outside");
         SkillAt("outside/demo", "demo");
@@ -265,6 +264,27 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Contains(locations, location => location.State == "unsupported");
         Assert.Contains(locations, location => location.State == "excluded");
         Assert.NotEmpty(incomplete);
+    }
+
+    [Fact]
+    public void DanglingDirectoryLinksRemainBrokenCandidatesBesideLiveLinkedContainers()
+    {
+        var root = DirectoryAt("skills");
+        var outside = DirectoryAt("outside");
+        SkillAt("outside/demo", "demo");
+        var broken = Path.Combine(root, "broken");
+        var container = Path.Combine(root, "container");
+        Directory.CreateSymbolicLink(broken, Path.Combine(_temporary.FullName, "missing"));
+        Directory.CreateSymbolicLink(container, outside);
+        var incomplete = new List<string>();
+        var locations = new List<DiscoveryLocation>();
+        var skill = Assert.Single(new LocalSkillScanner(new Logger()).ScanWithCancellation(
+            [new(root, Scope.Custom, null)], null, TestContext.Current.CancellationToken, incomplete, locations));
+        Assert.Equal(ValidityState.BrokenSymlink, skill.Validity);
+        Assert.Equal(broken, skill.ResolvedPath);
+        Assert.DoesNotContain(incomplete, path => PathIdentity.Equals(path, broken));
+        Assert.Contains(incomplete, path => PathIdentity.Equals(path, container));
+        Assert.Contains(locations, location => location.Path == container && location.State == "unsupported");
     }
 
     [Fact]

@@ -75,6 +75,16 @@ for gh in args.gh:
         assert all(agent['enabled'] is None and agent['activeSessionState'] == 'unknown' for agent in profile_row['agents'])
         assert any(location['state'] == 'container' for location in inventory['discoveryLocations'])
         assert all(Path(row['resolvedPath']).resolve().is_relative_to(root.resolve()) for row in inventory['skills'])
+        broken = custom / 'broken-exposure'
+        broken.symlink_to(root / 'missing-target', target_is_directory=True)
+        broken_inventory = run(['list', '--json'])
+        broken_row = next(row for row in broken_inventory['skills'] if row['name'] == 'broken-exposure')
+        assert broken_row['validity'] == 'BrokenSymlink', broken_row
+        assert not broken_inventory['partial'], broken_inventory
+        repaired = run(['cleanup', '--candidates', 'BrokenSymlink', '--apply', '--yes', '--json'])
+        assert any(row['kind'] == 'BrokenSymlink' for row in repaired['entries']), repaired
+        assert len(repaired['applied']) == 1 and repaired['applied'][0]['succeeded'], repaired
+        assert not broken.is_symlink(), repaired
         deep = custom.joinpath(*(['namespace'] * 10), 'unobserved')
         skill(deep, 'unobserved')
         partial = run(['list', '--json'])
@@ -86,6 +96,7 @@ for gh in args.gh:
                             nativeHost=str(args.app), redirectedLocalInstallObserved=True,
                             monorepoAndLegacyWorkspaceRootsObserved=True, namedProfileContextPreserved=True,
                             namespaceContainersSeparated=True, physicalAliasesMerged=True,
+                            danglingExposureIdentityPinnedCleanupVerified=True,
                             depthBudgetReportsPartialCoverage=True, incompleteCoverageCannotRecommendOrphanCleanup=True))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))

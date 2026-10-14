@@ -6,7 +6,7 @@
     "M21 bounded and adversarial inventory verification"
   ],
   "fullSuite": {
-    "passed": 969,
+    "passed": 970,
     "failed": 0,
     "skipped": 0
   },
@@ -22,6 +22,7 @@
       "namedProfileContextPreserved": true,
       "namespaceContainersSeparated": true,
       "physicalAliasesMerged": true,
+      "danglingExposureIdentityPinnedCleanupVerified": true,
       "depthBudgetReportsPartialCoverage": true,
       "incompleteCoverageCannotRecommendOrphanCleanup": true
     },
@@ -33,6 +34,7 @@
       "namedProfileContextPreserved": true,
       "namespaceContainersSeparated": true,
       "physicalAliasesMerged": true,
+      "danglingExposureIdentityPinnedCleanupVerified": true,
       "depthBudgetReportsPartialCoverage": true,
       "incompleteCoverageCannotRecommendOrphanCleanup": true
     }
@@ -68,7 +70,8 @@
       "charge each successful metadata read even if a later read fails",
       "missing explicit discovery paths report incomplete coverage",
       "physical ancestors of nested workspace aliases remain discoverable",
-      "macOS physical/lexical context assertions use native alias equality"
+      "macOS physical/lexical context assertions use native alias equality",
+      "Windows dangling directory links require target resolution before linked-container classification"
     ]
   },
   "sources": {

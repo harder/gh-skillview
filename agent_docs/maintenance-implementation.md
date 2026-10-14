@@ -214,9 +214,17 @@ Native manager manifests, bundled resources and effective loading policies
 remain in M12/M16; this batch does not infer those from placement alone. The
 recoverable repair/journal, desired-state and maintenance UI batches remain.
 
-Batch 3b local verification: warning-free build, 969 tests passed, solution
+Batch 3b local verification: warning-free build, 970 tests passed, solution
 format verification, and sequential standalone/extension native AOT publishes.
 Disposable runtime fixtures pass on gh 2.97.0 and 2.102.0, including redirected
 Git workspaces, profiles, namespaces, aliases and partial-coverage cleanup
 refusals. The preceding shared/exact update runtime proof also passed on this
 batch host. Platform CI and final independent review are required before merge.
+
+First batch 3b CI passed all platform/AOT checks except a Windows dangling-link
+cleanup regression. Directory.Exists can report the link itself as present on
+Windows, so linked-container classification now requires a resolving target.
+A new all-platform test distinguishes dangling links from live containers; the
+existing container test also runs on Windows. Final native fixtures prove
+identity-pinned dangling-link cleanup on both supported gh hosts. Fresh CI is
+required for the corrected head.

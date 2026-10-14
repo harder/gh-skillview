@@ -148,7 +148,10 @@ public sealed class LocalSkillScanner
                 }
                 var linked = PathResolver.IsSymlink(child);
                 if (!Directory.Exists(child) && !linked) continue;
-                if (linked && Directory.Exists(child) && !File.Exists(Path.Combine(child, SkillFileName)))
+                // Windows Directory.Exists can report a dangling directory link
+                // as present. Resolve the target before treating it as a live
+                // container; dangling links must still reach RegisterBroken.
+                if (linked && PathResolver.Resolve(child) is not null && !File.Exists(Path.Combine(child, SkillFileName)))
                 {
                     inaccessible?.Add(child);
                     if (locations is { Count: < 128 }) locations.Add(new(child, "unsupported", "Linked container is not traversed; add its target as an explicit scan root."));
