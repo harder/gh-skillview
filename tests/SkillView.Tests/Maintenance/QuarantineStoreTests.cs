@@ -281,10 +281,17 @@ public sealed class QuarantineStoreTests : IDisposable
     [InlineData("existing")]
     [InlineData("missing")]
     [InlineData("alias")]
+    [InlineData("outward-trailing")]
     public void ConfiguredNestedAgentRootRefusesQuarantineEvenWithoutSkills(string kind)
     {
         var root = Path.Combine(Payload, "agents");
-        if (kind != "missing") Directory.CreateDirectory(root);
+        if (kind == "outward-trailing")
+        {
+            var outside = Directory.CreateDirectory(Path.Combine(temporary.FullName, "outside-empty")).FullName;
+            Directory.CreateSymbolicLink(root, outside);
+            root += Path.DirectorySeparatorChar;
+        }
+        else if (kind != "missing") Directory.CreateDirectory(root);
         if (kind == "alias")
         {
             var alias = Path.Combine(temporary.FullName, "agent-root-alias");

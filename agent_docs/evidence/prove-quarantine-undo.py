@@ -76,6 +76,12 @@ for gh in args.gh or [None]:
         run('quarantine', '--path', payload, extra_root=nested_root, ok=False)
         assert payload.exists() and not root.joinpath('state').exists()
         nested_root.rmdir()
+        empty_external = root / 'empty-external'
+        empty_external.mkdir()
+        nested_root.symlink_to(empty_external, target_is_directory=True)
+        run('quarantine', '--path', payload, extra_root=str(nested_root) + os.sep, ok=False)
+        assert nested_root.is_symlink() and empty_external.is_dir() and not root.joinpath('state').exists()
+        nested_root.unlink()
         preview = run('quarantine', '--path', payload)['operations'][0]
         assert preview['status'] == 'preview' and not preview['mutationObserved']
         assert not root.joinpath('state').exists(), 'Preview created state'
@@ -131,7 +137,7 @@ for gh in args.gh or [None]:
                             securityIsolationClaimed=False, archiveExtractionUsed=False,
                             subtreeQuarantineConsumerRefused=True, danglingUndoDestinationRefused=True,
                             subtreeUndoConsumerRefused=True, outwardNestedRootRefused=True,
-                            emptyNestedRootRefused=True))
+                            emptyNestedRootRefused=True, outwardTrailingRootRefused=True))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
 print(json.dumps(results, indent=2))

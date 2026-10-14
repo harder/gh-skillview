@@ -489,3 +489,7 @@ with an isolated regression preserving the external payload and original link.
 The final independent policy review also protects configured/scanned roots within
 either relocation boundary, even empty or expected absent, including root aliases.
 Three fixtures and a native empty-root refusal proof cover this case.
+
+Entry-address checks strip a trailing directory separator before identifying the
+final entry, preserving an outward root link as a link entry. A trailing-root
+regression and native refusal proof cover that spelling.

@@ -12,7 +12,7 @@ internal sealed partial class QuarantineStore
         foreach (var root in inventory.ConfiguredRoots.Concat(inventory.ScannedRoots))
         {
             token.ThrowIfCancellationRequested();
-            var entry = OwnershipPath.EntryAddress(root.Path)
+            var entry = OwnershipPath.EntryAddress(Path.TrimEndingDirectorySeparator(root.Path))
                 ?? throw new IOException("Configured discovery root entry cannot be inspected.");
             var destination = ResolveExposureAddress(root.Path, token);
             if (PathIdentity.IsInside(entry, boundary) || PathIdentity.IsInside(destination, boundary))
@@ -26,7 +26,7 @@ internal sealed partial class QuarantineStore
             foreach (var path in skill.Agents.Select(agent => agent.Path).Prepend(skill.ResolvedPath))
             {
                 token.ThrowIfCancellationRequested();
-                var entryAddress = OwnershipPath.EntryAddress(path)
+                var entryAddress = OwnershipPath.EntryAddress(Path.TrimEndingDirectorySeparator(path))
                     ?? throw new IOException("Discovered exposure entry address cannot be inspected.");
                 var address = ResolveExposureAddress(path, token);
                 if (PathIdentity.IsInside(entryAddress, boundary) || PathIdentity.IsInside(boundary, entryAddress)
