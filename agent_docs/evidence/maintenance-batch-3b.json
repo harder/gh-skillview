@@ -98,6 +98,27 @@
       "EPERM",
       "ENOSYS"
     ],
-    "requires": "Linux AOT CI must verify valid skill metadata and owner lock parsing, with destructive removal refused and initial fixture bytes unchanged"
+    "requires": "Linux AOT CI must verify valid skill metadata and owner lock parsing, with destructive removal refused and initial fixture bytes unchanged",
+    "verifiedInCI": true
+  },
+  "platformCI": {
+    "reviewedHead": "fd16ce695b2a2288ab9304b2be9dc8d3e4aaf373",
+    "ciRun": 38600598555,
+    "codeqlRun": 38600598577,
+    "testsPerPlatform": 975,
+    "platforms": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64"
+    ],
+    "aot": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "allPassed": true,
+    "mergedPR": 45,
+    "mergeCommit": "34844d51606fbfc9522f2ebcd10e780aee32bf1f"
   }
 }

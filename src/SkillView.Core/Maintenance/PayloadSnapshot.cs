@@ -25,7 +25,14 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     internal static PayloadSnapshot CaptureWithObservationForTests(string path, Action<string, string> observation,
         CancellationToken cancellationToken) => CaptureCore(path, cancellationToken, observation);
 
-    private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation)
+    internal static PayloadSnapshot CaptureWithEntrySink(string path,
+        Action<NativePayloadItem, PayloadEntry> sink, CancellationToken token) => CaptureCore(path, token, null, sink, strictMetadata: false);
+
+    internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token) =>
+        CaptureCore(path, token, null, strictMetadata: false);
+
+    private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation,
+        Action<NativePayloadItem, PayloadEntry>? sink = null, bool strictMetadata = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var root = System.IO.Path.GetFullPath(path);
@@ -48,12 +55,16 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             if (item.Kind == "link")
             {
                 var hash = Convert.ToHexString(SHA256.HashData(item.LinkBytes ?? []));
-                entries.Add(new(item.RelativePath, "link", hash, hash, 0, item.UnixMode, item.LinkTarget));
+                var entry = new PayloadEntry(item.RelativePath, "link", hash, hash, 0, item.UnixMode, item.LinkTarget);
+                entries.Add(entry);
+                sink?.Invoke(item, entry);
                 return null;
             }
             if (item.Kind == "directory")
             {
-                entries.Add(new(item.RelativePath, "directory", "", "", 0, item.UnixMode, null));
+                var entry = new PayloadEntry(item.RelativePath, "directory", "", "", 0, item.UnixMode, null);
+                entries.Add(entry);
+                sink?.Invoke(item, entry);
                 return null;
             }
             var stream = item.Content ?? throw new IOException("native payload file stream is missing");
@@ -61,7 +72,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             var initialLength = stream.Length;
             if (initialLength > MaxBytes - totalBytes) throw new IOException("payload byte limit exceeded");
             using var hashBuilder = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            using var skillBytes = item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
+            using var skillBytes = strictMetadata && item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
             var buffer = new byte[64 * 1024];
             long readBytes = 0;
             while (true)
@@ -86,15 +97,21 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
                 {
                     var text = new UTF8Encoding(false, true).GetString(skillBytes.GetBuffer(), 0, (int)skillBytes.Length);
                     var (_, parsedMetadata, parsed) = FrontMatterParser.Parse(text);
-                    if (!parsed) throw new IOException("invalid frontmatter during payload comparison");
+                    if (!parsed && strictMetadata) throw new IOException("invalid frontmatter during payload comparison");
                     frontMatter = parsedMetadata;
-                    comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                    if (parsed) comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
                         InstallerMetadataNormalizer.Normalize(text))));
                 }
                 catch (Exception ex) when (ex is YamlException or DecoderFallbackException)
-                { throw new IOException("invalid frontmatter encoding or YAML during comparison", ex); }
+                { if (strictMetadata) throw new IOException("invalid frontmatter encoding or YAML during comparison", ex); }
             }
-            entries.Add(new(item.RelativePath, "file", rawHash, comparison, readBytes, item.UnixMode, null));
+            var fileEntry = new PayloadEntry(item.RelativePath, "file", rawHash, comparison, readBytes, item.UnixMode, null);
+            entries.Add(fileEntry);
+            if (sink is not null)
+            {
+                stream.Position = 0;
+                sink(item, fileEntry);
+            }
             return new(rawHash, readBytes);
         }
     }

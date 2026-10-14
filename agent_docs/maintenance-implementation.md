@@ -237,3 +237,74 @@ independent re-review passed 115 focused tests. Linux AOT CI now denies openat2
 with EPERM and ENOSYS in fresh processes, requiring valid metadata and owner
 lock observations alongside unchanged payloads after a native removal refusal.
 The private gh protocol fixture tests capability separation, not gh semantics.
+
+## Batch 3b merge
+
+PR [45](https://github.com/harder/gh-skillview/pull/45) merged as
+`34844d51606fbfc9522f2ebcd10e780aee32bf1f`. Reviewed head
+`fd16ce695b2a2288ab9304b2be9dc8d3e4aaf373` passed all 975 tests with
+zero skips on Linux, macOS and Windows, every AOT target and CodeQL
+(CI 38600598555, CodeQL 38600598577). Linux native proof verified both
+EPERM and ENOSYS openat2 denial scenarios. All four Copilot threads were
+addressed and resolved after independent re-review.
+
+## Batch 4a: private durable payload evidence
+
+The first M08/M15 recovery foundation adds exact `backup --path`/`--install-id`
+CLI selection and a bounded archive plus append-only creating/captured records.
+State stays outside known payloads/agent roots, uses private native authority,
+and coordinates SkillView writers. Source bytes/modes, empty directories and
+native link leaf bytes are verified; damaged markdown can still be captured.
+Incomplete/canceled evidence remains available without pruning prior records.
+
+This does not complete M08/M15: the schema does not yet restore ACLs, extended
+attributes, root permissions or package-owner registries, and does not authorize
+in-place restore or update replacement. Dispositions, verified recovery plans,
+repair/relink/consolidation, native owners, effective loading and the remaining
+policy/UI findings continue in subsequent merged batches.
+
+Independent Astra review/fix cycles corrected native authority, renamed exclusion
+objects, privacy, durability, Darwin ACL and ARM64 varargs handling, callback
+handle disposal, cancellation, ancestor refresh and inherited writer locks.
+A separate reproduction proved a child could retain a dup'd lock; the final
+borrowed CLOEXEC handle and regression acquire the next writer while that child
+is still alive. Final focused review has no actionable findings.
+
+Local final verification: warning-free SDK10.0.402 build, 1005 tests passed with
+zero skips, solution format verification, site build, sequential native App and
+extension publishes. Both native hosts pass the disposable backup proof with
+gh2.97.0 and2.102.0: exact IDs, archive/journal hashes, complete bytes/empty dirs,
+link leaves, private Unix modes, unchanged selected/unselected copies and the
+real shared registry. Native proof runs in all four AOT CI targets. Linux and
+Windows execution plus required CI are pending before merge. Reproduction,
+binary hashes, accepted findings and primary OS sources are in
+`agent_docs/evidence/maintenance-batch-4a.json`.
+
+First batch4a CI passed macOS tests and Linux/macOS native proofs but exposed a
+Windows-only test assumption: an exclusive open archive can prevent moving its
+parent. The regression now proves both safe outcomes explicitly: native refusal
+retains incomplete evidence at the original state address, or successful movement
+is detected before captured publication. Both require the attempted boundary,
+creating record, retained archive, no captured record and unchanged source.
+A separate M21 follow-up will make every legacy Unix native descriptor duplication
+CLOEXEC atomically; the backup writer's borrowed handle is already protected.
+
+Copilot's three subsequent findings are accepted and fixed. Inventory now retains
+bounded configured placements before existence filtering with a distinct
+configuration completeness flag. Backup excludes expected missing roots and
+refuses omitted/unresolved configuration, including private aliases and named
+profiles. Raw evidence bypasses all markdown parsing/normalization and preserves
+invalid UTF-8 and large markdown within its aggregate budget. The Windows payload
+walker opens its root without DELETE, while removal defaults retain that right.
+The ACL regression proves a readable non-deletable source is backed up unchanged.
+Independent re-review passed 55 focused tests; fresh full verification passed
+1018 tests, zero failures/skips. The prior test-only head 44b6045 passed every
+platform/AOT check (CI38614178840, CodeQL38614178677); the new production fixes
+require fresh native proofs and CI before merge.
+
+The first production-fix CI head d6e56c0 passed all native proofs, Linux/macOS
+1018-test suites and CodeQL, but Windows fixture cleanup retained read-only
+inherited ACLs after a successful backup test. The fixture now rehydrates saved
+DACL binary forms into fresh security objects (marking them modified), restores
+parent/payload/file ACLs explicitly, and preserves the original source owner.
+This is a test cleanup fix; no backup production permission policy is changed.

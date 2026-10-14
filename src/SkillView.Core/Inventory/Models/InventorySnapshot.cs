@@ -8,6 +8,9 @@ public sealed record InventorySnapshot
 {
     public required ImmutableArray<InstalledSkill> Skills { get; init; }
     public required ImmutableArray<ScanRoot> ScannedRoots { get; init; }
+    /// Includes expected missing placements, not observations of installations.
+    public ImmutableArray<ScanRoot> ConfiguredRoots { get; init; } = [];
+    public bool ConfiguredRootsComplete { get; init; } = true;
     public required bool UsedGhSkillList { get; init; }
     public required DateTimeOffset CapturedAt { get; init; }
 

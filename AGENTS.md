@@ -619,3 +619,40 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   strategy, verification scripts, and known pitfalls for terminal UI testing.
 - `agent_docs/ui-lifecycle-and-resource-bounds.md` — shell conventions,
   cancellation ownership, and subprocess/cache/log memory limits.
+
+- Maintenance backup evidence uses native held directories for every state-file
+  create/enumeration. Pin existing excluded payload/root identities for the full
+  session so a rename cannot turn one into state. Ancestor policy inspects held
+  objects, brackets metadata checks with native generations, and revalidates
+  canonical addresses and parent/child relationships. Refuse inherited/shared
+  permissions; never rewrite a reopened directory's ACL based on earlier mkdir
+  success. On native macOS ARM64, variadic openat's mode belongs on the stack;
+  keep the padded P/Invoke and exact 0700/0600 regression. NULL/ENOENT from
+  acl_get_fd_np means absent FILESEC_ACL in Darwin libc, not a generic permission
+  bypass. File Flush(true) alone does not publish directory entries durably:
+  Unix state uses held-directory fsync and macOS F_FULLFSYNC, while Windows
+  creates entries with native FILE_WRITE_THROUGH and flushes file handles.
+  The schema-1 backup is raw payload evidence, not ACL/xattr/owner restoration
+  or authority to replace an installation. See docs/usage.md and the batch-4
+  evidence before extending it into a reviewed recovery plan.
+  Retain the writer FileStream's CLOEXEC handle for the macOS device barrier;
+  never dup it without CLOEXEC. Such a duplicate can leak an advisory writer
+  lock into concurrently spawned processes after Capture returns. Keep the
+  child-outlives-capture regression and borrower AddRef/Release discipline.
+
+- Backup exclusions use inventory ConfiguredRoots, including expected absent
+  default/override/workspace/profile placements, not just ScannedRoots. Root
+  configuration completeness is separate from provider/scan completeness;
+  bounded omissions or unresolved contexts refuse backup admission. Keep the
+  prospective canonical state exclusion before mkdir and held native checks.
+  Raw backup evidence never parses or normalizes SKILL.md: it uses aggregate
+  payload limits even for malformed UTF-8, flow metadata or large markdown.
+  Windows payload walking needs read/enumeration rights only; keep DELETE access
+  for removal callers and the readable/non-deletable ACL regression.
+
+- Windows ACL fixtures must restore saved DACL binary forms through fresh
+  DirectorySecurity/FileSecurity objects with AccessControlSections.Access.
+  GetAccessControl returns descriptors without modified flags; passing an
+  unchanged saved object back to SetAccessControl can write nothing. Restore
+  parent then payload then file after inheritance propagation, and avoid changing
+  the source owner when testing read-only backup permissions.

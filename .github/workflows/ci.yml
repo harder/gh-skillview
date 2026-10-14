@@ -125,6 +125,11 @@ jobs:
           test -s 'dist/ext/gh-skillview${{ matrix.ext }}'
           'dist/app/skillview${{ matrix.ext }}' --version
           'dist/ext/gh-skillview${{ matrix.ext }}' --version
+      - name: Prove native backup evidence and unchanged installed copies
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/backup-app-proof.json
+          python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/backup-extension-proof.json
       - name: Inspect metadata with openat2 denied; retain removal refusal
         if: runner.os == 'Linux'
         run: python3 agent_docs/evidence/prove-metadata-without-openat2.py --app dist/app/skillview

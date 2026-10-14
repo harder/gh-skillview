@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SkillView.Inventory;
 
-internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
+internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
 {
     private const int MaxInterruptedAttempts = 8;
     private const int StatBufferSize = 512;
