@@ -22,7 +22,8 @@ public class CliDispatcherHelpTests
         Assert.Contains("| Subcommand | Purpose |", stdout);
         Assert.Contains("| `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |", stdout);
         Assert.DoesNotContain("`--json`, `--scope`, `--agent`, `--path`, `--allow-hidden-dirs`", stdout);
-        Assert.Contains("Homebrew and WinGet scaffolding", stdout);
+        Assert.Contains("brew install harder/tap/skillview", stdout);
+        Assert.Contains("WinGet manifests are generated for release review", stdout);
         Assert.Contains("automation-friendly", stdout);
         Assert.Contains("SkillView requires `gh` 2.97.0 or newer", stdout);
         Assert.DoesNotContain("capability-gated flags", stdout);
