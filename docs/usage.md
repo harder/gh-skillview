@@ -105,6 +105,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 |---|---|
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
+| `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
 | `skillview rescan` | Re-run inventory capture and print a summary |
 | `skillview search <query>` | Search public repositories for skills |
 | `skillview preview OWNER/REPO [SKILL]` | Render a skill preview without installing |
@@ -146,6 +147,19 @@ This release does not yet offer backup-and-replace or merging local edits.
 Update JSON schema 2 retains both gh output streams, per-installation outcomes,
 payload fingerprints, affected exposures and partial/canceled status. A disk change
 does not prove that an already-running agent session has reloaded the skill.
+
+Use `compare --path <left> --other-path <right> --json` to inspect two exact copies.
+Pass their `--scan-root` flags before the subcommand when needed. Comparison stays
+offline and reports source, revision, context and whole-payload differences
+separately. Unknown evidence and changed owner records require a refresh; identical
+bytes alone never authorize removing an exposure or changing ownership.
+
+Shared gh/Vercel, XDG and project lock records are retained in their own contexts.
+SkillView protects unsupported schemas, extensions and conflicting owners from
+implicit rewrites. Existing shared selectors require update or coordinated
+maintenance before reinstalling, including with `--force`. Project/custom updates
+preserve the user's shared registry. Owner-aware removal and record repairs remain
+refusals until a coordinated maintenance plan is available.
 
 ### Global flags
 
@@ -227,13 +241,15 @@ Inventory scans conventional user skill locations as well as `CLAUDE_CONFIG_DIR`
 
 ### Inventory reconciliation
 
-`list --json` reports schema version 2, provider outcomes, partial scans,
+`list --json` reports schema version 3, provider outcomes, partial scans,
 inaccessible paths, exact installation IDs, and each agent exposure’s scope.
 Authored `version` is separate from `repositoryRef`; source path, pinned ref,
-local source and metadata diagnostics are retained.
+local source and metadata diagnostics are retained. Source identity, physical
+installation, contextual owner records and revision/hash domains have separate
+fields; agent profile/version/enabled state stays unknown when not observed.
 
 A same-name collision is not proof of duplicate content. Collisions, malformed
 metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
-removal of a chosen install remains available through the Installed workflow.
+removal of an unowned chosen install remains available through the Installed workflow.
 An incomplete scan is marked in the Installed footer and Changes summary.

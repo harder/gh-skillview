@@ -82,6 +82,9 @@ public sealed class LocalInventoryService
         // Default gh discovery covers more agents than local seeds, but only
         // explicit --dir observations establish absence for a particular root.
         providers.Add(new ProviderObservation("gh-default", gh.Succeeded, [], DateTimeOffset.UtcNow, gh.Error));
+        providers.Add(new ProviderObservation("lockfiles", local.LockDiagnostics.IsEmpty,
+            local.Roots.Select(root => root.Path).ToImmutableArray(), DateTimeOffset.UtcNow,
+            local.LockDiagnostics.IsEmpty ? null : string.Join("; ", local.LockDiagnostics.Take(6).Select(d => $"{d.Path}: {d.Message}"))));
         if (ghPath is not null)
         {
             foreach (var root in local.Roots)
@@ -100,6 +103,18 @@ public sealed class LocalInventoryService
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
         // written by `npx skills`). Free signal — best-effort.
         merged = EnrichOwnership(merged, local.Packages, cancellationToken);
+        if (!local.LockDiagnostics.IsEmpty)
+            merged = merged.Select(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return skill with
+                {
+                    OwnershipDiagnostics = local.LockDiagnostics.Where(diagnostic => diagnostic.CoveredRoots.IsEmpty
+                    || diagnostic.CoveredRoots.Any(root => PathIdentity.IsInside(skill.ResolvedPath, root)
+                        || skill.Agents.Any(agent => PathIdentity.IsInside(agent.Path, root))))
+                    .Select(diagnostic => $"{diagnostic.Path}: {diagnostic.Message}").Take(128).ToImmutableArray()
+                };
+            }).ToImmutableArray();
 
         if (!string.IsNullOrEmpty(options.FilterScope))
         {
@@ -178,14 +193,16 @@ public sealed class LocalInventoryService
             roots,
             new LocalSkillScanner.Options(options.AllowHiddenDirs),
             cancellationToken, inaccessible);
+        var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(
             roots.Select(root => root.Path),
-            cancellationToken);
+            cancellationToken, diagnostics: lockDiagnostics);
         fsSw.Stop();
         _logger.Info(
             "inventory",
             $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
-        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray());
+        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            lockDiagnostics.ToImmutableArray());
     }
 
     internal static ImmutableArray<InstalledSkill> EnrichOwnership(ImmutableArray<InstalledSkill> skills,
@@ -198,15 +215,20 @@ public sealed class LocalInventoryService
             foreach (var skill in skills)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var claims = packages.Where(entry => entry.Name == skill.Name && entry.Package.Describes(skill))
+                var claims = packages.Where(entry => (entry.Package.Selector is not null || entry.Name == skill.Name) && entry.Package.Describes(skill))
                     .Select(entry => entry.Package).ToImmutableArray();
+                var associated = claims.Where(package => package.Provider != "gh-vercel-global" || SharedTrackingMatches(package, skill)).ToArray();
+                var trackingConflicts = claims.Where(package => ContradictsTracking(package, skill))
+                    .Select(package => $"Owner record contradicts tracking: {package.LockFilePath}").ToImmutableArray();
                 enriched.Add(claims.IsEmpty ? skill : skill with
                 {
-                    Package = claims[0],
+                    Package = associated.OrderByDescending(package => package.IsExclusiveOwner).FirstOrDefault(),
                     OwnershipClaims = claims,
-                    MetadataConflicts = claims.Length > 1
+                    MetadataConflicts = associated.Where(package => package.IsExclusiveOwner)
+                        .Select(package => (package.Source, package.SourceUrl, package.SkillPath, package.RepositoryRef,
+                            package.PinnedRef, package.ContentHash, package.HashKind, package.PackageVersion)).Distinct().Count() > 1
                         ? skill.MetadataConflicts.Add("Multiple owner records: " + string.Join(", ", claims.Select(p => p.LockFilePath)))
-                        : skill.MetadataConflicts
+                        : skill.MetadataConflicts.AddRange(trackingConflicts)
                 });
             }
             return enriched.MoveToImmutable();
@@ -214,12 +236,42 @@ public sealed class LocalInventoryService
         return skills;
     }
 
+    internal static bool SharedTrackingMatches(SkillPackage package, InstalledSkill skill) =>
+        skill.FrontMatter.Upstream is { } repository && package.SourceType == "github"
+        && SkillSourceIdentity.NormalizeRepository(repository) == SkillSourceIdentity.NormalizeRepository(
+            package.SourceUrl ?? "https://github.com/" + package.Source)
+        && package.ContentHash is { } tree && tree == skill.TreeSha
+        && SkillSourceIdentity.NormalizeSubpath(package.SkillPath) == SkillSourceIdentity.NormalizeSubpath(skill.FrontMatter.GithubPath)
+        && package.PinnedRef == skill.FrontMatter.PinnedRef;
+
+    private static bool ContradictsTracking(SkillPackage package, InstalledSkill skill)
+    {
+        var tracked = skill.SourceIdentity;
+        if (tracked.Origin is null) return false;
+        var recorded = (skill with
+        {
+            FrontMatter = SkillFrontMatter.Empty,
+            Package = package,
+            OwnershipClaims = [],
+            MetadataConflicts = []
+        }).SourceIdentity;
+        if (recorded.Origin is { } origin && (origin != tracked.Origin || recorded.Provider != tracked.Provider)) return true;
+        if (recorded.Subpath is { } path && tracked.Subpath is { } trackedPath && path != trackedPath) return true;
+        if (package.PinnedRef is not null && package.PinnedRef != skill.FrontMatter.PinnedRef) return true;
+        if (package.HashKind == "recorded-git-tree" && package.ContentHash is { } hash && skill.TreeSha is { } tree && hash != tree) return true;
+        return package.RepositoryRef is { } reference && skill.FrontMatter.GithubRef is { } trackedRef
+            && ShortRef(reference) != ShortRef(trackedRef);
+        static string ShortRef(string value) => value.StartsWith("refs/heads/", StringComparison.Ordinal) ? value[11..]
+            : value.StartsWith("refs/tags/", StringComparison.Ordinal) ? value[10..] : value;
+    }
+
     private sealed record LocalCapture(
         ImmutableArray<ScanRoot> Roots,
         ImmutableArray<InstalledSkill> Scanned,
         ImmutableArray<PackageObservation> Packages,
         TimeSpan Duration,
-        ImmutableArray<string> InaccessiblePaths);
+        ImmutableArray<string> InaccessiblePaths,
+        ImmutableArray<LockReadDiagnostic> LockDiagnostics);
 
     private sealed record GhCapture(
         ImmutableArray<GhSkillListRecord> Records,
@@ -291,7 +343,7 @@ public sealed class LocalInventoryService
             if (!string.IsNullOrWhiteSpace(local) && !string.IsNullOrWhiteSpace(remote)
                 && !(field == "repository ref" ? EquivalentRef(local, remote) : string.Equals(local.TrimEnd('/'), remote.TrimEnd('/'), StringComparison.Ordinal)))
                 conflicts.Add($"Conflicting {field}: {local} / {remote}");
-            return string.IsNullOrWhiteSpace(local) ? remote : local;
+            return string.IsNullOrWhiteSpace(local) ? string.IsNullOrWhiteSpace(remote) ? null : remote : local;
         }
         var a = first.FrontMatter;
         var b = next.FrontMatter;

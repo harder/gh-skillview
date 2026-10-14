@@ -48,6 +48,23 @@ public class RemoveValidatorTests : IDisposable
     private ScanRoot Root() => new(_tempRoot, Scope.User, "claude");
 
     [Fact]
+    public void UncorroboratedSharedClaimStillRequiresCoordinatedRemoval()
+    {
+        var dir = MakeSkillDir("owned");
+        var skill = MakeSkill(dir, "owned") with
+        {
+            Package = null,
+            OwnershipClaims = [new("team/repo", "github", null, null, null)
+                { Provider = "gh-vercel-global", IsExclusiveOwner = false }]
+        };
+        var validation = RemoveValidator.Validate(skill, [Root()], [skill],
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error => error.Kind == RemoveValidator.ErrorKind.OwnerRecordNeedsPlan);
+        Assert.True(File.Exists(Path.Combine(dir, "SKILL.md")));
+    }
+
+    [Fact]
     public void Validate_HappyPath_Allowed()
     {
         var dir = MakeSkillDir("ok");

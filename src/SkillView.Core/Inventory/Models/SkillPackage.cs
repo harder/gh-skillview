@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SkillView.Inventory.Models;
 
 /// Origin metadata for a skill installed via a "package" tool (e.g. `npx
@@ -13,9 +15,38 @@ public sealed record SkillPackage(
 {
     public string? LockFilePath { get; init; }
     public string? InstallationRoot { get; init; }
+    public string? ContextRoot { get; init; }
+    public string? SkillPath { get; init; }
+    public string? RepositoryRef { get; init; }
+    public string? ContentHash { get; init; }
+    public string? HashKind { get; init; }
+    public string? InstallationMode { get; init; }
+    public string? PinnedRef { get; init; }
+    public string? PluginName { get; init; }
+    public int? SchemaVersion { get; init; }
+    public string Provider { get; init; } = "legacy-lock";
+    public bool ReadOnly { get; init; }
+    public string? Diagnostic { get; init; }
+    public bool IsExclusiveOwner { get; init; } = true;
+    public ImmutableArray<string> CoveredRoots { get; init; } = [];
+    public string? Selector { get; init; }
+    public string? RecordFingerprint { get; init; }
+    public string? PackageVersion { get; init; }
 
     /// A same-name lock entry is evidence only within its installation context.
-    public bool Describes(InstalledSkill skill) => InstallationRoot is { } root
-        && (PathIdentity.IsInside(skill.ResolvedPath, root)
-            || skill.Agents.Any(agent => PathIdentity.IsInside(agent.Path, root)));
+    public bool Describes(InstalledSkill skill)
+    {
+        var selector = Selector ?? skill.Name;
+        if (selector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
+            return false;
+        // gh records InstallName (namespace/name) but materializes skill.Name
+        // directly in the selected root. Retain both observed conventions.
+        var selectors = Provider == "gh-vercel-global" && selector.Contains('/')
+            ? new[] { selector, selector.Split('/')[^1] } : [selector];
+        return Roots().Any(root => selectors.Any(name => PathIdentity.Equals(skill.ResolvedPath, Path.Combine(root, name))
+            || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, Path.Combine(root, name)))));
+    }
+
+    private IEnumerable<string> Roots() => CoveredRoots.IsEmpty
+        ? InstallationRoot is { } root ? [root] : [] : CoveredRoots;
 }

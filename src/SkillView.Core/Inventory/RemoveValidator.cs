@@ -20,6 +20,7 @@ public static class RemoveValidator
         FilesystemIdentityUnavailable,
         NotASkillDirectory,
         ContainsGitDirectory,
+        OwnerRecordNeedsPlan,
         TargetIsScanRoot,
     }
 
@@ -97,6 +98,9 @@ public static class RemoveValidator
         var errors = ImmutableArray.CreateBuilder<Error>();
         var warnings = ImmutableArray.CreateBuilder<Warning>();
         var incoming = ImmutableArray<string>.Empty;
+        if (target.AllOwnershipClaims.Any() || !target.OwnershipDiagnostics.IsDefaultOrEmpty)
+            errors.Add(new(ErrorKind.OwnerRecordNeedsPlan,
+                "This installation has a contextual owner record. Use a coordinated maintenance plan before deleting its payload or links."));
 
         var targetPath = target.ResolvedPath;
         var resolved = targetPath;

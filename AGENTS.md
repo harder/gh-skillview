@@ -541,6 +541,31 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   config resolution explicitly; Windows defaults to `APPDATA/GitHub CLI`, and
   XDG_CONFIG_HOME has precedence there too. Never mutate the parent environment.
   Shared gh/Vercel schema-3 lock entries are source evidence, not exclusive owners.
+- Owner mutation policy must inspect every `AllOwnershipClaims` entry and
+  `OwnershipDiagnostics`, never only the compatibility `Package` projection.
+  Diagnostic, entry, root and file bounds must retain global incomplete coverage
+  when evidence is omitted; exhausting a reporting budget cannot authorize work.
+- gh's global registry is keyed by `InstallName` (possibly `namespace/name`),
+  while its installer materializes flat `skill.Name` directories. Resolve actual
+  remote selectors before collision checks; unresolved paths, ambiguous names,
+  truncated capture or incomplete tabular discovery cannot authorize a write.
+  Keep explicit truncation facts on `ProcessResult` instead of parsing a marker.
+- Project/custom updates with explicit `--dir` isolate incidental global writes
+  in a separate private mutation home. Shared-directory updates must keep their
+  original registry context, including redirected roots and namespaced records,
+  and match the current source/subpath/tree/pin before launching gh. Every native
+  registry writer needs a schema/extension guard immediately before launch.
+  This guard is preflight protection; coordinated journals in the maintenance
+  plan layer must provide the stronger multi-writer preservation contract.
+- Compare revisions by evidence domain. An authored version, Git tree, owner
+  payload hash and distributor version are distinct facts; equivalent Git-tree
+  evidence must not become incomparable just because one copy also has a lock
+  claim. Missing evidence is unknown. Recheck contextual record fingerprints
+  before recommending a migration, and suppress it when coverage is partial.
+- Local inventory/comparison must suppress gh's update notifiers and telemetry
+  through child-only `GH_NO_UPDATE_NOTIFIER`, `GH_NO_EXTENSION_UPDATE_NOTIFIER`
+  and `GH_TELEMETRY=false`. A successful local command can otherwise spawn
+  `send-telemetry`; include that child in offline trace assertions.
 
 - `agent_docs/running-tests.md` — standard verification commands, UI-focused
   test filters, and opt-in `gh` contract-test workflow details.

@@ -48,11 +48,15 @@ public sealed class SkillUpdateCoordinator(
             string? staging = null;
             OwnedDirectoryLease? stagingOwner = null;
             var targetAttempted = false;
+            IReadOnlyDictionary<string, string>? mutationEnvironment = null;
             try
             {
                 if (!target.MetadataConflicts.IsDefaultOrEmpty)
                     throw new IOException("Resolve conflicting tracking observations before updating.");
-                if (target.Package is not null)
+                if (!target.OwnershipDiagnostics.IsDefaultOrEmpty)
+                    throw new IOException("Owner-record inspection is incomplete; resolve its diagnostics before updating.");
+                if (target.AllOwnershipClaims.Any(package => package.IsExclusiveOwner || package.ReadOnly
+                    || package.PluginName is not null || !LocalInventoryService.SharedTrackingMatches(package, target)))
                     throw new IOException("This installation has a package owner; use an owner-aware maintenance plan.");
                 if (target.Pinned && !options.Unpin)
                 {
@@ -96,16 +100,28 @@ public sealed class SkillUpdateCoordinator(
                         throw new IOException("Selected tracking metadata changed or is invalid; refresh and review again.");
                     if (!options.DryRun)
                     {
+                        var sharedRoot = Path.Combine(updater.EffectiveHome ?? throw new IOException("Cannot establish global lock context."), ".agents", "skills");
+                        var writesSharedRecord = PathIdentity.Equals(parent, sharedRoot)
+                            || target.AllOwnershipClaims.Any(claim => claim.Provider == "gh-vercel-global" && claim.LockFilePath is { } lockPath
+                                && PathIdentity.Equals(lockPath, Path.Combine(updater.EffectiveHome!, ".agents", SkillLockFileReader.FileName)))
+                            || (SecureRemovalBackend.TryCanonicalizePath(sharedRoot, out var canonicalSharedRoot, out _)
+                                && PathIdentity.Equals(parent, canonicalSharedRoot));
+                        if (writesSharedRecord) GhSharedLockGuard.ValidateCurrent(cancellationToken, updater.EffectiveHome);
                         var repository = target.FrontMatter.Upstream;
                         if (!Uri.TryCreate(repository, UriKind.Absolute, out var sourceUri)
                             || sourceUri.Scheme != "https" || sourceUri.Host != "github.com"
-                            || sourceUri.AbsolutePath.Trim('/').Split('/').Length != 2)
+                            || sourceUri.AbsolutePath.Trim('/').Split('/').Length != 2
+                            || sourceUri.UserInfo.Length != 0 || sourceUri.Query.Length != 0 || sourceUri.Fragment.Length != 0)
                             throw new IOException("Recorded source is unsupported or ambiguous; no source is guessed from the name.");
                         staging = Path.Combine(Path.GetTempPath(), "skillview-update-stage-" + Guid.NewGuid().ToString("N"));
                         Directory.CreateDirectory(staging);
                         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(staging, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                         stagingOwner = OwnedDirectoryLease.Open(staging);
                         var stageEnvironment = CreateStagingEnvironment(staging);
+                        // --dir fixes placement. Isolate incidental global registry
+                        // writes for project/custom targets so they cannot replace
+                        // a user's same-selector record for another installation.
+                        if (!writesSharedRecord) mutationEnvironment = CreateStagingEnvironment(Path.Combine(staging, "mutation"));
                         var refDestination = Path.Combine(staging, "current-ref");
                         var recordedRef = ShortRef(target.FrontMatter.GithubRef);
                         var listing = await installer.ListRepoSkillsAsync(ghPath, repository,
@@ -126,7 +142,7 @@ public sealed class SkillUpdateCoordinator(
                                 ProcessEnvironment: stageEnvironment),
                             cancellationToken).ConfigureAwait(false);
                         if (!staged.Succeeded) throw new IOException($"Cannot stage recorded base: {staged.ErrorMessage}");
-                        var stagedPath = Path.Combine(refDestination, sourceSelector.Replace('/', Path.DirectorySeparatorChar));
+                        var stagedPath = Path.Combine(refDestination, sourceSelector.Split('/')[^1]);
                         var basePayload = PayloadSnapshot.Capture(stagedPath, cancellationToken);
                         var frontMatter = basePayload.FrontMatter;
                         if (frontMatter is null || frontMatter.GithubTreeSha != target.FrontMatter.GithubTreeSha
@@ -163,11 +179,12 @@ public sealed class SkillUpdateCoordinator(
                         All = false,
                         ConfirmApply = true,
                         Directory = parent,
-                        Targets = null
+                        Targets = [target],
+                        ProcessEnvironment = mutationEnvironment
                     };
-                    targetAttempted = !options.DryRun;
-                    attempted |= targetAttempted;
                     var result = await updater.UpdateAsync(ghPath, exact, cancellationToken).ConfigureAwait(false);
+                    targetAttempted = result.MutationAttempted;
+                    attempted |= targetAttempted;
                     AppendBounded(stdout, result.StdOut);
                     AppendBounded(stderr, result.StdErr);
                     entries.AddRange(result.Entries.Take(Math.Max(0, 4096 - entries.Count)));
@@ -277,7 +294,8 @@ public sealed class SkillUpdateCoordinator(
             ["APPDATA"] = Path.Combine(home, "appdata"),
             ["LOCALAPPDATA"] = Path.Combine(home, "localappdata"),
             ["GH_NO_UPDATE_NOTIFIER"] = "1",
-            ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1"
+            ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1",
+            ["GH_TELEMETRY"] = "false"
         };
     }
 

@@ -7,5 +7,9 @@ public sealed record AgentMembership(
     bool IsSymlink,
     Scope? Scope = null,
     string? Context = null,
-    string? DiscoveryRoot = null
+    string? DiscoveryRoot = null,
+    string? Profile = null,
+    string? AgentVersion = null,
+    bool? Enabled = null,
+    string? LoadingRule = null
 );

@@ -33,7 +33,7 @@ public sealed class EnvironmentProbe
         _logDirectory = logDirectory;
     }
 
-    public async Task<EnvironmentReport> ProbeAsync(CancellationToken cancellationToken = default)
+    public async Task<EnvironmentReport> ProbeAsync(CancellationToken cancellationToken = default, bool includeAuthentication = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = _locator.FindOnPath(cancellationToken);
@@ -70,7 +70,7 @@ public sealed class EnvironmentProbe
             _logger.Info("env", $"gh {version} at {path} meets minimum {GhBinaryLocator.MinimumVersion}");
         }
 
-        var auth = await _auth.GetStatusAsync(path, cancellationToken).ConfigureAwait(false);
+        var auth = includeAuthentication ? await _auth.GetStatusAsync(path, cancellationToken).ConfigureAwait(false) : GhAuthStatus.Unknown;
 
         // Single smoke check — only meaningful above the minimum, since older
         // gh doesn't ship `gh skill` at all.

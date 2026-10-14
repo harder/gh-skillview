@@ -11,15 +11,46 @@ originating Codex chat. No installed user skills are test targets.
 1. Inventory facts and removal classification: M01, M02, M04; protective portion
    of M03 and foundations for M11/M12. Merged as PR #42, a0721245.
 2. Exact updates and complete results: M05–M07 and protective portions of M08/M09.
+   Merged as PR #43, b4b2c80e, after final CI38521164480 passed all904 tests and AOT targets.
    Local changes refuse replacement; explicit dispositions, durable backups and
    recovery complete M08 in batch 4.
-3. Sources, lock ownership, bounded payload comparison and discovery: remainder
-   of M03, M09–M11.
+3. Sources, contextual lock evidence and bounded payload comparison: M03/M09/M11
+   comparison foundations and protective ownership rules. Full repair/migration
+   actions complete those findings in subsequent batches.
+3b. Discovery/capability catalog, namespaces and ancestor contexts: M10.
 4. Recoverable repair plans, relinking and consolidation: M13–M15 and remaining M08.
 5. Native owners and agent visibility: M12 and M16.
 6. Desired state, adoption, skill diagnostics and maintenance UI/CLI: M17–M20.
 7. M21 contract/adversarial verification accompanies every batch, followed by a
    final acceptance audit against every original criterion.
+
+## Batch 3 behavior and remaining scope
+
+- Source identity, physical address, agent exposure and revision evidence are
+  separate facts in list JSON schema 3. New offline `compare --path …
+  --other-path … --json` inspects the entire bounded payload and contextual locks.
+  It distinguishes source, revision, context and payload relationships, reports
+  scripts/resources/mode differences and never selects a survivor by age or path.
+- User `.agents/.skill-lock.json`, XDG state lockfiles and project `skills-lock.json`
+  retain separate contextual records, schema versions, source paths, refs, pins,
+  hash domains, distributor versions and whole-record fingerprints. Ancestor
+  project locks cover only documented project installation directories. Every
+  claim and unresolved coverage diagnostic survives reconciliation and protects
+  mutations. A corroborated shared gh/Vercel record is not an exclusive owner.
+- gh's narrower typed lock writer can discard extensions or reset malformed
+  schemas. Install/update adapters refuse those writes. Same-selector reinstalls
+  refuse even with force; actual namespaced keys are resolved before preflight,
+  while unresolved paths, ambiguity and truncated discovery remain refusals.
+- Project/custom updates isolate incidental global writes; the user's shared
+  registry remains byte-identical. Shared updates retain their original registry
+  context and check its source/path/tree/pin immediately before execution.
+- These checks do not claim an atomic transaction against an external writer.
+  M15 must add coordinated preservation, recovery and journaled record changes.
+  Owner-aware uninstall, colliding imports, explicit-path resolution, repair and
+  exposure-preserving consolidation remain subsequent maintenance-plan work.
+- Discovery is a separate next batch. Native owner catalogs/effective loading,
+  desired state, adoption, lint/evaluation and maintenance TUI flows remain on the
+  original backlog; this batch does not mark those capabilities complete.
 
 ## Batch 1 evidence
 
@@ -118,3 +149,19 @@ originating Codex chat. No installed user skills are test targets.
   are interoperability evidence, not proof of exclusive native package ownership;
   resolving that distinction remains M09 in batch 3. This batch conservatively
   refuses updates when such a contextual claim is present.
+
+## Batch 3 verification
+
+- Independent Astra reviews and re-reviews found no remaining actionable source
+  findings after the accepted fixes listed in `evidence/maintenance-batch-3.json`.
+- Warning-free build, all935 tests, solution formatting and site build passed.
+  Final App native AOT publish promotes IL2026/IL3050/IL3053 to errors.
+- Actual gh2.97.0 and2.102.0 fixtures prove shared exact updates, preservation of
+  unselected copies, byte-identical shared registry after custom updates, refusal
+  of conflicting/unsupported writes, whole-payload extras and contextual revision
+  differences. Final offline traces contain only `gh skill list`; no auth, remote
+  API, installer/updater or telemetry child was launched during comparison.
+- Platform CI, including Windows tests and every AOT RID, is required before merge.
+- A fresh NuGet check found test SDK18.11.0, xunit.v3 4.0.2 and VS runner4.0.1;
+  production Terminal.Gui2.5.0/Editor2.5.7/YamlDotNet18.1.0 remain current stable.
+  Test-tooling updates will receive their own reviewed batch before discovery.

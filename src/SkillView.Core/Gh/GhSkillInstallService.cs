@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using SkillView.Gh.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
+using SkillView.Maintenance;
 
 namespace SkillView.Gh;
 
@@ -43,6 +44,40 @@ public sealed class GhSkillInstallService
     {
         options ??= new Options();
         var args = BuildArgs(repo, skillName, options);
+        try
+        {
+            if (!options.FromLocal && (options.All || !string.IsNullOrEmpty(skillName)))
+            {
+                var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
+                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
+                if (!records.IsEmpty)
+                {
+                    if (skillName is { } direct && records.ContainsKey(direct.Split('@')[0]))
+                        throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
+                    IReadOnlyList<string> selectors;
+                    if (options.Upstream)
+                        throw new IOException("Upstream import with existing shared records requires a coordinated maintenance plan.");
+                    var requested = skillName;
+                    var version = options.Version;
+                    if (requested?.LastIndexOf('@') is >= 0 and var at)
+                    { version ??= requested[(at + 1)..]; requested = requested[..at]; }
+                    var listing = await ListRepoSkillsAsync(ghPath, repo, version, options.AllowHiddenDirs, cancellationToken).ConfigureAwait(false);
+                    if (!listing.Succeeded) throw new IOException("Cannot establish install selectors before writing shared records: " + listing.ErrorMessage);
+                    // Exact paths may resolve an authored name different from
+                    // their leaf. Do not guess that name from the path.
+                    selectors = ResolveWriteSelectors(listing.Skills, requested, options.All);
+                    if (selectors.Count == 0 || selectors.Any(records.ContainsKey))
+                        throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
+                }
+                // Discovery above can be slow. Recheck both schema and selector
+                // collisions at the process admission boundary.
+                var current = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
+                if (current.Keys.Except(records.Keys, StringComparer.Ordinal).Any())
+                    throw new IOException("Shared records changed during install preparation; refresh before installing.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
             environment: options.ProcessEnvironment).ConfigureAwait(false);
         if (!result.Succeeded)
@@ -86,6 +121,9 @@ public sealed class GhSkillInstallService
             return RepoSkillListing.Failure(repo, version, result.ExitCode, result.StdErr.Trim(), args);
         }
 
+        if (result.StdOutTruncated || result.StdErrTruncated || !IsCompleteListing(result.StdOut))
+            return RepoSkillListing.Failure(repo, version, 2, "Repository discovery is truncated or schema-incomplete; no write was admitted.", args);
+
         var skills = ParseRepoSkillListing(result.StdOut);
         _logger.Info("gh.skill.install.list", $"{repo} → {skills.Length} skill(s) discovered");
         return new RepoSkillListing
@@ -121,6 +159,23 @@ public sealed class GhSkillInstallService
         args.Add("--");
         args.Add(repo);
         return args;
+    }
+
+    private static bool IsCompleteListing(string text)
+    {
+        var rows = text.Replace("\r\n", "\n").Split('\n').Where(line => !string.IsNullOrWhiteSpace(line)).Take(4097).ToArray();
+        return rows.Length <= 4096 && rows.All(row => row.Contains('\t')
+            && NormalizeSkillName(row[..row.IndexOf('\t')].Trim()).Split('/').All(part => part.Length > 0
+                && part is not ("." or "..") && !part.Any(char.IsWhiteSpace) && !part.Any(char.IsControl) && !part.Contains('\\')));
+    }
+
+    internal static IReadOnlyList<string> ResolveWriteSelectors(ImmutableArray<RepoSkill> skills, string? requested, bool all)
+    {
+        var exact = skills.Where(skill => skill.Name == requested).ToArray();
+        var bare = skills.Where(skill => skill.Name.Split('/')[^1] == requested).ToArray();
+        return all ? skills.Select(skill => skill.Name).ToArray()
+            : exact.Length == 1 ? [exact[0].Name]
+            : bare.Length == 1 ? [bare[0].Name] : [];
     }
 
     /// Parse the tab-separated `SKILL\tDESCRIPTION` rows gh emits when the
