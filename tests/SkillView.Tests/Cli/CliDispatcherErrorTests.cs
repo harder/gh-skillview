@@ -149,6 +149,56 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 
+    [Fact]
+    public async Task HistoryJsonVerifiesExactRecordReportsCorruptionAndDoesNotAlterPayload()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "history-skills")).FullName;
+        var payload = Directory.CreateDirectory(Path.Combine(root, "demo")).FullName;
+        const string markdown = "---\nname: demo\ndescription: Test\n---\nPayload\n";
+        File.WriteAllText(Path.Combine(payload, "SKILL.md"), markdown);
+        var (backupCode, backupOutput, _) = await RunCliAsync("skillview", "--scan-root", root, "backup", "--path", payload, "--json");
+        Assert.Equal(ExitCodes.Success, backupCode);
+        using var backup = JsonDocument.Parse(backupOutput);
+        var id = backup.RootElement.GetProperty("id").GetString()!;
+        var archive = backup.RootElement.GetProperty("archivePath").GetString()!;
+        var (code, output, error) = await RunCliAsync("skillview", "history", "--id", id, "--json");
+        Assert.Equal(ExitCodes.Success, code); Assert.Equal("", error);
+        using var history = JsonDocument.Parse(output);
+        var entry = Assert.Single(history.RootElement.GetProperty("entries").EnumerateArray());
+        Assert.Equal(id, entry.GetProperty("id").GetString()); Assert.Equal("verified", entry.GetProperty("status").GetString());
+        Assert.Equal(1, entry.GetProperty("payloadEntries").GetInt32());
+        var (missingCode, missingOutput, _) = await RunCliAsync("skillview", "history", "--id", new string('0', 32), "--json");
+        Assert.Equal(ExitCodes.NoMatches, missingCode);
+        using var missing = JsonDocument.Parse(missingOutput); Assert.Empty(missing.RootElement.GetProperty("entries").EnumerateArray());
+        File.WriteAllBytes(archive, [0, 1]);
+        var (corruptCode, corruptOutput, _) = await RunCliAsync("skillview", "history", "--json");
+        Assert.Equal(ExitCodes.UserError, corruptCode);
+        using var corrupt = JsonDocument.Parse(corruptOutput);
+        Assert.Equal("corrupt", Assert.Single(corrupt.RootElement.GetProperty("entries").EnumerateArray()).GetProperty("status").GetString());
+        Assert.Equal(markdown, File.ReadAllText(Path.Combine(payload, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData("--id")]
+    [InlineData("--id", "../escape")]
+    [InlineData("--id", "00000000000000000000000000000000", "--id", "00000000000000000000000000000000")]
+    [InlineData("--apply")]
+    public async Task HistoryInvalidArgumentsDoNotCreateState(params string[] arguments)
+    {
+        var (code, _, _) = await RunCliAsync("skillview", ["history", .. arguments]);
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Fact]
+    public async Task HistoryMissingStateReportsRefusalWithoutCreatingIt()
+    {
+        var (code, output, _) = await RunCliAsync("skillview", "history", "--json");
+        Assert.Equal(ExitCodes.EnvironmentError, code);
+        using var result = JsonDocument.Parse(output); Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
     [Theory]
     [InlineData("universal")]
     [InlineData("claude")]

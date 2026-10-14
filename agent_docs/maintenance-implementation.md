@@ -333,3 +333,37 @@ claim that completed Darwin directory streams remain inheritable.
 
 See `evidence/maintenance-batch-4a-descriptors.json` for verification. The remaining
 M08/M13–M15 recovery and repair work follows after this batch merges.
+
+Batch4a descriptor follow-up merged as PR #47 at f6b34db2 after independently
+reviewed head1bc0e2d passed CI38621616883 and CodeQL38621616839: 1022 tests on
+all three test platforms and both-host backup proofs on all four native AOT RIDs.
+Copilot reported zero findings.
+
+## Batch 4b: verify retained history before recovery
+
+`history [--id BACKUP_ID] [--json]` inspects existing private state without
+creating entries or changing installed skills. A held native reader lock
+serializes it with cooperating capture writers. Complete records require matching
+creating/captured journals, raw archive hash, strict schema, bounded ZIP layout,
+every blob hash and size, complete directory relationships and payload fingerprint.
+Interrupted, orphaned, corrupt and unrecognized records remain visible; one unsafe
+leaf is never followed and cannot hide valid peers. Unsafe store/lock privacy,
+unavailable state, traversal errors or whole-store quota refusal remain explicit
+environment failures.
+
+The reader accepts only capture's uncompressed, single-disk, comment-free ZIP
+format. It validates the end record and every central header before constructing
+ZipArchive. Each archive uses one exact-sized private byte snapshot bounded by
+MaxArchiveBytes (282 MiB) so validation and parsing cannot observe different ZIP
+structures. The original held file is rehashed before verified publication.
+Manifest JSON is bounded to16MiB/depth16, payloads to10000 entries,256MiB regular
+file bytes and32 directory levels, state to1GiB/4096 entries. Cancellation is
+checked between reads, entries and directory ancestors. A separate1GiB aggregate
+manifest/blob verification budget spans every record, charges before reading and
+retains charges after failures; exhaustion explicitly refuses inspection. This
+also bounds work when different ZIP entries reference the same stored bytes.
+
+Verification means byte consistency of raw payload evidence. It is not
+authentication against a same-user writer, ACL/xattr/root-mode restoration, or
+in-place replacement authority. M08/M13-M15 recovery, dispositions, relinking
+and consolidation still require subsequent plan/apply work.

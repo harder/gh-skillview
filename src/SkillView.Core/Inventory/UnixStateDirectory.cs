@@ -6,7 +6,8 @@ namespace SkillView.Inventory;
 
 internal sealed partial class UnixSecureRemovalBackend
 {
-    internal static NativeStateDirectory OpenStateDirectory(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null)
+    internal static NativeStateDirectory OpenStateDirectory(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null,
+        bool allowCreate = true)
     {
         var full = Path.GetFullPath(path);
         if (PathIdentity.Equals(full, Path.GetPathRoot(full)!)) throw new IOException("State cannot be a filesystem root.");
@@ -16,6 +17,7 @@ internal sealed partial class UnixSecureRemovalBackend
         while (!Directory.Exists(cursor))
         {
             token.ThrowIfCancellationRequested();
+            if (!allowCreate) throw new DirectoryNotFoundException("Maintenance state does not exist; history creates no files.");
             if (missing.Count >= 32) throw new IOException("State directory creation depth exceeded.");
             missing.Push(Path.GetFileName(cursor));
             cursor = Path.GetDirectoryName(cursor) ?? throw new IOException("State has no existing ancestor.");
@@ -213,11 +215,13 @@ internal sealed partial class UnixSecureRemovalBackend
             CheckStateOwner(buffer.Pointer);
             if (OperatingSystem.IsMacOS()) CheckPrivateStateAcl(root);
         }
-        internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token)
+        internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: true);
+        internal override FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: false);
+        private FileStream OpenStateFile(string name, bool writerLock, CancellationToken token, bool create)
         {
             ValidateLocation(token); NativeStateDirectory.CheckName(name);
-            var flags = OperatingSystem.IsMacOS() ? 2 | 0x100 | 0x1000000 | 4 | 0x200 | (writerLock ? 0 : 0x800)
-                : 2 | 0x20000 | 0x80000 | 0x800 | 0x40 | (writerLock ? 0 : 0x80);
+            var flags = OperatingSystem.IsMacOS() ? (create ? 2 | 0x200 | (writerLock ? 0 : 0x800) : 0) | 0x100 | 0x1000000 | 4
+                : (create ? 2 | 0x40 | (writerLock ? 0 : 0x80) : 0) | 0x20000 | 0x80000 | 0x800;
             token.ThrowIfCancellationRequested();
             int descriptor;
             if (OperatingSystem.IsLinux())
@@ -225,7 +229,7 @@ internal sealed partial class UnixSecureRemovalBackend
                 var how = new OpenHow
                 {
                     Flags = (ulong)flags,
-                    Mode = 0x180,
+                    Mode = create ? 0x180u : 0u,
                     Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
                 };
                 descriptor = RetryOnInterrupted(() =>
@@ -238,7 +242,8 @@ internal sealed partial class UnixSecureRemovalBackend
             else descriptor = RetryOnInterrupted(() =>
             {
                 token.ThrowIfCancellationRequested();
-                return StateNative.openat_create(root.FileDescriptor, name, flags, 0, 0, 0, 0, 0, 0x180);
+                return create ? StateNative.openat_create(root.FileDescriptor, name, flags, 0, 0, 0, 0, 0, 0x180)
+                    : UnixNative.openat(root.FileDescriptor, name, flags);
             });
             if (descriptor < 0) throw new IOException(LastError("open state file failed"));
             using var native = new SafeUnixHandle(descriptor);
@@ -257,7 +262,7 @@ internal sealed partial class UnixSecureRemovalBackend
             native.SetHandleAsInvalid();
             try
             {
-                var stream = new FileStream(file, FileAccess.ReadWrite);
+                var stream = new FileStream(file, create ? FileAccess.ReadWrite : FileAccess.Read);
                 // Borrow the still-owned writer handle; dup would clear CLOEXEC
                 // and could leak its advisory lock into an unrelated child.
                 if (writerLock) _barrier = file;
@@ -265,7 +270,7 @@ internal sealed partial class UnixSecureRemovalBackend
             }
             catch { file.Dispose(); throw; }
         }
-        internal override IEnumerable<(string Name, long Bytes)> EnumerateFiles(CancellationToken token)
+        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
         {
             ValidateLocation(token);
             using var frame = new DirectoryFrame(root, root, "state", canonical, 0, false, false);
@@ -276,14 +281,15 @@ internal sealed partial class UnixSecureRemovalBackend
                 if (!frame.TryReadNext(out var entry, out var error))
                 { if (error is not null) throw new IOException(error); yield break; }
                 if (entry is null) continue;
-                if (!TryReadStatAt(root, entry.Value.Name, buffer.Pointer, out var stat, out var statError)) throw new IOException(statError);
+                if (!TryReadStatAt(root, entry.Value.Name, buffer.Pointer, out var stat, out var statError))
+                { yield return (entry.Value.Name, 0, statError ?? "State entry disappeared."); continue; }
                 if (stat.FileType != 0x8000 || entry.Value.Inode != 0 && entry.Value.Inode != stat.Inode)
-                    throw new IOException("Unexpected state entry type or identity change.");
+                { yield return (entry.Value.Name, 0, "Unexpected state entry type or identity change."); continue; }
                 // Both verified Linux stat layouts put st_size at 48; native
                 // ARM64 Darwin puts it at 96 (SDK sys/stat.h).
                 var length = Marshal.ReadInt64(buffer.Pointer, OperatingSystem.IsMacOS() ? 96 : 48);
-                if (length < 0) throw new IOException("Invalid state entry length.");
-                yield return (entry.Value.Name, length);
+                if (length < 0) { yield return (entry.Value.Name, 0, "Invalid state entry length."); continue; }
+                yield return (entry.Value.Name, length, null);
             }
         }
         internal override void FlushPublication(CancellationToken token)

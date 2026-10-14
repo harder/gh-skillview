@@ -47,6 +47,7 @@ public static class CliDispatcher
                 "update" => await UpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "--help" or "-h" or "help" => PrintHelp(options),
@@ -69,7 +70,7 @@ public static class CliDispatcher
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "rescan" or "search" or "compare" => TimeSpan.FromMinutes(2),
+        "list" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
@@ -476,6 +477,51 @@ public static class CliDispatcher
         w.WriteString("diagnostic", owner.Diagnostic);
         if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
         w.WriteEndObject();
+    }
+
+    private static async Task<int> HistoryAsync(AppOptions options, TuiServices services, CancellationToken token)
+    {
+        var json = false;
+        string? id = null;
+        var args = options.SubcommandArgs;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] == "--json") { json = true; continue; }
+            if (args[i] == "--id" && id is null && i + 1 < args.Count) { id = args[++i]; continue; }
+            Console.Error.WriteLine("skillview: unsupported or incomplete history argument");
+            return ExitCodes.InvalidUsage;
+        }
+        if (id is not null && (id.Length != 32 || id.Any(c => !char.IsAsciiHexDigit(c) || char.IsUpper(c))))
+        { Console.Error.WriteLine("skillview: history --id requires a lowercase 32-character backup ID"); return ExitCodes.InvalidUsage; }
+        try
+        {
+            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner));
+            var entries = await Task.Run(() => store.ReadHistory(token), token).ConfigureAwait(false);
+            if (id is not null) entries = entries.Where(entry => entry.Id == id).ToArray();
+            if (json) WriteJson(w =>
+            {
+                w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("metadataContract", "verified raw payload evidence; no in-place restore authority");
+                w.WriteStartArray("entries");
+                foreach (var entry in entries)
+                {
+                    w.WriteStartObject(); w.WriteString("id", entry.Id); w.WriteString("status", entry.Status);
+                    w.WriteString("installationId", entry.Record?.InstallationId); w.WriteString("path", entry.Record?.Path);
+                    w.WriteString("fingerprint", entry.Record?.BeforeFingerprint); w.WriteString("archiveHash", entry.Record?.ArchiveHash);
+                    w.WriteString("archivePath", entry.Record?.ArchivePath); w.WriteNumber("payloadEntries", entry.PayloadEntries);
+                    w.WriteNumber("payloadBytes", entry.PayloadBytes); w.WriteString("error", entry.Error); w.WriteEndObject();
+                }
+                w.WriteEndArray(); w.WriteEndObject();
+            });
+            else foreach (var entry in entries) Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"{entry.Id}  {entry.Status}  {entry.Record?.Path ?? entry.Error}"));
+            return id is not null && entries.Count == 0 ? ExitCodes.NoMatches
+                : entries.Any(entry => entry.Status != "verified") ? ExitCodes.UserError : ExitCodes.Success;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
+            else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
+            return ExitCodes.EnvironmentError;
+        }
     }
 
     private static async Task<int> BackupAsync(AppOptions options, TuiServices services, CancellationToken token)
@@ -2048,6 +2094,7 @@ public static class CliDispatcher
             | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
+            | `history` | Verify retained backup journals and every payload blob; reports interrupted, orphaned and corrupt evidence without extracting it. | `--id`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 

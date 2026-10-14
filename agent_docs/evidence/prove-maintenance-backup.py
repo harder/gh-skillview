@@ -99,6 +99,11 @@ for gh in args.gh or [None]:
         journal = json.loads(state.joinpath(captured['id'] + '.captured.json').read_text())
         assert journal['archiveHash'] == captured['archiveHash']
         assert state.joinpath(captured['id'] + '.creating.json').is_file()
+        evidence_before = {path.name: digest(path) for path in state.iterdir()}
+        history = run(['history', '--id', captured['id'], '--json'])
+        assert len(history['entries']) == 1 and history['entries'][0]['status'] == 'verified', history
+        assert history['entries'][0]['archiveHash'] == captured['archiveHash']
+        assert {path.name: digest(path) for path in state.iterdir()} == evidence_before
         if os.name != 'nt':
             assert stat.S_IMODE(state.stat().st_mode) == 0o700
             assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in state.iterdir())
@@ -121,6 +126,24 @@ for gh in args.gh or [None]:
             row = next(row for row in manifest['entries'] if row['path'] == 'SKILL.md')
             assert archive.read(row['blob']) == first.joinpath('SKILL.md').read_bytes()
         assert snapshot() == raw_before
+        env['SKILLVIEW_STATE_HOME'] = str(root / 'state')
+        history = run(['history', '--json'])
+        assert len(history['entries']) == 2 and all(row['status'] == 'verified' for row in history['entries']), history
+        damaged = bytearray(archive_path.read_bytes())
+        damaged[0] ^= 1
+        archive_path.write_bytes(damaged)
+        evidence_before = {path.name: digest(path) for path in state.iterdir()}
+        history = run(['history', '--json'], expected=1)
+        statuses = {row['id']: row['status'] for row in history['entries']}
+        assert statuses == {captured['id']: 'corrupt', raw['id']: 'verified'}, history
+        assert {path.name: digest(path) for path in state.iterdir()} == evidence_before
+        state.joinpath(raw['id'] + '.captured.json').unlink()
+        history = run(['history', '--json'], expected=1)
+        assert next(row for row in history['entries'] if row['id'] == raw['id'])['status'] == 'incomplete', history
+        state.joinpath(raw['id'] + '.creating.json').unlink()
+        history = run(['history', '--json'], expected=1)
+        assert next(row for row in history['entries'] if row['id'] == raw['id'])['status'] == 'orphaned', history
+        assert snapshot() == raw_before
         missing_agent_root = home / '.agents' / 'skills'
         assert not missing_agent_root.exists()
         env['SKILLVIEW_STATE_HOME'] = str(missing_agent_root)
@@ -132,7 +155,9 @@ for gh in args.gh or [None]:
                             completeFileBytesAndEmptyDirectoriesVerified=True, nativeLinkRemainedLeaf=True,
                             unixPrivateModesVerified=os.name != 'nt', selectedAndUnselectedPayloadsUnchanged=True,
                             otherInstalledPayloadCannotBeState=True, missingConfiguredAgentRootCannotBeState=True,
-                            rawFlowMetadataArchivedByteExact=True, sharedRegistryUnchanged=True))
+                            rawFlowMetadataArchivedByteExact=True, sharedRegistryUnchanged=True,
+                            historyVerifiedEveryBlob=True, historyLeftEvidenceUnchanged=True,
+                            corruptArchiveDidNotHideVerifiedPeer=True, incompleteAndOrphanedHistoryVisible=True))
 assert digest(shared) == shared_before
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))

@@ -6,12 +6,22 @@ internal abstract class NativeStateDirectory : IDisposable
 {
     internal abstract string CanonicalPath { get; }
     internal abstract FileStream OpenFile(string name, bool writerLock, CancellationToken token);
-    internal abstract IEnumerable<(string Name, long Bytes)> EnumerateFiles(CancellationToken token);
+    internal abstract FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token);
+    internal abstract IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token);
+    internal IEnumerable<(string Name, long Bytes)> EnumerateFiles(CancellationToken token)
+    {
+        foreach (var entry in EnumerateEntries(token))
+        {
+            if (entry.Error is not null) throw new IOException(entry.Error);
+            yield return (entry.Name, entry.Bytes);
+        }
+    }
     internal abstract void FlushPublication(CancellationToken token);
     internal abstract void ValidateLocation(CancellationToken token);
     public abstract void Dispose();
 
-    internal static NativeStateDirectory OpenOrCreate(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null)
+    internal static NativeStateDirectory OpenOrCreate(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null,
+        bool allowCreate = true)
     {
         token.ThrowIfCancellationRequested();
         if (!SecureRemovalBackend.IsSupported) throw new IOException("Native state authority is unavailable: " + SecureRemovalBackend.UnsupportedReason);
@@ -24,8 +34,8 @@ internal abstract class NativeStateDirectory : IDisposable
         var canonicalExclusions = paths.ToArray();
         CheckExcluded(OwnershipPath.CanonicalCandidate(path) ?? Path.GetFullPath(path), canonicalExclusions);
         return OperatingSystem.IsWindows()
-            ? WindowsSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh)
-            : UnixSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh);
+            ? WindowsSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh, allowCreate)
+            : UnixSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh, allowCreate);
     }
 
     internal static void CheckExcluded(string candidate, IReadOnlyList<string> excluded)

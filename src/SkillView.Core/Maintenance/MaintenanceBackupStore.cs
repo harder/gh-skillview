@@ -10,7 +10,7 @@ namespace SkillView.Maintenance;
 /// Durable payload evidence outside installed skills. This archive format stores
 /// file bytes, entry Unix modes and native link bytes; it is not yet an in-place
 /// restore contract for ACLs, extended attributes or owner registries.
-public sealed class MaintenanceBackupStore(string root)
+public sealed partial class MaintenanceBackupStore(string root)
 {
     private readonly Action<string>? _entryArchivedForTests;
     internal MaintenanceBackupStore(string root, Action<string> entryArchivedForTests) : this(root) =>
