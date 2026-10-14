@@ -151,6 +151,35 @@ public sealed class SkillComparisonTests : IDisposable
     }
 
     [Fact]
+    public void CapturedSharedClaimCannotDisappearOrChangeBeforeUpdateAdmission()
+    {
+        var skill = Install("one");
+        var path = Path.Combine(_root.FullName, "captured-lock.json");
+        const string record = "{\"source\":\"owner/repo\",\"sourceType\":\"github\"}";
+        File.WriteAllText(path, "{\"version\":3,\"skills\":{\"ns/demo\":" + record + "}}");
+        using var document = System.Text.Json.JsonDocument.Parse(record);
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        {
+            Provider = "gh-vercel-global",
+            IsExclusiveOwner = false,
+            Selector = "ns/demo",
+            LockFilePath = path,
+            SchemaVersion = 3,
+            EntryFingerprint = OwnershipRecordFingerprint.Compute(document.RootElement, true),
+            RecordFingerprint = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))
+        };
+        skill = skill with { OwnershipClaims = [claim] };
+        Assert.Throws<IOException>(() => GhSharedLockGuard.ValidateUpdateRecords(
+            System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>.Empty, [skill]));
+        File.AppendAllText(path, " ");
+        GhSharedLockGuard.ValidateCapturedOwners([skill], TestContext.Current.CancellationToken);
+        File.WriteAllText(path, File.ReadAllText(path).Replace("owner/repo", "external/repo", StringComparison.Ordinal));
+        Assert.Throws<IOException>(() => GhSharedLockGuard.ValidateCapturedOwners([skill], TestContext.Current.CancellationToken));
+        File.Delete(path);
+        Assert.ThrowsAny<IOException>(() => GhSharedLockGuard.ValidateCapturedOwners([skill], TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task ChangedOwnerEvidenceRequiresRefresh()
     {
         var left = Owned(Install("one"), "one", "v1", "hash-one");

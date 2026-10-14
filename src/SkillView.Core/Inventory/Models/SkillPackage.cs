@@ -31,6 +31,7 @@ public sealed record SkillPackage(
     public ImmutableArray<string> CoveredRoots { get; init; } = [];
     public string? Selector { get; init; }
     public string? RecordFingerprint { get; init; }
+    public string? EntryFingerprint { get; init; }
     public string? PackageVersion { get; init; }
 
     /// A same-name lock entry is evidence only within its installation context.
@@ -43,8 +44,8 @@ public sealed record SkillPackage(
         // directly in the selected root. Retain both observed conventions.
         var selectors = Provider == "gh-vercel-global" && selector.Contains('/')
             ? new[] { selector, selector.Split('/')[^1] } : [selector];
-        return Roots().Any(root => selectors.Any(name => PathIdentity.Equals(skill.ResolvedPath, Path.Combine(root, name))
-            || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, Path.Combine(root, name)))));
+        return Roots().Any(root => selectors.Any(name => OwnershipPath.Same(skill.ResolvedPath, Path.Combine(root, name))
+            || skill.Agents.Any(agent => OwnershipPath.Same(agent.Path, Path.Combine(root, name)))));
     }
 
     private IEnumerable<string> Roots() => CoveredRoots.IsEmpty

@@ -31,12 +31,13 @@ internal static class GhSharedLockGuard
         return document.RootElement.GetProperty("skills").EnumerateObject().ToImmutableDictionary(entry => entry.Name,
             entry => new Record(Text(entry.Value, "sourceUrl"), Text(entry.Value, "source"), Text(entry.Value, "sourceType"),
                 Text(entry.Value, "skillPath"), Text(entry.Value, "skillFolderHash"), Text(entry.Value, "pinnedRef")), StringComparer.Ordinal);
-        static string? Text(JsonElement value, string key) => value.TryGetProperty(key, out var property) ? property.GetString() : null;
+        static string? Text(JsonElement value, string key) => value.TryGetProperty(key, out var property)
+            && property.GetString() is { Length: > 0 } text ? text : null;
     }
 
     internal static void ValidateUpdateRecords(ImmutableDictionary<string, Record> records, IReadOnlyList<InstalledSkill>? targets)
     {
-        if (records.IsEmpty) return;
+        if (records.IsEmpty && (targets is null || !targets.Any(target => target.AllOwnershipClaims.Any(claim => claim.Provider == "gh-vercel-global")))) return;
         if (targets is not { Count: > 0 })
             throw new IOException("Existing shared records require exact update ownership; use a coordinated maintenance plan.");
         foreach (var target in targets)
@@ -47,7 +48,12 @@ internal static class GhSharedLockGuard
                 .Distinct(StringComparer.Ordinal);
             foreach (var selector in selectors)
             {
-                if (!records.TryGetValue(selector, out var record)) continue;
+                if (!records.TryGetValue(selector, out var record))
+                {
+                    if (target.AllOwnershipClaims.Any(claim => claim.Provider == "gh-vercel-global" && claim.Selector == selector))
+                        throw new IOException("A captured shared ownership record disappeared; refresh before updating.");
+                    continue;
+                }
                 var expectedRepository = target.FrontMatter.Upstream;
                 var observedRepository = record.SourceUrl ?? (record.SourceType == "github" ? "https://github.com/" + record.Source : null);
                 if (expectedRepository is null || observedRepository is null
@@ -56,6 +62,33 @@ internal static class GhSharedLockGuard
                     || record.Tree != target.TreeSha || record.Pin != target.FrontMatter.PinnedRef)
                     throw new IOException("The shared selector belongs to different source or revision evidence; use a coordinated maintenance plan.");
             }
+        }
+    }
+
+    internal static void ValidateCapturedOwners(IReadOnlyList<InstalledSkill>? targets, CancellationToken token)
+    {
+        if (targets is null) return;
+        foreach (var group in targets.SelectMany(target => target.AllOwnershipClaims).GroupBy(claim => claim.LockFilePath, StringComparer.Ordinal))
+        {
+            token.ThrowIfCancellationRequested();
+            if (group.Key is null || group.Any(claim => claim.EntryFingerprint is null || claim.Selector is null))
+                throw new IOException("Captured owner evidence is incomplete; refresh before updating.");
+            if (group.Any(claim => claim.ReadOnly || claim.IsExclusiveOwner))
+                throw new IOException("Captured contextual ownership requires a coordinated maintenance plan before updating.");
+            try
+            {
+                var bytes = SkillLockFileReader.ReadBytes(group.Key, token);
+                if (group.Any(claim => claim.Provider == "gh-vercel-global")) ValidatePayload(bytes, token);
+                using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });
+                if (document.RootElement.ValueKind != JsonValueKind.Object
+                    || !document.RootElement.TryGetProperty("skills", out var skills) || skills.ValueKind != JsonValueKind.Object)
+                    throw new IOException("Captured owner structure changed; refresh before updating.");
+                foreach (var claim in group)
+                    if (!skills.TryGetProperty(claim.Selector!, out var entry)
+                        || claim.EntryFingerprint != OwnershipRecordFingerprint.Compute(entry, claim.Provider == "gh-vercel-global"))
+                        throw new IOException("A captured owner record disappeared or changed; refresh before updating.");
+            }
+            catch (JsonException ex) { throw new IOException("Captured owner structure is malformed; refresh before updating.", ex); }
         }
     }
 

@@ -158,6 +158,7 @@ public sealed class LocalInventoryService
             CapturedAt = DateTimeOffset.UtcNow,
             Diagnostics = diagnostics,
             Providers = providers.ToImmutable(),
+            OwnershipRecords = local.Packages.Select(package => package.Package).ToImmutableArray(),
         };
     }
 

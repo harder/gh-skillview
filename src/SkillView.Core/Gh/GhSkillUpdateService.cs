@@ -53,6 +53,7 @@ public sealed class GhSkillUpdateService
         {
             try
             {
+                GhSharedLockGuard.ValidateCapturedOwners(options.Targets, cancellationToken);
                 var records = GhSharedLockGuard.ValidateCurrent(cancellationToken,
                     _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment));
                 GhSharedLockGuard.ValidateUpdateRecords(records, options.Targets);
@@ -157,6 +158,7 @@ public sealed class GhSkillUpdateService
 
     private static UpdateEntry? TryClassify(string line, bool dryRun = false)
     {
+        if (line == "All skills are up to date.") return null;
         var completion = Regex.Match(line, @"^Updated (?<name>\S+)$", RegexOptions.CultureInvariant);
         if (completion.Success) return new UpdateEntry { Name = completion.Groups["name"].Value, Status = "updated" };
         var transition = Regex.Match(line, @"^(?<name>\S+) \((?<repo>[^)]+)\) (?<from>\S*) > (?<to>\S+) \[[^]]+\]$", RegexOptions.CultureInvariant);

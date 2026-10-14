@@ -16,13 +16,13 @@
     "M17-M20 desired state/adoption/diagnostics/maintenance UI"
   ],
   "fullSuite": {
-    "passed": 935,
+    "passed": 951,
     "failed": 0,
     "skipped": 0
   },
   "build": "zero warnings/errors",
   "format": "dotnet format SkillView.sln --no-restore --verify-no-changes passed after formatter",
-  "nativeAot": "App osx-arm64 publish with IL2026/IL3050/IL3053 promoted to errors passed; extension publish passed before final blank-tracking/telemetry corrections; final extension and other RIDs require CI",
+  "nativeAot": "App and extension osx-arm64 publish passed; App IL2026/IL3050/IL3053 promoted to errors. Fresh platform CI required before merge.",
   "runtimeProof": [
     {
       "gh": "gh version 2.97.0 (2026-07-31)",
@@ -33,6 +33,9 @@
       "sharedUpdateChangedOneCopy": true,
       "customUpdatePreservedSharedRecord": true,
       "collidingInstallRefusedWithoutMutation": true,
+      "contextualProjectAndXdgInstallRefused": true,
+      "aliasedProjectOwnerProtected": true,
+      "multiTargetSharedUpdateRetainedUnrelatedEntryEvidence": true,
       "unsupportedSharedWritesPreservedBytes": true,
       "completePayloadExtraDetected": true,
       "contextualRevisionsDistinguished": true,
@@ -53,6 +56,9 @@
       "sharedUpdateChangedOneCopy": true,
       "customUpdatePreservedSharedRecord": true,
       "collidingInstallRefusedWithoutMutation": true,
+      "contextualProjectAndXdgInstallRefused": true,
+      "aliasedProjectOwnerProtected": true,
+      "multiTargetSharedUpdateRetainedUnrelatedEntryEvidence": true,
       "unsupportedSharedWritesPreservedBytes": true,
       "completePayloadExtraDetected": true,
       "contextualRevisionsDistinguished": true,
@@ -84,7 +90,15 @@
       "flat gh materialization and namespaced registry mapping",
       "redirected shared roots preserve actual registry context",
       "blank gh fields normalize to absent metadata",
-      "gh telemetry suppressed in child environment"
+      "gh telemetry suppressed in child environment",
+      "Copilot: destination-scoped project and XDG install ownership, stale shared record absence, every owner pin/version, documentation spacing",
+      "canonical project discovery and parent/name matching preserve ownership through aliases and broken links",
+      "relative child environment roots resolve against captured working directory",
+      "Git redirected worktrees, CWD fallback and supported legacy Codex/Pi placements",
+      "entry fingerprints survive unrelated gh rewrites and known missing/empty string normalization",
+      "repository multiline descriptions cannot be used as an unambiguous update selector protocol; stage and inspect exact recorded source path",
+      "retain unmatched owner records and protect empty-directory cleanup and agent unlink",
+      "up-to-date summary is a notice, never a parsed update"
     ]
   },
   "lockBounds": {
@@ -126,5 +140,11 @@
       "xunit.runner.visualstudio": "4.0.1"
     },
     "newUpdateRequired": false
+  },
+  "installPlacementBounds": {
+    "agents": 128,
+    "pathDirectories": 256,
+    "executableExtensions": 32,
+    "canonicalAncestorDepth": 128
   }
 }

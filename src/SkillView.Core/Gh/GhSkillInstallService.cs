@@ -33,7 +33,8 @@ public sealed class GhSkillInstallService
         bool AllowHiddenDirs = false,
         bool FromLocal = false,
         bool All = false,
-        IReadOnlyDictionary<string, string>? ProcessEnvironment = null);
+        IReadOnlyDictionary<string, string>? ProcessEnvironment = null,
+        string? WorkingDirectory = null);
 
     public async Task<InstallResult> InstallAsync(
         string ghPath,
@@ -43,14 +44,24 @@ public sealed class GhSkillInstallService
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
+        options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? Environment.CurrentDirectory) };
         var args = BuildArgs(repo, skillName, options);
         try
         {
+            var mutates = options.All || !string.IsNullOrEmpty(skillName) || options.FromLocal;
+            var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
+            var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
+            IReadOnlyList<string>? resolvedSelectors = null;
+            string? registryHome = null;
+            System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;
             if (!options.FromLocal && (options.All || !string.IsNullOrEmpty(skillName)))
             {
                 var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
+                if (!string.IsNullOrEmpty(home)) home = System.IO.Path.GetFullPath(home, options.WorkingDirectory);
                 var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
-                if (!records.IsEmpty)
+                registryHome = home;
+                capturedRegistry = records;
+                if (!records.IsEmpty || context?.Claims.IsEmpty == false)
                 {
                     if (skillName is { } direct && records.ContainsKey(direct.Split('@')[0]))
                         throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
@@ -61,25 +72,38 @@ public sealed class GhSkillInstallService
                     var version = options.Version;
                     if (requested?.LastIndexOf('@') is >= 0 and var at)
                     { version ??= requested[(at + 1)..]; requested = requested[..at]; }
-                    var listing = await ListRepoSkillsAsync(ghPath, repo, version, options.AllowHiddenDirs, cancellationToken).ConfigureAwait(false);
+                    var listing = await ListRepoSkillsAsync(ghPath, repo, version, options.AllowHiddenDirs, cancellationToken,
+                        options.ProcessEnvironment, options.WorkingDirectory).ConfigureAwait(false);
                     if (!listing.Succeeded) throw new IOException("Cannot establish install selectors before writing shared records: " + listing.ErrorMessage);
                     // Exact paths may resolve an authored name different from
                     // their leaf. Do not guess that name from the path.
                     selectors = ResolveWriteSelectors(listing.Skills, requested, options.All);
+                    resolvedSelectors = selectors;
                     if (selectors.Count == 0 || selectors.Any(records.ContainsKey))
                         throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
                 }
-                // Discovery above can be slow. Recheck both schema and selector
-                // collisions at the process admission boundary.
-                var current = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
-                if (current.Keys.Except(records.Keys, StringComparer.Ordinal).Any())
-                    throw new IOException("Shared records changed during install preparation; refresh before installing.");
+            }
+            if (mutates)
+            {
+                var latestDestinations = await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false);
+                if (!destinations.SequenceEqual(latestDestinations, StringComparer.Ordinal))
+                    throw new IOException("Installation destinations changed during preparation; refresh before installing.");
+                var latestContext = GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken);
+                GhInstallOwnershipGuard.ValidateUnchanged(context!, cancellationToken);
+                GhInstallOwnershipGuard.Validate(latestContext, destinations, resolvedSelectors, cancellationToken);
+                // No discovery await may separate these checks from launch.
+                if (capturedRegistry is not null)
+                {
+                    var current = GhSharedLockGuard.ValidateCurrent(cancellationToken, registryHome);
+                    if (current.Keys.Except(capturedRegistry.Keys, StringComparer.Ordinal).Any())
+                        throw new IOException("Shared records changed during install preparation; refresh before installing.");
+                }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
-            environment: options.ProcessEnvironment).ConfigureAwait(false);
+            environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
@@ -111,10 +135,13 @@ public sealed class GhSkillInstallService
         string repo,
         string? version = null,
         bool allowHiddenDirs = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? processEnvironment = null,
+        string? workingDirectory = null)
     {
         var args = BuildListArgs(repo, version, allowHiddenDirs);
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
+            environment: processEnvironment, workingDirectory: workingDirectory).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             _logger.Warn("gh.skill.install.list", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");

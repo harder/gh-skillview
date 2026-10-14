@@ -44,7 +44,8 @@ public sealed class SkillLockFileReaderTests : IDisposable
         Assert.Equal("release", projectRecord.RepositoryRef);
         Assert.Equal("vercel-project-sha256", projectRecord.HashKind);
         Assert.Equal("payload", projectRecord.ContentHash);
-        Assert.Equal(one, Assert.Single(projectRecord.CoveredRoots));
+        Assert.Contains(one, projectRecord.CoveredRoots);
+        Assert.All(projectRecord.CoveredRoots, root => Assert.True(OwnershipPath.Same(one, root)));
         Assert.True(projectRecord.IsExclusiveOwner);
         Assert.False(records.Single(record => record.Package.Source == "team/user").Package.IsExclusiveOwner);
     }
@@ -84,7 +85,10 @@ public sealed class SkillLockFileReaderTests : IDisposable
             "{\"version\":1,\"skills\":{\"demo\":{\"source\":\"team/repo\",\"sourceType\":\"github\"}}}");
         var records = new SkillLockFileReader(new Logger()).LoadObservations([custom, canonical],
             TestContext.Current.CancellationToken, new(HomeDirectory: ""));
-        Assert.Equal(canonical, Assert.Single(Assert.Single(records).Package.CoveredRoots));
+        var covered = Assert.Single(records).Package.CoveredRoots;
+        Assert.Contains(canonical, covered);
+        Assert.All(covered, root => Assert.True(OwnershipPath.Same(canonical, root)));
+        Assert.DoesNotContain(custom, covered);
     }
 
     [Fact]
@@ -116,7 +120,8 @@ public sealed class SkillLockFileReaderTests : IDisposable
             .Where(entry => entry.Name == "sample").ToArray();
         Assert.Equal(2, observations.Length);
         Assert.Equal(["one/repo", "two/repo"], observations.Select(entry => entry.Package.Source));
-        Assert.Equal(roots, observations.Select(entry => entry.Package.InstallationRoot));
+        for (var i = 0; i < roots.Length; i++)
+            Assert.True(OwnershipPath.Same(roots[i], observations[i].Package.InstallationRoot!));
     }
 
     [Fact]

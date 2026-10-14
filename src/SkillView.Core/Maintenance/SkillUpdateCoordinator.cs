@@ -124,17 +124,12 @@ public sealed class SkillUpdateCoordinator(
                         if (!writesSharedRecord) mutationEnvironment = CreateStagingEnvironment(Path.Combine(staging, "mutation"));
                         var refDestination = Path.Combine(staging, "current-ref");
                         var recordedRef = ShortRef(target.FrontMatter.GithubRef);
-                        var listing = await installer.ListRepoSkillsAsync(ghPath, repository,
-                            recordedRef, cancellationToken: cancellationToken).ConfigureAwait(false);
-                        if (!listing.Succeeded) throw new IOException($"Cannot stage recorded base: {listing.ErrorMessage}");
                         var sourcePath = target.FrontMatter.GithubPath;
-                        var candidates = listing.Skills.Where(s => sourcePath is not null
-                                ? sourcePath == s.Name || sourcePath.EndsWith('/' + s.Name, StringComparison.Ordinal)
-                                : s.Name == selector)
-                            .OrderByDescending(s => s.Name.Length).ToArray();
-                        if (candidates.Length == 0 || (candidates.Length > 1 && candidates[0].Name.Length == candidates[1].Name.Length))
-                            throw new IOException("Recorded source subpath does not identify one repository skill.");
-                        var sourceSelector = candidates[0].Name;
+                        // Repository listings render multiline descriptions
+                        // without escaping; they are not always an unambiguous
+                        // selector protocol. Stage the recorded path in an
+                        // empty private destination and inspect the result.
+                        var sourceSelector = sourcePath ?? selector;
                         if (sourceSelector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\')))
                             throw new IOException("Unsafe repository skill selector.");
                         var staged = await installer.InstallAsync(ghPath, repository, sourceSelector,
@@ -142,7 +137,9 @@ public sealed class SkillUpdateCoordinator(
                                 ProcessEnvironment: stageEnvironment),
                             cancellationToken).ConfigureAwait(false);
                         if (!staged.Succeeded) throw new IOException($"Cannot stage recorded base: {staged.ErrorMessage}");
-                        var stagedPath = Path.Combine(refDestination, sourceSelector.Split('/')[^1]);
+                        var stagedPaths = Directory.EnumerateDirectories(refDestination).Take(2).ToArray();
+                        if (stagedPaths.Length != 1) throw new IOException("Recorded source did not materialize one exact skill.");
+                        var stagedPath = stagedPaths[0];
                         var basePayload = PayloadSnapshot.Capture(stagedPath, cancellationToken);
                         var frontMatter = basePayload.FrontMatter;
                         if (frontMatter is null || frontMatter.GithubTreeSha != target.FrontMatter.GithubTreeSha

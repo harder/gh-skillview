@@ -107,11 +107,18 @@ internal static class RemoveTargetResolver
             }
             var skill = target.Skills[0];
             cancellationToken.ThrowIfCancellationRequested();
+            var validation = RemoveValidator.ValidateSymlink(link.Path, snapshot.ScannedRoots);
+            if (skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty)
+                validation = validation with
+                {
+                    Errors = validation.Errors.Add(new(RemoveValidator.ErrorKind.OwnerRecordNeedsPlan,
+                    "This exposure has contextual ownership; use a coordinated maintenance plan before unlinking."))
+                };
             return new RemoveTargetEvaluation(
                 target,
                 [new RemoveTargetItem(
                     skill,
-                    RemoveValidator.ValidateSymlink(link.Path, snapshot.ScannedRoots))]);
+                    validation)]);
         }
 
         var items = ImmutableArray.CreateBuilder<RemoveTargetItem>(target.Skills.Length);

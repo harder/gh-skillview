@@ -105,18 +105,22 @@ public sealed class SkillLockFileReader(Logger logger)
             token.ThrowIfCancellationRequested();
             if (++rootCount > 256) { Report(root, "lock discovery root limit exceeded", allRoots: true); break; }
             if (string.IsNullOrWhiteSpace(root)) continue;
-            var full = Path.GetFullPath(root);
-            var parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(full));
-            if (parent is null) continue;
-            Add(Path.Combine(parent, FileName), full, parent, "legacy-lock");
-            var cursor = parent;
-            for (var depth = 0; depth < 8 && cursor is not null; depth++)
+            var lexical = Path.GetFullPath(root);
+            var canonical = OwnershipPath.CanonicalCandidate(lexical);
+            foreach (var full in new[] { lexical, canonical }.OfType<string>().Distinct(StringComparer.Ordinal))
             {
-                token.ThrowIfCancellationRequested();
-                if (ProjectInstallationDirectories.Any(relative => PathIdentity.Equals(full, Path.Combine(cursor, relative))))
-                    Add(Path.Combine(cursor, ProjectFileName), full, cursor, "vercel-project");
-                if (!string.IsNullOrWhiteSpace(home) && PathIdentity.Equals(cursor, home)) break;
-                cursor = Path.GetDirectoryName(cursor);
+                var parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(full));
+                if (parent is null) continue;
+                Add(Path.Combine(parent, FileName), full, parent, "legacy-lock");
+                var cursor = parent;
+                for (var depth = 0; depth < 8 && cursor is not null; depth++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (ProjectInstallationDirectories.Any(relative => PathIdentity.Equals(full, Path.Combine(cursor, relative))))
+                        Add(Path.Combine(cursor, ProjectFileName), full, cursor, "vercel-project");
+                    if (!string.IsNullOrWhiteSpace(home) && PathIdentity.Equals(cursor, home)) break;
+                    cursor = Path.GetDirectoryName(cursor);
+                }
             }
         }
         var result = ImmutableArray.CreateBuilder<PackageObservation>();
@@ -176,6 +180,7 @@ public sealed class SkillLockFileReader(Logger logger)
                         ContentHash = computedHash ?? treeHash,
                         HashKind = computedHash is not null ? "vercel-project-sha256" : treeHash is not null ? "recorded-git-tree" : null,
                         RecordFingerprint = recordFingerprint,
+                        EntryFingerprint = OwnershipRecordFingerprint.Compute(entry.Value, location.Provider == "gh-vercel-global"),
                         PackageVersion = String(entry.Value, "version"),
                         InstallationMode = String(entry.Value, "installationMode"),
                         ReadOnly = !supported || entryMalformed,
@@ -192,7 +197,7 @@ public sealed class SkillLockFileReader(Logger logger)
 
         void Add(string path, string installationRoot, string context, string provider)
         {
-            var key = PathIdentity.NormalizeKey(path);
+            var key = LocationKey(path);
             if (locations.TryGetValue(key, out var existing))
             {
                 existing.Roots.Add(installationRoot);
@@ -216,8 +221,15 @@ public sealed class SkillLockFileReader(Logger logger)
                 }
                 return;
             }
-            diagnostics.Add(new(path, message, !allRoots && locations.TryGetValue(PathIdentity.NormalizeKey(path), out var location)
+            diagnostics.Add(new(path, message, !allRoots && locations.TryGetValue(LocationKey(path), out var location)
                 ? location.Roots.ToImmutableArray() : []));
+        }
+        static string LocationKey(string path)
+        {
+            // Native directory canonicalization pins the parent; preserve the
+            // final name so a linked lock still reaches ReadBytes' refusal.
+            var parent = Path.GetDirectoryName(Path.GetFullPath(path))!;
+            return PathIdentity.NormalizeKey(Path.Combine(OwnershipPath.CanonicalCandidate(parent) ?? parent, Path.GetFileName(path)));
         }
     }
 
@@ -246,7 +258,7 @@ public sealed class SkillLockFileReader(Logger logger)
     }
 
     private static string? String(JsonElement element, string name) => element.TryGetProperty(name, out var value)
-        && value.ValueKind == JsonValueKind.String && value.GetString() is { Length: <= 8192 } text ? text : null;
+        && value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 and <= 8192 } text ? text : null;
     private static DateTimeOffset? Date(JsonElement element, string name) => DateTimeOffset.TryParse(String(element, name), out var date) ? date : null;
     private sealed record Location(string Path, string Context, string Provider, HashSet<string> Roots);
     private static bool DuplicateProperties(JsonElement element)

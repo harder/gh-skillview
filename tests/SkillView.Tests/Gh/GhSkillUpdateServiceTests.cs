@@ -121,5 +121,6 @@ public class GhSkillUpdateServiceTests
     {
         Assert.Empty(GhSkillUpdateService.ParseEntries(""));
         Assert.Empty(GhSkillUpdateService.ParseEntries("   \n\n"));
+        Assert.Empty(GhSkillUpdateService.ParseEntries("All skills are up to date.\n"));
     }
 }

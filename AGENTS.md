@@ -557,6 +557,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   registry writer needs a schema/extension guard immediately before launch.
   This guard is preflight protection; coordinated journals in the maintenance
   plan layer must provide the stronger multi-writer preservation contract.
+- Install admission must retain the original destination owner records across
+  discovery awaits, revalidate them after the final placement probe, and inspect
+  canonical contexts alongside lexical aliases. Normalize relative child HOME,
+  XDG and agent config paths against the captured child working directory.
+  Directory canonicalization cannot canonicalize a regular lockfile: deduplicate
+  those through its canonical parent plus final name. Broken exposure links also
+  need parent/name matching so aliases cannot hide contextual ownership.
+- Shared update admission uses entry fingerprints so an earlier target's update
+  does not invalidate an unrelated target. gh's typed lock writer adds required
+  empty strings and removes optional empty strings; normalize only those known
+  equivalent representations. Keep whole-file fingerprints for discovery-time
+  install admission and migration review. Repository descriptions can contain
+  unescaped newlines: stage a recorded source path into an empty private root,
+  inspect exactly one materialized skill, and verify its path/tree instead of
+  relaxing the listing's write-authority checks.
 - Compare revisions by evidence domain. An authored version, Git tree, owner
   payload hash and distributor version are distinct facts; equivalent Git-tree
   evidence must not become incomparable just because one copy also has a lock

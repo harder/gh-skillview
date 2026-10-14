@@ -341,6 +341,10 @@ public static class CliDispatcher
         }
         w.WriteEndArray();
 
+        w.WriteStartArray("ownerRecords");
+        foreach (var owner in snapshot.OwnershipRecords) WriteOwnerRecord(w, owner);
+        w.WriteEndArray();
+
         w.WriteStartArray("scannedRoots");
         foreach (var r in snapshot.ScannedRoots)
         {
@@ -402,27 +406,7 @@ public static class CliDispatcher
             w.WriteEndObject();
             w.WriteStartArray("ownerRecords");
             foreach (var owner in skill.OwnershipClaims)
-            {
-                w.WriteStartObject();
-                w.WriteString("provider", owner.Provider);
-                w.WriteString("recordPath", owner.LockFilePath);
-                w.WriteString("recordFingerprint", owner.RecordFingerprint);
-                w.WriteString("contextRoot", owner.ContextRoot);
-                w.WriteString("selector", owner.Selector);
-                w.WriteString("source", owner.Source);
-                w.WriteString("sourceType", owner.SourceType);
-                w.WriteString("sourceUrl", owner.SourceUrl);
-                w.WriteString("sourcePath", owner.SkillPath);
-                w.WriteString("repositoryRef", owner.RepositoryRef);
-                w.WriteString("contentHash", owner.ContentHash);
-                w.WriteString("hashKind", owner.HashKind);
-                w.WriteString("installationMode", owner.InstallationMode);
-                w.WriteBoolean("exclusiveOwner", owner.IsExclusiveOwner);
-                w.WriteBoolean("readOnly", owner.ReadOnly);
-                w.WriteString("diagnostic", owner.Diagnostic);
-                if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
-                w.WriteEndObject();
-            }
+                WriteOwnerRecord(w, owner);
             w.WriteEndArray();
             w.WriteStartArray("diagnostics");
             foreach (var diagnostic in skill.FrontMatter.Diagnostics.Concat(skill.MetadataConflicts).Concat(skill.OwnershipDiagnostics)) w.WriteStringValue(diagnostic);
@@ -449,6 +433,36 @@ public static class CliDispatcher
         }
         w.WriteEndArray();
 
+        w.WriteEndObject();
+    }
+
+    private static void WriteOwnerRecord(Utf8JsonWriter w, SkillPackage owner)
+    {
+        w.WriteStartObject();
+        w.WriteString("provider", owner.Provider);
+        w.WriteString("recordPath", owner.LockFilePath);
+        w.WriteString("recordFingerprint", owner.RecordFingerprint);
+        w.WriteString("entryFingerprint", owner.EntryFingerprint);
+        w.WriteString("contextRoot", owner.ContextRoot);
+        w.WriteString("installationRoot", owner.InstallationRoot);
+        w.WriteStartArray("coveredRoots");
+        foreach (var root in owner.CoveredRoots) w.WriteStringValue(root);
+        w.WriteEndArray();
+        w.WriteString("selector", owner.Selector);
+        w.WriteString("source", owner.Source);
+        w.WriteString("sourceType", owner.SourceType);
+        w.WriteString("sourceUrl", owner.SourceUrl);
+        w.WriteString("sourcePath", owner.SkillPath);
+        w.WriteString("repositoryRef", owner.RepositoryRef);
+        w.WriteString("pinnedRef", owner.PinnedRef);
+        w.WriteString("distributorVersion", owner.PackageVersion);
+        w.WriteString("contentHash", owner.ContentHash);
+        w.WriteString("hashKind", owner.HashKind);
+        w.WriteString("installationMode", owner.InstallationMode);
+        w.WriteBoolean("exclusiveOwner", owner.IsExclusiveOwner);
+        w.WriteBoolean("readOnly", owner.ReadOnly);
+        w.WriteString("diagnostic", owner.Diagnostic);
+        if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
         w.WriteEndObject();
     }
 

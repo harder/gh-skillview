@@ -15,6 +15,8 @@ public sealed record InventorySnapshot
     public bool IsPartial => !Diagnostics.InaccessiblePaths.IsEmpty || Providers.Any(provider => !provider.Succeeded);
 
     public ImmutableArray<ProviderObservation> Providers { get; init; } = [];
+    /// Includes records whose payload is absent or excluded from skill discovery.
+    public ImmutableArray<SkillPackage> OwnershipRecords { get; init; } = [];
 
     public ScanDiagnostics Diagnostics { get; init; } = ScanDiagnostics.Empty;
 

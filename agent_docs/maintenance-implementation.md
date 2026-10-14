@@ -11,7 +11,7 @@ originating Codex chat. No installed user skills are test targets.
 1. Inventory facts and removal classification: M01, M02, M04; protective portion
    of M03 and foundations for M11/M12. Merged as PR #42, a0721245.
 2. Exact updates and complete results: M05–M07 and protective portions of M08/M09.
-   Merged as PR #43, b4b2c80e, after final CI38521164480 passed all904 tests and AOT targets.
+   Merged as PR #43, b4b2c80e, after final CI38521164480 passed all 904 tests and AOT targets.
    Local changes refuse replacement; explicit dispositions, durable backups and
    recovery complete M08 in batch 4.
 3. Sources, contextual lock evidence and bounded payload comparison: M03/M09/M11
@@ -154,7 +154,7 @@ originating Codex chat. No installed user skills are test targets.
 
 - Independent Astra reviews and re-reviews found no remaining actionable source
   findings after the accepted fixes listed in `evidence/maintenance-batch-3.json`.
-- Warning-free build, all935 tests, solution formatting and site build passed.
+- Warning-free build, all 951 tests, solution formatting and site build passed.
   Final App native AOT publish promotes IL2026/IL3050/IL3053 to errors.
 - Actual gh2.97.0 and2.102.0 fixtures prove shared exact updates, preservation of
   unselected copies, byte-identical shared registry after custom updates, refusal
@@ -165,3 +165,16 @@ originating Codex chat. No installed user skills are test targets.
 - A fresh NuGet/project-file comparison confirms all dependencies are current
   stable: Terminal.Gui2.5.0, Editor2.5.7, YamlDotNet18.1.0, test SDK18.11.0,
   xunit.v3 4.0.2 and VS runner4.0.1. No further dependency update is needed.
+
+- Copilot findings and subsequent independent reviews are addressed: install
+  admission includes project/XDG records and retained discovery-time evidence;
+  aliases and relative child environment roots cannot bypass owner detection.
+  JSON exposes every owner pin/version, covered root, and unmatched record.
+- Shared update fingerprints survive unrelated gh rewrites, including missing
+  versus empty known string fields. Actual two-target forced updates pass on
+  gh 2.97.0 and 2.102.0 after removing optional fixture timestamps.
+- Native fixtures separately prove project/XDG overwrite refusal, project-alias
+  owner discovery and whole-registry preservation. Broken-link and empty-directory
+  alias protections have regression tests. Repository descriptions can contain
+  unescaped newlines; updates stage the recorded source path and inspect the
+  materialized payload instead of guessing a selector from those descriptions.
