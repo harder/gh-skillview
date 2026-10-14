@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace SkillView.Inventory;
 
-internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
+internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBackend
 {
     private const int DirectoryEntryHeaderSize = 88;
     private const uint FileAttributeDirectory = 0x00000010;

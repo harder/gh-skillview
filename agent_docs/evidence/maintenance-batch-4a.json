@@ -1,0 +1,115 @@
+{
+  "batch": "4a",
+  "date": "2026-10-14",
+  "baseCommit": "34844d51606fbfc9522f2ebcd10e780aee32bf1f",
+  "scope": "M08/M15 foundations only: raw payload evidence and private durable creating/captured journals; no in-place restore or replacement authority",
+  "remaining": "ACL/xattr/root-permission/owner metadata restoration, dispositions, repair/relink/consolidation and recovery plans remain subsequent batches; M08 and M15 are not complete",
+  "localVerification": {
+    "sdk": "10.0.402",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "testsPassed": 1005,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "formatVerified": true,
+    "siteBuildPassed": true,
+    "standaloneAotTrimWarningsAreErrors": true,
+    "sequentialAppAndExtensionNativePublishPassed": true
+  },
+  "nativeRuntimeProof": [
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/batch4a/app-final/skillview",
+      "nativeSha256": "7491839ffe5353bfc38317c46a6b27ea7ed9489db385150fb94344a444fd2ad0",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "exactInstallationIdSelected": true,
+      "archiveAndJournalHashesVerified": true,
+      "completeFileBytesAndEmptyDirectoriesVerified": true,
+      "nativeLinkRemainedLeaf": true,
+      "unixPrivateModesVerified": true,
+      "selectedAndUnselectedPayloadsUnchanged": true,
+      "otherInstalledPayloadCannotBeState": true,
+      "sharedRegistryUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/batch4a/app-final/skillview",
+      "nativeSha256": "7491839ffe5353bfc38317c46a6b27ea7ed9489db385150fb94344a444fd2ad0",
+      "gh": "/opt/homebrew/bin/gh",
+      "exactInstallationIdSelected": true,
+      "archiveAndJournalHashesVerified": true,
+      "completeFileBytesAndEmptyDirectoriesVerified": true,
+      "nativeLinkRemainedLeaf": true,
+      "unixPrivateModesVerified": true,
+      "selectedAndUnselectedPayloadsUnchanged": true,
+      "otherInstalledPayloadCannotBeState": true,
+      "sharedRegistryUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/batch4a/ext-final/gh-skillview",
+      "nativeSha256": "2d3d519d3d52f666e6a8c29cc65da5eb92888f51b2b2af0818725e0f041d9970",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "exactInstallationIdSelected": true,
+      "archiveAndJournalHashesVerified": true,
+      "completeFileBytesAndEmptyDirectoriesVerified": true,
+      "nativeLinkRemainedLeaf": true,
+      "unixPrivateModesVerified": true,
+      "selectedAndUnselectedPayloadsUnchanged": true,
+      "otherInstalledPayloadCannotBeState": true,
+      "sharedRegistryUnchanged": true
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/batch4a/ext-final/gh-skillview",
+      "nativeSha256": "2d3d519d3d52f666e6a8c29cc65da5eb92888f51b2b2af0818725e0f041d9970",
+      "gh": "/opt/homebrew/bin/gh",
+      "exactInstallationIdSelected": true,
+      "archiveAndJournalHashesVerified": true,
+      "completeFileBytesAndEmptyDirectoriesVerified": true,
+      "nativeLinkRemainedLeaf": true,
+      "unixPrivateModesVerified": true,
+      "selectedAndUnselectedPayloadsUnchanged": true,
+      "otherInstalledPayloadCannotBeState": true,
+      "sharedRegistryUnchanged": true
+    }
+  ],
+  "independentReview": {
+    "model": "Astra",
+    "status": "no remaining actionable source findings after repeated review/fix cycles",
+    "focusedBackupTests": 23,
+    "focusedCliBackupCases": 7,
+    "acceptedFindings": [
+      "State creates are relative to held native roots; canonical strings do not replace authority.",
+      "Excluded installations retain live native handles and cached full object IDs, preventing rename-based state admission.",
+      "Windows state and existing writer files require current-user/SYSTEM-only ACLs; Unix root0700/file0600 require the current owner. No ACL or mode rewrites.",
+      "File flush is paired with held-directory fsync and Darwin device full-sync or Windows native write-through creation.",
+      "Darwin absent ACL semantics and variadic ARM64 openat permissions are verified against Apple sources and real file modes.",
+      "Ancestor policy is refreshed through held identities and reverse parent/child relations; bounded retries repeat all policy inspection after unrelated generation races.",
+      "Cancellation is checked immediately before native creates and between bounded exclusion comparisons.",
+      "A borrowed CLOEXEC writer handle avoids advisory-lock inheritance into child processes; independent reproduction and regression prove the release.",
+      "Native link blobs have explicit blobBytes separately from comparison byte accounting.",
+      "CLI exact selection rejects ambiguous flags and resolves relative paths against the captured working directory."
+    ]
+  },
+  "durabilityContract": "Verified OS publication calls and restart-visible journals; no globally atomic transaction against external managers/same-UID adversaries or unconditional storage hardware power-loss guarantee.",
+  "platformCI": {
+    "required": true,
+    "status": "pending PR",
+    "tests": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64"
+    ],
+    "nativeProofForBothHosts": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ]
+  },
+  "primarySources": [
+    "https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_file.c",
+    "https://github.com/apple-oss-distributions/Libc/blob/main/gen/filesec.c",
+    "https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile",
+    "https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching",
+    "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers"
+  ]
+}

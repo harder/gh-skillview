@@ -110,6 +110,44 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.True(string.IsNullOrWhiteSpace(stderr));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BackupJsonCapturesExactSelectionWithoutChangingEitherCopy(bool relativeSelector)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "backup-skills")).FullName;
+        var first = Directory.CreateDirectory(Path.Combine(root, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
+        const string markdown = "---\nname: duplicate\ndescription: Test\n---\nPayload\n";
+        File.WriteAllText(Path.Combine(first, "SKILL.md"), markdown);
+        File.WriteAllText(Path.Combine(second, "SKILL.md"), markdown);
+        File.WriteAllBytes(Path.Combine(first, "resource.bin"), [0, 255, 42]);
+        var before = SkillView.Maintenance.PayloadSnapshot.Capture(first, TestContext.Current.CancellationToken);
+        var (code, output, error) = await RunCliAsync("skillview", "--scan-root", root, "backup", "--path", relativeSelector ? Path.GetRelativePath(_tempRoot, first) : first, "--json");
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.True(string.IsNullOrWhiteSpace(error), error);
+        using var result = JsonDocument.Parse(output);
+        Assert.True(result.RootElement.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(before.Fingerprint, result.RootElement.GetProperty("fingerprint").GetString());
+        Assert.True(File.Exists(result.RootElement.GetProperty("archivePath").GetString()));
+        Assert.Equal(before.Fingerprint, SkillView.Maintenance.PayloadSnapshot.Capture(first, TestContext.Current.CancellationToken).Fingerprint);
+        Assert.Equal(markdown, File.ReadAllText(Path.Combine(second, "SKILL.md")));
+        Assert.Equal(["SKILL.md"], Directory.EnumerateFileSystemEntries(second).Select(Path.GetFileName));
+    }
+
+    [Theory]
+    [InlineData("--path", "one", "--path", "two")]
+    [InlineData("--path", "one", "--install-id", "id")]
+    [InlineData("--install-id", "one", "--install-id", "two")]
+    [InlineData("--path", "--json")]
+    [InlineData("--name", "duplicate")]
+    public async Task BackupRejectsAmbiguousOrIncompleteSelectorsBeforeCreatingState(params string[] arguments)
+    {
+        var (code, _, _) = await RunCliAsync("skillview", ["backup", .. arguments]);
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
     // --- update parser edge cases ----------------------------------------
 
     [Fact]
@@ -314,6 +352,7 @@ public class CliDispatcherErrorTests : IDisposable
                 ["HOME"] = home,
                 ["USERPROFILE"] = home,
                 ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
+                ["SKILLVIEW_STATE_HOME"] = Path.Combine(home, "maintenance-state"),
                 ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, "claude"),
                 ["PI_CODING_AGENT_DIR"] = Path.Combine(home, "pi"),
                 ["GIT_DIR"] = Path.Combine(_tempRoot, ".git"),

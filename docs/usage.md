@@ -106,6 +106,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
 | `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
+| `skillview backup --path <installed-directory>` | Capture private, bounded payload evidence with a durable creating/captured journal |
 | `skillview rescan` | Re-run inventory capture and print a summary |
 | `skillview search <query>` | Search public repositories for skills |
 | `skillview preview OWNER/REPO [SKILL]` | Render a skill preview without installing |
@@ -133,6 +134,35 @@ when a ref is supplied; for an entire repository, `OWNER/REPO@<ref> --all --pin`
 pins that ref. `--upstream` is a switch for a republished skill's declared
 upstream source, not a URL argument. Run `skillview --help` for the
 complete option list.
+
+For `backup`, select one exact installation with `--path` or `--install-id` from
+`list --json`. Put global flags before the command, for example:
+
+```bash
+skillview --scan-root /path/to/skills backup --path /path/to/skills/demo --json
+```
+
+The archive contains file bytes, empty directories, entry Unix modes and native
+link bytes. Link targets are not followed. Capture leaves installed payloads
+unchanged, including damaged `SKILL.md` files. This first archive format does not
+restore ACLs, extended attributes, root permissions or package-owner registries;
+there is no in-place restore or backup-and-replace update action yet.
+
+State defaults to `~/Library/Application Support/SkillView/maintenance` on macOS,
+`$XDG_STATE_HOME/SkillView/maintenance` (or `~/.local/state/SkillView/maintenance`)
+on Linux, and `%LOCALAPPDATA%/SkillView/maintenance` on Windows.
+`SKILLVIEW_STATE_HOME` overrides the base directory. State must be private and
+outside installed payloads and recognized agent skill roots. An existing shared
+state directory is refused rather than having its permissions rewritten. macOS
+inherited extended ACLs are also refused; choose a private destination.
+
+Captures retain a creating record before archive work, then publish a captured
+record only after source verification and file/directory durability barriers.
+Failed or canceled captures retain incomplete evidence. Quotas bound each archive,
+total retained bytes and entry counts; reaching a quota refuses new captures and
+does not prune history. The lock coordinates SkillView writers. It does not make
+an atomic transaction with other installers or a hostile process running as the
+same user, and storage hardware still determines power-loss guarantees.
 
 For `update`, select an exact installation with `--path <installed-directory>`
 or `--install-id <id>` from `list --json`. A name shared by several installations

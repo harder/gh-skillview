@@ -46,6 +46,7 @@ public static class CliDispatcher
                 "install" => await InstallAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "update" => await UpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "--help" or "-h" or "help" => PrintHelp(options),
@@ -69,7 +70,7 @@ public static class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "rescan" or "search" or "compare" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" => TimeSpan.FromMinutes(10),
+        "install" or "update" or "remove" or "cleanup" or "backup" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -475,6 +476,63 @@ public static class CliDispatcher
         w.WriteString("diagnostic", owner.Diagnostic);
         if (owner.SchemaVersion is { } schema) w.WriteNumber("schemaVersion", schema); else w.WriteNull("schemaVersion");
         w.WriteEndObject();
+    }
+
+    private static async Task<int> BackupAsync(AppOptions options, TuiServices services, CancellationToken token)
+    {
+        string? path = null, id = null;
+        var selectors = 0;
+        var json = false;
+        var args = options.SubcommandArgs;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] == "--json") { json = true; continue; }
+            if (args[i] is "--path" or "--install-id" && i + 1 < args.Count && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            { if (++selectors > 1) break; if (args[i] == "--path") path = args[++i]; else id = args[++i]; continue; }
+            Console.Error.WriteLine("skillview: unsupported or incomplete backup argument");
+            return ExitCodes.InvalidUsage;
+        }
+        if (selectors != 1 || (path is null) == (id is null) || path is not null && string.IsNullOrWhiteSpace(path)
+            || id is not null && string.IsNullOrWhiteSpace(id))
+        {
+            Console.Error.WriteLine("skillview: backup requires exactly one --path or --install-id");
+            return ExitCodes.InvalidUsage;
+        }
+        if (path is not null)
+        {
+            try { path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory); }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            { Console.Error.WriteLine("skillview: invalid backup path: " + TerminalEscapeSanitizer.Sanitize(ex.Message)); return ExitCodes.InvalidUsage; }
+        }
+        var snapshot = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
+            new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
+        var selected = snapshot.Skills.Where(skill => id is not null ? skill.InstallationId == id
+            : PathIdentity.Equals(skill.ResolvedPath, path!) || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path!))).ToArray();
+        if (selected.Length != 1)
+        { Console.Error.WriteLine("skillview: backup selector must identify one captured payload; include its --scan-root before backup"); return ExitCodes.NoMatches; }
+        try
+        {
+            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner));
+            var record = await Task.Run(() => store.Capture(selected[0], token, snapshot.Skills,
+                snapshot.ScannedRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
+            if (json) WriteJson(w =>
+            {
+                w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", true);
+                w.WriteString("id", record.Id); w.WriteString("installationId", record.InstallationId); w.WriteString("path", record.Path);
+                w.WriteString("fingerprint", record.BeforeFingerprint); w.WriteString("archiveHash", record.ArchiveHash);
+                w.WriteString("archivePath", record.ArchivePath); w.WriteString("status", record.Status);
+                w.WriteString("metadataContract", "file bytes, entry Unix modes and native link bytes; in-place restore requires a reviewed plan");
+                w.WriteEndObject();
+            });
+            else Console.WriteLine("Payload evidence captured: " + TerminalEscapeSanitizer.Sanitize(record.ArchivePath));
+            return ExitCodes.Success;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
+            else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
+            return ExitCodes.EnvironmentError;
+        }
     }
 
     private static async Task<int> CompareAsync(AppOptions options, TuiServices services, CancellationToken token)
@@ -1988,6 +2046,7 @@ public static class CliDispatcher
             | `install OWNER/REPO [SKILL]` | Install one skill, or every skill in the repo with `--all`, then rescan inventory. | `--all`, `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--from-local`, `--allow-hidden-dirs`, `--json` |
             | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
+            | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 
