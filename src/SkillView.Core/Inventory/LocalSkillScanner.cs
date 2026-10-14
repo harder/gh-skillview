@@ -48,7 +48,8 @@ public sealed class LocalSkillScanner
     internal ImmutableArray<InstalledSkill> ScanWithCancellation(
         IReadOnlyList<ScanRoot> roots,
         Options? options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICollection<string>? inaccessiblePaths = null)
     {
         options ??= new Options();
         var byResolved = new Dictionary<string, Builder>(StringComparer.Ordinal);
@@ -57,7 +58,7 @@ public sealed class LocalSkillScanner
         foreach (var root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken);
+            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken, inaccessiblePaths);
         }
 
         var builder = ImmutableArray.CreateBuilder<InstalledSkill>(byResolved.Count);
@@ -82,7 +83,8 @@ public sealed class LocalSkillScanner
         Options opts,
         Dictionary<string, Builder> acc,
         Dictionary<string, bool> caseSensitivityByParent,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICollection<string>? inaccessiblePaths)
     {
         // `EnumerateFileSystemEntries` includes broken symlinks, which
         // `EnumerateDirectories` silently skips on POSIX when stat fails.
@@ -94,11 +96,13 @@ public sealed class LocalSkillScanner
         }
         catch (IOException ex)
         {
+            inaccessiblePaths?.Add(root.Path);
             _logger.Warn("inventory.scan", $"enumerate {root.Path} failed: {ex.Message}");
             return;
         }
         catch (UnauthorizedAccessException ex)
         {
+            inaccessiblePaths?.Add(root.Path);
             _logger.Warn("inventory.scan", $"enumerate {root.Path} denied: {ex.Message}");
             return;
         }
@@ -115,6 +119,7 @@ public sealed class LocalSkillScanner
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
+                    inaccessiblePaths?.Add(root.Path);
                     _logger.Warn("inventory.scan", $"enumerate {root.Path} failed: {ex.Message}");
                     return;
                 }
@@ -177,6 +182,7 @@ public sealed class LocalSkillScanner
                     validity = ValidityState.UnparsableFrontMatter;
                 }
                 fm = parsed;
+                if (parsedFence && !fm.Diagnostics.IsEmpty) validity = ValidityState.InvalidMetadata;
                 if (fm.Name is not null && !string.Equals(fm.Name, Path.GetFileName(resolved), StringComparison.Ordinal))
                 {
                     // Treat a front-matter name mismatch as invalid so it stays visible.
@@ -223,7 +229,7 @@ public sealed class LocalSkillScanner
         var agentId = fm.Name is not null
             ? root.AgentHint ?? "unknown"
             : root.AgentHint ?? "unknown";
-        entry.AgentMemberships.Add(new AgentMembership(agentId, candidatePath, isSymlink));
+        entry.AgentMemberships.Add(new AgentMembership(AgentIdentity.Normalize(agentId), candidatePath, isSymlink, root.Scope, DiscoveryRoot: root.Path));
     }
 
     private static string ReadBoundedPrefix(string path, CancellationToken cancellationToken)
@@ -288,7 +294,7 @@ public sealed class LocalSkillScanner
             Ignored = false,
             InstalledAt = null,
             IsSymlinked = true,
-            AgentMemberships = { new AgentMembership(root.AgentHint ?? "unknown", candidatePath, true) },
+            AgentMemberships = { new AgentMembership(AgentIdentity.Normalize(root.AgentHint ?? "unknown"), candidatePath, true, root.Scope, DiscoveryRoot: root.Path) },
         };
     }
 

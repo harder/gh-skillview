@@ -321,6 +321,24 @@ public static class CliDispatcher
         w.WriteStartObject();
         w.WriteString("capturedAt", snapshot.CapturedAt.ToString("O"));
         w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
+        w.WriteNumber("schemaVersion", 2);
+        w.WriteBoolean("partial", snapshot.IsPartial);
+        w.WriteStartArray("inaccessiblePaths");
+        foreach (var path in snapshot.Diagnostics.InaccessiblePaths) w.WriteStringValue(path);
+        w.WriteEndArray();
+        w.WriteStartArray("providers");
+        foreach (var provider in snapshot.Providers)
+        {
+            w.WriteStartObject();
+            w.WriteString("provider", provider.Provider);
+            w.WriteBoolean("succeeded", provider.Succeeded);
+            w.WriteString("error", provider.Error);
+            w.WriteStartArray("coveredRoots");
+            foreach (var path in provider.CoveredRoots) w.WriteStringValue(path);
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
 
         w.WriteStartArray("scannedRoots");
         foreach (var r in snapshot.ScannedRoots)
@@ -338,6 +356,7 @@ public static class CliDispatcher
         {
             w.WriteStartObject();
             w.WriteString("name", skill.Name);
+            w.WriteString("installationId", skill.InstallationId);
             w.WriteString("resolvedPath", skill.ResolvedPath);
             w.WriteString("scanRoot", skill.ScanRoot);
             w.WriteString("scope", skill.Scope.ToString());
@@ -349,6 +368,14 @@ public static class CliDispatcher
             w.WriteString("githubTreeSha", skill.TreeSha);
             w.WriteString("version", skill.FrontMatter.Version);
             w.WriteString("description", skill.FrontMatter.Description);
+            w.WriteString("source", skill.FrontMatter.Upstream);
+            w.WriteString("repositoryRef", skill.FrontMatter.GithubRef);
+            w.WriteString("sourcePath", skill.FrontMatter.GithubPath);
+            w.WriteString("pinnedRef", skill.FrontMatter.PinnedRef);
+            w.WriteString("localSourcePath", skill.FrontMatter.LocalPath);
+            w.WriteStartArray("diagnostics");
+            foreach (var diagnostic in skill.FrontMatter.Diagnostics.Concat(skill.MetadataConflicts)) w.WriteStringValue(diagnostic);
+            w.WriteEndArray();
             w.WriteStartArray("agents");
             foreach (var a in skill.Agents)
             {
@@ -356,6 +383,9 @@ public static class CliDispatcher
                 w.WriteString("id", a.AgentId);
                 w.WriteString("path", a.Path);
                 w.WriteBoolean("isSymlink", a.IsSymlink);
+                w.WriteString("scope", a.Scope?.ToString());
+                w.WriteString("context", a.Context);
+                w.WriteString("discoveryRoot", a.DiscoveryRoot);
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -1479,7 +1509,7 @@ public static class CliDispatcher
         IReadOnlyList<ScanRoot> scanRoots,
         IReadOnlyList<InstalledSkill> allSkills)
     {
-        return candidate.Kind switch
+        return candidate.ReviewOnly ? RefuseUnsupportedCleanupCandidate(candidate) : candidate.Kind switch
         {
             CleanupClassifier.CandidateKind.BrokenSymlink =>
                 RemoveValidator.ValidateBrokenSymlink(candidate.Path, scanRoots),
@@ -1495,7 +1525,7 @@ public static class CliDispatcher
         new(
             ImmutableArray.Create(new RemoveValidator.Error(
                 RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"cleanup candidate kind '{candidate.Kind}' requires installed-skill metadata")),
+                $"cleanup candidate kind '{candidate.Kind}' requires comparison or ownership review, not bulk removal")),
             ImmutableArray<RemoveValidator.Warning>.Empty,
             candidate.Path,
             ImmutableArray<string>.Empty);
@@ -1563,6 +1593,7 @@ public static class CliDispatcher
         {
             w.WriteStartObject();
             w.WriteString("kind", c.Kind.ToString());
+            w.WriteBoolean("reviewOnly", c.ReviewOnly);
             w.WriteString("path", c.Path);
             w.WriteString("reason", c.Reason);
             w.WriteString("name", c.Skill?.Name);
@@ -1592,6 +1623,7 @@ public static class CliDispatcher
                 w.WriteStartObject();
                 w.WriteString("path", candidate.Path);
                 w.WriteString("kind", candidate.Kind.ToString());
+                w.WriteBoolean("reviewOnly", candidate.ReviewOnly);
                 w.WriteString("reason", "duplicate candidate path");
                 w.WriteEndObject();
             }

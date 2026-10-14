@@ -12,6 +12,13 @@ public sealed record SkillFrontMatter
     public string? License { get; init; }
     public string? Upstream { get; init; }
     public string? GithubTreeSha { get; init; }
+    public string? GithubRef { get; init; }
+    public string? GithubPath { get; init; }
+    public string? PinnedRef { get; init; }
+    public string? LocalPath { get; init; }
+    public string? Compatibility { get; init; }
+    public ImmutableDictionary<string, string> Metadata { get; init; } = ImmutableDictionary<string, string>.Empty;
+    public ImmutableArray<string> Diagnostics { get; init; } = [];
     public bool Pinned { get; init; }
     public ImmutableArray<string> AllowedTools { get; init; } = ImmutableArray<string>.Empty;
     public ImmutableArray<string> Agents { get; init; } = ImmutableArray<string>.Empty;

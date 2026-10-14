@@ -11,6 +11,26 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
+    public async Task RemoveSelectedAsync_ReviewOnlyCollisionCannotDeleteValidPayload()
+    {
+        var root = Directory.CreateTempSubdirectory("skillview-review-only-");
+        var dir = Path.Combine(root.FullName, "demo");
+        Directory.CreateDirectory(dir);
+        var content = "---\nname: demo\ndescription: preserve\n---\nlocal content";
+        File.WriteAllText(Path.Combine(dir, "SKILL.md"), content);
+        try
+        {
+            var skill = Skill("demo", dir);
+            var screen = CreateScreen([new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision,
+                dir, "comparison required", skill, ReviewOnly: true)], [new ScanRoot(root.FullName, Scope.Custom, null)], [skill]);
+            var result = await screen.RemoveSelectedAsync([0], TestContext.Current.CancellationToken);
+            Assert.Equal(0, result.Removed);
+            Assert.Equal(content, File.ReadAllText(Path.Combine(dir, "SKILL.md")));
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
+    [Fact]
     public void CountFailedSelections_DeduplicatedTarget_IsSkippedNotFailed()
     {
         var report = new RemoveService.BatchRemoveReport(

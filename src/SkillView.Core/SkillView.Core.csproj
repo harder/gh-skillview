@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
     <PackageReference Include="Terminal.Gui.Editor" Version="$(TerminalGuiEditorVersion)" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
   <ItemGroup>

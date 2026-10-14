@@ -30,6 +30,38 @@ public class GhCliContractTests
     }
 
     [Fact]
+    public async Task GhInstall_PinnedMetadataAndFilesystemExposureRoundTrip()
+    {
+        if (!ShouldRun) return;
+        var ghPath = GhPath();
+        Assert.NotNull(ghPath);
+        var root = Directory.CreateTempSubdirectory("skillview-metadata-contract-");
+        try
+        {
+            var logger = new Logger();
+            var runner = new ProcessRunner(logger);
+            var result = await runner.RunAsync(ghPath!,
+                ["skill", "install", "--dir", root.FullName, "--pin=v2.102.0", "--", "cli/cli", "skills/gh-skill"],
+                cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(result.Succeeded, result.StdErr);
+            var scanner = new SkillView.Inventory.LocalSkillScanner(logger);
+            var skill = Assert.Single(scanner.Scan([new SkillView.Inventory.Models.ScanRoot(root.FullName,
+                SkillView.Inventory.Models.Scope.Custom, null)]));
+            Assert.Equal(SkillView.Inventory.Models.ValidityState.Valid, skill.Validity);
+            Assert.True(skill.Pinned);
+            Assert.Equal("v2.102.0", skill.FrontMatter.PinnedRef);
+            Assert.Equal("https://github.com/cli/cli", skill.FrontMatter.Upstream);
+            Assert.False(string.IsNullOrWhiteSpace(skill.TreeSha));
+            Assert.Equal("skills/gh-skill", skill.FrontMatter.GithubPath);
+            var capture = await new GhSkillListAdapter(runner, logger).CaptureAsync(ghPath!,
+                directory: root.FullName, cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(capture.Succeeded, capture.Error);
+            Assert.Single(capture.Records);
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
+    [Fact]
     public async Task GhVersion_ProducesParseableOutput()
     {
         if (!ShouldRun) return;

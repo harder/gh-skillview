@@ -94,6 +94,10 @@ public static class InstalledScreen
             s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
         AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
         AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned)));
+        if (s.FrontMatter.GithubRef is { } repositoryRef) AppendDetailItem(sb, "Repository ref", MarkdownTableFormatter.FormatCodeSpan(repositoryRef));
+        if (s.FrontMatter.PinnedRef is { } pinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(pinnedRef));
+        if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));
+        if (s.FrontMatter.LocalPath is { } localPath) AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
         AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
         if (!string.IsNullOrWhiteSpace(s.TreeSha))
         {
@@ -136,6 +140,8 @@ public static class InstalledScreen
             sb.AppendLine();
             sb.AppendLine(desc);
         }
+        foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts))
+            sb.AppendLine($"- ⚠️ {MarkdownTableFormatter.FormatTableCell(diagnostic)}");
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();

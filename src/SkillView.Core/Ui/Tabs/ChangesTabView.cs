@@ -329,6 +329,7 @@ internal sealed class ChangesTabView : FrameView
         // don't belong in Changes unless cleanup items are actually queued.
         // This summary describes cleanup state only — update availability is
         // unknown until dry-run and diagnostics are always accessible via 'd'.
+        if (snapshot.IsPartial) return "Partial inventory — review scan diagnostics";
         if (hasPendingCleanup)
         {
             if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))

@@ -1,0 +1,35 @@
+{
+  "baseline": "d6a5785",
+  "sdk": "10.0.402",
+  "fullSuite": {
+    "passed": 860,
+    "failed": 0,
+    "skipped": 0
+  },
+  "independentReview": {
+    "model": "Astra",
+    "rounds": 3,
+    "acceptedFindingsAddressed": 8,
+    "remainingActionableFindings": 0
+  },
+  "nativeRuntimeProof": [
+    {
+      "gh": "gh version 2.97.0 (2026-07-31)",
+      "nativeHost": true,
+      "physicalRows": 3,
+      "pinsAndSourcesVerified": true,
+      "customRootMerged": true,
+      "collisionCandidatesReviewOnly": 2,
+      "payloadsUnchangedAfterCleanupApply": true
+    },
+    {
+      "gh": "gh version 2.102.0 (2026-09-30)",
+      "nativeHost": true,
+      "physicalRows": 3,
+      "pinsAndSourcesVerified": true,
+      "customRootMerged": true,
+      "collisionCandidatesReviewOnly": 2,
+      "payloadsUnchangedAfterCleanupApply": true
+    }
+  ]
+}

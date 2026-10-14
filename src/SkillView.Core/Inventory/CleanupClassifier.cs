@@ -22,13 +22,17 @@ public static class CleanupClassifier
         HiddenNestedResidue,
         BrokenSymlink,
         OrphanCanonicalCopy,
+        NameCollision,
+        Untracked,
+        MetadataConflict,
     }
 
     public sealed record Candidate(
         CandidateKind Kind,
         string Path,
         string Reason,
-        InstalledSkill? Skill);
+        InstalledSkill? Skill,
+        bool ReviewOnly = false);
 
     internal sealed record CandidateSelection(
         ImmutableArray<Candidate> Unique,
@@ -137,24 +141,25 @@ public static class CleanupClassifier
             // Malformed (missing SKILL.md, unparsable front-matter, name mismatch).
             if (skill.Validity == ValidityState.MissingSkillMd ||
                 skill.Validity == ValidityState.UnparsableFrontMatter ||
-                skill.Validity == ValidityState.NameMismatch)
+                skill.Validity == ValidityState.NameMismatch ||
+                skill.Validity == ValidityState.InvalidMetadata)
             {
                 result.Add(new Candidate(
                     CandidateKind.Malformed,
                     skill.ResolvedPath,
-                    $"validity={skill.Validity}",
-                    skill));
+                    $"validity={skill.Validity}; inspect or repair metadata before removal",
+                    skill, ReviewOnly: true));
                 continue;
             }
 
             // Source-orphaned: CLI knows nothing about it but filesystem has it.
-            if (snapshot.UsedGhSkillList && skill.Provenance == Provenance.FsScan)
+            if (WasCovered(snapshot, skill) && skill.Provenance == Provenance.FsScan)
             {
                 result.Add(new Candidate(
-                    CandidateKind.SourceOrphaned,
+                    CandidateKind.Untracked,
                     skill.ResolvedPath,
-                    "present on disk but unknown to `gh skill list`",
-                    skill));
+                    "not reported by gh; may be unmanaged or outside provider coverage — review ownership",
+                    skill, ReviewOnly: true));
                 continue;
             }
 
@@ -187,36 +192,27 @@ public static class CleanupClassifier
             }
         }
 
-        // Duplicate logical install — two+ skills with same name at different
-        // resolved paths, neither symlinked to the other.
+        // A name collision is a review task, never evidence of redundant content.
+        // Every physical copy remains visible; no arbitrary survivor is chosen.
         foreach (var (name, bucket) in byName)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (bucket.Count < 2) continue;
-            // Pick the "primary" (prefer `Both` > `CliList` > `FsScan`, then
-            // earliest InstalledAt, then shortest path) and mark the rest as
-            // duplicates.
-            var sorted = bucket
-                .OrderBy(s => s.Provenance switch
-                {
-                    Provenance.Both => 0,
-                    Provenance.CliList => 1,
-                    _ => 2,
-                })
-                .ThenBy(s => s.InstalledAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(s => s.ResolvedPath.Length)
-                .ToList();
-            for (var i = 1; i < sorted.Count; i++)
+            var copies = bucket.DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).ToArray();
+            if (copies.Length < 2) continue;
+            foreach (var copy in copies)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var dup = sorted[i];
-                if (dup.Ignored && !options.IncludeIgnored) continue;
-                result.Add(new Candidate(
-                    CandidateKind.Duplicate,
-                    dup.ResolvedPath,
-                    $"duplicate of '{sorted[0].ResolvedPath}' (same name '{name}')",
-                    dup));
+                if (copy.Ignored && !options.IncludeIgnored) continue;
+                result.Add(new Candidate(CandidateKind.NameCollision, copy.ResolvedPath,
+                    $"{copies.Length} physical installations share name '{name}'; compare sources, revisions, payloads and contexts before consolidation",
+                    copy, ReviewOnly: true));
             }
+        }
+        foreach (var skill in snapshot.Skills)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (skill.MetadataConflicts.IsEmpty || (skill.Ignored && !options.IncludeIgnored)) continue;
+            result.Add(new Candidate(CandidateKind.MetadataConflict, skill.ResolvedPath,
+                string.Join("; ", skill.MetadataConflicts), skill, ReviewOnly: true));
         }
 
         // Broken shared mapping: two records with the SAME resolved path but
@@ -232,7 +228,7 @@ public static class CleanupClassifier
                 CandidateKind.BrokenSharedMapping,
                 group[0].ResolvedPath,
                 $"shared install reports conflicting names: {string.Join(", ", names)}",
-                group[0]));
+                group[0], ReviewOnly: true));
         }
 
         // Empty directories inside scan roots — not in `snapshot.Skills`
@@ -285,6 +281,16 @@ public static class CleanupClassifier
         }
 
         return result.ToImmutable();
+    }
+
+    private static bool WasCovered(InventorySnapshot snapshot, InstalledSkill skill)
+    {
+        // Older in-memory callers have no provider records. Production captures
+        // carry explicit coverage; failed or excluded roots establish no absence.
+        if (snapshot.Providers.IsEmpty) return snapshot.UsedGhSkillList;
+        return snapshot.Providers.Any(provider => provider.Succeeded && provider.CoveredRoots.Any(root =>
+            PathResolver.IsInside(skill.ResolvedPath, root)
+            || skill.Agents.Any(agent => PathResolver.IsInside(agent.Path, root))));
     }
 
     private static bool IsHiddenNested(string resolvedPath, IReadOnlyList<ScanRoot> roots)

@@ -505,6 +505,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.
 
+- Skill maintenance invariants and batch evidence live in
+  `agent_docs/maintenance-implementation.md`. A name collision or absent gh
+  catalog entry is never sufficient removal evidence. Preserve explicit root
+  coverage, authored-version versus repository-ref semantics, and all agent
+  exposures when reconciling inventory. Frontmatter uses bounded YAML events;
+  do not replace it with reflection-based deserialization or alias expansion.
+
 ## Progressive disclosure
 
 - `agent_docs/running-tests.md` — standard verification commands, UI-focused

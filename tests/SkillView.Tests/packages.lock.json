@@ -361,11 +361,17 @@
           "xunit.v3.runner.common": "[4.0.2]"
         }
       },
+      "YamlDotNet": {
+        "type": "Transitive",
+        "resolved": "18.1.0",
+        "contentHash": "5K+9KFg2TdTl7VXv88Qzi/0lqK6JFoNP3lRuImPYGRV7K/QYklDyTrj4+A+KAki1JsQi6qKY+hDyY7d6WRqjrw=="
+      },
       "skillview.core": {
         "type": "Project",
         "dependencies": {
           "Terminal.Gui": "[2.5.0, )",
-          "Terminal.Gui.Editor": "[2.5.7, )"
+          "Terminal.Gui.Editor": "[2.5.7, )",
+          "YamlDotNet": "[18.1.0, )"
         }
       }
     },
