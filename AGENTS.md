@@ -556,7 +556,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   prepared/completion journals, and held root/parent/object evidence. Keep it limited
   to explicitly reviewed standalone custom-directory copies; never add archive
   extraction, overwrite, cross-volume copy/delete, or automatic ambiguous recovery.
-  See `docs/quarantine-and-undo.md`. Quarantine retains live ACLs/links and does not
+  Resolve discovered exposure destinations even when links are dangling, relative
+  or aliased, and check subtree overlap at source, retained and original addresses
+  before publishing prepared journals. See `docs/quarantine-and-undo.md`.
+  Quarantine retains live ACLs/links and does not
   isolate content or attest agent session state.
 - Unix directory enumeration must open a fresh cursor relative to the held
   directory (`openat` of `.`), not `dup` the directory descriptor: duplicated

@@ -474,3 +474,9 @@ This finishes the agreed maintenance milestone. Broader M08/M13–M15 owner-awar
 repair/consolidation and generic plan/apply, remaining agent UX/doctor work and
 complete metadata attestation remain follow-ups. They are not represented as
 implemented by this batch. The original macOS native crash has not been reproduced.
+
+Copilot review found two consumer gaps: dangling links activated by undo and
+separately discovered subtree skills. Both now gate relocation/undo before journal
+admission using bounded intended-address resolution and canonical overlap checks.
+Six regressions and native refusal proofs cover the fixes, including ambiguous
+alias-parent traversal refusal. Independent re-review validates the final fixes.

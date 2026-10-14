@@ -23,12 +23,17 @@ public sealed class QuarantineStoreTests : IDisposable
         File.WriteAllBytes(Path.Combine(Payload, "data"), [0, 255, 3]);
     }
     public void Dispose() => temporary.Delete(true);
-    private InventorySnapshot Inventory() => InventorySnapshot.Empty with
+    private readonly List<ScanRoot> additionalRoots = [];
+    private InventorySnapshot Inventory()
     {
-        Skills = new LocalSkillScanner(new Logger()).Scan([new(Skills, Scope.Custom, null)]).ToImmutableArray(),
-        ScannedRoots = [new(Skills, Scope.Custom, null)],
-        ConfiguredRoots = [new(Skills, Scope.Custom, null)]
-    };
+        ScanRoot[] roots = [new(Skills, Scope.Custom, null), .. additionalRoots];
+        return InventorySnapshot.Empty with
+        {
+            Skills = new LocalSkillScanner(new Logger()).Scan(roots).ToImmutableArray(),
+            ScannedRoots = roots.ToImmutableArray(),
+            ConfiguredRoots = roots.ToImmutableArray()
+        };
+    }
     private QuarantineResult Apply()
     {
         var inventory = Inventory(); var target = Assert.Single(inventory.Skills);
@@ -198,6 +203,63 @@ public sealed class QuarantineStoreTests : IDisposable
         Assert.Throws<IOException>(() => Store.Undo(result.Id, inventory, true, Token));
         Assert.True(Directory.Exists(result.RetainedPath)); Assert.False(Directory.Exists(Payload));
         Assert.False(File.Exists(Path.Combine(State, result.Id, "undo-prepared.json")));
+    }
+
+    private string AddAgentRoot()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(temporary.FullName, "agent-skills")).FullName;
+        additionalRoots.Add(new(root, Scope.User, "claude")); return root;
+    }
+
+    [Theory]
+    [InlineData("absolute")]
+    [InlineData("relative")]
+    [InlineData("alias")]
+    [InlineData("alias-parent")]
+    public void UndoRefusesNewDanglingAgentLinkToOriginalDestination(string kind)
+    {
+        var agentRoot = AddAgentRoot();
+        var alias = Path.Combine(temporary.FullName, "alias");
+        if (kind == "alias") Directory.CreateSymbolicLink(alias, Skills);
+        if (kind == "alias-parent")
+        {
+            var physical = Directory.CreateDirectory(Path.Combine(Payload, "child")).FullName;
+            Directory.CreateSymbolicLink(alias, physical);
+        }
+        var result = Apply();
+        var destination = kind == "alias" ? Path.Combine(alias, "demo") : Payload;
+        if (kind == "alias-parent") destination = alias + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + "demo";
+        if (kind == "relative") destination = Path.GetRelativePath(agentRoot, destination);
+        Directory.CreateSymbolicLink(Path.Combine(agentRoot, "demo"), destination);
+        var inventory = Inventory(); Assert.Contains(inventory.Skills, skill => skill.Validity == ValidityState.BrokenSymlink);
+        Assert.Throws<IOException>(() => Store.Undo(result.Id, inventory, true, Token));
+        Assert.False(File.Exists(Path.Combine(State, result.Id, "undo-prepared.json")));
+        Assert.True(Directory.Exists(result.RetainedPath)); Assert.False(Directory.Exists(Payload));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SubtreeAgentExposureRefusesQuarantineOrUndoBeforeJournal(bool undo)
+    {
+        var agentRoot = AddAgentRoot();
+        var nested = Directory.CreateDirectory(Path.Combine(Payload, "sub")).FullName;
+        File.WriteAllText(Path.Combine(nested, "SKILL.md"), "---\nname: sub\ndescription: Nested\n---\nBody\n");
+        if (!undo)
+        {
+            Directory.CreateSymbolicLink(Path.Combine(agentRoot, "sub"), nested);
+            var inventory = Inventory(); var target = Assert.Single(inventory.Skills, skill => skill.Name == "demo");
+            Assert.Throws<IOException>(() => Store.Preview(target, inventory, Token));
+            Assert.False(Directory.Exists(State)); Assert.True(Directory.Exists(Payload));
+        }
+        else
+        {
+            var result = Apply();
+            Directory.CreateSymbolicLink(Path.Combine(agentRoot, "sub"), Path.Combine(result.RetainedPath, "sub"));
+            Assert.Throws<IOException>(() => Store.Undo(result.Id, Inventory(), true, Token));
+            Assert.False(File.Exists(Path.Combine(State, result.Id, "undo-prepared.json")));
+            Assert.True(Directory.Exists(result.RetainedPath)); Assert.False(Directory.Exists(Payload));
+        }
     }
 
 }

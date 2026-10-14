@@ -40,6 +40,12 @@ for gh in args.gh or [None]:
         if os.name != 'nt':
             payload.joinpath('data').chmod(0o500)
             payload.joinpath('link').symlink_to('data')
+        nested = payload / 'sub'
+        nested.mkdir()
+        nested.joinpath('SKILL.md').write_text('---\nname: sub\ndescription: Nested\n---\nBody\n')
+        agent_root = home / '.claude' / 'skills'
+        agent_root.mkdir(parents=True)
+        exposure = agent_root / 'sub'
         original_inode = payload.stat().st_ino
         original_mode = payload.joinpath('data').stat().st_mode
         original = payload.joinpath('SKILL.md').read_bytes()
@@ -50,6 +56,10 @@ for gh in args.gh or [None]:
             assert (process.returncode == 0) == ok, (process.returncode, process.stdout, process.stderr)
             return json.loads(process.stdout)
 
+        exposure.symlink_to(nested, target_is_directory=True)
+        run('quarantine', '--path', payload, ok=False)
+        assert payload.exists() and not root.joinpath('state').exists()
+        exposure.unlink()
         preview = run('quarantine', '--path', payload)['operations'][0]
         assert preview['status'] == 'preview' and not preview['mutationObserved']
         assert not root.joinpath('state').exists(), 'Preview created state'
@@ -68,6 +78,16 @@ for gh in args.gh or [None]:
             assert os.readlink(retained / 'link') == 'data'
             assert retained.parent.stat().st_mode & 0o777 == 0o700
         assert run('quarantine-history')['operations'][0]['status'] == 'quarantined'
+        exposure.symlink_to(os.path.relpath(payload, agent_root), target_is_directory=True)
+        run('undo', '--id', operation_id, '--yes', ok=False)
+        assert retained.exists() and not payload.exists()
+        assert not retained.parent.joinpath('undo-prepared.json').exists()
+        exposure.unlink()
+        exposure.symlink_to(retained / 'sub', target_is_directory=True)
+        run('undo', '--id', operation_id, '--yes', ok=False)
+        assert retained.exists() and not payload.exists()
+        assert not retained.parent.joinpath('undo-prepared.json').exists()
+        exposure.unlink()
         undo_preview = run('undo', '--id', operation_id)['operations'][0]
         assert undo_preview['succeeded'] and not undo_preview['mutationObserved'] and not payload.exists()
         restored = run('undo', '--id', operation_id, '--yes')['operations'][0]
@@ -92,7 +112,9 @@ for gh in args.gh or [None]:
                             payloadBytesModesLinksAndEmptyDirectoriesPreserved=True, undoPreviewReadOnly=True,
                             undoRestoredOriginalDirectory=True, repeatedUndoVerifiedNoOp=True,
                             occupiedRestorePathPreserved=True, completeJournalHistory=True,
-                            securityIsolationClaimed=False, archiveExtractionUsed=False))
+                            securityIsolationClaimed=False, archiveExtractionUsed=False,
+                            subtreeQuarantineConsumerRefused=True, danglingUndoDestinationRefused=True,
+                            subtreeUndoConsumerRefused=True))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
 print(json.dumps(results, indent=2))

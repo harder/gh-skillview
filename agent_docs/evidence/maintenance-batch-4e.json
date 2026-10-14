@@ -7,7 +7,7 @@
     "sdk": "10.0.402",
     "buildWarnings": 0,
     "buildErrors": 0,
-    "testsPassed": 1097,
+    "testsPassed": 1103,
     "testsFailed": 0,
     "testsSkipped": 0,
     "formatVerified": true,
@@ -16,16 +16,19 @@
     "standaloneTrimWarningsAreErrors": true
   },
   "independentReview": {
-    "review": "clear after fixes and final re-review",
-    "affectedTestsPassed": 81,
+    "review": "clear after Copilot findings, six consumer regressions and independent final re-review",
+    "affectedTestsPassed": 87,
     "failed": 0,
     "skipped": 0,
-    "remainingFindings": 0
+    "remainingFindings": 0,
+    "finalQuarantineTestsPassed": 22,
+    "previousAffectedRunPassed": 86,
+    "copilotFindingsAddressed": 2
   },
   "nativeRuntimeProof": [
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
-      "nativeSha256": "179ba439a0bbfc47f3b762671b90232d423a6adc3d923d7f8866c8af6bc2c744",
+      "nativeSha256": "20df5b0017a972e1bf1a439ad62708d5a17ae3151f6312aa42bae0457132c932",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -37,11 +40,14 @@
       "occupiedRestorePathPreserved": true,
       "completeJournalHistory": true,
       "securityIsolationClaimed": false,
-      "archiveExtractionUsed": false
+      "archiveExtractionUsed": false,
+      "subtreeQuarantineConsumerRefused": true,
+      "danglingUndoDestinationRefused": true,
+      "subtreeUndoConsumerRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
-      "nativeSha256": "179ba439a0bbfc47f3b762671b90232d423a6adc3d923d7f8866c8af6bc2c744",
+      "nativeSha256": "20df5b0017a972e1bf1a439ad62708d5a17ae3151f6312aa42bae0457132c932",
       "gh": "/opt/homebrew/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -53,11 +59,14 @@
       "occupiedRestorePathPreserved": true,
       "completeJournalHistory": true,
       "securityIsolationClaimed": false,
-      "archiveExtractionUsed": false
+      "archiveExtractionUsed": false,
+      "subtreeQuarantineConsumerRefused": true,
+      "danglingUndoDestinationRefused": true,
+      "subtreeUndoConsumerRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
-      "nativeSha256": "369bcdec3e6b352062bc02429aba097a53b0c08d97f3397f0103da0da495e0c5",
+      "nativeSha256": "503fbe99b19bbb1ee2b5ce52b9cb6f2a05756fa06bb8bd731ebbdd354bb97736",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -69,11 +78,14 @@
       "occupiedRestorePathPreserved": true,
       "completeJournalHistory": true,
       "securityIsolationClaimed": false,
-      "archiveExtractionUsed": false
+      "archiveExtractionUsed": false,
+      "subtreeQuarantineConsumerRefused": true,
+      "danglingUndoDestinationRefused": true,
+      "subtreeUndoConsumerRefused": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
-      "nativeSha256": "369bcdec3e6b352062bc02429aba097a53b0c08d97f3397f0103da0da495e0c5",
+      "nativeSha256": "503fbe99b19bbb1ee2b5ce52b9cb6f2a05756fa06bb8bd731ebbdd354bb97736",
       "gh": "/opt/homebrew/bin/gh",
       "previewReadOnly": true,
       "staleReviewRefusedBeforeState": true,
@@ -85,7 +97,10 @@
       "occupiedRestorePathPreserved": true,
       "completeJournalHistory": true,
       "securityIsolationClaimed": false,
-      "archiveExtractionUsed": false
+      "archiveExtractionUsed": false,
+      "subtreeQuarantineConsumerRefused": true,
+      "danglingUndoDestinationRefused": true,
+      "subtreeUndoConsumerRefused": true
     }
   ],
   "limits": [
@@ -97,7 +112,7 @@
     "Original macOS native crash remains unreproduced"
   ],
   "ci": {
-    "status": "required before merge",
+    "status": "final corrective head must pass before merge",
     "testPlatforms": [
       "macos-15",
       "ubuntu-latest",
@@ -108,6 +123,10 @@
       "linux-x64",
       "win-x64",
       "win-arm64"
-    ]
+    ],
+    "initialHead": "b890317350b7794adbc78c4f6dfe71bb520206b2",
+    "initialRunId": 38652240085,
+    "initialTestsPerPlatform": 1097,
+    "initialAllEightNativeProofsPassed": true
   }
 }

@@ -35,7 +35,10 @@ skillview --scan-root /path/to/custom-skills quarantine-history --json
 
 Undo checks the retained native directory and payload, original root/parent
 identity and generation, discovery context, and vacancy of the original path.
-It refuses a replacement at that path. An already completed undo verifies the
+It refuses a replacement at that path. Discovered installations and exposures
+that overlap either subtree are refused, including dangling agent links whose
+relative or aliased targets would become active when the original path returns.
+A link component followed by `..` is treated as uncertain and requires inspection. An already completed undo verifies the
 restored object and returns success without another move.
 
 State is stored under `SkillView/quarantine` in the platform state directory, or

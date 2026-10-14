@@ -121,6 +121,7 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
         if (components.Any(part => part.Equals("plugins", StringComparison.OrdinalIgnoreCase)
             || part.Equals("extensions", StringComparison.OrdinalIgnoreCase)))
             throw new IOException("Plugin/extension locations are excluded; use the owning manager.");
+        EnsureNoConsumers(target.ResolvedPath, inventory, token, target);
         var validation = RemoveValidator.Validate(target, inventory.ScannedRoots, inventory.Skills, token);
         if (!validation.Allowed || !validation.Warnings.IsEmpty)
             throw new IOException("Standalone quarantine policy refused: " + string.Join("; ",

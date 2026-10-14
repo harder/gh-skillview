@@ -39,9 +39,8 @@ internal sealed partial class QuarantineStore
         if (record.RootAfter is null || record.ParentAfter is null || record.TargetAfter is null
             || !ValidHash(record.ObjectFingerprintAfter!)) throw new IOException("Quarantine completion authority is incomplete.");
         var retainedPath = Path.Combine(operation.CanonicalPath, "payload");
-        if (inventory.Skills.Any(skill => OwnershipPath.Same(skill.ResolvedPath, retainedPath)
-            || skill.Agents.Any(agent => OwnershipPath.Same(agent.Path, retainedPath))))
-            throw new IOException("The retained directory now has a discovered consumer; review its exposures before undo.");
+        EnsureNoConsumers(retainedPath, inventory, token);
+        EnsureNoConsumers(record.OriginalPath, inventory, token);
         RequireAbsent(record.OriginalPath);
         using (var source = NativeDirectoryMoveLease.Open(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "payload"), token))
             VerifyRecordedPayload(record, source.Capture(token));
