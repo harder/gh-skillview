@@ -445,9 +445,9 @@ public sealed class CleanupScreen
                 CleanupClassifier.CandidateKind.BrokenSymlink =>
                     RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots),
                 CleanupClassifier.CandidateKind.EmptyDirectory =>
-                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots),
+                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, cancellationToken),
                 _ when candidate.Skill is not null =>
-                    RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills),
+                    RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, cancellationToken),
                 _ => RefuseUnsupportedCandidate(candidate),
             };
             if (!validation.Allowed || validation.RequiresSecondConfirm)

@@ -52,7 +52,7 @@ public class RemoveValidatorTests : IDisposable
     {
         var dir = MakeSkillDir("ok");
         var skill = MakeSkill(dir, "ok");
-        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(v.Allowed);
         Assert.Empty(v.Errors);
         Assert.Empty(v.Warnings);
@@ -107,7 +107,7 @@ public class RemoveValidatorTests : IDisposable
         var validation = RemoveValidator.Validate(
             skill,
             [new ScanRoot(filesystemRoot, Scope.User, "claude")],
-            [skill]);
+            [skill], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
         Assert.NotNull(validation.ExecutionIdentity);
@@ -119,7 +119,7 @@ public class RemoveValidatorTests : IDisposable
         var dir = MakeSkillDir("ok");
         var skill = MakeSkill(dir, "ok");
         var otherRoot = new ScanRoot(Path.Combine(Path.GetTempPath(), "other-root-" + Guid.NewGuid()), Scope.User, null);
-        var v = RemoveValidator.Validate(skill, new[] { otherRoot }, new[] { skill });
+        var v = RemoveValidator.Validate(skill, new[] { otherRoot }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(v.Allowed);
         Assert.Contains(v.Errors, e => e.Kind == RemoveValidator.ErrorKind.OutsideKnownRoots);
     }
@@ -129,7 +129,7 @@ public class RemoveValidatorTests : IDisposable
     {
         var dir = MakeSkillDir("bare", withSkillMd: false);
         var skill = MakeSkill(dir, "bare");
-        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(v.Allowed);
         Assert.Contains(v.Errors, e => e.Kind == RemoveValidator.ErrorKind.NotASkillDirectory);
     }
@@ -139,7 +139,7 @@ public class RemoveValidatorTests : IDisposable
     {
         var dir = MakeSkillDir("cloned", withGit: true);
         var skill = MakeSkill(dir, "cloned");
-        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var v = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(v.Allowed);
         Assert.Contains(v.Errors, e => e.Kind == RemoveValidator.ErrorKind.ContainsGitDirectory);
     }
@@ -151,7 +151,7 @@ public class RemoveValidatorTests : IDisposable
         var dir = MakeSkillDir("root-skill");
         var skill = MakeSkill(dir, "root-skill");
         var root = new ScanRoot(dir, Scope.User, "claude");
-        var v = RemoveValidator.Validate(skill, new[] { root }, new[] { skill });
+        var v = RemoveValidator.Validate(skill, new[] { root }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(v.Allowed);
         Assert.Contains(v.Errors, e => e.Kind == RemoveValidator.ErrorKind.TargetIsScanRoot);
     }
@@ -172,7 +172,7 @@ public class RemoveValidatorTests : IDisposable
             Agents = ImmutableArray.Create(new AgentMembership("other", linkDir, true)),
         };
 
-        var v = RemoveValidator.Validate(canonicalSkill, new[] { Root() }, new[] { canonicalSkill, linkSkill });
+        var v = RemoveValidator.Validate(canonicalSkill, new[] { Root() }, new[] { canonicalSkill, linkSkill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(v.Allowed);
         Assert.True(v.RequiresSecondConfirm);
         Assert.Contains(v.Warnings, w => w.Kind == RemoveValidator.WarningKind.HasIncomingSymlinks);
@@ -194,7 +194,7 @@ public class RemoveValidatorTests : IDisposable
         var skill = MakeSkill(linkedSkill, "linked-root-skill");
         var root = new ScanRoot(linkedRoot, Scope.User, "claude");
 
-        var validation = RemoveValidator.Validate(skill, new[] { root }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { root }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
         Assert.NotNull(validation.ExecutionIdentity);
@@ -207,7 +207,7 @@ public class RemoveValidatorTests : IDisposable
         var dir = Path.Combine(_tempRoot, "empty-cleanup");
         Directory.CreateDirectory(dir);
 
-        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
         Assert.NotNull(validation.ExecutionIdentity);
@@ -218,7 +218,7 @@ public class RemoveValidatorTests : IDisposable
     [Fact]
     public void ValidateEmptyDirectory_RefusesScanRootItself()
     {
-        var validation = RemoveValidator.ValidateEmptyDirectory(_tempRoot, new[] { Root() });
+        var validation = RemoveValidator.ValidateEmptyDirectory(_tempRoot, new[] { Root() }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(validation.Allowed);
         Assert.Contains(validation.Errors,

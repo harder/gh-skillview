@@ -24,7 +24,7 @@ originating Codex chat. No installed user skills are test targets.
 - Baseline: main d6a5785 (1.0.1), pinned SDK 10.0.402.
 - New YAML dependency 18.1.0 is used through bounded parsing events only; no
   reflection-based object serializer or alias expansion.
-- Final full suite: 860 passed, zero failed/skipped.
+- Final full suite: 867 passed, zero failed/skipped.
 - Native runtime fixtures under gh 2.97.0 and 2.102.0 verified pins, source/ref
   preservation, custom-root reconciliation, and unchanged payloads after refused
   `cleanup --apply --yes`. See `agent_docs/evidence/maintenance-batch-1.json`.
@@ -53,3 +53,12 @@ originating Codex chat. No installed user skills are test targets.
 - Every provider outcome and every discovery context must survive reconciliation.
 - Filtered test flags can select fewer tests than expected: use the full suite
   and assert counts, plus exact query filters for opt-in contract methods.
+
+- Windows CI exposed stale directory validation after a child link replacement.
+  Parent ChangeTime alone does not reliably detect this. Windows validation now
+  brackets policy inspection with bounded, handle-relative immediate-entry
+  fingerprints, includes reparse data and rechecks before any deletion callback.
+  Entry-limit/read errors refuse removal; cancellation precedes native reads.
+  This detects immediate-entry changes, not an atomic recursive snapshot.
+  Regression coverage includes in-place retargeting with unchanged link identity,
+  refreshed parent identity, capture mutation, cancellation and entry-limit refusal.

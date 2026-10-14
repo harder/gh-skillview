@@ -283,7 +283,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   well as device/inode for selected directories, parents, links, and observed
   entries because filesystems may immediately recycle an inode. A selected
   directory whose generation or contents changed after validation must be
-  refused and revalidated, not accepted for compatibility with stale behavior.
+  refused and revalidated, not accepted for compatibility with stale behavior. Windows
+  also pins a deterministic immediate-entry fingerprint (4,096-entry bound),
+  including full opened-child identities and raw reparse data. Compare snapshots
+  around policy inspection and before any mutation; cancellation must precede
+  each native enumeration/read. This is not an atomic recursive content snapshot.
   Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles

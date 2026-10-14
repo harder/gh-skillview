@@ -1,4 +1,6 @@
 using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using SkillView.Inventory;
 using Xunit;
 
@@ -178,7 +180,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
             linkedRoot,
             Path.Combine(linkedRoot, "skill"),
             out var snapshot,
-            out var error);
+            out var error, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(captured, error);
         Assert.True(snapshot.Directory.HasGitDirectory);
@@ -249,7 +251,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         var captured = backend.TryCaptureDirectoryValidation(
             skill,
             out var snapshot,
-            out var error);
+            out var error, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(Directory.Exists(Path.Combine(movedSkill, ".git")));
         Assert.False(Directory.Exists(Path.Combine(skill, ".git")));
@@ -287,6 +289,187 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         Assert.NotNull(error);
         Assert.True(Directory.Exists(target));
         Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
+    public void RemoveTree_ChangedLinkEvenWithCurrentParentIdentity_RefusesBeforeMutation()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var skill = Path.Combine(_tempRoot, "skill");
+        Directory.CreateDirectory(skill);
+        File.WriteAllText(Path.Combine(skill, "SKILL.md"), "payload");
+        var first = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
+        var link = Path.Combine(skill, "changing-link");
+        if (!TryCreateDirectoryLink(link, first)) return;
+        var backend = new WindowsSecureRemovalBackend();
+        Assert.True(backend.TryCaptureDirectoryValidation(skill, out var captured, out var error,
+            TestContext.Current.CancellationToken), error);
+        Directory.Delete(link);
+        Directory.CreateSymbolicLink(link, second);
+        // Deliberately refresh parent generation: the stale child snapshot must
+        // independently refuse mutation even when the parent identity matches.
+        Assert.True(backend.TryCaptureIdentity(skill, out var current, out error), error);
+        var expected = current with { DirectoryFingerprint = captured.Identity.DirectoryFingerprint };
+        var deletes = 0;
+        var failures = new List<string>();
+        backend.RemoveTree(skill, expected, false, 64, _ => { }, (_, _) => deletes++,
+            (_, _) => deletes++, (_, message) => failures.Add(message),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, deletes);
+        Assert.Contains(failures, message => message.Contains("identity changed", StringComparison.Ordinal));
+        Assert.True(File.Exists(Path.Combine(skill, "SKILL.md")));
+        Assert.True(Directory.Exists(first));
+        Assert.True(Directory.Exists(second));
+    }
+
+    [Fact]
+    public void CaptureDirectoryValidation_MutationBetweenSnapshots_Refuses()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var backend = new WindowsSecureRemovalBackend(directoryFingerprintCapturedForTests: () =>
+            File.WriteAllText(Path.Combine(_tempRoot, "new-entry"), "changed"));
+        Assert.False(backend.TryCaptureDirectoryValidation(_tempRoot, out _, out var error,
+            TestContext.Current.CancellationToken));
+        Assert.Contains("changed during policy inspection", error);
+    }
+
+    [Fact]
+    public void CaptureDirectoryValidation_EntryLimit_Refuses()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        for (var index = 0; index <= WindowsSecureRemovalBackend.MaxFingerprintEntries; index++)
+            File.WriteAllText(Path.Combine(_tempRoot, $"entry-{index}"), "");
+        Assert.False(new WindowsSecureRemovalBackend().TryCaptureDirectoryValidation(
+            _tempRoot, out _, out var error, TestContext.Current.CancellationToken));
+        Assert.Contains("immediate-entry limit", error);
+    }
+
+    [Fact]
+    public void CaptureDirectoryValidation_CanceledAfterFirstSnapshot_Throws()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var cancellation = new CancellationTokenSource();
+        var backend = new WindowsSecureRemovalBackend(
+            directoryFingerprintCapturedForTests: cancellation.Cancel);
+        Assert.Throws<OperationCanceledException>(() => backend.TryCaptureDirectoryValidation(
+            _tempRoot, out _, out _, cancellation.Token));
+    }
+
+    [Fact]
+    public void CaptureDirectoryValidation_UnchangedEntries_ProducesStableFingerprint()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        File.WriteAllText(Path.Combine(_tempRoot, "SKILL.md"), "payload");
+        var backend = new WindowsSecureRemovalBackend();
+        Assert.True(backend.TryCaptureDirectoryValidation(_tempRoot, out var first, out var error,
+            TestContext.Current.CancellationToken), error);
+        Assert.True(backend.TryCaptureDirectoryValidation(_tempRoot, out var second, out error,
+            TestContext.Current.CancellationToken), error);
+        Assert.NotNull(first.Identity.DirectoryFingerprint);
+        Assert.Equal(first.Identity.DirectoryFingerprint, second.Identity.DirectoryFingerprint);
+    }
+
+    [Fact]
+    public void CaptureDirectoryValidation_CanceledBetweenEntries_StopsAdmission()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        File.WriteAllText(Path.Combine(_tempRoot, "first"), "");
+        File.WriteAllText(Path.Combine(_tempRoot, "second"), "");
+        using var cancellation = new CancellationTokenSource();
+        var captures = 0;
+        var admissions = 0;
+        var backend = new WindowsSecureRemovalBackend(fingerprintEntryCapturedForTests: () =>
+        {
+            captures++;
+            cancellation.Cancel();
+        }, fingerprintEnumerationAdmittedForTests: () => admissions++);
+        Assert.Throws<OperationCanceledException>(() => backend.TryCaptureDirectoryValidation(
+            _tempRoot, out _, out _, cancellation.Token));
+        Assert.Equal(1, captures);
+        Assert.Equal(1, admissions);
+    }
+
+    [Fact]
+    public void RemoveTree_InPlaceRetargetWithUnchangedLinkIdentity_RefusesBeforeMutation()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var skill = Directory.CreateDirectory(Path.Combine(_tempRoot, "skill")).FullName;
+        File.WriteAllText(Path.Combine(skill, "SKILL.md"), "payload");
+        var first = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
+        var link = Path.Combine(skill, "link");
+        var donor = Path.Combine(_tempRoot, "donor-link");
+        if (!TryCreateDirectoryLink(link, first) || !TryCreateDirectoryLink(donor, second)) return;
+        var backend = new WindowsSecureRemovalBackend();
+        Assert.True(backend.TryCaptureDirectoryValidation(skill, out var captured, out var error,
+            TestContext.Current.CancellationToken), error);
+        Assert.True(backend.TryCaptureLinkIdentity(link, out var original, out error), error);
+        using (var donorHandle = OpenReparseHandle(donor))
+        using (var linkHandle = OpenReparseHandle(link))
+        {
+            var buffer = new byte[16 * 1024];
+            Assert.True(ReparseNative.DeviceIoControl(donorHandle, 0x000900A8, null, 0,
+                buffer, (uint)buffer.Length, out var returned, IntPtr.Zero),
+                $"get reparse error {Marshal.GetLastPInvokeError()}");
+            Assert.True(ReparseNative.DeviceIoControl(linkHandle, 0x000900A4, buffer, returned,
+                null, 0, out _, IntPtr.Zero), $"set reparse error {Marshal.GetLastPInvokeError()}");
+            // Neutralize timestamps as well as preserving the actual native ID.
+            // Only the captured reparse bytes can then distinguish the target.
+            var basic = new ReparseNative.BasicInfo { ChangeTime = original.LinkIdentity.WindowsChangeTime };
+            Assert.True(ReparseNative.SetFileInformationByHandle(linkHandle, 0, ref basic,
+                Marshal.SizeOf<ReparseNative.BasicInfo>()), $"set time error {Marshal.GetLastPInvokeError()}");
+        }
+        Assert.True(backend.TryCaptureLinkIdentity(link, out var retargeted, out error), error);
+        Assert.Equal(original.LinkIdentity, retargeted.LinkIdentity);
+        Assert.True(backend.TryCaptureIdentity(skill, out var parent, out error), error);
+        var deletes = 0;
+        var failures = new List<string>();
+        backend.RemoveTree(skill, parent with { DirectoryFingerprint = captured.Identity.DirectoryFingerprint },
+            false, 64, _ => { }, (_, _) => deletes++, (_, _) => deletes++,
+            (_, message) => failures.Add(message), TestContext.Current.CancellationToken);
+        Assert.Equal(0, deletes);
+        Assert.Contains(failures, message => message.Contains("identity changed", StringComparison.Ordinal));
+        Assert.Equal(second, new DirectoryInfo(link).ResolveLinkTarget(false)?.FullName);
+        Assert.True(File.Exists(Path.Combine(skill, "SKILL.md")));
+    }
+
+    private static SafeFileHandle OpenReparseHandle(string path)
+    {
+        var handle = ReparseNative.CreateFileW(path, 0xC0000000, 7, IntPtr.Zero, 3,
+            0x02200000, IntPtr.Zero);
+        if (!handle.IsInvalid) return handle;
+        var error = Marshal.GetLastPInvokeError();
+        handle.Dispose();
+        throw new IOException($"open reparse handle failed: {error}");
+    }
+
+    private static class ReparseNative
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BasicInfo
+        {
+            internal long CreationTime;
+            internal long LastAccessTime;
+            internal long LastWriteTime;
+            internal long ChangeTime;
+            internal uint FileAttributes;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern SafeFileHandle CreateFileW(string name, uint access,
+            uint sharing, IntPtr security, uint creation, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool DeviceIoControl(SafeFileHandle handle, uint code,
+            byte[]? input, uint inputSize, [Out] byte[]? output, uint outputSize,
+            out uint returned, IntPtr overlapped);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetFileInformationByHandle(SafeFileHandle handle,
+            int informationClass, ref BasicInfo information, int size);
     }
 
     private static bool TryCreateDirectoryLink(string link, string target)

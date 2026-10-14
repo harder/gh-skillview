@@ -1206,8 +1206,8 @@ public static class CliDispatcher
 
         var target = matches[0];
         var validation = parsed.Yes
-            ? RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills)
-            : RemoveValidator.ValidateForPreview(target, snapshot.ScannedRoots, snapshot.Skills);
+            ? RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills, cancellationToken)
+            : RemoveValidator.ValidateForPreview(target, snapshot.ScannedRoots, snapshot.Skills, cancellationToken);
 
         RemoveService.RemoveReport result;
         if (!validation.Allowed)
@@ -1417,7 +1417,7 @@ public static class CliDispatcher
             foreach (var c in selection.Unique)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills);
+                var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills, cancellationToken);
                 if (!validation.Allowed || validation.RequiresSecondConfirm)
                 {
                     environmentRefusal |= IsEnvironmentRefusal(validation);
@@ -1507,15 +1507,16 @@ public static class CliDispatcher
     private static RemoveValidator.RemoveValidation ValidateCleanupCandidate(
         CleanupClassifier.Candidate candidate,
         IReadOnlyList<ScanRoot> scanRoots,
-        IReadOnlyList<InstalledSkill> allSkills)
+        IReadOnlyList<InstalledSkill> allSkills,
+        CancellationToken cancellationToken)
     {
         return candidate.ReviewOnly ? RefuseUnsupportedCleanupCandidate(candidate) : candidate.Kind switch
         {
             CleanupClassifier.CandidateKind.BrokenSymlink =>
                 RemoveValidator.ValidateBrokenSymlink(candidate.Path, scanRoots),
             CleanupClassifier.CandidateKind.EmptyDirectory =>
-                RemoveValidator.ValidateEmptyDirectory(candidate.Path, scanRoots),
-            _ when candidate.Skill is not null => RemoveValidator.Validate(candidate.Skill, scanRoots, allSkills),
+                RemoveValidator.ValidateEmptyDirectory(candidate.Path, scanRoots, cancellationToken),
+            _ when candidate.Skill is not null => RemoveValidator.Validate(candidate.Skill, scanRoots, allSkills, cancellationToken),
             _ => RefuseUnsupportedCleanupCandidate(candidate),
         };
     }

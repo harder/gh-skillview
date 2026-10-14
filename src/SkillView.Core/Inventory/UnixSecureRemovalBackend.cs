@@ -88,8 +88,10 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     public bool TryCaptureDirectoryValidation(
         string path,
         out SecureDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         snapshot = default;
         error = null;
         try
@@ -126,8 +128,10 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         string rootPath,
         string path,
         out SecureRootedDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         snapshot = default;
         error = null;
         try
