@@ -656,3 +656,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   unchanged saved object back to SetAccessControl can write nothing. Restore
   parent then payload then file after inheritance propagation, and avoid changing
   the source owner when testing read-only backup permissions.
+
+- Every Unix descriptor duplication must atomically retain close-on-exec through
+  `F_DUPFD_CLOEXEC`; never use plain `dup` followed by `F_SETFD`. Darwin ARM64
+  `fcntl` has two fixed arguments, so its minimum-fd variadic value belongs on
+  the stack after six padded integer argument slots. Verify flags before stream
+  or fdopendir admission and child-exec behavior, not just directory stream flags.

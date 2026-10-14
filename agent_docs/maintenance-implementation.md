@@ -308,3 +308,28 @@ inherited ACLs after a successful backup test. The fixture now rehydrates saved
 DACL binary forms into fresh security objects (marking them modified), restores
 parent/payload/file ACLs explicitly, and preserves the original source owner.
 This is a test cleanup fix; no backup production permission policy is changed.
+
+Final batch4a CI38619873846 and CodeQL38619873873 passed at reviewed head
+303b1968: 1018 tests on Linux/macOS/Windows and both-host native backup proof
+on all four AOT targets. All three Copilot findings were fixed and independently
+re-reviewed. PR #46 merged at 4c4e5c68de1985d83db3e1f5d3a01481087f5900.
+
+## Batch 4a follow-up: Unix descriptor inheritance (M21)
+
+Legacy plain `dup` cleared CLOEXEC on payload streams and introduced an
+inheritance interval before directory enumeration. Every duplicate now uses
+atomic `F_DUPFD_CLOEXEC`, with verified Linux and Darwin ARM64 bindings and no
+non-atomic fallback. Existing bounded EINTR retries remain. Unverified ABIs refuse.
+
+The regression checks flags immediately after both file and directory duplication,
+before stream/fdopendir admission. A real `/bin/sh` exec cannot read the held
+payload descriptor, while the parent stream remains readable and the completed
+snapshot and original bytes remain unchanged. Replacing only the helper with
+the previous implementation made three of four cases fail: both duplicates lacked
+CLOEXEC and the child successfully read the private fixture. This establishes the
+regression detects the observed defect. Darwin fdopendir itself sets CLOEXEC;
+the defect is the initial duplication interval and the payload stream, not a
+claim that completed Darwin directory streams remain inheritable.
+
+See `evidence/maintenance-batch-4a-descriptors.json` for verification. The remaining
+M08/M13–M15 recovery and repair work follows after this batch merges.
