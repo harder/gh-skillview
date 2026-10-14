@@ -86,6 +86,7 @@ internal sealed class DiscoverTabView : FrameView
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(ResultsTable);
+        TuiHelpers.ConfigureTableNavigation(ResultsTable);
         TuiHelpers.ConfigureTableScheme(ResultsTable);
         TuiHelpers.ConfigureTableChrome(ResultsTable);
 

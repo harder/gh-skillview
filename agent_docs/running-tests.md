@@ -2,6 +2,14 @@
 
 The solution runs on xunit v4's `dotnet test` integration with the .NET 10 SDK's
 `Microsoft.Testing.Platform` runner (opted in via `global.json`'s `test.runner`).
+
+Install the exact SDK pinned in `global.json`. SDK roll-forward is disabled
+because Native AOT adds SDK-selected compiler/linker dependencies to the NuGet
+lock files. When upgrading the SDK, run `dotnet restore --force-evaluate` with
+that SDK, commit the updated lock files alongside `global.json`, and verify
+`dotnet restore --locked-mode` before building. CI and release workflows read
+the same `global.json`.
+
 A bare project path (e.g. `dotnet test tests/Foo/Foo.csproj`) no longer works —
 pass `--project <path>` explicitly, or run `dotnet test` from the repo root to
 target the whole solution.

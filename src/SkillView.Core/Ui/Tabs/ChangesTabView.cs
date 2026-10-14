@@ -71,6 +71,7 @@ internal sealed class ChangesTabView : FrameView
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
+        TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.ValueChanged += (_, _) => UpdateDetail();
         _table.FrameChanged += (_, _) => RecomputeColumnWidths();

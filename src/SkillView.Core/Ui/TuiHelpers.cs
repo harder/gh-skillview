@@ -523,6 +523,27 @@ internal static class TuiHelpers
         table.Style.ShowVerticalCellLineForLastColumn = false;
     }
 
+    /// Keep row navigation owned by the list even when the cursor is already
+    /// at an endpoint or the table is empty. Terminal.Gui's default Up/Down
+    /// commands return false there, allowing a parent to move focus instead.
+    /// Leave movement within the list to the table's normal command pipeline.
+    internal static void ConfigureTableNavigation(TableView table)
+    {
+        table.KeyDown += (_, key) =>
+        {
+            if (key.Handled) return;
+            var commands = table.KeyBindings.GetCommands(key);
+            if (commands.Length != 1) return;
+            var row = table.GetSelectedRow();
+            var count = table.Table?.Rows ?? 0;
+            if ((commands[0] == Command.Up && (count == 0 || row <= 0))
+                || (commands[0] == Command.Down && (count == 0 || row >= count - 1)))
+            {
+                key.Handled = true;
+            }
+        };
+    }
+
     /// Disable a TableView's built-in type-to-search by clearing its
     /// CollectionNavigator so printable shortcuts reach view-level handlers.
     internal static void DisableTypeToSearch(TableView table)

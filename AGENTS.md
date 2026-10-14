@@ -24,6 +24,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 ## How
 
 - Install the SDK selected by `global.json`, then run `dotnet restore --locked-mode`.
+  Keep SDK roll-forward disabled: Native AOT compiler/linker package versions
+  come from the SDK, so SDK upgrades must regenerate the lock files together.
   NuGet lock files are committed for all five projects and cover `win-x64`,
   `win-arm64`, `linux-x64`, and `osx-arm64`. Change dependencies with an
   intentional `dotnet restore --force-evaluate`, commit the lock-file diff,

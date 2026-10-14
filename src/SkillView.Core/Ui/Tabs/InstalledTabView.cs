@@ -137,6 +137,7 @@ internal sealed class InstalledTabView : FrameView
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
+        TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.Style.ShowVerticalCellLineForLastColumn = true;
         _table.HasFocusChanged += (_, _) =>
@@ -602,7 +603,9 @@ internal sealed class InstalledTabView : FrameView
         if (!_filterField.HasFocus && key.AsRune.Value == 'G')
         {
             _scopeFilter = CycleScope(_scopeFilter);
-            if (_scopedSnapshotLoader is not null && _scopeFilter is ScopeFilter.User or ScopeFilter.Project)
+            // Custom and All must recapture too: the previous user/project
+            // query may have replaced _all with a server-filtered snapshot.
+            if (_scopedSnapshotLoader is not null)
             {
                 _runTask(LoadAsync, "installed.scope");
             }

@@ -255,21 +255,40 @@ public sealed class SkillViewApp
         finally
         {
             AppDomain.CurrentDomain.UnhandledException -= onUnhandledException;
-            CancelStatusAutoClear();
-            // Close task admission before cancellation so no event racing the
-            // run-loop exit can add unowned work after the drain snapshot.
-            _backgroundTasks.StopAccepting();
-            DeactivateDoctorWorkspace(clearBusy: false);
-            DeactivateDiscoverWorkspace(clearBusy: false);
-            runLifetime.TryCancel();
-            CancelCurrentPreview();
-            await _backgroundTasks.DrainAsync().ConfigureAwait(false);
-            DisposeLogSubscription();
-            DetachApplicationKeyHandler();
-            _runLifetime = null;
-            _app = null;
-            window?.Dispose();
-            app?.Dispose();
+            try
+            {
+                CancelStatusAutoClear();
+                // Close task admission before cancellation so no event racing the
+                // run-loop exit can add unowned work after the drain snapshot.
+                _backgroundTasks.StopAccepting();
+                DeactivateDoctorWorkspace(clearBusy: false);
+                DeactivateDiscoverWorkspace(clearBusy: false);
+                runLifetime.TryCancel();
+                CancelCurrentPreview();
+                await _backgroundTasks.DrainAsync().ConfigureAwait(false);
+                DisposeLogSubscription();
+            }
+            finally
+            {
+                DetachApplicationKeyHandler();
+                _runLifetime = null;
+                _app = null;
+                try
+                {
+                    window?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    LogUnhandledException(ex);
+                    throw;
+                }
+                finally
+                {
+                    // The driver owns terminal mouse/paste modes. Always release
+                    // it, even if a view or earlier shutdown step throws.
+                    app?.Dispose();
+                }
+            }
         }
         return cancellationToken.IsCancellationRequested
             ? ExitCodes.Cancelled
