@@ -527,7 +527,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   on failure/cancellation. See `agent_docs/maintenance-implementation.md`.
 - Payload snapshots read entries relative to held native roots, treating links as
   leaves and rejecting special files. Recheck all observed entries/ancestors at
-  completion; Windows also needs every directory's immediate-entry manifest because
+  completion, including raw content rehashes: Windows can retain a file's native
+  generation through a same-length rewrite while a read handle is held. Windows
+  also needs every directory's immediate-entry manifest because
   its ChangeTime alone may miss a later sibling edit. Staging cleanup retains the
   originally opened directory lease; never recapture a replacement by path.
 - Package claims are contextual observations. Do not use the legacy name-map

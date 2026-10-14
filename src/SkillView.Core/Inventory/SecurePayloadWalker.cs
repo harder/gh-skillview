@@ -3,10 +3,12 @@ namespace SkillView.Inventory;
 internal readonly record struct NativePayloadItem(string RelativePath, string Kind,
     Stream? Content, int? UnixMode, byte[]? LinkBytes, string? LinkTarget);
 
+internal readonly record struct PayloadFileEvidence(string Hash, long Bytes);
+
 internal static class SecurePayloadWalker
 {
     internal static SecureFileIdentity Walk(string path, int maxDepth,
-        Action<NativePayloadItem> observe, CancellationToken cancellationToken)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!SecureRemovalBackend.IsSupported)
@@ -14,6 +16,28 @@ internal static class SecurePayloadWalker
         return OperatingSystem.IsWindows()
             ? WindowsSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken)
             : UnixSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken);
+    }
+
+    internal static void VerifyContent(Stream stream, PayloadFileEvidence expected, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!stream.CanSeek || stream.Length != expected.Bytes)
+            throw new IOException("payload file length changed before snapshot completion");
+        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        var buffer = new byte[64 * 1024];
+        long bytes = 0;
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            var count = stream.Read(buffer);
+            if (count == 0) break;
+            bytes += count;
+            if (bytes > expected.Bytes) throw new IOException("payload file grew before snapshot completion");
+            hash.AppendData(buffer.AsSpan(0, count));
+        }
+        if (bytes != expected.Bytes || stream.Length != expected.Bytes
+            || Convert.ToHexString(hash.GetHashAndReset()) != expected.Hash)
+            throw new IOException("payload file content changed before snapshot completion");
     }
 }
 

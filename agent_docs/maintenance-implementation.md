@@ -100,3 +100,9 @@ originating Codex chat. No installed user skills are test targets.
 - Tests and reproducible runtime evidence are recorded in
   `agent_docs/evidence/maintenance-batch-2.json`; the proof script accepts explicit
   app/gh paths and uses disposable roots. Windows native execution is required CI.
+- First batch 2 CI passed macOS/Linux tests and every AOT publish but found a
+  Windows same-length rewrite with unchanged native generation. Completion now
+  rehashes every file through held-root-relative opens on every platform, bounded
+  by its originally observed byte count. A Windows regression restores ChangeTime,
+  proves unchanged full identity, and requires a content-change refusal. Local
+  full suite after this fix: 900 passed; independent re-review clean.

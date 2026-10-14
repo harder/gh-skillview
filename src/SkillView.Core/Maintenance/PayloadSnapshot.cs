@@ -34,13 +34,14 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         SkillView.Inventory.Models.SkillFrontMatter? frontMatter = null;
         var identity = SecurePayloadWalker.Walk(root, MaxDepth, item =>
         {
-            Observe(item);
+            var evidence = Observe(item);
             observation?.Invoke(item.RelativePath, item.Kind);
+            return evidence;
         }, cancellationToken);
         var ordered = entries.OrderBy(e => e.Path, StringComparer.Ordinal).ToImmutableArray();
         return new(identity.CanonicalPath, Digest(ordered, false), Digest(ordered, true), ordered) { FrontMatter = frontMatter };
 
-        void Observe(NativePayloadItem item)
+        PayloadFileEvidence? Observe(NativePayloadItem item)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entries.Count >= MaxEntries) throw new IOException("payload entry limit exceeded");
@@ -48,12 +49,12 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             {
                 var hash = Convert.ToHexString(SHA256.HashData(item.LinkBytes ?? []));
                 entries.Add(new(item.RelativePath, "link", hash, hash, 0, item.UnixMode, item.LinkTarget));
-                return;
+                return null;
             }
             if (item.Kind == "directory")
             {
                 entries.Add(new(item.RelativePath, "directory", "", "", 0, item.UnixMode, null));
-                return;
+                return null;
             }
             var stream = item.Content ?? throw new IOException("native payload file stream is missing");
             if (!stream.CanSeek) throw new IOException("payload contains a non-regular file");
@@ -94,6 +95,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
                 { throw new IOException("invalid frontmatter encoding or YAML during comparison", ex); }
             }
             entries.Add(new(item.RelativePath, "file", rawHash, comparison, readBytes, item.UnixMode, null));
+            return new(rawHash, readBytes);
         }
     }
 

@@ -15,7 +15,7 @@
     "M09 current project/global/XDG schemas"
   ],
   "fullSuite": {
-    "passed": 899,
+    "passed": 900,
     "failed": 0,
     "skipped": 0
   },
@@ -79,10 +79,11 @@
       "malformed tree schema",
       "partial reconciliation",
       "staging namespace collisions",
-      "all contextual lock claims"
+      "all contextual lock claims",
+      "Windows file generation does not prove unchanged content; completion rehash on every platform"
     ]
   },
-  "windowsNativeExecution": "required PR CI before merge",
+  "windowsNativeExecution": "Initial CI38518641460 exposed unchanged file generation after same-length rewrite; content rehash fix awaiting required rerun",
   "proofCommand": "python3 agent_docs/evidence/prove-maintenance-batch-2.py --app /path/to/published/skillview --gh /path/to/gh-2.97 --gh /path/to/current-gh --output /tmp/batch2-proof.json",
   "limitations": [
     "Whole-tree snapshot is change detection, not atomic",

@@ -100,7 +100,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     }
 
     internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
-        Action<NativePayloadItem> observe, CancellationToken token)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var root = OpenEntry(path, directory: true, enumerateDirectory: true);
@@ -108,7 +108,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         if (!rootBefore.IsDirectory || rootBefore.IsReparsePoint)
             throw new IOException("payload root is not a non-link directory");
         var canonical = ReadFinalPath(root);
-        var observations = new List<(string Path, NativeIdentity Identity, string? LinkHash)>();
+        var observations = new List<(string Path, NativeIdentity Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
         var inspector = new WindowsSecureRemovalBackend();
         var directoryFingerprints = new Dictionary<string, string>(StringComparer.Ordinal);
         var frames = new Stack<(DirectoryFrame Frame, string Relative, string Fingerprint)>();
@@ -144,12 +144,12 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                         || before.IsDirectory != isDirectory || before.IsReparsePoint != isReparse)
                         throw new IOException("payload entry changed before it could be opened");
                     if (observations.Count >= 10_000) throw new IOException("payload entry limit exceeded");
-                    observations.Add((relative, before, null));
+                    observations.Add((relative, before, null, null));
                     if (isReparse)
                     {
                         token.ThrowIfCancellationRequested();
                         var bytes = ReadReparseData(child);
-                        observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)));
+                        observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), null);
                         observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes)));
                     }
                     else if (isDirectory)
@@ -165,7 +165,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                     {
                         if (WindowsNative.GetFileType(child) != 1) throw new IOException("payload entry is not a disk file");
                         using var stream = new FileStream(child, FileAccess.Read);
-                        observe(new(relative, "file", stream, null, null, null));
+                        var evidence = observe(new(relative, "file", stream, null, null, null))
+                            ?? throw new IOException("payload file evidence is missing");
+                        observations[^1] = (relative, before, null, evidence);
                         token.ThrowIfCancellationRequested();
                         if (!Matches(before, ReadIdentity(child))) throw new IOException("payload file changed during comparison");
                         // The stream owns the handle; all identity checks ran before its disposal.
@@ -184,7 +186,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 var parts = observation.Path.Split('/');
                 using var heldParent = OpenPayloadParent(root, parts[..^1], knownDirectories, token);
                 using var entry = OpenEntryAt(heldParent, parts[^1], directory: null,
-                    enumerateDirectory: observation.Identity.IsDirectory && !observation.Identity.IsReparsePoint, requestDeleteAccess: false);
+                    enumerateDirectory: observation.Identity.IsDirectory && !observation.Identity.IsReparsePoint,
+                    requestDeleteAccess: false, requestReadAccess: observation.FileEvidence is not null);
                 if (!Matches(observation.Identity, ReadIdentity(entry)))
                     throw new IOException("payload entry changed before snapshot completion");
                 if (observation.Identity.IsDirectory && !observation.Identity.IsReparsePoint
@@ -193,6 +196,14 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 if (observation.LinkHash is { } expectedLink
                     && expectedLink != Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(ReadReparseData(entry))))
                     throw new IOException("payload link changed before snapshot completion");
+                if (observation.FileEvidence is { } expectedFile)
+                {
+                    if (WindowsNative.GetFileType(entry) != 1) throw new IOException("payload entry is not a disk file");
+                    using var stream = new FileStream(entry, FileAccess.Read);
+                    SecurePayloadWalker.VerifyContent(stream, expectedFile, token);
+                    if (!Matches(observation.Identity, ReadIdentity(entry)))
+                        throw new IOException("payload file changed during completion verification");
+                }
             }
             if (rootFingerprint != inspector.CaptureDirectoryFingerprint(root, canonical, token))
                 throw new IOException("payload root contents changed before snapshot completion");

@@ -81,7 +81,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
     }
 
     internal static SecureFileIdentity WalkPayload(string path, int maxDepth,
-        Action<NativePayloadItem> observe, CancellationToken token)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var buffer = new StatBuffer();
@@ -91,7 +91,7 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
         using var rootParent = parent;
         var rootBefore = ReadStat(root, buffer.Pointer);
         var canonical = ReadFinalPath(root);
-        var observations = new List<(string Path, NativeStat Identity, string? LinkHash)>();
+        var observations = new List<(string Path, NativeStat Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
         var frames = new Stack<(DirectoryFrame Frame, NativeStat Before, string Relative)>();
         frames.Push((new DirectoryFrame(root, parent, rootName, canonical, 0, ownsParent: false, ownsDirectory: false), rootBefore, ""));
         try
@@ -117,14 +117,14 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 if (before.Device != rootBefore.Device) throw new IOException("cross-filesystem payload traversal refused");
                 var relative = current.Relative + entry.Value.Name;
                 if (observations.Count >= 10_000) throw new IOException("payload entry limit exceeded");
-                observations.Add((relative, before, null));
+                observations.Add((relative, before, null, null));
                 if (before.IsSymlink)
                 {
                     var bytes = new byte[32 * 1024];
                     token.ThrowIfCancellationRequested();
                     var length = ReadLinkAtWithRetry(current.Frame.Directory.FileDescriptor, entry.Value.Name, bytes);
                     if (length < 0 || length >= bytes.Length) throw new IOException("payload link inspection failed or exceeded limit");
-                    observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)length))));
+                    observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)length))), null);
                     observe(new(relative, "link", null, null, bytes.AsSpan(0, (int)length).ToArray(),
                         Encoding.UTF8.GetString(bytes, 0, (int)length)));
                     token.ThrowIfCancellationRequested();
@@ -149,28 +149,15 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 else
                 {
                     if (before.FileType != 0x8000) throw new IOException("payload entry is not a regular file");
-                    var flags = OperatingSystem.IsMacOS()
-                        ? 0x00000100 | 0x01000000 | 0x00000004
-                        : 0x00020000 | 0x00080000 | 0x00000800;
-                    int descriptor;
-                    if (OperatingSystem.IsLinux())
-                    {
-                        var how = new OpenHow
-                        {
-                            Flags = (ulong)flags,
-                            Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
-                        };
-                        descriptor = checked((int)OpenAt2WithRetry(UnixConstants.OpenAt2SystemCall,
-                            current.Frame.Directory.FileDescriptor, entry.Value.Name, ref how, (nuint)Marshal.SizeOf<OpenHow>()));
-                    }
-                    else descriptor = OpenAtWithRetry(current.Frame.Directory.FileDescriptor, entry.Value.Name, flags);
-                    using var child = CreateHandle(descriptor, "open payload file failed");
+                    using var child = OpenPayloadFile(current.Frame.Directory, entry.Value.Name);
                     var opened = ReadStat(child, buffer.Pointer);
                     if (!Matches(before, opened)) throw new IOException("payload file changed before open");
                     var duplicate = DupWithRetry(child.FileDescriptor);
                     if (duplicate < 0) throw new IOException("duplicate payload handle failed");
                     using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
-                    observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null));
+                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null))
+                        ?? throw new IOException("payload file evidence is missing");
+                    observations[^1] = (relative, before, null, evidence);
                     token.ThrowIfCancellationRequested();
                     if (!Matches(opened, ReadStat(child, buffer.Pointer))) throw new IOException("payload file changed during comparison");
                 }
@@ -188,6 +175,18 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
                 if (!TryReadStatAt(heldParent, parts[^1], buffer.Pointer, out var actual, out _)
                     || !Matches(observation.Identity, actual))
                     throw new IOException("payload entry changed before snapshot completion");
+                if (observation.FileEvidence is { } expectedFile)
+                {
+                    using var file = OpenPayloadFile(heldParent, parts[^1]);
+                    if (!Matches(observation.Identity, ReadStat(file, buffer.Pointer)))
+                        throw new IOException("payload file changed before completion verification");
+                    var duplicate = DupWithRetry(file.FileDescriptor);
+                    if (duplicate < 0) throw new IOException("duplicate payload file failed");
+                    using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
+                    SecurePayloadWalker.VerifyContent(stream, expectedFile, token);
+                    if (!Matches(observation.Identity, ReadStat(file, buffer.Pointer)))
+                        throw new IOException("payload file changed during completion verification");
+                }
                 if (observation.LinkHash is { } expectedLink)
                 {
                     var bytes = new byte[32 * 1024];
@@ -202,6 +201,26 @@ internal sealed class UnixSecureRemovalBackend : ISecureRemovalBackend
             return ToSecureIdentity(rootBefore, canonical);
         }
         finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
+    }
+
+    private static SafeUnixHandle OpenPayloadFile(SafeUnixHandle directory, string name)
+    {
+        var flags = OperatingSystem.IsMacOS()
+            ? 0x00000100 | 0x01000000 | 0x00000004
+            : 0x00020000 | 0x00080000 | 0x00000800;
+        int descriptor;
+        if (OperatingSystem.IsLinux())
+        {
+            var how = new OpenHow
+            {
+                Flags = (ulong)flags,
+                Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
+            };
+            descriptor = checked((int)OpenAt2WithRetry(UnixConstants.OpenAt2SystemCall,
+                directory.FileDescriptor, name, ref how, (nuint)Marshal.SizeOf<OpenHow>()));
+        }
+        else descriptor = OpenAtWithRetry(directory.FileDescriptor, name, flags);
+        return CreateHandle(descriptor, "open payload file failed");
     }
 
     private static SafeUnixHandle OpenPayloadParent(SafeUnixHandle root, string[] parts,
