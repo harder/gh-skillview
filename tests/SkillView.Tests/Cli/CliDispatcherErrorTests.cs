@@ -271,6 +271,25 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 
+    [Theory]
+    [InlineData("quarantine", "")]
+    [InlineData("quarantine", "--path demo --yes")]
+    [InlineData("quarantine", "--path demo --yes --standalone")]
+    [InlineData("quarantine", "--path demo --yes --standalone --expect invalid")]
+    [InlineData("quarantine", "--path first --path second")]
+    [InlineData("quarantine", "--path first --install-id second")]
+    [InlineData("undo", "")]
+    [InlineData("undo", "--id ../outside --yes")]
+    [InlineData("quarantine-history", "--yes")]
+    public async Task QuarantineInvalidConfirmationOrSelectorIsRejectedBeforeInventory(string command, string arguments)
+    {
+        var argv = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var (code, _, error) = await RunCliAsync("skillview", [command, .. argv]);
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.Contains("skillview:", error);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
     // --- update parser edge cases ----------------------------------------
 
     [Fact]

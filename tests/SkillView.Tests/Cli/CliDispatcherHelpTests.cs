@@ -25,6 +25,9 @@ public class CliDispatcherHelpTests
         Assert.Contains("brew install harder/tap/skillview", stdout);
         Assert.Contains("WinGet manifests are generated for release review", stdout);
         Assert.Contains("automation-friendly", stdout);
+        Assert.Contains("| `quarantine` |", stdout);
+        Assert.Contains("| `undo` |", stdout);
+        Assert.Contains("| `quarantine-history` |", stdout);
         Assert.Contains("SkillView requires `gh` 2.97.0 or newer", stdout);
         Assert.DoesNotContain("capability-gated flags", stdout);
         Assert.Contains("| `130` | Canceled by the caller or Ctrl+C |", stdout);
@@ -37,6 +40,9 @@ public class CliDispatcherHelpTests
     [InlineData("search", 120)]
     [InlineData("install", 600)]
     [InlineData("cleanup", 600)]
+    [InlineData("quarantine", 600)]
+    [InlineData("undo", 600)]
+    [InlineData("quarantine-history", 600)]
     public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
     {
         Assert.Equal(TimeSpan.FromSeconds(seconds), CliDispatcher.TimeoutFor(subcommand));

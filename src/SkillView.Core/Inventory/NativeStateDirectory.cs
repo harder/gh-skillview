@@ -18,6 +18,7 @@ internal abstract class NativeStateDirectory : IDisposable
     }
     internal abstract void FlushPublication(CancellationToken token);
     internal abstract void ValidateLocation(CancellationToken token);
+    internal abstract void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token);
     public abstract void Dispose();
 
     internal static NativeStateDirectory OpenOrCreate(string path, IReadOnlyList<string> excluded, CancellationToken token, Action<string>? afterCreate = null, Action? beforeAncestorRefresh = null,

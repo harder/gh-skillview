@@ -104,6 +104,13 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
     {
         token.ThrowIfCancellationRequested();
         using var root = OpenEntry(path, directory: true, enumerateDirectory: true, requestDeleteAccess: false);
+        return WalkOpenedPayload(root, maxDepth, observe, token);
+    }
+
+    private static NativePayloadRoot WalkOpenedPayload(SafeFileHandle root, int maxDepth,
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         var rootBefore = ReadIdentity(root);
         if (!rootBefore.IsDirectory || rootBefore.IsReparsePoint)
             throw new IOException("payload root is not a non-link directory");
@@ -208,6 +215,8 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
             if (rootFingerprint != inspector.CaptureDirectoryFingerprint(root, canonical, token))
                 throw new IOException("payload root contents changed before snapshot completion");
             if (!Matches(rootBefore, ReadIdentity(root))) throw new IOException("payload root changed before snapshot completion");
+            if (!PathIdentity.Equals(ReadFinalPath(root), canonical))
+                throw new IOException("payload root location changed before snapshot completion");
             return new NativePayloadRoot(ToSecureIdentity(rootBefore, canonical), null);
         }
         finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }

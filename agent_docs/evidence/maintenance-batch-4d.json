@@ -80,7 +80,24 @@
     "completeMetadataAttestation": false
   },
   "ci": {
-    "status": "pending PR",
-    "required": "three test platforms and both hosts on four native AOT targets"
+    "head": "f6aab63704d0ae66a74e400f305df8590413c0d9",
+    "runId": 38635536531,
+    "codeqlRunId": 38635536377,
+    "status": "passed",
+    "testsPassedPerPlatform": 1069,
+    "testPlatforms": [
+      "macos-15",
+      "ubuntu-latest",
+      "windows-latest"
+    ],
+    "nativeTargets": [
+      "osx-arm64",
+      "linux-x64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "bothNativeHostsObjectProofsPassed": true,
+    "copilotFindings": 0,
+    "mergeCommit": "af80737d3a025fb37fbcae086b8b2626be7b555f"
   }
 }

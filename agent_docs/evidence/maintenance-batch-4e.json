@@ -1,0 +1,113 @@
+{
+  "batch": "4e",
+  "date": "2026-10-14",
+  "baseCommit": "af80737d3a025fb37fbcae086b8b2626be7b555f",
+  "scope": "Finish agreed standalone custom-directory quarantine/undo milestone; broader maintenance redesign deferred",
+  "localVerification": {
+    "sdk": "10.0.402",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "testsPassed": 1097,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "formatVerified": true,
+    "siteBuildPassed": true,
+    "sequentialAppAndExtensionNativeAotPublishesPassed": true,
+    "standaloneTrimWarningsAreErrors": true
+  },
+  "independentReview": {
+    "review": "clear after fixes and final re-review",
+    "affectedTestsPassed": 81,
+    "failed": 0,
+    "skipped": 0,
+    "remainingFindings": 0
+  },
+  "nativeRuntimeProof": [
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
+      "nativeSha256": "179ba439a0bbfc47f3b762671b90232d423a6adc3d923d7f8866c8af6bc2c744",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "previewReadOnly": true,
+      "staleReviewRefusedBeforeState": true,
+      "originalDirectoryIdentityRetained": true,
+      "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+      "undoPreviewReadOnly": true,
+      "undoRestoredOriginalDirectory": true,
+      "repeatedUndoVerifiedNoOp": true,
+      "occupiedRestorePathPreserved": true,
+      "completeJournalHistory": true,
+      "securityIsolationClaimed": false,
+      "archiveExtractionUsed": false
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/quarantine/app/skillview",
+      "nativeSha256": "179ba439a0bbfc47f3b762671b90232d423a6adc3d923d7f8866c8af6bc2c744",
+      "gh": "/opt/homebrew/bin/gh",
+      "previewReadOnly": true,
+      "staleReviewRefusedBeforeState": true,
+      "originalDirectoryIdentityRetained": true,
+      "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+      "undoPreviewReadOnly": true,
+      "undoRestoredOriginalDirectory": true,
+      "repeatedUndoVerifiedNoOp": true,
+      "occupiedRestorePathPreserved": true,
+      "completeJournalHistory": true,
+      "securityIsolationClaimed": false,
+      "archiveExtractionUsed": false
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
+      "nativeSha256": "369bcdec3e6b352062bc02429aba097a53b0c08d97f3397f0103da0da495e0c5",
+      "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+      "previewReadOnly": true,
+      "staleReviewRefusedBeforeState": true,
+      "originalDirectoryIdentityRetained": true,
+      "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+      "undoPreviewReadOnly": true,
+      "undoRestoredOriginalDirectory": true,
+      "repeatedUndoVerifiedNoOp": true,
+      "occupiedRestorePathPreserved": true,
+      "completeJournalHistory": true,
+      "securityIsolationClaimed": false,
+      "archiveExtractionUsed": false
+    },
+    {
+      "nativeHost": "/private/tmp/skillview-maintenance/quarantine/ext/gh-skillview",
+      "nativeSha256": "369bcdec3e6b352062bc02429aba097a53b0c08d97f3397f0103da0da495e0c5",
+      "gh": "/opt/homebrew/bin/gh",
+      "previewReadOnly": true,
+      "staleReviewRefusedBeforeState": true,
+      "originalDirectoryIdentityRetained": true,
+      "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+      "undoPreviewReadOnly": true,
+      "undoRestoredOriginalDirectory": true,
+      "repeatedUndoVerifiedNoOp": true,
+      "occupiedRestorePathPreserved": true,
+      "completeJournalHistory": true,
+      "securityIsolationClaimed": false,
+      "archiveExtractionUsed": false
+    }
+  ],
+  "limits": [
+    "Standalone custom-directory copies only; known managers, tracking, shared consumers, Git metadata and incomplete inventory refused",
+    "Same-volume native exclusive rename; no overwrite, archive extraction or copy/delete fallback",
+    "Live permissions and links retained; no security isolation or agent session-state claim",
+    "Recorded history does not claim live validation; undo preview verifies current evidence",
+    "Interrupted or ambiguous operations require inspection; no automatic recovery or purge",
+    "Original macOS native crash remains unreproduced"
+  ],
+  "ci": {
+    "status": "required before merge",
+    "testPlatforms": [
+      "macos-15",
+      "ubuntu-latest",
+      "windows-latest"
+    ],
+    "nativeTargets": [
+      "osx-arm64",
+      "linux-x64",
+      "win-x64",
+      "win-arm64"
+    ]
+  }
+}

@@ -89,11 +89,18 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        using var buffer = new StatBuffer();
         var full = Path.GetFullPath(path);
         var canonicalParent = RealPath(Path.GetDirectoryName(full) ?? throw new IOException("payload directory has no parent"));
         using var root = OpenAbsoluteDirectory(Path.Combine(canonicalParent, Path.GetFileName(full)), out var parent, out var rootName);
         using var rootParent = parent;
+        return WalkOpenedPayload(root, parent, rootName, maxDepth, observe, token);
+    }
+
+    private static NativePayloadRoot WalkOpenedPayload(SafeUnixHandle root, SafeUnixHandle parent, string rootName,
+        int maxDepth, Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var buffer = new StatBuffer();
         var rootBefore = ReadStat(root, buffer.Pointer);
         var canonical = ReadFinalPath(root);
         var observations = new List<(string Path, NativeStat Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
@@ -203,6 +210,8 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             }
             if (!Matches(rootBefore, ReadStat(root, buffer.Pointer)))
                 throw new IOException("payload root changed before snapshot completion");
+            if (!PathIdentity.Equals(ReadFinalPath(root), canonical))
+                throw new IOException("payload root location changed before snapshot completion");
             return new NativePayloadRoot(ToSecureIdentity(rootBefore, canonical), (int)(rootBefore.Mode & 0xFFF));
         }
         finally { while (frames.Count > 0) frames.Pop().Frame.Dispose(); }
@@ -1329,19 +1338,17 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private static bool IsDirectoryEmpty(SafeUnixHandle directory, out string? error)
     {
-        var duplicate = DupWithRetry(directory.FileDescriptor);
-        if (duplicate < 0)
-        {
-            error = LastError("duplicate directory handle failed");
-            return false;
-        }
-        var stream = UnixNative.fdopendir(duplicate);
+        SafeUnixHandle cursor;
+        try { cursor = OpenDirectoryAt(directory, ".", refuseNestedMount: false); }
+        catch (IOException ex) { error = ex.Message; return false; }
+        using var ownedCursor = cursor;
+        var stream = UnixNative.fdopendir(cursor.FileDescriptor);
         if (stream == IntPtr.Zero)
         {
-            UnixNative.close(duplicate);
             error = LastError("open directory stream failed");
             return false;
         }
+        cursor.SetHandleAsInvalid();
         try
         {
             while (true)
@@ -1792,20 +1799,22 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             if (_finished) return false;
             if (_directoryStream == IntPtr.Zero)
             {
-                var duplicate = DupWithRetry(Directory.FileDescriptor);
-                if (duplicate < 0)
+                // dup shares a directory's file offset. Repeated policy/walk
+                // inspections of one held directory need independent cursors.
+                // Opening '.' relative to that authority cannot retarget it.
+                SafeUnixHandle cursor;
+                try { cursor = OpenDirectoryAt(Directory, ".", refuseNestedMount: false); }
+                catch (IOException ex) { error = ex.Message; _finished = true; return false; }
+                using (cursor)
                 {
-                    error = LastError("duplicate directory handle failed");
-                    _finished = true;
-                    return false;
-                }
-                _directoryStream = UnixNative.fdopendir(duplicate);
-                if (_directoryStream == IntPtr.Zero)
-                {
-                    UnixNative.close(duplicate);
-                    error = LastError("open directory stream failed");
-                    _finished = true;
-                    return false;
+                    _directoryStream = UnixNative.fdopendir(cursor.FileDescriptor);
+                    if (_directoryStream == IntPtr.Zero)
+                    {
+                        error = LastError("open directory stream failed");
+                        _finished = true;
+                        return false;
+                    }
+                    cursor.SetHandleAsInvalid(); // closedir now owns the descriptor.
                 }
             }
 
