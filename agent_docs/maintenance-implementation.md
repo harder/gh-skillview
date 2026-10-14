@@ -37,6 +37,9 @@ originating Codex chat. No installed user skills are test targets.
   passed. A second review identified missing partial-scan UI/JSON diagnostics
   and default-only source accounting; both were fixed and a third review found
   no remaining actionable findings.
+- First PR CI found whitespace-format errors in two files. Applied the exact
+  solution formatter and added its verification command to the agent workflow;
+  the formatting-only follow-up is independently reviewed before merge.
 
 ## Durable rules
 

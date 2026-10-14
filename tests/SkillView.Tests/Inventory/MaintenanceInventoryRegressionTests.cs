@@ -83,8 +83,13 @@ public sealed class MaintenanceInventoryRegressionTests
         };
         var record = new GhSkillListRecord
         {
-            Name = "demo", Path = local.ResolvedPath, Scope = "project", Pinned = true,
-            SourceUrl = "https://github.com/team/repo", Version = "v2.0", Hosts = ["codex"],
+            Name = "demo",
+            Path = local.ResolvedPath,
+            Scope = "project",
+            Pinned = true,
+            SourceUrl = "https://github.com/team/repo",
+            Version = "v2.0",
+            Hosts = ["codex"],
         };
         var result = Assert.Single(LocalInventoryService.Merge([local], [record, record]));
         Assert.True(result.Pinned);
@@ -205,9 +210,17 @@ public sealed class MaintenanceInventoryRegressionTests
 
     private static InstalledSkill Skill(string name, string path) => new()
     {
-        Name = name, ResolvedPath = path, ScanRoot = "/skills", Scope = Scope.User,
-        Agents = [], FrontMatter = SkillFrontMatter.Empty, Validity = ValidityState.Valid,
-        Provenance = Provenance.FsScan, Ignored = false, IsSymlinked = false, InstalledAt = null,
+        Name = name,
+        ResolvedPath = path,
+        ScanRoot = "/skills",
+        Scope = Scope.User,
+        Agents = [],
+        FrontMatter = SkillFrontMatter.Empty,
+        Validity = ValidityState.Valid,
+        Provenance = Provenance.FsScan,
+        Ignored = false,
+        IsSymlinked = false,
+        InstalledAt = null,
     };
 
     private static InventorySnapshot Snapshot(params InstalledSkill[] skills) => new()

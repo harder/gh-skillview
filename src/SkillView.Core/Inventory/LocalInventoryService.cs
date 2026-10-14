@@ -251,12 +251,17 @@ public sealed class LocalInventoryService
                 Agents = hosts.Select(host => new AgentMembership(AgentIdentity.Normalize(host), path, record.IsSymlink, scope)).ToImmutableArray(),
                 FrontMatter = new SkillFrontMatter
                 {
-                    Name = record.Name, GithubRef = record.Version,
+                    Name = record.Name,
+                    GithubRef = record.Version,
                     Upstream = record.SourceUrl ?? record.Repo,
-                    GithubTreeSha = record.GithubTreeSha, Pinned = record.Pinned,
+                    GithubTreeSha = record.GithubTreeSha,
+                    Pinned = record.Pinned,
                 },
-                Validity = ValidityState.Valid, Provenance = Provenance.CliList,
-                Ignored = false, IsSymlinked = record.IsSymlink, InstalledAt = null,
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.CliList,
+                Ignored = false,
+                IsSymlinked = record.IsSymlink,
+                InstalledAt = null,
             };
             index[key] = index.TryGetValue(key, out var match) ? Combine(match, observation) : observation;
         }
@@ -292,7 +297,8 @@ public sealed class LocalInventoryService
         var memberships = first.Agents.Concat(next.Agents)
             .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope))
             .Select(group => group.OrderByDescending(agent => agent.IsSymlink)
-                .ThenByDescending(agent => agent.DiscoveryRoot is not null).First() with { AgentId = group.Key.Item1 })
+                .ThenByDescending(agent => agent.DiscoveryRoot is not null).First() with
+            { AgentId = group.Key.Item1 })
             .ToImmutableArray();
         return first with
         {

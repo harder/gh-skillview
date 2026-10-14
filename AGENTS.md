@@ -30,7 +30,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `win-arm64`, `linux-x64`, and `osx-arm64`. Change dependencies with an
   intentional `dotnet restore --force-evaluate`, commit the lock-file diff,
   and confirm locked restore again.
-- Build/style verification: `dotnet build`
+- Build verification: `dotnet build`
+- CI style verification: `dotnet format SkillView.sln --no-restore --verify-no-changes`
 - Full tests: `dotnet test --no-build`
 - Run product publish commands sequentially. The App and gh-extension publishes
   share `SkillView.Core` intermediate/output files, so parallel publishes can
