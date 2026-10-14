@@ -62,3 +62,6 @@ originating Codex chat. No installed user skills are test targets.
   This detects immediate-entry changes, not an atomic recursive snapshot.
   Regression coverage includes in-place retargeting with unchanged link identity,
   refreshed parent identity, capture mutation, cancellation and entry-limit refusal.
+- Windows CI run 38511388030 passed all 867 tests after the safety fix. The
+  new link regressions require actual Windows symlink support rather than
+  silently returning when unavailable.

@@ -301,7 +301,7 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         var first = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
         var second = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
         var link = Path.Combine(skill, "changing-link");
-        if (!TryCreateDirectoryLink(link, first)) return;
+        Assert.True(TryCreateDirectoryLink(link, first), "Windows link support is required for this regression");
         var backend = new WindowsSecureRemovalBackend();
         Assert.True(backend.TryCaptureDirectoryValidation(skill, out var captured, out var error,
             TestContext.Current.CancellationToken), error);
@@ -400,7 +400,8 @@ public sealed class WindowsSecureRemovalBackendTests : IDisposable
         var second = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
         var link = Path.Combine(skill, "link");
         var donor = Path.Combine(_tempRoot, "donor-link");
-        if (!TryCreateDirectoryLink(link, first) || !TryCreateDirectoryLink(donor, second)) return;
+        Assert.True(TryCreateDirectoryLink(link, first), "Windows link support is required for this regression");
+        Assert.True(TryCreateDirectoryLink(donor, second), "Windows link support is required for this regression");
         var backend = new WindowsSecureRemovalBackend();
         Assert.True(backend.TryCaptureDirectoryValidation(skill, out var captured, out var error,
             TestContext.Current.CancellationToken), error);
