@@ -671,3 +671,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   entries were validated. Capture a file length once, validate it, and allocate
   only from that value. Keep raw evidence verification separate from restore
   authority; archive schema1 omits ACL/xattr/root-mode/owner restoration.
+
+- Protect every `.git` metadata entry at a selected root, including worktree/
+  submodule gitfiles and broken links; do not test only Directory.Exists or
+  follow a Git marker to decide protection. Native policy must observe it
+  relative to the held directory and accept only true absence. Keep the legacy
+  ContainsGitDirectory wire label while describing repository/worktree metadata
+  in UI text. Parent-repository warnings accepted with --yes are insufficient
+  protection for the repository/worktree root itself.

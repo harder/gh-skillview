@@ -133,3 +133,8 @@ jobs:
       - name: Inspect metadata with openat2 denied; retain removal refusal
         if: runner.os == 'Linux'
         run: python3 agent_docs/evidence/prove-metadata-without-openat2.py --app dist/app/skillview
+      - name: Refuse linked-worktree and broken Git metadata removals
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/gitfile-app-proof.json
+          python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/gitfile-extension-proof.json

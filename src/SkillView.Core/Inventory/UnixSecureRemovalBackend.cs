@@ -543,16 +543,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             : skillError is null
                 ? false
                 : throw new IOException(skillError);
-        var hasGit = TryReadFollowedStatAt(
-            handle,
-            ".git",
-            statBuffer.Pointer,
-            out var gitStat,
-            out var gitError)
-            ? gitStat.IsDirectory
-            : gitError is null
-                ? false
-                : throw new IOException(gitError);
+        var hasGit = EntryExistsWithoutFollowing(handle, ".git", statBuffer.Pointer);
         var isEmpty = IsDirectoryEmpty(handle, out var enumerationError);
         if (enumerationError is not null) throw new IOException(enumerationError);
 
@@ -1279,6 +1270,14 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             throw new IOException($"inspect opened entry failed: {LastErrorMessage()}");
         }
         return ParseStat(buffer);
+    }
+
+    private static bool EntryExistsWithoutFollowing(SafeUnixHandle parent, string name, IntPtr buffer)
+    {
+        if (FStatAtWithRetry(parent.FileDescriptor, name, buffer, UnixConstants.NoFollowFlag) == 0) return true;
+        var error = Marshal.GetLastPInvokeError();
+        if (error == 2) return false;
+        throw new IOException($"inspect metadata entry failed: {new Win32Exception(error).Message}");
     }
 
     private static bool TryReadStatAt(

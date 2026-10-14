@@ -474,7 +474,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         var hasSkill = EntryIsDirectory(
             handle,
             LocalSkillScanner.SkillFileName) is false;
-        var hasGit = EntryIsDirectory(handle, ".git") is true;
+        var hasGit = EntryExistsWithoutFollowing(handle, ".git");
         using var frame = new DirectoryFrame(
             handle,
             displayPath,
@@ -1105,6 +1105,18 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
             if (unicodePointer != IntPtr.Zero) Marshal.FreeHGlobal(unicodePointer);
             Marshal.FreeHGlobal(nameBuffer);
         }
+    }
+
+    private static bool EntryExistsWithoutFollowing(SafeFileHandle parent, string name)
+    {
+        try
+        {
+            using var entry = OpenEntryAt(parent, name, directory: null,
+                enumerateDirectory: false, openReparsePoint: true, requestDeleteAccess: false);
+            return true;
+        }
+        catch (WindowsOpenException ex) when (ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
+        { return false; }
     }
 
     private static bool? EntryIsDirectory(SafeFileHandle parent, string name)

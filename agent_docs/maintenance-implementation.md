@@ -376,3 +376,38 @@ path admission now preserves whitespace while keeping structural checks; two
 round-trip regressions and both native-host proofs cover whitespace files,
 directories and children. Independent re-review is clear; full suite1055 passed
 with zero failures/skips. Fresh CI is required for this production fix.
+
+Final PR #48 head4270510 passed CI38629955734 and CodeQL38629955648:1055 tests
+on every test platform and both-host native history proofs on all four AOT RIDs.
+The Copilot whitespace finding was fixed, independently re-reviewed and resolved.
+Merged at5a0db7c3f93d5459fb62ab377bd9734d2684eb94.
+
+## Batch 4c: protect Git worktree metadata before recovery mutations
+
+The prior native product permitted `remove --yes` on an actual disposable linked
+worktree: its `.git` file was not recognized by the directory-only guard, and a
+parent-repository warning could be accepted. The baseline proof deleted three
+tracked files and the checkout directory; no user repository was a test target.
+
+Native policy now observes any `.git` entry relative to the held directory
+without following it, including gitfiles and broken symbolic links. Only true
+absence is accepted; observation failures refuse. Managed non-mutating previews
+apply the same marker policy. The legacy ContainsGitDirectory error kind and
+HasGitDirectory field retain compatibility; their protection includes all Git
+metadata entry types. The removal wizard describes repository/worktree protection.
+
+The native proof creates a real private Git repository and linked worktree with
+private Git configuration/templates/hooks, then requires explicit execution
+refusal, zero deleted entries, unchanged tracked files/gitfile and a still-clean
+usable checkout. A broken Git link is protected without accessing its target.
+Both hosts and all native AOT targets run the proof in CI. Git's documented
+gitfile layout: https://git-scm.com/docs/gitrepository-layout.
+
+This closes an M03/M21 protection gap. Quarantine/undo and the remaining
+maintenance acceptance criteria continue after this batch merges.
+
+Local verification: SDK10.0.402 build clean,1061 full tests passed, formatting and
+site checks passed. Both native hosts passed the real-worktree/broken-link proof
+with gh2.97.0 and2.102.0, plus backup/history regression proofs. Independent review
+and re-review are clear;72 focused tests independently passed. Fresh platform CI
+is required before merge. See `evidence/maintenance-batch-4c.json`.

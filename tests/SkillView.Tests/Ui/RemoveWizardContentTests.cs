@@ -29,7 +29,7 @@ public sealed class RemoveWizardContentTests
             Assert.Contains("Blocked", markdown, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("ContainsGitDirectory", markdown);
             Assert.DoesNotContain("HasIncomingSymlinks", markdown);
-            Assert.Contains("git clone", markdown, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("repository or worktree", markdown, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

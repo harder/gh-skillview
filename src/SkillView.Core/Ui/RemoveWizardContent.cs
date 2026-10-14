@@ -165,7 +165,7 @@ internal static class RemoveWizardContent
             RemoveValidator.ErrorKind.NotASkillDirectory =>
                 "The target no longer looks like a skill directory.",
             RemoveValidator.ErrorKind.ContainsGitDirectory =>
-                "The target looks like a git clone, so SkillView won't delete it automatically.",
+                "The target contains Git metadata for a repository or worktree, so SkillView won't delete it automatically.",
             RemoveValidator.ErrorKind.TargetIsScanRoot =>
                 "The selected path is itself a scan root, so deleting it would remove the whole skill root.",
             _ => error.Detail,

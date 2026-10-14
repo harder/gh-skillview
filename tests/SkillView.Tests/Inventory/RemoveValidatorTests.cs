@@ -161,6 +161,42 @@ public class RemoveValidatorTests : IDisposable
         Assert.Contains(v.Errors, e => e.Kind == RemoveValidator.ErrorKind.ContainsGitDirectory);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Validate_GitfileProtectsWorktreeInNativeAndManagedPreview(bool managedPreview)
+    {
+        var dir = MakeSkillDir("linked-worktree");
+        var marker = Path.Combine(dir, ".git");
+        File.WriteAllText(marker, "gitdir: ../repository/.git/worktrees/linked-worktree\n");
+        var skill = MakeSkill(dir, "linked-worktree");
+        var validation = managedPreview ? RemoveValidator.ValidateWithBackendAvailabilityForTests(skill, [Root()], [skill],
+            allowUnpinnedPreview: true, secureBackendSupported: false)
+            : RemoveValidator.Validate(skill, [Root()], [skill], cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error => error.Kind == RemoveValidator.ErrorKind.ContainsGitDirectory);
+        Assert.Equal("gitdir: ../repository/.git/worktrees/linked-worktree\n", File.ReadAllText(marker));
+        Assert.True(File.Exists(Path.Combine(dir, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Validate_BrokenGitLinkIsProtectedWithoutFollowingTarget(bool managedPreview)
+    {
+        var dir = MakeSkillDir("broken-git-link");
+        var marker = Path.Combine(dir, ".git");
+        File.CreateSymbolicLink(marker, "missing-git-metadata");
+        var skill = MakeSkill(dir, "broken-git-link");
+        var validation = managedPreview ? RemoveValidator.ValidateWithBackendAvailabilityForTests(skill, [Root()], [skill],
+            allowUnpinnedPreview: true, secureBackendSupported: false)
+            : RemoveValidator.Validate(skill, [Root()], [skill], cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error => error.Kind == RemoveValidator.ErrorKind.ContainsGitDirectory);
+        Assert.Equal("missing-git-metadata", new FileInfo(marker).LinkTarget);
+        Assert.False(File.Exists(Path.Combine(dir, "missing-git-metadata")));
+    }
+
     [Fact]
     public void Validate_TargetIsScanRoot_Refused()
     {
