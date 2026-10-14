@@ -155,14 +155,15 @@ public sealed class MaintenanceBackupStoreTests : IDisposable
         var target = Target();
         var payload = new DirectoryInfo(target.ResolvedPath);
         var parent = payload.Parent!;
-        var originalPayload = payload.GetAccessControl();
+        var originalPayload = payload.GetAccessControl().GetSecurityDescriptorBinaryForm();
         var sourceFile = Path.Combine(payload.FullName, "SKILL.md");
         var originalBytes = File.ReadAllBytes(sourceFile);
-        var originalParent = parent.GetAccessControl();
+        var originalParent = parent.GetAccessControl().GetSecurityDescriptorBinaryForm();
+        var originalFile = new FileInfo(sourceFile).GetAccessControl().GetSecurityDescriptorBinaryForm();
         using var current = WindowsIdentity.GetCurrent();
         var user = current.User!;
         var payloadAcl = new DirectorySecurity();
-        payloadAcl.SetOwner(user); payloadAcl.SetAccessRuleProtection(true, false);
+        payloadAcl.SetAccessRuleProtection(true, false);
         payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.ReadAndExecute,
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
         payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.Delete, AccessControlType.Deny));
@@ -180,7 +181,20 @@ public sealed class MaintenanceBackupStoreTests : IDisposable
             Assert.Equal(reviewedAcl, payload.GetAccessControl().GetSecurityDescriptorBinaryForm());
             Assert.Equal(originalBytes, File.ReadAllBytes(sourceFile));
         }
-        finally { payload.SetAccessControl(originalPayload); parent.SetAccessControl(originalParent); }
+        finally
+        {
+            // Rehydrate to mark DACL sections modified; an unchanged descriptor
+            // returned by GetAccessControl can otherwise persist no changes.
+            var restoreParent = new DirectorySecurity();
+            restoreParent.SetSecurityDescriptorBinaryForm(originalParent, AccessControlSections.Access);
+            parent.SetAccessControl(restoreParent);
+            var restorePayload = new DirectorySecurity();
+            restorePayload.SetSecurityDescriptorBinaryForm(originalPayload, AccessControlSections.Access);
+            payload.SetAccessControl(restorePayload);
+            var restoreFile = new FileSecurity();
+            restoreFile.SetSecurityDescriptorBinaryForm(originalFile, AccessControlSections.Access);
+            new FileInfo(sourceFile).SetAccessControl(restoreFile);
+        }
     }
 
     [Fact]

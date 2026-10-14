@@ -301,3 +301,10 @@ Independent re-review passed 55 focused tests; fresh full verification passed
 1018 tests, zero failures/skips. The prior test-only head 44b6045 passed every
 platform/AOT check (CI38614178840, CodeQL38614178677); the new production fixes
 require fresh native proofs and CI before merge.
+
+The first production-fix CI head d6e56c0 passed all native proofs, Linux/macOS
+1018-test suites and CodeQL, but Windows fixture cleanup retained read-only
+inherited ACLs after a successful backup test. The fixture now rehydrates saved
+DACL binary forms into fresh security objects (marking them modified), restores
+parent/payload/file ACLs explicitly, and preserves the original source owner.
+This is a test cleanup fix; no backup production permission policy is changed.

@@ -118,7 +118,9 @@
     "https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms",
     "https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile",
     "https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching",
-    "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers"
+    "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers",
+    "https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.IO.FileSystem.AccessControl/src/System/Security/AccessControl/FileSystemSecurity.cs",
+    "https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Security.AccessControl/src/System/Security/AccessControl/ObjectSecurity.cs"
   ],
   "firstCI": {
     "run": 38612962296,
@@ -149,5 +151,13 @@
     "codeql": 38614178677,
     "allPassed": true,
     "newProductionFixesRequireFreshCI": true
+  },
+  "productionFixCI": {
+    "head": "d6e56c0d4be0daaa51ec34dbcaa3455b96aae52d",
+    "run": 38618470714,
+    "codeql": 38618470582,
+    "linuxAndMacTestsPassed": 1018,
+    "allFourNativeProofsPassed": true,
+    "windowsOnlyFailure": "Successful read-only backup test left restrictive inherited file ACLs during fixture Dispose; restore saved DACLs with fresh modified security objects, without changing source ownership."
   }
 }

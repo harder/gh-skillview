@@ -649,3 +649,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   payload limits even for malformed UTF-8, flow metadata or large markdown.
   Windows payload walking needs read/enumeration rights only; keep DELETE access
   for removal callers and the readable/non-deletable ACL regression.
+
+- Windows ACL fixtures must restore saved DACL binary forms through fresh
+  DirectorySecurity/FileSecurity objects with AccessControlSections.Access.
+  GetAccessControl returns descriptors without modified flags; passing an
+  unchanged saved object back to SetAccessControl can write nothing. Restore
+  parent then payload then file after inheritance propagation, and avoid changing
+  the source owner when testing read-only backup permissions.
