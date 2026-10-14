@@ -103,7 +103,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        using var root = OpenEntry(path, directory: true, enumerateDirectory: true);
+        using var root = OpenEntry(path, directory: true, enumerateDirectory: true, requestDeleteAccess: false);
         var rootBefore = ReadIdentity(root);
         if (!rootBefore.IsDirectory || rootBefore.IsReparsePoint)
             throw new IOException("payload root is not a non-link directory");
@@ -1005,11 +1005,11 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
     private static SafeFileHandle OpenEntry(
         string path,
         bool directory,
-        bool enumerateDirectory)
+        bool enumerateDirectory,
+        bool requestDeleteAccess = true)
     {
-        var desiredAccess = DeleteAccess
-            | FileReadAttributes
-            | SynchronizeAccess;
+        var desiredAccess = FileReadAttributes | SynchronizeAccess;
+        if (requestDeleteAccess) desiredAccess |= DeleteAccess;
         if (enumerateDirectory) desiredAccess |= FileListDirectory;
         var flags = OpenReparsePoint | (directory ? BackupSemantics : 0u);
         var handle = WindowsNative.CreateFileW(

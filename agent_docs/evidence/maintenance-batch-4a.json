@@ -8,7 +8,7 @@
     "sdk": "10.0.402",
     "buildWarnings": 0,
     "buildErrors": 0,
-    "testsPassed": 1005,
+    "testsPassed": 1018,
     "testsFailed": 0,
     "testsSkipped": 0,
     "formatVerified": true,
@@ -19,7 +19,7 @@
   "nativeRuntimeProof": [
     {
       "nativeHost": "/private/tmp/skillview-maintenance/batch4a/app-final/skillview",
-      "nativeSha256": "7491839ffe5353bfc38317c46a6b27ea7ed9489db385150fb94344a444fd2ad0",
+      "nativeSha256": "6c8c625506739a40c8bad95c7c84215d5489750776c62ba10475a62ff9ca5eac",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -28,11 +28,13 @@
       "unixPrivateModesVerified": true,
       "selectedAndUnselectedPayloadsUnchanged": true,
       "otherInstalledPayloadCannotBeState": true,
+      "missingConfiguredAgentRootCannotBeState": true,
+      "rawFlowMetadataArchivedByteExact": true,
       "sharedRegistryUnchanged": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/batch4a/app-final/skillview",
-      "nativeSha256": "7491839ffe5353bfc38317c46a6b27ea7ed9489db385150fb94344a444fd2ad0",
+      "nativeSha256": "6c8c625506739a40c8bad95c7c84215d5489750776c62ba10475a62ff9ca5eac",
       "gh": "/opt/homebrew/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -41,11 +43,13 @@
       "unixPrivateModesVerified": true,
       "selectedAndUnselectedPayloadsUnchanged": true,
       "otherInstalledPayloadCannotBeState": true,
+      "missingConfiguredAgentRootCannotBeState": true,
+      "rawFlowMetadataArchivedByteExact": true,
       "sharedRegistryUnchanged": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/batch4a/ext-final/gh-skillview",
-      "nativeSha256": "2d3d519d3d52f666e6a8c29cc65da5eb92888f51b2b2af0818725e0f041d9970",
+      "nativeSha256": "b722776ed697f8a6f9858fb93bda194b456c66f05770ac9572a0904c4bef6d1f",
       "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -54,11 +58,13 @@
       "unixPrivateModesVerified": true,
       "selectedAndUnselectedPayloadsUnchanged": true,
       "otherInstalledPayloadCannotBeState": true,
+      "missingConfiguredAgentRootCannotBeState": true,
+      "rawFlowMetadataArchivedByteExact": true,
       "sharedRegistryUnchanged": true
     },
     {
       "nativeHost": "/private/tmp/skillview-maintenance/batch4a/ext-final/gh-skillview",
-      "nativeSha256": "2d3d519d3d52f666e6a8c29cc65da5eb92888f51b2b2af0818725e0f041d9970",
+      "nativeSha256": "b722776ed697f8a6f9858fb93bda194b456c66f05770ac9572a0904c4bef6d1f",
       "gh": "/opt/homebrew/bin/gh",
       "exactInstallationIdSelected": true,
       "archiveAndJournalHashesVerified": true,
@@ -67,14 +73,16 @@
       "unixPrivateModesVerified": true,
       "selectedAndUnselectedPayloadsUnchanged": true,
       "otherInstalledPayloadCannotBeState": true,
+      "missingConfiguredAgentRootCannotBeState": true,
+      "rawFlowMetadataArchivedByteExact": true,
       "sharedRegistryUnchanged": true
     }
   ],
   "independentReview": {
     "model": "Astra",
     "status": "no remaining actionable source findings after repeated review/fix cycles",
-    "focusedBackupTests": 23,
-    "focusedCliBackupCases": 7,
+    "focusedBackupTests": 29,
+    "focusedCliBackupCases": 13,
     "acceptedFindings": [
       "State creates are relative to held native roots; canonical strings do not replace authority.",
       "Excluded installations retain live native handles and cached full object IDs, preventing rename-based state admission.",
@@ -120,5 +128,26 @@
   },
   "followUps": [
     "M21: replace legacy Unix descriptor dup calls with atomic CLOEXEC duplication and verify child-process lifetimes."
-  ]
+  ],
+  "copilotFindings": [
+    {
+      "comment": 4274591002,
+      "fix": "Retain bounded configured default/override/workspace/profile roots before existence filtering; refuse incomplete configuration and check prospective canonical state before mkdir."
+    },
+    {
+      "comment": 4274591107,
+      "fix": "Windows payload walking requests read/enumeration access without DELETE; removal defaults retain DELETE, with a non-deletable readable-source regression."
+    },
+    {
+      "comment": 4274591172,
+      "fix": "Raw capture bypasses parser allocation, UTF-8 decoding and comparison normalization; aggregate quotas cover malformed encoding, flow tracking metadata and large markdown."
+    }
+  ],
+  "intermediateCI": {
+    "head": "44b6045f94b79149d3545781e085d431769c399c",
+    "run": 38614178840,
+    "codeql": 38614178677,
+    "allPassed": true,
+    "newProductionFixesRequireFreshCI": true
+  }
 }

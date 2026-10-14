@@ -89,6 +89,101 @@ public sealed class MaintenanceBackupStoreTests : IDisposable
     }
 
     [Fact]
+    public void FlowTrackingMetadataIsArchivedWithoutComparisonNormalization()
+    {
+        const string markdown = "---\nname: demo\ndescription: Test\nmetadata: {github-ref: main}\n---\nBody\n";
+        var target = Target(markdown);
+        var result = new MaintenanceBackupStore(State).Capture(target, TestContext.Current.CancellationToken);
+        Assert.Equal("captured", result.Status);
+        Assert.Equal(markdown, File.ReadAllText(Path.Combine(target.ResolvedPath, "SKILL.md")));
+        Assert.Null(PayloadSnapshot.CaptureEvidence(target.ResolvedPath, TestContext.Current.CancellationToken).FrontMatter);
+    }
+
+    [Fact]
+    public void InvalidUtf8IsArchivedAsRawBytes()
+    {
+        var target = Target();
+        byte[] expected = [0xFF, 0xFE, 0, 42];
+        File.WriteAllBytes(Path.Combine(target.ResolvedPath, "SKILL.md"), expected);
+        var result = new MaintenanceBackupStore(State).Capture(target, TestContext.Current.CancellationToken);
+        using var archive = ZipFile.OpenRead(result.ArchivePath);
+        using var manifest = JsonDocument.Parse(archive.GetEntry("manifest.json")!.Open());
+        var row = Assert.Single(manifest.RootElement.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("path").GetString() == "SKILL.md");
+        using var blob = archive.GetEntry(row.GetProperty("blob").GetString()!)!.Open();
+        using var content = new MemoryStream(); blob.CopyTo(content);
+        Assert.Equal(expected, content.ToArray());
+        Assert.Equal(expected, File.ReadAllBytes(Path.Combine(target.ResolvedPath, "SKILL.md")));
+    }
+
+    [Fact]
+    public void RawMarkdownMayExceedTheComparisonParserLimitWithinTheAggregatePayloadBudget()
+    {
+        var target = Target();
+        var path = Path.Combine(target.ResolvedPath, "SKILL.md");
+        using (var source = new FileStream(path, FileMode.Append)) source.SetLength(PayloadSnapshot.MaxSkillBytes + 2048L);
+        var before = SHA256.HashData(File.ReadAllBytes(path));
+        var result = new MaintenanceBackupStore(State).Capture(target, TestContext.Current.CancellationToken);
+        using var archive = ZipFile.OpenRead(result.ArchivePath);
+        using var manifest = JsonDocument.Parse(archive.GetEntry("manifest.json")!.Open());
+        var row = Assert.Single(manifest.RootElement.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("path").GetString() == "SKILL.md");
+        using var blob = archive.GetEntry(row.GetProperty("blob").GetString()!)!.Open();
+        Assert.Equal(before, SHA256.HashData(blob));
+        Assert.Equal(PayloadSnapshot.MaxSkillBytes + 2048L, row.GetProperty("blobBytes").GetInt64());
+        Assert.Equal(before, SHA256.HashData(File.ReadAllBytes(path)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProspectiveMissingManagedRootIsExcludedThroughAnAliasBeforeCreatingParents(bool stateThroughAlias)
+    {
+        var target = Target();
+        var home = Directory.CreateDirectory(Path.Combine(_temporary.FullName, "future-home")).FullName;
+        var alias = Path.Combine(_temporary.FullName, "home-alias");
+        Directory.CreateSymbolicLink(alias, home);
+        var managed = Path.Combine(alias, ".agents", "skills");
+        var state = Path.Combine(stateThroughAlias ? alias : home, ".agents", "skills", "SkillView", "maintenance");
+        Assert.Throws<IOException>(() => new MaintenanceBackupStore(state).Capture(target, TestContext.Current.CancellationToken,
+            managedRoots: [new(managed, Scope.User, "agents")]));
+        Assert.False(Directory.Exists(Path.Combine(home, ".agents")));
+    }
+
+    [Fact]
+    public void WindowsReadableNonDeletablePayloadCanBeBackedUp()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var target = Target();
+        var payload = new DirectoryInfo(target.ResolvedPath);
+        var parent = payload.Parent!;
+        var originalPayload = payload.GetAccessControl();
+        var sourceFile = Path.Combine(payload.FullName, "SKILL.md");
+        var originalBytes = File.ReadAllBytes(sourceFile);
+        var originalParent = parent.GetAccessControl();
+        using var current = WindowsIdentity.GetCurrent();
+        var user = current.User!;
+        var payloadAcl = new DirectorySecurity();
+        payloadAcl.SetOwner(user); payloadAcl.SetAccessRuleProtection(true, false);
+        payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.ReadAndExecute,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.Delete, AccessControlType.Deny));
+        var parentAcl = parent.GetAccessControl();
+        parentAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.DeleteSubdirectoriesAndFiles, AccessControlType.Deny));
+        try
+        {
+            parent.SetAccessControl(parentAcl); payload.SetAccessControl(payloadAcl);
+            var reviewedAcl = payload.GetAccessControl().GetSecurityDescriptorBinaryForm();
+            Assert.Equal(originalBytes, File.ReadAllBytes(sourceFile));
+            Assert.False(SecureRemovalBackend.TryCaptureIdentity(payload.FullName, out _, out _));
+            var result = new MaintenanceBackupStore(State).Capture(target, TestContext.Current.CancellationToken);
+            Assert.Equal("captured", result.Status);
+            Assert.True(File.Exists(result.ArchivePath));
+            Assert.Equal(reviewedAcl, payload.GetAccessControl().GetSecurityDescriptorBinaryForm());
+            Assert.Equal(originalBytes, File.ReadAllBytes(sourceFile));
+        }
+        finally { payload.SetAccessControl(originalPayload); parent.SetAccessControl(originalParent); }
+    }
+
+    [Fact]
     public void PreCanceledCaptureDoesNotCreateState()
     {
         var target = Target();

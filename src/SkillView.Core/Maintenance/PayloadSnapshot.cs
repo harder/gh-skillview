@@ -72,7 +72,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             var initialLength = stream.Length;
             if (initialLength > MaxBytes - totalBytes) throw new IOException("payload byte limit exceeded");
             using var hashBuilder = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            using var skillBytes = item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
+            using var skillBytes = strictMetadata && item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
             var buffer = new byte[64 * 1024];
             long readBytes = 0;
             while (true)

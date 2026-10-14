@@ -639,3 +639,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   never dup it without CLOEXEC. Such a duplicate can leak an advisory writer
   lock into concurrently spawned processes after Capture returns. Keep the
   child-outlives-capture regression and borrower AddRef/Release discipline.
+
+- Backup exclusions use inventory ConfiguredRoots, including expected absent
+  default/override/workspace/profile placements, not just ScannedRoots. Root
+  configuration completeness is separate from provider/scan completeness;
+  bounded omissions or unresolved contexts refuse backup admission. Keep the
+  prospective canonical state exclusion before mkdir and held native checks.
+  Raw backup evidence never parses or normalizes SKILL.md: it uses aggregate
+  payload limits even for malformed UTF-8, flow metadata or large markdown.
+  Windows payload walking needs read/enumeration rights only; keep DELETE access
+  for removal callers and the readable/non-deletable ACL regression.

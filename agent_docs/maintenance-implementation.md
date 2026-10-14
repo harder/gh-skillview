@@ -288,3 +288,16 @@ is detected before captured publication. Both require the attempted boundary,
 creating record, retained archive, no captured record and unchanged source.
 A separate M21 follow-up will make every legacy Unix native descriptor duplication
 CLOEXEC atomically; the backup writer's borrowed handle is already protected.
+
+Copilot's three subsequent findings are accepted and fixed. Inventory now retains
+bounded configured placements before existence filtering with a distinct
+configuration completeness flag. Backup excludes expected missing roots and
+refuses omitted/unresolved configuration, including private aliases and named
+profiles. Raw evidence bypasses all markdown parsing/normalization and preserves
+invalid UTF-8 and large markdown within its aggregate budget. The Windows payload
+walker opens its root without DELETE, while removal defaults retain that right.
+The ACL regression proves a readable non-deletable source is backed up unchanged.
+Independent re-review passed 55 focused tests; fresh full verification passed
+1018 tests, zero failures/skips. The prior test-only head 44b6045 passed every
+platform/AOT check (CI38614178840, CodeQL38614178677); the new production fixes
+require fresh native proofs and CI before merge.

@@ -8,6 +8,25 @@ namespace SkillView.Tests.Inventory;
 public class ScanRootResolverTests
 {
     [Fact]
+    public void ConfiguredRootsRetainMissingDefaultsOverridesAndProfilesWithoutClaimingTheyWereScanned()
+    {
+        using var temp = new TempHome();
+        var configuration = new ScanRootConfiguration();
+        var claude = Path.Combine(temp.Home, "custom-claude");
+        var pi = Path.Combine(temp.Home, "custom-pi");
+        var profile = Path.Combine(temp.Home, "profile");
+        var scanned = new ScanRootResolver().ResolveWithCancellation(new(temp.Home, temp.Home, [], claude, pi,
+            Profiles: [new("claude", profile, "work")]), TestContext.Current.CancellationToken, configuration: configuration);
+        Assert.Empty(scanned);
+        Assert.True(configuration.IsComplete);
+        Assert.Contains(configuration.Roots, root => root.Path == Path.Combine(temp.Home, ".agents", "skills"));
+        Assert.Contains(configuration.Roots, root => root.Path == Path.Combine(claude, "skills"));
+        Assert.Contains(configuration.Roots, root => root.Path == Path.Combine(pi, "skills"));
+        Assert.Contains(configuration.Roots, root => root.Path == profile && root.Profile == "work");
+        Assert.False(Directory.Exists(profile));
+    }
+
+    [Fact]
     public void Resolves_existing_user_seeds_only()
     {
         using var temp = new TempHome();

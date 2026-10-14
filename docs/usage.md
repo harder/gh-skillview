@@ -152,7 +152,9 @@ State defaults to `~/Library/Application Support/SkillView/maintenance` on macOS
 `$XDG_STATE_HOME/SkillView/maintenance` (or `~/.local/state/SkillView/maintenance`)
 on Linux, and `%LOCALAPPDATA%/SkillView/maintenance` on Windows.
 `SKILLVIEW_STATE_HOME` overrides the base directory. State must be private and
-outside installed payloads and recognized agent skill roots. An existing shared
+outside installed payloads and recognized agent skill roots, including expected
+paths that do not exist yet. Omitted or unresolved workspace/root configuration
+refuses capture. An existing shared
 state directory is refused rather than having its permissions rewritten. macOS
 inherited extended ACLs are also refused; choose a private destination.
 

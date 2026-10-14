@@ -22,6 +22,7 @@ internal abstract class NativeStateDirectory : IDisposable
             paths.Add(OwnershipPath.CanonicalCandidate(item) ?? Path.GetFullPath(item));
         }
         var canonicalExclusions = paths.ToArray();
+        CheckExcluded(OwnershipPath.CanonicalCandidate(path) ?? Path.GetFullPath(path), canonicalExclusions);
         return OperatingSystem.IsWindows()
             ? WindowsSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh)
             : UnixSecureRemovalBackend.OpenStateDirectory(path, canonicalExclusions, token, afterCreate, beforeAncestorRefresh);

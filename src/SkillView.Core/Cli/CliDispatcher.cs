@@ -512,9 +512,10 @@ public static class CliDispatcher
         { Console.Error.WriteLine("skillview: backup selector must identify one captured payload; include its --scan-root before backup"); return ExitCodes.NoMatches; }
         try
         {
+            if (!snapshot.ConfiguredRootsComplete) throw new IOException("Configured agent/workspace root coverage is incomplete; resolve omitted or unavailable contexts before backup.");
             var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner));
             var record = await Task.Run(() => store.Capture(selected[0], token, snapshot.Skills,
-                snapshot.ScannedRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
+                snapshot.ConfiguredRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", true);

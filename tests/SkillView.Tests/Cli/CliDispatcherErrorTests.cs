@@ -17,6 +17,7 @@ namespace SkillView.Tests.Cli;
 public class CliDispatcherErrorTests : IDisposable
 {
     private readonly string _tempRoot;
+    private string? _backupStateOverride;
 
     public CliDispatcherErrorTests()
     {
@@ -145,6 +146,54 @@ public class CliDispatcherErrorTests : IDisposable
     {
         var (code, _, _) = await RunCliAsync("skillview", ["backup", .. arguments]);
         Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Theory]
+    [InlineData("universal")]
+    [InlineData("claude")]
+    [InlineData("pi")]
+    [InlineData("workspace")]
+    [InlineData("profile")]
+    public async Task BackupRefusesStateInsideInitiallyMissingConfiguredAgentRoots(string context)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "backup-skills")).FullName;
+        var target = Directory.CreateDirectory(Path.Combine(root, "demo")).FullName;
+        File.WriteAllText(Path.Combine(target, "SKILL.md"), "---\nname: demo\ndescription: Test\n---\nBody\n");
+        var home = Path.Combine(_tempRoot, "fixture-home");
+        var workspace = Directory.CreateDirectory(Path.Combine(_tempRoot, "workspace")).FullName;
+        var agentRoot = context switch
+        {
+            "universal" => Path.Combine(home, ".agents", "skills"),
+            "claude" => Path.Combine(home, "claude", "skills"),
+            "pi" => Path.Combine(home, "pi", "skills"),
+            "workspace" => Path.Combine(workspace, ".github", "skills"),
+            _ => Path.Combine(_tempRoot, "future-profile")
+        };
+        _backupStateOverride = agentRoot;
+        Assert.False(Directory.Exists(agentRoot));
+        string[] extra = context == "workspace" ? ["--workspace", workspace]
+            : context == "profile" ? ["--profile", "claude:work=" + agentRoot] : [];
+        var (code, output, _) = await RunCliAsync("skillview", ["--scan-root", root, .. extra, "backup", "--path", target, "--json"]);
+        Assert.Equal(ExitCodes.EnvironmentError, code);
+        using var result = JsonDocument.Parse(output);
+        Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
+        Assert.False(Directory.Exists(agentRoot));
+        Assert.Equal(["SKILL.md"], Directory.EnumerateFileSystemEntries(target).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public async Task BackupRefusesIncompleteConfiguredRootCoverageBeforeCreatingState()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "backup-skills")).FullName;
+        var target = Directory.CreateDirectory(Path.Combine(root, "demo")).FullName;
+        File.WriteAllText(Path.Combine(target, "SKILL.md"), "---\nname: demo\ndescription: Test\n---\nBody\n");
+        var roots = new List<string> { "--scan-root", root };
+        for (var i = 0; i < 256; i++) roots.AddRange(["--scan-root", Path.Combine(_tempRoot, "missing-" + i)]);
+        var (code, output, _) = await RunCliAsync("skillview", [.. roots, "backup", "--path", target, "--json"]);
+        Assert.Equal(ExitCodes.EnvironmentError, code);
+        using var result = JsonDocument.Parse(output);
+        Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 
@@ -352,7 +401,7 @@ public class CliDispatcherErrorTests : IDisposable
                 ["HOME"] = home,
                 ["USERPROFILE"] = home,
                 ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
-                ["SKILLVIEW_STATE_HOME"] = Path.Combine(home, "maintenance-state"),
+                ["SKILLVIEW_STATE_HOME"] = _backupStateOverride ?? Path.Combine(home, "maintenance-state"),
                 ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, "claude"),
                 ["PI_CODING_AGENT_DIR"] = Path.Combine(home, "pi"),
                 ["GIT_DIR"] = Path.Combine(_tempRoot, ".git"),

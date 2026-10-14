@@ -42,7 +42,7 @@ public sealed class ScanRootResolver
     internal ImmutableArray<ScanRoot> ResolveWithCancellation(
         Options opts,
         CancellationToken cancellationToken,
-        ICollection<string>? incompleteLocations = null)
+        ICollection<string>? incompleteLocations = null, ScanRootConfiguration? configuration = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var builder = ImmutableArray.CreateBuilder<ScanRoot>();
@@ -52,19 +52,26 @@ public sealed class ScanRootResolver
         var exhausted = false;
         var contexts = new[] { opts.CurrentDirectory }.Concat(opts.WorkspaceDirectories ?? []).Take(33).ToArray();
         if ((opts.WorkspaceDirectories?.Count ?? 0) > 32 || opts.CustomRoots.Count > 256 || (opts.Profiles?.Count ?? 0) > 32)
+        {
+            configuration?.MarkIncomplete();
             incompleteLocations?.Add("Discovery input limit exceeded; omitted contexts remain unobserved.");
+        }
         foreach (var context in contexts.Concat(opts.GhProjectDirectory is { } ghProject ? [ghProject] : []))
         {
             var selectedContext = Path.GetFullPath(context, opts.CurrentDirectory);
             if (!Directory.Exists(selectedContext))
             {
+                foreach (var (rel, agent) in ProjectSeeds)
+                    Add(Path.Combine(selectedContext, rel), Scope.Project, agent, contextRoot: selectedContext);
+                configuration?.MarkIncomplete();
                 incompleteLocations?.Add(selectedContext);
                 continue;
             }
-            var physicalContext = OwnershipPath.CanonicalCandidate(selectedContext) ?? selectedContext;
+            var physicalContext = OwnershipPath.CanonicalCandidate(selectedContext);
+            if (physicalContext is null) { configuration?.MarkIncomplete(); physicalContext = selectedContext; }
             if (!PathIdentity.Equals(physicalContext, selectedContext))
                 foreach (var (rel, agent) in ProjectSeeds) Add(Path.Combine(selectedContext, rel), Scope.Project, agent, contextRoot: selectedContext);
-            var gitRoot = FindGitRootWithCancellation(physicalContext, cancellationToken, incompleteLocations);
+            var gitRoot = FindGitRootWithCancellation(physicalContext, cancellationToken, incompleteLocations, configuration);
             string? cursor = physicalContext;
             for (var depth = 0; cursor is not null && depth < 32; depth++)
             {
@@ -78,7 +85,10 @@ public sealed class ScanRootResolver
                 cursor = Path.GetDirectoryName(cursor);
             }
             if (cursor is not null && gitRoot is not null && !PathIdentity.Equals(cursor, gitRoot))
+            {
+                configuration?.MarkIncomplete();
                 incompleteLocations?.Add("Project ancestor depth limit reached: " + selectedContext);
+            }
         }
 
         foreach (var (rel, agent) in UserSeeds)
@@ -133,14 +143,17 @@ public sealed class ScanRootResolver
         void Add(string path, Scope scope, string? agentHint, string? profile = null, string? contextRoot = null, bool required = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            path = Path.GetFullPath(path, opts.CurrentDirectory);
+            configuration?.Add(new(path, scope, agentHint)
+            { Profile = profile, Context = contextRoot ?? (scope == Scope.User ? opts.HomeDirectory : Path.GetDirectoryName(path)) });
             if (exhausted) return;
             if (++probes > 4096 || builder.Count >= 256)
             {
                 exhausted = true;
+                configuration?.MarkIncomplete();
                 incompleteLocations?.Add("Root discovery limit exceeded; omitted locations remain unobserved.");
                 return;
             }
-            path = Path.GetFullPath(path, opts.CurrentDirectory);
             try
             {
                 if ((File.GetAttributes(path) & FileAttributes.Directory) == 0)
@@ -165,7 +178,7 @@ public sealed class ScanRootResolver
 
     internal static string? FindGitRootWithCancellation(
         string start,
-        CancellationToken cancellationToken, ICollection<string>? incompleteLocations = null)
+        CancellationToken cancellationToken, ICollection<string>? incompleteLocations = null, ScanRootConfiguration? configuration = null)
     {
         if (string.IsNullOrWhiteSpace(start)) return null;
         string? cursor = Path.GetFullPath(start);
@@ -179,12 +192,35 @@ public sealed class ScanRootResolver
             if (parent == cursor) return null;
             cursor = parent;
         }
-        if (!string.IsNullOrEmpty(cursor)) incompleteLocations?.Add("Git ancestor lookup limit reached: " + start);
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            configuration?.MarkIncomplete();
+            incompleteLocations?.Add("Git ancestor lookup limit reached: " + start);
+        }
         return null;
     }
 
     internal static string NormalizeKey(string path)
     {
         return PathIdentity.NormalizeKey(path);
+    }
+}
+
+/// Expected placements remain policy evidence when they are absent on disk.
+/// This completeness is separate from scan/provider availability.
+internal sealed class ScanRootConfiguration
+{
+    internal const int MaxRoots = 4096;
+    private readonly List<ScanRoot> _roots = [];
+    private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+    internal bool IsComplete { get; private set; } = true;
+    internal ImmutableArray<ScanRoot> Roots => _roots.ToImmutableArray();
+    internal void MarkIncomplete() => IsComplete = false;
+    internal void Add(ScanRoot root)
+    {
+        var key = root.Path + "\0" + root.Scope + "\0" + root.AgentHint + "\0" + root.Profile;
+        if (_seen.Contains(key)) return;
+        if (_roots.Count >= MaxRoots) { MarkIncomplete(); return; }
+        _seen.Add(key); _roots.Add(root);
     }
 }

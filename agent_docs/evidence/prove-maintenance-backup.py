@@ -111,11 +111,28 @@ for gh in args.gh or [None]:
         assert not refused['succeeded'], refused
         assert snapshot() == before
         assert not second.joinpath('backup-state').exists()
+        env['SKILLVIEW_STATE_HOME'] = str(root / 'state')
+        first.joinpath('SKILL.md').write_text('---\nname: demo\ndescription: Fixture\nmetadata: {github-ref: main}\n---\nRaw body\n')
+        raw_before = snapshot()
+        raw = run(['backup', '--path', str(first), '--json'])
+        assert raw['succeeded'], raw
+        with zipfile.ZipFile(raw['archivePath']) as archive:
+            manifest = json.loads(archive.read('manifest.json'))
+            row = next(row for row in manifest['entries'] if row['path'] == 'SKILL.md')
+            assert archive.read(row['blob']) == first.joinpath('SKILL.md').read_bytes()
+        assert snapshot() == raw_before
+        missing_agent_root = home / '.agents' / 'skills'
+        assert not missing_agent_root.exists()
+        env['SKILLVIEW_STATE_HOME'] = str(missing_agent_root)
+        refused = run(['backup', '--path', str(first), '--json'], expected=10)
+        assert not refused['succeeded'] and not missing_agent_root.exists(), refused
+        assert snapshot() == raw_before
         results.append(dict(nativeHost=str(app), nativeSha256=digest(app), gh=str(gh) if gh else 'runner default',
                             exactInstallationIdSelected=True, archiveAndJournalHashesVerified=True,
                             completeFileBytesAndEmptyDirectoriesVerified=True, nativeLinkRemainedLeaf=True,
                             unixPrivateModesVerified=os.name != 'nt', selectedAndUnselectedPayloadsUnchanged=True,
-                            otherInstalledPayloadCannotBeState=True, sharedRegistryUnchanged=True))
+                            otherInstalledPayloadCannotBeState=True, missingConfiguredAgentRootCannotBeState=True,
+                            rawFlowMetadataArchivedByteExact=True, sharedRegistryUnchanged=True))
 assert digest(shared) == shared_before
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))

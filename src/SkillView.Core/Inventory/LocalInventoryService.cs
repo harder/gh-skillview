@@ -172,6 +172,8 @@ public sealed class LocalInventoryService
         {
             Skills = merged,
             ScannedRoots = local.Roots,
+            ConfiguredRoots = local.ConfiguredRoots,
+            ConfiguredRootsComplete = local.ConfigurationComplete,
             UsedGhSkillList = usedGhList,
             CapturedAt = DateTimeOffset.UtcNow,
             Diagnostics = diagnostics,
@@ -203,6 +205,8 @@ public sealed class LocalInventoryService
             ? Path.GetFullPath(value, currentDirectory) : null;
         var home = EnvironmentPath(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
             ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var configuration = new ScanRootConfiguration();
+        if (contextError is not null) configuration.MarkIncomplete();
         var roots = _resolver.ResolveWithCancellation(new ScanRootResolver.Options(
             CurrentDirectory: currentDirectory,
             HomeDirectory: home,
@@ -210,7 +214,7 @@ public sealed class LocalInventoryService
             ClaudeUserConfigDir: EnvironmentPath("CLAUDE_CONFIG_DIR"),
             PiCodingAgentDir: EnvironmentPath("PI_CODING_AGENT_DIR"),
             WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles, GhProjectDirectory: activeProject),
-            cancellationToken, inaccessible);
+            cancellationToken, inaccessible, configuration);
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
         var fsSw = Stopwatch.StartNew();
@@ -228,7 +232,7 @@ public sealed class LocalInventoryService
             "inventory",
             $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
         return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray(),
-            lockDiagnostics.ToImmutableArray(), locations.ToImmutableArray());
+            lockDiagnostics.ToImmutableArray(), locations.ToImmutableArray(), configuration.Roots, configuration.IsComplete);
     }
 
     internal static ImmutableArray<InstalledSkill> EnrichOwnership(ImmutableArray<InstalledSkill> skills,
@@ -298,7 +302,9 @@ public sealed class LocalInventoryService
         TimeSpan Duration,
         ImmutableArray<string> InaccessiblePaths,
         ImmutableArray<LockReadDiagnostic> LockDiagnostics,
-        ImmutableArray<DiscoveryLocation> Locations);
+        ImmutableArray<DiscoveryLocation> Locations,
+        ImmutableArray<ScanRoot> ConfiguredRoots,
+        bool ConfigurationComplete);
 
     private sealed record GhCapture(
         ImmutableArray<GhSkillListRecord> Records,
