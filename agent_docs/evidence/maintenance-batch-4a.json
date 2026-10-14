@@ -99,7 +99,7 @@
   "durabilityContract": "Verified OS publication calls and restart-visible journals; no globally atomic transaction against external managers/same-UID adversaries or unconditional storage hardware power-loss guarantee.",
   "platformCI": {
     "required": true,
-    "status": "pending PR",
+    "status": "all passed",
     "tests": [
       "linux-x64",
       "osx-arm64",
@@ -110,7 +110,13 @@
       "osx-arm64",
       "win-x64",
       "win-arm64"
-    ]
+    ],
+    "head": "303b1968bc820616f55bceb3758d82c1996eb68f",
+    "run": 38619873846,
+    "codeql": 38619873873,
+    "testsPassedPerPlatform": 1018,
+    "mergeCommit": "4c4e5c68de1985d83db3e1f5d3a01481087f5900",
+    "pullRequest": 46
   },
   "primarySources": [
     "https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_file.c",

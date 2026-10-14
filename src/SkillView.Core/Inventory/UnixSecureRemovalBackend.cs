@@ -1587,10 +1587,16 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                 state.Buffer,
                 state.Flags));
 
-    private static int DupWithRetry(int descriptor) =>
-        RetryOnInterrupted(
+    internal static int DupWithRetry(int descriptor)
+    {
+        if (!IsRegularFileInspectionSupported)
+            throw new IOException("Native close-on-exec duplication has no verified ABI on this platform.");
+        return RetryOnInterrupted(
             descriptor,
-            static value => UnixNative.dup(value));
+            static value => OperatingSystem.IsMacOS()
+                ? UnixNative.fcntl_duplicate_macos(value, 67, 0, 0, 0, 0, 0, 0, 0)
+                : UnixNative.fcntl_duplicate_linux(value, 1030, 0));
+    }
 
     private static int FGetAttrListWithRetry(
         int descriptor,
@@ -1937,8 +1943,17 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         [DllImport("libc", SetLastError = true)]
         internal static extern int unlinkat(int directory, string path, int flags);
 
-        [DllImport("libc", SetLastError = true)]
-        internal static extern int dup(int descriptor);
+        // F_DUPFD_CLOEXEC sets close-on-exec atomically with duplication. Plain
+        // dup followed by F_SETFD would leave an inheritance race with exec.
+        [DllImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+        internal static extern int fcntl_duplicate_linux(int descriptor, int command, int minimum);
+
+        // Darwin ARM64 puts variadic arguments on the stack. Fill the remaining
+        // six integer argument registers so the minimum descriptor is stacked.
+        [DllImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+        internal static extern int fcntl_duplicate_macos(int descriptor, int command,
+            nint padding2, nint padding3, nint padding4, nint padding5,
+            nint padding6, nint padding7, nint minimum);
 
         [DllImport("libc", SetLastError = true)]
         internal static extern int close(int descriptor);
