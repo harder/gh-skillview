@@ -1,17 +1,20 @@
 class Skillview < Formula
-  desc "Terminal UI and CLI for browsing and managing gh skill skills"
-  homepage "https://github.com/harder/gh-skillview"
-  version "{{VERSION}}"
+  desc "Terminal UI and CLI for browsing and managing GitHub CLI skills"
+  homepage "https://skillview.dev/"
   license "MIT"
 
+  depends_on "gh"
+
   on_macos do
-    odie "SkillView Homebrew packages currently support Apple Silicon only." unless Hardware::CPU.arm?
+    odie "SkillView currently supports Apple Silicon Macs only." unless Hardware::CPU.arm?
+
     url "{{URL_DARWIN_ARM64}}"
     sha256 "{{SHA_DARWIN_ARM64}}"
   end
 
   on_linux do
-    odie "SkillView Homebrew packages currently support x86_64 Linux only." unless Hardware::CPU.intel?
+    odie "SkillView currently supports x86_64 Linux only." unless Hardware::CPU.intel?
+
     url "{{URL_LINUX_X64}}"
     sha256 "{{SHA_LINUX_X64}}"
   end
@@ -22,6 +25,6 @@ class Skillview < Formula
   end
 
   test do
-    assert_match "Terminal.Gui", shell_output("#{bin}/skillview --version")
+    assert_match "{{VERSION}}", shell_output("#{bin}/skillview --version")
   end
 end

@@ -243,6 +243,14 @@ jobs:
           gh extension install harder/gh-skillview
           gh skillview
           \`\`\`
+
+          ## Homebrew
+
+          On Apple Silicon macOS or x86_64 Linux, install the standalone app with:
+
+          \`\`\`bash
+          brew install harder/tap/skillview
+          \`\`\`
           EOF
 
       - name: Publish release
@@ -273,17 +281,16 @@ jobs:
           fi
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
-  # Dark-launch scaffold only. Generates a formula from the currently shipped
-  # Unix release assets but does not commit or push to a tap yet.
+  # Generate a verified formula artifact for the tap's automatic release watcher.
+  # The tap independently validates new releases on both supported platforms.
   publish-homebrew:
     needs: [build, release]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
     env:
       RELEASE_REF: ${{ github.ref_name }}
       RELEASE_REPO: ${{ github.repository }}
-      HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -300,20 +307,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p generated/homebrew
-          DARWIN_ARM64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-darwin-arm64"
-          LINUX_X64_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_REF}/skillview-linux-amd64"
-          DARWIN_ARM64_SHA=$(awk '$2 == "skillview-darwin-arm64" {print $1}' artifacts/SHA256SUMS-darwin-arm64.txt)
-          LINUX_X64_SHA=$(awk '$2 == "skillview-linux-amd64" {print $1}' artifacts/SHA256SUMS-linux-amd64.txt)
-          sed \
-            -e "s|{{VERSION}}|${RELEASE_REF#v}|g" \
-            -e "s|{{URL_DARWIN_ARM64}}|${DARWIN_ARM64_URL}|g" \
-            -e "s|{{URL_LINUX_X64}}|${LINUX_X64_URL}|g" \
-            -e "s|{{SHA_DARWIN_ARM64}}|${DARWIN_ARM64_SHA}|g" \
-            -e "s|{{SHA_LINUX_X64}}|${LINUX_X64_SHA}|g" \
-            packaging/homebrew/skillview.rb.tmpl \
-            > generated/homebrew/skillview.rb
-          printf 'Dark-launch only: generated formula for %s (target tap: %s)\n' "${RELEASE_REF}" "${HOMEBREW_TAP_REPO:-harder/homebrew-tap}"
+          python3 packaging/homebrew/render_formula.py \
+            --tag "$RELEASE_REF" \
+            --assets-dir artifacts \
+            --output generated/homebrew/skillview.rb
+          printf 'Generated verified Homebrew formula for %s\n' "$RELEASE_REF"
 
       - name: Upload generated formula
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
