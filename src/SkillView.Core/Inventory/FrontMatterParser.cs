@@ -1,222 +1,190 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 
 namespace SkillView.Inventory;
 
-/// Hand-rolled SKILL.md front-matter parser. We handle the subset actually
-/// emitted in the wild — scalar keys, string-or-boolean scalars, and block /
-/// flow arrays — rather than pulling in YamlDotNet (a heavy AOT surface for a
-/// file format we only read). Unknown keys land in `Extra`.
+/// Bounded event-based YAML reading. No object deserialization, reflection,
+/// custom-tag execution, or alias expansion; safe for the native AOT hosts.
 public static class FrontMatterParser
 {
-    /// Returns (body, frontMatter). If the document has no front-matter block,
-    /// `FrontMatter` is `Empty` and `Body` is the whole input.
+    public const int MaxYamlChars = 64 * 1024;
+    public const int MaxNodes = 4096;
+    public const int MaxDepth = 16;
+
     public static (string Body, Models.SkillFrontMatter FrontMatter, bool Parsed) Parse(string source)
     {
-        if (string.IsNullOrEmpty(source))
-        {
-            return (string.Empty, Models.SkillFrontMatter.Empty, false);
-        }
-
-        // Accept `---\n` or `---\r\n` opening. Must be at position 0.
-        if (!source.StartsWith("---", StringComparison.Ordinal))
-        {
+        if (string.IsNullOrEmpty(source)) return (string.Empty, Models.SkillFrontMatter.Empty, false);
+        var text = source.TrimStart('\uFEFF');
+        var firstNl = text.IndexOf('\n');
+        if (firstNl < 0 || text[..firstNl].TrimEnd('\r') != "---")
             return (source, Models.SkillFrontMatter.Empty, false);
-        }
-
-        // Allow an optional BOM and whitespace up to the first newline after the opener.
-        var firstNl = source.IndexOf('\n', 3);
-        if (firstNl < 0) return (source, Models.SkillFrontMatter.Empty, false);
-        var afterOpen = firstNl + 1;
-
-        // Find closing `---` line.
-        var closeIdx = FindCloseFence(source, afterOpen);
-        if (closeIdx < 0)
+        var start = firstNl + 1;
+        var close = start;
+        while (close < text.Length)
         {
-            return (source, Models.SkillFrontMatter.Empty, false);
+            var end = text.IndexOf('\n', close);
+            var line = (end < 0 ? text[close..] : text[close..end]).TrimEnd('\r');
+            if (line is "---" or "...")
+            {
+                var body = end < 0 ? string.Empty : text[(end + 1)..];
+                if (close - start > MaxYamlChars) return (body, Models.SkillFrontMatter.Empty, false);
+                try { return (body, ParseBlock(text[start..close]), true); }
+                catch (Exception ex) when (ex is YamlException or FormatException)
+                {
+                    return (body, Models.SkillFrontMatter.Empty with { Diagnostics = [ex.Message] }, false);
+                }
+            }
+            if (end < 0) break;
+            close = end + 1;
+            if (close - start > MaxYamlChars) break;
         }
-
-        var blockEnd = closeIdx;
-        var afterClose = source.IndexOf('\n', closeIdx + 3);
-        var body = afterClose < 0 ? string.Empty : source[(afterClose + 1)..];
-
-        var block = source.Substring(afterOpen, blockEnd - afterOpen);
-        var fm = ParseBlock(block);
-        return (body, fm, true);
-    }
-
-    private static int FindCloseFence(string source, int start)
-    {
-        var idx = start;
-        while (idx < source.Length)
-        {
-            // Look for a line starting with `---` or `...`.
-            var lineEnd = source.IndexOf('\n', idx);
-            var line = lineEnd < 0 ? source[idx..] : source[idx..lineEnd];
-            var trimmed = line.TrimEnd('\r');
-            if (trimmed == "---" || trimmed == "...") return idx;
-            if (lineEnd < 0) return -1;
-            idx = lineEnd + 1;
-        }
-        return -1;
+        return (source, Models.SkillFrontMatter.Empty, false);
     }
 
     private static Models.SkillFrontMatter ParseBlock(string block)
     {
-        string? name = null, description = null, version = null, license = null, upstream = null, sha = null;
-        bool pinned = false;
-        var tools = ImmutableArray.CreateBuilder<string>();
-        var agents = ImmutableArray.CreateBuilder<string>();
+        var parser = new Parser(new StringReader(block));
+        parser.Consume<StreamStart>();
+        parser.Consume<DocumentStart>();
+        var nodes = 0;
+        var root = ReadNode(parser, 0, ref nodes) as Dictionary<string, object>
+            ?? throw new FormatException("Skill frontmatter must be a mapping.");
+        parser.Consume<DocumentEnd>();
+        parser.Consume<StreamEnd>();
+        var metadata = root.GetValueOrDefault("metadata") as Dictionary<string, object> ?? [];
+        string? Field(string name) => root.GetValueOrDefault(name) as string;
+        string? Meta(string name) => metadata.GetValueOrDefault(name) as string;
+        var diagnostics = ImmutableArray.CreateBuilder<string>();
+        if (root.TryGetValue("metadata", out var metadataNode) && metadataNode is not Dictionary<string, object>)
+            diagnostics.Add("Metadata must be a mapping of strings to strings.");
+        foreach (var (key, value) in metadata)
+            if (value is not string) diagnostics.Add($"Metadata field '{key}' must be a string.");
+        var name = Field("name");
+        var description = Field("description");
+        if (string.IsNullOrWhiteSpace(name)) diagnostics.Add("Required name is missing or empty.");
+        else if (!ValidName(name)) diagnostics.Add("Name must be 1–64 lowercase letters, digits or single hyphens.");
+        if (string.IsNullOrWhiteSpace(description)) diagnostics.Add("Required description is missing or empty.");
+        else if (description.Length > 1024) diagnostics.Add("Description exceeds 1024 characters.");
+        var compatibility = Field("compatibility");
+        if (compatibility?.Length > 500) diagnostics.Add("Compatibility exceeds 500 characters.");
         var extra = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-
-        var lines = block.Replace("\r\n", "\n").Split('\n');
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var raw = lines[i];
-            if (raw.Length == 0) continue;
-            // Skip comment-only or blank lines.
-            var ltrim = raw.TrimStart();
-            if (ltrim.Length == 0 || ltrim[0] == '#') continue;
-            // Only top-level keys (no leading whitespace) are recognized.
-            if (raw.Length != ltrim.Length) continue;
-
-            var colon = raw.IndexOf(':');
-            if (colon <= 0) continue;
-            var key = raw[..colon].Trim();
-            var value = raw[(colon + 1)..].Trim();
-
-            // Flow array `key: [a, b]`
-            if (value.StartsWith('[') && value.EndsWith(']'))
-            {
-                var items = ParseFlowArray(value);
-                switch (NormalizeKey(key))
-                {
-                    case "allowed-tools": tools.AddRange(items); break;
-                    case "agents": agents.AddRange(items); break;
-                    default:
-                        extra[key] = string.Join(", ", items);
-                        break;
-                }
-                continue;
-            }
-
-            // Block array:
-            //   key:
-            //     - item
-            //     - item
-            if (value.Length == 0 && i + 1 < lines.Length && IsBlockArrayStart(lines[i + 1]))
-            {
-                var items = ImmutableArray.CreateBuilder<string>();
-                while (i + 1 < lines.Length && IsBlockArrayStart(lines[i + 1]))
-                {
-                    var item = lines[++i].TrimStart();
-                    // Strip leading "- " and surrounding quotes.
-                    item = item[1..].TrimStart();
-                    items.Add(Unquote(item));
-                }
-                switch (NormalizeKey(key))
-                {
-                    case "allowed-tools": tools.AddRange(items); break;
-                    case "agents": agents.AddRange(items); break;
-                    default:
-                        extra[key] = string.Join(", ", items);
-                        break;
-                }
-                continue;
-            }
-
-            var scalar = Unquote(value);
-            switch (NormalizeKey(key))
-            {
-                case "name": name = scalar; break;
-                case "description": description = scalar; break;
-                case "version": version = scalar; break;
-                case "license": license = scalar; break;
-                case "upstream": upstream = scalar; break;
-                case "github-tree-sha":
-                case "tree-sha":
-                case "treesha":
-                    sha = scalar;
-                    break;
-                case "pinned":
-                    pinned = string.Equals(scalar, "true", StringComparison.OrdinalIgnoreCase);
-                    break;
-                default:
-                    extra[key] = scalar;
-                    break;
-            }
-        }
-
+        Flatten(root, "", extra);
+        var pinnedRef = Meta("github-pinned");
         return new Models.SkillFrontMatter
         {
             Name = name,
             Description = description,
-            Version = version,
-            License = license,
-            Upstream = upstream,
-            GithubTreeSha = sha,
-            Pinned = pinned,
-            AllowedTools = tools.ToImmutable(),
-            Agents = agents.ToImmutable(),
+            Version = Field("version") ?? Meta("version"),
+            License = Field("license"),
+            Compatibility = compatibility,
+            Upstream = Meta("github-repo") ?? Field("upstream"),
+            GithubTreeSha = Meta("github-tree-sha") ?? Field("github-tree-sha") ?? Field("tree-sha") ?? Field("treesha"),
+            GithubRef = Meta("github-ref"),
+            GithubPath = Meta("github-path"),
+            PinnedRef = pinnedRef,
+            LocalPath = Meta("local-path"),
+            Pinned = !string.IsNullOrWhiteSpace(pinnedRef)
+                || string.Equals(Field("pinned"), "true", StringComparison.OrdinalIgnoreCase)
+                || root.GetValueOrDefault("pinned") is NonStringScalar { Value: "true" },
+            AllowedTools = StringList(root.GetValueOrDefault("allowed-tools"), splitScalar: true),
+            Agents = StringList(root.GetValueOrDefault("agents"), splitScalar: false),
             Extra = extra.ToImmutable(),
+            Metadata = metadata.Where(x => x.Value is string).ToImmutableDictionary(x => x.Key, x => (string)x.Value, StringComparer.Ordinal),
+            Diagnostics = diagnostics.ToImmutable(),
         };
     }
 
-    private static bool IsBlockArrayStart(string line)
+    private static object ReadNode(IParser parser, int depth, ref int nodes)
     {
-        var i = 0;
-        while (i < line.Length && (line[i] == ' ' || line[i] == '\t')) i++;
-        if (i >= line.Length) return false;
-        if (line[i] != '-') return false;
-        // Require at least one leading space (i.e. indented under the key) OR
-        // the next char being a space — guards against `---` closers.
-        if (i == 0) return false;
-        return i + 1 < line.Length && line[i + 1] == ' ';
+        if (depth > MaxDepth || ++nodes > MaxNodes) throw new FormatException("Frontmatter exceeds YAML complexity limits.");
+        if (parser.TryConsume<Scalar>(out var scalar))
+        {
+            var value = scalar.Value;
+            var explicitlyString = scalar.Tag.ToString() == "tag:yaml.org,2002:str";
+            var typedTag = !scalar.Tag.IsEmpty && !explicitlyString;
+            var implicitTyped = scalar.Style == ScalarStyle.Plain && !explicitlyString
+                && (value.Length == 0 || value is "~" || value.Equals("null", StringComparison.OrdinalIgnoreCase)
+                    || value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("false", StringComparison.OrdinalIgnoreCase)
+                    || decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _));
+            return typedTag || implicitTyped ? new NonStringScalar(value) : value;
+        }
+        if (parser.TryConsume<MappingStart>(out _))
+        {
+            var values = new Dictionary<string, object>(StringComparer.Ordinal);
+            while (!parser.TryConsume<MappingEnd>(out _))
+            {
+                var key = ReadNode(parser, depth + 1, ref nodes) as string
+                    ?? throw new FormatException("Frontmatter keys must be scalar strings.");
+                var value = ReadNode(parser, depth + 1, ref nodes);
+                if (!values.TryAdd(key, value)) throw new FormatException($"Duplicate frontmatter key: {key}");
+            }
+            return values;
+        }
+        if (parser.TryConsume<SequenceStart>(out _))
+        {
+            var values = new List<object>();
+            while (!parser.TryConsume<SequenceEnd>(out _)) values.Add(ReadNode(parser, depth + 1, ref nodes));
+            return values;
+        }
+        throw new FormatException("Unsupported YAML node (aliases are not expanded).");
+    }
+
+    private sealed record NonStringScalar(string Value);
+
+    private static bool ValidName(string name) => name.Length is >= 1 and <= 64
+        && name[0] != '-' && name[^1] != '-' && !name.Contains("--", StringComparison.Ordinal)
+        && name.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
+
+    private static ImmutableArray<string> StringList(object? value, bool splitScalar)
+    {
+        if (value is List<object> list) return list.OfType<string>().ToImmutableArray();
+        if (value is not string text || string.IsNullOrWhiteSpace(text)) return [];
+        if (!splitScalar) return [text];
+        // Spaces inside tool argument patterns belong to the same tool.
+        var parts = ImmutableArray.CreateBuilder<string>();
+        var depth = 0;
+        var start = 0;
+        for (var i = 0; i <= text.Length; i++)
+        {
+            if (i < text.Length && text[i] == '(') depth++;
+            if (i < text.Length && text[i] == ')') depth = Math.Max(0, depth - 1);
+            if (i == text.Length || (char.IsWhiteSpace(text[i]) && depth == 0))
+            {
+                if (i > start) parts.Add(text[start..i]);
+                start = i + 1;
+            }
+        }
+        return parts.ToImmutable();
+    }
+
+    private static void Flatten(Dictionary<string, object> map, string prefix, ImmutableDictionary<string, string>.Builder output)
+    {
+        foreach (var (key, value) in map)
+        {
+            var path = prefix + key;
+            if (value is string text) output[path] = text;
+            else if (value is NonStringScalar typed) output[path] = typed.Value;
+            else if (value is Dictionary<string, object> nested) Flatten(nested, path + ".", output);
+            else if (value is List<object> list) output[path] = string.Join(", ", list.OfType<string>());
+        }
     }
 
     internal static IEnumerable<string> ParseFlowArray(string value)
     {
-        // Assumes value starts with '[' and ends with ']'.
-        var inner = value[1..^1];
-        var parts = new List<string>();
-        var sb = new System.Text.StringBuilder();
-        char? quote = null;
-        foreach (var ch in inner)
+        try
         {
-            if (quote is not null)
-            {
-                if (ch == quote) { quote = null; continue; }
-                sb.Append(ch);
-                continue;
-            }
-            if (ch == '"' || ch == '\'') { quote = ch; continue; }
-            if (ch == ',')
-            {
-                AppendTrimmed(parts, sb);
-                continue;
-            }
-            sb.Append(ch);
+            var parser = new Parser(new StringReader(value));
+            parser.Consume<StreamStart>();
+            parser.Consume<DocumentStart>();
+            var nodes = 0;
+            return StringList(ReadNode(parser, 0, ref nodes), false);
         }
-        AppendTrimmed(parts, sb);
-        return parts;
+        catch (Exception ex) when (ex is YamlException or FormatException) { return []; }
     }
 
-    private static void AppendTrimmed(List<string> parts, System.Text.StringBuilder sb)
-    {
-        var piece = sb.ToString().Trim();
-        sb.Clear();
-        if (piece.Length > 0) parts.Add(piece);
-    }
-
-    internal static string Unquote(string s)
-    {
-        if (s.Length >= 2 &&
-            ((s[0] == '"' && s[^1] == '"') || (s[0] == '\'' && s[^1] == '\'')))
-        {
-            return s[1..^1];
-        }
-        return s;
-    }
-
-    private static string NormalizeKey(string key) => key.ToLower(CultureInfo.InvariantCulture);
+    internal static string Unquote(string value) => value.Length >= 2
+        && ((value[0] == '\"' && value[^1] == '\"') || (value[0] == '\'' && value[^1] == '\''))
+        ? value[1..^1] : value;
 }

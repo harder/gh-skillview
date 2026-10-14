@@ -30,7 +30,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `win-arm64`, `linux-x64`, and `osx-arm64`. Change dependencies with an
   intentional `dotnet restore --force-evaluate`, commit the lock-file diff,
   and confirm locked restore again.
-- Build/style verification: `dotnet build`
+- Build verification: `dotnet build`
+- CI style verification: `dotnet format SkillView.sln --no-restore --verify-no-changes`
 - Full tests: `dotnet test --no-build`
 - Run product publish commands sequentially. The App and gh-extension publishes
   share `SkillView.Core` intermediate/output files, so parallel publishes can
@@ -282,7 +283,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   well as device/inode for selected directories, parents, links, and observed
   entries because filesystems may immediately recycle an inode. A selected
   directory whose generation or contents changed after validation must be
-  refused and revalidated, not accepted for compatibility with stale behavior.
+  refused and revalidated, not accepted for compatibility with stale behavior. Windows
+  also pins a deterministic immediate-entry fingerprint (4,096-entry bound),
+  including full opened-child identities and raw reparse data. Compare snapshots
+  around policy inspection and before any mutation; cancellation must precede
+  each native enumeration/read. This is not an atomic recursive content snapshot.
   Do not fall back to
   path-recursive deletion on Windows, macOS, or Linux. Keep cancellation
   checks immediately before every native destructive call and dispose handles
@@ -504,6 +509,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.
+
+- Skill maintenance invariants and batch evidence live in
+  `agent_docs/maintenance-implementation.md`. A name collision or absent gh
+  catalog entry is never sufficient removal evidence. Preserve explicit root
+  coverage, authored-version versus repository-ref semantics, and all agent
+  exposures when reconciling inventory. Frontmatter uses bounded YAML events;
+  do not replace it with reflection-based deserialization or alias expansion.
 
 ## Progressive disclosure
 

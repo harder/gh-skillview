@@ -18,7 +18,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
 | **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
-| **Cleanup view** | Finds duplicates, broken symlinks, residue, and other cleanup candidates; remove or ignore them in batches. | `c` |
+| **Cleanup view** | Finds name collisions, metadata issues, broken symlinks, and residue; compare/review uncertain items and remove eligible cleanup candidates. | `c` |
 | **Help overlay** | Grouped Markdown reference for every keybinding. | `?` or `F1` |
 
 Each tab preserves its own state (filter text, selection, sort, marks) when you switch away and back.
@@ -210,3 +210,16 @@ If you open a bug, include:
 SkillView requires `gh` 2.97.0 or newer and a terminal with ANSI support. It complements `gh skill`; use the [upstream commands](https://cli.github.com/manual/gh_skill) for options SkillView does not expose, including [`gh skill publish`](https://cli.github.com/manual/gh_skill_publish).
 
 Inventory scans conventional user skill locations as well as `CLAUDE_CONFIG_DIR` for Claude Code and `PI_CODING_AGENT_DIR` for Pi.
+
+### Inventory reconciliation
+
+`list --json` reports schema version 2, provider outcomes, partial scans,
+inaccessible paths, exact installation IDs, and each agent exposure’s scope.
+Authored `version` is separate from `repositoryRef`; source path, pinned ref,
+local source and metadata diagnostics are retained.
+
+A same-name collision is not proof of duplicate content. Collisions, malformed
+metadata, conflicting observations and skills absent from a covered gh catalog
+are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
+removal of a chosen install remains available through the Installed workflow.
+An incomplete scan is marked in the Installed footer and Changes summary.

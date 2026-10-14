@@ -79,7 +79,7 @@ internal sealed class GhSkillListCache
             var loaded = await flight.Completion.Task
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return new LookupResult(loaded.Records, FromCache: false);
+            return new LookupResult(loaded.Records, FromCache: false, Succeeded: loaded.ShouldCache, Error: loaded.Error);
         }
         finally
         {
@@ -273,11 +273,14 @@ internal sealed class GhSkillListCache
 
     internal readonly record struct LoadResult(
         ImmutableArray<GhSkillListRecord> Records,
-        bool ShouldCache = true);
+        bool ShouldCache = true,
+        string? Error = null);
 
     internal readonly record struct LookupResult(
         ImmutableArray<GhSkillListRecord> Records,
-        bool FromCache);
+        bool FromCache,
+        bool Succeeded = true,
+        string? Error = null);
 
     private sealed class InflightLoad(
         long generation,

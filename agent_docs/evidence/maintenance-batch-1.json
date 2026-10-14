@@ -1,0 +1,48 @@
+{
+  "baseline": "d6a5785",
+  "sdk": "10.0.402",
+  "fullSuite": {
+    "passed": 867,
+    "failed": 0,
+    "skipped": 0
+  },
+  "independentReview": {
+    "model": "Astra",
+    "rounds": 9,
+    "acceptedFindingsAddressed": 11,
+    "remainingActionableFindings": 0
+  },
+  "nativeRuntimeProof": [
+    {
+      "gh": "gh version 2.97.0 (2026-07-31)",
+      "nativeHost": true,
+      "physicalRows": 3,
+      "pinsAndSourcesVerified": true,
+      "customRootMerged": true,
+      "collisionCandidatesReviewOnly": 2,
+      "payloadsUnchangedAfterCleanupApply": true
+    },
+    {
+      "gh": "gh version 2.102.0 (2026-09-30)",
+      "nativeHost": true,
+      "physicalRows": 3,
+      "pinsAndSourcesVerified": true,
+      "customRootMerged": true,
+      "collisionCandidatesReviewOnly": 2,
+      "payloadsUnchangedAfterCleanupApply": true
+    }
+  ],
+  "windowsValidation": {
+    "immediateEntryLimit": 4096,
+    "fingerprintsIncludeNativeChildIdentitiesAndReparseData": true,
+    "regressions": [
+      "recreated link with refreshed parent identity",
+      "in-place retarget with unchanged link identity",
+      "capture mutation",
+      "entry limit refusal",
+      "cancellation between native enumeration admissions"
+    ],
+    "localNativeExecution": "macOS local plus Windows CI run 38511388030 passed 867 tests",
+    "ciRun": "https://github.com/harder/gh-skillview/actions/runs/38511388030"
+  }
+}

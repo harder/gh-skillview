@@ -61,7 +61,7 @@ public sealed class LocalInventoryService
         var ghTask = ghPath is null
             ? Task.FromResult(new GhCapture(
                 ImmutableArray<GhSkillListRecord>.Empty,
-                TimeSpan.Zero))
+                TimeSpan.Zero, false, "gh unavailable"))
             : CaptureGhAsync(
                 ghPath,
                 options.FilterScope,
@@ -74,10 +74,26 @@ public sealed class LocalInventoryService
         if (ghPath is not null)
         {
             ghRecords = gh.Records;
-            usedGhList = true;
+            usedGhList = gh.Succeeded;
             _logger.Info("inventory", $"gh skill list returned {ghRecords.Length} record(s)");
         }
 
+        var providers = ImmutableArray.CreateBuilder<ProviderObservation>();
+        // Default gh discovery covers more agents than local seeds, but only
+        // explicit --dir observations establish absence for a particular root.
+        providers.Add(new ProviderObservation("gh-default", gh.Succeeded, [], DateTimeOffset.UtcNow, gh.Error));
+        if (ghPath is not null)
+        {
+            foreach (var root in local.Roots)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var custom = await _listAdapter.CaptureAsync(ghPath, directory: root.Path,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                providers.Add(new ProviderObservation("gh", custom.Succeeded, [root.Path], DateTimeOffset.UtcNow, custom.Error));
+                ghRecords = ghRecords.AddRange(custom.Records);
+                usedGhList |= custom.Succeeded;
+            }
+        }
         var merged = MergeWithCancellation(local.Scanned, ghRecords, cancellationToken);
 
         // Enrich with package-bundle metadata from any `.skill-lock.json`
@@ -104,7 +120,7 @@ public sealed class LocalInventoryService
             {
                 merged = FilterWithCancellation(
                     merged,
-                    skill => skill.Scope == wanted,
+                    skill => skill.Scope == wanted || skill.Agents.Any(agent => agent.Scope == wanted),
                     cancellationToken);
             }
         }
@@ -112,10 +128,7 @@ public sealed class LocalInventoryService
         {
             merged = FilterWithCancellation(
                 merged,
-                skill => skill.Agents.Any(agent => string.Equals(
-                    agent.AgentId,
-                    options.FilterAgent,
-                    StringComparison.OrdinalIgnoreCase)),
+                skill => skill.Agents.Any(agent => AgentIdentity.Matches(agent.AgentId, options.FilterAgent)),
                 cancellationToken);
         }
 
@@ -131,6 +144,7 @@ public sealed class LocalInventoryService
             FsScanDuration = local.Duration,
             GhListDuration = gh.Duration,
             BrokenSymlinksFound = brokenCount,
+            InaccessiblePaths = local.InaccessiblePaths,
         };
 
         return new InventorySnapshot
@@ -140,6 +154,7 @@ public sealed class LocalInventoryService
             UsedGhSkillList = usedGhList,
             CapturedAt = DateTimeOffset.UtcNow,
             Diagnostics = diagnostics,
+            Providers = providers.ToImmutable(),
         };
     }
 
@@ -151,10 +166,10 @@ public sealed class LocalInventoryService
     {
         var stopwatch = Stopwatch.StartNew();
         var records = await _listAdapter
-            .ListAsync(ghPath, filterScope, filterAgent, cancellationToken)
+            .CaptureAsync(ghPath, filterScope, filterAgent, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         stopwatch.Stop();
-        return new GhCapture(records, stopwatch.Elapsed);
+        return new GhCapture(records.Records, stopwatch.Elapsed, records.Succeeded, records.Error);
     }
 
     private LocalCapture CaptureLocal(Options options, CancellationToken cancellationToken)
@@ -170,10 +185,11 @@ public sealed class LocalInventoryService
 
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
         var fsSw = Stopwatch.StartNew();
+        var inaccessible = new List<string>();
         var scanned = _scanner.ScanWithCancellation(
             roots,
             new LocalSkillScanner.Options(options.AllowHiddenDirs),
-            cancellationToken);
+            cancellationToken, inaccessible);
         var packages = _lockReader.LoadFromRootsWithCancellation(
             roots.Select(root => root.Path),
             cancellationToken);
@@ -181,18 +197,21 @@ public sealed class LocalInventoryService
         _logger.Info(
             "inventory",
             $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
-        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed);
+        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray());
     }
 
     private sealed record LocalCapture(
         ImmutableArray<ScanRoot> Roots,
         ImmutableArray<InstalledSkill> Scanned,
         ImmutableDictionary<string, SkillPackage> Packages,
-        TimeSpan Duration);
+        TimeSpan Duration,
+        ImmutableArray<string> InaccessiblePaths);
 
     private sealed record GhCapture(
         ImmutableArray<GhSkillListRecord> Records,
-        TimeSpan Duration);
+        TimeSpan Duration,
+        bool Succeeded,
+        string? Error);
 
     internal static ImmutableArray<InstalledSkill> Merge(
         ImmutableArray<InstalledSkill> scanned,
@@ -205,77 +224,101 @@ public sealed class LocalInventoryService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (ghRecords.IsEmpty)
-        {
-            return scanned;
-        }
-
-        // Build a key→record index for the scan output.
-        var scanIndex = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
-        var caseSensitivityByParent = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var s in scanned)
+        var index = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
+        var caseSensitivity = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var skill in scanned)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            scanIndex[NormalizeMergeKey(s.ResolvedPath, caseSensitivityByParent)] = s;
+            var key = NormalizeMergeKey(skill.ResolvedPath, caseSensitivity);
+            index[key] = index.TryGetValue(key, out var old) ? Combine(old, skill) : skill;
         }
-
-        var outputBuilder = ImmutableArray.CreateBuilder<InstalledSkill>(scanned.Length + ghRecords.Length);
-        var matchedScanKeys = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var rec in ghRecords)
+        foreach (var record in ghRecords)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var key = ResolveKey(rec, caseSensitivityByParent);
-            if (key is not null && scanIndex.TryGetValue(key, out var match))
+            var key = ResolveKey(record, caseSensitivity);
+            if (key is null) continue;
+            var path = record.ResolvedPath ?? record.Path!;
+            var scope = ParseScope(record.Scope) ?? Scope.Custom;
+            var hosts = record.Hosts.IsDefaultOrEmpty
+                ? (record.Agent is null ? [] : ImmutableArray.Create(record.Agent))
+                : record.Hosts;
+            var observation = new InstalledSkill
             {
-                outputBuilder.Add(match with { Provenance = Provenance.Both });
-                matchedScanKeys.Add(key);
-            }
-            else
-            {
-                // CLI claims this install but filesystem scan didn't see it.
-                // Emit as CliList-only, with the path the CLI reported. The
-                // upstream `gh skill list` shape (cli/cli#13418) makes
-                // `hosts: []` always an array; we adapt that to AgentMembership
-                // entries. SourceUrl lands on FrontMatter.Upstream so the UI
-                // can render the source link from CliList-only records.
-                var path = rec.ResolvedPath ?? rec.Path ?? string.Empty;
-                outputBuilder.Add(new InstalledSkill
+                Name = record.Name ?? Path.GetFileName(path.TrimEnd('/')),
+                ResolvedPath = path,
+                ScanRoot = path,
+                Scope = scope,
+                Agents = hosts.Select(host => new AgentMembership(AgentIdentity.Normalize(host), path, record.IsSymlink, scope)).ToImmutableArray(),
+                FrontMatter = new SkillFrontMatter
                 {
-                    Name = rec.Name ?? Path.GetFileName(path.TrimEnd('/')) ?? "(unnamed)",
-                    ResolvedPath = path,
-                    ScanRoot = path,
-                    Scope = ParseScope(rec.Scope) ?? Scope.Custom,
-                    Agents = rec.Hosts.IsDefaultOrEmpty
-                        ? (rec.Agent is null
-                            ? ImmutableArray<AgentMembership>.Empty
-                            : ImmutableArray.Create(new AgentMembership(rec.Agent, path, rec.IsSymlink)))
-                        : rec.Hosts.Select(a => new AgentMembership(a, path, rec.IsSymlink)).ToImmutableArray(),
-                    FrontMatter = new SkillFrontMatter
-                    {
-                        Name = rec.Name,
-                        Version = rec.Version,
-                        Upstream = rec.SourceUrl ?? rec.Repo,
-                        GithubTreeSha = rec.GithubTreeSha,
-                        Pinned = rec.Pinned,
-                    },
-                    Validity = ValidityState.Valid,
-                    Provenance = Provenance.CliList,
-                    Ignored = false,
-                    IsSymlinked = rec.IsSymlink,
-                    InstalledAt = null,
-                });
-            }
+                    Name = record.Name,
+                    GithubRef = record.Version,
+                    Upstream = record.SourceUrl ?? record.Repo,
+                    GithubTreeSha = record.GithubTreeSha,
+                    Pinned = record.Pinned,
+                },
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.CliList,
+                Ignored = false,
+                IsSymlinked = record.IsSymlink,
+                InstalledAt = null,
+            };
+            index[key] = index.TryGetValue(key, out var match) ? Combine(match, observation) : observation;
         }
+        return index.Values.OrderBy(skill => skill.Name, StringComparer.Ordinal)
+            .ThenBy(skill => skill.ResolvedPath, StringComparer.Ordinal).ToImmutableArray();
+    }
 
-        foreach (var kv in scanIndex)
+    private static InstalledSkill Combine(InstalledSkill first, InstalledSkill next)
+    {
+        var conflicts = first.MetadataConflicts.AddRange(next.MetadataConflicts).ToBuilder();
+        string? Prefer(string? local, string? remote, string field)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (matchedScanKeys.Contains(kv.Key)) continue;
-            outputBuilder.Add(kv.Value);
+            if (!string.IsNullOrWhiteSpace(local) && !string.IsNullOrWhiteSpace(remote)
+                && !(field == "repository ref" ? EquivalentRef(local, remote) : string.Equals(local.TrimEnd('/'), remote.TrimEnd('/'), StringComparison.Ordinal)))
+                conflicts.Add($"Conflicting {field}: {local} / {remote}");
+            return string.IsNullOrWhiteSpace(local) ? remote : local;
         }
+        var a = first.FrontMatter;
+        var b = next.FrontMatter;
+        // gh's version is a repository ref, not the author's semantic version.
+        var isCli = next.Provenance == Provenance.CliList;
+        if (!string.Equals(first.Name, next.Name, StringComparison.Ordinal)
+            && !string.Equals(first.Name, Path.GetFileName(next.Name), StringComparison.Ordinal))
+            conflicts.Add($"Conflicting skill names: {first.Name} / {next.Name}");
+        var fm = a with
+        {
+            Upstream = Prefer(a.Upstream, b.Upstream, "source"),
+            GithubTreeSha = Prefer(a.GithubTreeSha, b.GithubTreeSha, "tree SHA"),
+            GithubRef = Prefer(a.GithubRef, b.GithubRef, "repository ref"),
+            Version = isCli ? a.Version : Prefer(a.Version, b.Version, "authored version"),
+            Pinned = a.Pinned || b.Pinned,
+        };
+        var memberships = first.Agents.Concat(next.Agents)
+            .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope))
+            .Select(group => group.OrderByDescending(agent => agent.IsSymlink)
+                .ThenByDescending(agent => agent.DiscoveryRoot is not null).First() with
+            { AgentId = group.Key.Item1 })
+            .ToImmutableArray();
+        return first with
+        {
+            FrontMatter = fm,
+            Agents = memberships,
+            MetadataConflicts = conflicts.Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            Provenance = first.Provenance == next.Provenance ? first.Provenance : Provenance.Both,
+            IsSymlinked = first.IsSymlinked || next.IsSymlinked,
+            Ignored = first.Ignored || next.Ignored,
+        };
+    }
 
-        return outputBuilder.ToImmutable();
+    private static bool EquivalentRef(string left, string right)
+    {
+        static string Short(string value) => value.StartsWith("refs/heads/", StringComparison.Ordinal) ? value[11..]
+            : value.StartsWith("refs/tags/", StringComparison.Ordinal) ? value[10..] : value;
+        left = Short(left);
+        right = Short(right);
+        if (left == right) return true;
+        return false;
     }
 
     private static ImmutableArray<InstalledSkill> FilterWithCancellation(

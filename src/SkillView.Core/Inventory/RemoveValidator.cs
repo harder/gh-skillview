@@ -55,8 +55,10 @@ public static class RemoveValidator
     public static RemoveValidation Validate(
         InstalledSkill target,
         IReadOnlyList<ScanRoot> knownRoots,
-        IReadOnlyList<InstalledSkill> otherSkills) =>
-        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: false);
+        IReadOnlyList<InstalledSkill> otherSkills,
+        CancellationToken cancellationToken = default) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: false,
+            cancellationToken: cancellationToken);
 
     /// Performs the same non-mutating policy checks for a dry run. On a host
     /// where the native secure backend is unavailable, this may use managed
@@ -65,8 +67,10 @@ public static class RemoveValidator
     public static RemoveValidation ValidateForPreview(
         InstalledSkill target,
         IReadOnlyList<ScanRoot> knownRoots,
-        IReadOnlyList<InstalledSkill> otherSkills) =>
-        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: true);
+        IReadOnlyList<InstalledSkill> otherSkills,
+        CancellationToken cancellationToken = default) =>
+        ValidateCore(target, knownRoots, otherSkills, allowUnpinnedPreview: true,
+            cancellationToken: cancellationToken);
 
     internal static RemoveValidation ValidateWithBackendAvailabilityForTests(
         InstalledSkill target,
@@ -86,8 +90,10 @@ public static class RemoveValidator
         IReadOnlyList<ScanRoot> knownRoots,
         IReadOnlyList<InstalledSkill> otherSkills,
         bool allowUnpinnedPreview,
-        bool? secureBackendSupportedOverride = null)
+        bool? secureBackendSupportedOverride = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var errors = ImmutableArray.CreateBuilder<Error>();
         var warnings = ImmutableArray.CreateBuilder<Warning>();
         var incoming = ImmutableArray<string>.Empty;
@@ -130,7 +136,8 @@ public static class RemoveValidator
                     matchedRootByRawPath.Path,
                     target.ResolvedPath,
                     out var rootedSnapshot,
-                    out identityError))
+                    out identityError,
+                    cancellationToken))
             {
                 var capturedSnapshot = rootedSnapshot.Directory;
                 directorySnapshot = capturedSnapshot;
@@ -285,8 +292,10 @@ public static class RemoveValidator
 
     internal static RemoveValidation ValidateEmptyDirectory(
         string path,
-        IReadOnlyList<ScanRoot> knownRoots)
+        IReadOnlyList<ScanRoot> knownRoots,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var errors = ImmutableArray.CreateBuilder<Error>();
         var fullPath = Path.GetFullPath(path);
         var resolved = fullPath;
@@ -312,7 +321,8 @@ public static class RemoveValidator
                     matchedRootByRawPath.Path,
                     fullPath,
                     out var rootedSnapshot,
-                    out var identityError))
+                    out var identityError,
+                    cancellationToken))
             {
                 var capturedSnapshot = rootedSnapshot.Directory;
                 directorySnapshot = capturedSnapshot;

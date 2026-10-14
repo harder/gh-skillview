@@ -213,6 +213,9 @@ internal static class TuiHelpers
     internal static string ShortKind(CleanupClassifier.CandidateKind kind) => kind switch
     {
         CleanupClassifier.CandidateKind.Malformed => "malformed",
+        CleanupClassifier.CandidateKind.NameCollision => "compare",
+        CleanupClassifier.CandidateKind.Untracked => "untracked",
+        CleanupClassifier.CandidateKind.MetadataConflict => "metadata",
         CleanupClassifier.CandidateKind.SourceOrphaned => "orphan",
         CleanupClassifier.CandidateKind.Duplicate => "duplicate",
         CleanupClassifier.CandidateKind.EmptyDirectory => "empty-dir",

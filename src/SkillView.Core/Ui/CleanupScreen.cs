@@ -440,14 +440,14 @@ public sealed class CleanupScreen
             // target executes. Do not materialize it: deleting an earlier
             // sibling changes the shared parent's native generation, so later
             // link identities must be captured after that owned mutation.
-            var validation = candidate.Kind switch
+            var validation = candidate.ReviewOnly ? RefuseUnsupportedCandidate(candidate) : candidate.Kind switch
             {
                 CleanupClassifier.CandidateKind.BrokenSymlink =>
                     RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots),
                 CleanupClassifier.CandidateKind.EmptyDirectory =>
-                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots),
+                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, cancellationToken),
                 _ when candidate.Skill is not null =>
-                    RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills),
+                    RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, cancellationToken),
                 _ => RefuseUnsupportedCandidate(candidate),
             };
             if (!validation.Allowed || validation.RequiresSecondConfirm)
@@ -586,7 +586,7 @@ public sealed class CleanupScreen
         new(
             ImmutableArray.Create(new RemoveValidator.Error(
                 RemoveValidator.ErrorKind.NotASkillDirectory,
-                $"cleanup candidate kind '{candidate.Kind}' requires installed-skill metadata")),
+                $"cleanup candidate kind '{candidate.Kind}' requires comparison or ownership review, not bulk removal")),
             ImmutableArray<RemoveValidator.Warning>.Empty,
             candidate.Path,
             ImmutableArray<string>.Empty);

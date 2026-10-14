@@ -119,7 +119,7 @@ public sealed class ResourceStressTests : IDisposable
             InstalledAt = null,
         };
         var root = new ScanRoot(skill.ScanRoot, Scope.User, "test");
-        var validation = RemoveValidator.Validate(skill, [root], [skill]);
+        var validation = RemoveValidator.Validate(skill, [root], [skill], cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed);
         var before = GC.GetAllocatedBytesForCurrentThread();
 

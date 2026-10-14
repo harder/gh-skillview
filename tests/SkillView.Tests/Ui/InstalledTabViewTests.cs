@@ -12,6 +12,22 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public void PartialInventory_IsVisibleInFooter()
+    {
+        using var view = new InstalledTabView(
+            action => { action(); return Task.CompletedTask; },
+            (_, _) => { }, _ => Task.FromResult(InventorySnapshot.Empty),
+            (_, _, _) => Task.CompletedTask, () => { }, () => { });
+        view.LoadSeeded(SnapshotWithSkill("demo", null) with
+        {
+            Providers = [new ProviderObservation("gh", false, [], DateTimeOffset.UtcNow, "failed")],
+            Diagnostics = new ScanDiagnostics { InaccessiblePaths = ["/denied"] },
+        });
+        Assert.Contains("partial scan", view.FooterTextForTests);
+        Assert.Contains("1 inaccessible", view.FooterTextForTests);
+    }
+
+    [Fact]
     public void ScopeCycle_ReloadsFullInventoryAfterServerSideFiltering()
     {
         var snapshot = SnapshotWithSkill("user-skill", null) with

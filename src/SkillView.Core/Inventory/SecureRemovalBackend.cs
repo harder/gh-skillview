@@ -10,7 +10,8 @@ internal readonly record struct SecureFileIdentity(
     long ChangeTimeSeconds = 0,
     long ChangeTimeNanoseconds = 0,
     long WindowsCreationTime = 0,
-    long WindowsChangeTime = 0);
+    long WindowsChangeTime = 0,
+    string? DirectoryFingerprint = null);
 
 internal readonly record struct SecureLinkIdentity(
     SecureFileIdentity ParentIdentity,
@@ -45,13 +46,15 @@ internal interface ISecureRemovalBackend
     bool TryCaptureDirectoryValidation(
         string path,
         out SecureDirectoryValidationSnapshot snapshot,
-        out string? error);
+        out string? error,
+        CancellationToken cancellationToken = default);
 
     bool TryCaptureDirectoryValidationWithinRoot(
         string rootPath,
         string path,
         out SecureRootedDirectoryValidationSnapshot snapshot,
-        out string? error);
+        out string? error,
+        CancellationToken cancellationToken = default);
 
     bool TryCaptureLinkIdentity(string path, out SecureLinkIdentity identity, out string? error);
 
@@ -130,7 +133,8 @@ internal static class SecureRemovalBackend
     internal static bool TryCaptureDirectoryValidation(
         string path,
         out SecureDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
         if (Current is null)
         {
@@ -139,14 +143,15 @@ internal static class SecureRemovalBackend
                 ?? "secure removal is not supported on this operating system";
             return false;
         }
-        return Current.TryCaptureDirectoryValidation(path, out snapshot, out error);
+        return Current.TryCaptureDirectoryValidation(path, out snapshot, out error, cancellationToken);
     }
 
     internal static bool TryCaptureDirectoryValidationWithinRoot(
         string rootPath,
         string path,
         out SecureRootedDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
         if (Current is null)
         {
@@ -159,7 +164,8 @@ internal static class SecureRemovalBackend
             rootPath,
             path,
             out snapshot,
-            out error);
+            out error,
+            cancellationToken);
     }
 
     internal static bool TryCaptureLinkIdentity(

@@ -44,6 +44,11 @@ public sealed record InstalledSkill
     /// installs not recorded in any lockfile.
     public SkillPackage? Package { get; init; }
 
+    /// Disagreements remain visible; they must not silently authorize maintenance.
+    public ImmutableArray<string> MetadataConflicts { get; init; } = [];
+    public string InstallationId => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(PathIdentity.NormalizeKey(ResolvedPath))));
+
     public string? TreeSha => FrontMatter.GithubTreeSha;
     public bool Pinned => FrontMatter.Pinned;
 }

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using SkillView.Gh.Models;
 using SkillView.Logging;
+using SkillView.Inventory;
 using SkillView.Subprocess;
 using SkillView.Threading;
 
@@ -37,55 +38,49 @@ public sealed class GhSkillListAdapter
         string? agent = null,
         CancellationToken cancellationToken = default)
     {
-        var lookup = await _cache.GetOrLoadAsync(
-                ghPath,
-                scope,
-                agent,
-                token => LoadAsync(ghPath, scope, agent, token),
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (lookup.FromCache)
-        {
-            _logger.Debug("gh.skill.list", $"cache hit scope={scope ?? "(any)"} agent={agent ?? "(any)"} count={lookup.Records.Length}");
-        }
-        return lookup.Records;
+        var capture = await CaptureAsync(ghPath, scope, agent, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return capture.Records;
+    }
+
+    public sealed record CaptureResult(ImmutableArray<GhSkillListRecord> Records, bool Succeeded, string? Error, bool FromCache);
+
+    public async Task<CaptureResult> CaptureAsync(
+        string ghPath,
+        string? scope = null,
+        string? agent = null,
+        string? directory = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Root and environment changes must not reuse another context's catalog.
+        var contextKey = $"{scope}\n{Environment.CurrentDirectory}\n{directory}\n" +
+            $"{Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")}\n{Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR")}\n" +
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var lookup = await _cache.GetOrLoadAsync(ghPath, contextKey, agent,
+            token => LoadAsync(ghPath, scope, agent, directory, token), cancellationToken).ConfigureAwait(false);
+        return new CaptureResult(lookup.Records, lookup.Succeeded, lookup.Error, lookup.FromCache);
     }
 
     private async Task<GhSkillListCache.LoadResult> LoadAsync(
-        string ghPath,
-        string? scope,
-        string? agent,
+        string ghPath, string? scope, string? agent, string? directory,
         CancellationToken cancellationToken)
     {
-        // gh requires an explicit comma-separated field list after `--json`;
-        // bare `--json` errors out listing the available fields. These are the
-        // fields shipped by gh 2.94.0 (cli/cli#13418). The adapter's parser is
-        // tolerant of extra/missing keys, so widening this list later is safe.
         var args = new List<string>
         {
-            "skill", "list",
-            "--json", "skillName,agentHosts,path,pinned,scope,sourceURL,version",
+            "skill", "list", "--json", "skillName,agentHosts,path,pinned,scope,sourceURL,version",
         };
-        if (!string.IsNullOrEmpty(scope))
+        if (directory is not null) { args.Add("--dir"); args.Add(directory); }
+        else
         {
-            args.Add("--scope");
-            args.Add(scope);
+            if (!string.IsNullOrEmpty(scope)) { args.Add("--scope"); args.Add(scope); }
+            if (!string.IsNullOrEmpty(agent)) { args.Add("--agent"); args.Add(AgentIdentity.Normalize(agent)); }
         }
-        if (!string.IsNullOrEmpty(agent))
-        {
-            args.Add("--agent");
-            args.Add(agent);
-        }
-
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            _logger.Warn("gh.skill.list", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
-            return new GhSkillListCache.LoadResult(
-                ImmutableArray<GhSkillListRecord>.Empty,
-                ShouldCache: false);
+            var error = $"gh list exited {result.ExitCode}: {result.StdErr.Trim()}";
+            _logger.Warn("gh.skill.list", error);
+            return new GhSkillListCache.LoadResult([], ShouldCache: false, Error: error);
         }
-
         return ParseLoadResult(result.StdOut, _logger);
     }
 
@@ -103,7 +98,7 @@ public sealed class GhSkillListAdapter
     internal static GhSkillListCache.LoadResult ParseLoadResult(string json, Logger? logger = null)
     {
         var succeeded = TryParse(json, out var records, logger);
-        return new GhSkillListCache.LoadResult(records, ShouldCache: succeeded);
+        return new GhSkillListCache.LoadResult(records, ShouldCache: succeeded, Error: succeeded ? null : "gh list returned invalid inventory JSON.");
     }
 
     internal static bool TryParse(

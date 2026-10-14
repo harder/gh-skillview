@@ -45,15 +45,24 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     private readonly Action? _directoryIdentityCapturedForTests;
     private readonly Action? _linkTargetObservedForTests;
     private readonly Action? _rootIdentityCapturedForTests;
+    private readonly Action? _directoryFingerprintCapturedForTests;
+    private readonly Action? _fingerprintEntryCapturedForTests;
+    private readonly Action? _fingerprintEnumerationAdmittedForTests;
 
     internal WindowsSecureRemovalBackend(
         Action? directoryIdentityCapturedForTests = null,
         Action? linkTargetObservedForTests = null,
-        Action? rootIdentityCapturedForTests = null)
+        Action? rootIdentityCapturedForTests = null,
+        Action? directoryFingerprintCapturedForTests = null,
+        Action? fingerprintEntryCapturedForTests = null,
+        Action? fingerprintEnumerationAdmittedForTests = null)
     {
         _directoryIdentityCapturedForTests = directoryIdentityCapturedForTests;
         _linkTargetObservedForTests = linkTargetObservedForTests;
         _rootIdentityCapturedForTests = rootIdentityCapturedForTests;
+        _directoryFingerprintCapturedForTests = directoryFingerprintCapturedForTests;
+        _fingerprintEntryCapturedForTests = fingerprintEntryCapturedForTests;
+        _fingerprintEnumerationAdmittedForTests = fingerprintEnumerationAdmittedForTests;
     }
 
     public bool TryCaptureIdentity(
@@ -91,14 +100,16 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
     public bool TryCaptureDirectoryValidation(
         string path,
         out SecureDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         snapshot = default;
         error = null;
         try
         {
             using var handle = OpenEntry(path, directory: true, enumerateDirectory: true);
-            snapshot = CaptureDirectoryValidation(handle, path);
+            snapshot = CaptureDirectoryValidation(handle, path, cancellationToken);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -112,8 +123,10 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         string rootPath,
         string path,
         out SecureRootedDirectoryValidationSnapshot snapshot,
-        out string? error)
+        out string? error,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         snapshot = default;
         error = null;
         try
@@ -123,7 +136,7 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             var rootBefore = ReadIdentity(root);
             _rootIdentityCapturedForTests?.Invoke();
             using var target = OpenRelativeDirectory(root, components);
-            var directory = CaptureDirectoryValidation(target, path);
+            var directory = CaptureDirectoryValidation(target, path, cancellationToken);
             var rootIdentity = CaptureStableRootIdentity(root, rootBefore);
             snapshot = new SecureRootedDirectoryValidationSnapshot(
                 rootIdentity,
@@ -255,7 +268,8 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private SecureDirectoryValidationSnapshot CaptureDirectoryValidation(
         SafeFileHandle handle,
-        string displayPath)
+        string displayPath,
+        CancellationToken cancellationToken)
     {
         var before = ReadIdentity(handle);
         if (!before.IsDirectory || before.IsReparsePoint)
@@ -265,6 +279,9 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
         }
         _directoryIdentityCapturedForTests?.Invoke();
 
+        var fingerprintBefore = CaptureDirectoryFingerprint(handle, displayPath, cancellationToken);
+        _directoryFingerprintCapturedForTests?.Invoke();
+        cancellationToken.ThrowIfCancellationRequested();
         var hasSkill = EntryIsDirectory(
             handle,
             LocalSkillScanner.SkillFileName) is false;
@@ -277,19 +294,110 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
             ownsDirectory: false);
         var isEmpty = !frame.TryReadNext(out _, out var enumerationError);
         if (enumerationError is not null) throw new IOException(enumerationError);
+        cancellationToken.ThrowIfCancellationRequested();
 
+        var fingerprintAfter = CaptureDirectoryFingerprint(handle, displayPath, cancellationToken);
         var canonicalPath = ReadFinalPath(handle);
         var after = ReadIdentity(handle);
-        if (!Matches(before, after))
+        if (!Matches(before, after) || fingerprintBefore != fingerprintAfter)
         {
             throw new IOException(
                 "selected directory changed during policy inspection");
         }
         return new SecureDirectoryValidationSnapshot(
-            ToSecureIdentity(after, canonicalPath),
+            ToSecureIdentity(after, canonicalPath) with { DirectoryFingerprint = fingerprintAfter },
             hasSkill,
             hasGit,
             isEmpty);
+    }
+
+    internal const int MaxFingerprintEntries = 4096;
+    private const uint FsctlGetReparsePoint = 0x000900A8;
+    private const int MaxReparseDataBytes = 16 * 1024;
+
+    // Inspect only immediate children, through the held parent. The compact
+    // digest is deterministic despite filesystem enumeration order. No path
+    // reopen or directory-enumeration timestamp becomes an authority address.
+    private string CaptureDirectoryFingerprint(
+        SafeFileHandle directory,
+        string displayPath,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var entries = new List<(string Name, byte[] Digest)>();
+        using var frame = new DirectoryFrame(directory, displayPath,
+            ReadIdentity(directory), depth: 0, ownsDirectory: false);
+        string? enumerationError;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _fingerprintEnumerationAdmittedForTests?.Invoke();
+            if (!frame.TryReadNext(out var entry, out enumerationError)) break;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry is null) continue;
+            if (entries.Count >= MaxFingerprintEntries)
+                throw new IOException("directory validation exceeds immediate-entry limit");
+            using var child = OpenEntryAt(directory, entry.Value.Name,
+                directory: null, enumerateDirectory: false, requestDeleteAccess: false);
+            var before = ReadIdentity(child);
+            if (before.FileIdLow != entry.Value.FileIdLow
+                || before.FileIdHigh != entry.Value.FileIdHigh
+                || before.IsDirectory != ((entry.Value.Attributes & FileAttributeDirectory) != 0)
+                || before.IsReparsePoint != ((entry.Value.Attributes & FileAttributeReparsePoint) != 0))
+                throw new IOException("directory entry identity changed during validation");
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] reparseData = [];
+            if (before.IsReparsePoint)
+            {
+                var buffer = new byte[MaxReparseDataBytes];
+                if (!WindowsNative.DeviceIoControl(child, FsctlGetReparsePoint,
+                        IntPtr.Zero, 0, buffer, (uint)buffer.Length, out var returned, IntPtr.Zero))
+                    throw new IOException($"inspect reparse data failed: {LastErrorMessage()}");
+                if (returned < 8 || returned > buffer.Length)
+                    throw new IOException("invalid reparse data length");
+                reparseData = buffer.AsSpan(0, (int)returned).ToArray();
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Matches(before, ReadIdentity(child)))
+                throw new IOException("directory entry identity changed during validation");
+            using var encoded = new MemoryStream();
+            using (var writer = new BinaryWriter(encoded, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(before.Volume);
+                writer.Write(before.FileIdLow);
+                writer.Write(before.FileIdHigh);
+                writer.Write(before.CreationTime);
+                writer.Write(before.ChangeTime);
+                writer.Write(before.IsDirectory);
+                writer.Write(before.IsReparsePoint);
+                writer.Write(reparseData.Length);
+                writer.Write(reparseData);
+            }
+            entries.Add((entry.Value.Name,
+                System.Security.Cryptography.SHA256.HashData(encoded.GetBuffer().AsSpan(0, (int)encoded.Length))));
+            _fingerprintEntryCapturedForTests?.Invoke();
+        }
+        // TryReadNext reports terminal enumeration failures separately.
+        // A second frame would restart enumeration, so retain the last result.
+        if (enumerationError is not null) throw new IOException(enumerationError);
+        entries.Sort((left, right) => StringComparer.Ordinal.Compare(left.Name, right.Name));
+        using var digest = System.Security.Cryptography.IncrementalHash.CreateHash(
+            System.Security.Cryptography.HashAlgorithmName.SHA256);
+        foreach (var entry in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var encoded = new MemoryStream();
+            using (var writer = new BinaryWriter(encoded, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(entry.Name.Length);
+                foreach (var character in entry.Name) writer.Write((ushort)character);
+                writer.Write(entry.Digest.Length);
+                writer.Write(entry.Digest);
+            }
+            digest.AppendData(encoded.GetBuffer().AsSpan(0, (int)encoded.Length));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return Convert.ToHexString(digest.GetHashAndReset());
     }
 
     private (SecureLinkIdentity Identity, bool IsBroken) CaptureLink(
@@ -481,6 +589,14 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
                 failure(path, "selected target is no longer a non-link directory");
                 return;
             }
+
+            if (expectedIdentity.DirectoryFingerprint is not { } fingerprint
+                || fingerprint != CaptureDirectoryFingerprint(root, fullPath, cancellationToken))
+            {
+                failure(path, "selected target identity changed after validation (immediate entries)");
+                return;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
 
             frames.Push(new DirectoryFrame(root, fullPath, rootIdentity, depth: 0));
             root = null;
@@ -1249,6 +1365,12 @@ internal sealed class WindowsSecureRemovalBackend : ISecureRemovalBackend
 
     private static class WindowsNative
     {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool DeviceIoControl(
+            SafeFileHandle handle, uint controlCode, IntPtr input, uint inputSize,
+            [Out] byte[] output, uint outputSize, out uint returned, IntPtr overlapped);
+
         [DllImport("ntdll.dll")]
         internal static extern int NtOpenFile(
             out IntPtr fileHandle,

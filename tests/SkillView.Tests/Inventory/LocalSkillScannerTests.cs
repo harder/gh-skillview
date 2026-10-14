@@ -136,7 +136,7 @@ public class LocalSkillScannerTests : IDisposable
         var shared = Assert.Single(results);
         Assert.True(shared.IsSymlinked);
         Assert.Equal(2, shared.Agents.Length);
-        Assert.Contains(shared.Agents, a => a.AgentId == "claude");
+        Assert.Contains(shared.Agents, a => a.AgentId == "claude-code");
         Assert.Contains(shared.Agents, a => a.AgentId == "cursor");
     }
 

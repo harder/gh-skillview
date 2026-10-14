@@ -120,7 +120,7 @@ internal static class RemoveTargetResolver
             cancellationToken.ThrowIfCancellationRequested();
             items.Add(new RemoveTargetItem(
                 skill,
-                RemoveValidator.Validate(skill, snapshot.ScannedRoots, snapshot.Skills)));
+                RemoveValidator.Validate(skill, snapshot.ScannedRoots, snapshot.Skills, cancellationToken)));
         }
 
         return new RemoveTargetEvaluation(target, items.ToImmutable());

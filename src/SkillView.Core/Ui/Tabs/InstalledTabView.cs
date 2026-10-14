@@ -309,7 +309,7 @@ internal sealed class InstalledTabView : FrameView
         // correct whether or not the gh push-down ran, and covers "custom".
         if (ToScope(_scopeFilter) is { } wantedScope)
         {
-            source = source.Where(s => s.Scope == wantedScope);
+            source = source.Where(s => (s.Scope == wantedScope || s.Agents.Any(agent => agent.Scope == wantedScope)));
         }
         source = _pinFilter switch
         {
@@ -572,6 +572,8 @@ internal sealed class InstalledTabView : FrameView
             : $" {_rows.Count} of {_all.Count} skill(s) · {_snapshot.ScannedRoots.Length} location(s)";
         var pkgs = _packageCount > 0 ? $" · {_packageCount} package(s)" : "";
         var srcSuffix = _snapshot.UsedGhSkillList ? " · merged inventory" : " · scan only";
+        if (_snapshot.IsPartial)
+            srcSuffix += $" · partial scan ({_snapshot.Providers.Count(provider => !provider.Succeeded)} provider failure(s), {_snapshot.Diagnostics.InaccessiblePaths.Length} inaccessible path(s))";
         var sortLabel = _sort switch
         {
             SortMode.Package => "package",

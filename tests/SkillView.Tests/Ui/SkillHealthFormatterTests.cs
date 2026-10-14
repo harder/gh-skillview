@@ -10,6 +10,7 @@ public sealed class SkillHealthFormatterTests
     [InlineData(ValidityState.Valid, false, "Healthy")]
     [InlineData(ValidityState.MissingSkillMd, false, "Needs review")]
     [InlineData(ValidityState.Valid, true, "Symlink")]
+    [InlineData(ValidityState.BrokenSymlink, true, "Needs review")]
     public void RowBadge_MapsValidityAndSymlinkState(
         ValidityState validity,
         bool isSymlinked,
@@ -23,6 +24,7 @@ public sealed class SkillHealthFormatterTests
     [Theory]
     [InlineData(ValidityState.Valid, false, "OK")]
     [InlineData(ValidityState.Valid, true, "SYM")]
+    [InlineData(ValidityState.BrokenSymlink, true, "REV")]
     [InlineData(ValidityState.MissingSkillMd, false, "REV")]
     public void CompactBadge_UsesShortForms(
         ValidityState validity,

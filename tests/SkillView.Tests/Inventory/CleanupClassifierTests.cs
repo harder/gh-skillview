@@ -79,7 +79,7 @@ public class CleanupClassifierTests : IDisposable
         var snap = Snapshot(true, Skill("orph", prov: Provenance.FsScan));
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
         var result = CleanupClassifier.Classify(snap, roots);
-        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.SourceOrphaned);
+        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Untracked);
     }
 
     [Fact]
@@ -88,18 +88,19 @@ public class CleanupClassifierTests : IDisposable
         var snap = Snapshot(false, Skill("orph", prov: Provenance.FsScan));
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
         var result = CleanupClassifier.Classify(snap, roots);
-        Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.SourceOrphaned);
+        Assert.DoesNotContain(result, c => c.Kind == CleanupClassifier.CandidateKind.Untracked);
     }
 
     [Fact]
-    public void Classify_Duplicate_DetectedByName()
+    public void Classify_NameCollision_RequiresReviewWithoutChoosingSurvivor()
     {
         var a = Skill("dup", path: Path.Combine(_tempRoot, "a"), prov: Provenance.Both);
         var b = Skill("dup", path: Path.Combine(_tempRoot, "b"), prov: Provenance.FsScan);
         var snap = Snapshot(false, a, b);
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
         var result = CleanupClassifier.Classify(snap, roots);
-        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Duplicate);
+        Assert.Equal(2, result.Count(c => c.Kind == CleanupClassifier.CandidateKind.NameCollision));
+        Assert.All(result.Where(c => c.Kind == CleanupClassifier.CandidateKind.NameCollision), c => Assert.True(c.ReviewOnly));
     }
 
     [Fact]
@@ -127,9 +128,9 @@ public class CleanupClassifierTests : IDisposable
 
         Assert.Equal(2, matching.Length);
         Assert.Contains(matching, candidate =>
-            candidate.Kind == CleanupClassifier.CandidateKind.SourceOrphaned);
+            candidate.Kind == CleanupClassifier.CandidateKind.Untracked);
         Assert.Contains(matching, candidate =>
-            candidate.Kind == CleanupClassifier.CandidateKind.Duplicate);
+            candidate.Kind == CleanupClassifier.CandidateKind.NameCollision);
         Assert.Single(selection.Unique);
         Assert.Single(selection.Duplicates);
         Assert.Equal(duplicatePath, selection.Unique[0].Path);
@@ -221,14 +222,15 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
-    public void Classify_DuplicateWithSameTreeSha_StillDetected()
+    public void Classify_SameUpstreamTreeDoesNotEstablishIdenticalLocalContent()
     {
         var a = Skill("dup-sha", path: Path.Combine(_tempRoot, "a"), prov: Provenance.Both, treeSha: "abc123");
         var b = Skill("dup-sha", path: Path.Combine(_tempRoot, "b"), prov: Provenance.FsScan, treeSha: "abc123");
         var snap = Snapshot(false, a, b);
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
         var result = CleanupClassifier.Classify(snap, roots);
-        Assert.Contains(result, c => c.Kind == CleanupClassifier.CandidateKind.Duplicate);
+        Assert.Equal(2, result.Count(c => c.Kind == CleanupClassifier.CandidateKind.NameCollision));
+        Assert.All(result.Where(c => c.Kind == CleanupClassifier.CandidateKind.NameCollision), c => Assert.True(c.ReviewOnly));
     }
 
     [Fact]

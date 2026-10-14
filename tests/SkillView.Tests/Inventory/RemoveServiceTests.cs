@@ -59,7 +59,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_HappyPath_DeletesRecursively()
     {
         var (skill, dir) = MakeSkill("rm-me", extraFiles: 2, nestedDirs: 1);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed);
 
         var svc = new RemoveService(_logger);
@@ -75,7 +75,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_DryRun_DoesNotTouchDisk()
     {
         var (skill, dir) = MakeSkill("dry", extraFiles: 1);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var svc = new RemoveService(_logger);
         var report = svc.Remove(validation, new RemoveService.Options(DryRun: true),
             TestContext.Current.CancellationToken);
@@ -92,7 +92,7 @@ public class RemoveServiceTests : IDisposable
         var (skill, dir) = MakeSkill("bad");
         // Stamp a .git dir to force refusal.
         Directory.CreateDirectory(Path.Combine(dir, ".git"));
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(validation.Allowed);
 
         var svc = new RemoveService(_logger);
@@ -107,7 +107,7 @@ public class RemoveServiceTests : IDisposable
     {
         var (skill, dir) = MakeSkill("bad-progress");
         Directory.CreateDirectory(Path.Combine(dir, ".git"));
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(validation.Allowed);
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
@@ -163,8 +163,8 @@ public class RemoveServiceTests : IDisposable
     {
         var (first, firstDir) = MakeSkill("group-one", extraFiles: 1);
         var (second, secondDir) = MakeSkill("group-two", extraFiles: 1);
-        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
-        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
 
         var svc = new RemoveService(_logger);
         var report = svc.RemoveMany([firstValidation, secondValidation],
@@ -181,7 +181,7 @@ public class RemoveServiceTests : IDisposable
     public void RemoveMany_DuplicateCanonicalTarget_IsReportedAsSkipped()
     {
         var (skill, dir) = MakeSkill("group-duplicate", extraFiles: 1);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
 
         var report = new RemoveService(_logger).RemoveMany(
             [validation, validation],
@@ -201,8 +201,8 @@ public class RemoveServiceTests : IDisposable
         var (second, secondDir) = MakeSkill("group-two", extraFiles: 1);
         Directory.CreateDirectory(Path.Combine(secondDir, ".git"));
 
-        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
-        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
 
         var svc = new RemoveService(_logger);
         var report = svc.RemoveMany([firstValidation, secondValidation],
@@ -226,7 +226,7 @@ public class RemoveServiceTests : IDisposable
         var link = Path.Combine(dir, "linked-directory");
         if (!TryCreateDirectoryLink(link, external)) return;
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -245,7 +245,7 @@ public class RemoveServiceTests : IDisposable
         var link = Path.Combine(dir, "linked-file.txt");
         if (!TryCreateFileLink(link, externalFile)) return;
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -263,7 +263,7 @@ public class RemoveServiceTests : IDisposable
         var link = Path.Combine(dir, "broken");
         if (!TryCreateDirectoryLink(link, missingTarget)) return;
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -283,7 +283,7 @@ public class RemoveServiceTests : IDisposable
         var link = Path.Combine(dir, "cycle");
         if (!TryCreateDirectoryLink(link, _tempRoot)) return;
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -307,7 +307,7 @@ public class RemoveServiceTests : IDisposable
         var link = Path.Combine(dir, "changing-link");
         if (!TryCreateDirectoryLink(link, firstTarget)) return;
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         DeleteDirectoryLink(link);
         if (!TryCreateDirectoryLink(link, secondTarget)) return;
 
@@ -326,7 +326,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_TargetReplacedAfterValidation_RefusesBothObjects()
     {
         var (skill, dir) = MakeSkill("target-replaced");
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed);
         Assert.NotNull(validation.ExecutionIdentity);
 
@@ -351,7 +351,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_TargetReplacedByLinkAfterValidation_RefusesLinkAndBothDirectories()
     {
         var (skill, dir) = MakeSkill("target-replaced-by-link");
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed);
         Assert.NotNull(validation.ExecutionIdentity);
 
@@ -473,7 +473,7 @@ public class RemoveServiceTests : IDisposable
     {
         var dir = Path.Combine(_tempRoot, "empty-became-populated");
         Directory.CreateDirectory(dir);
-        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
         Assert.NotNull(validation.ExecutionIdentity);
         Assert.True(validation.RequiresEmptyDirectory);
@@ -498,7 +498,7 @@ public class RemoveServiceTests : IDisposable
         var dir = Path.Combine(_tempRoot, "empty-replaced");
         var original = Path.Combine(_tempRoot, "empty-replaced-original");
         Directory.CreateDirectory(dir);
-        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() });
+        var validation = RemoveValidator.ValidateEmptyDirectory(dir, new[] { Root() }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
         Directory.Move(dir, original);
         Directory.CreateDirectory(dir);
@@ -529,7 +529,7 @@ public class RemoveServiceTests : IDisposable
         File.WriteAllText(externalFile, "keep");
         var movedOriginal = Path.Combine(_tempRoot, "directory-swap-original");
         var swapped = false;
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var service = new RemoveService(_logger, observed =>
         {
             if (swapped || !PathIdentity.Equals(observed, nested)) return;
@@ -552,7 +552,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_AlreadyCanceled_DoesNotTouchDisk()
     {
         var (skill, dir) = MakeSkill("canceled", extraFiles: 2, nestedDirs: 1);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -566,7 +566,7 @@ public class RemoveServiceTests : IDisposable
     public void Remove_CancellationBetweenDirectoryEntriesStopsEnumerationPromptly()
     {
         var (skill, dir) = MakeSkill("cancel-during-enumeration", extraFiles: 2_000);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var observedEntries = 0;
         var service = new RemoveService(_logger, _ =>
@@ -591,7 +591,7 @@ public class RemoveServiceTests : IDisposable
         if (!SecureRemovalBackend.IsSupported) return;
         var (skill, dir) = MakeSkill("cancel-before-delete");
         var skillFile = Path.Combine(dir, "SKILL.md");
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var deletingEntries = 0;
         var service = new RemoveService(
@@ -619,7 +619,7 @@ public class RemoveServiceTests : IDisposable
         var (skill, dir) = MakeSkill("cancel-before-directory-delete");
         var nested = Path.Combine(dir, "nested");
         Directory.CreateDirectory(nested);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
         using var cancellation = new CancellationTokenSource();
         var service = new RemoveService(
@@ -646,7 +646,7 @@ public class RemoveServiceTests : IDisposable
         var movedOriginal = Path.Combine(_tempRoot, "final-directory-name-original");
         Directory.CreateDirectory(nested);
         var swapped = false;
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var canonicalNested = Path.Combine(validation.ResolvedPath, "nested");
         var service = new RemoveService(
             _logger,
@@ -683,7 +683,7 @@ public class RemoveServiceTests : IDisposable
     public async Task RemoveAsync_CancellationPublishesTerminalProgress()
     {
         var (skill, dir) = MakeSkill("cancel-async", extraFiles: 2_000);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
@@ -702,7 +702,7 @@ public class RemoveServiceTests : IDisposable
     public async Task RemoveAsync_ThrottlesProgressAndPublishesCompletion()
     {
         var (skill, dir) = MakeSkill("progress", extraFiles: 2_000);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
 
@@ -728,8 +728,8 @@ public class RemoveServiceTests : IDisposable
     {
         var (first, _) = MakeSkill("progress-one", extraFiles: 2);
         var (second, _) = MakeSkill("progress-two", extraFiles: 2);
-        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
-        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
 
@@ -757,8 +757,8 @@ public class RemoveServiceTests : IDisposable
     {
         var (first, firstDir) = MakeSkill("cancel-after-one", extraFiles: 2);
         var (second, secondDir) = MakeSkill("must-remain", extraFiles: 2);
-        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second });
-        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second });
+        var firstValidation = RemoveValidator.Validate(first, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
+        var secondValidation = RemoveValidator.Validate(second, new[] { Root() }, new[] { first, second }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
@@ -799,7 +799,7 @@ public class RemoveServiceTests : IDisposable
         var secondValidation = RemoveValidator.Validate(
             second,
             new[] { Root() },
-            new[] { second });
+            new[] { second }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var updates = new List<RemoveService.RemoveProgress>();
         var progress = new CallbackProgress<RemoveService.RemoveProgress>(updates.Add);
@@ -829,7 +829,7 @@ public class RemoveServiceTests : IDisposable
     public async Task RemoveManyAsync_CancellationMidTargetPreservesPartialAggregate()
     {
         var (skill, dir) = MakeSkill("cancel-mid-target", extraFiles: 2_000);
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var observedEntries = 0;
         var updates = new List<RemoveService.RemoveProgress>();
@@ -892,7 +892,7 @@ public class RemoveServiceTests : IDisposable
         var error = process.StandardError.ReadToEnd();
         Assert.True(process.ExitCode == 0, $"mklink failed with exit code {process.ExitCode}: {error}");
 
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var report = new RemoveService(_logger).Remove(validation,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -920,7 +920,7 @@ public class RemoveServiceTests : IDisposable
         }
         var swapped = false;
         var linkCreated = false;
-        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill });
+        var validation = RemoveValidator.Validate(skill, new[] { Root() }, new[] { skill }, cancellationToken: TestContext.Current.CancellationToken);
         var service = new RemoveService(_logger, _ =>
         {
             if (swapped) return;

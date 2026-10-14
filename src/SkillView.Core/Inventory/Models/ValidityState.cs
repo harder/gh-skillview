@@ -9,4 +9,5 @@ public enum ValidityState
     UnparsableFrontMatter,
     NameMismatch,
     BrokenSymlink,
+    InvalidMetadata,
 }

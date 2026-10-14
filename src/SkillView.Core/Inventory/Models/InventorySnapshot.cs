@@ -12,6 +12,10 @@ public sealed record InventorySnapshot
     public required DateTimeOffset CapturedAt { get; init; }
 
     /// Phase 9 — scan-level diagnostics for surfacing in doctor/rescan output.
+    public bool IsPartial => !Diagnostics.InaccessiblePaths.IsEmpty || Providers.Any(provider => !provider.Succeeded);
+
+    public ImmutableArray<ProviderObservation> Providers { get; init; } = [];
+
     public ScanDiagnostics Diagnostics { get; init; } = ScanDiagnostics.Empty;
 
     public static InventorySnapshot Empty { get; } = new()
@@ -40,3 +44,11 @@ public sealed record ScanDiagnostics
 
     public static ScanDiagnostics Empty { get; } = new();
 }
+
+/// An observation can establish absence only within its successfully covered roots.
+public sealed record ProviderObservation(
+    string Provider,
+    bool Succeeded,
+    ImmutableArray<string> CoveredRoots,
+    DateTimeOffset CapturedAt,
+    string? Error = null);

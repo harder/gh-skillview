@@ -222,7 +222,7 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
             linkedRoot,
             Path.Combine(linkedRoot, "skill"),
             out var snapshot,
-            out var error);
+            out var error, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(captured, error);
         Assert.True(snapshot.Directory.HasGitDirectory);
@@ -254,7 +254,8 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
                 Path.DirectorySeparatorChar.ToString(),
                 "/proc",
                 out _,
-                out var error);
+                out var error,
+                TestContext.Current.CancellationToken);
 
         Assert.False(captured);
         Assert.False(string.IsNullOrWhiteSpace(error));
@@ -398,7 +399,7 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
         var captured = backend.TryCaptureDirectoryValidation(
             directory,
             out _,
-            out var error);
+            out var error, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(captured);
         Assert.Contains("unlinked or replaced", error);
@@ -426,7 +427,7 @@ public sealed class UnixSecureRemovalBackendTests : IDisposable
         var captured = backend.TryCaptureDirectoryValidation(
             skill,
             out var snapshot,
-            out var error);
+            out var error, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(captured, error);
         Assert.True(snapshot.HasSkillFile);

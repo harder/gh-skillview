@@ -38,7 +38,7 @@ logs show the args reached the process. `--treenode-filter` (the platform-level
 filter option) also doesn't work against xunit v3/v4 here — use the `--filter-*`
 flags instead.
 
-- **Default verification:** `dotnet restore --locked-mode`, `dotnet build`, then `dotnet test --no-build` (from repo root; runs both test projects).
+- **Default verification:** `dotnet restore --locked-mode`, `dotnet build`, `dotnet format SkillView.sln --no-restore --verify-no-changes`, then `dotnet test --no-build` (from repo root; runs both test projects).
 - **UI-focused tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-namespace "SkillView.Tests.Ui"`
 - **Resource stress tests:** `dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-class "SkillView.Tests.Ui.ResourceStressTests"`. These allocation/process tests are serialized through the `ResourceStress` collection.
 - **Contract tests:** require a real `gh` binary plus auth. CI runs them with `SKILLVIEW_CONTRACT_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --configuration Release --no-build --filter-trait "Category=Contract"` via `.github/workflows/contract-tests.yml`.
