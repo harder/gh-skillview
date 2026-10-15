@@ -844,3 +844,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   exact partial mutation totals through both progress throttles. Accumulate one
   terminal report per attempt, including failed attempts, so workflow rescans
   cannot miss a deleted file. Keep retry and omitted-attempt-state coverage.
+
+- CLI removal orchestration must convert unexpected removal faults into a failed
+  subject-bearing result using captured progress, with one added error. Preserve
+  earlier cleanup rows and continue independent targets; low-level removal APIs
+  still throw, and unrelated cancellation must not be labeled owned cancellation.

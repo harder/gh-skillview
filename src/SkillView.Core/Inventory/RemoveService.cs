@@ -414,7 +414,7 @@ public sealed class RemoveService
         IProgress<RemoveProgress>? progress = null) =>
         Task.Run(() => Remove(validation, options, cancellationToken, progress));
 
-    /// Orchestrators need a terminal result even after partial cancellation.
+    /// Orchestrators need a terminal result even after partial cancellation or failure.
     /// Preserve the throwing low-level API while retaining its exact terminal
     /// progress and the already frozen subject; never reopen the removed path.
     internal async Task<RemoveReport> RemoveWithOutcomeAsync(
@@ -431,6 +431,19 @@ public sealed class RemoveService
                 Math.Max(0, last?.DirectoriesProcessed ?? 0), errors == 0 ? []
                     : [$"… {errors} runtime error detail(s) unavailable after cancellation; see logs"], options?.DryRun ?? false)
             { IsCanceled = true, ErrorCount = errors, Impact = validation.Impact };
+        }
+        catch (Exception ex)
+        {
+            var last = capture.Last;
+            var priorErrors = Math.Max(0, last?.Errors ?? 0);
+            _logger.Error("remove", $"Unexpected removal failure for {validation.ResolvedPath}: {ex}");
+            var report = new RemoveReport(false, validation.ResolvedPath, Math.Max(0, last?.FilesProcessed ?? 0),
+                Math.Max(0, last?.DirectoriesProcessed ?? 0), priorErrors == 0 ? [ex.Message]
+                    : [ex.Message, $"… {priorErrors} earlier runtime error detail(s) unavailable; see logs"], options?.DryRun ?? false)
+            { ErrorCount = priorErrors == int.MaxValue ? int.MaxValue : priorErrors + 1, Impact = validation.Impact };
+            new ProgressTracker(capture, _logger).Publish(1, report.FilesDeleted, report.DirectoriesDeleted,
+                report.ErrorCount, validation.ResolvedPath, force: true, isCompleted: true, targetsDeleted: 0, isFaulted: true);
+            return report;
         }
     }
 

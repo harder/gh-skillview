@@ -1733,7 +1733,8 @@ public static partial class CliDispatcher
     }
 
     internal static async Task<(RemoveValidator.RemoveValidation Validation, RemoveService.RemoveReport Report)> RemoveTargetAsync(
-        InstalledSkill target, InventorySnapshot snapshot, bool execute, RemoveService service, CancellationToken token)
+        InstalledSkill target, InventorySnapshot snapshot, bool execute, RemoveService service, CancellationToken token,
+        IProgress<RemoveService.RemoveProgress>? progress = null)
     {
         var impact = OperationImpact.Payload(OperationSubject.From(target), "remove");
         RemoveValidator.RemoveValidation validation;
@@ -1749,7 +1750,7 @@ public static partial class CliDispatcher
             return (validation, new(false, target.ResolvedPath, 0, 0, [], !execute)
             { IsCanceled = true, Impact = impact });
         }
-        var result = await service.RemoveWithOutcomeAsync(validation, new(DryRun: !execute), token).ConfigureAwait(false);
+        var result = await service.RemoveWithOutcomeAsync(validation, new(DryRun: !execute), token, progress).ConfigureAwait(false);
         return (validation, result);
     }
 

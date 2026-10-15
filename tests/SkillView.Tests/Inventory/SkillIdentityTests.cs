@@ -365,6 +365,73 @@ public sealed class SkillIdentityTests : IDisposable
         Assert.Equal(0, report.ErrorCount); Assert.True(Directory.Exists(skill.ResolvedPath));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CliUnexpectedRemovalFailureRetainsPartialTotalsAndFrozenSubject(bool unrelatedCancellation)
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var skill = Observe(Skill("faulted/demo"));
+        File.WriteAllText(Path.Combine(skill.ResolvedPath, "extra"), "fixture");
+        skill = Observe(skill);
+        var deleting = 0;
+        var service = new RemoveService(logger, null, (_, _) =>
+        {
+            if (++deleting != 2) return;
+            if (unrelatedCancellation) throw new OperationCanceledException("unrelated fixture cancellation");
+            throw new InvalidOperationException("fixture unexpected removal failure");
+        });
+        var updates = new List<RemoveService.RemoveProgress>();
+        var (validation, report) = await CliDispatcher.RemoveTargetAsync(skill, Snapshot(skill), true, service, Token,
+            new CapturedProgress(updates));
+        Assert.False(report.Succeeded); Assert.False(report.IsCanceled);
+        Assert.Equal(1, report.FilesDeleted); Assert.Equal(0, report.DirectoriesDeleted);
+        Assert.Equal(1, report.ErrorCount); Assert.Single(Directory.EnumerateFiles(skill.ResolvedPath));
+        Assert.Same(skill.ObservedSubject, report.Impact!.Subject);
+        var terminal = updates[^1];
+        Assert.True(terminal.IsCompleted); Assert.False(terminal.IsCanceled);
+        Assert.Equal(1, terminal.TargetsProcessed); Assert.Equal(0, terminal.TargetsDeleted);
+        Assert.Equal(report.ErrorCount, terminal.Errors); Assert.Equal(report.FilesDeleted, terminal.FilesProcessed);
+        Assert.Equal(report.DirectoriesDeleted, terminal.DirectoriesProcessed);
+        using var json = JsonDocument.Parse(CliDispatcher.RenderRemoveJson(report, skill, new(null, null, true, true), validation));
+        Assert.Equal(skill.InstallationId, json.RootElement.GetProperty("impact").GetProperty("subject").GetProperty("installationId").GetString());
+        Assert.False(json.RootElement.GetProperty("succeeded").GetBoolean());
+    }
+
+    private sealed class CapturedProgress(List<RemoveService.RemoveProgress> updates) : IProgress<RemoveService.RemoveProgress>
+    {
+        public void Report(RemoveService.RemoveProgress value) => updates.Add(value);
+    }
+
+    [Fact]
+    public async Task CliCleanupUnexpectedSecondTargetFailureRetainsAllResults()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var first = Observe(Skill("fault-cleanup/first"));
+        var second = Observe(Skill("fault-cleanup/second"));
+        var third = Observe(Skill("fault-cleanup/third"));
+        var canonicalSecond = OwnershipPath.CanonicalCandidate(second.ResolvedPath)!;
+        var service = new RemoveService(logger, null, (path, _) =>
+        {
+            if (PathIdentity.IsInside(path, canonicalSecond)) throw new InvalidOperationException("fixture second target failure");
+        });
+        CleanupClassifier.Candidate Candidate(InstalledSkill skill) => new(CleanupClassifier.CandidateKind.Malformed, skill.ResolvedPath, "fixture", skill)
+        { Impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup") };
+        var candidates = ImmutableArray.Create(Candidate(first), Candidate(second), Candidate(third), Candidate(second));
+        var result = await CliDispatcher.ApplyCleanupAsync(candidates, Snapshot(first, second, third), service, Runner(), Token);
+        Assert.Equal(3, result.Applied.Count);
+        Assert.Single(result.Duplicates);
+        Assert.True(result.Applied[0].R.Succeeded); Assert.False(result.Applied[1].R.Succeeded); Assert.True(result.Applied[2].R.Succeeded);
+        Assert.Equal(1, result.Applied[1].R.ErrorCount);
+        Assert.Equal(2, result.Applied.Sum(item => item.R.FilesDeleted));
+        Assert.Equal(2, result.Applied.Sum(item => item.R.DirectoriesDeleted));
+        Assert.False(Directory.Exists(first.ResolvedPath)); Assert.True(Directory.Exists(second.ResolvedPath)); Assert.False(Directory.Exists(third.ResolvedPath));
+        Assert.Equal(new[] { first.InstallationId, second.InstallationId, third.InstallationId }, result.Applied.Select(item => item.R.Impact!.Subject.InstallationId));
+        using var json = JsonDocument.Parse(CliDispatcher.RenderCleanupJson(candidates, result.Applied, new(null, true, true, true, null), result.Duplicates));
+        Assert.Equal(3, json.RootElement.GetProperty("applied").GetArrayLength());
+        Assert.Equal(second.InstallationId, json.RootElement.GetProperty("applied")[1].GetProperty("impact").GetProperty("subject").GetProperty("installationId").GetString());
+    }
+
     [Fact]
     public async Task CleanupCancellationReturnsCompletedInterruptedAndNotStartedSubjects()
     {

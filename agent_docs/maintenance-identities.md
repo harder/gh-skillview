@@ -138,3 +138,16 @@ original payload survived. Two independent source re-reviews are clear. Focused
 CLI 74/74, cleanup 24/24 and removal 40/40 tests pass; disposable debug-host proofs
 confirm broken-link retention and occupied-destination undo evidence. Full final
 suite, final AOT hosts, remote gates and merge remain required before closing M11.
+
+
+Acceptance review extended the frozen-failure contract to CLI orchestration:
+unexpected removal faults now return a failed result with the captured subject,
+exact partial totals and one additional error. Low-level removal APIs retain
+throwing behavior. Three CLI orchestration regressions failed before the fix,
+including unrelated cancellation and cleanup's second-target failure. Earlier
+1512/1512 full-suite success is retained as historical evidence; final-source
+verification must include the three added cases.
+
+The failed CLI result also publishes a guarded terminal completed update matching
+its exact counts. Unrelated cancellation is a failure in both report and progress.
+The same regressions assert these lifecycle guarantees; acceptance re-review is clear.
