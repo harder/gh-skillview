@@ -41,6 +41,14 @@ registry write or journal. An interrupted plan with a vacant original slot must
 still recover, even if original and candidate bytes match. Do not short-circuit
 started journals or owner repair on payload equality.
 
+Schema-2 plans written before no-op preservation may contain the old selected
+owner rewrite even when tree, pin and semantic fingerprint are unchanged.
+Validation accepts either the exact fresh before-image or the exact historical
+tree/pin/timestamp serialization, checking both saved bytes and fingerprints.
+`RecreateSavedTransition` is validation-only; never use it for fresh preparation.
+Persisted legacy fixtures cover different and equal timestamps, interrupted
+payload moves, forward recovery, undo and rejection of changed extension fields.
+
 `UpdateResultAccumulator` retains bounded stdout, stderr, notices, parsed entries,
 errors and failure/cancellation state across one captured UI queue. It must never
 reuse an earlier saved plan as a later Apply target. The queue owner retains exact

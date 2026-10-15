@@ -605,6 +605,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   private stage through ownership duplicated from its held state handle; failed
   cleanup must expose the exact location. Legacy equal plans may return unchanged
   only after fresh ready-state validation; interrupted moves still need recovery.
+  Validate persisted schema-2 owner transitions against exact fresh or historical
+  serialization; no-op preparation changes must not strand older recovery plans.
   Preserve bounded stdout/stderr and earlier mutation/failure evidence across
   the captured update queue without reusing its prior Apply target. See
   `agent_docs/maintenance-update-outcomes.md` for the contract and proof commands.

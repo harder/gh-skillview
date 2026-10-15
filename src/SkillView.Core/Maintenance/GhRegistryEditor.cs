@@ -69,7 +69,17 @@ internal static class GhRegistryEditor
     }
 
     internal static GhRegistryPatch Prepare(byte[] current, string selector, string expectedEntryFingerprint,
-        string desiredTree, string? desiredPin, DateTimeOffset updatedAt, CancellationToken token)
+        string desiredTree, string? desiredPin, DateTimeOffset updatedAt, CancellationToken token) =>
+        PrepareCore(current, selector, expectedEntryFingerprint, desiredTree, desiredPin, updatedAt, token, preserveUnchanged: true);
+
+    // Validation only: schema-2 plans saved before no-op preservation always
+    // rebuilt this exact tree/pin/timestamp image. Never use it for fresh plans.
+    internal static GhRegistryPatch RecreateSavedTransition(byte[] current, string selector, string expectedEntryFingerprint,
+        string desiredTree, string? desiredPin, DateTimeOffset updatedAt, CancellationToken token) =>
+        PrepareCore(current, selector, expectedEntryFingerprint, desiredTree, desiredPin, updatedAt, token, preserveUnchanged: false);
+
+    private static GhRegistryPatch PrepareCore(byte[] current, string selector, string expectedEntryFingerprint,
+        string desiredTree, string? desiredPin, DateTimeOffset updatedAt, CancellationToken token, bool preserveUnchanged)
     {
         token.ThrowIfCancellationRequested();
         if (current.Length > SkillLockFileReader.MaxFileBytes)
@@ -101,7 +111,7 @@ internal static class GhRegistryEditor
             if (fingerprint != expectedEntryFingerprint)
                 throw new IOException("Selected owner record changed; review a new update plan.");
             var oldPin = entry.TryGetProperty("pinnedRef", out var pin) && pin.GetString() is { Length: > 0 } value ? value : null;
-            if (oldTree.Equals(desiredTree, StringComparison.OrdinalIgnoreCase) && oldPin == desiredPin)
+            if (preserveUnchanged && oldTree.Equals(desiredTree, StringComparison.OrdinalIgnoreCase) && oldPin == desiredPin)
             {
                 // An unchanged revision/pin is not a registry update. Preserve
                 // raw extensions, formatting and the original updatedAt value.

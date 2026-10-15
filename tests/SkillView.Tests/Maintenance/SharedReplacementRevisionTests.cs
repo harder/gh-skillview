@@ -10,7 +10,7 @@ using Xunit;
 
 namespace SkillView.Tests.Maintenance;
 
-public sealed class SharedReplacementRevisionTests : IDisposable
+public sealed partial class SharedReplacementRevisionTests : IDisposable
 {
     private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-shared-revision-");
     private CancellationToken Token => TestContext.Current.CancellationToken;
