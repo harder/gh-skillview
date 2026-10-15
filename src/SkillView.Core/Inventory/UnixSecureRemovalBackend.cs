@@ -97,7 +97,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     }
 
     private static NativePayloadRoot WalkOpenedPayload(SafeUnixHandle root, SafeUnixHandle parent, string rootName,
-        int maxDepth, Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+        int maxDepth, Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, bool flushToDisk = false)
     {
         token.ThrowIfCancellationRequested();
         using var buffer = new StatBuffer();
@@ -116,6 +116,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     if (error is not null) throw new IOException(error);
                     if (!Matches(current.Before, ReadStat(current.Frame.Directory, buffer.Pointer)))
                         throw new IOException("payload directory changed during comparison");
+                    if (flushToDisk) FlushStateDirectory(current.Frame.Directory, token);
                     frames.Pop().Frame.Dispose();
                     continue;
                 }
@@ -170,6 +171,8 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, "")))
                         ?? throw new IOException("payload file evidence is missing");
                     observations[^1] = (relative, before, null, evidence);
+                    if (flushToDisk && RetryOnInterrupted(() => StateNative.fsync(child.FileDescriptor)) != 0)
+                        throw new IOException(LastError("staged file durability barrier failed"));
                     token.ThrowIfCancellationRequested();
                     if (!Matches(opened, ReadStat(child, buffer.Pointer))) throw new IOException("payload file changed during comparison");
                 }

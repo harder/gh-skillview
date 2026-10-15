@@ -703,3 +703,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   ContainsGitDirectory wire label while describing repository/worktree metadata
   in UI text. Parent-repository warnings accepted with --yes are insufficient
   protection for the repository/worktree root itself.
+
+- Recorded restoration uses `ReplacementPlanStore`, separate from standalone
+  quarantine admission. Promote the saved candidate; never rerun a moving remote
+  update after review. Keep source/tree/pin and owner entries unchanged for this
+  workflow. Hash plan JSON canonically, sorting object properties: immutable
+  dictionary enumeration can differ across processes. Capture the installation
+  ID once; path key casing can change while its original slot is vacant.
+- Replacement transitions rescan currently existing configured roots, including
+  previously missing roots, and reread contextual owner records before moving.
+  Partial step journals are retained as non-authoritative evidence; explicit
+  recovery binds reviewed live slots. Reserve intent/completion space before a
+  move and retain the separate bounded undo journal for exhausted forward logs.
+  Keep its writer handle alive for native publication barriers. Flush staged
+  files and directory namespaces before publishing a ready plan. See
+  `docs/recorded-restoration.md` and the real-gh replacement proof.

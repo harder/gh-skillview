@@ -1,0 +1,618 @@
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+using SkillView.Inventory;
+using SkillView.Subprocess;
+using SkillView.Inventory.Models;
+using SkillView.Logging;
+using SkillView.Threading;
+
+namespace SkillView.Maintenance;
+
+/// Saved, exact-payload replacement. Both old and displaced directories are
+/// retained by exclusive native rename; this store never extracts or deletes.
+internal sealed class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
+{
+    internal string Root { get; } = Path.GetFullPath(root);
+    private const int MaxJournalBytes = 16 * 1024 * 1024;
+    private const int MaxSteps = 32;
+    private const int MaxPlans = 16;
+
+    internal async Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
+        Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var canonicalPath = Canonical(target.ResolvedPath);
+        var containingRoot = inventory.ScannedRoots.Select(scan => Canonical(scan.Path))
+            .Where(path => !PathIdentity.Equals(path, canonicalPath) && PathIdentity.IsInside(canonicalPath, path))
+            .OrderByDescending(path => path.Length).FirstOrDefault()
+            ?? throw new IOException("The physical installation needs a containing scan root; add --scan-root for its actual directory.");
+        target = target with { ResolvedPath = canonicalPath, ScanRoot = containingRoot };
+        inventory = Admit(target, inventory, token);
+        CheckPlacement(inventory);
+        using var original = NativeDirectoryMoveLease.Open(Canonical(target.ScanRoot), target.ResolvedPath, token);
+        var before = original.Capture(token);
+        var context = Context(target, inventory, token);
+        using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
+        using var writer = state.OpenFile("writer.lock", true, token);
+        CheckWriter(writer);
+        var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
+        if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
+            throw new IOException("Replacement plan quota or state entry policy refused; inspect retained plans.");
+        var id = Guid.NewGuid().ToString("N");
+        using var operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token);
+        using var operationWriter = operation.OpenFile("writer.lock", true, token);
+        CheckWriter(operationWriter);
+        var candidatePath = Path.Combine(operation.CanonicalPath, "candidate");
+        // Admission and the writer lock precede any remote staging. Staging is
+        // private and never invokes a manager against the live installation.
+        using var staging = operation.CreateStagingDirectory("candidate", token);
+        try { await stage(staging, token).ConfigureAwait(false); staging.SealStagingDirectory(493, token); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        { throw new IOException($"Staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
+        inventory = Admit(target, inventory, token);
+        operation.ValidateLocation(token);
+        using var candidate = NativeDirectoryMoveLease.Open(operation.CanonicalPath, candidatePath, token);
+        var desired = candidate.FlushPayload(token);
+        var metadata = PayloadSnapshot.Capture(candidatePath, token).FrontMatter
+            ?? throw new IOException("Staged skill has no supported metadata.");
+        SameTracking(target.FrontMatter, metadata);
+        if (desired.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json"))
+            throw new IOException("Staged payload contains owner records; use an owner transition plan.");
+        original.Revalidate(token);
+        var current = original.Capture(token);
+        if (before.ObjectStateFingerprint != current.ObjectStateFingerprint || before.Fingerprint != current.Fingerprint
+            || Context(target, inventory, token) != context)
+            throw new IOException("Installed payload or context changed while staging; no replacement was admitted.");
+        var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents,
+            target.FrontMatter, target.AllOwnershipClaims.ToImmutableArray());
+        var plan = new ReplacementPlan(1, id, "restore-recorded", DateTimeOffset.UtcNow, before.Path,
+            original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity,
+            subject, context, ReplacementEvidence.From(before), ReplacementEvidence.From(desired),
+            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "");
+        plan = plan with { ReviewFingerprint = PlanHash(plan) };
+        Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+        return Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
+            "Saved exact staged payload. Review every changed path, affected consumer and pin before applying with --disposition retain-original.");
+    }
+
+    internal ReplacementResult Inspect(string id, InventorySnapshot inventory, CancellationToken token)
+    {
+        using var session = Open(id, inventory, token);
+        var plan = session.Plan;
+        var observation = Observe(plan, session.Operation, inventory, token);
+        return Result(plan, observation.Topology, true, false, false, ObservationHash(plan, observation),
+            (session.IncompleteJournal ? "Incomplete journal entries remain unchanged; recovery uses the reviewed current locations. " : "") + "Current locations verified against the saved original and candidate. This fingerprint is required for recovery or undo; agent session state is unknown.");
+    }
+
+    internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token)
+    {
+        using var session = Open(id, inventory, token);
+        var plan = session.Plan;
+        if (expectedPlan != plan.ReviewFingerprint) throw new IOException("Saved plan fingerprint does not match the reviewed plan.");
+        if (session.StepCount != 0) throw new IOException("This plan has started. Inspect it and use explicit recovery with the current review fingerprint.");
+        var observation = Observe(plan, session.Operation, inventory, token);
+        if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
+            || observation.Candidate?.Objects != plan.Candidate.Objects
+            || observation.Root != plan.RootIdentity || observation.Parent != plan.ParentIdentity)
+            throw new IOException("The reviewed installation or stage changed; create a new plan.");
+        return Execute(session, inventory, observation, undo: false, token);
+    }
+
+    internal ReplacementResult Recover(string id, string expectedObservation, InventorySnapshot inventory,
+        bool undo, CancellationToken token)
+    {
+        using var session = Open(id, inventory, token);
+        var observation = Observe(session.Plan, session.Operation, inventory, token);
+        if (expectedObservation != ObservationHash(session.Plan, observation))
+            throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
+        return Execute(session, inventory, observation, undo, token);
+    }
+
+    private ReplacementResult Execute(Session session, InventorySnapshot inventory, ReplacementObservation current,
+        bool undo, CancellationToken token)
+    {
+        var plan = session.Plan;
+        var changed = false;
+        if (!undo && (session.RecoveryJournal is not null || session.StepCount > MaxSteps - 8))
+            throw new IOException("Forward journal budget is exhausted; inspect and undo before creating a new plan.");
+        if (undo && (session.StepCount > MaxSteps - 6 || session.RecoveryJournal is not null))
+            session.UseRecoveryJournal(Exclusions(inventory), token);
+        var needed = undo ? current.Topology == "installed" ? 4 : current.Topology is "replacement-retained" or "original-retained" ? 2 : 0
+            : current.Topology == "ready" ? 4 : current.Topology == "original-retained" ? 2 : 0;
+        if (session.StepCount > MaxSteps - needed)
+            throw new IOException("Journal capacity for the entire remaining transition is unavailable; no move was admitted.");
+        try
+        {
+            if (!undo && current.Topology == "restored") throw new IOException("This plan was undone; create a new plan to install again.");
+            if (undo && current.Topology == "ready")
+                return Result(plan, "ready", true, false, false, ObservationHash(plan, current), "Replacement has not started; the original is still installed.");
+            if (!undo && current.Topology == "ready")
+                Move("retain", plan.RootPath, plan.OriginalPath, "original", false);
+            if (!undo && current.Topology == "original-retained")
+                Move("install", session.Operation.CanonicalPath, Path.Combine(session.Operation.CanonicalPath, "candidate"), null, true);
+            if (undo && current.Topology == "installed")
+                Move("displace", plan.RootPath, plan.OriginalPath, "displaced", false);
+            if (undo && current.Topology is "replacement-retained" or "original-retained")
+                Move("restore", session.Operation.CanonicalPath, Path.Combine(session.Operation.CanonicalPath, "original"), null, true);
+            var success = undo ? current.Topology is "restored" or "ready" : current.Topology == "installed";
+            return Result(plan, current.Topology, success, changed, token.IsCancellationRequested, ObservationHash(plan, current),
+                success ? "Payload and native continuity verified. Retained directories remain available; agent session state is unknown."
+                    : "No further transition was admitted; inspect the retained locations.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or EntryPointNotFoundException)
+        {
+            if (!changed && ex is OperationCanceledException) throw;
+            return Result(plan, "needs-recovery", false, changed, token.IsCancellationRequested, "",
+                "Inspect the saved plan before recovery. All original/candidate/displaced directories are retained. " + ex.Message);
+        }
+
+        void Move(string action, string sourceRoot, string sourcePath, string? stateName, bool toOriginal)
+        {
+            token.ThrowIfCancellationRequested();
+            // Every transition revalidates ownership and topology. Publication
+            // changes the private parent generation, so open a fresh move lease.
+            var admitted = Observe(plan, session.Operation, inventory, token);
+            if (admitted != current) throw new IOException("Locations changed between reviewed transitions.");
+            if (session.StepCount > MaxSteps - 2)
+                throw new IOException("Journal capacity for intent and completion is unavailable; no move was admitted.");
+            Append(action + "-intent", admitted, token);
+            using var lease = NativeDirectoryMoveLease.Open(sourceRoot, sourcePath, token);
+            var before = lease.Capture(token);
+            var expected = action is "retain" or "restore" ? plan.Original : plan.Candidate;
+            VerifyPayload(expected, before);
+            var sourceSlot = action switch
+            {
+                "retain" or "displace" => admitted.Original,
+                "install" => admitted.Candidate,
+                _ => admitted.Retained
+            };
+            if (sourceSlot?.Objects != before.ObjectStateFingerprint) throw new IOException("Move source changed after intent publication.");
+            try
+            {
+                if (toOriginal) lease.MoveToSlot(plan.RootPath, plan.OriginalPath, admitted.Root, admitted.Parent, token);
+                else lease.MoveToState(session.Operation, stateName!, token);
+            }
+            finally { changed |= lease.MutationCompleted; }
+            // Once a move commits, finish observing/journaling it even when the
+            // caller cancels. Never start another forward move on this token.
+            using var reconciliation = new CancellationSource(TimeSpan.FromSeconds(30),
+                CancellationCallbackReporter.For(logger, "Replacement reconciliation"));
+            lease.FlushSourceNamespace(reconciliation.Token);
+            session.Operation.FlushPublication(reconciliation.Token);
+            var after = lease.Capture(reconciliation.Token);
+            VerifyPayload(expected, after);
+            if (before.Fingerprint != after.Fingerprint || !before.Objects.SequenceEqual(after.Objects))
+                throw new IOException("Objects changed during relocation; review recovery.");
+            checkpoint?.Invoke(action + "-moved");
+            current = Observe(plan, session.Operation, inventory, reconciliation.Token);
+            Append(action + "-complete", current, reconciliation.Token);
+        }
+
+        void Append(string status, ReplacementObservation observation, CancellationToken ct)
+        {
+            if (session.StepCount >= MaxSteps) throw new IOException("Recovery journal step limit reached; retain evidence for inspection.");
+            var step = new ReplacementStep(session.StepCount, plan.ReviewFingerprint, status, observation);
+            Write(session.Journal, $"step-{session.StepCount:D4}.json", step, ReplacementJsonContext.Default.ReplacementStep, ct);
+            session.StepCount++;
+        }
+    }
+
+    private ReplacementObservation Observe(ReplacementPlan plan, NativeStateDirectory operation,
+        InventorySnapshot inventory, CancellationToken token)
+    {
+        var subject = Subject(plan);
+        inventory = Admit(subject, inventory, token);
+        if (Context(subject, inventory, token, plan.Subject.InstallationId) != plan.ContextFingerprint)
+            throw new IOException("Ownership, exposures or configured roots changed; the saved plan needs renewed review.");
+        operation.ValidateLocation(token);
+        foreach (var privateName in new[] { "candidate", "original", "displaced" })
+            QuarantineStore.EnsureNoConsumers(Path.Combine(operation.CanonicalPath, privateName), inventory, token);
+        var original = Slot(plan.RootPath, plan.OriginalPath);
+        var retained = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "original"));
+        var candidate = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "candidate"));
+        var displaced = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "displaced"));
+        var topology = (original?.Payload == plan.Original.Payload && Is(original, plan.Original), retained, candidate, displaced) switch
+        {
+            (true, null, not null, null) when Is(candidate, plan.Candidate) => "ready",
+            (_, not null, not null, null) when original is null && Is(retained, plan.Original) && Is(candidate, plan.Candidate) => "original-retained",
+            (_, not null, null, null) when Is(original, plan.Candidate) && Is(retained, plan.Original) => "installed",
+            (_, not null, null, not null) when original is null && Is(retained, plan.Original) && Is(displaced, plan.Candidate) => "replacement-retained",
+            (true, null, null, not null) when Is(displaced, plan.Candidate) => "restored",
+            _ => throw new IOException("Saved replacement locations disagree, are occupied or contain an unexpected object; no transition was admitted.")
+        };
+        if (!SecureRemovalBackend.TryCaptureIdentity(plan.RootPath, out var rootIdentity, out var rootError)
+            || !SecureRemovalBackend.TryCaptureIdentity(Path.GetDirectoryName(plan.OriginalPath)!, out var parentIdentity, out rootError)
+            || !NativeDirectoryMoveLease.SameObject(plan.RootIdentity, rootIdentity)
+            || !NativeDirectoryMoveLease.SameObject(plan.ParentIdentity, parentIdentity)
+            || rootIdentity.CanonicalPath != plan.RootPath || parentIdentity.CanonicalPath != plan.ParentIdentity.CanonicalPath)
+            throw new IOException("Original root/parent authority changed: " + rootError);
+        return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity);
+
+        ReplacementSlot? Slot(string scanRoot, string path)
+        {
+            token.ThrowIfCancellationRequested();
+            try { _ = File.GetAttributes(path); }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            using var lease = NativeDirectoryMoveLease.Open(scanRoot, path, token);
+            var payload = lease.Capture(token);
+            var expected = NativeDirectoryMoveLease.SameObject(plan.Original.Identity, payload.RootIdentity!.Value)
+                ? plan.Original : plan.Candidate;
+            VerifyPayload(expected, payload);
+            return new(path, payload.Fingerprint, payload.ObjectStateFingerprint!, payload.RootUnixMode, payload.RootIdentity.Value);
+        }
+    }
+
+    private static bool Is(ReplacementSlot? slot, ReplacementEvidence expected) => slot is not null
+        && slot.Payload == expected.Payload && slot.Mode == expected.Mode
+        && NativeDirectoryMoveLease.SameObject(slot.Identity, expected.Identity);
+
+    private static void VerifyPayload(ReplacementEvidence expected, PayloadSnapshot payload)
+    {
+        if (expected.Payload != payload.Fingerprint || expected.Mode != payload.RootUnixMode
+            || !NativeDirectoryMoveLease.SameObject(expected.Identity, payload.RootIdentity!.Value)
+            || !expected.Children.SequenceEqual(payload.Objects))
+            throw new IOException("Original or staged payload/native children changed; no replacement or undo was admitted.");
+    }
+
+    private static InstalledSkill Subject(ReplacementPlan plan) => new()
+    {
+        Name = plan.Subject.Name,
+        ResolvedPath = plan.OriginalPath,
+        ScanRoot = plan.RootPath,
+        Scope = plan.Subject.Scope,
+        Agents = plan.Subject.Agents,
+        FrontMatter = plan.Subject.Metadata,
+        OwnershipClaims = plan.Subject.Owners,
+        Validity = ValidityState.Valid,
+        Provenance = Provenance.FsScan,
+        Ignored = false,
+        IsSymlinked = plan.Subject.Agents.Any(agent => agent.IsSymlink),
+        InstalledAt = null
+    };
+
+    private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512
+            || target.Validity != ValidityState.Valid || !target.MetadataConflicts.IsEmpty
+            || !target.OwnershipDiagnostics.IsEmpty || !target.FrontMatter.Diagnostics.IsEmpty
+            || target.FrontMatter.LocalPath is not null || string.IsNullOrWhiteSpace(target.FrontMatter.Upstream)
+            || target.TreeSha is not { Length: 40 } tree || !tree.All(char.IsAsciiHexDigit)
+            || string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
+            throw new IOException("Recorded restore requires complete inventory and an unambiguous gh remote revision.");
+        if (!inventory.ScannedRoots.Any(scan => OwnershipPath.Same(scan.Path, target.ScanRoot)))
+            throw new IOException("The original scan root must be included in the current inventory.");
+        if (target.AllOwnershipClaims.Any(claim => claim.Provider != "gh-vercel-global" || claim.ReadOnly || claim.IsExclusiveOwner)
+            || inventory.OwnershipRecords.Any(claim => claim.Diagnostic is not null))
+            throw new IOException("Native/exclusive or uncertain owner evidence requires an owner transition plan.");
+        GhSharedLockGuard.ValidateCapturedOwners([target], token);
+        var capturedClaims = target.AllOwnershipClaims.ToArray();
+        var freshClaims = ReadOwners(target, token);
+        if (!freshClaims.IsEmpty)
+        {
+            var records = freshClaims.Where(claim => claim.Provider == "gh-vercel-global" && claim.Selector is not null)
+                .ToImmutableDictionary(claim => claim.Selector!, claim => new GhSharedLockGuard.Record(claim.SourceUrl,
+                    claim.Source, claim.SourceType, claim.SkillPath, claim.ContentHash, claim.PinnedRef), StringComparer.Ordinal);
+            GhSharedLockGuard.ValidateUpdateRecords(records, [target]);
+        }
+        if (freshClaims.Any(claim => !capturedClaims.Any(captured => captured.LockFilePath == claim.LockFilePath
+                && captured.Selector == claim.Selector && captured.EntryFingerprint == claim.EntryFingerprint
+                && captured.Provider == claim.Provider && captured.ReadOnly == claim.ReadOnly
+                && captured.IsExclusiveOwner == claim.IsExclusiveOwner)))
+            throw new IOException("Live contextual owner evidence changed; refresh before replacement.");
+        var inaccessible = new List<string>();
+        var locations = new List<DiscoveryLocation>();
+        var liveRoots = new List<ScanRoot>();
+        foreach (var configured in inventory.ConfiguredRoots.Concat(inventory.ScannedRoots).Distinct())
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var attributes = File.GetAttributes(configured.Path);
+                if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0)
+                    throw new IOException("Configured skill root is no longer a directory.");
+                liveRoots.Add(configured);
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+        }
+        var fresh = new LocalSkillScanner(logger).ScanWithCancellation(liveRoots, null, token, inaccessible, locations);
+        if (inaccessible.Count != 0 || locations.Any(location => location.State == "partial"))
+            throw new IOException("Live consumer discovery is incomplete; replacement is refused.");
+        var matching = inventory.Skills.Concat(fresh).Where(skill => OwnershipPath.Same(skill.ResolvedPath, target.ResolvedPath)).ToArray();
+        if (matching.Any(skill => skill.Agents.Any(agent => !target.Agents.Any(saved =>
+                saved.AgentId == agent.AgentId && OwnershipPath.Same(saved.Path, agent.Path)
+                && saved.IsSymlink == agent.IsSymlink && saved.Profile == agent.Profile && saved.Context == agent.Context))))
+            throw new IOException("The installation's discovered consumers changed; create a newly reviewed plan.");
+        if (inventory.OwnershipRecords.Where(claim => claim.Describes(target)).Any(claim =>
+                !capturedClaims.Any(captured => captured.LockFilePath == claim.LockFilePath
+                    && captured.Selector == claim.Selector && captured.EntryFingerprint == claim.EntryFingerprint
+                    && captured.Provider == claim.Provider && captured.ReadOnly == claim.ReadOnly
+                    && captured.IsExclusiveOwner == claim.IsExclusiveOwner)))
+            throw new IOException("A new or changed contextual owner claims this installation; review its ownership.");
+        var knownPaths = target.Agents.Select(agent => Path.GetFullPath(agent.Path)).ToHashSet(StringComparer.Ordinal);
+        foreach (var agent in target.Agents)
+        {
+            token.ThrowIfCancellationRequested();
+            if (OwnershipPath.EntryAddress(Path.TrimEndingDirectorySeparator(agent.Path)) is not { } entry)
+                throw new IOException("Captured consumer entry cannot be inspected.");
+            if (agent.IsSymlink)
+            {
+                if (!PathResolver.IsSymlink(agent.Path) || !OwnershipPath.Same(
+                    QuarantineStore.ResolveExposureAddress(agent.Path, token), target.ResolvedPath))
+                    throw new IOException("Captured consumer link changed its intended destination.");
+            }
+            else if (!OwnershipPath.Same(entry, target.ResolvedPath))
+                throw new IOException("A consumer is nested in the replacement payload; review its topology first.");
+        }
+        // Broken captured links may become separate inventory rows while the
+        // original slot is vacant. They are expected only at captured addresses.
+        var others = inventory with
+        {
+            Skills = inventory.Skills.Concat(fresh).Where(skill => !OwnershipPath.Same(skill.ResolvedPath, target.ResolvedPath)
+                && !(skill.Validity == ValidityState.BrokenSymlink && !skill.Agents.IsEmpty
+                    && skill.Agents.All(agent => knownPaths.Contains(Path.GetFullPath(agent.Path))))).Append(target).ToImmutableArray()
+        };
+        QuarantineStore.EnsureNoConsumers(target.ResolvedPath, others, token, target);
+        return others;
+    }
+
+    private string Context(InstalledSkill target, InventorySnapshot inventory, CancellationToken token, string? fixedId = null)
+    {
+        token.ThrowIfCancellationRequested();
+        GhSharedLockGuard.ValidateCapturedOwners([target], token);
+        var roots = inventory.ConfiguredRoots.OrderBy(scan => scan.Path, StringComparer.Ordinal).ToArray();
+        using var bytes = new MemoryStream();
+        using (var writer = new BinaryWriter(bytes, System.Text.Encoding.UTF8, true))
+        {
+            writer.Write("SkillView.replacement-context.v1"); writer.Write(fixedId ?? target.InstallationId);
+            writer.Write(runner?.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME") ?? "");
+            writer.Write(runner?.GetEffectiveEnvironmentVariable("XDG_STATE_HOME") ?? "");
+            foreach (var scan in roots)
+            { writer.Write(scan.Path); writer.Write(scan.Scope.ToString()); writer.Write(scan.AgentHint ?? ""); writer.Write(scan.Context ?? ""); writer.Write(scan.Profile ?? ""); }
+            foreach (var agent in target.Agents.OrderBy(agent => agent.Path, StringComparer.Ordinal))
+            {
+                writer.Write(agent.AgentId); writer.Write(agent.Path); writer.Write(agent.IsSymlink);
+                writer.Write(agent.Context ?? ""); writer.Write(agent.Profile ?? "");
+                writer.Write(agent.IsSymlink ? new DirectoryInfo(agent.Path).LinkTarget ?? "" : "");
+            }
+            foreach (var claim in target.AllOwnershipClaims.OrderBy(claim => claim.LockFilePath, StringComparer.Ordinal).ThenBy(claim => claim.Selector, StringComparer.Ordinal))
+            { writer.Write(claim.LockFilePath ?? ""); writer.Write(claim.Selector ?? ""); writer.Write(claim.EntryFingerprint ?? ""); }
+        }
+        return Hash(bytes.GetBuffer().AsSpan(0, (int)bytes.Length));
+    }
+
+    private ImmutableArray<SkillPackage> ReadOwners(InstalledSkill target, CancellationToken token)
+    {
+        var diagnostics = new List<LockReadDiagnostic>();
+        var destinations = target.Agents.Select(agent => agent.DiscoveryRoot ?? Path.GetDirectoryName(agent.Path)!)
+            .Append(target.ScanRoot).Distinct(StringComparer.Ordinal).ToArray();
+        var home = runner?.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
+        var stateHome = runner?.GetEffectiveEnvironmentVariable("XDG_STATE_HOME");
+        var cwd = runner?.EffectiveWorkingDirectory ?? Environment.CurrentDirectory;
+        if (home is not null) home = Path.GetFullPath(home, cwd);
+        if (stateHome is not null) stateHome = Path.GetFullPath(stateHome, cwd);
+        var observed = new SkillLockFileReader(logger).LoadObservations(destinations, token, new(home, stateHome), diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.CoveredRoots.IsEmpty || diagnostic.CoveredRoots.Any(rootPath =>
+                destinations.Any(destination => OwnershipPath.Same(rootPath, destination)))))
+            throw new IOException("Live owner discovery is incomplete; replacement is refused.");
+        return observed.Select(observation => observation.Package).Where(claim => claim.Describes(target)).ToImmutableArray();
+    }
+
+    internal static void SameTracking(SkillFrontMatter original, SkillFrontMatter desired)
+    {
+        if (original.Upstream != desired.Upstream || original.GithubTreeSha != desired.GithubTreeSha
+            || original.GithubRef != desired.GithubRef || original.GithubPath != desired.GithubPath
+            || original.PinnedRef != desired.PinnedRef || original.LocalPath != desired.LocalPath || original.Pinned != desired.Pinned)
+            throw new IOException("Recorded restore cannot change source, revision, pin policy or owner records.");
+    }
+
+    private void CheckPlacement(InventorySnapshot inventory)
+    {
+        NativeStateDirectory.CheckExcluded(Canonical(Root), Exclusions(inventory).Select(Canonical).ToArray());
+        if (ScanRootResolver.FindGitRoot(Root) is not null) throw new IOException("Replacement state must remain outside Git working trees.");
+    }
+    private static string Canonical(string path) => OwnershipPath.CanonicalCandidate(path) ?? Path.GetFullPath(path);
+    private static string[] Exclusions(InventorySnapshot inventory) => inventory.ConfiguredRoots.Concat(inventory.ScannedRoots)
+        .Select(scan => scan.Path).Concat(inventory.Skills.Select(skill => skill.ResolvedPath)).ToArray();
+    private static void CheckWriter(FileStream writer) { if (writer.Length != 0) throw new IOException("Replacement writer lock must be empty."); }
+    private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+    private static string PlanHash(ReplacementPlan plan)
+    {
+        using var document = JsonDocument.Parse(JsonSerializer.SerializeToUtf8Bytes(plan with { ReviewFingerprint = "" }, ReplacementJsonContext.Default.ReplacementPlan));
+        using var bytes = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(bytes)) WriteCanonical(document.RootElement, writer);
+        return Hash(bytes.GetBuffer().AsSpan(0, (int)bytes.Length));
+    }
+
+    private static void WriteCanonical(JsonElement value, Utf8JsonWriter writer)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            writer.WriteStartObject();
+            foreach (var property in value.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
+            { writer.WritePropertyName(property.Name); WriteCanonical(property.Value, writer); }
+            writer.WriteEndObject();
+        }
+        else if (value.ValueKind == JsonValueKind.Array)
+        {
+            writer.WriteStartArray();
+            foreach (var item in value.EnumerateArray()) WriteCanonical(item, writer);
+            writer.WriteEndArray();
+        }
+        else value.WriteTo(writer);
+    }
+    private static string ObservationHash(ReplacementPlan plan, ReplacementObservation observation) => Hash(
+        System.Text.Encoding.UTF8.GetBytes(plan.ReviewFingerprint + "\n" + JsonSerializer.Serialize(observation, ReplacementJsonContext.Default.ReplacementObservation)));
+
+    private ReplacementResult Result(ReplacementPlan plan, string status, bool succeeded, bool changed, bool canceled, string review, string message) =>
+        new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
+            Path.Combine(Root, plan.Id, "candidate"), Path.Combine(Root, plan.Id, "displaced"),
+            plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, "plan.json"),
+            plan.Original.Mode, plan.Candidate.Mode);
+
+    private void Write<T>(NativeStateDirectory operation, string name, T value, JsonTypeInfo<T> type, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, type);
+        if (bytes.Length > MaxJournalBytes) throw new IOException("Replacement journal byte budget exceeded.");
+        using (var file = operation.OpenFile(name, false, token)) { file.Write(bytes); file.Flush(true); }
+        operation.FlushPublication(token);
+        checkpoint?.Invoke(name);
+    }
+
+    private static T Read<T>(NativeStateDirectory operation, string name, JsonTypeInfo<T> type, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var file = operation.OpenExistingFile(name, false, token);
+        var length = file.Length;
+        if (length is <= 0 or > MaxJournalBytes) throw new JournalDataException("Invalid replacement journal length.");
+        var bytes = new byte[checked((int)length)]; file.ReadExactly(bytes);
+        if (file.ReadByte() != -1) throw new IOException("Replacement journal changed while reading.");
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = 48 });
+        var properties = new Stack<HashSet<string>>();
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            if (reader.TokenType == JsonTokenType.StartObject) properties.Push(new(StringComparer.Ordinal));
+            else if (reader.TokenType == JsonTokenType.EndObject) properties.Pop();
+            else if (reader.TokenType == JsonTokenType.PropertyName && !properties.Peek().Add(reader.GetString()!))
+                throw new JournalDataException("Duplicate replacement journal property.");
+        }
+        return JsonSerializer.Deserialize(bytes, type) ?? throw new IOException("Empty replacement journal.");
+    }
+
+    private Session Open(string id, InventorySnapshot inventory, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!QuarantineStore.ValidId(id)) throw new IOException("A lowercase 32-character plan ID is required.");
+        CheckPlacement(inventory);
+        NativeStateDirectory? state = null, operation = null;
+        FileStream? writer = null, operationWriter = null;
+        try
+        {
+            state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token, allowCreate: false);
+            writer = state.OpenExistingFile("writer.lock", true, token); CheckWriter(writer);
+            operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
+            operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
+            var plan = Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
+            if (plan.SchemaVersion != 1 || plan.Id != id || plan.Purpose != "restore-recorded"
+                || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
+                || PlanHash(plan) != plan.ReviewFingerprint
+                || !QuarantineStore.ValidHash(plan.ReviewFingerprint) || !QuarantineStore.ValidHash(plan.ContextFingerprint)
+                || !Path.IsPathFullyQualified(plan.OriginalPath) || !Path.IsPathFullyQualified(plan.RootPath)
+                || !PathIdentity.IsInside(plan.OriginalPath, plan.RootPath)
+                || plan.RootIdentity.CanonicalPath != plan.RootPath || plan.Original.Identity.CanonicalPath != plan.OriginalPath
+                || plan.Candidate.Identity.CanonicalPath != Path.Combine(operation.CanonicalPath, "candidate")
+                || plan.Subject.Agents.IsDefault || plan.Subject.Owners.IsDefault || plan.ChangedPaths.IsDefault
+                || plan.Subject.Agents.Any(agent => agent is null || string.IsNullOrWhiteSpace(agent.AgentId)
+                    || string.IsNullOrWhiteSpace(agent.Path) || !Path.IsPathFullyQualified(agent.Path))
+                || plan.Subject.Owners.Any(owner => owner is null))
+                throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
+            ValidateEvidence(plan.Original); ValidateEvidence(plan.Candidate);
+            var stepCount = 0;
+            var incompleteJournal = false;
+            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 8).ToArray();
+            if (entries.Length > MaxSteps + 6) throw new IOException("Replacement operation entry budget exceeded.");
+            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery")))
+                throw new IOException("Unsafe replacement journal entry.");
+            var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+            while (names.Contains($"step-{stepCount:D4}.json"))
+            {
+                if (stepCount >= MaxSteps) throw new IOException("Replacement journal step limit exceeded.");
+                try
+                {
+                    var step = Read(operation, $"step-{stepCount:D4}.json", ReplacementJsonContext.Default.ReplacementStep, token);
+                    if (step.Sequence != stepCount || step.PlanFingerprint != plan.ReviewFingerprint
+                        || step.Status is not ("retain-intent" or "retain-complete" or "install-intent" or "install-complete"
+                            or "displace-intent" or "displace-complete" or "restore-intent" or "restore-complete"))
+                        throw new IOException("Replacement journal sequence or identity is invalid.");
+                }
+                catch (Exception ex) when (ex is JsonException or JournalDataException or EndOfStreamException)
+                {
+                    // A crash/disk-full can leave a create-new file partially
+                    // written. Keep it untouched. Explicit live-slot review is
+                    // the authority for recovery; subsequent steps append.
+                    incompleteJournal = true;
+                    logger.Warn("replacement", $"Replacement {id}: preserving incomplete step {stepCount}: {ex.Message}");
+                }
+                stepCount++;
+            }
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery")
+                && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
+                throw new IOException("Unknown replacement operation entry or journal gap.");
+            var session = new Session(state, writer, operation, operationWriter, plan, stepCount, incompleteJournal);
+            if (names.Contains("undo-recovery")) session.OpenRecoveryJournal(Exclusions(inventory), token, false);
+            return session;
+        }
+        catch { operationWriter?.Dispose(); operation?.Dispose(); writer?.Dispose(); state?.Dispose(); throw; }
+    }
+
+    private static void ValidateEvidence(ReplacementEvidence evidence)
+    {
+        if (!QuarantineStore.ValidHash(evidence.Payload) || !QuarantineStore.ValidHash(evidence.Objects)
+            || !evidence.Identity.IsDirectory || evidence.Identity.IsReparsePoint
+            || evidence.Mode is < 0 or > 4095 || evidence.Entries.IsDefaultOrEmpty || evidence.Children.IsDefaultOrEmpty
+            || evidence.Entries.Length > PayloadSnapshot.MaxEntries || evidence.Children.Length != evidence.Entries.Length
+            || evidence.Entries.Any(entry => entry is null || string.IsNullOrEmpty(entry.Path) || entry.Bytes < 0
+                || entry.Kind is not ("file" or "link" or "directory") || entry.ContentHash is null || entry.ComparisonHash is null)
+            || evidence.Children.Any(child => child is null)
+            || evidence.Entries.Sum(entry => entry.Bytes) > PayloadSnapshot.MaxBytes
+            || PayloadSnapshot.Digest(evidence.Entries, false) != evidence.Payload)
+            throw new IOException("Saved replacement payload evidence is invalid or exceeds its budget.");
+    }
+
+    private sealed class JournalDataException(string message) : IOException(message);
+
+    private sealed class Session(NativeStateDirectory state, FileStream writer, NativeStateDirectory operation,
+        FileStream operationWriter, ReplacementPlan plan, int stepCount, bool incompleteJournal) : IDisposable
+    {
+        internal NativeStateDirectory Operation { get; } = operation;
+        internal ReplacementPlan Plan { get; } = plan;
+        internal bool IncompleteJournal { get; } = incompleteJournal;
+        internal int StepCount { get; set; } = stepCount;
+        internal NativeStateDirectory? RecoveryJournal { get; private set; }
+        internal NativeStateDirectory Journal => RecoveryJournal ?? Operation;
+        private int recoverySteps;
+        private FileStream? recoveryWriter;
+        internal void UseRecoveryJournal(string[] exclusions, CancellationToken token)
+        {
+            if (RecoveryJournal is null) OpenRecoveryJournal(exclusions, token, true);
+            recoveryWriter = RecoveryJournal!.OpenFile("writer.lock", true, token);
+            CheckWriter(recoveryWriter);
+            StepCount = recoverySteps;
+        }
+        internal void OpenRecoveryJournal(string[] exclusions, CancellationToken token, bool create)
+        {
+            var recovery = NativeStateDirectory.OpenOrCreate(Path.Combine(Operation.CanonicalPath, "undo-recovery"), exclusions, token, allowCreate: create);
+            try
+            {
+                var entries = recovery.EnumerateEntries(token).Take(MaxSteps + 2).ToArray();
+                if (entries.Length > MaxSteps + 1 || entries.Any(entry => entry.Error is not null)) throw new IOException("Unsafe undo recovery journal.");
+                var names = entries.Where(entry => entry.Name != "writer.lock").Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+                if (entries.Any(entry => entry.Name == "writer.lock" && entry.Bytes != 0)) throw new IOException("Recovery writer lock must be empty.");
+                var count = 0;
+                while (names.Contains($"step-{count:D4}.json"))
+                {
+                    try
+                    {
+                        var step = Read(recovery, $"step-{count:D4}.json", ReplacementJsonContext.Default.ReplacementStep, token);
+                        if (step.Sequence != count || step.PlanFingerprint != Plan.ReviewFingerprint
+                            || step.Status is not ("displace-intent" or "displace-complete" or "restore-intent" or "restore-complete"))
+                            throw new IOException("Invalid undo recovery journal identity.");
+                    }
+                    catch (Exception ex) when (ex is JsonException or JournalDataException or EndOfStreamException) { }
+                    count++;
+                }
+                if (count != names.Count) throw new IOException("Undo recovery journal has unknown entries or gaps.");
+                recoverySteps = count;
+                RecoveryJournal = recovery;
+            }
+            catch { recovery.Dispose(); throw; }
+        }
+        public void Dispose() { recoveryWriter?.Dispose(); RecoveryJournal?.Dispose(); operationWriter.Dispose(); Operation.Dispose(); writer.Dispose(); state.Dispose(); }
+    }
+}

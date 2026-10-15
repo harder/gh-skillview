@@ -244,8 +244,29 @@ internal sealed partial class WindowsSecureRemovalBackend
 
     [SupportedOSPlatform("windows")]
     private sealed class WindowsStateSession(List<SafeFileHandle> held, SafeFileHandle root, string canonical,
-        WindowsStateExclusions excluded, SecurityIdentifier user, byte[] descriptor) : NativeStateDirectory
+        WindowsStateExclusions excluded, SecurityIdentifier user, byte[] descriptor,
+        Action<CancellationToken>? stagingGuard = null) : NativeStateDirectory
     {
+        private bool sealedStage;
+        internal override NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token)
+        {
+            ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            var child = CreateStateEntryAt(root, name, directory: true, openIf: false, descriptor, exclusive: false, token);
+            try
+            {
+                var address = Path.Combine(canonical, name);
+                if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Staging directory moved during creation.");
+                CheckWindowsPrivateState(child, user);
+                return new WindowsStateSession([child], child, address, excluded, user, descriptor, ValidateLocation);
+            }
+            catch { child.Dispose(); throw; }
+        }
+        internal override void SealStagingDirectory(int unixMode, CancellationToken token)
+        {
+            if (stagingGuard is null || unixMode is not (448 or 493)) throw new IOException("Only new staging directories may be sealed.");
+            ValidateLocation(token);
+            sealedStage = true;
+        }
         internal override string CanonicalPath => canonical;
         internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token)
         {
@@ -259,7 +280,10 @@ internal sealed partial class WindowsSecureRemovalBackend
         {
             token.ThrowIfCancellationRequested();
             if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("State directory moved; retained evidence needs review.");
-            CheckWindowsStateAncestors(root, excluded, token); CheckWindowsPrivateState(root, user);
+            if (sealedStage) throw new IOException("Staging directory is sealed; no more writes are admitted.");
+            if (stagingGuard is null) CheckWindowsStateAncestors(root, excluded, token);
+            else stagingGuard(token);
+            CheckWindowsPrivateState(root, user);
         }
         internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token)
         {

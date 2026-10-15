@@ -329,3 +329,5 @@ refusal returns exit10 without creating state. Invalid arguments return exit2.
 A verified schema1 archive preserves file bytes, entry Unix modes and link bytes;
 it does not yet support in-place restore or preserve ACLs, extended attributes,
 root permissions or manager registries.
+
+For local changes on a tracked GitHub installation, see [recorded restoration](recorded-restoration.md) for saved plans, retained originals and verified undo.

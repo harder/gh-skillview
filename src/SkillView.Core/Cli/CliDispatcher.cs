@@ -19,7 +19,7 @@ namespace SkillView.Cli;
 /// `doctor`, `list`, `rescan`, `search`, `preview`, `install`, `update`,
 /// `remove`, `cleanup`. JSON rendering and argv parsing are factored into
 /// `internal` helpers for snapshot testing.
-public static class CliDispatcher
+public static partial class CliDispatcher
 {
     public static async Task<int> RunAsync(
         AppOptions options,
@@ -48,6 +48,7 @@ public static class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -72,7 +73,7 @@ public static class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" => TimeSpan.FromMinutes(10),
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -2183,6 +2184,10 @@ public static class CliDispatcher
             | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
+            | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--json` |
+            | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |
+            | `restore-apply` | Apply a saved plan, retaining the original directory. | `--id`, `--yes --disposition retain-original --expect`, `--json` |
+            | `restore-recover`, `restore-undo` | Resume or undo after inspecting current evidence; never overwrite another object. | `--id`, `--yes --expect`, `--json` |
             | `quarantine` | Preview relocation of one standalone custom-directory copy. Apply requires a reviewed fingerprint and explicit confirmation. | `--path` or `--install-id`, `--yes --standalone --expect`, `--json` |
             | `undo` | Preview or restore an unchanged quarantined directory to its vacant original location. | `--id`, `--yes`, `--json` |
             | `quarantine-history` | Inspect recorded relocation states; incomplete operations require inspection. | `--json` |

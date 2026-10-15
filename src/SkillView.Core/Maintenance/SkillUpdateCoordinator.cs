@@ -114,8 +114,9 @@ public sealed class SkillUpdateCoordinator(
                             || sourceUri.UserInfo.Length != 0 || sourceUri.Query.Length != 0 || sourceUri.Fragment.Length != 0)
                             throw new IOException("Recorded source is unsupported or ambiguous; no source is guessed from the name.");
                         staging = Path.Combine(Path.GetTempPath(), "skillview-update-stage-" + Guid.NewGuid().ToString("N"));
-                        Directory.CreateDirectory(staging);
-                        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(staging, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                        using var stagingAuthority = NativeStateDirectory.OpenOrCreate(staging, [parent], cancellationToken);
+                        using var stagingWriter = stagingAuthority.OpenFile("writer.lock", true, cancellationToken);
+                        if (stagingWriter.Length != 0) throw new IOException("Staging writer lock must be empty.");
                         stagingOwner = OwnedDirectoryLease.Open(staging);
                         var stageEnvironment = CreateStagingEnvironment(staging);
                         // --dir fixes placement. Isolate incidental global registry

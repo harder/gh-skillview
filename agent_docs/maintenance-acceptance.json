@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "sourceAudit": "maintenance-audit.json",
+  "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
+  "verifiedMainCommit": "8b2ebb034ba9e50836144d6843483256793dc938",
+  "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
+  "items": [
+    {
+      "id": "M01",
+      "title": "Read the actual gh tracking metadata and valid YAML",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Bounded YAML and tracking metadata parsing",
+      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "acceptance": "Round-trip-read fixtures created by actual gh remote, pinned and --from-local installs; folded/literal descriptions; string allowed-tools; nested metadata.version; invalid/missing required fields. Verify source links and pin badges against gh list. No silent YAML alias expansion or unlimited reads.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M02",
+      "title": "Merge physical installs once while preserving all observations",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Physical inventory reconciliation, contexts and aliases",
+      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "acceptance": "One physical row for direct, symlink and ancestor aliases; multiple exposures survive. Conflicting metadata remains visible. Same target exposed in project and user contexts preserves both. Scope/agent filters produce the expected installs without generating artificial duplicates.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M03",
+      "title": "Replace name-only duplicate cleanup with evidence-based comparisons",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Unsafe duplicate removal refused; whole-payload comparison",
+      "remaining": "Exposure-preserving consolidation and migration",
+      "acceptance": "Different origins, pins, versions and project overrides never enter bulk safe cleanup. Identical copies require an exposure-preserving migration plan. Different paths to one object count as aliases. Compare all files, not only the markdown body. Case-sensitive naming behavior follows each agent.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M04",
+      "title": "Distinguish incomplete inventory from genuine orphaning",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Provider outcomes, explicit coverage, partial-inventory refusals",
+      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "acceptance": "A gh failure, invalid JSON, inaccessible root or uncovered custom root generates a diagnostic and no removal recommendation based on absence. A valid [] result remains distinguishable. Credentials/network failures do not become deleted-upstream diagnoses.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M05",
+      "title": "Make selected updates work in the captured subprocess",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Noninteractive selected update confirmation",
+      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "acceptance": "A real available update succeeds for a selected fixture, with unrelated fixture names untouched. Test u, U, Update and CLI paths, not merely the generated args or a stubbed successful runner. Verify that all-mode cannot silently expand a marked selection.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M06",
+      "title": "Update an exact installation rather than every matching name",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Exact installation update targeting and selectors",
+      "remaining": "Controlled staged repair when gh cannot express the selection",
+      "acceptance": "Two copies of one name in different agents/scopes: selecting one changes only its intended target, except explicitly shown shared consumers. Custom and namespaced roots update correctly. Never treat the target skill directory itself as the --dir skills root. Add CLI --path/--install-id selectors and reject unsupported flags.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M07",
+      "title": "Preserve both output streams and verify partial outcomes",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Both streams, per-target outcomes and post-attempt verification",
+      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "acceptance": "Fixtures for updated, pinned, untracked, remote failure, force reinstall, no-op, partial failure and cancellation. First target succeeds/second fails: preserve stdout and report the first change. Force restoration with unchanged tree SHA still appears as a real file change.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M08",
+      "title": "Protect local changes before update or force repair",
+      "priority": "P0",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Local changes refused; raw backups; standalone quarantine/undo; saved recorded-revision replacement retaining original and displaced native objects, with reviewed recovery",
+      "remaining": "Latest-revision and source/owner transitions; additional reviewed local-change dispositions; external suppression state; complete original acceptance audit",
+      "acceptance": "Changed tracked file, extra file, deletion, pin, shared symlink target and unchanged upstream tree SHA are all covered. No overwrite without an explicit disposition of local changes. Verified rollback restores extras and exclusions. Preserve the observed doc/runtime disagreement in compatibility tests.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M09",
+      "title": "Read lockfiles in context and preserve manager ownership",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Contextual lock readers, preserved claims, guarded writes",
+      "remaining": "Coordinated manager-owned mutation and ownership migration",
+      "acceptance": "Same skill name in user and two projects with three different sources stays separate. Test current global/project/XDG locations and old schema fixtures. Package/repository group removal never includes an unrelated copy because of a name collision. Unknown schema versions remain read-only diagnostics.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M10",
+      "title": "Discover namespace containers, agent roots and contexts correctly",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Shared catalog, namespaces, profiles, workspaces and bounded discovery",
+      "remaining": "Managed/built-in discovery adapters and final acceptance verification",
+      "acceptance": "Namespaced gh installs, monorepo ancestors, alternate profiles, custom paths and shared roots appear with correct ownership and context. Containers are not offered as malformed skills. Scan budgets report partial coverage and never manufacture orphan conclusions when hit.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M11",
+      "title": "Model identity, revisions, physical installs and agent exposures separately",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Separate source/revision/object/exposure evidence",
+      "remaining": "Complete native package identity and mutation topology across owner types",
+      "acceptance": "Represent a shared user install, a pinned project copy, a locally edited fork and a plugin-bundled copy of the same display name without losing information. Every update/delete operation resolves to physical IDs and enumerates affected exposures.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M12",
+      "title": "Explain what each agent can actually load",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Basic validity and placement evidence",
+      "remaining": "Versioned effective-loading analysis and observed-versus-expected agent views",
+      "acceptance": "Explain why a skill is unavailable and which copy is selected or which names coexist. Disabled, broken and incompatible states outrank a generic symlink badge. Do not apply the generic client guide\u2019s project-over-user advice as a universal rule for every agent.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M13",
+      "title": "Offer repairs matched to the diagnosis",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Compare, exact update, standalone quarantine and undo",
+      "remaining": "Target-backed relink, detach, restore, adoption, disablement and migration actions",
+      "acceptance": "A broken link offers a target-backed repair before unlinking. Missing source does not prompt automatic guessed metadata. A direct-copy-only agent gets a copy rather than a symlink. Repeating an already completed repair is a verified no-op.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M14",
+      "title": "Consolidate fragmented copies without erasing intentional differences",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Complete comparisons and refusal of unsafe duplicate cleanup",
+      "remaining": "Approved per-consumer topology migration and verified consolidation",
+      "acceptance": "Four old installs become a demonstrably correct topology with no broken consumer. One project remains pinned while other agents share a newer revision. Different authors using one name are kept distinct. No automatic cross-agent replacement of platform-specific instructions, resources or invocation policy.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M15",
+      "title": "Add plan, stage, verify and recover around the existing safe filesystem backend",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Native move/removal authority; quarantine journals; saved exact recorded-tree plan/stage/apply/inspect/recover/undo; real process-kill restart proofs",
+      "remaining": "General multi-target/source/owner transition plans, relinking/migration recovery and concurrent manager coordination; complete original acceptance audit",
+      "acceptance": "Disk full, interrupted process, canceled worker, target replacement, concurrent native manager update and restart halfway through relinking all leave either a recoverable journal or a verified refusal. Shared consumers are never switched before the chosen payload validates.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M16",
+      "title": "Respect native plugin and extension lifecycles",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Loose-copy ownership protection",
+      "remaining": "Native plugin/extension read and lifecycle adapters",
+      "acceptance": "A plugin skill and a loose same-name skill stay distinct; active/referenced cache versions and persistent package data are protected. Disabled packages remain installed. Owner-driven updates preserve dependencies and mark unresolved capabilities instead of guessing command support.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M17",
+      "title": "Separate latest, pinned, approved and intentionally customized revisions",
+      "priority": "P2",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Pin preservation and explicit unpin targeting",
+      "remaining": "Desired-state policies, immutable approvals and reproducible profiles",
+      "acceptance": "Routine maintenance leaves pins and forks alone. Unpin is an explicit change for selected installs. Reprovisioning produces the same approved payloads and exposure topology. A branch-only file change can count even when an authored version string is unchanged.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M18",
+      "title": "Recover provenance using evidence instead of guessing from names",
+      "priority": "P2",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Uncertain provenance remains protected",
+      "remaining": "Evidence-backed adoption and reviewed source switching",
+      "acceptance": "Two repositories with the same skill name never produce an automatic adoption. A verified local-path install offers reimport from that source. A disappeared/private remote retains the local payload and reports access/source uncertainty. Metadata is never fabricated solely to make the update button work.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M19",
+      "title": "Review the whole skill package and distinguish quality from safety",
+      "priority": "P2",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Bounded metadata parsing, payload evidence and terminal sanitization",
+      "remaining": "Static package lint, compatibility review and explicit isolated evaluations",
+      "acceptance": "Valid format, agent-compatible, intact payload and reviewed source are separate states. Missing dependencies have concrete repair guidance. Evaluations require an explicit runnable environment and cannot silently incur agent/API execution. Preserve user-authored instructions unless a reviewed edit is selected.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M20",
+      "title": "Make the maintenance queue actionable and explain application state",
+      "priority": "P2",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Exact selectors/results, compare/backup/history/quarantine/undo plus saved recorded-restore CLI plan/apply/inspect/recover/undo with versioned JSON",
+      "remaining": "Unified maintenance queue, saved plan/apply contract and TUI repair flows",
+      "acceptance": "A selected row always identifies exact affected paths. Every skip/partial result explains what happened. Current Claude plugin docs say running sessions retain loaded plugin versions after background updates; display that as a reload requirement, not failed filesystem verification. Runtime state is unknown unless observed.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    },
+    {
+      "id": "M21",
+      "title": "Test real gh contracts and adversarial multi-agent scenarios",
+      "priority": "P1",
+      "status": "incomplete",
+      "implementedEvidenceSummary": "Minimum/current gh proofs, cross-platform native fixtures and review cycles",
+      "remaining": "Remaining feature contracts, recovery/restart cases and final 21-item acceptance audit",
+      "acceptance": "Required scenarios: same name/different origins; pinned and unpinned versions; local edits and extras; direct plus shared links; custom roots; failed provider; namespace containers; project/global lock conflicts; partial update; stale plan; concurrent owner mutation; rollback/restart. Routine inventory remains offline unless a check is requested, and never launches skill code.",
+      "evidenceLedger": "maintenance-implementation.md",
+      "finalAcceptanceProven": false
+    }
+  ]
+}

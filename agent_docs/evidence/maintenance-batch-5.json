@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "batch": "5-recorded-restoration",
+  "baseCommit": "8b2ebb034ba9e50836144d6843483256793dc938",
+  "scope": [
+    "M08",
+    "M13",
+    "M15",
+    "M20",
+    "M21"
+  ],
+  "implemented": [
+    "Saved exact recorded-tree plans with canonical hashes and full original/candidate manifests",
+    "Native held-parent create-new staging; immutable Git tree/blob verification; authored bytes and pin preservation",
+    "Exact retained-original apply, inspect, reviewed resume and undo retaining replacement",
+    "Fresh configured-root/consumer and contextual ownership revalidation",
+    "Bounded durable intent/completion journals with partial-record retention and reserved undo capacity"
+  ],
+  "reviews": {
+    "independentReviewers": 2,
+    "acceptedFindingsOutstanding": 0,
+    "reReview": "clear"
+  },
+  "localVerification": {
+    "build": "passed: 0 warnings/errors",
+    "lockedRestore": "passed",
+    "siteBuild": "passed",
+    "nativeProof": [
+      {
+        "nativeHost": "/Users/kharder/.codex/worktrees/skill-maintenance/gh-skillview/src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview",
+        "gh": "gh version 2.97.0 (2026-07-31)",
+        "fixtures": [
+          {
+            "shared": false,
+            "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+            "stagedNativeDirectoryPromoted": true,
+            "originalNativeDirectoryRestored": true,
+            "registryBytesUnchanged": true,
+            "unrelatedSameNameUnchanged": true,
+            "nativeProcessKillRestartAndUndoVerified": true,
+            "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+          },
+          {
+            "shared": true,
+            "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+            "stagedNativeDirectoryPromoted": true,
+            "originalNativeDirectoryRestored": true,
+            "registryBytesUnchanged": true,
+            "unrelatedSameNameUnchanged": true,
+            "nativeProcessKillRestartAndUndoVerified": true,
+            "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+          }
+        ]
+      },
+      {
+        "nativeHost": "/Users/kharder/.codex/worktrees/skill-maintenance/gh-skillview/src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview",
+        "gh": "gh version 2.102.0 (2026-09-30)",
+        "fixtures": [
+          {
+            "shared": false,
+            "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+            "stagedNativeDirectoryPromoted": true,
+            "originalNativeDirectoryRestored": true,
+            "registryBytesUnchanged": true,
+            "unrelatedSameNameUnchanged": true,
+            "nativeProcessKillRestartAndUndoVerified": true,
+            "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+          },
+          {
+            "shared": true,
+            "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+            "stagedNativeDirectoryPromoted": true,
+            "originalNativeDirectoryRestored": true,
+            "registryBytesUnchanged": true,
+            "unrelatedSameNameUnchanged": true,
+            "nativeProcessKillRestartAndUndoVerified": true,
+            "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+          }
+        ]
+      }
+    ],
+    "fullSuiteBeforeFinalWhitespaceRegression": {
+      "passed": 1161,
+      "failed": 0,
+      "skipped": 0
+    },
+    "finalFullSuite": {
+      "passed": 1162,
+      "failed": 0,
+      "skipped": 0
+    },
+    "style": "passed"
+  },
+  "requiredBeforeMerge": [
+    "Both native AOT hosts with minimum/current gh proofs",
+    "Linux/macOS/Windows tests and four-RID native CI proof"
+  ],
+  "remaining": "Original all-21 acceptance ledger remains incomplete; recorded restoration does not implement newer-revision/owner transitions or general maintenance topology."
+}

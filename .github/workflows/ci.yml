@@ -148,3 +148,10 @@ jobs:
         run: |
           python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
           python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json
+      - name: Prove recorded restoration and undo with real gh and native hosts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/replacement-app-proof.json
+          python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/replacement-extension-proof.json
