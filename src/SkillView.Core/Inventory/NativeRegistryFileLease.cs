@@ -12,6 +12,7 @@ internal abstract class NativeRegistryFileLease : IDisposable
     private bool disposed;
     protected abstract FileStream File { get; }
     internal abstract string CanonicalPath { get; }
+    internal abstract SecureFileIdentity ParentIdentity { get; }
     protected abstract SecureFileIdentity CurrentIdentity(CancellationToken token);
     protected abstract void ValidateNative(CancellationToken token);
     protected abstract void FlushNative(CancellationToken token);

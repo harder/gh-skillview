@@ -22,7 +22,8 @@ internal sealed record ReplacementRevision(ResolvedSkillRevision Source, SkillFr
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerTransition? Owner = null);
 
 internal sealed record ReplacementOwnerTransition(string RegistryPath, string Selector, SecureFileIdentity Identity,
-    byte[] BeforeEntry, byte[] DesiredEntry, string BeforeFingerprint, string DesiredFingerprint, DateTimeOffset UpdatedAt);
+    byte[] BeforeEntry, byte[] DesiredEntry, string BeforeFingerprint, string DesiredFingerprint, DateTimeOffset UpdatedAt,
+    SecureFileIdentity ParentIdentity);
 
 internal sealed record ReplacementOwnerObservation(string State, string RegistryPath, string Selector,
     string Hash, int Bytes, SecureFileIdentity Identity,

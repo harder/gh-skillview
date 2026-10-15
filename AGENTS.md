@@ -752,3 +752,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Keep missing/partial main and raw intent publication, live compensation, and
   actual process-kill restart proofs. See `agent_docs/maintenance-update-owner-transitions.md`
   and the proof-only host instructions in `agent_docs/running-tests.md`.
+  Persist the held registry parent's full native identity/generation across
+  released leases; file IDs alone cannot distinguish Unix inode reuse from
+  permitted in-place data edits. Initialize validated private state ancestors
+  before capturing that witness when state is beneath `.agents`; never refresh
+  it after staging to accept an unexplained namespace change.

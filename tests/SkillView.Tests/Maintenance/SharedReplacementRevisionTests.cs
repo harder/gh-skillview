@@ -34,7 +34,7 @@ public sealed class SharedReplacementRevisionTests : IDisposable
         File.WriteAllText(Registry, OriginalRegistry);
     }
     public void Dispose() => temporary.Delete(true);
-    private ReplacementPlanStore Store(Action<string>? checkpoint = null) => new(State, new Logger(), checkpoint,
+    private ReplacementPlanStore Store(Action<string>? checkpoint = null, string? stateRoot = null) => new(stateRoot ?? State, new Logger(), checkpoint,
         new ProcessRunner(new Logger(), environment: new Dictionary<string, string>
         {
             ["HOME"] = Home,
@@ -182,6 +182,55 @@ public sealed class SharedReplacementRevisionTests : IDisposable
         Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
         Assert.Equal(original.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
         Assert.False(Directory.Exists(plan.RetainedPath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegistryParentGenerationChangeRefusesApplyOrTornRepairWithoutPayloadMutation(bool torn)
+    {
+        var plan = torn ? await TornPlan() : await Plan();
+        var original = PayloadSnapshot.Capture(Payload, Token);
+        var bytes = File.ReadAllBytes(Registry);
+        using (var registry = NativeRegistryFileLease.Open(Registry, Token))
+            Assert.Equal(plan.Revision!.Owner!.ParentIdentity, registry.ParentIdentity);
+        File.WriteAllText(Path.Combine(Path.GetDirectoryName(Registry)!, "other-entry"), "Namespace change");
+        if (torn) Assert.Throws<IOException>(() => Store().Inspect(plan.Id, Inventory(), Token));
+        else Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
+        Assert.Equal(bytes, File.ReadAllBytes(Registry));
+        Assert.Equal(original.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
+        Assert.Equal(original.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        if (!torn) Assert.False(Directory.Exists(plan.RetainedPath));
+    }
+
+    [Fact]
+    public async Task RegistryParentGenerationChangeDuringStagingRefusesPlanPublication()
+    {
+        var inventory = Inventory(); var original = PayloadSnapshot.Capture(Payload, Token);
+        await Assert.ThrowsAsync<IOException>(() => Store().PlanUpdateAsync(Assert.Single(inventory.Skills), inventory, Source,
+            async (directory, token) =>
+            {
+                await Stage(directory, token);
+                File.WriteAllText(Path.Combine(Path.GetDirectoryName(Registry)!, "other-entry"), "Namespace change");
+            }, Base, false, Token));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+        Assert.Equal(original.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
+        Assert.Equal(original.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Empty(Directory.EnumerateFiles(State, "plan.json", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task FirstSharedPlanWithStateUnderRegistryParentInitializesBeforeCapturingWitness()
+    {
+        var nestedState = Path.Combine(Path.GetDirectoryName(Registry)!, "SkillView", "replacements");
+        Assert.False(Directory.Exists(Path.GetDirectoryName(nestedState)));
+        var store = Store(stateRoot: nestedState);
+        var plan = await Plan(store);
+        Assert.True(store.Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token).Succeeded);
+        var inspected = store.Inspect(plan.Id, Inventory(), Token);
+        var undo = store.Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), true, Token);
+        Assert.True(undo.Succeeded, undo.Message);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
     }
 
     [Fact]

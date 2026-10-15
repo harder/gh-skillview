@@ -85,6 +85,7 @@ internal sealed partial class UnixSecureRemovalBackend
     {
         protected override FileStream File => stream;
         internal override string CanonicalPath => canonical;
+        internal override SecureFileIdentity ParentIdentity => parentIdentity;
         private SafeUnixHandle BorrowFile() => new(stream.SafeFileHandle.DangerousGetHandle().ToInt32(), ownsHandle: false);
         protected override SecureFileIdentity CurrentIdentity(CancellationToken token)
         {
@@ -99,7 +100,7 @@ internal sealed partial class UnixSecureRemovalBackend
             using var buffer = new StatBuffer();
             var heldParent = ToSecureIdentity(ReadStat(parent, buffer.Pointer), ReadFinalPath(parent));
             var heldFile = CurrentIdentity(token);
-            if (!NativeDirectoryMoveLease.SameObject(parentIdentity, heldParent)
+            if (parentIdentity != heldParent
                 || heldParent.CanonicalPath != Path.GetDirectoryName(canonical) || heldFile.CanonicalPath != canonical
                 || heldFile.IsDirectory || heldFile.IsReparsePoint
                 || !TryReadStatAt(parent, name, buffer.Pointer, out var named, out _)

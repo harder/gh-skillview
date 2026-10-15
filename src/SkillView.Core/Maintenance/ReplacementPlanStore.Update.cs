@@ -50,8 +50,9 @@ internal sealed partial class ReplacementPlanStore
             PinnedRef = null,
             Pinned = false
         };
-        var revision = new ReplacementRevision(source, desired, null, [], PrepareOwner(target, source, token));
+        var revision = new ReplacementRevision(source, desired, null, []);
         ValidateSource(target.FrontMatter, revision);
+        revision = revision with { Owner = PrepareOwner(target, source, inventory, token) };
         return PlanCoreAsync(target, inventory, stage, revision, stageBase, token);
     }
 

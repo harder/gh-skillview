@@ -25,6 +25,7 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
     {
         if (!OperatingSystem.IsWindows()) System.IO.File.SetUnixFileMode(Registry, (UnixFileMode)416);
         using var lease = NativeRegistryFileLease.Open(Registry, Token);
+        var parentIdentity = lease.ParentIdentity;
         var before = lease.Read(Token);
         var desired = Encoding.UTF8.GetBytes("desired registry contents\n");
         var after = lease.Write(before, desired, Token);
@@ -35,6 +36,31 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
         if (!OperatingSystem.IsWindows()) Assert.Equal((UnixFileMode)416, System.IO.File.GetUnixFileMode(Registry));
         lease.Dispose();
         Assert.Equal(desired, System.IO.File.ReadAllBytes(Registry));
+        using var reopened = NativeRegistryFileLease.Open(Registry, Token);
+        Assert.Equal(parentIdentity, reopened.ParentIdentity);
+        Assert.Equal(desired, reopened.Read(Token).Bytes);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ParentEntryGenerationChangesRefuseDespiteUnchangedRegistryObjectAndBytes(bool removeEntry)
+    {
+        using var lease = NativeRegistryFileLease.Open(Registry, Token);
+        var parent = lease.ParentIdentity;
+        var before = lease.Read(Token);
+        var entry = Path.Combine(Parent, "namespace-change");
+        System.IO.File.WriteAllText(entry, "Namespace generation changed");
+        if (removeEntry) System.IO.File.Delete(entry);
+        var method = lease.GetType().GetMethod("CurrentIdentity", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var identity = Assert.IsType<SecureFileIdentity>(method.Invoke(lease, [Token]));
+        Assert.Equal(before.Identity, identity);
+        Assert.Throws<IOException>(() => lease.Write(before, Encoding.UTF8.GetBytes("replacement"), Token));
+        Assert.False(lease.MutationAttempted);
+        lease.Dispose();
+        using var reopened = NativeRegistryFileLease.Open(Registry, Token);
+        Assert.NotEqual(parent, reopened.ParentIdentity);
+        Assert.Equal(Original, reopened.Read(Token).Bytes);
     }
 
     [Fact]

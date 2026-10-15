@@ -27,6 +27,7 @@ internal sealed class GhRegistryWriteSession : IDisposable
     private readonly Action<string>? checkpoint;
     private readonly string selector;
     internal string CanonicalPath => lease.CanonicalPath;
+    internal SecureFileIdentity ParentIdentity => lease.ParentIdentity;
     internal GhRegistryWriteSession(string path, string selector, Logger logger, CancellationToken token, Action<string>? checkpoint = null, bool rawRecovery = false)
     {
         this.logger = logger; this.selector = selector; this.checkpoint = checkpoint;

@@ -39,6 +39,7 @@ internal sealed partial class WindowsSecureRemovalBackend
     {
         protected override FileStream File => stream;
         internal override string CanonicalPath => canonical;
+        internal override SecureFileIdentity ParentIdentity => ToSecureIdentity(parentIdentity, Path.GetDirectoryName(canonical)!);
         protected override SecureFileIdentity CurrentIdentity(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -50,7 +51,7 @@ internal sealed partial class WindowsSecureRemovalBackend
             var heldParent = ReadIdentity(parent);
             var heldFile = ReadIdentity(stream.SafeFileHandle);
             using var named = OpenEntryAt(parent, name, directory: false, enumerateDirectory: false, requestDeleteAccess: false);
-            if (!NativeDirectoryMoveLease.SameObject(ToSecureIdentity(parentIdentity, ""), ToSecureIdentity(heldParent, ""))
+            if (ToSecureIdentity(heldParent, ReadFinalPath(parent)) != ParentIdentity
                 || ReadFinalPath(parent) != Path.GetDirectoryName(canonical) || ReadFinalPath(stream.SafeFileHandle) != canonical
                 || heldFile.IsDirectory || heldFile.IsReparsePoint || !Matches(heldFile, ReadIdentity(named)))
                 throw new IOException("Registry parent, address or native file identity changed.");

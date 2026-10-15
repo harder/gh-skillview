@@ -8,7 +8,7 @@ namespace SkillView.Maintenance;
 
 internal sealed partial class ReplacementPlanStore
 {
-    private ReplacementOwnerTransition? PrepareOwner(InstalledSkill target, ResolvedSkillRevision source, CancellationToken token)
+    private ReplacementOwnerTransition? PrepareOwner(InstalledSkill target, ResolvedSkillRevision source, InventorySnapshot inventory, CancellationToken token)
     {
         var claims = target.AllOwnershipClaims.ToArray();
         if (claims.Length == 0) return null;
@@ -16,6 +16,17 @@ internal sealed partial class ReplacementPlanStore
             || claim.LockFilePath is null || claim.Selector is null || claim.EntryFingerprint is null)
             || claims.Select(claim => (OwnershipPath.EntryAddress(claim.LockFilePath!), claim.Selector, claim.EntryFingerprint)).Distinct().Count() != 1)
             throw new IOException("Update requires one verified shared gh owner; native/exclusive or ambiguous owners require their own transition.");
+        if (inventory.IsPartial || !inventory.ConfiguredRootsComplete)
+            throw new IOException("Shared update planning requires complete inventory before initializing private state.");
+        // A configured state home may be beneath .agents (outside skills).
+        // Create its private ancestors before capturing the registry namespace
+        // witness; never refresh that witness after staging begins.
+        CheckPlacement(inventory);
+        using (var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token))
+        {
+            using var writer = state.OpenFile("writer.lock", true, token);
+            CheckWriter(writer);
+        }
         var claim = claims[0];
         using var held = new GhRegistryWriteSession(claim.LockFilePath!, claim.Selector!, logger, token);
         if (!PathIdentity.Equals(held.CanonicalPath, GlobalRegistryPath()))
@@ -26,7 +37,7 @@ internal sealed partial class ReplacementPlanStore
         var before = GhRegistryEditor.CaptureEntry(patch.BeforeBytes, claim.Selector!, token);
         var desired = GhRegistryEditor.CaptureEntry(patch.DesiredBytes, claim.Selector!, token);
         var transition = new ReplacementOwnerTransition(held.CanonicalPath, claim.Selector!, snapshot.Identity,
-            before.Bytes, desired.Bytes, before.Fingerprint, desired.Fingerprint, updated);
+            before.Bytes, desired.Bytes, before.Fingerprint, desired.Fingerprint, updated, held.ParentIdentity);
         ValidateOwnerTransition(target.FrontMatter, claims.ToImmutableArray(), source, transition, token);
         return transition;
     }
@@ -74,6 +85,8 @@ internal sealed partial class ReplacementPlanStore
             || Path.GetFileName(transition.RegistryPath) != SkillLockFileReader.FileName
             || transition.Identity.IsDirectory || transition.Identity.IsReparsePoint
             || transition.Identity.CanonicalPath != transition.RegistryPath || claims.IsEmpty
+            || !transition.ParentIdentity.IsDirectory || transition.ParentIdentity.IsReparsePoint
+            || transition.ParentIdentity.CanonicalPath != Path.GetDirectoryName(transition.RegistryPath)
             || transition.BeforeEntry is null || transition.DesiredEntry is null
             || !QuarantineStore.ValidHash(transition.BeforeFingerprint) || !QuarantineStore.ValidHash(transition.DesiredFingerprint)
             || claims.Any(claim => claim.Provider != "gh-vercel-global" || claim.ReadOnly || claim.IsExclusiveOwner
@@ -152,6 +165,8 @@ internal sealed partial class ReplacementPlanStore
         internal ReplacementOwnerObservation Observe(CancellationToken token)
         {
             var snapshot = Held.Read(token);
+            if (Held.ParentIdentity != Transition.ParentIdentity)
+                throw new IOException("The saved registry parent identity or generation changed; no owner mutation was admitted.");
             if (!NativeDirectoryMoveLease.SameObject(Transition.Identity, snapshot.Identity))
                 throw new IOException("The saved registry file object was replaced; no owner mutation was admitted.");
             if (GhRegistryWriteSession.MalformedJson(snapshot.Bytes))

@@ -637,3 +637,19 @@ per-target queue described in `maintenance-update-plans.md`; sibling plans
 prepared together cannot silently bypass generation changes. Final workflow
 review, exact-source full/platform/native checks and PR merge remain. All 21
 original findings retain their final acceptance obligations.
+
+## Batch 6 refinement: registry namespace witness
+
+Saved shared updates now retain the held registry parent's full native identity
+and generation across planning and execution leases. This refuses namespace
+replacement/reuse even when the registry file ID and selected bytes match,
+while ordinary in-place manager writes remain supported. Validated private state
+ancestors are initialized before the witness so a state home beneath `.agents`
+does not invalidate its own first plan; staging never refreshes that witness.
+
+Independent review/re-review found no remaining actionable source issues. The
+exact refinement passes all 1,303 default tests, zero-warning/error build, style,
+and actual minimum/current gh data-file lock contracts. See
+`evidence/maintenance-batch-6-registry-parent-checkpoint.json`. Earlier native
+runtime results remain attributed to their prior checkpoint; final native and
+platform proof and ordinary CLI/TUI routing remain pending.
