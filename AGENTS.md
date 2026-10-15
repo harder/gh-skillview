@@ -88,6 +88,19 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Critical agent notes
 
+- Saved revision updates use schema 2 replacement plans, retaining the recorded
+  base and explicit local-change/pin review. Keep schema 1 recorded-restore
+  fingerprints compatible by omitting absent revision fields. Registry writes
+  must hold gh's DATA FILE lock through payload and owner transitions and keep
+  the same file object; replacing its pathname breaks coordination. While a
+  native registry lease is held, read through its handle (Windows byte locks
+  reject second-handle reads). NativeStateDirectory publication requires its
+  `writer.lock` handle to remain open. See `agent_docs/maintenance-update-plans.md`.
+  Unix registry owners must explicitly `LOCK_UN` before closing, including
+  failed initialization after acquisition: a fork can retain the open file
+  description temporarily even with CLOEXEC. Duplicate-descriptor regressions
+  must use the verified `DupWithRetry` (`F_DUPFD_CLOEXEC`) helper.
+
 - `GhPlacementCatalog` is the authority for gh placement paths. Filesystem
   discovery and UI/Doctor detection derive from it, retaining explicitly
   documented native/legacy paths separately. Shared `.agents` placements are

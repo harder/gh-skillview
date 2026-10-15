@@ -17,10 +17,14 @@ internal sealed record ReplacementSubject(string InstallationId, string Name, Sc
     ImmutableArray<AgentMembership> Agents, SkillFrontMatter Metadata,
     ImmutableArray<SkillPackage> Owners);
 
+internal sealed record ReplacementRevision(ResolvedSkillRevision Source, SkillFrontMatter DesiredMetadata,
+    ReplacementEvidence? RecordedBase, ImmutableArray<string> LocalChanges);
+
 internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purpose, DateTimeOffset CreatedAt,
     string OriginalPath, string RootPath, SecureFileIdentity RootIdentity, SecureFileIdentity ParentIdentity,
     ReplacementSubject Subject, string ContextFingerprint, ReplacementEvidence Original,
-    ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint);
+    ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -31,7 +35,8 @@ internal sealed record ReplacementStep(int Sequence, string PlanFingerprint, str
 
 internal sealed record ReplacementResult(string Id, string Status, bool Succeeded, bool MutationObserved,
     bool Canceled, string OriginalPath, string RetainedPath, string CandidatePath, string DisplacedPath,
-    string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode);
+    string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, WriteIndented = true, RespectRequiredConstructorParameters = true)]

@@ -1044,12 +1044,14 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         bool enumerateDirectory,
         bool openReparsePoint = true,
         bool requestDeleteAccess = true,
-        bool requestReadAccess = false)
+        bool requestReadAccess = false,
+        bool requestWriteAccess = false)
     {
         ValidateRelativeEntryName(name);
         var desiredAccess = FileReadAttributes | SynchronizeAccess;
         if (requestDeleteAccess) desiredAccess |= DeleteAccess;
         if (requestReadAccess) desiredAccess |= 0x00000001;
+        if (requestWriteAccess) desiredAccess |= 0x00000002; // FILE_WRITE_DATA
         if (enumerateDirectory) desiredAccess |= FileListDirectory;
         var openOptions = FileOpenForBackupIntent
             | FileSynchronousIoNonAlert;

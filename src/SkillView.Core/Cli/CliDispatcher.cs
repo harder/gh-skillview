@@ -48,7 +48,8 @@ public static partial class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+                    or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -73,7 +74,8 @@ public static partial class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => TimeSpan.FromMinutes(10),
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+            or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -2185,6 +2187,8 @@ public static partial class CliDispatcher
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `update-plan` | Resolve and stage an immutable newer revision, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--unpin`, `--allow-hidden-dirs`, `--json` |
+            | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update using the same fingerprint and disposition contract as restore commands. | `--id`, `--expect`, `--yes`, `--disposition retain-original`, `--json` |
             | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |
             | `restore-apply` | Apply a saved plan, retaining the original directory. | `--id`, `--yes --disposition retain-original --expect`, `--json` |
             | `restore-recover`, `restore-undo` | Resume or undo after inspecting current evidence; never overwrite another object. | `--id`, `--yes --expect`, `--json` |

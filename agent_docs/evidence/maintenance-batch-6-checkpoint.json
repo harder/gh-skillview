@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "batch": 6,
+  "status": "in-progress-checkpoint",
+  "baseCommit": "8639e6fe0d95d93294aa6f03145753fe4688a2e4",
+  "scope": "Ownerless saved revision update CLI and standalone preserving registry transaction components; full batch remains incomplete",
+  "localVerification": {
+    "build": "zero warnings/errors",
+    "defaultSuite": {
+      "passed": 1264,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/tmp/skillview-update-plan-final-full-suite.log",
+      "contractOptIn": false
+    },
+    "focused": {
+      "registryLease": 11,
+      "registryWriteSession": 10,
+      "revisionResolver": 30,
+      "replacementRevision": 10
+    },
+    "actualGhDataFileContention": [
+      "2.97.0",
+      "2.102.0"
+    ],
+    "nativeAotPublishes": [
+      "SkillView.App/osx-arm64",
+      "SkillView.GhExtension/osx-arm64"
+    ],
+    "style": "passed",
+    "lockedRestore": "passed",
+    "siteBuild": "passed",
+    "actualGhDataFileContentionLogs": [
+      "/tmp/skillview-registry-specific-gh-minimum.log",
+      "/tmp/skillview-registry-specific-gh-current.log"
+    ]
+  },
+  "review": {
+    "independentReviewer": "consumer_final_review",
+    "cycles": "review, fixes, re-review",
+    "addressed": [
+      "legacy source subpath and no-tag resolution parity",
+      "recorded-base state directory admission",
+      "baseline staging retained-location diagnostics",
+      "Parsed candidate metadata replaces stale authored/metadata projections",
+      "Whole-file recovery review rejects intervening unrelated bytes",
+      "Explicit Unix data-file unlock on disposal and failed initialization, including retained duplicate descriptions",
+      "Deterministic close-on-exec duplicate and cancellation regressions",
+      "Private HOME contract fixture captures existing authentication before isolation and checks specific lock-acquisition refusal"
+    ],
+    "remainingComponentFindings": []
+  },
+  "proofs": [
+    {
+      "file": "/tmp/skillview-maintenance/update-plan/reviewed-debug-proof.json",
+      "sha256": "7215378fadb4498058c0dbcd84b44465a2c3be29d839125b2ddad48f5a6dd492",
+      "results": [
+        {
+          "host": "/Users/kharder/.codex/worktrees/skill-maintenance/gh-skillview/src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview",
+          "gh": "gh version 2.97.0 (2026-07-31)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        },
+        {
+          "host": "/Users/kharder/.codex/worktrees/skill-maintenance/gh-skillview/src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "/tmp/skillview-maintenance/update-plan/final-aot-app-proof.json",
+      "sha256": "b2c92a47d4f3716b2bb42b907bfc87858dfd4aef824df34bf395955d44ec84c2",
+      "results": [
+        {
+          "host": "/private/tmp/skillview-maintenance/update-plan/aot-app/skillview",
+          "gh": "gh version 2.97.0 (2026-07-31)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        },
+        {
+          "host": "/private/tmp/skillview-maintenance/update-plan/aot-app/skillview",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "/tmp/skillview-maintenance/update-plan/final-aot-ext-proof.json",
+      "sha256": "828635cac800ddd882fe3e9306155d190dc5dc1b0dd59a0e99ad25912d9eec6f",
+      "results": [
+        {
+          "host": "/private/tmp/skillview-maintenance/update-plan/aot-ext/gh-skillview",
+          "gh": "gh version 2.97.0 (2026-07-31)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        },
+        {
+          "host": "/private/tmp/skillview-maintenance/update-plan/aot-ext/gh-skillview",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "fixtures": [
+            {
+              "namespaced": false,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            },
+            {
+              "namespaced": true,
+              "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+              "approvedRevision": {
+                "repository": "https://github.com/cli/cli",
+                "ref": "refs/tags/v2.102.0",
+                "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "subpath": "skills/gh-skill"
+              },
+              "explicitUnpinVerified": true,
+              "localChangesReviewedAndOriginalRestored": true,
+              "approvedNativeStagePromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "processKillRestartRecoveryAndUndo": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "remainingBeforeBatchMerge": [
+    "Shared gh owner transition integration across held registry and payload moves",
+    "Same-handle phase-aware live owner observations",
+    "Reviewed torn-registry inspection and process-death repair",
+    "Ordinary update entrypoint and TUI routing through saved immutable plans",
+    "Shared/pinned/namespace/concurrent-owner/recovery proof matrix",
+    "Linux/macOS/Windows tests and four-RID both-host native CI",
+    "Final independent review/re-review and PR merge"
+  ],
+  "originalGoal": "All 21 audit findings remain subject to criterion-by-criterion final acceptance; this checkpoint closes none by itself"
+}

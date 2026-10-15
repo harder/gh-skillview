@@ -563,3 +563,40 @@ both native hosts pass the real-gh proof on all four RIDs. Local AOT hosts also
 pass gh 2.97.0 and 2.102.0 with direct/shared/namespaced fixtures and real process
 kill/restart recovery. Both Copilot findings are resolved after independent
 re-review. See the finalized `evidence/maintenance-batch-5.json`.
+
+## Batch 6 checkpoint: immutable newer revisions and preserving registry sessions
+
+The active batch now provides ownerless saved updates through `update-plan`,
+`update-inspect`, `update-apply`, `update-recover` and `update-undo`. Schema 2 binds
+the resolved commit/source tree, original tracking, desired tracking/unpin,
+recorded base and local differences. Schema 1 restore fingerprints remain
+compatible. Applying promotes the reviewed native candidate without another
+source resolution and retains the original directory for verified undo.
+
+The existing-only native registry lease matches gh's Unix/Windows data-file
+lock, pins the parent/address/file and writes through the same file object.
+The preserving editor can replace one exact selected entry while retaining
+fresh unrelated records and extensions. The standalone write session durably
+records raw before/desired evidence before truncating, attempts bounded live
+preimage restoration after write/cancellation failure under the same lock, and
+retains unattributable foreign bytes for explicit review. It is not yet wired
+into shared payload replacement; those updates remain refused.
+
+Independent review/re-review fixed legacy source-path/no-tag compatibility,
+recorded-base directory admission and incomplete baseline-stage diagnostics.
+Local verification passes 1,264 default-suite tests, style, locked restore and
+site build. Both macOS native AOT hosts publish, with standalone AOT warnings
+promoted to errors. Actual gh 2.97.0 and 2.102.0 processes respect the held data
+lock. Twelve disposable newer-revision CLI fixtures (four debug, eight AOT)
+prove direct/nested namespace updates, explicit unpin, local-change review,
+same-name isolation, unchanged registry bytes, native object continuity and
+real process-kill/restart/recovery/undo. See
+`evidence/maintenance-batch-6-checkpoint.json` and
+`evidence/prove-revision-update.py`.
+
+Batch 6 is not ready to merge: shared owner integration must retain the data
+lock across payload and registry transitions, use same-handle registry reads,
+bind phase-aware owner evidence and offer explicit torn-write review after
+process death. Ordinary product updates/TUI routing and the full platform proof
+remain. The original 21-item objective is unchanged; this checkpoint does not
+close any item's final acceptance.

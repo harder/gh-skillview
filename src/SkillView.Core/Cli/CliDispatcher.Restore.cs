@@ -11,15 +11,20 @@ public static partial class CliDispatcher
 {
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
-        var command = options.SubcommandName!;
+        var requestedCommand = options.SubcommandName!;
+        var command = requestedCommand.StartsWith("update-", StringComparison.Ordinal)
+            ? "restore-" + requestedCommand[7..] : requestedCommand;
+        var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
         string? path = null, installId = null, id = null, expected = null, disposition = null;
         var execute = false;
         var json = false;
         var allowHidden = false;
+        var unpin = false;
         for (var index = 0; index < args.Count; index++)
         {
             if (args[index] == "--allow-hidden-dirs" && !allowHidden) { allowHidden = true; continue; }
+            if (args[index] == "--unpin" && latest && !unpin) { unpin = true; continue; }
             if (args[index] == "--json" && !json) { json = true; continue; }
             if (args[index] == "--yes" && !execute && command is not ("restore-plan" or "restore-inspect")) { execute = true; continue; }
             if (index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
@@ -30,7 +35,7 @@ public static partial class CliDispatcher
                 if (args[index] == "--expect" && command is "restore-apply" or "restore-recover" or "restore-undo" && expected is null) { expected = args[++index]; continue; }
                 if (args[index] == "--disposition" && command == "restore-apply" && disposition is null) { disposition = args[++index]; continue; }
             }
-            Console.Error.WriteLine("skillview: unsupported or incomplete restore argument");
+            Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
             return ExitCodes.InvalidUsage;
         }
         if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
@@ -38,7 +43,7 @@ public static partial class CliDispatcher
             || command == "restore-apply" && (!execute || disposition != "retain-original" || !QuarantineStore.ValidHash(expected!))
             || command is "restore-recover" or "restore-undo" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan needs one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         try
@@ -52,12 +57,13 @@ public static partial class CliDispatcher
             ReplacementResult result;
             if (command == "restore-plan")
             {
-                if (gh is null) throw new IOException("Recorded restore staging requires GitHub CLI.");
+                if (gh is null) throw new IOException("Saved replacement staging requires GitHub CLI.");
                 var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
                     : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
                 if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
                 var target = selected[0];
-                result = await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
+                result = latest ? await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false)
+                    : await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
                 {
                     await new GhRecordedTreeStager(services.Runner).StageIntoAsync(gh, target.FrontMatter.Upstream!, target.TreeSha!, destination, bytes =>
                     {

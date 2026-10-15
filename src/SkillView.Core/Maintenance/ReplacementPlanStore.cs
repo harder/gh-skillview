@@ -12,15 +12,20 @@ namespace SkillView.Maintenance;
 
 /// Saved, exact-payload replacement. Both old and displaced directories are
 /// retained by exclusive native rename; this store never extracts or deletes.
-internal sealed class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
+internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     private const int MaxJournalBytes = 16 * 1024 * 1024;
     private const int MaxSteps = 32;
     private const int MaxPlans = 16;
 
-    internal async Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
-        Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token)
+    internal Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
+        Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token) =>
+        PlanCoreAsync(target, inventory, stage, null, null, token);
+
+    private async Task<ReplacementResult> PlanCoreAsync(InstalledSkill target, InventorySnapshot inventory,
+        Func<NativeStateDirectory, CancellationToken, Task> stage, ReplacementRevision? revision,
+        Func<NativeStateDirectory, CancellationToken, Task>? stageBase, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var canonicalPath = Canonical(target.ResolvedPath);
@@ -66,7 +71,27 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         var desired = candidate.FlushPayload(token);
         var metadata = PayloadSnapshot.Capture(candidatePath, token).FrontMatter
             ?? throw new IOException("Staged skill has no supported metadata.");
-        SameTracking(target.FrontMatter, metadata);
+        SameTracking(revision?.DesiredMetadata ?? target.FrontMatter, metadata);
+        if (revision is not null)
+        {
+            if (metadata.Name != target.FrontMatter.Name)
+                throw new IOException("The candidate changed the authored skill name; review a source migration.");
+            using var baseline = operation.CreateStagingDirectory("recorded-base", token);
+            try { await stageBase!(baseline, token).ConfigureAwait(false); baseline.SealStagingDirectory(493, token); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { throw new IOException($"Recorded-base staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
+            using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, baseline.CanonicalPath, token);
+            var recorded = baseLease.FlushPayload(token);
+            var baseMetadata = PayloadSnapshot.Capture(baseline.CanonicalPath, token).FrontMatter
+                ?? throw new IOException("Recorded base has no supported metadata.");
+            SameTracking(target.FrontMatter, baseMetadata);
+            revision = revision with
+            {
+                DesiredMetadata = metadata,
+                RecordedBase = ReplacementEvidence.From(recorded),
+                LocalChanges = PayloadSnapshot.Differences(recorded, before)
+            };
+        }
         if (desired.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json"))
             throw new IOException("Staged payload contains owner records; use an owner transition plan.");
         original.Revalidate(token);
@@ -76,10 +101,10 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             throw new IOException("Installed payload or context changed while staging; no replacement was admitted.");
         var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents,
             target.FrontMatter, target.AllOwnershipClaims.ToImmutableArray());
-        var plan = new ReplacementPlan(1, id, "restore-recorded", DateTimeOffset.UtcNow, before.Path,
+        var plan = new ReplacementPlan(revision is null ? 1 : 2, id, revision is null ? "restore-recorded" : "update-revision", DateTimeOffset.UtcNow, before.Path,
             original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity,
             subject, context, ReplacementEvidence.From(before), ReplacementEvidence.From(desired),
-            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "");
+            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "", revision);
         plan = plan with { ReviewFingerprint = PlanHash(plan) };
         Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
         return Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
@@ -216,7 +241,13 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         if (Context(subject, inventory, token, plan.Subject.InstallationId) != plan.ContextFingerprint)
             throw new IOException("Ownership, exposures or configured roots changed; the saved plan needs renewed review.");
         operation.ValidateLocation(token);
-        foreach (var privateName in new[] { "candidate", "original", "displaced" })
+        if (plan.Revision?.RecordedBase is { } baseline)
+        {
+            using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "recorded-base"), token);
+            VerifyPayload(baseline, baseLease.Capture(token));
+        }
+        foreach (var privateName in plan.Revision is null ? new[] { "candidate", "original", "displaced" }
+            : new[] { "candidate", "original", "displaced", "recorded-base" })
             QuarantineStore.EnsureNoConsumers(Path.Combine(operation.CanonicalPath, privateName), inventory, token);
         var original = Slot(plan.RootPath, plan.OriginalPath);
         var retained = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "original"));
@@ -480,7 +511,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, "candidate"), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, "plan.json"),
-            plan.Original.Mode, plan.Candidate.Mode);
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision);
 
     private void Write<T>(NativeStateDirectory operation, string name, T value, JsonTypeInfo<T> type, CancellationToken token)
     {
@@ -527,7 +558,9 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
             operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
             var plan = Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (plan.SchemaVersion != 1 || plan.Id != id || plan.Purpose != "restore-recorded"
+            if (!(plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null
+                    || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null)
+                || plan.Id != id
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
                 || PlanHash(plan) != plan.ReviewFingerprint
                 || !QuarantineStore.ValidHash(plan.ReviewFingerprint) || !QuarantineStore.ValidHash(plan.ContextFingerprint)
@@ -541,11 +574,12 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                 || plan.Subject.Owners.Any(owner => owner is null))
                 throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
             ValidateEvidence(plan.Original); ValidateEvidence(plan.Candidate);
+            ValidateRevision(plan, operation.CanonicalPath);
             var stepCount = 0;
             var incompleteJournal = false;
-            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 8).ToArray();
-            if (entries.Length > MaxSteps + 6) throw new IOException("Replacement operation entry budget exceeded.");
-            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery")))
+            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 9).ToArray();
+            if (entries.Length > MaxSteps + 7) throw new IOException("Replacement operation entry budget exceeded.");
+            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base")))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             while (names.Contains($"step-{stepCount:D4}.json"))
@@ -569,7 +603,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                 }
                 stepCount++;
             }
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery")
+            if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base")
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");
             var session = new Session(state, writer, operation, operationWriter, plan, stepCount, incompleteJournal);

@@ -152,6 +152,63 @@ public class GhCliContractTests
     }
 
     [Fact]
+    public async Task GhInstall_CannotRewriteRegistryWhileSkillViewHoldsDataFileLock()
+    {
+        if (!ShouldRun) return;
+        var gh = GhPath();
+        Assert.NotNull(gh);
+        var logger = new Logger();
+        var root = Directory.CreateTempSubdirectory("skillview-registry-lock-contract-");
+        try
+        {
+            var environment = new Dictionary<string, string>(SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(root.FullName));
+            // Capture credentials before changing HOME. Older gh hosts can
+            // resolve keychain/config credentials differently in a private
+            // home; this proof must exercise the registry lock, not auth lookup.
+            var token = System.Environment.GetEnvironmentVariable("GH_TOKEN") ?? System.Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                var credentials = await new ProcessRunner(logger).RunAsync(gh!, ["auth", "token", "--hostname", "github.com"],
+                    cancellationToken: TestContext.Current.CancellationToken);
+                Assert.True(credentials.Succeeded && !credentials.StdOutTruncated, "A configured GitHub credential is required for this opt-in proof.");
+                token = credentials.StdOut.Trim();
+            }
+            Assert.False(string.IsNullOrWhiteSpace(token));
+            environment["GH_TOKEN"] = token;
+            // A null ProcessStartInfo.Environment value removes the inherited
+            // key. No inherited Git redirection may escape this private fixture.
+            foreach (var key in System.Environment.GetEnvironmentVariables().Keys.Cast<string>().Where(key => key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)))
+                environment[key] = null!;
+            environment["GIT_CONFIG_COUNT"] = "0";
+            var runner = new ProcessRunner(logger, environment: environment, defaultWorkingDirectory: root.FullName);
+            var registry = Path.Combine(environment["HOME"], ".agents", ".skill-lock.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
+            byte[] original = System.Text.Encoding.UTF8.GetBytes("{\"version\":3,\"skills\":{},\"dismissed\":{\"fixture\":true}}");
+            File.WriteAllBytes(registry, original);
+            using (var held = SkillView.Inventory.NativeRegistryFileLease.Open(registry, TestContext.Current.CancellationToken))
+            {
+                var blocked = await runner.RunAsync(gh!,
+                    ["skill", "install", "--dir", Path.Combine(root.FullName, "blocked"), "--pin=v2.102.0", "--", "cli/cli", "skills/gh-skill"],
+                    cancellationToken: TestContext.Current.CancellationToken);
+                // gh may finish materializing the disposable payload and report
+                // the owner-write failure as a warning rather than a failed exit.
+                Assert.True(blocked.StdErr.Contains("could not acquire lock after", StringComparison.OrdinalIgnoreCase),
+                    $"Expected the registry lock refusal. gh exit={blocked.ExitCode}\nstdout:\n{blocked.StdOut}\nstderr:\n{blocked.StdErr}");
+                Assert.Equal(original, held.Read(TestContext.Current.CancellationToken).Bytes);
+            }
+            var allowed = await runner.RunAsync(gh!,
+                ["skill", "install", "--dir", Path.Combine(root.FullName, "allowed"), "--pin=v2.102.0", "--", "cli/cli", "skills/gh-skill"],
+                cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(allowed.Succeeded, allowed.StdErr);
+            using var document = JsonDocument.Parse(File.ReadAllBytes(registry));
+            Assert.True(document.RootElement.GetProperty("skills").TryGetProperty("gh-skill", out var installed));
+            Assert.Equal("v2.102.0", installed.GetProperty("pinnedRef").GetString());
+            Assert.True(document.RootElement.GetProperty("dismissed").GetProperty("fixture").GetBoolean());
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
+    [Fact]
     public async Task GhVersion_ProducesParseableOutput()
     {
         if (!ShouldRun) return;
