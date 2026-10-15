@@ -555,3 +555,11 @@ Owner revalidation includes the physical namespace installation root. Focused
 coverage includes source/tree/ref/pin drift, normal and interrupted namespace
 apply/undo with and without README, and newly introduced contextual ownership.
 The native proof also exercises a nested namespaced installation.
+
+PR #52 merged as `178476f7d8b0c9f7ab6cb5dcf4066410f0570c7c` after CI
+38679954928 and CodeQL 38679954897 passed. The merged tree exactly matches the
+reviewed source tree. Final local and three-platform suites pass 1178 tests;
+both native hosts pass the real-gh proof on all four RIDs. Local AOT hosts also
+pass gh 2.97.0 and 2.102.0 with direct/shared/namespaced fixtures and real process
+kill/restart recovery. Both Copilot findings are resolved after independent
+re-review. See the finalized `evidence/maintenance-batch-5.json`.
