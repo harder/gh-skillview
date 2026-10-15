@@ -904,3 +904,23 @@ current checks, same-tree repairs and later remote failures. Exact-head remote
 verification and merge remain required before M07 closure; local results and
 hashes are retained in `evidence/maintenance-batch-10-update-outcomes-checkpoint.json`. See
 `maintenance-update-outcomes.md` for semantics and proof commands.
+
+
+Batch 10 final acceptance: PR #58 merged at
+`9c4df912ffe632b4740bf7c4dd1e537f2beea9a1`, with the same tree as reviewed head
+`9fe638699192e7fcc4e327b55e8f7ed64fee0077`. Copilot found an exact legacy
+owner-transition compatibility regression; persisted tests reproduced it before
+the fix, and actual plans saved by the prior native binary reproduced the same
+inspection refusal. Validation now accepts only exact fresh or historical
+serialization, preserving unapproved-field rejection. Both rebuilt native hosts
+inspect, recover and undo old plans after the old Apply process is killed.
+
+All 13 PR checks pass. Linux, macOS and Windows each pass 1,429 tests without
+failures/skips; the exact-head minimum/current gh lanes each pass all 17 opt-in
+contracts. All 84 native proof files / 292 fixture rows across four RIDs were
+inspected, including 48 outcome rows. Final independent source, ownership,
+evidence and original-criterion reviews are clear. Full final-source results,
+hashes, legacy restart proofs and remote artifact attribution are retained in
+`evidence/maintenance-batch-10-final.json`; the earlier checkpoint remains
+historical evidence and is not attributed to the compatibility fix.
+M01, M02, M04, M05, M06 and M07 are complete; 15 original items remain.
