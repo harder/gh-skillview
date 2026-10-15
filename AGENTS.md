@@ -833,3 +833,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   admission correctly refuses a second global-selector overwrite. Capture gh
   credentials before changing fixture HOME; keychain-backed lookup afterward
   can become unauthenticated. Preserve all update/local-change assertions.
+
+- Retention output must distinguish observed directories from broken links and
+  unknown historical materialization. Freeze the subject before work; only a
+  verified capture or recorded transition may strengthen its retention evidence.
+  An updater exception after mutation admission requires bounded verification,
+  inventory invalidation and conservative mutation accounting. Failure callbacks
+  must retain the requested operation (for example, `undo`).
+- Cleanup cancellation and unexpected failure must preserve duplicate skips and
+  exact partial mutation totals through both progress throttles. Accumulate one
+  terminal report per attempt, including failed attempts, so workflow rescans
+  cannot miss a deleted file. Keep retry and omitted-attempt-state coverage.

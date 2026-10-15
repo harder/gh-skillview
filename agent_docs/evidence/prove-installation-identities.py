@@ -140,6 +140,8 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
         assert {'one', 'two'} <= {exposure['profile'] for exposure in preview['impact']['affectedExposures']}
         update = run(['update', '--path', pinned, '--dry-run'])
         assert update['outcomes'][0]['status'] == 'pinned', update
+        assert update['outcomes'][0]['impact']['payloadRetained']
+        assert Path(update['outcomes'][0]['impact']['retainedPayloadPath']).samefile(pinned)
         assert update['outcomes'][0]['impact']['subject']['installationId'] == pinned_row['installationId']
         managed = run(['remove', '--path', plugins[0], '--yes'], expected=1)
         assert not managed['succeeded'] and managed['impact']['subject']['distributors'], managed
@@ -171,6 +173,14 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
         assert unchanged_fixture() == before_refusals
         broken = custom / 'dangling'
         broken.symlink_to(root / 'missing-payload', target_is_directory=True)
+        backup_broken = run(['backup', '--path', broken], expected=10)
+        assert not backup_broken['succeeded']
+        for outcome in (backup_broken, run(['update', '--path', broken])['outcomes'][0],
+                        run(['update', '--path', broken, '--dry-run'])['outcomes'][0]):
+            assert outcome['impact']['subject']['materialization'] == 'broken-link'
+            assert not outcome['impact']['payloadRetained']
+            assert outcome['impact']['retainedPayloadPath'] is None
+        assert broken.is_symlink()
         cleanup = run(['cleanup', '--candidates', 'BrokenSymlink', '--apply', '--yes'])
         assert len(cleanup['applied']) == 1, cleanup
         impact = cleanup['applied'][0]['impact']
@@ -200,6 +210,7 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
                             nativeObjectGenerationIndependentlyVerified=True,
                             managedRefusalRetainsSubject=True, exactSelectorsRequired=True,
                             quarantinePreviewRetainsOriginal=True, brokenUnlinkDoesNotInventRetainedPayload=True,
+                            brokenBackupAndUpdatesDoNotInventRetainedPayload=True,
                             resolvedCommitAndPayloadHashNotInvented=True, networkProxiesBlocked=True, fixtures=rows))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2) + '\n')

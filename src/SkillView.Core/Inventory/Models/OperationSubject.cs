@@ -130,6 +130,18 @@ public sealed record OperationImpact(OperationSubject Subject, string Operation,
     internal static OperationImpact Payload(OperationSubject subject, string operation) => new(subject, operation,
         subject.Path, false, subject.Exposures, [], subject.ExposureCoverageComplete, subject.ExposureCoverage);
 
+    internal static OperationImpact ObservedRetention(OperationSubject subject, string operation)
+    {
+        var retained = subject.Materialization == "directory";
+        return Payload(subject, operation) with
+        {
+            PayloadRetained = retained,
+            RetainedPayloadPath = retained ? subject.Path : null,
+            RetentionEvidence = retained ? "inventory-observed-directory; no payload mutation attempted"
+                : subject.Materialization == "broken-link" ? "inventory-observed-broken-link; no payload observed" : "payload materialization unrecorded"
+        };
+    }
+
     internal static OperationImpact Link(OperationSubject subject, AgentMembership link)
     {
         var entry = subject.Exposures.FirstOrDefault(exposure => exposure.Membership == link)?.EntryKey;

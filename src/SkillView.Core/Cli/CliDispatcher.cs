@@ -557,7 +557,7 @@ public static partial class CliDispatcher
                 new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger, runner: services.Runner,
-                subjectObserved: impact => frozenImpact = impact);
+                subjectObserved: impact => frozenImpact = impact with { Operation = command! });
             IReadOnlyList<SkillView.Maintenance.QuarantineResult> results;
             if (command == "quarantine-history") results = await Task.Run(() => store.History(inventory, token), token).ConfigureAwait(false);
             else if (command == "undo") results = [await Task.Run(() => store.Undo(id!, inventory, execute, token), token).ConfigureAwait(false)];
@@ -695,13 +695,19 @@ public static partial class CliDispatcher
             : PathIdentity.Equals(skill.ResolvedPath, path!) || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path!))).ToArray();
         if (selected.Length != 1)
         { Console.Error.WriteLine("skillview: backup selector must identify one captured payload; include its --scan-root before backup"); return ExitCodes.NoMatches; }
-        var impact = OperationImpact.Payload(OperationSubject.From(selected[0]), "backup") with { PayloadRetained = true };
+        var impact = OperationImpact.ObservedRetention(OperationSubject.From(selected[0]), "backup");
         try
         {
             if (!snapshot.ConfiguredRootsComplete) throw new IOException("Configured agent/workspace root coverage is incomplete; resolve omitted or unavailable contexts before backup.");
             var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner), services.Runner);
             var record = await Task.Run(() => store.Capture(selected[0], token, snapshot.Skills,
                 snapshot.ProtectedRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
+            impact = impact with
+            {
+                PayloadRetained = true,
+                RetainedPayloadPath = record.Path,
+                RetentionEvidence = "verified-backup-capture; original payload was not mutated"
+            };
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", true);

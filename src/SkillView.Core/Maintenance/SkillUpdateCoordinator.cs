@@ -49,6 +49,7 @@ public sealed class SkillUpdateCoordinator(
             string? staging = null;
             OwnedDirectoryLease? stagingOwner = null;
             var targetAttempted = false;
+            var mutationAdmissionUncertain = false;
             IReadOnlyDictionary<string, string>? mutationEnvironment = null;
             try
             {
@@ -183,7 +184,11 @@ public sealed class SkillUpdateCoordinator(
                         ProcessEnvironment = mutationEnvironment
                     };
                     ManagedSkillDiscovery.RefuseTarget(target, cancellationToken, sourceRunner ?? updater.Runner);
+                    // Until a result returns, an adapter exception cannot prove
+                    // the original payload was left untouched.
+                    mutationAdmissionUncertain = !options.DryRun;
                     var result = await updater.UpdateAsync(ghPath, exact, cancellationToken).ConfigureAwait(false);
+                    mutationAdmissionUncertain = result.MutationAttempted;
                     targetAttempted = result.MutationAttempted;
                     attempted |= targetAttempted;
                     AppendBounded(stdout, result.StdOut);
@@ -212,8 +217,9 @@ public sealed class SkillUpdateCoordinator(
             { failed = true; status = "refused"; message = ex.Message; }
             finally
             {
-                if (targetAttempted)
+                if (targetAttempted || mutationAdmissionUncertain)
                 {
+                    attempted = true;
                     catalog.Invalidate();
                     using var verification = new CancellationSource(TimeSpan.FromSeconds(3),
                         CancellationCallbackReporter.For(logger, "update verification"));
@@ -236,13 +242,13 @@ public sealed class SkillUpdateCoordinator(
                 ? PayloadSnapshot.Differences(before, after, ignoreInstallerMetadata: false) : [];
             outcomes.Add(new(target.InstallationId, target.ResolvedPath, status, before?.Fingerprint,
                 after?.Fingerprint, changedFiles.Take(128).ToImmutableArray(), changedFiles.Length, exposures, message)
-            { Impact = impact });
+            { Impact = targetAttempted || mutationAdmissionUncertain ? impact : OperationImpact.ObservedRetention(impact.Subject, impact.Operation) });
             if (canceled) break;
         }
         foreach (var target in targets.Where(t => !seen.Contains(t.InstallationId)))
             outcomes.Add(new(target.InstallationId, target.ResolvedPath, "not-attempted", null, null, [], 0,
                 target.Agents.Select(a => $"{a.AgentId}: {a.Path}").ToImmutableArray(), "Canceled before this target.")
-            { Impact = OperationImpact.Payload(OperationSubject.From(target), options.DryRun ? "update-preview" : "update") });
+            { Impact = OperationImpact.ObservedRetention(OperationSubject.From(target), options.DryRun ? "update-preview" : "update") });
         return new UpdateResult
         {
             DryRun = options.DryRun,

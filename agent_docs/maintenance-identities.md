@@ -126,3 +126,15 @@ The shared frozen impact is now marked retained at the verified current path
 before JSON/text rendering. The real-gh Native AOT proof reproduced the previous
 false `payloadRetained` result; update-outcomes now asserts retention for both
 ordinary and direct no-op checks. Final-source gates restart for this correction.
+
+
+Final follow-up review corrects backup and refused-update retention for broken
+links, retains the requested undo operation on failure, and preserves cleanup
+duplicate skips plus partial mutation totals on cancellation and unexpected
+failure. Fault snapshots bypass both progress throttles; each attempt contributes
+once to lifetime mutation totals. An adapter exception after update admission now
+invalidates inventory and triggers bounded verification without claiming the
+original payload survived. Two independent source re-reviews are clear. Focused
+CLI 74/74, cleanup 24/24 and removal 40/40 tests pass; disposable debug-host proofs
+confirm broken-link retention and occupied-destination undo evidence. Full final
+suite, final AOT hosts, remote gates and merge remain required before closing M11.

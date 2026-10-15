@@ -188,8 +188,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         new(target.InstallationId, target.ResolvedPath, status, null, null, [], 0,
             target.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(), message)
         {
-            Impact = OperationImpact.Payload(OperationSubject.From(target), "update-prepare") with
-            { PayloadRetained = true, RetainedPayloadPath = target.ResolvedPath }
+            Impact = OperationImpact.ObservedRetention(OperationSubject.From(target), "update-prepare")
         };
 
     private static InstallationUpdateOutcome FromPlan(ReplacementResult plan, string status, string message) =>

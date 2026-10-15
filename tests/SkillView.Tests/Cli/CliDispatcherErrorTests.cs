@@ -118,6 +118,23 @@ public class CliDispatcherErrorTests : IDisposable
     }
 
     [Fact]
+    public async Task BackupBrokenLinkReportsNoRetainedPayloadWithoutDeletingEntry()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "broken-backup")).FullName;
+        var link = Path.Combine(root, "dangling");
+        Directory.CreateSymbolicLink(link, Path.Combine(_tempRoot, "absent-payload"));
+        var (code, output, _) = await RunCliAsync("skillview", "--scan-root", root, "backup", "--path", link, "--json");
+        Assert.Equal(ExitCodes.EnvironmentError, code);
+        using var result = JsonDocument.Parse(output);
+        Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
+        var impact = result.RootElement.GetProperty("impact");
+        Assert.Equal("broken-link", impact.GetProperty("subject").GetProperty("materialization").GetString());
+        Assert.False(impact.GetProperty("payloadRetained").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, impact.GetProperty("retainedPayloadPath").ValueKind);
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
     public async Task QuarantinePreviewReportsPayloadRetainedAtOriginalPathWithoutMutation()
     {
         var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "quarantine-skills")).FullName;
@@ -135,6 +152,36 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.Contains("preview", impact.GetProperty("retentionEvidence").GetString());
         Assert.Equal(markdown, File.ReadAllText(Path.Combine(target, "SKILL.md")));
         Assert.False(Directory.Exists(operation.GetProperty("retainedPath").GetString()));
+    }
+
+    [Fact]
+    public async Task UndoRefusalRetainsRequestedOperationAndRecordedSubject()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "undo-skills")).FullName;
+        var target = Directory.CreateDirectory(Path.Combine(root, "demo")).FullName;
+        File.WriteAllText(Path.Combine(target, "SKILL.md"), "---\nname: demo\ndescription: Fixture\n---\nOriginal\n");
+        var (previewCode, previewOutput, _) = await RunCliAsync("skillview", "--scan-root", root, "quarantine", "--path", target, "--json");
+        Assert.Equal(ExitCodes.Success, previewCode);
+        using var preview = JsonDocument.Parse(previewOutput);
+        var fingerprint = preview.RootElement.GetProperty("operations")[0].GetProperty("reviewFingerprint").GetString()!;
+        var (applyCode, applyOutput, _) = await RunCliAsync("skillview", "--scan-root", root, "quarantine", "--path", target,
+            "--yes", "--standalone", "--expect", fingerprint, "--json");
+        Assert.Equal(ExitCodes.Success, applyCode);
+        using var applied = JsonDocument.Parse(applyOutput);
+        var operation = applied.RootElement.GetProperty("operations")[0];
+        var id = operation.GetProperty("id").GetString()!;
+        var installationId = operation.GetProperty("impact").GetProperty("subject").GetProperty("installationId").GetString();
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "replacement"), "keep occupied destination");
+        var (undoCode, undoOutput, _) = await RunCliAsync("skillview", "--scan-root", root, "undo", "--id", id, "--yes", "--json");
+        Assert.Equal(ExitCodes.UserError, undoCode);
+        using var refusal = JsonDocument.Parse(undoOutput);
+        Assert.False(refusal.RootElement.GetProperty("succeeded").GetBoolean());
+        var impact = refusal.RootElement.GetProperty("impact");
+        Assert.Equal("undo", impact.GetProperty("operation").GetString());
+        Assert.Equal(installationId, impact.GetProperty("subject").GetProperty("installationId").GetString());
+        Assert.Equal("keep occupied destination", File.ReadAllText(Path.Combine(target, "replacement")));
+        Assert.True(Directory.Exists(operation.GetProperty("retainedPath").GetString()));
     }
 
     [Theory]
@@ -157,6 +204,10 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.True(result.RootElement.GetProperty("succeeded").GetBoolean());
         Assert.Equal(before.Fingerprint, result.RootElement.GetProperty("fingerprint").GetString());
         Assert.True(File.Exists(result.RootElement.GetProperty("archivePath").GetString()));
+        var impact = result.RootElement.GetProperty("impact");
+        Assert.True(impact.GetProperty("payloadRetained").GetBoolean());
+        Assert.Equal(OwnershipPath.CanonicalCandidate(first), impact.GetProperty("retainedPayloadPath").GetString());
+        Assert.NotNull(impact.GetProperty("retentionEvidence").GetString());
         Assert.Equal(before.Fingerprint, SkillView.Maintenance.PayloadSnapshot.Capture(first, TestContext.Current.CancellationToken).Fingerprint);
         Assert.Equal(markdown, File.ReadAllText(Path.Combine(second, "SKILL.md")));
         Assert.Equal(["SKILL.md"], Directory.EnumerateFileSystemEntries(second).Select(Path.GetFileName));

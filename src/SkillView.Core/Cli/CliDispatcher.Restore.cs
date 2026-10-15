@@ -56,7 +56,7 @@ public static partial class CliDispatcher
                 new LocalInventoryService.Options(options.ScanRoots, allowHidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger,
-                runner: services.Runner, subjectObserved: impact => frozenImpact = impact);
+                runner: services.Runner, subjectObserved: impact => frozenImpact = impact with { Operation = requestedCommand });
             ReplacementResult result;
             if (command == "restore-plan")
             {

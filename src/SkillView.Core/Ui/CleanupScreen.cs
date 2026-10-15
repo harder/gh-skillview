@@ -255,9 +255,6 @@ public sealed class CleanupScreen
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 var removed = lastProgress?.TargetsDeleted ?? 0;
-                RemovedCount += removed;
-                RemovedFileCount += lastProgress?.FilesProcessed ?? 0;
-                RemovedDirectoryCount += lastProgress?.DirectoriesProcessed ?? 0;
                 var skipped = attemptState.PreValidationSkipped;
                 var failed = CountFailedSelections(
                     selectedCount,
@@ -364,6 +361,8 @@ public sealed class CleanupScreen
         IProgress<RemoveService.RemoveProgress>? progress = null,
         RemovalAttemptState? attemptState = null)
     {
+        attemptState ??= new RemovalAttemptState();
+        attemptState.SetPreValidationSkipped(0);
         var impacts = checkedRows.Where(index => index >= 0 && index < _candidates.Length)
             .Select(index => _candidates[index].Impact).OfType<OperationImpact>().ToImmutableArray();
         if (impacts.IsEmpty) impacts = ImmutableArray<OperationImpact>.Empty;
@@ -378,13 +377,22 @@ public sealed class CleanupScreen
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            LastReport = RemovalReportState.Canceled(last) with { Impacts = impacts };
+            LastReport = RemovalReportState.Canceled(last) with { Impacts = impacts, TargetsSkipped = attemptState.PreValidationSkipped };
             throw;
         }
         catch (Exception ex)
         {
-            LastReport = RemovalReportState.Failed(last, ex.Message) with { Impacts = impacts };
+            LastReport = RemovalReportState.Failed(last, ex.Message) with { Impacts = impacts, TargetsSkipped = attemptState.PreValidationSkipped };
             throw;
+        }
+        finally
+        {
+            if (LastReport is { } report)
+            {
+                RemovedCount += report.TargetsDeleted;
+                RemovedFileCount += report.FilesDeleted;
+                RemovedDirectoryCount += report.DirectoriesDeleted;
+            }
         }
     }
 
@@ -439,9 +447,6 @@ public sealed class CleanupScreen
         var removed = report.TargetsDeleted;
         LastReport = report;
         var failed = CountFailedSelections(selected.Length, report);
-        RemovedCount += removed;
-        RemovedFileCount += report.FilesDeleted;
-        RemovedDirectoryCount += report.DirectoriesDeleted;
         return new RemovalSummary(removed, failed, Confirmed: true)
         {
             Skipped = report.TargetsSkipped,

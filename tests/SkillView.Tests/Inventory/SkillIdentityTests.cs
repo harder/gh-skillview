@@ -248,6 +248,8 @@ public sealed class SkillIdentityTests : IDisposable
         var outcome = Assert.Single(result.Outcomes);
         Assert.Equal("pinned", outcome.Status); Assert.Same(skill.ObservedSubject, outcome.Impact!.Subject);
         Assert.Equal(2, outcome.Impact.AffectedExposures.Length);
+        Assert.True(outcome.Impact.PayloadRetained);
+        Assert.Equal(skill.ResolvedPath, outcome.Impact.RetainedPayloadPath);
         var saved = new SavedUpdateCoordinator(new(Path.Combine(temporary.FullName, "state"), logger, runner: runner), coordinator, adapter, logger);
         var refusal = await saved.PrepareAsync("unused-no-process", new(Targets: [skill]),
             Snapshot(skill) with { ConfiguredRootsComplete = false }, Token);
@@ -257,6 +259,29 @@ public sealed class SkillIdentityTests : IDisposable
         var affected = json.RootElement.GetProperty("outcomes")[0].GetProperty("impact").GetProperty("affectedExposures");
         Assert.Equal("context-two", affected[1].GetProperty("context").GetString());
         Assert.Equal("two", affected[1].GetProperty("profile").GetString());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BrokenLinkUpdatePreparationNeverInventsRetainedPayload(bool completeCoverage)
+    {
+        var root = Folder("broken-update");
+        var link = Path.Combine(root, "demo");
+        Directory.CreateSymbolicLink(link, Path.Combine(temporary.FullName, "absent"));
+        var skill = Observe(Assert.Single(new LocalSkillScanner(logger).Scan([new(root, Scope.Custom, null)])));
+        var runner = Runner();
+        var adapter = new GhSkillListAdapter(runner, logger);
+        var coordinator = new SkillUpdateCoordinator(new(runner, logger), new(runner, logger), adapter, logger, runner);
+        var saved = new SavedUpdateCoordinator(new(Path.Combine(temporary.FullName, "state"), logger, runner: runner), coordinator, adapter, logger);
+        var result = await saved.PrepareAsync("unused-no-process", new(Targets: [skill]),
+            Snapshot(skill) with { ConfiguredRootsComplete = completeCoverage }, Token);
+        var outcome = Assert.Single(result.Outcomes);
+        Assert.Equal(completeCoverage ? "untracked" : "refused", outcome.Status);
+        Assert.False(outcome.Impact!.PayloadRetained);
+        Assert.Null(outcome.Impact.RetainedPayloadPath);
+        Assert.Equal("broken-link", outcome.Impact.Subject.Materialization);
+        Assert.True(PathResolver.IsSymlink(link));
     }
 
     [Fact]

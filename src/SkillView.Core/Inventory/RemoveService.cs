@@ -49,7 +49,10 @@ public sealed class RemoveService
         int Errors,
         string CurrentPath,
         bool IsCompleted,
-        bool IsCanceled);
+        bool IsCanceled)
+    {
+        internal bool IsFaulted { get; init; }
+    }
 
     public sealed record RemoveReport(
         bool Succeeded,
@@ -470,6 +473,12 @@ public sealed class RemoveService
                 force: true, isCanceled: true);
             throw;
         }
+        catch (Exception)
+        {
+            progressTracker.Publish(0, files, 0, errors.Count, target,
+                force: true, isFaulted: true);
+            throw;
+        }
 
         if (errors.Count == 0)
         {
@@ -536,6 +545,12 @@ public sealed class RemoveService
         {
             progressTracker.Publish(0, files, directories, errors.Count, target,
                 force: true, isCanceled: true);
+            throw;
+        }
+        catch (Exception)
+        {
+            progressTracker.Publish(0, files, directories, errors.Count, target,
+                force: true, isFaulted: true);
             throw;
         }
 
@@ -763,6 +778,11 @@ public sealed class RemoveService
             progressAdapter.CancelBatch();
             throw;
         }
+        catch (Exception)
+        {
+            progressAdapter.FailBatch();
+            throw;
+        }
 
         progressAdapter.CompleteBatch(
             targetsDeleted,
@@ -805,7 +825,8 @@ public sealed class RemoveService
             bool force = false,
             bool isCompleted = false,
             bool isCanceled = false,
-            int? targetsDeleted = null)
+            int? targetsDeleted = null,
+            bool isFaulted = false)
         {
             if (_disabled || progress is null)
             {
@@ -830,7 +851,8 @@ public sealed class RemoveService
                     errors,
                     currentPath,
                     isCompleted,
-                    isCanceled));
+                    isCanceled)
+                { IsFaulted = isFaulted });
             }
             catch (Exception ex)
             {
@@ -914,7 +936,7 @@ public sealed class RemoveService
                 IsCompleted = false,
             };
             Remember(aggregate);
-            Publish(aggregate, force: value.IsCanceled);
+            Publish(aggregate, force: value.IsCanceled || value.IsFaulted);
         }
 
         internal void CompleteTarget(
@@ -973,6 +995,11 @@ public sealed class RemoveService
                 _currentPath,
                 IsCompleted: false,
                 IsCanceled: true), force: true);
+
+        internal void FailBatch() =>
+            Publish(new RemoveProgress(_latestTargets, _latestTargetsDeleted, _latestFiles,
+                _latestDirectories, _latestErrors, _currentPath, IsCompleted: false, IsCanceled: false)
+            { IsFaulted = true }, force: true);
 
         private void Remember(RemoveProgress value)
         {
