@@ -20,7 +20,11 @@ public sealed record SkillDistributorIdentity(string Id, string Provider, string
         // A local manifest name has meaning only in its own installation context.
         var authority = owner.Provider.StartsWith("local-", StringComparison.Ordinal)
             ? region?.ObservedCanonicalPath ?? region?.Path ?? owner.ContextRoot ?? owner.InstallationRoot : null;
-        var id = Digest(owner.Provider, owner.SourceType, locator, authority);
+        // A plugin label is only one claim: distinct recorded repositories must
+        // never collapse into one destructive package group.
+        var source = NormalizeSource(owner.Source, owner.SourceType);
+        var sourceUrl = owner.SourceUrl is { } url ? NormalizeSource(url, owner.SourceType) : null;
+        var id = Digest(owner.Provider, owner.SourceType, owner.PluginName, source, sourceUrl, authority);
         var boundary = region?.ObservedCanonicalPath ?? region?.Path ?? owner.InstallationRoot;
         var registry = region?.RegistrationPath ?? owner.LockFilePath;
         var context = region?.Context ?? owner.ContextRoot;
@@ -29,6 +33,13 @@ public sealed record SkillDistributorIdentity(string Id, string Provider, string
             Digest([id, registry, context, boundary,
                 owner.PackageVersion, roots.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), .. roots]),
             owner.PackageVersion, boundary, registry, context, owner);
+    }
+
+    private static string NormalizeSource(string source, string type)
+    {
+        if (type == "github" && source.Split('/').Length == 2 && !source.Contains(':'))
+            return SkillSourceIdentity.NormalizeRepository("https://github.com/" + source);
+        return type is "github" or "git" ? SkillSourceIdentity.NormalizeRepository(source) : source;
     }
 
     internal static string Digest(params string?[] values)
@@ -73,6 +84,8 @@ public sealed record OperationSubject(string InstallationId, string AddressRole,
     NativeObjectObservation NativeObject, ImmutableArray<ObservedSkillExposure> Exposures,
     DateTimeOffset? CapturedAt, bool ExposureCoverageComplete, string ExposureCoverage)
 {
+    public string Materialization { get; init; } = "unknown";
+
     internal static OperationSubject FromRecorded(string id, string path, string? name, Scope? scope,
         SkillFrontMatter? metadata, ImmutableArray<AgentMembership> agents, ImmutableArray<SkillPackage> owners,
         DateTimeOffset? capturedAt = null, NativeObjectObservation? native = null, string? fingerprint = null)
@@ -104,7 +117,7 @@ public sealed record OperationSubject(string InstallationId, string AddressRole,
     internal static OperationSubject From(InstalledSkill skill) => skill.ObservedSubject ?? FromRecorded(
         skill.InstallationId, skill.ResolvedPath, skill.Name, skill.Scope, skill.FrontMatter, skill.Agents,
         skill.AllOwnershipClaims.ToImmutableArray(), fingerprint: skill.PayloadFingerprint) with
-    { Source = skill.SourceIdentity, Revision = skill.Revision };
+    { Source = skill.SourceIdentity, Revision = skill.Revision, Materialization = skill.PhysicalInstallation.Materialization };
 }
 
 public sealed record OperationImpact(OperationSubject Subject, string Operation, string TargetPath,
@@ -123,9 +136,14 @@ public sealed record OperationImpact(OperationSubject Subject, string Operation,
         var affected = subject.Exposures.Where(exposure => entry is not null
             ? string.Equals(exposure.EntryKey, entry, StringComparison.Ordinal)
             : string.Equals(exposure.Membership.Path, link.Path, StringComparison.Ordinal)).ToImmutableArray();
-        return new(subject, "unlink", link.Path, true, affected,
+        var retainsPayload = subject.Materialization == "directory";
+        return new(subject, "unlink", link.Path, retainsPayload, affected,
             subject.Exposures.Except(affected).ToImmutableArray(), subject.ExposureCoverageComplete && entry is not null,
             entry is null ? "link entry address unobserved; other contexts may exist" : subject.ExposureCoverage)
-        { RetainedPayloadPath = subject.Path, RetentionEvidence = "inventory-observed-payload; link-only operation" };
+        {
+            RetainedPayloadPath = retainsPayload ? subject.Path : null,
+            RetentionEvidence = retainsPayload ? "inventory-observed-payload; link-only operation"
+                : subject.Materialization == "broken-link" ? "inventory-observed-broken-link; no payload observed" : "payload materialization unrecorded"
+        };
     }
 }

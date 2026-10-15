@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using SkillView.Cli;
 using SkillView.Gh;
 using SkillView.Gh.Models;
@@ -104,6 +106,76 @@ public sealed class SkillIdentityTests : IDisposable
         Assert.NotEqual(first.DeliveryId, second.DeliveryId);
         Assert.NotEqual(first.Id, other.Id);
         Assert.Equal("observed-distributor-label", first.Evidence);
+    }
+
+    [Fact]
+    public void SamePluginLabelFromDifferentRepositoriesDoesNotJoinPackageRemoval()
+    {
+        InstalledSkill Owned(string path, string source)
+        {
+            var skill = Skill(path);
+            var owner = new SkillPackage(source, "github", null, null, null)
+            { Provider = "codex-plugin", PluginName = "tools", ReadOnly = true, InstallationRoot = skill.ScanRoot };
+            return skill with { Package = owner };
+        }
+        var first = Owned("repositories/first", "vendor-one/skills");
+        var sibling = Owned("repositories/sibling", "Vendor-One/Skills");
+        var other = Owned("repositories/other", "vendor-two/skills");
+        Assert.Equal(SkillDistributorIdentity.From(first.Package!).Id, SkillDistributorIdentity.From(sibling.Package!).Id);
+        Assert.NotEqual(SkillDistributorIdentity.From(first.Package!).Id, SkillDistributorIdentity.From(other.Package!).Id);
+        var group = Assert.Single(RemoveTargetResolver.BuildTargets(first, Snapshot(first, sibling, other)), target => target.Kind == RemoveTargetKind.PackageGroup);
+        Assert.Equal(2, group.Skills.Length); Assert.DoesNotContain(other, group.Skills);
+        var changedUrl = first.Package! with { SourceUrl = "https://github.com/vendor-two/skills" };
+        Assert.NotEqual(SkillDistributorIdentity.From(first.Package!).Id, SkillDistributorIdentity.From(changedUrl).Id);
+    }
+
+    [Fact]
+    public void WindowsReadableNonDeletableDirectoryRetainsNativeObservation()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var skill = Skill("acl/demo");
+        var payload = new DirectoryInfo(skill.ResolvedPath);
+        var parent = payload.Parent!;
+        var originalPayload = payload.GetAccessControl().GetSecurityDescriptorBinaryForm();
+        var originalParent = parent.GetAccessControl().GetSecurityDescriptorBinaryForm();
+        var sourceFile = new FileInfo(Path.Combine(payload.FullName, "SKILL.md"));
+        var originalFile = sourceFile.GetAccessControl().GetSecurityDescriptorBinaryForm();
+        var originalBytes = File.ReadAllBytes(sourceFile.FullName);
+        using var current = WindowsIdentity.GetCurrent();
+        var user = current.User!;
+        var payloadAcl = new DirectorySecurity();
+        payloadAcl.SetAccessRuleProtection(true, false);
+        payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.ReadAndExecute,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        payloadAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.Delete, AccessControlType.Deny));
+        var parentAcl = parent.GetAccessControl();
+        parentAcl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.DeleteSubdirectoriesAndFiles, AccessControlType.Deny));
+        try
+        {
+            parent.SetAccessControl(parentAcl); payload.SetAccessControl(payloadAcl);
+            var reviewedAcl = payload.GetAccessControl().GetSecurityDescriptorBinaryForm();
+            Assert.False(SecureRemovalBackend.TryCaptureIdentity(payload.FullName, out _, out _));
+            Assert.True(SecureRemovalBackend.TryObserveIdentity(payload.FullName, out var native, out var error), error);
+            var subject = SkillIdentityObserver.Capture(skill, DateTimeOffset.UtcNow, true, Token);
+            Assert.Equal("observed", subject.NativeObject.Status);
+            Assert.Equal(native.FileIdHigh.ToString("x16") + native.FileIdLow.ToString("x16"), subject.NativeObject.ObjectId);
+            Assert.Equal(native.WindowsCreationTime.ToString(System.Globalization.CultureInfo.InvariantCulture), subject.NativeObject.WindowsCreationTime);
+            Assert.Equal(native.WindowsChangeTime.ToString(System.Globalization.CultureInfo.InvariantCulture), subject.NativeObject.WindowsChangeTime);
+            Assert.Equal(reviewedAcl, payload.GetAccessControl().GetSecurityDescriptorBinaryForm());
+            Assert.Equal(originalBytes, File.ReadAllBytes(sourceFile.FullName));
+        }
+        finally
+        {
+            var restoreParent = new DirectorySecurity();
+            restoreParent.SetSecurityDescriptorBinaryForm(originalParent, AccessControlSections.Access);
+            parent.SetAccessControl(restoreParent);
+            var restorePayload = new DirectorySecurity();
+            restorePayload.SetSecurityDescriptorBinaryForm(originalPayload, AccessControlSections.Access);
+            payload.SetAccessControl(restorePayload);
+            var restoreFile = new FileSecurity();
+            restoreFile.SetSecurityDescriptorBinaryForm(originalFile, AccessControlSections.Access);
+            sourceFile.SetAccessControl(restoreFile);
+        }
     }
 
     [Fact]

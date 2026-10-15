@@ -37,6 +37,7 @@ public static partial class CliDispatcher
         w.WriteStartObject("subject");
         w.WriteString("installationId", subject.InstallationId);
         w.WriteString("addressRole", subject.AddressRole);
+        w.WriteString("materialization", subject.Materialization);
         w.WriteString("path", subject.Path);
         w.WriteString("name", subject.Name);
         w.WriteString("scope", subject.Scope?.ToString());

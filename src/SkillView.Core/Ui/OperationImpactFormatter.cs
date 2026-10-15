@@ -18,6 +18,7 @@ internal static class OperationImpactFormatter
     {
         void Field(string label, string? value) => text.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
         Field("Installation address ID", impact.Subject.InstallationId);
+        Field("Materialization", impact.Subject.Materialization);
         Field("Captured", impact.Subject.CapturedAt?.ToString("O"));
         Field("Native observation", impact.Subject.NativeObject.Status == "observed"
             ? impact.Subject.NativeObject.ObjectId + " (" + impact.Subject.NativeObject.Role + ")" : "unknown");

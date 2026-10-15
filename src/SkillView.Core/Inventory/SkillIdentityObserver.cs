@@ -59,6 +59,7 @@ internal static class SkillIdentityObserver
         return OperationSubject.FromRecorded(skill.InstallationId, skill.ResolvedPath, skill.Name, skill.Scope,
             skill.FrontMatter, skill.Agents, skill.AllOwnershipClaims.ToImmutableArray(), at, native, skill.PayloadFingerprint) with
         {
+            Materialization = skill.PhysicalInstallation.Materialization,
             Source = skill.SourceIdentity,
             Revision = skill.Revision,
             Exposures = exposures.ToImmutable(),

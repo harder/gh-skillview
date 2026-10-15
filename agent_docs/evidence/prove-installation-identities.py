@@ -124,6 +124,7 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
             assert native['objectId'] and native['volume'] and native['capturedAt'], item
             verify_native(path, native)
             assert item['subject']['addressRole'] == 'installation-address'
+            assert item['subject']['materialization'] == 'directory'
             assert item['subject']['revision']['resolvedCommit'] is None
             assert item['subject']['revision']['payloadFingerprint'] is None
         assert shared_row['sourceIdentity']['id'] == pinned_row['sourceIdentity']['id']
@@ -156,6 +157,23 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
         unsupported = run(['remove', '--path', fork, '--unknown'], expected=2, decode=False)
         assert 'unsupported remove flag: --unknown' in unsupported.stderr, unsupported.stderr
         assert unchanged_fixture() == before_refusals
+        quarantine = run(['quarantine', '--path', fork])
+        quarantine_operation = quarantine['operations'][0]
+        assert quarantine_operation['status'] == 'preview'
+        assert quarantine_operation['impact']['payloadRetained']
+        assert Path(quarantine_operation['impact']['retainedPayloadPath']).samefile(fork)
+        assert 'preview' in quarantine_operation['impact']['retentionEvidence']
+        assert unchanged_fixture() == before_refusals
+        broken = custom / 'dangling'
+        broken.symlink_to(root / 'missing-payload', target_is_directory=True)
+        cleanup = run(['cleanup', '--candidates', 'BrokenSymlink', '--apply', '--yes'])
+        assert len(cleanup['applied']) == 1, cleanup
+        impact = cleanup['applied'][0]['impact']
+        assert impact['subject']['materialization'] == 'broken-link'
+        assert not impact['payloadRetained'] and impact['retainedPayloadPath'] is None
+        assert len(impact['affectedExposures']) == 1
+        assert not broken.is_symlink()
+        assert unchanged_fixture() == before_refusals
         before = shared_row['subject']['nativeObject']
         retained = root / 'held-original'
         shared.rename(retained)
@@ -176,6 +194,7 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
                             addressStableAcrossNativeReplacement=True, frozenDeletedSubjectRetained=True,
                             nativeObjectGenerationIndependentlyVerified=True,
                             managedRefusalRetainsSubject=True, exactSelectorsRequired=True,
+                            quarantinePreviewRetainsOriginal=True, brokenUnlinkDoesNotInventRetainedPayload=True,
                             resolvedCommitAndPayloadHashNotInvented=True, networkProxiesBlocked=True, fixtures=rows))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2) + '\n')

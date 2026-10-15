@@ -105,3 +105,17 @@ is retained as intermediate evidence; the full final-source suite is next.
 The native proof now checks ambiguity diagnostics plus unchanged object/byte/mode
 fixtures, and independently reads native IDs and generation values. Native AOT,
 old-host restart and remote checks remain pending.
+
+PR #61 Copilot follow-up: logical distributor digests now retain normalized
+recorded source and URL evidence alongside the plugin label; a shared label
+cannot combine different repositories in package removal. Frozen subjects carry
+output-only materialization (`directory`, `broken-link`, or historical `unknown`),
+so unlinking a broken entry cannot claim its deleted address is a retained payload.
+Quarantine previews identify the original observed retention location. Windows
+inventory identity reads omit DELETE access; destructive capture still requires
+it. The new repository and CLI regressions failed before these fixes. A disposable
+Windows ACL regression denies target DELETE and parent DELETE_CHILD while proving
+read-only identity/generation capture leaves permissions and bytes intact; its
+platform execution remains a CI gate. Native identity proofs now include actual
+quarantine preview and broken-link cleanup output. Original M11 remains open until
+final-source checks, native proofs, review and merge complete.

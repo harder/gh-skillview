@@ -572,7 +572,15 @@ public static partial class CliDispatcher
                     var preview = await Task.Run(() => store.Preview(selected[0], inventory, token), token).ConfigureAwait(false);
                     results = [new(preview.Id, "preview", true, false, false, preview.OriginalPath,
                         Path.Combine(store.Root, preview.Id, "payload"), preview.ReviewFingerprint,
-                        "Preview only: relocate this standalone directory on the same filesystem. Retains live permissions and links; agent sessions were not observed. Apply requires --yes --standalone --expect <reviewFingerprint>.")];
+                        "Preview only: relocate this standalone directory on the same filesystem. Retains live permissions and links; agent sessions were not observed. Apply requires --yes --standalone --expect <reviewFingerprint>.")
+                    {
+                        Impact = frozenImpact with
+                        {
+                            PayloadRetained = true,
+                            RetainedPayloadPath = preview.OriginalPath,
+                            RetentionEvidence = "quarantine-preview; original payload observed; no relocation attempted"
+                        }
+                    }];
                 }
             }
             results = results.Select(result => result with

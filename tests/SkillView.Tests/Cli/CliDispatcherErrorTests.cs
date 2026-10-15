@@ -108,7 +108,33 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.Contains("\"kind\": \"BrokenSymlink\"", stdout);
         Assert.Contains("\"succeeded\": true", stdout);
         Assert.False(PathResolver.IsSymlink(brokenLink));
+        using var result = JsonDocument.Parse(stdout);
+        var impact = Assert.Single(result.RootElement.GetProperty("applied").EnumerateArray()).GetProperty("impact");
+        Assert.Equal(brokenLink, impact.GetProperty("targetPath").GetString());
+        Assert.False(impact.GetProperty("payloadRetained").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, impact.GetProperty("retainedPayloadPath").ValueKind);
+        Assert.Single(impact.GetProperty("affectedExposures").EnumerateArray());
         Assert.True(string.IsNullOrWhiteSpace(stderr));
+    }
+
+    [Fact]
+    public async Task QuarantinePreviewReportsPayloadRetainedAtOriginalPathWithoutMutation()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(_tempRoot, "quarantine-skills")).FullName;
+        var target = Directory.CreateDirectory(Path.Combine(root, "demo")).FullName;
+        const string markdown = "---\nname: demo\ndescription: Test\n---\nPayload\n";
+        File.WriteAllText(Path.Combine(target, "SKILL.md"), markdown);
+        var (code, output, error) = await RunCliAsync("skillview", "--scan-root", root, "quarantine", "--path", target, "--json");
+        Assert.Equal(ExitCodes.Success, code); Assert.Equal("", error);
+        using var result = JsonDocument.Parse(output);
+        var operation = Assert.Single(result.RootElement.GetProperty("operations").EnumerateArray());
+        Assert.Equal("preview", operation.GetProperty("status").GetString());
+        var impact = operation.GetProperty("impact");
+        Assert.True(impact.GetProperty("payloadRetained").GetBoolean());
+        Assert.Equal(OwnershipPath.CanonicalCandidate(target), impact.GetProperty("retainedPayloadPath").GetString());
+        Assert.Contains("preview", impact.GetProperty("retentionEvidence").GetString());
+        Assert.Equal(markdown, File.ReadAllText(Path.Combine(target, "SKILL.md")));
+        Assert.False(Directory.Exists(operation.GetProperty("retainedPath").GetString()));
     }
 
     [Theory]
