@@ -307,6 +307,15 @@ internal sealed class SkillViewWorkflowCoordinator
         return CaptureForTabAsync(null, cancellationToken);
     }
 
+    internal void ShowEffectiveLoading(InstalledSkill selected)
+    {
+        if (_getApp() is not { } app) return;
+        EffectiveLoadingScreen.Show(app, _services.Logger, selected, _services.Runner.EffectiveWorkingDirectory,
+            (request, token) => new SkillView.Loading.EffectiveSkillLoader(_services.Runner).CaptureInventoryAsync(
+                _services.InventoryService, _getGhPath(), request, _options.ScanRoots,
+                _options.WorkspaceDirectories, _options.Profiles, token));
+    }
+
     /// Scope-filtered capture used by the Installed tab's scope cycle. When
     /// `scopeFilter` is "user"/"project", `gh skill list --scope` does the
     /// filtering server-side; null captures everything (the tab narrows

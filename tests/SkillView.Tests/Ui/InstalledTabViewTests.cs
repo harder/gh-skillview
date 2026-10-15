@@ -12,6 +12,20 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public void EffectiveLoadingShortcutUsesSelectedSkillAndDoesNotInterceptFilterTyping()
+    {
+        InstalledSkill? selected = null;
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { }, () => { },
+            onEffectiveLoading: skill => selected = skill);
+        view.LoadSeeded(SnapshotWithSkill("demo", null));
+        view.FocusFilterForTests(); view.NewKeyDownEvent(new Key('E'));
+        Assert.Null(selected);
+        view.FocusList(); view.NewKeyDownEvent(new Key('E'));
+        Assert.Equal("demo", selected?.Name);
+    }
+
+    [Fact]
     public void PartialInventory_IsVisibleInFooter()
     {
         using var view = new InstalledTabView(

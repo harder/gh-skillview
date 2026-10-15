@@ -2,8 +2,8 @@
 
 PR #61 merged at `351224b3e058166073370caafcba225bce12d7e9`. This
 reviewed design starts the next implementation batch. Close the complete original
-M12 change and acceptance, retaining M08/M09/M13-M21 obligations. Runtime
-implementation and final acceptance remain pending.
+M12 change and acceptance, retaining M08/M09/M13-M21 obligations. Implementation
+is in review; final acceptance remains pending.
 
 Use M10 contextual inventory + M11 frozen subjects. Add an analysis result for
 one selected agent, profile, working project and client version, retaining every
@@ -88,3 +88,56 @@ Read-only preparation refresh (2026-10-15):
 Sources: [Build skills](https://learn.chatgpt.com/docs/build-skills),
 [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference),
 [app server](https://learn.chatgpt.com/docs/app-server).
+
+Implementation checkpoint (2026-10-15; M12 acceptance remains open):
+- `LoadingConfigurationReader` uses native regular-file admission, bounded
+  source-generated TOML/JSON/YAML parsing and header-only skill reads. Provider
+  syntax is explicit; an arbitrary override suffix cannot change its parser.
+  TOML 2.10.1's DOM merges duplicate scalar keys, so syntax/semantic validation
+  with `SyntaxParser.ParseStrict` must precede DOM conversion. Do not remove
+  that independent validation or enable reflection serialization for AOT.
+- `LoadingSettings` retains source scope/applicability and known local-policy
+  blockers separately from routine unobserved remote/session inputs. Claude
+  project deny/ask and visibility remain applicable before trust; project allow
+  is filtered separately, and managed-only locks cannot come from ordinary
+  files. Gemini disabled-name arrays union. OpenCode permission order follows
+  released 1.19.1/Remeda 2.26.0, including stable overwritten-key positions.
+- `EffectiveSkillLoader` captures metadata, contextual registration facts and
+  concrete plugin namespaces separately from broad protection boundaries and
+  distributor IDs. Physical IDs stay independent of contextual loading keys.
+  Partial discovery cannot establish a highest-tier winner; known higher copies
+  can still justify shadowing. Competitor references are bounded to 16 per row,
+  with explicit coverage; the complete candidate array remains available.
+- `effective` JSON schema 1 and Installed **E** use the same capture service and
+  frozen text renderer. The modal owns cancellation/drain and does not perform
+  filesystem I/O while rendering. Native observations/session state remain
+  separate; fixture version labels are never native conformance.
+- `prove-effective-loading.py` is a disposable product-host proof driver. It
+  checks contextual policies, effective Gemini-home roots, source-generated
+  TOML, competitor identities and unchanged skill/configuration entries. This
+  script does not claim actual AI-client conformance.
+
+Still required before acceptance: final independent review closure, remaining
+semantic/discovery gaps, TUI context/cancellation proof, full stable-build tests,
+both native hosts and all four CI RIDs, minimum/current gh lanes, exact artifact
+binding, old-native persisted-journal compatibility, and merged-PR evidence.
+An interim macOS App Native AOT publish passed IL2026/IL3050/IL3053 promotion;
+its disposable CLI smoke parsed TOML and kept all three fixture files unchanged.
+That interim smoke is not final-head or all-platform acceptance evidence.
+
+Resumed review checkpoint (M12 acceptance still open):
+- Relevant competitors are indexed before applying the peer display bound;
+  outside-context rows cannot hide a selected copy. Native disagreements use
+  final definite invocation facts, including partial-discovery qualification.
+- Gemini saved trust and extension manifests/install metadata/enablement are
+  captured directly, including explicitly linked payload roots. Saved trust is
+  conditional below live IDE trust. Invalid manifests, duplicate names, omitted
+  directories, bounded patterns and unavailable security/hydration stay unknown.
+- OpenCode captures bounded hidden/nested Markdown agent headers at each config
+  directory, with explicit names and the legacy shallow mode phase. Permission
+  strings and agent tools normalize before source merge; global tools normalize
+  afterward. Typed unsupported headers cannot silently inherit default allow.
+- The disposable product proof now includes linked Gemini extension discovery,
+  saved trust evidence and a named OpenCode Markdown override, and CI invokes it
+  for both native hosts on every AOT target. These remain product fixtures, not
+  actual AI-client conformance or observations of the user's running sessions.

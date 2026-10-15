@@ -9,6 +9,19 @@
   skill discovery. Startup TUI capture must use the workflow coordinator so
   workspace/profile options match later rescans.
 
+- Effective loading is a conditional, frozen local-policy view, separate from
+  physical subjects and native/session evidence. Do not launch AI clients just
+  to populate it: a read-only list handler does not establish zero-write startup.
+  Keep the source/version and explicit unavailable reason in each result.
+- OpenCode 1.19.1 normalizes scalar permissions and agent tools per source
+  before merging; overwritten keys retain their original position. Markdown
+  agents/modes load during each config-directory phase; JSON modes fold last.
+  Missing/bounded/linked-container observations cannot imply default allow.
+- Gemini 0.46.0 saved trust is below live IDE trust. Extension overrides use
+  exact manifest keys and case-sensitive stored rules, with last match winning;
+  they do not normalize stored paths. Keep these provider-specific comparisons
+  separate from SkillView's path identity and mutation authority.
+
 ## Repo
 
 `gh-skillview` is a .NET 10 / Terminal.Gui v2 terminal UI and CLI for browsing,

@@ -92,6 +92,7 @@ public static class InstalledScreen
             OperationImpactFormatter.Append(sb, OperationImpact.Payload(subject, "inspect"));
         AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeLocation(s)));
         AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeProvenance(s)));
+        AppendDetailItem(sb, "Loading", "Press **E** in Installed to analyze an agent/profile/project. Filesystem presence does not establish active-session loading.");
         AppendDetailItem(sb, "Health", MarkdownTableFormatter.FormatTableCell(
             s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
         AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
