@@ -185,6 +185,9 @@ The TUI queues a separate review and approval for each target. See
 
 Update JSON schema 2 retains gh output streams and per-installation outcomes and
 adds `savedPlan` plus exact `applyArguments` when a candidate is prepared.
+An already-current installation reports `unchanged`, no saved plan and zero
+changed files; its installed objects and owner bytes remain untouched. The
+Updates queue retains earlier output and outcomes if a later target fails.
 Preparation is distinct from installed mutation. A disk change does not prove
 that an already-running agent session has reloaded the skill.
 

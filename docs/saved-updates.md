@@ -1,6 +1,6 @@
 # Review and apply a saved update
 
-Ordinary `update` prepares a saved review and leaves installed payloads unchanged:
+Ordinary `update` prepares a saved review when needed and leaves installed payloads unchanged:
 
 ```sh
 skillview --scan-root /path/to/skills update --path /path/to/skills/demo --json
@@ -18,6 +18,7 @@ marked installations, and Update uses marks or the explicit all selection.
 Each candidate has its own review, retention checkbox and **Apply reviewed plan**
 action. **Next / skip** retains an unapplied plan and advances to the next target.
 The next candidate is prepared only after the previous operation completes.
+Earlier outcomes, output and notices remain visible when a later target fails.
 Select **Include hidden directories** (CLI `--allow-hidden-dirs`) when hidden
 containers would otherwise make inventory incomplete. Availability checks through
 Dry-run do not create plans or consume the retained-plan quota.
@@ -26,6 +27,19 @@ Dry-run do not create plans or consume the retained-plan quota.
 no release) to an exact commit and skill tree. It saves the candidate alongside
 the recorded base and shows local changes separately from incoming changes.
 Planning leaves the installed payload unchanged.
+
+If the installation is already current, ordinary `update` reports `unchanged`
+with `savedPlan: null`, zero changed files and `mutationAttempted: false`.
+`update-plan --json` returns `operation: null` and an `unchanged` object instead
+of a plan. Current checks preserve installed objects and registry bytes and do
+not consume the retained-plan quota. A private staging cleanup failure reports
+the exact location and a failed exit so it can be inspected.
+
+For the same immutable revision, YAML mapping order, string presentation and
+gh's frontmatter delimiter newlines can compare as current without rewriting
+those bytes. Meaningful content, sequence order, file, permission, pin and owner
+changes still need review. Ambiguous YAML remains a review rather than being
+assumed equivalent. New upstream revisions do not use this presentation check.
 
 At most 16 plan directories are retained. Failed private staging also remains as
 evidence. When the quota is reached, planning refuses and asks for inspection;
