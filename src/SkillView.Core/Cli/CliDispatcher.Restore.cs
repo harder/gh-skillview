@@ -71,6 +71,12 @@ public static partial class CliDispatcher
                     var preparation = await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false);
                     if (preparation.Unchanged is { } current)
                     {
+                        frozenImpact = frozenImpact with
+                        {
+                            PayloadRetained = true,
+                            RetainedPayloadPath = current.Path,
+                            RetentionEvidence = "verified-update-plan-no-op; original payload remains installed"
+                        };
                         if (json) WriteJson(w =>
                         {
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);

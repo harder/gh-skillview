@@ -101,11 +101,16 @@ for gh_path in gh_paths:
             noop = run('update', '--path', payload, '--force')
             assert noop['savedPlan'] is None and noop['outcomes'][0]['status'] == 'unchanged'
             assert noop['outcomes'][0]['changedFileCount'] == 0 and not noop['mutationAttempted']
+            assert noop['outcomes'][0]['impact']['payloadRetained'], noop
+            assert Path(noop['outcomes'][0]['impact']['retainedPayloadPath']).samefile(payload), noop
             assert snapshot(payload) == current and registry.read_bytes() == current_registry
             assert sorted((root / 'state').rglob('plan.json')) == saved_before
             assert sorted(path.name for path in store.iterdir()) == store_entries
         direct = run('update-plan', '--path', payload)
         assert direct['operation'] is None and direct['unchanged']['cleanupWarning'] is None
+        assert direct['impact']['payloadRetained'], direct
+        assert Path(direct['impact']['retainedPayloadPath']).samefile(payload), direct
+        assert 'no-op' in direct['impact']['retentionEvidence'], direct
         assert snapshot(payload) == current and registry.read_bytes() == current_registry
         assert sorted(path.name for path in store.iterdir()) == store_entries
         fresh_check = run('update', '--path', fresh)
@@ -147,7 +152,7 @@ for gh_path in gh_paths:
             dict(kind='untracked', exactPayloadPreserved=True),
             dict(kind='updated', changedPaths=applied['changedPaths'], retainedOriginalVerified=True),
             dict(kind='no-op', repeatedChecks=3, rawGhAlreadyCurrentVerified=True,
-                 nativeObjectsAndRegistryBytesPreserved=True, noPlanQuotaConsumed=True),
+                 nativeObjectsAndRegistryBytesPreserved=True, noPlanQuotaConsumed=True, directPlanRetainsOriginalPayload=True),
             dict(kind='force-repair-same-tree', tree=repair_plan['revision']['source']['tree'], changedPaths=repaired['changedPaths'],
                  editedOriginalRetained=True, ownerBytesPreserved=True),
             dict(kind='later-remote-failure', stdout=failed['stdout'], stderr=failed['stderr'],

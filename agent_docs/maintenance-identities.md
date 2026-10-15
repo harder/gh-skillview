@@ -119,3 +119,10 @@ read-only identity/generation capture leaves permissions and bytes intact; its
 platform execution remains a CI gate. Native identity proofs now include actual
 quarantine preview and broken-link cleanup output. Original M11 remains open until
 final-source checks, native proofs, review and merge complete.
+
+Final review also found the direct `update-plan` already-current branch omitted
+retention even though ordinary saved-update preparation already handled it.
+The shared frozen impact is now marked retained at the verified current path
+before JSON/text rendering. The real-gh Native AOT proof reproduced the previous
+false `payloadRetained` result; update-outcomes now asserts retention for both
+ordinary and direct no-op checks. Final-source gates restart for this correction.
