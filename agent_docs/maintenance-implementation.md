@@ -815,3 +815,46 @@ rerun. Both native macOS hosts publish and pass actual denied-root proofs under
 gh 2.97.0 and 2.102.0. `evidence/maintenance-batch-8-provider-checkpoint.json`
 preserves exact source/log/binary/proof attribution. Final committed-head
 platform proof and merge remain the M04 acceptance gate.
+
+
+Batch 8 final acceptance: PR #55 merged at `daac6fc5280e7bba6a584d31038a72ea02eaabc2`,
+with a tree identical to reviewed head `ece6caa37b0148ad0abfd50dd84496eccb439dfa`.
+All 13 checks pass; each platform runs 1,354 tests with zero failures/skips.
+Inspected 68 native proof files and 212 fixture rows across all four RIDs,
+including four actual POSIX permission-denial proofs. Windows passed a same-head
+failed-job rerun after initial GitHub API rate-limit failures. Independent final
+evidence review confirms original M04 acceptance. Full results are retained in
+`evidence/maintenance-batch-8-final.json`. M02, M04, M05 and M06 are complete.
+
+## Batch 9: actual gh metadata acceptance
+
+Twenty-two deterministic parser/scanner cases cover all literal/folded block
+chomping modes, scalar tool patterns, nested authored version/extensions, invalid
+and overlong required fields, and the node-count bound independent of character
+and depth limits. Four opt-in actual-gh contracts inspect the raw scanner before
+gh enrichment, then compare inventory, JSON and Installed detail text with actual
+unpinned, pinned and local installs. Read-only checks retain original metadata
+bytes. Native proofs compare complete freshly enumerated payload manifests and
+registry bytes before/after inventory under isolated HOME/config/state.
+
+The new contracts are included in the minimum/current gh contract workflow;
+native round-trip proofs run for both hosts on all four AOT RIDs. Final local,
+remote and independent review results remain required before closing M01.
+
+Local batch-9 verification: build has zero warnings/errors, format verification
+passes, and all 1,380 tests pass. The 22 deterministic acceptance cases pass.
+Separate explicitly enabled contracts pass four cases each under gh 2.97.0 and
+2.102.0; the four gated cases in the default suite are not counted as actual-gh
+execution. Both sequentially published native macOS hosts pass both gh versions
+(16 actual-install fixtures). Source/CI review is clear. Exact attribution lives
+in `evidence/maintenance-batch-9-metadata-checkpoint.json`; final remote proof
+and merge remain required for M01 closure.
+
+The initial remote contract lanes pass 14 of 15 cases, stopping in the old
+fragmented-install fixture because product install admission correctly refuses a
+second global-selector overwrite. Fixture setup now invokes native gh directly;
+all selected-update, unrelated-copy and local-extra protection assertions remain.
+The older mutating fixtures also capture credentials before private HOME and
+use private config/CWD/agent paths plus stripped Git overrides. Final source
+build/style checks pass; all 15 opt-in contracts pass under both gh versions.
+Separate review confirms both fixture corrections. Production code is unchanged.

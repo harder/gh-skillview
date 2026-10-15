@@ -29,6 +29,31 @@ public class GhCliContractTests
         return locator.FindOnPath();
     }
 
+    private static async Task<IReadOnlyDictionary<string, string>> AuthenticatedFixtureEnvironmentAsync(
+        string ghPath, string root, Logger logger)
+    {
+        var token = System.Environment.GetEnvironmentVariable("GH_TOKEN") ?? System.Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            var credentials = await new ProcessRunner(logger).RunAsync(ghPath, ["auth", "token", "--hostname", "github.com"],
+                cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(credentials.Succeeded && !credentials.StdOutTruncated,
+                "Configured GitHub credentials are required for opt-in contracts.");
+            token = credentials.StdOut.Trim();
+        }
+        Assert.False(string.IsNullOrWhiteSpace(token));
+        var environment = new Dictionary<string, string>(SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(
+            Path.Combine(root, ".fixture")));
+        environment["GH_TOKEN"] = token;
+        environment["GH_CONFIG_DIR"] = Path.Combine(environment["HOME"], "gh-config");
+        environment["CLAUDE_CONFIG_DIR"] = Path.Combine(environment["HOME"], ".claude");
+        environment["PI_CODING_AGENT_DIR"] = Path.Combine(environment["HOME"], ".pi", "agent");
+        foreach (var key in System.Environment.GetEnvironmentVariables().Keys.Cast<string>().Where(key => key.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)))
+            environment[key] = null!;
+        environment["GIT_CONFIG_COUNT"] = "0";
+        return environment;
+    }
+
     [Fact]
     public async Task GhInstall_PinnedMetadataAndFilesystemExposureRoundTrip()
     {
@@ -40,7 +65,7 @@ public class GhCliContractTests
         {
             var logger = new Logger();
             var runner = new ProcessRunner(logger, environment:
-                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
+                await AuthenticatedFixtureEnvironmentAsync(ghPath!, root.FullName, logger), defaultWorkingDirectory: root.FullName);
             var result = await runner.RunAsync(ghPath!,
                 ["skill", "install", "--dir", root.FullName, "--pin=v2.102.0", "--", "cli/cli", "skills/gh-skill"],
                 cancellationToken: TestContext.Current.CancellationToken);
@@ -73,14 +98,17 @@ public class GhCliContractTests
         {
             var logger = new Logger();
             var runner = new ProcessRunner(logger, environment:
-                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
+                await AuthenticatedFixtureEnvironmentAsync(ghPath!, root.FullName, logger), defaultWorkingDirectory: root.FullName);
             var installer = new GhSkillInstallService(runner, logger);
             var roots = new[] { Path.Combine(root.FullName, "first"), Path.Combine(root.FullName, "second") };
             foreach (var directory in roots)
             {
-                var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
-                    new GhSkillInstallService.Options(Path: directory, Version: "33789149b9def6b66ddf247438a79fac94e22074", Pin: true),
-                    TestContext.Current.CancellationToken);
+                // Deliberately construct fragmentation through native gh. Product
+                // install admission correctly refuses the second global selector
+                // overwrite; update behavior is the subject of this fixture.
+                var installed = await runner.RunAsync(ghPath!,
+                    ["skill", "install", "--dir", directory, "--pin=33789149b9def6b66ddf247438a79fac94e22074",
+                        "--", "cli/cli", "skills/gh-skill"], cancellationToken: TestContext.Current.CancellationToken);
                 Assert.True(installed.Succeeded, installed.StdErr);
             }
             var skills = new SkillView.Inventory.LocalSkillScanner(logger).Scan(roots.Select(directory =>
@@ -122,7 +150,7 @@ public class GhCliContractTests
         {
             var logger = new Logger();
             var runner = new ProcessRunner(logger, environment:
-                SkillView.Maintenance.SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(root.FullName, ".fixture")));
+                await AuthenticatedFixtureEnvironmentAsync(ghPath!, root.FullName, logger), defaultWorkingDirectory: root.FullName);
             var installer = new GhSkillInstallService(runner, logger);
             var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
                 new GhSkillInstallService.Options(Path: root.FullName,

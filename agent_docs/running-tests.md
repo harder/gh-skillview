@@ -112,3 +112,22 @@ restores the denied root's mode in `finally`, verifies the readable control and
 compares freshly enumerated object/byte/mode manifests. CI runs both native
 hosts on those platforms; the deterministic enumeration-failure test also runs
 on Windows. Pass `--gh /absolute/gh` to select another supported gh version.
+
+
+### Actual gh metadata acceptance
+
+`MetadataAcceptanceTests` exercises bounded YAML and scanner validity without
+network access. `GhMetadataContractTests` is opt-in (`SKILLVIEW_CONTRACT_TESTS=true`)
+and uses actual gh remote, exact-pin and `--from-local` installs in private
+HOME/config/state. It validates raw tracking fields before catalog enrichment,
+then inventory JSON and Installed details. Run the class with `--filter-class
+SkillView.Tests.Gh.GhMetadataContractTests`; the scheduled/manual contract workflow
+includes it in both minimum and current gh lanes. Default-suite discovery of
+these four cases does not substitute for running the opt-in contract.
+
+`agent_docs/evidence/prove-tracking-roundtrip.py --app /absolute/native/skillview
+--output /tmp/tracking-proof.json` compares native inventory with actual gh list,
+including authored local descriptions/version and distinct repository refs/pins.
+Repeat `--gh /absolute/gh` to prove multiple gh versions. CI runs both native
+hosts on each AOT RID and retains the results with maintenance proof artifacts.
+The fixture never invokes skill code.
