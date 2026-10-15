@@ -132,3 +132,31 @@ installer metadata, rather than projecting old authored metadata onto the new
 tracking fields. These refinements passed independent re-review and the final
 1,264-test suite. See `maintenance-update-owner-transitions.md` for the next
 shared-owner integration contract and interruption matrix.
+
+## Ordinary entrypoint integration review
+
+The next product integration separates prepare, review and apply of the saved
+plan. Keep `GhSkillUpdateService` as a low-level gh contract adapter; the product
+must not fall back to mutable `gh update` after reviewing an immutable stage.
+CLI `update` prepares exact installations and reports the existing explicit
+`update-apply --id --expect --yes --disposition retain-original` command. A force
+request is not approval to discard local content.
+
+The Updates tab's `u`, `U` and Update actions start an embedded review queue.
+Capture physical target identities and policy before awaiting, show the saved
+commit/tree/ref, affected paths/consumers, local changes, pin transition and root
+modes, then expose a separate Apply reviewed plan action. Keep workflow ownership
+in `SkillViewWorkflowCoordinator`, native I/O off the UI thread, and preserve
+durable outcomes plus inventory invalidation even when navigation cancels work.
+
+Prepare/review/apply one queued installation at a time. Applying a sibling
+changes the shared root/parent generation and invalidates other plans prepared
+beforehand; silently Inspect/Recover-ing them would bypass their approval.
+A future single-approval multi-target transaction needs explicit batch authority
+accounting for its own prior mutations and revalidating untouched targets.
+Pins remain skips unless explicitly unpinned. Report independent successes,
+refusals, recovery-required results and not-started targets. Availability checks
+must not consume the 16 retained-plan quota; explain quota failures when staging.
+Required integration proofs include all shortcuts, sibling queues, stale
+selection/navigation, no second source resolution on apply, cancellation and
+partial failures.

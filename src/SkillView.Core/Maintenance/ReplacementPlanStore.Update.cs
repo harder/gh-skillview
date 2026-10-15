@@ -42,9 +42,6 @@ internal sealed partial class ReplacementPlanStore
     {
         token.ThrowIfCancellationRequested();
         if (target.Pinned && !unpin) throw new IOException("Exact pin retained; updating this installation requires explicit unpin review.");
-        // The preserving owner transaction will extend this admission. Never
-        // update a manager-owned payload without its matching owner transition.
-        if (target.AllOwnershipClaims.Any()) throw new IOException("Shared owner update requires a coordinated registry transition.");
         var desired = target.FrontMatter with
         {
             GithubTreeSha = source.Tree,
@@ -53,7 +50,7 @@ internal sealed partial class ReplacementPlanStore
             PinnedRef = null,
             Pinned = false
         };
-        var revision = new ReplacementRevision(source, desired, null, []);
+        var revision = new ReplacementRevision(source, desired, null, [], PrepareOwner(target, source, token));
         ValidateSource(target.FrontMatter, revision);
         return PlanCoreAsync(target, inventory, stage, revision, stageBase, token);
     }
@@ -75,15 +72,17 @@ internal sealed partial class ReplacementPlanStore
             throw new IOException("Saved update source, revision or pin transition is inconsistent.");
     }
 
-    private static void ValidateRevision(ReplacementPlan plan, string operationPath)
+    private static void ValidateRevision(ReplacementPlan plan, string operationPath, CancellationToken token)
     {
         if (plan.Revision is not { } revision) return;
-        if (!plan.Subject.Owners.IsEmpty || revision.RecordedBase is not { } baseline
+        if (revision.RecordedBase is not { } baseline
             || baseline.Identity.CanonicalPath != Path.Combine(operationPath, "recorded-base")
             || revision.LocalChanges.IsDefault || revision.LocalChanges.Length > PayloadSnapshot.MaxEntries
             || revision.LocalChanges.Any(path => string.IsNullOrEmpty(path)))
             throw new IOException("Saved update baseline or owner transition is invalid.");
         ValidateSource(plan.Subject.Metadata, revision);
         ValidateEvidence(baseline);
+        if (revision.Owner is { } owner) ValidateOwnerTransition(plan.Subject.Metadata, plan.Subject.Owners, revision.Source, owner, token);
+        else if (!plan.Subject.Owners.IsEmpty) throw new IOException("Saved update lacks the required owner transition.");
     }
 }

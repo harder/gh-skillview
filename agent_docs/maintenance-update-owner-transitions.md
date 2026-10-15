@@ -77,6 +77,18 @@ verify. Foreign bytes remain a refusal. Never automatically replay a stale whole
 registry after process death. If JSON is valid, patch only the selected entry
 into current bytes so unrelated changes survive.
 
+Implementation uses an explicit `update-repair-owner --yes --expect` action.
+Main owner steps bind each raw write ID before its raw intent can admit native
+mutation. Only the latest durable unfinished owner step authorizes repair;
+automatic compensation uses its valid desired preimage, and repair attempts
+inherit that image through bounded, acyclic same-plan/direction ancestry.
+Applicable terminal filenames block replay even when their JSON is partial.
+Missing/partial raw repair intent can retain its parent's exact unchanged torn
+snapshot review. A partial main step grants no authority: retain the preceding
+durable owner marker only when no unbound raw intent, restoration or completion
+could represent a later admitted write. Unknown records still consume budget.
+All existing/schema-1 optional fields remain omitted when absent.
+
 ## Required proof before merge
 
 Exercise custom/ownerless and shared gh installs, multiple exposures, pins/unpin,

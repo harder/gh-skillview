@@ -85,7 +85,7 @@ public sealed class SkillLockFileReader(Logger logger)
             .ToImmutableDictionary(group => group.Key, group => group.First().Package, StringComparer.Ordinal);
 
     internal ImmutableArray<PackageObservation> LoadObservations(IEnumerable<string> roots, CancellationToken token,
-        Options? options = null, ICollection<LockReadDiagnostic>? diagnostics = null)
+        Options? options = null, ICollection<LockReadDiagnostic>? diagnostics = null, Func<string, byte[]?>? heldRead = null)
     {
         token.ThrowIfCancellationRequested();
         options ??= new();
@@ -134,7 +134,11 @@ public sealed class SkillLockFileReader(Logger logger)
             if (++files > MaxFiles) { Report(location.Path, "lockfile count limit exceeded", allRoots: true); break; }
             try
             {
-                var bytes = ReadBytes(location.Path, token);
+                // A coordinated owner transaction may already hold gh's data
+                // file lock. Windows forbids reopening its locked byte range;
+                // consume only that transaction's same-handle snapshot.
+                var bytes = heldRead?.Invoke(location.Path) ?? ReadBytes(location.Path, token);
+                if (bytes.Length > MaxFileBytes) throw new IOException("lockfile byte limit exceeded");
                 totalBytes += bytes.Length;
                 if (totalBytes > MaxAggregateBytes) { Report(location.Path, "aggregate lockfile byte limit exceeded", allRoots: true); break; }
                 using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });

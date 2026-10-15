@@ -600,3 +600,40 @@ bind phase-aware owner evidence and offer explicit torn-write review after
 process death. Ordinary product updates/TUI routing and the full platform proof
 remain. The original 21-item objective is unchanged; this checkpoint does not
 close any item's final acceptance.
+
+## Batch 6 checkpoint: shared owner transitions and reviewed torn-image repair
+
+Saved newer-revision updates now coordinate one verified global gh owner with
+the retained/promoted payload. A held native registry lease spans every move,
+same-handle contextual reread, selected-entry write and terminal journal step.
+The selected entry preserves extensions and installedAt; apply and undo rebase
+into fresh unrelated manager bytes. Owner state and full raw/native registry
+snapshots participate in recovery review fingerprints. Owner journals reserve
+separate bounded undo capacity, including when forward evidence is incomplete.
+
+`update-repair-owner --yes --expect` repairs only explicitly reviewed torn JSON
+from applicable unfinished causal evidence. It never moves payloads. Valid
+manager JSON uses selected-entry patching, while foreign/unsupported content and
+unrelated inventory failures remain refusals. Latest durable write IDs, exact
+images, bounded ancestry and terminal evidence prevent arbitrary historical
+preimage replay. Partial main/raw intent publication, live compensation and
+interrupted repair remain recoverable only under the verified evidence contract.
+
+Independent review/re-review fixed initial journal creation, reserved undo
+accounting, missing/partial main/raw intent windows and proof-host containment
+and candidate assertions. The baseline full suite passed 1,290 tests, followed
+by 124 focused cases covering the final refinements (including 28 shared owner
+cases). Both macOS AOT hosts publish; strict standalone AOT diagnostics pass.
+The strengthened disposable proof kills a separate process at production
+checkpoints, then uses the actual product CLI for inspection, explicit image
+repair, recovery and undo. It compares the installed candidate independently and
+proves original native payload/exposure continuity and unrelated preservation.
+See `evidence/maintenance-batch-6-shared-owner-checkpoint.json` for exact runtime
+results and hashes. Four-RID CI now runs both saved-update proof scripts and
+retains JSON evidence artifacts.
+
+The batch remains in progress. Ordinary CLI/TUI routing still needs the reviewed
+per-target queue described in `maintenance-update-plans.md`; sibling plans
+prepared together cannot silently bypass generation changes. Final workflow
+review, exact-source full/platform/native checks and PR merge remain. All 21
+original findings retain their final acceptance obligations.

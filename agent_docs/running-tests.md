@@ -52,3 +52,14 @@ flags instead.
   `python site/build.py`, and `node --check site/app.js`. CI also runs
   `actionlint` and dependency review for PRs.
 - For PTY-driven TUI checks, prefer the built binary and follow `agent_docs/tui-pty-testing.md`.
+
+The solution also builds `tests/SkillView.MaintenanceProof`, a proof-only console
+host for deterministic process death at production maintenance checkpoints. It
+requires a marked disposable HOME/CWD/state root and has no shipping product
+fault flags. After building, run `agent_docs/evidence/prove-shared-revision-update.py`
+with `--app <built skillview> --proof-host <built SkillView.MaintenanceProof>` and
+one or more `--gh <binary>` arguments plus `--output <evidence.json>`. The parent
+kills the paused process without teardown, then uses the actual product CLI for
+fresh inspection, explicit torn-image repair, recovery and undo. Auth is captured
+before HOME isolation, passed only through the child environment, and never
+included in proof output. The proof host pause is bounded to two minutes.

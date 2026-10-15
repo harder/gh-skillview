@@ -743,3 +743,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   exclusion pinning must accept only native file/path-not-found from the target
   open as absence, retain the excluded address, and propagate access/sharing
   failures. Keep shared-link restart coverage for both vacant-original slots.
+- Saved shared revision updates hold gh's native data-file lock across payload
+  moves and selected-entry publication. Use same-handle lockfile reads (Windows
+  byte locks prohibit a second-handle read), preserve unrelated raw bytes, and
+  bind recovery review to the full registry snapshot. Torn-image repair is a
+  separate explicit action authorized by the latest durable unfinished owner
+  write and bounded image ancestry; never replay arbitrary historical preimages.
+  Keep missing/partial main and raw intent publication, live compensation, and
+  actual process-kill restart proofs. See `agent_docs/maintenance-update-owner-transitions.md`
+  and the proof-only host instructions in `agent_docs/running-tests.md`.

@@ -32,7 +32,7 @@ public static partial class CliDispatcher
                 if (args[index] == "--path" && command == "restore-plan" && path is null && installId is null) { path = args[++index]; continue; }
                 if (args[index] == "--install-id" && command == "restore-plan" && path is null && installId is null) { installId = args[++index]; continue; }
                 if (args[index] == "--id" && command != "restore-plan" && id is null) { id = args[++index]; continue; }
-                if (args[index] == "--expect" && command is "restore-apply" or "restore-recover" or "restore-undo" && expected is null) { expected = args[++index]; continue; }
+                if (args[index] == "--expect" && command is "restore-apply" or "restore-recover" or "restore-undo" or "restore-repair-owner" && expected is null) { expected = args[++index]; continue; }
                 if (args[index] == "--disposition" && command == "restore-apply" && disposition is null) { disposition = args[++index]; continue; }
             }
             Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
@@ -41,9 +41,9 @@ public static partial class CliDispatcher
         if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
             || command == "restore-apply" && (!execute || disposition != "retain-original" || !QuarantineStore.ValidHash(expected!))
-            || command is "restore-recover" or "restore-undo" && (!execute || !QuarantineStore.ValidHash(expected!)))
+            || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         try
@@ -77,6 +77,7 @@ public static partial class CliDispatcher
             {
                 "restore-inspect" => store.Inspect(id!, inventory, token),
                 "restore-apply" => store.Apply(id!, expected!, inventory, token),
+                "restore-repair-owner" => store.RepairOwner(id!, expected!, inventory, token),
                 _ => store.Recover(id!, expected!, inventory, command == "restore-undo", token)
             }, token).ConfigureAwait(false);
             if (json) WriteJson(w =>
