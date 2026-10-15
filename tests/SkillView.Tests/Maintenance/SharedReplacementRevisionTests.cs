@@ -76,6 +76,103 @@ public sealed class SharedReplacementRevisionTests : IDisposable
     }
     private byte[] Selected() => GhRegistryEditor.CaptureEntry(File.ReadAllBytes(Registry), "demo", Token).Bytes;
 
+    private SavedUpdateCoordinator Coordinator(ReplacementPlanStore store)
+    {
+        var logger = new Logger(); var runner = new ProcessRunner(logger);
+        var catalog = new SkillView.Gh.GhSkillListAdapter(runner, logger);
+        var availability = new SkillUpdateCoordinator(new(runner, logger), new(runner, logger), catalog, logger, runner);
+        return new(store, availability, catalog, logger);
+    }
+
+    [Fact]
+    public async Task ProductApplyCancellationAfterMoveStillReconcilesWithIndependentTokenAndRetainsPlan()
+    {
+        var plan = await Plan(); var reconciled = 0;
+        using var cancellation = new SkillView.Threading.CancellationSource(Token, _ => { });
+        var store = Store(step => { if (step == "retain-moved") cancellation.TryCancel(); });
+        var result = await Coordinator(store).ApplyAsync(plan, "retain-original", Inventory(), token =>
+        {
+            Assert.False(token.IsCancellationRequested); reconciled++;
+            return Task.FromResult(Inventory());
+        }, cancellation.Token);
+        Assert.True(result.MutationAttempted); Assert.True(result.Cancelled);
+        Assert.Equal(130, result.ExitCode); Assert.Equal(1, reconciled);
+        Assert.Equal(plan.Id, result.SavedPlan!.Id);
+        Assert.Equal("needs-recovery", result.SavedPlan.Status);
+        Assert.Equal("recovery-required", Assert.Single(result.Outcomes).Status);
+        Assert.Contains(plan.Id, Assert.Single(result.Outcomes).Message);
+        Assert.Contains(plan.PlanPath, Assert.Single(result.Outcomes).Message);
+        Assert.True(Directory.Exists(plan.RetainedPath)); Assert.False(Directory.Exists(Payload));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProductApplyRequiresApprovalAndRejectsPreCanceledAdmission(bool canceled)
+    {
+        var plan = await Plan(); var before = PayloadSnapshot.Capture(Payload, Token);
+        var reconciled = 0;
+        var result = await Coordinator(Store()).ApplyAsync(plan, canceled ? "retain-original" : "force", Inventory(), _ =>
+        { reconciled++; return Task.FromResult(Inventory()); }, canceled ? new CancellationToken(true) : Token);
+        Assert.False(result.Succeeded); Assert.False(result.MutationAttempted); Assert.Equal(0, reconciled);
+        Assert.Equal(canceled ? 130 : 2, result.ExitCode);
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.False(Directory.Exists(plan.RetainedPath));
+    }
+
+    [Fact]
+    public async Task ProductApplyReconciliationFailurePreservesVerifiedApplyAndRecoveryEvidence()
+    {
+        var plan = await Plan();
+        var result = await Coordinator(Store()).ApplyAsync(plan, "retain-original", Inventory(),
+            _ => throw new IOException("Provider failed after apply"), Token);
+        Assert.False(result.Succeeded); Assert.True(result.ReconciliationPartial);
+        Assert.True(result.MutationAttempted); Assert.Equal(2, result.ExitCode);
+        Assert.Equal("installed", result.SavedPlan!.Status); Assert.Equal(plan.Id, result.SavedPlan.Id);
+        Assert.Equal("changed", Assert.Single(result.Outcomes).Status);
+        Assert.Contains("Provider failed", Assert.Single(result.Notices).Text);
+        Assert.Contains("Provider failed", result.ErrorMessage);
+        Assert.Equal(NewTree, Assert.Single(Inventory().Skills).TreeSha);
+    }
+
+    [Fact]
+    public async Task ProductApplyMalformedSavedPlanReturnsRefusalWithRecoverableReference()
+    {
+        var plan = await Plan(); var before = PayloadSnapshot.Capture(Payload, Token); var reconciled = 0;
+        File.WriteAllText(plan.PlanPath, "{malformed");
+        var result = await Coordinator(Store()).ApplyAsync(plan, "retain-original", Inventory(), _ =>
+        { reconciled++; return Task.FromResult(Inventory()); }, Token);
+        Assert.False(result.Succeeded); Assert.Equal(2, result.ExitCode); Assert.Equal(1, reconciled);
+        Assert.Equal(plan.Id, result.SavedPlan!.Id);
+        Assert.Contains(plan.PlanPath, Assert.Single(result.Outcomes).Message);
+        Assert.Equal("refused", Assert.Single(result.Outcomes).Status);
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+    }
+
+    [Fact]
+    public async Task ProductPreparationPreservesPinsAndUntrackedOutcomesWithoutCreatingPlans()
+    {
+        var inventory = Inventory(); var target = Assert.Single(inventory.Skills);
+        var pinned = target with { ResolvedPath = Path.Combine(Skills, "pinned"), FrontMatter = target.FrontMatter with { Pinned = true } };
+        var local = target with { FrontMatter = SkillFrontMatter.Empty };
+        var result = await Coordinator(Store()).PrepareAsync("unused-gh",
+            new(Targets: [pinned, local], Force: true), inventory, Token);
+        Assert.Equal(new[] { "pinned", "untracked" }, result.Outcomes.Select(outcome => outcome.Status));
+        Assert.Null(result.SavedPlan); Assert.False(result.MutationAttempted);
+        Assert.False(Directory.Exists(State));
+    }
+
+    [Fact]
+    public async Task ProductPreparationRefusesIncompleteInventoryBeforePrivateStateOrNetwork()
+    {
+        var inventory = Inventory();
+        var result = await Coordinator(Store()).PrepareAsync("unused-gh",
+            new(Targets: inventory.Skills), inventory with { ConfiguredRootsComplete = false }, Token);
+        Assert.False(result.Succeeded); Assert.Null(result.SavedPlan);
+        Assert.False(Directory.Exists(State)); Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
     [Fact]
     public async Task SharedApplyAndUndoPreserveExtensionsFreshUnrelatedRecordsAndExposure()
     {

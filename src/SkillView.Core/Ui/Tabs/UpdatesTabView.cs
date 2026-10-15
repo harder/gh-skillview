@@ -3,6 +3,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Maintenance;
 using SkillView.Threading;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
@@ -17,13 +18,13 @@ namespace SkillView.Ui.Tabs;
 /// persistent view that follows the winget-tui Updates pattern:
 ///   Space — toggle mark on current row
 ///   a     — mark / unmark all visible
-///   u     — run update on the current row's skill
-///   U     — run update on every marked row (batch)
+///   u     — prepare a review for the current physical installation
+///   U     — queue a separate review for every marked row
 /// Plus the existing Dry-run / Update / Cancel buttons.
 ///
 /// Renders RenderResult markdown into the right pane using the existing
 /// static helper on UpdateScreen so the 3 UpdateScreenTests stay green.
-internal sealed class UpdatesTabView : FrameView
+internal sealed partial class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
     private readonly Action<Func<Task>, string> _runTask;
@@ -39,7 +40,7 @@ internal sealed class UpdatesTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _preview;
     private readonly CheckBox _allBox;
-    private readonly CheckBox _forceBox;
+    private readonly CheckBox _hiddenBox;
     private readonly CheckBox _unpinBox;
     private readonly Label _status;
     private readonly SpinnerView _spinner;
@@ -63,12 +64,14 @@ internal sealed class UpdatesTabView : FrameView
         Logger logger,
         Action onLeaveTab,
         Action onUpdateApplied,
-        CancellationToken lifetimeToken = default)
+        CancellationToken lifetimeToken = default,
+        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _updateRunner = updateRunner;
+        _applyRunner = applyRunner;
         _ghPathProvider = ghPathProvider;
         _logger = logger;
         _onLeaveTab = onLeaveTab;
@@ -84,7 +87,7 @@ internal sealed class UpdatesTabView : FrameView
 
         _tableLabel = new Label
         {
-            Text = "Select skills to update. Space toggles · a marks all · u updates current · U updates all marked",
+            Text = "Space toggles · a marks all · u reviews current · U reviews marked",
             X = 0,
             Y = 0,
         };
@@ -93,7 +96,7 @@ internal sealed class UpdatesTabView : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Percent(45),
-            Height = Dim.Fill(5),
+            Height = Dim.Fill(7),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
@@ -105,7 +108,7 @@ internal sealed class UpdatesTabView : FrameView
             X = Pos.Right(_table) + 1,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(5),
+            Height = Dim.Fill(7),
             Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
@@ -113,33 +116,33 @@ internal sealed class UpdatesTabView : FrameView
         _allBox = new CheckBox
         {
             X = 0,
-            Y = Pos.AnchorEnd(4),
+            Y = Pos.AnchorEnd(5),
             Text = "_all",
         };
-        _forceBox = new CheckBox
+        _hiddenBox = new CheckBox
         {
-            X = 10,
-            Y = Pos.AnchorEnd(4),
-            Text = "_force",
+            X = 22,
+            Y = Pos.AnchorEnd(5),
+            Text = "Include _hidden directories",
         };
         _unpinBox = new CheckBox
         {
-            X = 22,
-            Y = Pos.AnchorEnd(4),
+            X = 10,
+            Y = Pos.AnchorEnd(5),
             Text = "_unpin",
         };
 
         _status = new Label
         {
             X = 2,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(4),
             Width = Dim.Fill(2),
             Text = " loading inventory…",
         };
         _spinner = new SpinnerView
         {
             X = 0,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(4),
             Width = 1,
             Height = 1,
             Visible = false,
@@ -150,16 +153,18 @@ internal sealed class UpdatesTabView : FrameView
         _dryRunButton = new Button
         {
             Text = "_Dry-run",
-            X = Pos.Center() - 22,
-            Y = Pos.AnchorEnd(2),
+            X = 0,
+            Y = Pos.AnchorEnd(3),
         };
         _updateButton = new Button
         {
             Text = "_Update",
             X = Pos.Right(_dryRunButton) + 2,
-            Y = Pos.AnchorEnd(2),
+            Y = Pos.AnchorEnd(3),
             IsDefault = true,
         };
+
+        InitializeReviewControls();
 
         _dryRunButton.Accepting += (_, ev) =>
         {
@@ -176,27 +181,28 @@ internal sealed class UpdatesTabView : FrameView
         [
             new Shortcut { Title = "Space", HelpText = "Toggle" },
             new Shortcut { Title = "a",     HelpText = "Mark all" },
-            new Shortcut { Title = "u",     HelpText = "Update row" },
-            new Shortcut { Title = "U",     HelpText = "Update marked" },
+            new Shortcut { Title = "u",     HelpText = "Review row" },
+            new Shortcut { Title = "U",     HelpText = "Review marked" },
             new Shortcut { Title = "d",     HelpText = "Dry-run" },
             new Shortcut { Key = Key.Esc,   Title = "Esc", HelpText = "Back" },
         ], includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SchemeNames.Base,
             this, _tableLabel, _table, _preview,
-            _allBox, _forceBox, _unpinBox,
+            _allBox, _hiddenBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar);
 
         KeyDown += OnKeyDown;
 
         Add(_tableLabel, _table, _preview,
-            _allBox, _forceBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _statusBar);
+            _allBox, _hiddenBox, _unpinBox,
+            _status, _spinner, _dryRunButton, _updateButton, _statusBar, _retainBox, _applyButton, _nextButton);
         Disposing += (_, _) => CancelPendingWork();
     }
 
     internal async Task LoadAsync()
     {
+        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -253,8 +259,8 @@ internal sealed class UpdatesTabView : FrameView
         var nameStyle = style.GetOrCreateColumnStyle(2);
         nameStyle.MinWidth = 8;
         RecomputeColumnWidths();
-        _status.Text = $" {_skills.Count} installed skill(s) — Space to toggle, U to update marked";
-        _preview.Text = "## Updates\n\n_Press **Dry-run** to preview, or mark rows and **U** to update all marked._";
+        _status.Text = $" {_skills.Count} installed skill(s) — Space to toggle, U to review marked";
+        _preview.Text = "## Updates\n\n_Press **Dry-run** to preview, or mark rows and **U** to review each installation._";
         _table.SetFocus();
         SetBusy(false);
     }
@@ -364,7 +370,7 @@ internal sealed class UpdatesTabView : FrameView
 
     private void UpdateCurrentRow()
     {
-        if (_wrapper is null) return;
+        if (_wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count)
         {
@@ -379,7 +385,7 @@ internal sealed class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_operationCancellations.HasActive || _loadCancellations.HasActive) return;
+        if (_operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -396,7 +402,7 @@ internal sealed class UpdatesTabView : FrameView
 
         var marked = selected.Select(s => s.Name).ToList();
         var targets = allChecked ? _skills : selected;
-        if (!allChecked && marked.Count == 0)
+        if (targets.Count == 0)
         {
             _status.Text = dryRun
                 ? " pick at least one skill or enable --all to dry-run"
@@ -404,86 +410,24 @@ internal sealed class UpdatesTabView : FrameView
             return;
         }
 
-        using var operationCancellation = _operationCancellations.TryBegin(_lifetimeToken);
-        if (operationCancellation is null)
-        {
-            return;
-        }
-        SetBusy(true);
-        SetOperationControlsEnabled(false);
-        _status.Text = dryRun
-            ? $" dry-running {(allChecked ? "all" : marked.Count + " skill(s)")}…"
-            : $" updating {(allChecked ? "all" : marked.Count + " skill(s)")}…";
-
         var options = new GhSkillUpdateService.Options(
-            Skills: marked,
-            All: allChecked,
-            DryRun: dryRun,
-            Force: _forceBox.Value == CheckState.Checked,
-            Unpin: _unpinBox.Value == CheckState.Checked,
-            Targets: targets);
-
-        try
+            Skills: marked.ToArray(), All: allChecked, DryRun: dryRun,
+            Unpin: _unpinBox.Value == CheckState.Checked, Targets: targets.ToArray(),
+            AllowHiddenDirectories: _hiddenBox.Value == CheckState.Checked);
+        if (!dryRun)
         {
-            var result = await _updateRunner(ghPath, options, operationCancellation.Token).ConfigureAwait(false);
-            await _runOnUi(() =>
+            if (targets.Count > SkillUpdateCoordinator.MaxTargets)
             {
-                if (operationCancellation.Token.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                SetBusy(false);
-                SetOperationControlsEnabled(true);
-                _preview.Text = UpdateScreen.RenderResult(result, dryRun, allChecked, marked);
-                if (!dryRun && result.MutationAttempted) _onUpdateApplied();
-                if (dryRun)
-                {
-                    _status.Text = result.Succeeded
-                        ? (string.IsNullOrWhiteSpace(result.StdOut)
-                            ? " check complete · inspect per-installation outcomes"
-                            : $" dry-run complete · {result.Entries.Length} entries parsed")
-                        : $" dry-run failed (exit {result.ExitCode}): {TuiHelpers.ErrorSnippet(result.ErrorMessage)}";
-                }
-                else if (result.Succeeded)
-                {
-                    // gh 2.94 skips metadata-less skills under --all; surface
-                    // the count so success isn't mistaken for "all updated".
-                    var skipped = result.Outcomes.Count(e => e.Status is "skipped" or "pinned" or "untracked" or "source-unavailable");
-                    var changed = result.Outcomes.Count(e => e.Status == "changed");
-                    _status.Text = skipped > 0
-                        ? $" completed · {changed} changed · {skipped} retained/skipped · inspect outcomes"
-                        : $" completed · {changed} changed · inspect outcomes";
-
-                }
-                else
-                {
-                    var snippet = TuiHelpers.ErrorSnippet(result.ErrorMessage);
-                    _status.Text = snippet.Length > 0
-                        ? $" update failed (exit {result.ExitCode}): {snippet}"
-                        : $" update failed (exit {result.ExitCode}) — see logs";
-                }
-            }).ConfigureAwait(false);
+                _status.Text = $" select at most {SkillUpdateCoordinator.MaxTargets} installations";
+                return;
+            }
+            _queue = new Queue<InstalledSkill>(targets.DistinctBy(target => target.InstallationId));
+            _queueOptions = options;
+            _queueOutcomes.Clear();
+            await PrepareNextAsync().ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (operationCancellation.Token.IsCancellationRequested)
-        {
-            _logger.Debug("update.tab", "update canceled during deactivation or teardown");
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("update.tab", ex.Message);
-            await _runOnUi(() =>
-            {
-                if (operationCancellation.Token.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                SetBusy(false);
-                SetOperationControlsEnabled(true);
-                _status.Text = $" update failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
-            }).ConfigureAwait(false);
-        }
+        else await ExecuteReviewOperationAsync(
+            token => _updateRunner(ghPath, options, token), dryRun: true).ConfigureAwait(false);
     }
 
     internal void CancelPendingLoad()
@@ -500,6 +444,10 @@ internal sealed class UpdatesTabView : FrameView
     {
         CancelPendingLoad();
         _operationCancellations.Cancel();
+        _review = null;
+        _queue.Clear();
+        _queueOptions = null;
+        _retainBox.Value = CheckState.UnChecked;
         SetBusy(false);
         SetOperationControlsEnabled(true);
     }
@@ -512,11 +460,13 @@ internal sealed class UpdatesTabView : FrameView
 
     private void SetOperationControlsEnabled(bool enabled)
     {
+        enabled = enabled && _review is null && _queue.Count == 0;
         _dryRunButton.Enabled = enabled;
         _updateButton.Enabled = enabled;
         _allBox.Enabled = enabled;
-        _forceBox.Enabled = enabled;
+        _hiddenBox.Enabled = enabled;
         _unpinBox.Enabled = enabled;
         _table.Enabled = enabled;
+        RefreshReviewControls();
     }
 }

@@ -63,3 +63,21 @@ kills the paused process without teardown, then uses the actual product CLI for
 fresh inspection, explicit torn-image repair, recovery and undo. Auth is captured
 before HOME isolation, passed only through the child environment, and never
 included in proof output. The proof host pause is bounded to two minutes.
+
+### Reviewed update PTY proof (POSIX)
+
+After building, run `agent_docs/evidence/prove-reviewed-update-tui.py` with an
+absolute `--app`, `--gh`, `--output`, and `--shortcut u`, `U`, or `button`.
+The script uses a private HOME/state/CWD and actual gh remote installation,
+answers terminal probes, and locates visible controls through a small ANSI screen
+reader. It verifies preparation and unapproved Enter leave payload/registry
+unchanged, then explicitly approves retention and applies. Filesystem manifests
+independently compare candidate bytes/modes/native objects; CLI inspection and
+undo prove restoration of the original objects and exact registry bytes. An
+unselected manual installation remains unchanged, including when the all checkbox
+is enabled for row/marked shortcuts. Ctrl+Q must exit successfully. The script
+retains JSON screen/evidence output and a raw terminal transcript at the supplied
+output path; all skill, agent and manager fixture state is disposable.
+
+Use the built host, never `dotnet run`. This opt-in proof requires gh authentication
+and network access to `cli/cli`; it does not execute the installed skill.

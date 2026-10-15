@@ -298,13 +298,23 @@ internal sealed partial class UnixSecureRemovalBackend
             native.SetHandleAsInvalid();
             try
             {
-                var stream = new FileStream(file, create ? FileAccess.ReadWrite : FileAccess.Read);
+                FileStream stream = writerLock ? new StateWriterStream(file, create ? FileAccess.ReadWrite : FileAccess.Read)
+                    : new FileStream(file, create ? FileAccess.ReadWrite : FileAccess.Read);
                 // Borrow the still-owned writer handle; dup would clear CLOEXEC
                 // and could leak its advisory lock into an unrelated child.
                 if (writerLock) _barrier = file;
                 return stream;
             }
-            catch { file.Dispose(); throw; }
+            catch
+            {
+                try
+                {
+                    if (writerLock && !file.IsClosed)
+                        RetryOnInterrupted(() => StateNative.flock(descriptor, 8));
+                }
+                finally { file.Dispose(); }
+                throw;
+            }
         }
         internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
         {
@@ -348,6 +358,63 @@ internal sealed partial class UnixSecureRemovalBackend
             }
         }
         public override void Dispose() { foreach (var directory in held.AsEnumerable().Reverse()) directory.Dispose(); }
+    }
+
+    // flock belongs to the open file description, which can outlive a close
+    // through dup or the fork-before-exec interval. End ownership explicitly,
+    // independently of cancellation, before allowing the descriptor to close.
+    private sealed class StateWriterStream : FileStream
+    {
+        private readonly SafeFileHandle handle;
+        private readonly object disposeGate = new();
+        private bool released;
+
+        internal StateWriterStream(SafeFileHandle handle, FileAccess access) : base(handle, access) => this.handle = handle;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!disposing)
+            {
+                // FileStream's finalizer reaches this override, including after
+                // partial construction. Finalizer cleanup must never throw.
+                try { ReleaseWriter(flush: false); }
+                catch { }
+                finally { base.Dispose(false); }
+                return;
+            }
+            try { ReleaseWriter(flush: true); }
+            finally { base.Dispose(true); }
+        }
+
+        private void ReleaseWriter(bool flush)
+        {
+            lock (disposeGate)
+            {
+                if (released) return;
+                released = true;
+                try { if (flush) base.Flush(); }
+                finally
+                {
+                    if (!handle.IsClosed && !handle.IsInvalid)
+                    {
+                        var added = false;
+                        try
+                        {
+                            handle.DangerousAddRef(ref added);
+                            if (RetryOnInterrupted(() => StateNative.flock(handle.DangerousGetHandle().ToInt32(), 8)) != 0)
+                                throw new IOException(LastError("maintenance writer unlock failed"));
+                        }
+                        finally { if (added) handle.DangerousRelease(); }
+                    }
+                }
+            }
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 
     private static class StateNative

@@ -9,6 +9,7 @@ namespace SkillView.Gh.Models;
 /// raw body remains for direct rendering when the parse finds nothing.
 public sealed record UpdateResult
 {
+    internal SkillView.Maintenance.ReplacementResult? SavedPlan { get; init; }
     public required bool DryRun { get; init; }
     public required bool Succeeded { get; init; }
     public required int ExitCode { get; init; }

@@ -88,6 +88,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Critical agent notes
 
+- Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
+  candidate, review, then apply its saved ID/fingerprint with explicit retention
+  approval. Only availability checks use the low-level mutable gh update adapter
+  in dry-run mode. Never prepare every sibling before applying the first: native
+  parent/root generations change. Keep the next preparation after prior apply
+  reconciliation, which must survive canceled view/UI dispatch. Availability
+  checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
+
 - Saved revision updates use schema 2 replacement plans, retaining the recorded
   base and explicit local-change/pin review. Keep schema 1 recorded-restore
   fingerprints compatible by omitting absent revision fields. Registry writes
@@ -100,6 +108,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions
   must use the verified `DupWithRetry` (`F_DUPFD_CLOEXEC`) helper.
+  State writer streams likewise explicitly unlock before close, for synchronous
+  and asynchronous disposal. Do not replace them with plain FileStream writers;
+  duplicate descriptions can otherwise retain a completed operation's lock.
 
 - `GhPlacementCatalog` is the authority for gh placement paths. Filesystem
   discovery and UI/Doctor detection derive from it, retaining explicitly

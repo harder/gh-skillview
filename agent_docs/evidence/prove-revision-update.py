@@ -79,7 +79,10 @@ for gh_path in gh_paths:
             refused = run('update-plan', '--path', payload, ok=False)
             assert not refused['succeeded'] and 'pin' in refused['error'].lower(), refused
             assert manifest(payload) == original and registry_path.read_bytes() == registry
-            plan = run('update-plan', '--path', payload, '--unpin')['operation']
+            preparation = run('update', '--path', payload, '--unpin', '--force')
+            assert not preparation['mutationAttempted']
+            assert preparation['outcomes'][0]['status'] == 'review-required'
+            plan = preparation['savedPlan']
             assert plan['status'] == 'planned' and not plan['mutationObserved'], plan
             revision = plan['revision']
             assert len(revision['source']['commit']) == 40 and len(revision['source']['tree']) == 40

@@ -1,9 +1,35 @@
 # Review and apply a saved update
 
+Ordinary `update` prepares a saved review and leaves installed payloads unchanged:
+
+```sh
+skillview --scan-root /path/to/skills update --path /path/to/skills/demo --json
+```
+
+Its JSON includes `savedPlan` and exact `applyArguments`. Retain the same HOME,
+state, working directory and global scan/workspace/profile options for apply.
+`--force` does not authorize replacement or a disposition of local edits.
+With several selected installations, one candidate is prepared; other targets
+are explicitly `not-started`. Prepare each next target after applying or skipping
+the current review. Applying a sibling changes captured directory generations.
+
+From a list, `u` opens the Updates workspace. There, `u` reviews the current physical installation, `U` queues
+marked installations, and Update uses marks or the explicit all selection.
+Each candidate has its own review, retention checkbox and **Apply reviewed plan**
+action. **Next / skip** retains an unapplied plan and advances to the next target.
+The next candidate is prepared only after the previous operation completes.
+Select **Include hidden directories** (CLI `--allow-hidden-dirs`) when hidden
+containers would otherwise make inventory incomplete. Availability checks through
+Dry-run do not create plans or consume the retained-plan quota.
+
 `update-plan` resolves the latest release (or the default branch when there is
 no release) to an exact commit and skill tree. It saves the candidate alongside
 the recorded base and shows local changes separately from incoming changes.
 Planning leaves the installed payload unchanged.
+
+At most 16 plan directories are retained. Failed private staging also remains as
+evidence. When the quota is reached, planning refuses and asks for inspection;
+it never automatically removes local originals or candidates to make room.
 
 ```sh
 skillview --scan-root /path/to/skills update-plan --path /path/to/skills/demo --json

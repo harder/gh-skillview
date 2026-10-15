@@ -111,7 +111,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview search <query>` | Search public repositories for skills |
 | `skillview preview OWNER/REPO [SKILL]` | Render a skill preview without installing |
 | `skillview install OWNER/REPO [SKILL]` | Install a skill with SkillView's wrappers and diff output |
-| `skillview update [...]` | Dry-run or apply skill updates |
+| `skillview update [...]` | Check availability or prepare a saved update review |
 | `skillview remove <skill>` | Remove an installed skill with safety checks |
 | `skillview cleanup` | Report or apply cleanup actions |
 
@@ -174,15 +174,19 @@ requires one of these selectors. `--all` selects the captured inventory; in the
 Updates tab, applying marked rows still applies only those rows. `--agent` and
 `--scope` are install options and are rejected for updates.
 
-Updates preserve exact pins unless `--unpin` is explicit. Before applying, SkillView
-compares the complete payload against its recorded upstream tree, including scripts,
-extra files, links and Unix permissions. Local changes are refused even with `--force`.
-For explicit replacement of an ownerless installation while retaining the
-original directory, use [saved updates](saved-updates.md). Local edits are not
-automatically merged.
-Update JSON schema 2 retains both gh output streams, per-installation outcomes,
-payload fingerprints, affected exposures and partial/canceled status. A disk change
-does not prove that an already-running agent session has reloaded the skill.
+Updates preserve exact pins unless `--unpin` is explicit. Ordinary `update`
+prepares one immutable candidate for review and reports other selected targets as
+not started. It compares the complete payload with its recorded upstream tree,
+including scripts, extras, links and Unix permissions. `--force` never approves
+replacement. Apply the saved plan with explicit `retain-original` approval; local
+edits and extras stay in the retained original and are not automatically merged.
+The TUI queues a separate review and approval for each target. See
+[saved updates](saved-updates.md) for commands, recovery and undo.
+
+Update JSON schema 2 retains gh output streams and per-installation outcomes and
+adds `savedPlan` plus exact `applyArguments` when a candidate is prepared.
+Preparation is distinct from installed mutation. A disk change does not prove
+that an already-running agent session has reloaded the skill.
 
 Use `compare --path <left> --other-path <right> --json` to inspect two exact copies.
 JSON also reports native object/generation fingerprints and observed root Unix

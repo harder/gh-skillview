@@ -541,6 +541,27 @@ internal sealed class SkillViewWorkflowCoordinator
                 FilterScope: scopeFilter),
             cancellationToken);
 
+    internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUpdatesAsync(string ghPath,
+        SkillView.Gh.GhSkillUpdateService.Options options, CancellationToken token)
+    {
+        var inventory = await CaptureUpdateInventoryAsync(ghPath, options.AllowHiddenDirectories, token).ConfigureAwait(false);
+        return await Task.Run(() => _services.SavedUpdates.PrepareAsync(ghPath, options, inventory, token), token).ConfigureAwait(false);
+    }
+
+    internal async Task<SkillView.Gh.Models.UpdateResult> ApplyReviewedUpdateAsync(
+        SkillView.Maintenance.ReplacementResult review, bool allowHidden, CancellationToken token)
+    {
+        var ghPath = _getGhPath();
+        var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
+        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, "retain-original", inventory,
+            reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
+    }
+
+    private Task<InventorySnapshot> CaptureUpdateInventoryAsync(string? ghPath, bool allowHidden, CancellationToken token) =>
+        _services.InventoryService.CaptureAsync(ghPath,
+            new LocalInventoryService.Options(_options.ScanRoots, allowHidden,
+                WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles), token);
+
     /// Drill into the Updates workspace from the Changes queue.
     /// Calls <paramref name="activateUpdates"/> with <paramref name="hideChanges"/> so the caller
     /// controls the concrete tab-view types; the coordinator stays decoupled from UI types.

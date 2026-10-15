@@ -54,8 +54,8 @@
       "title": "Make selected updates work in the captured subprocess",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Noninteractive selected update confirmation",
-      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "implementedEvidenceSummary": "Ordinary saved CLI updates and actual PTY u/U/Update approval flows with unchanged unselected fixture and all-checkbox isolation",
+      "remaining": "Final PR-head platform/native verification, merge and criterion-by-criterion acceptance audit",
       "acceptance": "A real available update succeeds for a selected fixture, with unrelated fixture names untouched. Test u, U, Update and CLI paths, not merely the generated args or a stubbed successful runner. Verify that all-mode cannot silently expand a marked selection.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -66,7 +66,7 @@
       "priority": "P0",
       "status": "incomplete",
       "implementedEvidenceSummary": "Exact installation targeting/selectors and saved immutable newer-revision updates for ownerless and single shared-gh-owner installations",
-      "remaining": "Ordinary CLI/TUI routing, other manager owner transitions and final criterion-by-criterion verification",
+      "remaining": "Other manager owner transitions and final criterion-by-criterion verification",
       "acceptance": "Two copies of one name in different agents/scopes: selecting one changes only its intended target, except explicitly shown shared consumers. Custom and namespaced roots update correctly. Never treat the target skill directory itself as the --dir skills root. Add CLI --path/--install-id selectors and reject unsupported flags.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -165,7 +165,7 @@
       "priority": "P1",
       "status": "incomplete",
       "implementedEvidenceSummary": "Native move/removal authority; quarantine journals; saved recorded restore and ownerless/shared-gh newer-revision plan/stage/apply/inspect/recover/undo; preserving registry sessions and separately reviewed torn-image repair; real process-kill restart proofs",
-      "remaining": "Ordinary update routing, general multi-target/source/owner transitions, relinking/migration recovery and final original acceptance proof",
+      "remaining": "General multi-target/source/owner transitions, relinking/migration recovery and final original acceptance proof",
       "acceptance": "Disk full, interrupted process, canceled worker, target replacement, concurrent native manager update and restart halfway through relinking all leave either a recoverable journal or a verified refusal. Shared consumers are never switched before the chosen payload validates.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -220,7 +220,7 @@
       "priority": "P2",
       "status": "incomplete",
       "implementedEvidenceSummary": "Exact selectors/results, compare/backup/history/quarantine/undo plus saved recorded-restore and ownerless/shared-gh newer-revision CLI plan/apply/inspect/recover/undo and explicit owner-image repair with versioned JSON",
-      "remaining": "Unified maintenance queue, ordinary update routing and TUI repair flows",
+      "remaining": "Unified diagnosis/action queue and remaining TUI repair flows",
       "acceptance": "A selected row always identifies exact affected paths. Every skip/partial result explains what happened. Current Claude plugin docs say running sessions retain loaded plugin versions after background updates; display that as a reload requirement, not failed filesystem verification. Runtime state is unknown unless observed.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false

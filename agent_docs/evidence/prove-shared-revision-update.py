@@ -96,7 +96,7 @@ for gh_path in args.gh:
         original['extension'] = {'keep': True}
         original['skills']['gh-skill']['selectedExtension'] = {'keep': True}
         original['skills']['unrelated'] = {'source': 'other/repo', 'sourceType': 'github', 'extension': [1, 2]}
-        registry_path.write_text(json.dumps(original, indent=2) + '\n')
+        registry_path.write_bytes((json.dumps(original, indent=2) + '\n').encode('utf-8'))
         payload.joinpath('SKILL.md').write_bytes(payload.joinpath('SKILL.md').read_bytes() + b'\nUser modifications\n')
         payload.joinpath('user-extra').write_bytes(b'\x00\xffKeep extra')
         original_payload, unrelated_payload = manifest(payload), manifest(custom / 'gh-skill')
@@ -110,7 +110,13 @@ for gh_path in args.gh:
             return json.loads(process.stdout)
 
         def plan():
-            result = run('update-plan', '--path', payload, '--unpin')['operation']
+            preparation = run('update', '--path', payload, '--unpin', '--force')
+            assert not preparation['mutationAttempted']
+            assert preparation['outcomes'][0]['status'] == 'review-required'
+            result = preparation['savedPlan']
+            assert preparation['applyArguments'] == ['update-apply', '--id', result['id'], '--expect', result['planFingerprint'], '--yes', '--disposition', 'retain-original', '--allow-hidden-dirs']
+            assert manifest(payload) == original_payload
+            assert manifest(custom / 'gh-skill') == unrelated_payload
             assert result['revision']['owner']['selector'] == 'gh-skill', result
             assert result['revision']['source']['tree'] != result['subject']['metadata']['githubTreeSha']
             assert len(result['subject']['agents']) >= 2
@@ -168,7 +174,7 @@ for gh_path in args.gh:
         # selected entry; initial apply must preserve this fresh manager work.
         current = json.loads(registry_path.read_bytes())
         current['skills']['unrelated']['extension'] = [1, 2, 3]
-        registry_path.write_text(json.dumps(current, indent=2) + '\n')
+        registry_path.write_bytes((json.dumps(current, indent=2) + '\n').encode('utf-8'))
         preimage = registry_path.read_bytes()
         applied = run('update-apply', '--id', saved['id'], '--yes', '--disposition', 'retain-original',
                       '--expect', saved['planFingerprint'])['operation']
@@ -181,8 +187,13 @@ for gh_path in args.gh:
         assert selected['installedAt'] == original['skills']['gh-skill']['installedAt']
         assert updated['skills']['unrelated']['extension'] == [1, 2, 3]
         assert manifest(custom / 'gh-skill') == unrelated_payload
-        registry_path.write_text(registry_path.read_text().replace('"extension": [\n        1,\n        2,\n        3\n', '"extension": [\n        1,\n        2,\n        3,\n        4\n'))
-        expected_undo = preimage.decode().replace('"extension": [\n        1,\n        2,\n        3\n', '"extension": [\n        1,\n        2,\n        3,\n        4\n').encode()
+        before_extension = b'"extension": [\n        1,\n        2,\n        3\n'
+        after_extension = b'"extension": [\n        1,\n        2,\n        3,\n        4\n'
+        live_bytes = registry_path.read_bytes()
+        assert live_bytes.count(before_extension) == preimage.count(before_extension) == 1
+        registry_path.write_bytes(live_bytes.replace(before_extension, after_extension))
+        expected_undo = preimage.replace(before_extension, after_extension)
+        assert json.loads(registry_path.read_bytes())['skills']['unrelated']['extension'] == [1, 2, 3, 4]
         assert transition('update-undo', saved, inspect(saved))['succeeded']
         assert registry_path.read_bytes() == expected_undo
         assert_original()

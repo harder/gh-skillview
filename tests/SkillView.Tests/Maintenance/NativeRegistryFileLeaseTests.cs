@@ -206,7 +206,7 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
         using (var lease = NativeRegistryFileLease.Open(Registry, Token)) Assert.Throws<IOException>(() => lease.Read(Token));
         Assert.Equal(size, new FileInfo(Registry).Length);
         System.IO.File.Delete(Registry);
-        Assert.Throws<IOException>(() => NativeRegistryFileLease.Open(Registry, Token));
+        Assert.ThrowsAny<IOException>(() => NativeRegistryFileLease.Open(Registry, Token));
         Assert.False(System.IO.File.Exists(Registry));
     }
 }

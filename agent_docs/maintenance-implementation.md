@@ -653,3 +653,37 @@ and actual minimum/current gh data-file lock contracts. See
 `evidence/maintenance-batch-6-registry-parent-checkpoint.json`. Earlier native
 runtime results remain attributed to their prior checkpoint; final native and
 platform proof and ordinary CLI/TUI routing remain pending.
+
+## Batch 6: ordinary product review/apply routing
+
+Ordinary CLI `update` now stages one immutable candidate and returns a saved
+manifest and exact apply arguments. It does not mutate an installed payload,
+including with `--force`. Other selected targets report independent retained,
+refused or not-started outcomes. Dry-run remains a disposable availability check
+and consumes no plan quota. The TUI captures selected physical targets, prepares
+one at a time, displays source/local-change/consumer/mode/pin evidence, and
+requires a fresh retain-original checkbox plus Apply reviewed plan for each.
+The next target waits for the preceding apply/reconciliation. Recovery references
+survive advancing the queue; failed reconciliation cannot hide a verified change.
+The global update shortcut opens the workspace without fabricating pending rows.
+
+The full-suite run exposed a real Unix state-writer gap: plain stream close could
+leave flock held by a forked/duplicated open-file description. State writer
+streams now explicitly unlock before synchronous/asynchronous close, with
+idempotent release, initialization cleanup and nonthrowing finalizer behavior.
+Six deterministic cases retain duplicated descriptors, including repeated old
+owner disposal and already-closed finalizer cleanup. Windows-specific test and
+proof failures were exact exception typing and CRLF fixture normalization; fixes
+preserve no-create assertions and exact registry byte equality.
+
+Separate reviewers re-reviewed all agreed findings. Both native macOS AOT hosts
+publish; real minimum/current gh shared process-kill proofs and ownerless native
+proofs pass. Actual PTY `u`, marked `U` and Update-button proofs verify unchanged
+payload/registry before approval, exact promoted candidates, retained original
+native objects, successful quit, CLI inspection/undo, exact registry restoration
+and an unchanged unselected installation. The all checkbox cannot widen row or
+marked shortcuts. See `evidence/maintenance-batch-6-product-routing-checkpoint.json`.
+The final local suite passes all 1,327 tests with zero failures. The duplicate-
+descriptor release regressions fail all four cases against pre-fix commit
+8527301 and pass with the fix. Final PR-head platform checks/readiness review
+remain before merge; the original 21-item acceptance audit is unchanged.
