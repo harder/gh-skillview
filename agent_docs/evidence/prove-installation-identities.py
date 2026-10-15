@@ -81,9 +81,9 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
         subprocess.run(['git', 'init', '--quiet', str(cwd)], env=env, cwd=root,
                        capture_output=True, text=True, check=True, timeout=30)
 
-        def skill(path, metadata=''):
+        def skill(path, metadata='', name='demo'):
             path.mkdir(parents=True)
-            path.joinpath('SKILL.md').write_text('---\nname: demo\ndescription: Identity fixture\n'
+            path.joinpath('SKILL.md').write_text('---\nname: ' + name + '\ndescription: Identity fixture\n'
                                                + metadata + '---\nInstructions\n')
             return path
 
@@ -157,11 +157,16 @@ for gh_path in args.gh or [Path(shutil.which('gh') or 'gh')]:
         unsupported = run(['remove', '--path', fork, '--unknown'], expected=2, decode=False)
         assert 'unsupported remove flag: --unknown' in unsupported.stderr, unsupported.stderr
         assert unchanged_fixture() == before_refusals
-        quarantine = run(['quarantine', '--path', fork])
+        preview_payload = skill(custom / 'quarantine-preview', name='quarantine-preview')
+        preview_before = (preview_payload.stat().st_dev, preview_payload.stat().st_ino,
+                          preview_payload.stat().st_ctime_ns, preview_payload.joinpath('SKILL.md').read_bytes())
+        quarantine = run(['quarantine', '--path', preview_payload])
         quarantine_operation = quarantine['operations'][0]
         assert quarantine_operation['status'] == 'preview'
         assert quarantine_operation['impact']['payloadRetained']
-        assert Path(quarantine_operation['impact']['retainedPayloadPath']).samefile(fork)
+        assert Path(quarantine_operation['impact']['retainedPayloadPath']).samefile(preview_payload)
+        assert preview_before == (preview_payload.stat().st_dev, preview_payload.stat().st_ino,
+                                  preview_payload.stat().st_ctime_ns, preview_payload.joinpath('SKILL.md').read_bytes())
         assert 'preview' in quarantine_operation['impact']['retentionEvidence']
         assert unchanged_fixture() == before_refusals
         broken = custom / 'dangling'
