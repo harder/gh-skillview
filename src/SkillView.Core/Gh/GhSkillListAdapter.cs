@@ -20,13 +20,16 @@ namespace SkillView.Gh;
 ///   { skillName, agentHosts:[], scope, sourceURL, version, pinned, path }
 public sealed class GhSkillListAdapter
 {
-    private readonly ProcessRunner _runner;
+    private readonly Func<string, IReadOnlyList<string>, CancellationToken, Task<ProcessResult>> _execute;
     private readonly Logger _logger;
     private readonly GhSkillListCache _cache;
 
     public GhSkillListAdapter(ProcessRunner runner, Logger logger)
+        : this((path, arguments, token) => runner.RunAsync(path, arguments, cancellationToken: token), logger) { }
+
+    internal GhSkillListAdapter(Func<string, IReadOnlyList<string>, CancellationToken, Task<ProcessResult>> execute, Logger logger)
     {
-        _runner = runner;
+        _execute = execute;
         _logger = logger;
         _cache = new GhSkillListCache(
             onCallbackException: CancellationCallbackReporter.For(logger, "gh skill list cache"));
@@ -74,7 +77,7 @@ public sealed class GhSkillListAdapter
             if (!string.IsNullOrEmpty(scope)) { args.Add("--scope"); args.Add(scope); }
             if (!string.IsNullOrEmpty(agent)) { args.Add("--agent"); args.Add(AgentIdentity.Normalize(agent)); }
         }
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var result = await _execute(ghPath, args, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             var error = $"gh list exited {result.ExitCode}: {result.StdErr.Trim()}";

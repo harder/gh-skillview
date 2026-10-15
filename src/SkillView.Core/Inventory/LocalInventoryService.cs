@@ -79,11 +79,7 @@ public sealed class LocalInventoryService
             ? Task.FromResult(new GhCapture(
                 ImmutableArray<GhSkillListRecord>.Empty,
                 TimeSpan.Zero, false, "gh unavailable"))
-            : CaptureGhAsync(
-                ghPath,
-                options.FilterScope,
-                options.FilterAgent,
-                cancellationToken);
+            : CaptureGhAsync(ghPath, cancellationToken);
 
         await Task.WhenAll(localTask, ghTask).ConfigureAwait(false);
         var local = await localTask.ConfigureAwait(false);
@@ -133,23 +129,11 @@ public sealed class LocalInventoryService
                 };
             }).ToImmutableArray();
 
-        if (!string.IsNullOrEmpty(options.FilterScope))
+        var wantedScope = ParseScope(options.FilterScope);
+        if (wantedScope is not null || !string.IsNullOrEmpty(options.FilterAgent))
         {
-            var wanted = ParseScope(options.FilterScope);
-            if (wanted is not null)
-            {
-                merged = FilterWithCancellation(
-                    merged,
-                    skill => skill.Scope == wanted || skill.Agents.Any(agent => agent.Scope == wanted),
-                    cancellationToken);
-            }
-        }
-        if (!string.IsNullOrEmpty(options.FilterAgent))
-        {
-            merged = FilterWithCancellation(
-                merged,
-                skill => skill.Agents.Any(agent => AgentIdentity.Matches(agent.AgentId, options.FilterAgent)),
-                cancellationToken);
+            merged = FilterWithCancellation(merged,
+                skill => MatchesFilters(skill, wantedScope, options.FilterAgent), cancellationToken);
         }
 
         // Collect diagnostics from the scan pass.
@@ -183,15 +167,25 @@ public sealed class LocalInventoryService
         };
     }
 
+    internal static bool MatchesFilters(InstalledSkill skill, Scope? scope, string? agent)
+    {
+        // Both predicates describe the same exposure. Legacy memberships with
+        // no scope use the installation scope; known contrary scopes never do.
+        if (!string.IsNullOrEmpty(agent))
+            return skill.Agents.Any(exposure => AgentIdentity.Matches(exposure.AgentId, agent)
+                && (scope is null || (exposure.Scope ?? skill.Scope) == scope));
+        return scope is null || skill.Scope == scope || skill.Agents.Any(exposure => exposure.Scope == scope);
+    }
+
     private async Task<GhCapture> CaptureGhAsync(
         string ghPath,
-        string? filterScope,
-        string? filterAgent,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
         var records = await _listAdapter
-            .CaptureAsync(ghPath, filterScope, filterAgent, cancellationToken: cancellationToken)
+            // Filter physical rows only after reconciliation, preserving every
+            // gh observation needed to explain their other consumers/conflicts.
+            .CaptureAsync(ghPath, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         stopwatch.Stop();
         return new GhCapture(records.Records, stopwatch.Elapsed, records.Succeeded, records.Error);

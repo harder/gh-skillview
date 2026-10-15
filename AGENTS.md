@@ -125,6 +125,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   values as gh. Retain physical workspace observations alongside Git's actual
   redirected context. Native directory keys and broken-entry parent/name keys
   merge aliases on every supported OS; preserve original paths for policy.
+- Inventory scope/agent filters select reconciled physical rows. Both predicates
+  must match one exposure; retain every other consumer and metadata conflict in
+  the selected row. Capture the default gh catalog without those filters first.
+  Legacy memberships with null scope use their installation's declared scope;
+  a known contrary exposure scope never falls back to another consumer.
 - Mutating CLI fixtures must isolate HOME/USERPROFILE, state and CWD, and
   neutralize inherited Git redirection. Use explicit private GIT_DIR/WORK_TREE/
   COMMON_DIR and GIT_CONFIG_COUNT=0, or strip inherited GIT_* before configuring
@@ -594,7 +599,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
-- Product updates use `TuiServices.MaintenanceUpdates`, carrying physical targets
+- Product updates use `TuiServices.SavedUpdates`, carrying physical targets
   rather than names alone. Keep `--dir` rooted at the verified containing skills
   directory and gh noninteractive confirmation separate from target selection.
   Local drift refuses replacement even with force until an explicit recoverable

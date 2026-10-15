@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "178476f7d8b0c9f7ab6cb5dcf4066410f0570c7c",
+  "verifiedMainCommit": "657800503ddb3890560cad2923a617fcbee83207",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -53,23 +53,29 @@
       "id": "M05",
       "title": "Make selected updates work in the captured subprocess",
       "priority": "P1",
-      "status": "incomplete",
+      "status": "complete",
       "implementedEvidenceSummary": "Ordinary saved CLI updates and actual PTY u/U/Update approval flows with unchanged unselected fixture and all-checkbox isolation",
-      "remaining": "Final PR-head platform/native verification, merge and criterion-by-criterion acceptance audit",
+      "remaining": null,
       "acceptance": "A real available update succeeds for a selected fixture, with unrelated fixture names untouched. Test u, U, Update and CLI paths, not merely the generated args or a stubbed successful runner. Verify that all-mode cannot silently expand a marked selection.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-6-final.json",
+      "verifiedCommit": "657800503ddb3890560cad2923a617fcbee83207",
+      "mergedPullRequest": 53
     },
     {
       "id": "M06",
       "title": "Update an exact installation rather than every matching name",
       "priority": "P0",
-      "status": "incomplete",
+      "status": "complete",
       "implementedEvidenceSummary": "Exact installation targeting/selectors and saved immutable newer-revision updates for ownerless and single shared-gh-owner installations",
-      "remaining": "Other manager owner transitions and final criterion-by-criterion verification",
+      "remaining": null,
       "acceptance": "Two copies of one name in different agents/scopes: selecting one changes only its intended target, except explicitly shown shared consumers. Custom and namespaced roots update correctly. Never treat the target skill directory itself as the --dir skills root. Add CLI --path/--install-id selectors and reject unsupported flags.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-6-final.json",
+      "verifiedCommit": "657800503ddb3890560cad2923a617fcbee83207",
+      "mergedPullRequest": 53
     },
     {
       "id": "M07",
