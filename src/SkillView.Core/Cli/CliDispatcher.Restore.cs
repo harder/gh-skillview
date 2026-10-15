@@ -62,8 +62,24 @@ public static partial class CliDispatcher
                     : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
                 if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
                 var target = selected[0];
-                result = latest ? await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false)
-                    : await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
+                if (latest)
+                {
+                    var preparation = await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false);
+                    if (preparation.Unchanged is { } current)
+                    {
+                        if (json) WriteJson(w =>
+                        {
+                            w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                            w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
+                            w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
+                            w.WriteEndObject();
+                        });
+                        else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"));
+                        return current.CleanupWarning is null ? ExitCodes.Success : ExitCodes.UserError;
+                    }
+                    result = preparation.Plan!;
+                }
+                else result = await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
                 {
                     await new GhRecordedTreeStager(services.Runner).StageIntoAsync(gh, target.FrontMatter.Upstream!, target.TreeSha!, destination, bytes =>
                     {
@@ -93,8 +109,22 @@ public static partial class CliDispatcher
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException)
         {
-            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
-            else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
+            if (json) WriteJson(w =>
+            {
+                w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message);
+                if (ex is GhSourceRequestException source)
+                { w.WriteString("stdout", source.StdOut); w.WriteString("stderr", source.StdErr); }
+                w.WriteEndObject();
+            });
+            else
+            {
+                Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
+                if (ex is GhSourceRequestException source)
+                {
+                    if (!string.IsNullOrWhiteSpace(source.StdOut)) Console.Out.WriteLine(TerminalEscapeSanitizer.Sanitize(source.StdOut));
+                    if (!string.IsNullOrWhiteSpace(source.StdErr)) Console.Error.WriteLine(TerminalEscapeSanitizer.Sanitize(source.StdErr));
+                }
+            }
             return ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
         }
     }

@@ -230,6 +230,13 @@ internal sealed partial class UnixSecureRemovalBackend
             FlushStateDirectory(root, token);
             sealedStage = true;
         }
+        internal override OwnedDirectoryLease CaptureOwnership(CancellationToken token)
+        {
+            ValidateLocation(token);
+            var descriptor = DupWithRetry(root.FileDescriptor);
+            if (descriptor < 0) throw new IOException(LastError("duplicate owned state directory failed"));
+            return CreateOwnedDirectoryLease(new SafeUnixHandle(descriptor));
+        }
         internal override string CanonicalPath => canonical;
         internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token)
         {

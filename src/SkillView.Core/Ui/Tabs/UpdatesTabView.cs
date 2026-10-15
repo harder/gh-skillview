@@ -424,6 +424,7 @@ internal sealed partial class UpdatesTabView : FrameView
             _queue = new Queue<InstalledSkill>(targets.DistinctBy(target => target.InstallationId));
             _queueOptions = options;
             _queueOutcomes.Clear();
+            _queueResults = new();
             await PrepareNextAsync().ConfigureAwait(false);
         }
         else await ExecuteReviewOperationAsync(

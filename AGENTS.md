@@ -600,6 +600,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   descriptors share the enumeration offset and make repeated policy/payload
   inspections incorrectly see EOF. Preserve this in both emptiness and traversal.
 
+- Fresh equal update checks leave installed objects and owner bytes/timestamps
+  untouched and consume no saved-plan quota. Clean only their never-published
+  private stage through ownership duplicated from its held state handle; failed
+  cleanup must expose the exact location. Legacy equal plans may return unchanged
+  only after fresh ready-state validation; interrupted moves still need recovery.
+  Preserve bounded stdout/stderr and earlier mutation/failure evidence across
+  the captured update queue without reusing its prior Apply target. See
+  `agent_docs/maintenance-update-outcomes.md` for the contract and proof commands.
+
 ## Progressive disclosure
 
 - Product updates use `TuiServices.SavedUpdates`, carrying physical targets

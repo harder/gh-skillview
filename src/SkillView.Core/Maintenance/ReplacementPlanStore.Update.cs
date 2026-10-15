@@ -7,7 +7,20 @@ namespace SkillView.Maintenance;
 
 internal sealed partial class ReplacementPlanStore
 {
-    internal async Task<ReplacementResult> PlanLatestAsync(string ghPath, InstalledSkill target,
+    private static bool IsUnchangedRevision(ReplacementPlan plan) =>
+        IsUnchangedRevision(plan, plan.Original.Payload == plan.Candidate.Payload);
+
+    private static bool IsUnchangedRevision(ReplacementPlan plan, bool payloadsMatch)
+    {
+        if (plan.Revision is not { } revision || plan.Original.Mode != plan.Candidate.Mode
+            || !payloadsMatch
+            || revision.Owner is { } owner && owner.BeforeFingerprint != owner.DesiredFingerprint)
+            return false;
+        try { SameTracking(plan.Subject.Metadata, revision.DesiredMetadata); return true; }
+        catch (IOException) { return false; }
+    }
+
+    internal async Task<ReplacementPreparation> PlanLatestAsync(string ghPath, InstalledSkill target,
         InventorySnapshot inventory, bool unpin, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -24,7 +37,7 @@ internal sealed partial class ReplacementPlanStore
             Pinned = false
         };
         var stager = new GhRecordedTreeStager(process);
-        return await PlanUpdateAsync(target, inventory, source,
+        return await PrepareUpdateAsync(target, inventory, source,
             (destination, ct) => Stage(desired, source.Tree, destination, ct),
             (destination, ct) => Stage(target.FrontMatter, target.TreeSha!, destination, ct), unpin, token).ConfigureAwait(false);
 
@@ -36,9 +49,19 @@ internal sealed partial class ReplacementPlanStore
             }, ct);
     }
 
-    internal Task<ReplacementResult> PlanUpdateAsync(InstalledSkill target, InventorySnapshot inventory,
+    internal async Task<ReplacementResult> PlanUpdateAsync(InstalledSkill target, InventorySnapshot inventory,
         ResolvedSkillRevision source, Func<NativeStateDirectory, CancellationToken, Task> stage,
-        Func<NativeStateDirectory, CancellationToken, Task> stageBase, bool unpin, CancellationToken token)
+        Func<NativeStateDirectory, CancellationToken, Task> stageBase, bool unpin, CancellationToken token) =>
+        (await PrepareUpdateCoreAsync(target, inventory, source, stage, stageBase, unpin, false, token).ConfigureAwait(false)).Plan!;
+
+    internal Task<ReplacementPreparation> PrepareUpdateAsync(InstalledSkill target, InventorySnapshot inventory,
+        ResolvedSkillRevision source, Func<NativeStateDirectory, CancellationToken, Task> stage,
+        Func<NativeStateDirectory, CancellationToken, Task> stageBase, bool unpin, CancellationToken token) =>
+        PrepareUpdateCoreAsync(target, inventory, source, stage, stageBase, unpin, true, token);
+
+    private Task<ReplacementPreparation> PrepareUpdateCoreAsync(InstalledSkill target, InventorySnapshot inventory,
+        ResolvedSkillRevision source, Func<NativeStateDirectory, CancellationToken, Task> stage,
+        Func<NativeStateDirectory, CancellationToken, Task> stageBase, bool unpin, bool allowUnchanged, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (target.Pinned && !unpin) throw new IOException("Exact pin retained; updating this installation requires explicit unpin review.");
@@ -53,7 +76,7 @@ internal sealed partial class ReplacementPlanStore
         var revision = new ReplacementRevision(source, desired, null, []);
         ValidateSource(target.FrontMatter, revision);
         revision = revision with { Owner = PrepareOwner(target, source, inventory, token) };
-        return PlanCoreAsync(target, inventory, stage, revision, stageBase, token);
+        return PlanCoreAsync(target, inventory, stage, revision, stageBase, token, allowUnchanged);
     }
 
     private static void ValidateSource(SkillFrontMatter original, ReplacementRevision revision)

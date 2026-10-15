@@ -84,6 +84,283 @@ public sealed class SharedReplacementRevisionTests : IDisposable
         return new(store, availability, catalog, logger);
     }
 
+    private static Task EqualStage(NativeStateDirectory directory, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        File.WriteAllText(Path.Combine(directory.CanonicalPath, "SKILL.md"), Metadata + "Local instructions\n");
+        File.WriteAllText(Path.Combine(directory.CanonicalPath, "extra"), "Keep local extra");
+        return Task.CompletedTask;
+    }
+
+    private Task<ReplacementResult> EqualPlan()
+    {
+        var inventory = Inventory();
+        return Store().PlanUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Ref = "refs/heads/main", Tree = OldTree }, EqualStage, EqualStage, false, Token);
+    }
+
+    private Task<ReplacementPreparation> PrepareEqual(ReplacementPlanStore? store = null)
+    {
+        var inventory = Inventory();
+        return (store ?? Store()).PrepareUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Ref = "refs/heads/main", Tree = OldTree }, EqualStage, EqualStage, false, Token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SourceFailureDuringEitherStageRetainsBothStreamsAndPrivateEvidencePath(bool baseline)
+    {
+        var inventory = Inventory();
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        Task Fail(NativeStateDirectory _, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            throw new GhSourceRequestException("Remote blob failed", "source stdout", "source stderr");
+        }
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Store().PrepareUpdateAsync(
+            Assert.Single(inventory.Skills), inventory, Source, baseline ? Stage : Fail, Fail, false, Token));
+        Assert.Equal("source stdout", error.StdOut);
+        Assert.Equal("source stderr", error.StdErr);
+        Assert.Contains(Assert.Single(Directory.EnumerateDirectories(State)), error.Message);
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task RepeatedCurrentChecksPreserveOriginalObjectsAndDoNotConsumePlanQuota()
+    {
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        for (var index = 0; index < 18; index++)
+        {
+            var prepared = await PrepareEqual();
+            Assert.Null(prepared.Plan);
+            Assert.NotNull(prepared.Unchanged);
+            Assert.Null(prepared.Unchanged.CleanupWarning);
+            Assert.Equal(before.Fingerprint, prepared.Unchanged.PayloadFingerprint);
+            Assert.Empty(Directory.EnumerateDirectories(State));
+        }
+        var after = PayloadSnapshot.Capture(Payload, Token);
+        Assert.Equal(before.RootIdentity, after.RootIdentity);
+        Assert.Equal(before.Objects, after.Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CurrentRevisionPreservesGhYamlPresentationButNewTreeRequiresReview(bool newTree)
+    {
+        var metadata = Metadata.Replace("name: demo\ndescription: Fixture\n", "description: 'Fixture'\nname: demo\n");
+        File.WriteAllText(Path.Combine(Payload, "SKILL.md"), metadata + "\nLocal instructions\n");
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var inventory = Inventory();
+        Task Candidate(NativeStateDirectory directory, CancellationToken token)
+        {
+            EqualStage(directory, token);
+            if (newTree) File.WriteAllText(Path.Combine(directory.CanonicalPath, "SKILL.md"), (Metadata + "Local instructions\n").Replace(OldTree, NewTree));
+            return Task.CompletedTask;
+        }
+        var prepared = await Store().PrepareUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Ref = "refs/heads/main", Tree = newTree ? NewTree : OldTree }, Candidate, EqualStage, false, Token);
+        if (newTree) { Assert.NotNull(prepared.Plan); Assert.Null(prepared.Unchanged); }
+        else { Assert.NotNull(prepared.Unchanged); Assert.Null(prepared.Plan); Assert.Empty(Directory.EnumerateDirectories(State)); }
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task EqualBytesAtReplacedCandidateNameCannotSupplyMetadataAuthority()
+    {
+        var store = Store(step =>
+        {
+            if (step != "candidate-metadata-read") return;
+            var operation = Assert.Single(Directory.EnumerateDirectories(State));
+            var candidate = Path.Combine(operation, "candidate");
+            Directory.Move(candidate, Path.Combine(operation, "moved-candidate"));
+            Directory.CreateDirectory(candidate);
+            File.WriteAllText(Path.Combine(candidate, "SKILL.md"), Metadata + "Local instructions\n");
+            File.WriteAllText(Path.Combine(candidate, "extra"), "Keep local extra");
+        });
+        var error = await Assert.ThrowsAsync<IOException>(() => PrepareEqual(store));
+        Assert.Contains("bound to the captured candidate", error.Message);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+        Assert.True(File.Exists(Path.Combine(Payload, "extra")));
+    }
+
+    [Fact]
+    public async Task CurrentPayloadWithDifferentRootModeStillRequiresReview()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        File.SetUnixFileMode(Payload, (UnixFileMode)448);
+        var prepared = await PrepareEqual();
+        Assert.Null(prepared.Unchanged);
+        Assert.NotNull(prepared.Plan);
+        Assert.Contains("/", prepared.Plan.ChangedPaths);
+        Assert.Equal((UnixFileMode)448, File.GetUnixFileMode(Payload));
+    }
+
+    [Fact]
+    public async Task SameTreeRepairStillReportsActualFileChangesAndRetainsOriginal()
+    {
+        var inventory = Inventory();
+        var prepared = await Store().PrepareUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Ref = "refs/heads/main", Tree = OldTree }, Base, Base, false, Token);
+        Assert.Null(prepared.Unchanged);
+        var plan = Assert.IsType<ReplacementResult>(prepared.Plan);
+        Assert.Equal(OldTree, plan.Revision!.Source.Tree);
+        Assert.Contains("SKILL.md", plan.ChangedPaths);
+        Assert.Contains("extra", plan.ChangedPaths);
+        var result = await Coordinator(Store()).ApplyAsync(plan, "retain-original", Inventory(), _ => Task.FromResult(Inventory()), Token);
+        Assert.True(result.Succeeded, result.ErrorMessage);
+        Assert.True(result.MutationAttempted);
+        var outcome = Assert.Single(result.Outcomes);
+        Assert.Equal("changed", outcome.Status);
+        Assert.True(outcome.ChangedFileCount >= 2);
+        Assert.Contains("extra", outcome.ChangedFiles);
+        Assert.Equal(OldTree, Assert.Single(Inventory().Skills).TreeSha);
+        Assert.False(File.Exists(Path.Combine(Payload, "extra")));
+        Assert.Equal("Keep local extra", File.ReadAllText(Path.Combine(plan.RetainedPath, "extra")));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task SameTreeRefTransitionStillRequiresReview()
+    {
+        var inventory = Inventory();
+        Task RefStage(NativeStateDirectory directory, CancellationToken token)
+        {
+            EqualStage(directory, token);
+            File.WriteAllText(Path.Combine(directory.CanonicalPath, "SKILL.md"),
+                Metadata.Replace("refs/heads/main", "refs/tags/v2") + "Local instructions\n");
+            return Task.CompletedTask;
+        }
+        var prepared = await Store().PrepareUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Tree = OldTree }, RefStage, EqualStage, false, Token);
+        Assert.Null(prepared.Unchanged);
+        Assert.NotNull(prepared.Plan);
+        Assert.Contains("SKILL.md", prepared.Plan.ChangedPaths);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task CleanupRefusalLeavesExactPrivateLocationVisibleAndInstalledPayloadUnchanged()
+    {
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var prepared = await PrepareEqual(Store(step => { if (step == "unchanged-cleanup") throw new IOException("Injected cleanup refusal"); }));
+        Assert.Null(prepared.Plan);
+        Assert.NotNull(prepared.Unchanged);
+        var retained = Assert.Single(Directory.EnumerateDirectories(State));
+        Assert.Contains(retained, prepared.Unchanged.CleanupWarning);
+        Assert.Contains("Injected cleanup refusal", prepared.Unchanged.CleanupWarning);
+        Assert.False(File.Exists(Path.Combine(retained, "plan.json")));
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task CancellationDuringNoopCleanupStillRemovesPrivateStageBeforeReportingCancellation()
+    {
+        using var cancellation = new SkillView.Threading.CancellationSource(Token, _ => { });
+        var inventory = Inventory();
+        var store = Store(step => { if (step == "unchanged-cleanup") cancellation.TryCancel(); });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.PrepareUpdateAsync(Assert.Single(inventory.Skills), inventory,
+            Source with { Ref = "refs/heads/main", Tree = OldTree }, EqualStage, EqualStage, false, cancellation.Token));
+        Assert.Empty(Directory.EnumerateDirectories(State));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+        Assert.True(File.Exists(Path.Combine(Payload, "extra")));
+    }
+
+    [Fact]
+    public async Task CleanupNeverRecapturesAReplacementAtThePrivateOperationName()
+    {
+        var moved = ""; var replaced = "";
+        var prepared = await PrepareEqual(Store(step =>
+        {
+            if (step != "unchanged-cleanup") return;
+            replaced = Assert.Single(Directory.EnumerateDirectories(State));
+            moved = replaced + "-retained";
+            Directory.Move(replaced, moved);
+            Directory.CreateDirectory(replaced);
+            File.WriteAllText(Path.Combine(replaced, "sentinel"), "Keep replacement");
+        }));
+        Assert.NotNull(prepared.Unchanged!.CleanupWarning);
+        Assert.Equal("Keep replacement", File.ReadAllText(Path.Combine(replaced, "sentinel")));
+        Assert.True(Directory.Exists(Path.Combine(moved, "candidate")));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task EqualSavedUpdateDoesNotReplacePayloadOrRewriteOwner()
+    {
+        var plan = await EqualPlan();
+        Assert.Empty(plan.ChangedPaths);
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var reconciled = 0;
+        var result = await Coordinator(Store()).ApplyAsync(plan, "retain-original", Inventory(), _ =>
+        { reconciled++; return Task.FromResult(Inventory()); }, Token);
+        Assert.True(result.Succeeded, result.ErrorMessage);
+        Assert.Equal("unchanged", Assert.Single(result.Outcomes).Status);
+        Assert.False(result.MutationAttempted);
+        Assert.False(result.SavedPlan!.MutationObserved);
+        Assert.Equal(0, reconciled);
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Equal(before.RootIdentity, PayloadSnapshot.Capture(Payload, Token).RootIdentity);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+        Assert.False(Directory.Exists(plan.RetainedPath));
+    }
+
+    [Fact]
+    public async Task ForwardRecoveryOfNeverStartedEqualPlanPreservesObjectsAndWritesNoJournal()
+    {
+        var plan = await EqualPlan();
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var review = Store().Inspect(plan.Id, Inventory(), Token);
+        var recovered = Store().Recover(plan.Id, review.ReviewFingerprint, Inventory(), false, Token);
+        Assert.True(recovered.Succeeded, recovered.Message);
+        Assert.Equal("unchanged", recovered.Status);
+        Assert.False(recovered.MutationObserved);
+        Assert.Equal(before.RootIdentity, PayloadSnapshot.Capture(Payload, Token).RootIdentity);
+        Assert.Equal(before.Objects, PayloadSnapshot.Capture(Payload, Token).Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(plan.PlanPath)!, "step-*.json"));
+    }
+
+    [Fact]
+    public async Task RetainedOriginalOfLegacyEqualPlanStillCompletesRecoveryAndUndo()
+    {
+        var plan = await EqualPlan();
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        // Construct a prior-version interrupted topology with held native moves.
+        // Equal bytes do not mean a vacant original slot has been recovered.
+        using (var operation = NativeStateDirectory.OpenOrCreate(Path.GetDirectoryName(plan.PlanPath)!, [], Token))
+        using (var original = NativeDirectoryMoveLease.Open(Skills, Payload, Token))
+            operation.ReceiveDirectory(original, "original", Token);
+        var review = Store().Inspect(plan.Id, Inventory(), Token);
+        Assert.Equal("original-retained", review.Status);
+        var recovered = Store().Recover(plan.Id, review.ReviewFingerprint, Inventory(), false, Token);
+        Assert.True(recovered.Succeeded, recovered.Message);
+        Assert.Equal("installed", recovered.Status);
+        Assert.True(recovered.MutationObserved);
+        var after = PayloadSnapshot.Capture(Payload, Token);
+        Assert.Equal(before.Fingerprint, after.Fingerprint);
+        Assert.False(NativeDirectoryMoveLease.SameObject(before.RootIdentity!.Value, after.RootIdentity!.Value));
+        review = Store().Inspect(plan.Id, Inventory(), Token);
+        var undone = Store().Recover(plan.Id, review.ReviewFingerprint, Inventory(), true, Token);
+        Assert.True(undone.Succeeded, undone.Message);
+        Assert.True(NativeDirectoryMoveLease.SameObject(before.RootIdentity.Value, PayloadSnapshot.Capture(Payload, Token).RootIdentity!.Value));
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
+    [Fact]
+    public async Task EqualOwnerTransitionPreservesOriginalBytesAndTimestamp()
+    {
+        var plan = await EqualPlan();
+        Assert.Equal(plan.Revision!.Owner!.BeforeFingerprint, plan.Revision.Owner.DesiredFingerprint);
+        Assert.Equal(plan.Revision.Owner.BeforeEntry, plan.Revision.Owner.DesiredEntry);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
+    }
+
     [Fact]
     public async Task ProductApplyCancellationAfterMoveStillReconcilesWithIndependentTokenAndRetainsPlan()
     {

@@ -63,6 +63,28 @@ public sealed class PayloadSnapshotTests : IDisposable
     }
 
     [Fact]
+    public void PresentationFingerprintIncludesEveryOtherEntryAndItsMode()
+    {
+        WriteSkill();
+        var before = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        Assert.NotNull(before.GhPresentationFingerprint);
+        var extra = Path.Combine(_root, "extra");
+        File.WriteAllText(extra, "extra");
+        var added = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        Assert.NotEqual(before.GhPresentationFingerprint, added.GhPresentationFingerprint);
+        File.WriteAllText(extra, "changed");
+        var changed = PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken);
+        Assert.NotEqual(added.GhPresentationFingerprint, changed.GhPresentationFingerprint);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(extra, (UnixFileMode)448);
+            Assert.NotEqual(changed.GhPresentationFingerprint, PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken).GhPresentationFingerprint);
+        }
+        File.Delete(extra);
+        Assert.Equal(before.GhPresentationFingerprint, PayloadSnapshot.Capture(_root, TestContext.Current.CancellationToken).GhPresentationFingerprint);
+    }
+
+    [Fact]
     public void Snapshot_DirectoryLinkIsALeafAndRetargetingIsADifference()
     {
         if (OperatingSystem.IsWindows()) return;

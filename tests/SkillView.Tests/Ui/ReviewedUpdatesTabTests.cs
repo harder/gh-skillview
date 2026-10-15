@@ -213,4 +213,66 @@ public sealed class ReviewedUpdatesTabTests
         Assert.Contains("retain-original", root.GetProperty("applyArguments").EnumerateArray().Select(value => value.GetString()));
         Assert.Contains("--allow-hidden-dirs", root.GetProperty("applyArguments").EnumerateArray().Select(value => value.GetString()));
     }
+    [Fact]
+    public async Task PriorSuccessfulOutputAndNoticesSurviveNextPreparationFailure()
+    {
+        var first = Target("first"); var second = Target("second");
+        using var view = View([first, second], (_, options, _) =>
+        {
+            var target = Assert.Single(options.Targets!);
+            return Task.FromResult(target.Name == "first" ? Result(Review(target)) : Result() with
+            {
+                Succeeded = false,
+                ExitCode = 2,
+                ErrorMessage = "Second remote failed",
+                StdOut = "Second preparation output",
+                StdErr = "Second remote diagnostic",
+                Outcomes = [new(second.InstallationId, second.ResolvedPath, "refused", null, null, [], 0, [], "Second remote failed")]
+            });
+        }, (saved, _, _) => Task.FromResult(Result(saved with { Status = "installed" }, true) with
+        {
+            StdOut = "First update completed",
+            StdErr = "First update warning",
+            Notices = [new("warning", "First notice remains visible")],
+            Outcomes = [new(first.InstallationId, first.ResolvedPath, "changed", null, null, ["SKILL.md"], 1, [], "First payload verified")]
+        }));
+        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked;
+        await view.RunForTestsAsync(false, false);
+        view.RetainBoxForTests.Value = CheckState.Checked;
+        await view.ApplyReviewForTestsAsync();
+        await view.NextReviewForTestsAsync();
+        foreach (var text in new[] { "First update completed", "First update warning", "First notice remains visible",
+            "Second preparation output", "Second remote diagnostic", "First payload verified", "Second remote failed" })
+            Assert.Contains(text, view.PreviewTextForTests);
+    }
+
+    [Fact]
+    public async Task FreshReviewQueueDoesNotRetainPriorOutputOrApplyTarget()
+    {
+        var first = Target("first"); var second = Target("second");
+        var applied = new List<string>();
+        using var view = View([first, second], (_, options, _) =>
+        {
+            var target = Assert.Single(options.Targets!);
+            return Task.FromResult(Result(Review(target)) with { StdOut = "prepared " + target.Name });
+        }, (saved, _, _) =>
+        {
+            applied.Add(saved.Subject.Name);
+            return Task.FromResult(Result(saved with { Status = "installed" }, true) with { StdOut = "applied " + saved.Subject.Name });
+        });
+        await view.LoadAsync(); view.SelectRowForTests(0); view.UpdateCurrentRowForTests();
+        view.RetainBoxForTests.Value = CheckState.Checked;
+        await view.ApplyReviewForTestsAsync();
+        Assert.Contains("applied first", view.PreviewTextForTests);
+        await view.NextReviewForTestsAsync();
+        view.SelectRowForTests(1); view.UpdateCurrentRowForTests();
+        Assert.Contains("prepared second", view.PreviewTextForTests);
+        Assert.DoesNotContain("prepared first", view.PreviewTextForTests);
+        Assert.DoesNotContain("applied first", view.PreviewTextForTests);
+        Assert.False(view.ApplyButtonForTests.Enabled);
+        view.RetainBoxForTests.Value = CheckState.Checked;
+        await view.ApplyReviewForTestsAsync();
+        Assert.Equal(new[] { "first", "second" }, applied);
+    }
+
 }

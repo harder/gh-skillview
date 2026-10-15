@@ -11,7 +11,8 @@ using SkillView.Threading;
 namespace SkillView.Maintenance;
 
 /// Saved, exact-payload replacement. Both old and displaced directories are
-/// retained by exclusive native rename; this store never extracts or deletes.
+/// retained by exclusive native rename. Only never-published, verified unchanged
+/// private staging operations may be removed; installed payloads are never deleted.
 internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
@@ -19,13 +20,13 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     private const int MaxSteps = 32;
     private const int MaxPlans = 16;
 
-    internal Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
+    internal async Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
         Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token) =>
-        PlanCoreAsync(target, inventory, stage, null, null, token);
+        (await PlanCoreAsync(target, inventory, stage, null, null, token).ConfigureAwait(false)).Plan!;
 
-    private async Task<ReplacementResult> PlanCoreAsync(InstalledSkill target, InventorySnapshot inventory,
+    private async Task<ReplacementPreparation> PlanCoreAsync(InstalledSkill target, InventorySnapshot inventory,
         Func<NativeStateDirectory, CancellationToken, Task> stage, ReplacementRevision? revision,
-        Func<NativeStateDirectory, CancellationToken, Task>? stageBase, CancellationToken token)
+        Func<NativeStateDirectory, CancellationToken, Task>? stageBase, CancellationToken token, bool allowUnchanged = false)
     {
         token.ThrowIfCancellationRequested();
         var canonicalPath = Canonical(target.ResolvedPath);
@@ -58,63 +59,100 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
             throw new IOException("Replacement plan quota or state entry policy refused; inspect retained plans.");
         var id = Guid.NewGuid().ToString("N");
-        using var operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token);
-        using var operationWriter = operation.OpenFile("writer.lock", true, token);
-        CheckWriter(operationWriter);
-        var candidatePath = Path.Combine(operation.CanonicalPath, "candidate");
-        // Admission and the writer lock precede any remote staging. Staging is
-        // private and never invokes a manager against the live installation.
-        using var staging = operation.CreateStagingDirectory("candidate", token);
-        try { await stage(staging, token).ConfigureAwait(false); staging.SealStagingDirectory(493, token); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        { throw new IOException($"Staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
-        // No data-file lock is held while remote staging runs.
-        operation.ValidateLocation(token);
-        using var candidate = NativeDirectoryMoveLease.Open(operation.CanonicalPath, candidatePath, token);
-        var desired = candidate.FlushPayload(token);
-        var metadata = PayloadSnapshot.Capture(candidatePath, token).FrontMatter
-            ?? throw new IOException("Staged skill has no supported metadata.");
-        SameTracking(revision?.DesiredMetadata ?? target.FrontMatter, metadata);
-        if (revision is not null)
+        var operationPath = Path.Combine(state.CanonicalPath, id);
+        OwnedDirectoryLease? ownedOperation = null;
+        var unchanged = false;
+        try
         {
-            if (metadata.Name != target.FrontMatter.Name)
-                throw new IOException("The candidate changed the authored skill name; review a source migration.");
-            using var baseline = operation.CreateStagingDirectory("recorded-base", token);
-            try { await stageBase!(baseline, token).ConfigureAwait(false); baseline.SealStagingDirectory(493, token); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-            { throw new IOException($"Recorded-base staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
-            using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, baseline.CanonicalPath, token);
-            var recorded = baseLease.FlushPayload(token);
-            var baseMetadata = PayloadSnapshot.Capture(baseline.CanonicalPath, token).FrontMatter
-                ?? throw new IOException("Recorded base has no supported metadata.");
-            SameTracking(target.FrontMatter, baseMetadata);
-            revision = revision with
-            {
-                DesiredMetadata = metadata,
-                RecordedBase = ReplacementEvidence.From(recorded),
-                LocalChanges = PayloadSnapshot.Differences(recorded, before)
-            };
+            var plan = await StagePlanAsync().ConfigureAwait(false);
+            if (!unchanged)
+                return ReplacementPreparation.Saved(Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
+                    "Saved exact staged payload. Review every changed path, affected consumer and pin before applying with --disposition retain-original."));
+            var warning = RemoveUnchangedStaging(operationPath, ownedOperation!, state);
+            token.ThrowIfCancellationRequested();
+            using var owner = OpenOwner(revision?.Owner, token, requireBefore: true);
+            inventory = Admit(target, inventory, token, owner: owner);
+            var current = original.Capture(token);
+            if (current.Fingerprint != before.Fingerprint || current.ObjectStateFingerprint != before.ObjectStateFingerprint
+                || Context(target, inventory, token, owner: owner) != context)
+                throw new IOException("The installation or context changed during no-op staging cleanup; refresh before checking again.");
+            return ReplacementPreparation.Current(new(target.InstallationId, target.ResolvedPath, before.Fingerprint,
+                "The source revision, tracking policy and payload content are current. Existing YAML presentation and delimiter whitespace were preserved. Installed objects and owner bytes were left unchanged; no saved plan was created.", warning));
         }
-        if (desired.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json"))
-            throw new IOException("Staged payload contains owner records; use an owner transition plan.");
-        original.Revalidate(token);
-        using var finalOwner = OpenOwner(revision?.Owner, token, requireBefore: true);
-        inventory = Admit(target, inventory, token, owner: finalOwner);
-        var current = original.Capture(token);
-        if (before.ObjectStateFingerprint != current.ObjectStateFingerprint || before.Fingerprint != current.Fingerprint
-            || Context(target, inventory, token, owner: finalOwner) != context)
-            throw new IOException("Installed payload or context changed while staging; no replacement was admitted.");
-        var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents,
-            target.FrontMatter, target.AllOwnershipClaims.ToImmutableArray());
-        var plan = new ReplacementPlan(revision is null ? 1 : 2, id, revision is null ? "restore-recorded" : "update-revision", DateTimeOffset.UtcNow, before.Path,
-            original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity,
-            subject, context, ReplacementEvidence.From(before), ReplacementEvidence.From(desired),
-            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "", revision);
-        plan = plan with { ReviewFingerprint = PlanHash(plan) };
-        Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
-        return Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
-            "Saved exact staged payload. Review every changed path, affected consumer and pin before applying with --disposition retain-original.");
+        finally { ownedOperation?.Dispose(); }
+
+        async Task<ReplacementPlan> StagePlanAsync()
+        {
+            using var operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token);
+            operationPath = operation.CanonicalPath;
+            if (allowUnchanged) ownedOperation = operation.CaptureOwnership(token);
+            using var operationWriter = operation.OpenFile("writer.lock", true, token);
+            CheckWriter(operationWriter);
+            var candidatePath = Path.Combine(operation.CanonicalPath, "candidate");
+            // Admission and the writer lock precede any remote staging. Staging is
+            // private and never invokes a manager against the live installation.
+            using var staging = operation.CreateStagingDirectory("candidate", token);
+            try { await stage(staging, token).ConfigureAwait(false); staging.SealStagingDirectory(493, token); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { throw StagingFailure($"Staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
+            // No data-file lock is held while remote staging runs.
+            operation.ValidateLocation(token);
+            using var candidate = NativeDirectoryMoveLease.Open(operation.CanonicalPath, candidatePath, token);
+            var desired = candidate.FlushPayload(token);
+            checkpoint?.Invoke("candidate-metadata-read");
+            var stagedMetadata = PayloadSnapshot.Capture(candidatePath, token);
+            if (stagedMetadata.Fingerprint != desired.Fingerprint || stagedMetadata.ObjectStateFingerprint != desired.ObjectStateFingerprint)
+                throw new IOException("Staged metadata could not be bound to the captured candidate.");
+            var metadata = stagedMetadata.FrontMatter
+                ?? throw new IOException("Staged skill has no supported metadata.");
+            SameTracking(revision?.DesiredMetadata ?? target.FrontMatter, metadata);
+            if (revision is not null)
+            {
+                if (metadata.Name != target.FrontMatter.Name)
+                    throw new IOException("The candidate changed the authored skill name; review a source migration.");
+                using var baseline = operation.CreateStagingDirectory("recorded-base", token);
+                try { await stageBase!(baseline, token).ConfigureAwait(false); baseline.SealStagingDirectory(493, token); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                { throw StagingFailure($"Recorded-base staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
+                using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, baseline.CanonicalPath, token);
+                var recorded = baseLease.FlushPayload(token);
+                var baseMetadata = PayloadSnapshot.Capture(baseline.CanonicalPath, token).FrontMatter
+                    ?? throw new IOException("Recorded base has no supported metadata.");
+                SameTracking(target.FrontMatter, baseMetadata);
+                revision = revision with
+                {
+                    DesiredMetadata = metadata,
+                    RecordedBase = ReplacementEvidence.From(recorded),
+                    LocalChanges = PayloadSnapshot.Differences(recorded, before)
+                };
+            }
+            if (desired.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json"))
+                throw new IOException("Staged payload contains owner records; use an owner transition plan.");
+            original.Revalidate(token);
+            using var finalOwner = OpenOwner(revision?.Owner, token, requireBefore: true);
+            inventory = Admit(target, inventory, token, owner: finalOwner);
+            var current = original.Capture(token);
+            if (before.ObjectStateFingerprint != current.ObjectStateFingerprint || before.Fingerprint != current.Fingerprint
+                || Context(target, inventory, token, owner: finalOwner) != context)
+                throw new IOException("Installed payload or context changed while staging; no replacement was admitted.");
+            var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents,
+                target.FrontMatter, target.AllOwnershipClaims.ToImmutableArray());
+            var plan = new ReplacementPlan(revision is null ? 1 : 2, id, revision is null ? "restore-recorded" : "update-revision", DateTimeOffset.UtcNow, before.Path,
+                original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity,
+                subject, context, ReplacementEvidence.From(before), ReplacementEvidence.From(desired),
+                PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "", revision);
+            plan = plan with { ReviewFingerprint = PlanHash(plan) };
+            var payloadsMatch = live.ComparisonFingerprint == stagedMetadata.ComparisonFingerprint
+                || revision?.Source.Tree == target.TreeSha && live.GhPresentationFingerprint is { } presentation
+                    && presentation == stagedMetadata.GhPresentationFingerprint;
+            unchanged = allowUnchanged && IsUnchangedRevision(plan, payloadsMatch);
+            if (!unchanged) Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+            return plan;
+        }
     }
+
+    private static IOException StagingFailure(string message, Exception cause) => cause is GhSourceRequestException source
+        ? new GhSourceRequestException(message, source.StdOut, source.StdErr) : new IOException(message, cause);
 
     internal ReplacementResult Inspect(string id, InventorySnapshot inventory, CancellationToken token)
     {
@@ -140,6 +178,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             || observation.Candidate?.Objects != plan.Candidate.Objects
             || observation.Root != plan.RootIdentity || observation.Parent != plan.ParentIdentity)
             throw new IOException("The reviewed installation or stage changed; create a new plan.");
+        if (IsUnchangedRevision(plan))
+            return Result(plan, "unchanged", true, false, false, ObservationHash(plan, observation),
+                "The verified payload, tracking policy and owner record are already current; no directory or registry write was attempted.", observation.Owner);
         return Execute(session, inventory, observation, undo: false, token, owner);
     }
 
@@ -151,6 +192,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         var observation = Observe(session.Plan, session.Operation, inventory, token, owner);
         if (expectedObservation != ObservationHash(session.Plan, observation))
             throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
+        if (!undo && session.StepCount == 0 && !session.IncompleteJournal && session.RecoveryJournal is null
+            && observation.Topology == "ready" && IsUnchangedRevision(session.Plan)
+            && (owner is null || OwnerSatisfied(observation, owner, false)))
+            return Result(session.Plan, "unchanged", true, false, false, expectedObservation,
+                "The never-started plan is already current; no payload move, registry write or journal was attempted.", observation.Owner);
         return Execute(session, inventory, observation, undo, token, owner);
     }
 

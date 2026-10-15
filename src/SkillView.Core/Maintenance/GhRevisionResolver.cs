@@ -5,7 +5,11 @@ using SkillView.Subprocess;
 namespace SkillView.Maintenance;
 
 internal sealed record ResolvedSkillRevision(string Repository, string Ref, string Commit, string Tree, string Subpath);
-internal sealed record GhApiPayload(int Status, string Body);
+internal sealed record GhApiPayload(int Status, string Body)
+{
+    internal string StdOut { get; init; } = "";
+    internal string StdErr { get; init; } = "";
+}
 
 /// Resolves the same latest-release/default-branch policy as gh, once. Every
 /// subsequent tree request is addressed by a full immutable Git object ID.
@@ -16,13 +20,19 @@ internal sealed class GhRevisionResolver
     {
         var result = await runner.RunAsync(ghPath, ["api", "--include", "--hostname", "github.com", "--", endpoint],
             cancellationToken: token).ConfigureAwait(false);
-        if (result.StdOutTruncated || result.StdErrTruncated) throw new IOException("Revision response exceeded capture limits.");
-        var payload = ParseResponse(result.StdOut);
-        if (!result.Succeeded && payload.Status is >= 200 and < 300)
-            throw new IOException("Revision request failed: " + result.StdErr);
-        return payload;
+        return CaptureResponse(result);
     })
     { }
+    internal static GhApiPayload CaptureResponse(ProcessResult result)
+    {
+        if (result.StdOutTruncated || result.StdErrTruncated) throw new GhSourceRequestException("Revision response exceeded capture limits.", result);
+        GhApiPayload payload;
+        try { payload = ParseResponse(result.StdOut); }
+        catch (IOException ex) { throw new GhSourceRequestException(ex.Message, result); }
+        if (!result.Succeeded && payload.Status is >= 200 and < 300)
+            throw new GhSourceRequestException("Revision request failed: " + result.StdErr, result);
+        return payload with { StdOut = result.StdOut, StdErr = result.StdErr };
+    }
     internal GhRevisionResolver(Func<string, CancellationToken, Task<GhApiPayload>> request) => this.request = request;
 
     internal async Task<ResolvedSkillRevision> ResolveLatestAsync(string repositoryUrl, string? sourcePath, CancellationToken token)
@@ -112,7 +122,8 @@ internal sealed class GhRevisionResolver
     }
     private static void RequireSuccess(GhApiPayload response)
     {
-        if (response.Status != 200) throw new IOException($"Source request failed (HTTP {response.Status}); no fallback or payload change was admitted.");
+        if (response.Status != 200) throw new GhSourceRequestException(
+            $"Source request failed (HTTP {response.Status}); no fallback or payload change was admitted.", response.StdOut, response.StdErr);
         if (response.Body.Length > 1024 * 1024) throw new IOException("Source response byte limit exceeded.");
     }
     private static string? Text(string body, string property)

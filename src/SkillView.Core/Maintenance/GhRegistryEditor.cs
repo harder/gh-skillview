@@ -100,6 +100,14 @@ internal static class GhRegistryEditor
             var fingerprint = OwnershipRecordFingerprint.Compute(entry, normalizeGhStrings: true);
             if (fingerprint != expectedEntryFingerprint)
                 throw new IOException("Selected owner record changed; review a new update plan.");
+            var oldPin = entry.TryGetProperty("pinnedRef", out var pin) && pin.GetString() is { Length: > 0 } value ? value : null;
+            if (oldTree.Equals(desiredTree, StringComparison.OrdinalIgnoreCase) && oldPin == desiredPin)
+            {
+                // An unchanged revision/pin is not a registry update. Preserve
+                // raw extensions, formatting and the original updatedAt value.
+                token.ThrowIfCancellationRequested();
+                return new(before, before.ToArray(), fingerprint, fingerprint);
+            }
             using var bytes = new MemoryStream();
             using (var writer = new Utf8JsonWriter(bytes))
             {

@@ -84,6 +84,11 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
     internal static OwnedDirectoryLease OpenOwnedDirectory(string path)
     {
         var handle = OpenEntry(path, directory: true, enumerateDirectory: true);
+        return CreateOwnedDirectoryLease(handle);
+    }
+
+    private static OwnedDirectoryLease CreateOwnedDirectoryLease(SafeFileHandle handle)
+    {
         try
         {
             var canonical = ReadFinalPath(handle);
