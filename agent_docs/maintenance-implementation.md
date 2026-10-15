@@ -1003,3 +1003,18 @@ re-reviewed clear. Inventory tests passed 344 cases at the earlier checkpoint;
 the debug native App passed 16 disposable command rows across minimum/current
 gh. Final-source full/platform/native/compatibility gates are pending. No original
 finding is marked complete by this checkpoint.
+
+
+Batch 12 final acceptance: PR #61 merged at
+`351224b3e058166073370caafcba225bce12d7e9`, with a tree identical to reviewed head
+`4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad`. All 13 PR checks pass. Local and each
+Linux/macOS/Windows suite pass 1,515 tests with no failures/skips; both actual-gh
+contract lanes pass 17 cases. All 100 native proof files / 468 fixture rows across
+four RIDs were inspected and bound to GitHub artifact/head metadata. Both local AOT
+hosts pass minimum/current gh identity, quarantine and update-outcome proofs plus
+actual old-schema 1/schema 2 killed-Apply inspection, recovery and undo, restoring
+original native objects/bytes/modes and exact registry. Copilot and independent
+source/evidence acceptance reviews are clear. Evidence is in `evidence/maintenance-
+batch-12-final.json`. M11 is complete; eight original findings are complete and 13
+remain. The original Installed down-arrow crash was never reproduced. Next is full
+original M12 effective agent loading, retaining all remaining M08 obligations.

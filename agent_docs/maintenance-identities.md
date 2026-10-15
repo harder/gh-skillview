@@ -151,3 +151,10 @@ verification must include the three added cases.
 The failed CLI result also publishes a guarded terminal completed update matching
 its exact counts. Unrelated cancellation is a failure in both report and progress.
 The same regressions assert these lifecycle guarantees; acceptance re-review is clear.
+
+
+Final M11 acceptance: PR #61 merged at `351224b3e058166073370caafcba225bce12d7e9`
+after all final gates passed. Full source, native artifact, old-schema restart,
+review and merge-tree evidence is recorded in `evidence/maintenance-
+batch-12-final.json`. The pending checkpoints above remain historical. M11 is
+complete; the whole 21-item goal remains active.
