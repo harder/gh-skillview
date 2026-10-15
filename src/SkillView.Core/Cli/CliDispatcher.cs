@@ -48,7 +48,8 @@ public static partial class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+                    or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -73,7 +74,8 @@ public static partial class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo" => TimeSpan.FromMinutes(10),
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+            or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -1192,9 +1194,12 @@ public static partial class CliDispatcher
             report.GhPath,
             new Inventory.LocalInventoryService.Options(
                 ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
-                AllowHiddenDirs: false),
+                AllowHiddenDirs: parsed.AllowHiddenDirectories),
             cancellationToken
         ).ConfigureAwait(false);
+
+        if (parsed.Path is not null)
+            parsed = parsed with { Path = Path.GetFullPath(parsed.Path, services.Runner.EffectiveWorkingDirectory) };
 
         bool MatchesSelector(InstalledSkill skill, string name) => name == skill.Name
             || skill.Agents.Any(agent => agent.DiscoveryRoot is not null
@@ -1227,43 +1232,13 @@ public static partial class CliDispatcher
             DryRun: parsed.DryRun,
             Force: parsed.Force,
             Unpin: parsed.Unpin,
-            Targets: targets);
+            Targets: targets,
+            AllowHiddenDirectories: parsed.AllowHiddenDirectories);
 
-        var result = await services.MaintenanceUpdates.UpdateAsync(
-            report.GhPath!,
-            updateOptions,
-            cancellationToken
-        ).ConfigureAwait(false);
-
+        var result = await Task.Run(() => services.SavedUpdates.PrepareAsync(
+            report.GhPath!, updateOptions, preSnapshot, cancellationToken), cancellationToken).ConfigureAwait(false);
         IReadOnlyList<InstalledSkill> added = Array.Empty<InstalledSkill>();
         IReadOnlyList<UpdateDiffEntry> changed = Array.Empty<UpdateDiffEntry>();
-        if (!parsed.DryRun && result.MutationAttempted)
-        {
-            services.ListAdapter.Invalidate();
-            // Cancellation stops mutations but must not discard their evidence.
-            using var reconciliation = new SkillView.Threading.CancellationSource(TimeSpan.FromSeconds(10),
-                SkillView.Threading.CancellationCallbackReporter.For(services.Logger, "update reconciliation"));
-            try
-            {
-                var postSnapshot = await services.InventoryService.CaptureAsync(report.GhPath,
-                    new Inventory.LocalInventoryService.Options(ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles, AllowHiddenDirs: false),
-                    reconciliation.Token).ConfigureAwait(false);
-                added = InventoryDiff(preSnapshot, postSnapshot);
-                changed = InventoryUpdateDiff(preSnapshot, postSnapshot);
-                if (postSnapshot.IsPartial) result = result with
-                { ReconciliationPartial = true, Notices = result.Notices.Add(new("reconciliation", "Post-update inventory is partial; per-target payload outcomes are retained.")) };
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
-            {
-                result = result with
-                {
-                    Succeeded = false,
-                    ExitCode = result.Cancelled ? 130 : 2,
-                    ErrorMessage = "Post-update inventory reconciliation incomplete; per-target evidence retained.",
-                    Notices = result.Notices.Add(new("reconciliation", ex.Message))
-                };
-            }
-        }
         if (cancellationToken.IsCancellationRequested)
             result = result with { Cancelled = true, Succeeded = false, ExitCode = 130 };
 
@@ -1282,12 +1257,13 @@ public static partial class CliDispatcher
         bool Json,
         string? Path = null,
         string? InstallationId = null,
-        string? Error = null);
+        string? Error = null,
+        bool AllowHiddenDirectories = false);
 
     internal static ParsedUpdateArgs ParseUpdateArgs(IReadOnlyList<string> args)
     {
         var skills = new List<string>();
-        bool all = false, dryRun = false, force = false, unpin = false, json = false;
+        bool all = false, dryRun = false, force = false, unpin = false, json = false, allowHidden = false;
         string? path = null, installationId = null, error = null;
         bool positionals = false;
         for (var i = 0; i < args.Count; i++)
@@ -1307,6 +1283,7 @@ public static partial class CliDispatcher
             // `--json` selects SkillView's own machine-readable output; it is
             // not passed to `gh skill update` (which has no --json flag).
             if (a == "--json") { json = true; continue; }
+            if (a == "--allow-hidden-dirs") { allowHidden = true; continue; }
             if (a == "--all") { all = true; continue; }
             if (a == "--dry-run") { dryRun = true; continue; }
             if (a == "--force") { force = true; continue; }
@@ -1316,7 +1293,7 @@ public static partial class CliDispatcher
         }
         if (path is not null && string.IsNullOrWhiteSpace(path)) error = "--path must not be empty";
         if (installationId is not null && string.IsNullOrWhiteSpace(installationId)) error = "--install-id must not be empty";
-        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, json, path, installationId, error);
+        return new ParsedUpdateArgs(skills, all, dryRun, force, unpin, json, path, installationId, error, allowHidden);
     }
 
     /// Per-skill TreeSha delta: skills present at the same ResolvedPath in
@@ -1388,7 +1365,13 @@ public static partial class CliDispatcher
             Console.Out.WriteLine($"note: {skipped} skill(s) skipped (no GitHub metadata — install via gh to enable updates)");
         }
 
-        if (p.DryRun) return;
+        if (r.SavedPlan is { } plan)
+        {
+            Console.Out.WriteLine(TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderPlan(plan)));
+            Console.Out.WriteLine($"Apply: skillview update-apply --id {plan.Id} --expect {plan.PlanFingerprint} --yes --disposition retain-original{(p.AllowHiddenDirectories ? " --allow-hidden-dirs" : "")}");
+            Console.Out.WriteLine("Keep the same HOME, state, working directory and global scan/workspace/profile options for apply.");
+        }
+        if (p.DryRun || !r.MutationAttempted) return;
 
         if (added.Count > 0)
         {
@@ -1435,11 +1418,22 @@ public static partial class CliDispatcher
     {
         w.WriteStartObject();
         w.WriteNumber("schemaVersion", 2);
+        w.WritePropertyName("savedPlan");
+        if (r.SavedPlan is null) w.WriteNullValue();
+        else JsonSerializer.Serialize(w, r.SavedPlan, SkillView.Maintenance.ReplacementJsonContext.Default.ReplacementResult);
+        if (r.SavedPlan is { } plan)
+        {
+            w.WriteStartArray("applyArguments");
+            foreach (var arg in new[] { "update-apply", "--id", plan.Id, "--expect", plan.PlanFingerprint, "--yes", "--disposition", "retain-original" }) w.WriteStringValue(arg);
+            if (p.AllowHiddenDirectories) w.WriteStringValue("--allow-hidden-dirs");
+            w.WriteEndArray();
+            w.WriteString("applyContext", "Reuse the same HOME, state, working directory and global scan/workspace/profile options.");
+        }
         w.WriteString("stdout", r.StdOut);
         w.WriteString("stderr", r.StdErr);
         w.WriteBoolean("canceled", r.Cancelled);
         w.WriteBoolean("mutationAttempted", r.MutationAttempted);
-        w.WriteBoolean("partial", r.ReconciliationPartial || !r.Succeeded || r.Outcomes.Any(o => o.Status is "failed" or "refused" or "canceled" or "not-attempted" or "skipped" or "untracked" or "verification-incomplete" or "source-unavailable" or "availability-unknown"));
+        w.WriteBoolean("partial", r.ReconciliationPartial || !r.Succeeded || r.Outcomes.Any(o => o.Status is "failed" or "refused" or "canceled" or "not-attempted" or "skipped" or "untracked" or "verification-incomplete" or "source-unavailable" or "availability-unknown" or "not-started" or "recovery-required"));
         w.WriteStartArray("outcomes");
         foreach (var outcome in r.Outcomes)
         {
@@ -1476,6 +1470,7 @@ public static partial class CliDispatcher
         w.WriteBoolean("all", p.All);
         w.WriteBoolean("force", p.Force);
         w.WriteBoolean("unpin", p.Unpin);
+        w.WriteBoolean("allowHiddenDirectories", p.AllowHiddenDirectories);
 
         w.WriteStartArray("skills");
         foreach (var s in p.Skills) w.WriteStringValue(s);
@@ -2181,10 +2176,13 @@ public static partial class CliDispatcher
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
             | `install OWNER/REPO [SKILL]` | Install one skill, or every skill in the repo with `--all`, then rescan inventory. | `--all`, `--agent`, `--scope`, `--path`, `--version`, `--pin`, `--force`, `--upstream`, `--from-local`, `--allow-hidden-dirs`, `--json` |
-            | `update [SKILL...]` | Check or update exact physical installations. Ambiguous names need a path or installation ID; local changes are protected. | `--all`, `--path`, `--install-id`, `--dry-run`, `--force`, `--unpin`, `--json` |
+            | `update [SKILL...]` | Check availability or stage one exact saved update for review. Other selected targets remain not started until this review is applied/skipped. | `--all`, `--path`, `--install-id`, `--dry-run`, `--unpin`, `--allow-hidden-dirs`, `--json`; `--force` never approves replacement |
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `update-plan` | Resolve and stage an immutable newer revision, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--unpin`, `--allow-hidden-dirs`, `--json` |
+            | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update using the same fingerprint and disposition contract as restore commands. | `--id`, `--expect`, `--yes`, `--disposition retain-original`, `--json` |
+            | `update-repair-owner` | Repair only a recognized torn registry from its explicitly reviewed retained image. Inspect again before resuming payload recovery. | `--id`, `--yes --expect`, `--json` |
             | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |
             | `restore-apply` | Apply a saved plan, retaining the original directory. | `--id`, `--yes --disposition retain-original --expect`, `--json` |
             | `restore-recover`, `restore-undo` | Resume or undo after inspecting current evidence; never overwrite another object. | `--id`, `--yes --expect`, `--json` |

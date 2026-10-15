@@ -12,15 +12,20 @@ namespace SkillView.Maintenance;
 
 /// Saved, exact-payload replacement. Both old and displaced directories are
 /// retained by exclusive native rename; this store never extracts or deletes.
-internal sealed class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
+internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     private const int MaxJournalBytes = 16 * 1024 * 1024;
     private const int MaxSteps = 32;
     private const int MaxPlans = 16;
 
-    internal async Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
-        Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token)
+    internal Task<ReplacementResult> PlanAsync(InstalledSkill target, InventorySnapshot inventory,
+        Func<NativeStateDirectory, CancellationToken, Task> stage, CancellationToken token) =>
+        PlanCoreAsync(target, inventory, stage, null, null, token);
+
+    private async Task<ReplacementResult> PlanCoreAsync(InstalledSkill target, InventorySnapshot inventory,
+        Func<NativeStateDirectory, CancellationToken, Task> stage, ReplacementRevision? revision,
+        Func<NativeStateDirectory, CancellationToken, Task>? stageBase, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var canonicalPath = Canonical(target.ResolvedPath);
@@ -29,7 +34,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             .OrderByDescending(path => path.Length).FirstOrDefault()
             ?? throw new IOException("The physical installation needs a containing scan root; add --scan-root for its actual directory.");
         target = target with { ResolvedPath = canonicalPath, ScanRoot = containingRoot };
-        inventory = Admit(target, inventory, token);
+        using (var initialOwner = OpenOwner(revision?.Owner, token, requireBefore: true))
+            inventory = Admit(target, inventory, token, owner: initialOwner);
         CheckPlacement(inventory);
         using var original = NativeDirectoryMoveLease.Open(Canonical(target.ScanRoot), target.ResolvedPath, token);
         var before = original.Capture(token);
@@ -42,7 +48,9 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         var afterMetadata = original.Capture(token);
         if (afterMetadata.Fingerprint != before.Fingerprint || afterMetadata.ObjectStateFingerprint != before.ObjectStateFingerprint)
             throw new IOException("The installation changed while reading tracking metadata; refresh before planning.");
-        var context = Context(target, inventory, token);
+        string context;
+        using (var initialOwner = OpenOwner(revision?.Owner, token, requireBefore: true))
+            context = Context(target, inventory, token, owner: initialOwner);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token);
         CheckWriter(writer);
@@ -60,26 +68,48 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         try { await stage(staging, token).ConfigureAwait(false); staging.SealStagingDirectory(493, token); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         { throw new IOException($"Staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
-        inventory = Admit(target, inventory, token);
+        // No data-file lock is held while remote staging runs.
         operation.ValidateLocation(token);
         using var candidate = NativeDirectoryMoveLease.Open(operation.CanonicalPath, candidatePath, token);
         var desired = candidate.FlushPayload(token);
         var metadata = PayloadSnapshot.Capture(candidatePath, token).FrontMatter
             ?? throw new IOException("Staged skill has no supported metadata.");
-        SameTracking(target.FrontMatter, metadata);
+        SameTracking(revision?.DesiredMetadata ?? target.FrontMatter, metadata);
+        if (revision is not null)
+        {
+            if (metadata.Name != target.FrontMatter.Name)
+                throw new IOException("The candidate changed the authored skill name; review a source migration.");
+            using var baseline = operation.CreateStagingDirectory("recorded-base", token);
+            try { await stageBase!(baseline, token).ConfigureAwait(false); baseline.SealStagingDirectory(493, token); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { throw new IOException($"Recorded-base staging failed; installation unchanged. Private evidence retained at {operation.CanonicalPath}. {ex.Message}", ex); }
+            using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, baseline.CanonicalPath, token);
+            var recorded = baseLease.FlushPayload(token);
+            var baseMetadata = PayloadSnapshot.Capture(baseline.CanonicalPath, token).FrontMatter
+                ?? throw new IOException("Recorded base has no supported metadata.");
+            SameTracking(target.FrontMatter, baseMetadata);
+            revision = revision with
+            {
+                DesiredMetadata = metadata,
+                RecordedBase = ReplacementEvidence.From(recorded),
+                LocalChanges = PayloadSnapshot.Differences(recorded, before)
+            };
+        }
         if (desired.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json"))
             throw new IOException("Staged payload contains owner records; use an owner transition plan.");
         original.Revalidate(token);
+        using var finalOwner = OpenOwner(revision?.Owner, token, requireBefore: true);
+        inventory = Admit(target, inventory, token, owner: finalOwner);
         var current = original.Capture(token);
         if (before.ObjectStateFingerprint != current.ObjectStateFingerprint || before.Fingerprint != current.Fingerprint
-            || Context(target, inventory, token) != context)
+            || Context(target, inventory, token, owner: finalOwner) != context)
             throw new IOException("Installed payload or context changed while staging; no replacement was admitted.");
         var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents,
             target.FrontMatter, target.AllOwnershipClaims.ToImmutableArray());
-        var plan = new ReplacementPlan(1, id, "restore-recorded", DateTimeOffset.UtcNow, before.Path,
+        var plan = new ReplacementPlan(revision is null ? 1 : 2, id, revision is null ? "restore-recorded" : "update-revision", DateTimeOffset.UtcNow, before.Path,
             original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity,
             subject, context, ReplacementEvidence.From(before), ReplacementEvidence.From(desired),
-            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "");
+            PayloadSnapshot.Differences(before, desired, false).AddRange(before.RootUnixMode != desired.RootUnixMode ? new string[] { "/" } : Array.Empty<string>()), "", revision);
         plan = plan with { ReviewFingerprint = PlanHash(plan) };
         Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
         return Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
@@ -90,37 +120,42 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
     {
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
-        var observation = Observe(plan, session.Operation, inventory, token);
+        using var owner = OpenOwner(plan.Revision?.Owner, token, recoverySession: session, inventory: inventory);
+        var observation = Observe(plan, session.Operation, inventory, token, owner);
         return Result(plan, observation.Topology, true, false, false, ObservationHash(plan, observation),
-            (session.IncompleteJournal ? "Incomplete journal entries remain unchanged; recovery uses the reviewed current locations. " : "") + "Current locations verified against the saved original and candidate. This fingerprint is required for recovery or undo; agent session state is unknown.");
+            (session.IncompleteJournal ? "Incomplete journal entries remain unchanged; recovery uses the reviewed current locations. " : "") + "Current locations verified against the saved original and candidate. This fingerprint is required for recovery or undo; agent session state is unknown."
+            + (observation.Owner is null ? "" : " Registry owner state: " + observation.Owner.State + ".")
+            + (observation.Owner?.Repair is not { } repair ? "" : $" Explicit owner repair would restore the entire retained registry image {repair.ImageHash} ({repair.Bytes} bytes, selected entry {repair.EntryState}, {repair.Direction} write {repair.WriteId}). Review its retained intent before authorizing repair. A matching prefix is evidence, not proof of which process changed the file."), observation.Owner);
     }
 
     internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token)
     {
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
+        using var owner = OpenOwner(plan.Revision?.Owner, token, requireBefore: true);
         if (expectedPlan != plan.ReviewFingerprint) throw new IOException("Saved plan fingerprint does not match the reviewed plan.");
         if (session.StepCount != 0) throw new IOException("This plan has started. Inspect it and use explicit recovery with the current review fingerprint.");
-        var observation = Observe(plan, session.Operation, inventory, token);
+        var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
             || observation.Candidate?.Objects != plan.Candidate.Objects
             || observation.Root != plan.RootIdentity || observation.Parent != plan.ParentIdentity)
             throw new IOException("The reviewed installation or stage changed; create a new plan.");
-        return Execute(session, inventory, observation, undo: false, token);
+        return Execute(session, inventory, observation, undo: false, token, owner);
     }
 
     internal ReplacementResult Recover(string id, string expectedObservation, InventorySnapshot inventory,
         bool undo, CancellationToken token)
     {
         using var session = Open(id, inventory, token);
-        var observation = Observe(session.Plan, session.Operation, inventory, token);
+        using var owner = OpenOwner(session.Plan.Revision?.Owner, token, recoverySession: session, inventory: inventory);
+        var observation = Observe(session.Plan, session.Operation, inventory, token, owner);
         if (expectedObservation != ObservationHash(session.Plan, observation))
             throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
-        return Execute(session, inventory, observation, undo, token);
+        return Execute(session, inventory, observation, undo, token, owner);
     }
 
     private ReplacementResult Execute(Session session, InventorySnapshot inventory, ReplacementObservation current,
-        bool undo, CancellationToken token)
+        bool undo, CancellationToken token, OwnerContext? owner = null)
     {
         var plan = session.Plan;
         var changed = false;
@@ -130,13 +165,21 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             session.UseRecoveryJournal(Exclusions(inventory), token);
         var needed = undo ? current.Topology == "installed" ? 4 : current.Topology is "replacement-retained" or "original-retained" ? 2 : 0
             : current.Topology == "ready" ? 4 : current.Topology == "original-retained" ? 2 : 0;
+        var needsOwnerWrite = owner is not null && !OwnerSatisfied(current, owner, undo);
+        if (owner is not null && current.Owner?.State is not ("before" or "desired"))
+            throw new IOException("The owner state needs explicit review before payload or registry changes.");
+        if (owner is not null && current.Topology is ("ready" or "original-retained") && current.Owner?.State != "before")
+            throw new IOException("Owner/payload phases disagree before candidate promotion; no move was admitted.");
+        if (needsOwnerWrite) needed += 2;
         if (session.StepCount > MaxSteps - needed)
             throw new IOException("Journal capacity for the entire remaining transition is unavailable; no move was admitted.");
+        using var ownerJournal = OpenOwnerJournal(session, inventory, token, create: needsOwnerWrite);
+        if (needsOwnerWrite) ownerJournal!.Reserve(undo);
         try
         {
             if (!undo && current.Topology == "restored") throw new IOException("This plan was undone; create a new plan to install again.");
             if (undo && current.Topology == "ready")
-                return Result(plan, "ready", true, false, false, ObservationHash(plan, current), "Replacement has not started; the original is still installed.");
+                return Result(plan, "ready", true, false, false, ObservationHash(plan, current), "Replacement has not started; the original is still installed.", current.Owner);
             if (!undo && current.Topology == "ready")
                 Move("retain", plan.RootPath, plan.OriginalPath, "original", false);
             if (!undo && current.Topology == "original-retained")
@@ -145,10 +188,12 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                 Move("displace", plan.RootPath, plan.OriginalPath, "displaced", false);
             if (undo && current.Topology is "replacement-retained" or "original-retained")
                 Move("restore", session.Operation.CanonicalPath, Path.Combine(session.Operation.CanonicalPath, "original"), null, true);
-            var success = undo ? current.Topology is "restored" or "ready" : current.Topology == "installed";
+            if (needsOwnerWrite && (undo ? current.Topology == "restored" : current.Topology == "installed")) PublishOwner();
+            var success = (undo ? current.Topology is "restored" or "ready" : current.Topology == "installed")
+                && (owner is null || OwnerSatisfied(current, owner, undo));
             return Result(plan, current.Topology, success, changed, token.IsCancellationRequested, ObservationHash(plan, current),
                 success ? "Payload and native continuity verified. Retained directories remain available; agent session state is unknown."
-                    : "No further transition was admitted; inspect the retained locations.");
+                    : "No further transition was admitted; inspect the retained locations.", current.Owner);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or EntryPointNotFoundException)
         {
@@ -162,7 +207,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             token.ThrowIfCancellationRequested();
             // Every transition revalidates ownership and topology. Publication
             // changes the private parent generation, so open a fresh move lease.
-            var admitted = Observe(plan, session.Operation, inventory, token);
+            var admitted = Observe(plan, session.Operation, inventory, token, owner);
             if (admitted != current) throw new IOException("Locations changed between reviewed transitions.");
             if (session.StepCount > MaxSteps - 2)
                 throw new IOException("Journal capacity for intent and completion is unavailable; no move was admitted.");
@@ -195,28 +240,55 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             if (before.Fingerprint != after.Fingerprint || !before.Objects.SequenceEqual(after.Objects))
                 throw new IOException("Objects changed during relocation; review recovery.");
             checkpoint?.Invoke(action + "-moved");
-            current = Observe(plan, session.Operation, inventory, reconciliation.Token);
+            current = Observe(plan, session.Operation, inventory, reconciliation.Token, owner);
             Append(action + "-complete", current, reconciliation.Token);
         }
 
-        void Append(string status, ReplacementObservation observation, CancellationToken ct)
+        void PublishOwner()
+        {
+            var admitted = Observe(plan, session.Operation, inventory, token, owner);
+            if (admitted != current) throw new IOException("Owner or payload evidence changed before owner publication.");
+            var snapshot = owner!.Held.Read(token);
+            if (snapshot.ContentHash != admitted.Owner!.Hash || snapshot.Identity != admitted.Owner.Identity)
+                throw new IOException("Registry changed after transition review; inspect again.");
+            var writeId = Guid.NewGuid().ToString("N");
+            Append(undo ? "owner-undo-intent" : "owner-forward-intent", admitted, token, writeId);
+            var result = owner.Held.WriteSelection(undo ? owner.Transition.DesiredFingerprint : owner.Transition.BeforeFingerprint,
+                undo ? owner.Transition.BeforeEntry : owner.Transition.DesiredEntry, ownerJournal!.Directory, writeId, token,
+                snapshot, new(plan.ReviewFingerprint, undo ? "undo" : "forward", writeId));
+            changed |= result.MutationAttempted;
+            if (!result.Succeeded) throw new IOException("Owner publication needs recovery. " + result.Error);
+            checkpoint?.Invoke("owner-written");
+            using var reconciliation = new CancellationSource(TimeSpan.FromSeconds(30), CancellationCallbackReporter.For(logger, "Owner reconciliation"));
+            current = Observe(plan, session.Operation, inventory, reconciliation.Token, owner);
+            Append(undo ? "owner-undo-complete" : "owner-forward-complete", current, reconciliation.Token, writeId);
+        }
+
+        void Append(string status, ReplacementObservation observation, CancellationToken ct, string? ownerWriteId = null)
         {
             if (session.StepCount >= MaxSteps) throw new IOException("Recovery journal step limit reached; retain evidence for inspection.");
-            var step = new ReplacementStep(session.StepCount, plan.ReviewFingerprint, status, observation);
+            var step = new ReplacementStep(session.StepCount, plan.ReviewFingerprint, status, observation, ownerWriteId);
             Write(session.Journal, $"step-{session.StepCount:D4}.json", step, ReplacementJsonContext.Default.ReplacementStep, ct);
             session.StepCount++;
+            if (ownerWriteId is not null) { session.LatestOwnerStep = step; session.OwnerWriteIds.Add(ownerWriteId); }
         }
     }
 
     private ReplacementObservation Observe(ReplacementPlan plan, NativeStateDirectory operation,
-        InventorySnapshot inventory, CancellationToken token)
+        InventorySnapshot inventory, CancellationToken token, OwnerContext? owner = null)
     {
         var subject = Subject(plan);
-        inventory = Admit(subject, inventory, token, plan);
-        if (Context(subject, inventory, token, plan.Subject.InstallationId) != plan.ContextFingerprint)
+        inventory = Admit(subject, inventory, token, plan, owner);
+        if (Context(subject, inventory, token, plan.Subject.InstallationId, owner) != plan.ContextFingerprint)
             throw new IOException("Ownership, exposures or configured roots changed; the saved plan needs renewed review.");
         operation.ValidateLocation(token);
-        foreach (var privateName in new[] { "candidate", "original", "displaced" })
+        if (plan.Revision?.RecordedBase is { } baseline)
+        {
+            using var baseLease = NativeDirectoryMoveLease.Open(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "recorded-base"), token);
+            VerifyPayload(baseline, baseLease.Capture(token));
+        }
+        foreach (var privateName in plan.Revision is null ? new[] { "candidate", "original", "displaced" }
+            : new[] { "candidate", "original", "displaced", "recorded-base" })
             QuarantineStore.EnsureNoConsumers(Path.Combine(operation.CanonicalPath, privateName), inventory, token);
         var original = Slot(plan.RootPath, plan.OriginalPath);
         var retained = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "original"));
@@ -237,7 +309,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             || !NativeDirectoryMoveLease.SameObject(plan.ParentIdentity, parentIdentity)
             || rootIdentity.CanonicalPath != plan.RootPath || parentIdentity.CanonicalPath != plan.ParentIdentity.CanonicalPath)
             throw new IOException("Original root/parent authority changed: " + rootError);
-        return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity);
+        return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity, owner?.Observe(token));
 
         ReplacementSlot? Slot(string scanRoot, string path)
         {
@@ -283,9 +355,10 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
     };
 
     private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token,
-        ReplacementPlan? activePlan = null)
+        ReplacementPlan? activePlan = null, OwnerContext? owner = null)
     {
         token.ThrowIfCancellationRequested();
+        inventory = owner?.RecoveryInventory(inventory, token) ?? inventory;
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512
             || target.Validity != ValidityState.Valid || !target.MetadataConflicts.IsEmpty
             || !target.OwnershipDiagnostics.IsEmpty || !target.FrontMatter.Diagnostics.IsEmpty
@@ -298,9 +371,9 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         if (target.AllOwnershipClaims.Any(claim => claim.Provider != "gh-vercel-global" || claim.ReadOnly || claim.IsExclusiveOwner)
             || inventory.OwnershipRecords.Any(claim => claim.Diagnostic is not null))
             throw new IOException("Native/exclusive or uncertain owner evidence requires an owner transition plan.");
-        GhSharedLockGuard.ValidateCapturedOwners([target], token);
+        ValidateOwners(target, token, owner);
         var capturedClaims = target.AllOwnershipClaims.ToArray();
-        var freshClaims = ReadOwners(target, token);
+        var freshClaims = ReadOwners(target, token, owner).Select(claim => owner?.Normalize(claim) ?? claim).ToImmutableArray();
         if (!freshClaims.IsEmpty)
         {
             var records = freshClaims.Where(claim => claim.Provider == "gh-vercel-global" && claim.Selector is not null)
@@ -337,7 +410,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                 saved.AgentId == agent.AgentId && OwnershipPath.Same(saved.Path, agent.Path)
                 && saved.IsSymlink == agent.IsSymlink && saved.Profile == agent.Profile && saved.Context == agent.Context))))
             throw new IOException("The installation's discovered consumers changed; create a newly reviewed plan.");
-        if (inventory.OwnershipRecords.Where(claim => claim.Describes(target)).Any(claim =>
+        if (inventory.OwnershipRecords.Where(claim => claim.Describes(target)).Select(claim => owner?.Normalize(claim) ?? claim).Any(claim =>
                 !capturedClaims.Any(captured => captured.LockFilePath == claim.LockFilePath
                     && captured.Selector == claim.Selector && captured.EntryFingerprint == claim.EntryFingerprint
                     && captured.Provider == claim.Provider && captured.ReadOnly == claim.ReadOnly
@@ -387,10 +460,10 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         }
     }
 
-    private string Context(InstalledSkill target, InventorySnapshot inventory, CancellationToken token, string? fixedId = null)
+    private string Context(InstalledSkill target, InventorySnapshot inventory, CancellationToken token, string? fixedId = null, OwnerContext? owner = null)
     {
         token.ThrowIfCancellationRequested();
-        GhSharedLockGuard.ValidateCapturedOwners([target], token);
+        ValidateOwners(target, token, owner);
         var roots = inventory.ConfiguredRoots.OrderBy(scan => scan.Path, StringComparer.Ordinal).ToArray();
         using var bytes = new MemoryStream();
         using (var writer = new BinaryWriter(bytes, System.Text.Encoding.UTF8, true))
@@ -412,7 +485,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         return Hash(bytes.GetBuffer().AsSpan(0, (int)bytes.Length));
     }
 
-    private ImmutableArray<SkillPackage> ReadOwners(InstalledSkill target, CancellationToken token)
+    private ImmutableArray<SkillPackage> ReadOwners(InstalledSkill target, CancellationToken token, OwnerContext? owner = null)
     {
         var diagnostics = new List<LockReadDiagnostic>();
         var destinations = target.Agents.Select(agent => agent.DiscoveryRoot ?? Path.GetDirectoryName(agent.Path)!)
@@ -423,7 +496,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         var cwd = runner?.EffectiveWorkingDirectory ?? Environment.CurrentDirectory;
         if (home is not null) home = Path.GetFullPath(home, cwd);
         if (stateHome is not null) stateHome = Path.GetFullPath(stateHome, cwd);
-        var observed = new SkillLockFileReader(logger).LoadObservations(destinations, token, new(home, stateHome), diagnostics);
+        var observed = new SkillLockFileReader(logger).LoadObservations(destinations, token, new(home, stateHome), diagnostics,
+            owner is null ? null : path => owner.ReadFor(path, token));
         if (diagnostics.Any(diagnostic => diagnostic.CoveredRoots.IsEmpty || diagnostic.CoveredRoots.Any(rootPath =>
                 destinations.Any(destination => OwnershipPath.Same(rootPath, destination)))))
             throw new IOException("Live owner discovery is incomplete; replacement is refused.");
@@ -476,11 +550,11 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
     private static string ObservationHash(ReplacementPlan plan, ReplacementObservation observation) => Hash(
         System.Text.Encoding.UTF8.GetBytes(plan.ReviewFingerprint + "\n" + JsonSerializer.Serialize(observation, ReplacementJsonContext.Default.ReplacementObservation)));
 
-    private ReplacementResult Result(ReplacementPlan plan, string status, bool succeeded, bool changed, bool canceled, string review, string message) =>
+    private ReplacementResult Result(ReplacementPlan plan, string status, bool succeeded, bool changed, bool canceled, string review, string message, ReplacementOwnerObservation? owner = null) =>
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, "candidate"), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, "plan.json"),
-            plan.Original.Mode, plan.Candidate.Mode);
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner);
 
     private void Write<T>(NativeStateDirectory operation, string name, T value, JsonTypeInfo<T> type, CancellationToken token)
     {
@@ -527,7 +601,9 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
             operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
             var plan = Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (plan.SchemaVersion != 1 || plan.Id != id || plan.Purpose != "restore-recorded"
+            if (!(plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null
+                    || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null)
+                || plan.Id != id
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
                 || PlanHash(plan) != plan.ReviewFingerprint
                 || !QuarantineStore.ValidHash(plan.ReviewFingerprint) || !QuarantineStore.ValidHash(plan.ContextFingerprint)
@@ -541,11 +617,14 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                 || plan.Subject.Owners.Any(owner => owner is null))
                 throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
             ValidateEvidence(plan.Original); ValidateEvidence(plan.Candidate);
+            ValidateRevision(plan, operation.CanonicalPath, token);
             var stepCount = 0;
+            ReplacementStep? latestOwnerStep = null;
+            var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
             var incompleteJournal = false;
-            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 8).ToArray();
-            if (entries.Length > MaxSteps + 6) throw new IOException("Replacement operation entry budget exceeded.");
-            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery")))
+            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 10).ToArray();
+            if (entries.Length > MaxSteps + 8) throw new IOException("Replacement operation entry budget exceeded.");
+            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal")))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             while (names.Contains($"step-{stepCount:D4}.json"))
@@ -556,8 +635,12 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                     var step = Read(operation, $"step-{stepCount:D4}.json", ReplacementJsonContext.Default.ReplacementStep, token);
                     if (step.Sequence != stepCount || step.PlanFingerprint != plan.ReviewFingerprint
                         || step.Status is not ("retain-intent" or "retain-complete" or "install-intent" or "install-complete"
-                            or "displace-intent" or "displace-complete" or "restore-intent" or "restore-complete"))
+                            or "displace-intent" or "displace-complete" or "restore-intent" or "restore-complete"
+                            or "owner-forward-intent" or "owner-forward-complete" or "owner-undo-intent" or "owner-undo-complete"
+                            or "owner-repair-intent" or "owner-repair-complete")
+                        || !ValidOwnerStep(step, plan))
                         throw new IOException("Replacement journal sequence or identity is invalid.");
+                    if (step.OwnerWriteId is not null) { latestOwnerStep = step; ownerWriteIds.Add(step.OwnerWriteId); }
                 }
                 catch (Exception ex) when (ex is JsonException or JournalDataException or EndOfStreamException)
                 {
@@ -565,14 +648,21 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                     // written. Keep it untouched. Explicit live-slot review is
                     // the authority for recovery; subsequent steps append.
                     incompleteJournal = true;
+                    // An incomplete step grants no new write authority. Keep
+                    // the last durable owner marker; raw recovery additionally
+                    // refuses any unbound later write/completion evidence.
                     logger.Warn("replacement", $"Replacement {id}: preserving incomplete step {stepCount}: {ex.Message}");
                 }
                 stepCount++;
             }
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery")
+            if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
+            if (names.Contains("owner-journal") && plan.Revision?.Owner is null) throw new IOException("Unexpected owner journal for this plan.");
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal")
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");
-            var session = new Session(state, writer, operation, operationWriter, plan, stepCount, incompleteJournal);
+            var session = new Session(state, writer, operation, operationWriter, plan, stepCount, incompleteJournal) { LatestOwnerStep = latestOwnerStep };
+            session.OwnerWriteIds.UnionWith(ownerWriteIds);
+            using var ownerJournal = OpenOwnerJournal(session, inventory, token, create: false);
             if (names.Contains("undo-recovery")) session.OpenRecoveryJournal(Exclusions(inventory), token, false);
             return session;
         }
@@ -595,6 +685,10 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
 
     private sealed class JournalDataException(string message) : IOException(message);
 
+    private static bool ValidOwnerStep(ReplacementStep step, ReplacementPlan plan) => step.Status.StartsWith("owner-", StringComparison.Ordinal)
+        ? plan.Revision?.Owner is not null && QuarantineStore.ValidId(step.OwnerWriteId!)
+        : step.OwnerWriteId is null;
+
     private sealed class Session(NativeStateDirectory state, FileStream writer, NativeStateDirectory operation,
         FileStream operationWriter, ReplacementPlan plan, int stepCount, bool incompleteJournal) : IDisposable
     {
@@ -602,6 +696,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         internal ReplacementPlan Plan { get; } = plan;
         internal bool IncompleteJournal { get; } = incompleteJournal;
         internal int StepCount { get; set; } = stepCount;
+        internal ReplacementStep? LatestOwnerStep { get; set; }
+        internal HashSet<string> OwnerWriteIds { get; } = new(StringComparer.Ordinal);
         internal NativeStateDirectory? RecoveryJournal { get; private set; }
         internal NativeStateDirectory Journal => RecoveryJournal ?? Operation;
         private int recoverySteps;
@@ -629,8 +725,10 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
                     {
                         var step = Read(recovery, $"step-{count:D4}.json", ReplacementJsonContext.Default.ReplacementStep, token);
                         if (step.Sequence != count || step.PlanFingerprint != Plan.ReviewFingerprint
-                            || step.Status is not ("displace-intent" or "displace-complete" or "restore-intent" or "restore-complete"))
+                            || step.Status is not ("displace-intent" or "displace-complete" or "restore-intent" or "restore-complete" or "owner-undo-intent" or "owner-undo-complete" or "owner-repair-intent" or "owner-repair-complete")
+                            || !ValidOwnerStep(step, Plan))
                             throw new IOException("Invalid undo recovery journal identity.");
+                        if (step.OwnerWriteId is not null) { LatestOwnerStep = step; OwnerWriteIds.Add(step.OwnerWriteId); }
                     }
                     catch (Exception ex) when (ex is JsonException or JournalDataException or EndOfStreamException) { }
                     count++;

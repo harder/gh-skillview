@@ -179,6 +179,7 @@ public sealed class LocalInventoryService
             Diagnostics = diagnostics,
             Providers = providers.ToImmutable(),
             OwnershipRecords = local.Packages.Select(package => package.Package).ToImmutableArray(),
+            OwnershipReadDiagnostics = local.LockDiagnostics,
         };
     }
 

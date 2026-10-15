@@ -17,21 +17,40 @@ internal sealed record ReplacementSubject(string InstallationId, string Name, Sc
     ImmutableArray<AgentMembership> Agents, SkillFrontMatter Metadata,
     ImmutableArray<SkillPackage> Owners);
 
+internal sealed record ReplacementRevision(ResolvedSkillRevision Source, SkillFrontMatter DesiredMetadata,
+    ReplacementEvidence? RecordedBase, ImmutableArray<string> LocalChanges,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerTransition? Owner = null);
+
+internal sealed record ReplacementOwnerTransition(string RegistryPath, string Selector, SecureFileIdentity Identity,
+    byte[] BeforeEntry, byte[] DesiredEntry, string BeforeFingerprint, string DesiredFingerprint, DateTimeOffset UpdatedAt,
+    SecureFileIdentity ParentIdentity);
+
+internal sealed record ReplacementOwnerObservation(string State, string RegistryPath, string Selector,
+    string Hash, int Bytes, SecureFileIdentity Identity,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerRepair? Repair = null);
+
+internal sealed record ReplacementOwnerRepair(string WriteId, string Direction, string ImageHash, int Bytes, string EntryState);
+
 internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purpose, DateTimeOffset CreatedAt,
     string OriginalPath, string RootPath, SecureFileIdentity RootIdentity, SecureFileIdentity ParentIdentity,
     ReplacementSubject Subject, string ContextFingerprint, ReplacementEvidence Original,
-    ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint);
+    ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
 internal sealed record ReplacementObservation(string Topology, ReplacementSlot? Original, ReplacementSlot? Retained,
-    ReplacementSlot? Candidate, ReplacementSlot? Displaced, SecureFileIdentity Root, SecureFileIdentity Parent);
+    ReplacementSlot? Candidate, ReplacementSlot? Displaced, SecureFileIdentity Root, SecureFileIdentity Parent,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null);
 
-internal sealed record ReplacementStep(int Sequence, string PlanFingerprint, string Status, ReplacementObservation Observation);
+internal sealed record ReplacementStep(int Sequence, string PlanFingerprint, string Status, ReplacementObservation Observation,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? OwnerWriteId = null);
 
 internal sealed record ReplacementResult(string Id, string Status, bool Succeeded, bool MutationObserved,
     bool Canceled, string OriginalPath, string RetainedPath, string CandidatePath, string DisplacedPath,
-    string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode);
+    string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, WriteIndented = true, RespectRequiredConstructorParameters = true)]

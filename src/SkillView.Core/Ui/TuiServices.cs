@@ -19,8 +19,12 @@ public sealed class TuiServices
     public required GhSkillPreviewService PreviewService { get; init; }
     public required GhSkillInstallService InstallService { get; init; }
     public required GhSkillUpdateService UpdateService { get; init; }
-    public SkillView.Maintenance.SkillUpdateCoordinator MaintenanceUpdates =>
+    private SkillView.Maintenance.SkillUpdateCoordinator UpdateAvailability =>
         new(InstallService, UpdateService, ListAdapter, Logger, Runner);
+    internal SkillView.Maintenance.SavedUpdateCoordinator SavedUpdates => new(
+        new SkillView.Maintenance.ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(
+            SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(Runner))!, "replacements"), Logger, runner: Runner),
+        UpdateAvailability, ListAdapter, Logger);
     public required GhSkillListAdapter ListAdapter { get; init; }
     public required ScanRootResolver ScanRootResolver { get; init; }
     public required LocalSkillScanner Scanner { get; init; }

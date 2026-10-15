@@ -555,3 +555,173 @@ Owner revalidation includes the physical namespace installation root. Focused
 coverage includes source/tree/ref/pin drift, normal and interrupted namespace
 apply/undo with and without README, and newly introduced contextual ownership.
 The native proof also exercises a nested namespaced installation.
+
+PR #52 merged as `178476f7d8b0c9f7ab6cb5dcf4066410f0570c7c` after CI
+38679954928 and CodeQL 38679954897 passed. The merged tree exactly matches the
+reviewed source tree. Final local and three-platform suites pass 1178 tests;
+both native hosts pass the real-gh proof on all four RIDs. Local AOT hosts also
+pass gh 2.97.0 and 2.102.0 with direct/shared/namespaced fixtures and real process
+kill/restart recovery. Both Copilot findings are resolved after independent
+re-review. See the finalized `evidence/maintenance-batch-5.json`.
+
+## Batch 6 checkpoint: immutable newer revisions and preserving registry sessions
+
+The active batch now provides ownerless saved updates through `update-plan`,
+`update-inspect`, `update-apply`, `update-recover` and `update-undo`. Schema 2 binds
+the resolved commit/source tree, original tracking, desired tracking/unpin,
+recorded base and local differences. Schema 1 restore fingerprints remain
+compatible. Applying promotes the reviewed native candidate without another
+source resolution and retains the original directory for verified undo.
+
+The existing-only native registry lease matches gh's Unix/Windows data-file
+lock, pins the parent/address/file and writes through the same file object.
+The preserving editor can replace one exact selected entry while retaining
+fresh unrelated records and extensions. The standalone write session durably
+records raw before/desired evidence before truncating, attempts bounded live
+preimage restoration after write/cancellation failure under the same lock, and
+retains unattributable foreign bytes for explicit review. It is not yet wired
+into shared payload replacement; those updates remain refused.
+
+Independent review/re-review fixed legacy source-path/no-tag compatibility,
+recorded-base directory admission and incomplete baseline-stage diagnostics.
+Local verification passes 1,264 default-suite tests, style, locked restore and
+site build. Both macOS native AOT hosts publish, with standalone AOT warnings
+promoted to errors. Actual gh 2.97.0 and 2.102.0 processes respect the held data
+lock. Twelve disposable newer-revision CLI fixtures (four debug, eight AOT)
+prove direct/nested namespace updates, explicit unpin, local-change review,
+same-name isolation, unchanged registry bytes, native object continuity and
+real process-kill/restart/recovery/undo. See
+`evidence/maintenance-batch-6-checkpoint.json` and
+`evidence/prove-revision-update.py`.
+
+Batch 6 is not ready to merge: shared owner integration must retain the data
+lock across payload and registry transitions, use same-handle registry reads,
+bind phase-aware owner evidence and offer explicit torn-write review after
+process death. Ordinary product updates/TUI routing and the full platform proof
+remain. The original 21-item objective is unchanged; this checkpoint does not
+close any item's final acceptance.
+
+## Batch 6 checkpoint: shared owner transitions and reviewed torn-image repair
+
+Saved newer-revision updates now coordinate one verified global gh owner with
+the retained/promoted payload. A held native registry lease spans every move,
+same-handle contextual reread, selected-entry write and terminal journal step.
+The selected entry preserves extensions and installedAt; apply and undo rebase
+into fresh unrelated manager bytes. Owner state and full raw/native registry
+snapshots participate in recovery review fingerprints. Owner journals reserve
+separate bounded undo capacity, including when forward evidence is incomplete.
+
+`update-repair-owner --yes --expect` repairs only explicitly reviewed torn JSON
+from applicable unfinished causal evidence. It never moves payloads. Valid
+manager JSON uses selected-entry patching, while foreign/unsupported content and
+unrelated inventory failures remain refusals. Latest durable write IDs, exact
+images, bounded ancestry and terminal evidence prevent arbitrary historical
+preimage replay. Partial main/raw intent publication, live compensation and
+interrupted repair remain recoverable only under the verified evidence contract.
+
+Independent review/re-review fixed initial journal creation, reserved undo
+accounting, missing/partial main/raw intent windows and proof-host containment
+and candidate assertions. The baseline full suite passed 1,290 tests, followed
+by 124 focused cases covering the final refinements (including 28 shared owner
+cases). Both macOS AOT hosts publish; strict standalone AOT diagnostics pass.
+The strengthened disposable proof kills a separate process at production
+checkpoints, then uses the actual product CLI for inspection, explicit image
+repair, recovery and undo. It compares the installed candidate independently and
+proves original native payload/exposure continuity and unrelated preservation.
+See `evidence/maintenance-batch-6-shared-owner-checkpoint.json` for exact runtime
+results and hashes. Four-RID CI now runs both saved-update proof scripts and
+retains JSON evidence artifacts.
+
+The batch remains in progress. Ordinary CLI/TUI routing still needs the reviewed
+per-target queue described in `maintenance-update-plans.md`; sibling plans
+prepared together cannot silently bypass generation changes. Final workflow
+review, exact-source full/platform/native checks and PR merge remain. All 21
+original findings retain their final acceptance obligations.
+
+## Batch 6 refinement: registry namespace witness
+
+Saved shared updates now retain the held registry parent's full native identity
+and generation across planning and execution leases. This refuses namespace
+replacement/reuse even when the registry file ID and selected bytes match,
+while ordinary in-place manager writes remain supported. Validated private state
+ancestors are initialized before the witness so a state home beneath `.agents`
+does not invalidate its own first plan; staging never refreshes that witness.
+
+Independent review/re-review found no remaining actionable source issues. The
+exact refinement passes all 1,303 default tests, zero-warning/error build, style,
+and actual minimum/current gh data-file lock contracts. See
+`evidence/maintenance-batch-6-registry-parent-checkpoint.json`. Earlier native
+runtime results remain attributed to their prior checkpoint; final native and
+platform proof and ordinary CLI/TUI routing remain pending.
+
+## Batch 6: ordinary product review/apply routing
+
+Ordinary CLI `update` now stages one immutable candidate and returns a saved
+manifest and exact apply arguments. It does not mutate an installed payload,
+including with `--force`. Other selected targets report independent retained,
+refused or not-started outcomes. Dry-run remains a disposable availability check
+and consumes no plan quota. The TUI captures selected physical targets, prepares
+one at a time, displays source/local-change/consumer/mode/pin evidence, and
+requires a fresh retain-original checkbox plus Apply reviewed plan for each.
+The next target waits for the preceding apply/reconciliation. Recovery references
+survive advancing the queue; failed reconciliation cannot hide a verified change.
+The global update shortcut opens the workspace without fabricating pending rows.
+
+The full-suite run exposed a real Unix state-writer gap: plain stream close could
+leave flock held by a forked/duplicated open-file description. State writer
+streams now explicitly unlock before synchronous/asynchronous close, with
+idempotent release, initialization cleanup and nonthrowing finalizer behavior.
+Six deterministic cases retain duplicated descriptors, including repeated old
+owner disposal and already-closed finalizer cleanup. Windows-specific test and
+proof failures were exact exception typing and CRLF fixture normalization; fixes
+preserve no-create assertions and exact registry byte equality.
+
+Separate reviewers re-reviewed all agreed findings. Both native macOS AOT hosts
+publish; real minimum/current gh shared process-kill proofs and ownerless native
+proofs pass. Actual PTY `u`, marked `U` and Update-button proofs verify unchanged
+payload/registry before approval, exact promoted candidates, retained original
+native objects, successful quit, CLI inspection/undo, exact registry restoration
+and an unchanged unselected installation. The all checkbox cannot widen row or
+marked shortcuts. See `evidence/maintenance-batch-6-product-routing-checkpoint.json`.
+The final local suite passes all 1,327 tests with zero failures. The duplicate-
+descriptor release regressions fail all four cases against pre-fix commit
+8527301 and pass with the fix. Final PR-head platform checks/readiness review
+remain before merge; the original 21-item acceptance audit is unchanged.
+
+## Batch 6 refinement: cross-platform process-proof admission
+
+PR-head 9102474 passes all three platform test jobs and both Linux/macOS native
+jobs. The Windows x64/ARM64 native jobs reached the shared-owner process proof,
+then the proof host refused its marker before the first checkpoint: Python text
+output translated the required LF marker into CRLF. The fixture now writes exact
+bytes while preserving the host's strict disposable-workspace guard. A positive
+ordinary HOME/state control must pass that guard before the two linked-directory
+negative controls can count as containment evidence. Merged, bounded host output
+also makes early exits visible immediately instead of hiding their diagnostics
+behind the checkpoint timeout.
+
+This changes the proof harness only. Historical product/source evidence remains
+attributed to its original checkpoint. See
+`evidence/maintenance-batch-6-proof-admission-refinement.json` for the new local
+native proof and independent review; final-head Windows/native CI remains the
+merge gate. No original acceptance criterion is closed by a fixture correction.
+
+## Batch 6 refinement: Windows registry namespace evidence
+
+Run 38698483453 verifies the LF proof fix on all four native targets, including
+both Windows architectures. Its Windows test job exposed a separate production
+gap: parent ChangeTime can remain equal after a new sibling appears. A registry
+lease now captures and revalidates a bounded immediate namespace fingerprint
+through its held parent handle, opened with enumeration access. It retains full
+native entry IDs, creation times, names and types across reopened leases, while
+excluding mutable child times/content so registry writes and payload moves below
+`skills` remain supported. Double captures bracket the parent's identity/path.
+
+Windows regressions explicitly preserve the parent's timestamps across sibling
+creation, removal and replacement; the replaced object remains held outside the
+registry parent to prevent native-ID reuse without a delete-pending pathname.
+A create/delete generation-only case sets and verifies a distinct timestamp.
+The concurrent cross-logger barrier regression now uses dedicated workers so
+shared-pool starvation cannot masquerade as lock inversion. Separate reviews
+and re-review addressed parent enumeration access and replacement fixture
+semantics. See `evidence/maintenance-batch-6-windows-namespace-refinement.json`.

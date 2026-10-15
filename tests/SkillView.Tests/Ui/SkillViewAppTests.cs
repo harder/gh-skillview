@@ -875,6 +875,19 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void BuildUi_UpdateShortcutOpensReviewEvenWithoutPendingUpdateRows()
+    {
+        var app = CreateApp();
+        app.StopBackgroundAdmissionForTests(); // navigation must not probe this machine
+        using var window = app.BuildUiForTests();
+        app.ForceActiveTabForTests(SkillViewTab.Installed);
+        _ = window.NewKeyDownEvent(new Key('u'));
+        Assert.True(app.UpdatesWorkspaceVisibleForTests);
+        Assert.Equal(SkillViewTab.Changes, app.ActiveTabForTests);
+        Assert.False(app.ChangesTabForTests!.Visible);
+    }
+
+    [Fact]
     public void BuildUi_EscLeavesDiscoverQueryField()
     {
         var app = CreateApp();

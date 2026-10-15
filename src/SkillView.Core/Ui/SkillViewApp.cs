@@ -488,11 +488,12 @@ public sealed class SkillViewApp
             runOnUi: runOnUi,
             runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            updateRunner: (ghPath, options, token) => _services.MaintenanceUpdates.UpdateAsync(ghPath, options, token),
+            updateRunner: (ghPath, options, token) => _workflows.PrepareUpdatesAsync(ghPath, options, token),
             ghPathProvider: () => _ghPath,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,
             onUpdateApplied: () => _services.ListAdapter.Invalidate(),
+            applyRunner: (review, hidden, token) => _workflows.ApplyReviewedUpdateAsync(review, hidden, token),
             lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,
@@ -515,14 +516,7 @@ public sealed class SkillViewApp
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            onActivateUpdates: () =>
-            {
-                _openedUpdatesFromChanges = true;
-                _changesTab?.CancelPendingLoad();
-                _workflows.OpenUpdatesFromChanges(
-                    hideChanges: () => _changesTab!.Visible = false,
-                    activateUpdates: hideChanges => _updatesTab!.ActivateFromChanges(hideChanges));
-            },
+            onActivateUpdates: OpenUpdatesWorkspace,
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
                 hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
@@ -727,9 +721,9 @@ public sealed class SkillViewApp
         // to install (gh ≥ 2.95 non-interactive listing, cli/cli#13548).
         if (rune.Value == 'A' && _activeTab == SkillViewTab.Discover) { StageInstallAll(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
-        // `u` jumps to the Changes tab (embedded). The actual single-row vs.
-        // batch update keys live on the tab itself (u current row, U marked).
-        if (rune.Value == 'u' || rune.Value == 'U') { ActivateTab(SkillViewTab.Changes); return true; }
+        // Open the update workspace directly. Changes rows describe observed
+        // work and do not fabricate an update-available row for navigation.
+        if (rune.Value == 'u' || rune.Value == 'U') { OpenUpdatesWorkspace(); return true; }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
@@ -1065,9 +1059,19 @@ public sealed class SkillViewApp
         && Interlocked.Read(ref _doctorGeneration) == generation
         && _doctorLifetime is { IsCancellationRequested: false };
 
-    /// Esc handler for the Updates view. When drilled in from Changes, returns
-    /// to Changes; otherwise falls back to Discover. Mirrors LeaveDoctor's
-    /// no-op-guard bypass.
+    /// Open update review without requiring an update-available queue row.
+    private void OpenUpdatesWorkspace()
+    {
+        if (_updatesTab is null || _changesTab is null || _updatesTab.Visible) return;
+        ActivateTab(SkillViewTab.Changes);
+        _openedUpdatesFromChanges = true;
+        _changesTab.CancelPendingLoad();
+        _workflows.OpenUpdatesFromChanges(
+            hideChanges: () => _changesTab.Visible = false,
+            activateUpdates: hideChanges => _updatesTab.ActivateFromChanges(hideChanges));
+    }
+
+    /// Esc returns from the update workspace to Changes.
     private void LeaveUpdates()
     {
         if (_updatesTab is not null) _updatesTab.Visible = false;
@@ -1971,6 +1975,11 @@ public sealed class SkillViewApp
     private void RefreshActiveTab()
     {
         _services.ListAdapter.Invalidate();
+        if (_updatesTab?.Visible == true)
+        {
+            RunOwnedTask(_updatesTab.LoadAsync, "updates.refresh");
+            return;
+        }
         switch (_activeTab)
         {
             case SkillViewTab.Installed when _installedTab is not null:
@@ -2838,6 +2847,8 @@ public sealed class SkillViewApp
         _doctorLifetime?.Token ?? new CancellationToken(canceled: true);
 
     internal SkillView.Ui.Tabs.ChangesTabView? ChangesTabForTests => _changesTab;
+    internal bool UpdatesWorkspaceVisibleForTests => _updatesTab?.Visible == true;
+    internal void StopBackgroundAdmissionForTests() => _backgroundTasks.StopAccepting();
 
     internal ContextBarView? ContextBarForTests => _contextBar;
 

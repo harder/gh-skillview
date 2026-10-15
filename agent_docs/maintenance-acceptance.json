@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "8b2ebb034ba9e50836144d6843483256793dc938",
+  "verifiedMainCommit": "178476f7d8b0c9f7ab6cb5dcf4066410f0570c7c",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -54,8 +54,8 @@
       "title": "Make selected updates work in the captured subprocess",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Noninteractive selected update confirmation",
-      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "implementedEvidenceSummary": "Ordinary saved CLI updates and actual PTY u/U/Update approval flows with unchanged unselected fixture and all-checkbox isolation",
+      "remaining": "Final PR-head platform/native verification, merge and criterion-by-criterion acceptance audit",
       "acceptance": "A real available update succeeds for a selected fixture, with unrelated fixture names untouched. Test u, U, Update and CLI paths, not merely the generated args or a stubbed successful runner. Verify that all-mode cannot silently expand a marked selection.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -65,8 +65,8 @@
       "title": "Update an exact installation rather than every matching name",
       "priority": "P0",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Exact installation update targeting and selectors",
-      "remaining": "Controlled staged repair when gh cannot express the selection",
+      "implementedEvidenceSummary": "Exact installation targeting/selectors and saved immutable newer-revision updates for ownerless and single shared-gh-owner installations",
+      "remaining": "Other manager owner transitions and final criterion-by-criterion verification",
       "acceptance": "Two copies of one name in different agents/scopes: selecting one changes only its intended target, except explicitly shown shared consumers. Custom and namespaced roots update correctly. Never treat the target skill directory itself as the --dir skills root. Add CLI --path/--install-id selectors and reject unsupported flags.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -87,8 +87,8 @@
       "title": "Protect local changes before update or force repair",
       "priority": "P0",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Local changes refused; raw backups; standalone quarantine/undo; saved recorded-revision replacement retaining original and displaced native objects, with reviewed recovery",
-      "remaining": "Latest-revision and source/owner transitions; additional reviewed local-change dispositions; external suppression state; complete original acceptance audit",
+      "implementedEvidenceSummary": "Local changes refused by routine updates; raw backups; quarantine/undo; saved recorded and ownerless/shared-gh newer-revision replacement retaining original/displaced native objects, with reviewed owner/payload recovery",
+      "remaining": "Source and other manager owner transitions; additional reviewed local-change dispositions; external suppression state; complete original acceptance audit",
       "acceptance": "Changed tracked file, extra file, deletion, pin, shared symlink target and unchanged upstream tree SHA are all covered. No overwrite without an explicit disposition of local changes. Verified rollback restores extras and exclusions. Preserve the observed doc/runtime disagreement in compatibility tests.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -98,8 +98,8 @@
       "title": "Read lockfiles in context and preserve manager ownership",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Contextual lock readers, preserved claims, guarded writes",
-      "remaining": "Coordinated manager-owned mutation and ownership migration",
+      "implementedEvidenceSummary": "Contextual lock readers, preserved claims, guarded writes and single shared-gh-owner payload/registry transactions preserving fresh unrelated bytes and extensions",
+      "remaining": "Other native manager-owned mutations, ownership migration and final acceptance verification",
       "acceptance": "Same skill name in user and two projects with three different sources stays separate. Test current global/project/XDG locations and old schema fixtures. Package/repository group removal never includes an unrelated copy because of a name collision. Unknown schema versions remain read-only diagnostics.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -164,8 +164,8 @@
       "title": "Add plan, stage, verify and recover around the existing safe filesystem backend",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Native move/removal authority; quarantine journals; saved exact recorded-tree plan/stage/apply/inspect/recover/undo; real process-kill restart proofs",
-      "remaining": "General multi-target/source/owner transition plans, relinking/migration recovery and concurrent manager coordination; complete original acceptance audit",
+      "implementedEvidenceSummary": "Native move/removal authority; quarantine journals; saved recorded restore and ownerless/shared-gh newer-revision plan/stage/apply/inspect/recover/undo; preserving registry sessions and separately reviewed torn-image repair; real process-kill restart proofs",
+      "remaining": "General multi-target/source/owner transitions, relinking/migration recovery and final original acceptance proof",
       "acceptance": "Disk full, interrupted process, canceled worker, target replacement, concurrent native manager update and restart halfway through relinking all leave either a recoverable journal or a verified refusal. Shared consumers are never switched before the chosen payload validates.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -219,8 +219,8 @@
       "title": "Make the maintenance queue actionable and explain application state",
       "priority": "P2",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Exact selectors/results, compare/backup/history/quarantine/undo plus saved recorded-restore CLI plan/apply/inspect/recover/undo with versioned JSON",
-      "remaining": "Unified maintenance queue, saved plan/apply contract and TUI repair flows",
+      "implementedEvidenceSummary": "Exact selectors/results, compare/backup/history/quarantine/undo plus saved recorded-restore and ownerless/shared-gh newer-revision CLI plan/apply/inspect/recover/undo and explicit owner-image repair with versioned JSON",
+      "remaining": "Unified diagnosis/action queue and remaining TUI repair flows",
       "acceptance": "A selected row always identifies exact affected paths. Every skip/partial result explains what happened. Current Claude plugin docs say running sessions retain loaded plugin versions after background updates; display that as a reload requirement, not failed filesystem verification. Runtime state is unknown unless observed.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false

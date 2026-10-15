@@ -26,6 +26,14 @@ public class CliDispatcherUpdateTests
     }
 
     [Fact]
+    public void Update_HiddenCoverageIsExplicitAndDoesNotApproveReplacement()
+    {
+        var args = CliDispatcher.ParseUpdateArgs(["--path", "skills/demo", "--allow-hidden-dirs", "--force"]);
+        Assert.Null(args.Error); Assert.True(args.AllowHiddenDirectories); Assert.True(args.Force);
+        Assert.Equal("skills/demo", args.Path);
+    }
+
+    [Fact]
     public void PackageOwnershipDoesNotLeakToSameNameOutsideLockContext()
     {
         var root = Path.Combine(Path.GetTempPath(), "context", "skills");

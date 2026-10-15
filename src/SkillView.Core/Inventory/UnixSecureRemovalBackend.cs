@@ -1866,7 +1866,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
 
     private sealed class SafeUnixHandle : SafeHandleMinusOneIsInvalid
     {
-        internal SafeUnixHandle(int fd) : base(ownsHandle: true) =>
+        internal SafeUnixHandle(int fd, bool ownsHandle = true) : base(ownsHandle) =>
             SetHandle(new IntPtr(fd));
 
         internal int FileDescriptor => handle.ToInt32();

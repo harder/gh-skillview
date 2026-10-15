@@ -9,8 +9,8 @@ using SkillView.Threading;
 
 namespace SkillView.Maintenance;
 
-/// Product updates resolve physical targets and protect installed content.
-/// The gh adapter remains responsible only for the actual CLI contract.
+/// Low-level gh contract coordinator. Product callers use its dry-run path for
+/// availability only; saved candidate preparation/apply uses SavedUpdateCoordinator.
 public sealed class SkillUpdateCoordinator(
     GhSkillInstallService installer, GhSkillUpdateService updater,
     GhSkillListAdapter catalog, Logger logger, SkillView.Subprocess.ProcessRunner? sourceRunner = null)

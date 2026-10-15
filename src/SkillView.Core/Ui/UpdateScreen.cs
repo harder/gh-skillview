@@ -14,6 +14,7 @@ public static class UpdateScreen
         var heading = dryRun ? "Dry-run results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
+        if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
         var scope = allChecked
             ? "_all skills_"
             : skills.Count == 1
@@ -63,10 +64,53 @@ public static class UpdateScreen
             sb.AppendLine("### Notices and errors");
             AppendFencedBlock(sb, result.StdErr);
         }
+        foreach (var notice in result.Notices)
+        {
+            sb.AppendLine($"### {MarkdownTableFormatter.FormatTableCell(notice.Stream)}");
+            AppendFencedBlock(sb, notice.Text);
+        }
         if (result.Outcomes.IsDefaultOrEmpty && string.IsNullOrWhiteSpace(result.StdOut)
             && string.IsNullOrWhiteSpace(result.StdErr))
             sb.AppendLine("_Completed with no output; availability was not independently established._");
         return sb.ToString();
+    }
+
+    internal static string RenderPlan(SkillView.Maintenance.ReplacementResult plan)
+    {
+        var sb = new System.Text.StringBuilder();
+        void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
+        sb.AppendLine("### Saved update review");
+        Field("State", plan.Status);
+        Field("Installation", plan.OriginalPath);
+        Field("Installation ID", plan.Subject.InstallationId);
+        Field("Plan ID", plan.Id);
+        Field("Plan fingerprint", plan.PlanFingerprint);
+        Field("Manifest", plan.PlanPath);
+        Field("Retained original", plan.RetainedPath);
+        Field("Candidate", plan.CandidatePath);
+        Field("Root mode", $"{plan.OriginalRootMode} -> {plan.CandidateRootMode}");
+        if (plan.Revision is { } revision)
+        {
+            Field("Repository", revision.Source.Repository);
+            Field("Resolved ref", revision.Source.Ref);
+            Field("Commit", revision.Source.Commit);
+            Field("Git tree", revision.Source.Tree);
+            Field("Authored version", $"{plan.Subject.Metadata.Version ?? "unspecified"} -> {revision.DesiredMetadata.Version ?? "unspecified"}");
+            Field("Pin", plan.Subject.Metadata.Pinned || plan.Subject.Metadata.PinnedRef is not null
+                ? $"{plan.Subject.Metadata.PinnedRef ?? plan.Subject.Metadata.GithubRef} -> explicitly unpinned" : "unpinned -> unpinned");
+            Field("Local changes", revision.LocalChanges.Length.ToString());
+            foreach (var path in revision.LocalChanges) Field("Local", path);
+            if (revision.Owner is { } owner)
+            {
+                Field("Registry", owner.RegistryPath);
+                Field("Selected owner entry", owner.Selector);
+                Field("Owner fingerprints", owner.BeforeFingerprint + " -> " + owner.DesiredFingerprint);
+            }
+        }
+        foreach (var agent in plan.Subject.Agents) Field("Affected consumer", $"{agent.AgentId}: {agent.Path}");
+        foreach (var path in plan.ChangedPaths) Field("Changed path", path);
+        sb.AppendLine("The original directory, including local edits and extras, is retained for explicit recovery/undo. Agent session state is unknown.");
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
     }
 
     private static void AppendFencedBlock(System.Text.StringBuilder sb, string text)

@@ -47,7 +47,8 @@ public sealed class GhSkillUpdateService
         string? Directory = null,
         bool ConfirmApply = true,
         IReadOnlyList<InstalledSkill>? Targets = null,
-        IReadOnlyDictionary<string, string>? ProcessEnvironment = null);
+        IReadOnlyDictionary<string, string>? ProcessEnvironment = null,
+        bool AllowHiddenDirectories = false);
 
     public async Task<UpdateResult> UpdateAsync(
         string ghPath,

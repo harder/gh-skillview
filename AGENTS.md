@@ -88,6 +88,30 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Critical agent notes
 
+- Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
+  candidate, review, then apply its saved ID/fingerprint with explicit retention
+  approval. Only availability checks use the low-level mutable gh update adapter
+  in dry-run mode. Never prepare every sibling before applying the first: native
+  parent/root generations change. Keep the next preparation after prior apply
+  reconciliation, which must survive canceled view/UI dispatch. Availability
+  checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
+
+- Saved revision updates use schema 2 replacement plans, retaining the recorded
+  base and explicit local-change/pin review. Keep schema 1 recorded-restore
+  fingerprints compatible by omitting absent revision fields. Registry writes
+  must hold gh's DATA FILE lock through payload and owner transitions and keep
+  the same file object; replacing its pathname breaks coordination. While a
+  native registry lease is held, read through its handle (Windows byte locks
+  reject second-handle reads). NativeStateDirectory publication requires its
+  `writer.lock` handle to remain open. See `agent_docs/maintenance-update-plans.md`.
+  Unix registry owners must explicitly `LOCK_UN` before closing, including
+  failed initialization after acquisition: a fork can retain the open file
+  description temporarily even with CLOEXEC. Duplicate-descriptor regressions
+  must use the verified `DupWithRetry` (`F_DUPFD_CLOEXEC`) helper.
+  State writer streams likewise explicitly unlock before close, for synchronous
+  and asynchronous disposal. Do not replace them with plain FileStream writers;
+  duplicate descriptions can otherwise retain a completed operation's lock.
+
 - `GhPlacementCatalog` is the authority for gh placement paths. Filesystem
   discovery and UI/Doctor detection derive from it, retaining explicitly
   documented native/legacy paths separately. Shared `.agents` placements are
@@ -730,3 +754,24 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   exclusion pinning must accept only native file/path-not-found from the target
   open as absence, retain the excluded address, and propagate access/sharing
   failures. Keep shared-link restart coverage for both vacant-original slots.
+- Saved shared revision updates hold gh's native data-file lock across payload
+  moves and selected-entry publication. Use same-handle lockfile reads (Windows
+  byte locks prohibit a second-handle read), preserve unrelated raw bytes, and
+  bind recovery review to the full registry snapshot. Torn-image repair is a
+  separate explicit action authorized by the latest durable unfinished owner
+  write and bounded image ancestry; never replay arbitrary historical preimages.
+  Keep missing/partial main and raw intent publication, live compensation, and
+  actual process-kill restart proofs. See `agent_docs/maintenance-update-owner-transitions.md`
+  and the proof-only host instructions in `agent_docs/running-tests.md`.
+  Persist the held registry parent's full native identity/generation across
+  released leases; file IDs alone cannot distinguish Unix inode reuse from
+  permitted in-place data edits. Initialize validated private state ancestors
+  before capturing that witness when state is beneath `.agents`; never refresh
+  it after staging to accept an unexplained namespace change.
+  Windows additionally pins a bounded immediate namespace fingerprint from the
+  held parent opened with enumeration access: names, full IDs, creation times
+  and entry types. Child content, ChangeTime and reparse payload are excluded so
+  in-place registry writes and moves beneath `skills` remain valid. Parent
+  ChangeTime alone can miss a sibling addition/removal/replacement; test those
+  cases with timestamps explicitly held equal, alongside a distinct-generation
+  create/delete case and successful ordinary writes.

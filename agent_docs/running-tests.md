@@ -52,3 +52,37 @@ flags instead.
   `python site/build.py`, and `node --check site/app.js`. CI also runs
   `actionlint` and dependency review for PRs.
 - For PTY-driven TUI checks, prefer the built binary and follow `agent_docs/tui-pty-testing.md`.
+
+The solution also builds `tests/SkillView.MaintenanceProof`, a proof-only console
+host for deterministic process death at production maintenance checkpoints. It
+requires a marked disposable HOME/CWD/state root and has no shipping product
+fault flags. After building, run `agent_docs/evidence/prove-shared-revision-update.py`
+with `--app <built skillview> --proof-host <built SkillView.MaintenanceProof>` and
+one or more `--gh <binary>` arguments plus `--output <evidence.json>`. The parent
+kills the paused process without teardown, then uses the actual product CLI for
+fresh inspection, explicit torn-image repair, recovery and undo. Auth is captured
+before HOME isolation, passed only through the child environment, and never
+included in proof output. The proof host pause is bounded to two minutes.
+Write exact marker and registry-image fixtures as bytes: Python text output
+translates LF on Windows. Keep a positive disposable-workspace admission control
+alongside linked HOME/state refusals, so an invalid marker cannot make negative
+containment checks appear to pass. Drain host stderr with stdout and report an
+early exit before waiting for a checkpoint timeout.
+
+### Reviewed update PTY proof (POSIX)
+
+After building, run `agent_docs/evidence/prove-reviewed-update-tui.py` with an
+absolute `--app`, `--gh`, `--output`, and `--shortcut u`, `U`, or `button`.
+The script uses a private HOME/state/CWD and actual gh remote installation,
+answers terminal probes, and locates visible controls through a small ANSI screen
+reader. It verifies preparation and unapproved Enter leave payload/registry
+unchanged, then explicitly approves retention and applies. Filesystem manifests
+independently compare candidate bytes/modes/native objects; CLI inspection and
+undo prove restoration of the original objects and exact registry bytes. An
+unselected manual installation remains unchanged, including when the all checkbox
+is enabled for row/marked shortcuts. Ctrl+Q must exit successfully. The script
+retains JSON screen/evidence output and a raw terminal transcript at the supplied
+output path; all skill, agent and manager fixture state is disposable.
+
+Use the built host, never `dotnet run`. This opt-in proof requires gh authentication
+and network access to `cli/cli`; it does not execute the installed skill.

@@ -20,6 +20,7 @@ public sealed record InventorySnapshot
     public ImmutableArray<ProviderObservation> Providers { get; init; } = [];
     /// Includes records whose payload is absent or excluded from skill discovery.
     public ImmutableArray<SkillPackage> OwnershipRecords { get; init; } = [];
+    internal ImmutableArray<LockReadDiagnostic> OwnershipReadDiagnostics { get; init; } = [];
 
     public ScanDiagnostics Diagnostics { get; init; } = ScanDiagnostics.Empty;
 

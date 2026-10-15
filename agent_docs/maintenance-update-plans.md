@@ -1,0 +1,162 @@
+# Batch 6: recoverable updates and gh owner transitions
+
+Status: in progress on codex/skill-maintenance-update-plans, based on merged
+PR #52 (178476f7d8b0c9f7ab6cb5dcf4066410f0570c7c). Scope: a complete
+single-installation update workflow for ownerless custom copies and
+shared gh installations. The original 21-item acceptance ledger remains active.
+
+## Required workflow
+
+1. Resolve gh's latest-release/default-branch policy to an immutable commit and
+   the existing source subpath's Git tree. Preserve routine pins; unpin requires
+   explicit review. Source changes and renamed skills need separate migration.
+2. Reuse the held native stage and saved manifests. Capture recorded-base drift,
+   original/candidate changes, exact paths, consumers and desired tracking.
+   Retain the original as the explicit local-change disposition.
+3. For a shared install, acquire the existing registry DATA FILE's gh-compatible
+   lock before the first payload move. Revalidate the selected owner entry and
+   native parent/name/file identities. Keep that handle throughout the operation.
+4. Prepare the desired registry from the current locked bytes. Change only the
+   selected entry; retain unrelated entries, extensions and original installedAt.
+   Publish bounded durable raw before/desired bytes and write intent first.
+5. Retain original, promote exact stage, then write/flush/verify through the held
+   registry handle and publish completion. Never resolve a moving ref again or
+   invoke gh update against the live target after plan approval.
+6. Inspect/recover/undo bind both payload slots and current whole-file bytes/native
+   identity. Valid unrelated manager changes survive selected-entry rollback.
+   Unexpected selected entry changes refuse before displacement. Torn bytes
+   require explicit repair review with retained before/desired evidence.
+
+## Upstream authority contract
+
+gh 2.102.0 locks .agents/.skill-lock.json itself: Unix flock exclusive/nonblocking,
+Windows LockFileEx exclusive byte zero, length one. It seek/truncate/writes that
+same file. A sidecar does not coordinate, and replacing the registry pathname
+can strand a cooperating writer on an old inode. The new lease must use matching
+locks and preserve existing permissions.
+
+Primary sources:
+
+- https://github.com/cli/cli/blob/v2.102.0/internal/skills/lockfile/lockfile.go
+- https://github.com/cli/cli/blob/v2.102.0/internal/flock/flock_unix.go
+- https://github.com/cli/cli/blob/v2.102.0/internal/flock/flock_windows.go
+- https://github.com/cli/cli/blob/v2.102.0/internal/skills/discovery/discovery.go
+- https://cli.github.com/manual/gh_skill_update
+
+An in-place write can tear on process death. Another manager can act after the
+lock is released by death, and gh treats corrupt content as a fresh registry.
+Private evidence supports reviewed recovery; it cannot establish that an
+external writer preserved all data. While alive, attempt bounded preimage
+restoration under the same lock after write failure. Never blindly restore an
+old whole-file snapshot over unrelated post-crash updates.
+
+## Implementation and verification
+
+GhRegistryEditor is the first component. It prepares bounded bytes without I/O,
+preserves raw bytes outside the selected entry, and rejects ambiguous schemas,
+duplicate keys and selected-entry drift. It supplies no write authority. It has
+independent source review and focused preservation/refusal tests.
+Current component verification: clean build and 12 focused tests passed.
+
+### Ownerless update checkpoint
+
+The branch now has `update-plan`, `update-inspect`, `update-apply`,
+`update-recover` and `update-undo`. Planning resolves gh's latest release or
+genuine no-release default branch once, then binds a full commit and source
+subtree. Supported recorded `/SKILL.md` and trailing-slash spellings use the
+shared subpath normalizer. Authentication, rate-limit, server and transport
+failures cannot select another ref. Annotated-tag dereference is bounded.
+
+Schema 2 plans retain a verified recorded-base manifest, original-versus-base
+local changes, original-versus-candidate changes and the desired tracking/pin
+transition. Schema 1 recorded-restore fingerprints remain unchanged. Routine
+pins refuse update planning; `--unpin` makes that change explicit. Apply requires
+the saved fingerprint and `--disposition retain-original`. Agent sessions remain
+unknown. This currently admits ownerless installations, including user/project
+placements with verified consumers. Manager-owned payloads remain refused until
+their preserving registry transaction is integrated; absence of an owner does
+not imply custom scope.
+
+Disposable CLI proofs with gh 2.97.0 and 2.102.0 cover direct/nested namespace
+placements, a real available update, same-name isolation, pin refusal/unpin,
+approved native stage promotion, original retention, undo and actual process
+kill/restart/recovery. `evidence/prove-revision-update.py` runs the proof against
+either host. The proof verifies exact candidate bytes/native continuity and
+preserves the fixture global registry byte-for-byte for ownerless targets.
+
+The new native registry lease opens the existing data file relative to a held
+parent, takes gh's native lock, verifies full native identity and raw bytes, and
+writes through the same locked handle. Eleven lease regressions and actual gh
+2.97.0/2.102.0 second-process contention tests pass locally. Unix uncooperative
+writer tests must open native descriptors: path-based .NET FileStream opens
+also take flock and do not model a noncooperating writer. External byte reads
+belong after lease disposal; Windows mandatory byte locks reject such reads.
+
+`GhRegistryWriteSession` prepares selected-entry patches against fresh locked
+bytes, preserves unrelated bytes/extensions, and durably records exact
+before/desired evidence before truncation. While the lease is alive, a failed
+or canceled write attempts bounded, separately journaled preimage restoration
+only for bytes attributable to its desired prefix. Foreign bytes are retained
+for explicit review. Identical entry writes are verified no-ops. Ten focused
+write-session tests pass, including failures after truncate/chunk/flush, canceled
+callers, stale selected records, foreign partial bytes and unrelated changes
+through forward/undo writes. Callers must retain the native journal's
+`writer.lock` handle for publication durability, reserve bounded journal space,
+and use same-handle registry reads throughout the payload/owner transition.
+
+Independent source review and re-review addressed the source-path compatibility,
+recorded-base directory admission and retained-state diagnostics. This is a
+checkpoint within batch 6; shared-owner integration, ordinary update routing,
+reviewed process-death owner repair and full platform proof are still required.
+
+Still required before this batch is ready:
+
+- Integrate the native existing-file registry lease across the payload/owner
+  transaction, with saved before/desired owner evidence and phase-aware
+  observations in the replacement engine.
+- Ordinary product-update routing through the saved stage and TUI review.
+- Custom/shared/pinned/local-edit/namespaced real-gh proofs, concurrent gh lock
+  contention, every payload/registry interruption boundary, torn-write review,
+  unrelated record preservation through apply/undo and unwritable-owner refusal.
+- Full tests, both native hosts, four-RID CI, independent review/re-review and merge.
+
+The full parallel run exposed a Unix lock-release race: closing the original
+file description alone can leave a duplicated/fork-retained description locked.
+The lease now explicitly unlocks before closing, including failed initialization
+and cancellation after acquisition. Deterministic F_DUPFD_CLOEXEC regressions
+cover normal disposal and both ownership-transfer failure phases. Whole-registry
+recovery snapshots also reject unrelated changes after inspection; initial
+selected-entry applies still preserve current unrelated records. The plan stores
+actual parsed candidate metadata, including authored descriptions/versions and
+installer metadata, rather than projecting old authored metadata onto the new
+tracking fields. These refinements passed independent re-review and the final
+1,264-test suite. See `maintenance-update-owner-transitions.md` for the next
+shared-owner integration contract and interruption matrix.
+
+## Ordinary entrypoint integration review
+
+The next product integration separates prepare, review and apply of the saved
+plan. Keep `GhSkillUpdateService` as a low-level gh contract adapter; the product
+must not fall back to mutable `gh update` after reviewing an immutable stage.
+CLI `update` prepares exact installations and reports the existing explicit
+`update-apply --id --expect --yes --disposition retain-original` command. A force
+request is not approval to discard local content.
+
+The Updates tab's `u`, `U` and Update actions start an embedded review queue.
+Capture physical target identities and policy before awaiting, show the saved
+commit/tree/ref, affected paths/consumers, local changes, pin transition and root
+modes, then expose a separate Apply reviewed plan action. Keep workflow ownership
+in `SkillViewWorkflowCoordinator`, native I/O off the UI thread, and preserve
+durable outcomes plus inventory invalidation even when navigation cancels work.
+
+Prepare/review/apply one queued installation at a time. Applying a sibling
+changes the shared root/parent generation and invalidates other plans prepared
+beforehand; silently Inspect/Recover-ing them would bypass their approval.
+A future single-approval multi-target transaction needs explicit batch authority
+accounting for its own prior mutations and revalidating untouched targets.
+Pins remain skips unless explicitly unpinned. Report independent successes,
+refusals, recovery-required results and not-started targets. Availability checks
+must not consume the 16 retained-plan quota; explain quota failures when staging.
+Required integration proofs include all shortcuts, sibling queues, stale
+selection/navigation, no second source resolution on apply, cancellation and
+partial failures.
