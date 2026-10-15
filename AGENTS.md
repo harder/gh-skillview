@@ -790,3 +790,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Installed details, and `prove-tracking-roundtrip.py` for native CLI parity and
   unchanged payload/registry evidence. Default-suite early returns are not proof
   that opt-in gh contracts executed.
+
+- To test updates from deliberately fragmented same-selector installs, construct
+  the starting copies with raw gh inside a private fixture. Product install
+  admission correctly refuses a second global-selector overwrite. Capture gh
+  credentials before changing fixture HOME; keychain-backed lookup afterward
+  can become unauthenticated. Preserve all update/local-change assertions.

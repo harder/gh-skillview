@@ -849,3 +849,12 @@ execution. Both sequentially published native macOS hosts pass both gh versions
 (16 actual-install fixtures). Source/CI review is clear. Exact attribution lives
 in `evidence/maintenance-batch-9-metadata-checkpoint.json`; final remote proof
 and merge remain required for M01 closure.
+
+The initial remote contract lanes pass 14 of 15 cases, stopping in the old
+fragmented-install fixture because product install admission correctly refuses a
+second global-selector overwrite. Fixture setup now invokes native gh directly;
+all selected-update, unrelated-copy and local-extra protection assertions remain.
+The older mutating fixtures also capture credentials before private HOME and
+use private config/CWD/agent paths plus stripped Git overrides. Final source
+build/style checks pass; all 15 opt-in contracts pass under both gh versions.
+Separate review confirms both fixture corrections. Production code is unchanged.

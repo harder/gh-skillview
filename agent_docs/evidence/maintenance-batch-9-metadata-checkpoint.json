@@ -4,7 +4,7 @@
   "baseCommit": "daac6fc5280e7bba6a584d31038a72ea02eaabc2",
   "scope": "M01 actual gh tracking metadata, valid bounded YAML and UI/CLI agreement",
   "originalAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "sourceFingerprint": "1572b3f11dacbd8f0cfb03e32837e19a33a9c8007f3c940f84ab0c7f50bf5c3c",
+  "sourceFingerprint": "122c7dc630287db56fdb1f9d30decc3fcfe369df2024d7f3b9ddaa812c46b29c",
   "sourceManifest": [
     {
       "path": "Directory.Build.props",
@@ -740,7 +740,7 @@
     },
     {
       "path": "tests/SkillView.Tests/Gh/GhCliContractTests.cs",
-      "sha256": "a2aca0909df6b6116c3042dec080047525320eb4a82cc6b09a01d09a84cb40ac"
+      "sha256": "10d0d1a6375877cf0aec7351aa8b00048629b269ad735ac4ab39b83c1826432e"
     },
     {
       "path": "tests/SkillView.Tests/Gh/GhJsonContextTests.cs",
@@ -1155,7 +1155,7 @@
     "failed": 0,
     "skipped": 0,
     "deterministicAcceptanceCases": 22,
-    "actualGhContractCases": 8,
+    "actualGhContractCases": 30,
     "ghVersions": [
       "2.97.0",
       "2.102.0"
@@ -2431,13 +2431,34 @@
       {
         "name": "skillview-metadata-tracking-extension-proof.log",
         "sha256": "bf2058bc0a252221ad7abcafdafbd55eca29660f332158fcb000da4d45d566ad"
+      },
+      {
+        "name": "skillview-metadata-final-build.log",
+        "sha256": "00a43f24142d6d2a7ed1cdf53cc4158b926fa9464e6e503920cd7b64ba79e181"
+      },
+      {
+        "name": "skillview-metadata-auth-format-verify.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "skillview-metadata-minimum-final-contract.log",
+        "sha256": "76c0b8816d12e6e77d7373d35bcd2c47c19b4ed39612a3077c692af577a4a7b6"
+      },
+      {
+        "name": "skillview-metadata-current-final-contract.log",
+        "sha256": "17a9510c99db6520719e0e0748c5da51d4b463e3fedb6311a6698f9dcf2e5d94"
       }
-    ]
+    ],
+    "metadataContractCasesWithinFullContractRuns": 8,
+    "contractFixtureCorrections": "Both initial remote lanes passed14/15, failing only preexisting duplicate setup due correct product install guard. Raw gh setup preserves fragmented starting state without weakening update assertions. Local reruns then exposed unauthenticated keychain lookup after HOME isolation; explicit child-only captured auth fixes it. All15 now pass on both versions."
   },
-  "qualification": "Four gated contract cases return early in default suite; separate explicitly enabled runs passed all four cases under each gh version. Raw scanning is checked before catalog enrichment. Formatting completed before build/full-suite compilation.",
+  "qualification": "Four gated metadata cases return early in default suite; separate explicitly enabled final full-contract runs passed15 cases per gh version including all four metadata cases. Raw scanning is checked before catalog enrichment. See fullSuiteAttribution for the existing fixture-only correction after initial full suite. Native production sources remain identical.",
   "independentReviews": {
     "sourceAndCi": "replacement_design_review: final applied code/CI clear, including pre-first-scan byte capture; existing alias/size/depth/bounded-read cases cover remaining parser constraints",
-    "previousBatchEvidence": "object_evidence_review: PR55 final 68 raw hashes/results, 212 rows, three1354-test logs, 280 merged source hashes and exact merge tree verified"
+    "previousBatchEvidence": "object_evidence_review: PR55 final 68 raw hashes/results, 212 rows, three1354-test logs, 280 merged source hashes and exact merge tree verified",
+    "fixtureCorrections": "replacement_design_review: rawgh argv matches prior installer args; authcapturedbeforeHOME/privateconfig andCWD/GITisolation correct; all update/extra-protection assertions and production guards unchanged; no findings"
   },
-  "remaining": "Final exact-head min/current contract workflow, all platform/native CI and artifact inspection, review and merge before M01 closure. Full 21-item objective remains active."
+  "remaining": "Final exact-head min/current contract workflow, all platform/native CI and artifact inspection, review and merge before M01 closure. Full 21-item objective remains active.",
+  "localFullSuiteSourceFingerprint": "1572b3f11dacbd8f0cfb03e32837e19a33a9c8007f3c940f84ab0c7f50bf5c3c",
+  "fullSuiteAttribution": "The recorded full suite compiled the initial ceae582 source. Final production and M01-specific test sources are identical. Only existing GhCliContractTests fixture setup changed afterward: raw gh builds deliberately fragmented copies; child credentials captured before HOME isolation. Final source rebuilt and all15 opt-in contracts passed under each gh version. Final remote platform CI must compile/run exact committed source."
 }
