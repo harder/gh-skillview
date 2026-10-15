@@ -37,6 +37,11 @@ public sealed class LoadingDiscoveryTests : IDisposable
             ["XDG_CONFIG_HOME"] = Path.Combine(Home, ".config"),
             ["XDG_STATE_HOME"] = Path.Combine(Home, "state"),
             ["CODEX_HOME"] = "",
+            ["GEMINI_CLI_HOME"] = "",
+            ["GEMINI_CLI_TRUST_WORKSPACE"] = "",
+            ["GEMINI_CLI_TRUSTED_FOLDERS_PATH"] = "",
+            ["GEMINI_CLI_SYSTEM_SETTINGS_PATH"] = Path.Combine(temporary.FullName, "no-system-settings"),
+            ["GEMINI_CLI_SYSTEM_DEFAULTS_PATH"] = Path.Combine(temporary.FullName, "no-system-defaults"),
             ["CLAUDE_CONFIG_DIR"] = "",
             ["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = "",
             ["CLAUDE_CODE_PLUGIN_DIRS"] = "",
@@ -183,6 +188,37 @@ public sealed class LoadingDiscoveryTests : IDisposable
         var row = Assert.Single(analysis.Candidates, row => row.EntryPath is { } entry && PathIdentity.Equals(entry, path));
         Assert.Equal("configured-path", row.Placement); Assert.Equal("expected", row.Expected.Discoverability);
         Assert.NotEqual("disabled", row.Expected.State); // gh is unavailable, so invocation selection remains conditional.
+    }
+
+    [Fact]
+    public async Task GeminiRootAndImmediateChildSkillsAreDiscoveredWithoutEnablingRecursiveLoading()
+    {
+        var root = Skill(Path.Combine(Home, ".gemini", "skills"), "root");
+        var child = Skill(Path.Combine(root, "child"), "child");
+        var deep = Skill(Path.Combine(child, "deeper"), "deep");
+        var analysis = await Inventory("gemini", Runner());
+        foreach (var path in new[] { root, child })
+            Assert.Contains(analysis.Candidates, row => row.EntryPath is { } entry && PathIdentity.Equals(entry, path) && row.Placement == "user-gemini");
+        Assert.DoesNotContain(analysis.Candidates, row => row.EntryPath is { } entry && PathIdentity.Equals(entry, deep));
+    }
+
+    [Fact]
+    public async Task GeminiExtensionRootAndChildRemainVisibleInsideADeclaredManagedPayload()
+    {
+        var plugin = Path.Combine(Home, ".claude", "plugins", "cache", "market", "package", "1.0.0");
+        Write(Path.Combine(plugin, ".claude-plugin", "plugin.json"), "{\"name\":\"package\",\"skills\":\"./skills/\"}");
+        Write(Path.Combine(plugin, "gemini-extension.json"), "{\"name\":\"shared-extension\",\"version\":\"1.0.0\"}");
+        var root = Skill(Path.Combine(plugin, "skills"), "root");
+        var child = Skill(Path.Combine(root, "child"), "child");
+        Write(Path.Combine(Home, ".gemini", "extensions", "local", ".gemini-extension-install.json"),
+            JsonSerializer.Serialize(new { type = "link", source = plugin }));
+        var analysis = await Inventory("gemini", Runner());
+        foreach (var path in new[] { root, child })
+        {
+            var row = Assert.Single(analysis.Candidates, row => row.EntryPath is { } entry && PathIdentity.Equals(entry, path));
+            Assert.Equal("gemini-extension", row.Placement);
+            Assert.Contains(row.Subject.Owners, owner => owner.ReadOnly && owner.Provider == "claude-plugin");
+        }
     }
 
     [Fact]

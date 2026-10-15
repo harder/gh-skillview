@@ -44,6 +44,45 @@ public sealed class LoadingSettingsTests : IDisposable
         Assert.False(Evaluate("opencode", new([lower, later, mode], [])).Enabled);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("\"mode\":\"subagent\",")]
+    public void JsonLegacyModeForcesPrimaryAfterValidDecoding(string mode)
+    {
+        var initial = Layer("{\"agent\":{\"build\":{\"mode\":\"subagent\"}}}");
+        var legacy = Layer("{\"mode\":{\"build\":{" + mode + "\"permission\":{\"skill\":\"deny\"}}}}");
+        var settings = new LoadingSettings([initial, legacy], []);
+        Assert.Equal("primary", settings.Merge("opencode").Get("agent", "build", "mode")!.Text);
+        Assert.False(Evaluate("opencode", settings).Enabled);
+    }
+
+    [Fact]
+    public void InvalidJsonLegacyModeCannotBeRepairedByPrimaryNormalization()
+    {
+        Assert.Null(Evaluate("opencode", new([Layer("{\"mode\":{\"build\":{\"mode\":false}}}")], [])).Enabled);
+    }
+
+    [Theory]
+    [InlineData("DEMO", "demo", true, true)]
+    [InlineData("DEMO", "demo", false, false)]
+    [InlineData("SK*", "skill", true, true)]
+    [InlineData("SK*", "skill", false, false)]
+    [InlineData("team\\*", "team/demo", false, true)]
+    [InlineData("demo *", "demo", false, true)]
+    [InlineData("demo *", "demo args", false, true)]
+    public void OpenCodeMatcherUsesNativePlatformAndWildcardRules(string pattern, string name, bool windows, bool matches)
+    {
+        Assert.Equal(matches, LoadingPolicyEvaluator.OpenCodeGlob(pattern, name, windows));
+    }
+
+    [Fact]
+    public void WindowsCaseFoldingAppliesToBothOpenCodePatternLevelsAndLeavesClaudeUnchanged()
+    {
+        var settings = new LoadingSettings([Layer("{\"permission\":{\"SKILL\":{\"DEMO\":\"deny\"}}}")], []);
+        Assert.Equal(!OperatingSystem.IsWindows(), Evaluate("opencode", settings).Enabled);
+        Assert.True(Evaluate("claude-code", new([Layer("{\"permissions\":{\"deny\":[\"Skill(DEMO)\"]}}")], [])).Automatic);
+    }
+
     [Fact]
     public void OpenCodeScalarPermissionsNormalizeBeforeSourceMergesAndKeepWildcardPosition()
     {

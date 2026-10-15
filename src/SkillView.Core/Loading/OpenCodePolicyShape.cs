@@ -18,12 +18,12 @@ internal static class OpenCodePolicyShape
         foreach (var key in new[] { "agent", "mode" })
         {
             var agents = root.Get(key);
-            if (agents is not null && (agents.Kind != "table" || agents.Fields.Values.Any(agent => !Agent(agent)))) return false;
+            if (agents is not null && (agents.Kind != "table" || agents.Fields.Values.Any(agent => !SupportedAgent(agent)))) return false;
         }
         return true;
     }
 
-    private static bool Agent(LoadingValue agent)
+    internal static bool SupportedAgent(LoadingValue agent)
     {
         if (agent.Kind != "table" || !Permission(agent.Get("permission")) || !Tools(agent.Get("tools"))) return false;
         foreach (var key in new[] { "name", "model", "variant", "prompt", "description" })

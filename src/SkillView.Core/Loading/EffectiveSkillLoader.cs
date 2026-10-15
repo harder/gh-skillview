@@ -41,7 +41,7 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
         var selectedRunner = runner.WithContext(configuration.Context.WorkingDirectory, selectedEnvironment);
         var inventory = await inventoryService.InContext(selectedRunner).CaptureAsync(ghPath,
             new(roots, configuration.Context.AgentId == "opencode", WorkspaceDirectories: contexts, Profiles: profiles)
-            { DiscoverNestedSkillFiles = configuration.Context.AgentId == "opencode" }, token).ConfigureAwait(false);
+            { DiscoverNestedSkillFiles = configuration.Context.AgentId == "opencode", IncludeRootSkillFiles = configuration.Context.AgentId == "gemini-cli" }, token).ConfigureAwait(false);
         return await Task.Run(() => Capture(discovery.Apply(inventory), configuration, token), token).ConfigureAwait(false);
     }
 

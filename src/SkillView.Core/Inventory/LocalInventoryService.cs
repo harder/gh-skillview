@@ -48,6 +48,7 @@ public sealed class LocalInventoryService
         IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null)
     {
         internal bool DiscoverNestedSkillFiles { get; init; }
+        internal bool IncludeRootSkillFiles { get; init; }
     }
 
     public async Task<InventorySnapshot> CaptureAsync(
@@ -256,7 +257,8 @@ public sealed class LocalInventoryService
         var allRoots = roots.AddRange(managed.Roots);
         var scanned = _scanner.ScanWithCancellation(
             allRoots,
-            new LocalSkillScanner.Options(options.AllowHiddenDirs) { Managed = managed, DiscoverNestedSkillFiles = options.DiscoverNestedSkillFiles },
+            new LocalSkillScanner.Options(options.AllowHiddenDirs)
+            { Managed = managed, DiscoverNestedSkillFiles = options.DiscoverNestedSkillFiles, IncludeRootSkillFiles = options.IncludeRootSkillFiles },
             cancellationToken, inaccessible, locations);
         var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(

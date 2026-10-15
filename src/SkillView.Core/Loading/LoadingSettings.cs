@@ -62,7 +62,8 @@ internal sealed record LoadingSettings(ImmutableArray<LoadingSettingsLayer> Laye
         if (agent == "opencode")
         {
             if (root.Get("mode") is { Kind: "table" } modes)
-                root = With(root, "agent", MergeValue(root.Get("agent") ?? new("table"), modes, agent, "agent"));
+                root = With(root, "agent", MergeValue(root.Get("agent") ?? new("table"), modes with
+                { Fields = modes.Fields.ToImmutableDictionary(item => item.Key, item => OpenCodePolicyShape.SupportedAgent(item.Value) ? AsPrimaryMode(item.Value) : item.Value, StringComparer.Ordinal) }, agent, "agent"));
             root = NormalizeTools(root, deep: true);
         }
         return root;
@@ -111,6 +112,7 @@ internal sealed record LoadingSettings(ImmutableArray<LoadingSettingsLayer> Laye
     }
 
     internal static bool IsManaged(LoadingSettingsLayer layer) => layer.Scope.StartsWith("managed-", StringComparison.Ordinal);
+    internal static LoadingValue AsPrimaryMode(LoadingValue value) => With(value, "mode", new("string", "primary"));
     private static LoadingValue Without(LoadingValue value, params string[] keys) => value with
     { Fields = value.Fields.RemoveRange(keys), FieldOrder = value.FieldOrder.Where(key => !keys.Contains(key, StringComparer.Ordinal)).ToImmutableArray() };
     private static LoadingValue With(LoadingValue value, string key, LoadingValue child) => value with
@@ -341,7 +343,7 @@ internal static class LoadingPolicyEvaluator
         foreach (var toolPattern in permission.FieldOrder)
         {
             if (Unresolved(toolPattern)) return "unknown";
-            if (!Glob(toolPattern, "skill")) continue;
+            if (!OpenCodeGlob(toolPattern, "skill")) continue;
             var skills = permission.Fields[toolPattern];
             if (skills.Kind == "string") { result = Action(skills); continue; }
             if (skills.Kind != "table") return "unknown";
@@ -350,7 +352,7 @@ internal static class LoadingPolicyEvaluator
                 if (Unresolved(pattern)) return "unknown";
                 var action = Action(skills.Fields[pattern]);
                 if (action == "unknown") return action;
-                if (Glob(pattern, name)) result = action;
+                if (OpenCodeGlob(pattern, name)) result = action;
             }
         }
         return result;
@@ -360,6 +362,16 @@ internal static class LoadingPolicyEvaluator
     private static LoadingInvocationPolicy Invalid(string reason) => LoadingInvocationPolicy.Unknown(reason);
     private static bool Unresolved(string? value) => value is null || value.Contains("{env:", StringComparison.Ordinal)
         || value.Contains("{file:", StringComparison.Ordinal) || value.Contains("${", StringComparison.Ordinal);
+    internal static bool OpenCodeGlob(string pattern, string name, bool? windowsForTests = null)
+    {
+        if (pattern.Length > 2048) throw new NotSupportedException("Permission pattern budget exceeded.");
+        var expression = Regex.Escape(pattern.Replace('\\', '/')).Replace("\\*", ".*", StringComparison.Ordinal).Replace("\\?", ".", StringComparison.Ordinal);
+        // OpenCode makes the final space-plus-wildcard optional for bare names.
+        if (expression.EndsWith("\\ .*", StringComparison.Ordinal)) expression = expression[..^4] + "( .*)?";
+        var flags = RegexOptions.CultureInvariant | RegexOptions.NonBacktracking | RegexOptions.Singleline;
+        if (windowsForTests ?? OperatingSystem.IsWindows()) flags |= RegexOptions.IgnoreCase;
+        return Regex.IsMatch(name.Replace('\\', '/'), "\\A" + expression + "$", flags);
+    }
     private static bool Glob(string pattern, string name)
     {
         if (pattern.Length > 2048) throw new NotSupportedException("Permission pattern budget exceeded.");

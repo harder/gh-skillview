@@ -226,6 +226,20 @@ public sealed class LoadingConfigurationCaptureTests : IDisposable
         Assert.True(custom.Enabled); Assert.Equal("ask", custom.Approval);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("mode: subagent\n")]
+    public void ValidMarkdownModesForcePrimaryEvenAfterSubagentSettings(string mode)
+    {
+        Write(Path.Combine(Home, ".config", "opencode", "opencode.json"), "{\"agent\":{\"build\":{\"mode\":\"subagent\"}}}");
+        Write(Path.Combine(Home, ".config", "opencode", "modes", "build.md"), "---\n" + mode + "permission:\n  skill: deny\n---\n");
+        var capture = Capture("opencode");
+        Assert.Equal("primary", capture.Settings.Merge("opencode").Get("agent", "build", "mode")!.Text);
+        Assert.False(Policy(capture).Enabled);
+        File.WriteAllText(Path.Combine(Home, ".config", "opencode", "modes", "build.md"), "---\nmode: false\npermission:\n  skill: allow\n---\n");
+        Assert.Null(Policy(Capture("opencode")).Enabled);
+    }
+
     [Fact]
     public void KnownButUncapturedOpenCodeMarkdownNeverFallsBackToAllow()
     {

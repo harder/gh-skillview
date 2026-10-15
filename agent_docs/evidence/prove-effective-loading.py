@@ -23,8 +23,8 @@ def write(path, content):
     path.write_text(content, encoding="utf-8")
 
 
-def skill(path, extra=""):
-    write(path / "SKILL.md", "---\nname: demo\ndescription: Disposable loading fixture\n" + extra + "---\nNever execute skill content.\n")
+def skill(path, extra="", name="demo"):
+    write(path / "SKILL.md", "---\nname: " + name + "\ndescription: Disposable loading fixture\n" + extra + "---\nNever execute skill content.\n")
 
 
 def main():
@@ -80,8 +80,11 @@ def main():
         write(universal / "agents/openai.yaml", "policy:\n  allow_implicit_invocation: false\n")
         write(project_a / ".gemini/settings.json", '{"skills":{"disabled":["DEMO"]}}\n')
         write(project_b / ".gemini/settings.json", '{"skills":{"disabled":[]}}\n')
-        write(home / ".config/opencode/opencode.json", '{"agent":{"build":{"tools":{"skill":false}}}}\n')
+        write(home / ".config/opencode/opencode.json", '{"agent":{"build":{"mode":"subagent","tools":{"skill":false}}}}\n')
         write(home / ".config/opencode/agents/nested/policy.md", "---\nname: build\npermission:\n  skill: ask\n---\nNever execute this agent prompt.\n")
+        write(home / ".config/opencode/modes/build.md", "---\nmode: subagent\npermission:\n  skill: ask\n---\nNever execute this mode prompt.\n")
+        gemini_root = home / ".gemini/skills"
+        skill(gemini_root, name="root-gemini")
         extension_payload = root / "extension-payload"
         extension_install = home / ".gemini/extensions/local"
         skill(extension_payload / "skills/demo")
@@ -97,9 +100,12 @@ def main():
         write(alternate_plugin / ".claude-plugin/plugin.json", '{"name":"package","skills":"./skills/"}\n')
         skill(alternate_plugin / "skills/demo")
         opencode_config = root / "opencode-config"
+        opencode_json_config = root / "opencode-json-config"
+        write(opencode_json_config / "opencode.json", '{"mode":{"build":{"mode":"subagent","permission":{"skill":{"*":"ask","CASE-DEMO":"deny"}}}}}\n')
         bundle = project_a / "loading-bundle"
         for path in (opencode_config / "skill/demo", home / ".opencode/skills/demo", bundle, bundle / "outer", bundle / "outer/nested"):
             skill(path)
+        skill(bundle / "case", name="case-demo")
         write(project_a / "opencode.json", '{"skills":{"paths":["loading-bundle"]}}\n')
 
         def snapshot():
@@ -108,7 +114,7 @@ def main():
             # Both filenames and bytes are compared; added files are changes.
             for directory in (home / ".agents", home / ".claude", home / ".codex", home / ".config/opencode",
                               project_a / ".claude", project_a / ".gemini", project_b / ".gemini", alternate_home, home / ".gemini", extension_payload,
-                              alternate_claude, opencode_config, bundle, home / ".opencode"):
+                              alternate_claude, opencode_config, opencode_json_config, bundle, home / ".opencode"):
                 for path in sorted(directory.rglob("*")):
                     observed[str(path.relative_to(root))] = "directory" if path.is_dir() else sha(path)
             observed[str((project_a / "opencode.json").relative_to(root))] = sha(project_a / "opencode.json")
@@ -144,6 +150,10 @@ def main():
 
         first = run("gemini-cli", version="0.46.0")
         second = run("gemini-cli", project_b, version="0.46.0")
+        root_row = rows(second, gemini_root)[0]
+        assert root_row["placement"] == "user-gemini"
+        assert root_row["invocationName"] == "root-gemini"
+        assert root_row["expected"]["discoverability"] == "expected"
         first_user, second_user = rows(first, universal)[0], rows(second, universal)[0]
         assert first_user["expected"]["state"] == "disabled"
         assert second_user["expected"]["state"] == "eligible"
@@ -177,10 +187,12 @@ def main():
         for path in (opencode_config / "skill/demo", home / ".opencode/skills/demo", bundle, bundle / "outer", bundle / "outer/nested"):
             assert rows(opencode, path)[0]["expected"]["discoverability"] == "expected"
         assert any(Path(item["path"]).resolve() == bundle.resolve() for item in opencode["discoveryRoots"])
-        excluded = run("opencode", overrides={"OPENCODE_DISABLE_EXTERNAL_SKILLS": "true", "OPENCODE_CONFIG_DIR": str(opencode_config)})
+        excluded = run("opencode", overrides={"OPENCODE_DISABLE_EXTERNAL_SKILLS": "true", "OPENCODE_CONFIG_DIR": str(opencode_json_config)})
         assert rows(excluded, universal)[0]["placement"] == "excluded-discovery-root"
         assert rows(excluded, universal)[0]["expected"]["manualInvocation"] == "no"
         assert rows(excluded, bundle)[0]["expected"]["discoverability"] == "expected"
+        assert rows(excluded, bundle)[0]["expected"]["approval"] == "ask"
+        assert rows(excluded, bundle / "case")[0]["expected"]["approval"] == ("deny" if os.name == "nt" else "ask")
         assert opencode["context"]["id"] != excluded["context"]["id"]
         assert before == snapshot()
         output = {

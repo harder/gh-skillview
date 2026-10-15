@@ -56,6 +56,7 @@ internal sealed class OpenCodeAgentCapture(Action<string>? beforeChildInspection
                         { layers.Add(new("agent-header-observation", "observed-only", document)); Block("agent name unsupported"); continue; }
                         var key = declared?.Text ?? relative + name[..^3];
                         if (!names.Add(key)) Block("duplicate agent header names have unverified native enumeration order");
+                        if (!recursive && OpenCodePolicyShape.SupportedAgent(header)) header = LoadingSettings.AsPrimaryMode(header);
                         var agent = new LoadingValue("table")
                         { Fields = ImmutableDictionary<string, LoadingValue>.Empty.Add(key, header), FieldOrder = [key] };
                         var root = new LoadingValue("table")

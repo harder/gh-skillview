@@ -17,6 +17,10 @@
   before merging; overwritten keys retain their original position. Markdown
   agents/modes load during each config-directory phase; JSON modes fold last.
   Missing/bounded/linked-container observations cannot imply default allow.
+  Valid legacy JSON and Markdown modes become primary roles at their respective
+  merge boundaries; do not normalize unsupported headers into valid policy.
+  OpenCode permission wildcards normalize separators and ignore case on Windows;
+  keep that matcher separate from Claude's case-sensitive selectors.
 - OpenCode effective analysis freezes all config-directory `skill`/`skills`
   roots and final merged `skills.paths`. Its bounded scanner mode includes
   root `SKILL.md` and continues into skill-bearing directories; ordinary
@@ -32,6 +36,8 @@
   exact manifest keys and case-sensitive stored rules, with last match winning;
   they do not normalize stored paths. Keep these provider-specific comparisons
   separate from SkillView's path identity and mutation authority.
+  Gemini's discovery includes the root `SKILL.md` and immediate-child skills;
+  enable root admission separately from OpenCode's recursive observation mode.
 
 ## Repo
 

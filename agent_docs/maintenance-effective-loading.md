@@ -157,3 +157,13 @@ Copilot review follow-up (acceptance remains pending):
   OpenCode config directories, root/nested configured skills and disable flags.
   CI resolves gh with Python's native executable lookup: Git Bash's `command -v`
   can return an MSYS path that native Windows Python cannot inspect.
+
+Second Copilot follow-up (acceptance remains pending): Gemini root-level skill
+files now enter automatic capture through a separate root-admission option.
+OpenCode's valid legacy JSON/Markdown mode definitions force primary roles at the
+native merge boundaries. Its permission matcher preserves native separator,
+optional trailing wildcard and Windows case behavior, independently of Claude.
+Malformed mode headers remain unknown. Tests cover inherited/authored subagent
+modes, both Windows permission-pattern levels, and gh-unavailable Gemini capture.
+The eight-command native proof exercises Gemini root files, both legacy mode
+boundaries and an OS-specific permission result without starting an AI client.

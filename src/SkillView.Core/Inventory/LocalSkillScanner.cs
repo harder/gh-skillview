@@ -47,6 +47,7 @@ public sealed class LocalSkillScanner
         // OpenCode's **/SKILL.md observation includes root files and skills
         // nested inside other skills. Ordinary maintenance keeps leaf semantics.
         internal bool DiscoverNestedSkillFiles { get; init; }
+        internal bool IncludeRootSkillFiles { get; init; }
     }
 
     public ImmutableArray<InstalledSkill> Scan(
@@ -70,7 +71,7 @@ public sealed class LocalSkillScanner
         foreach (var root in roots.OrderByDescending(root => root.Managed))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (root.Managed && root.DirectSkill && !options.DiscoverNestedSkillFiles)
+            if (root.Managed && root.DirectSkill && !options.DiscoverNestedSkillFiles && !options.IncludeRootSkillFiles)
             {
                 var errors = inaccessiblePaths?.Count ?? 0;
                 ConsiderCandidate(root, root.Path, byResolved, caseSensitivityByParent, cancellationToken, budget, inaccessiblePaths);
@@ -79,7 +80,8 @@ public sealed class LocalSkillScanner
             }
             if (!root.Managed && ManagedBoundary(root.Path, root, options, completedManaged, inaccessiblePaths, locations)) continue;
             var errorsBeforeWalk = inaccessiblePaths?.Count ?? 0;
-            if (options.DiscoverNestedSkillFiles && (root.Managed && root.DirectSkill || File.Exists(Path.Combine(root.Path, SkillFileName))))
+            if ((options.DiscoverNestedSkillFiles || options.IncludeRootSkillFiles)
+                && (root.Managed && root.DirectSkill || File.Exists(Path.Combine(root.Path, SkillFileName))))
                 ConsiderCandidate(root, root.Path, byResolved, caseSensitivityByParent, cancellationToken, budget, inaccessiblePaths);
             var result = Walk(root.Path, 0, root, options, byResolved, caseSensitivityByParent,
                 cancellationToken, inaccessiblePaths, budget, locations, completedManaged);
