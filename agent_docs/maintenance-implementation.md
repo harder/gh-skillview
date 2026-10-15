@@ -954,3 +954,12 @@ Node automation tests, site build and actionlint pass. Exact-head remote checks,
 all-RID native artifact inspection and merge remain required before closing M10. The acceptance ledger remains incomplete
 until those results are recorded. Effective loading and plugin lifecycle remain
 their separate original findings.
+
+
+The first PR #59 source passed 1,467 tests on each platform, but native Linux
+verification exposed unavailable-openat2 inventory failure and macOS verification
+exposed incorrect inaccessible-root classification. Review identified the related
+unknown-boundary cleanup path. These are fixed, permission regressions pass, and
+all 319 Inventory tests plus both 17-case actual-gh contract suites pass. Source
+and evidence re-review are clear. The follow-up checkpoint preserves attribution;
+final full-suite, native and exact-head remote results remain required.

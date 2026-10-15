@@ -98,8 +98,6 @@ public sealed class LocalInventoryService
         providers.Add(new ProviderObservation("lockfiles", local.LockDiagnostics.IsEmpty,
             local.Roots.Select(root => root.Path).ToImmutableArray(), DateTimeOffset.UtcNow,
             local.LockDiagnostics.IsEmpty ? null : string.Join("; ", local.LockDiagnostics.Take(6).Select(d => $"{d.Path}: {d.Message}"))));
-        providers.Add(new("managed", local.Managed.Complete, local.Managed.Roots.Select(root => root.Path).Distinct(StringComparer.Ordinal).ToImmutableArray(),
-            DateTimeOffset.UtcNow, local.Managed.Complete ? null : string.Join("; ", local.Managed.Incomplete.Take(6))));
         if (ghPath is not null)
         {
             foreach (var root in local.Roots.Where(root => !root.Managed))
@@ -118,10 +116,11 @@ public sealed class LocalInventoryService
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
         // written by `npx skills`). Free signal — best-effort.
         merged = EnrichOwnership(merged, local.Packages, cancellationToken);
+        var managedFailures = new List<DiscoveryLocation>();
         merged = merged.Select(skill =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var claims = local.Managed.Claims(skill).ToImmutableArray();
+            var claims = local.Managed.Claims(skill, managedFailures).ToImmutableArray();
             return skill with
             {
                 OwnershipClaims = skill.AllOwnershipClaims.Concat(claims).ToImmutableArray(),
@@ -129,6 +128,10 @@ public sealed class LocalInventoryService
                 OwnershipRunner = _contextRunner
             };
         }).ToImmutableArray();
+        var managedComplete = local.Managed.Complete && managedFailures.Count == 0;
+        providers.Add(new("managed", managedComplete, local.Managed.Roots.Select(root => root.Path).Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            DateTimeOffset.UtcNow, managedComplete ? null : string.Join("; ", local.Managed.Incomplete
+                .Concat(managedFailures.Select(failure => failure.Path + ": " + failure.Reason)).Take(6))));
         var managedRecords = merged.SelectMany(skill => skill.AllOwnershipClaims
             .Where(claim => claim.InstallationMode == "managed-read-only")).Distinct().ToImmutableArray();
         if (!local.LockDiagnostics.IsEmpty)
@@ -163,8 +166,8 @@ public sealed class LocalInventoryService
             FsScanDuration = local.Duration,
             GhListDuration = gh.Duration,
             BrokenSymlinksFound = brokenCount,
-            InaccessiblePaths = local.InaccessiblePaths,
-            Locations = local.Locations,
+            InaccessiblePaths = local.InaccessiblePaths.AddRange(managedFailures.Select(failure => failure.Path)).Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            Locations = local.Locations.AddRange(managedFailures),
         };
 
         return new InventorySnapshot

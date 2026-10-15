@@ -215,12 +215,24 @@ public sealed class LocalSkillScanner
         ICollection<string>? incomplete, ICollection<DiscoveryLocation>? locations)
     {
         if (options.Managed is not { } managed) return false;
-        var boundary = managed.Regions.FirstOrDefault(region => region.Covers(path));
+        bool unknown = false;
+        bool Observed(ManagedSkillRegion region, string candidate)
+        {
+            var value = region.ObserveCoverage(candidate);
+            if (value is null)
+            {
+                unknown = true;
+                if (incomplete is { Count: < 128 }) incomplete.Add(region.Path);
+                if (locations is { Count: < 128 }) locations.Add(new(region.Path, "unsupported", "Managed ownership comparison could not be inspected."));
+            }
+            return value == true;
+        }
+        var boundary = managed.Regions.FirstOrDefault(region => Observed(region, path));
         if (boundary is null) return false;
-        var required = managed.Roots.Where(candidate => boundary.Covers(candidate.Path)).ToArray();
+        var required = managed.Roots.Where(candidate => Observed(boundary, candidate.Path)).ToArray();
         var covered = !managed.TopologyIncomplete
-            && !managed.Locations.Any(location => location.State == "unsupported" && boundary.Covers(location.Path))
-            && required.All(candidate => completed.Contains(PathIdentity.NormalizeKey(candidate.Path)));
+            && !managed.Locations.Any(location => location.State == "unsupported" && Observed(boundary, location.Path))
+            && required.All(candidate => completed.Contains(PathIdentity.NormalizeKey(candidate.Path))) && !unknown;
         if (!covered) incomplete?.Add(path);
         if (locations is { Count: < 128 }) locations.Add(new(path, covered ? "managed" : "unsupported",
             covered ? "Managed resources observed separately; only declared skill payloads are scanned."

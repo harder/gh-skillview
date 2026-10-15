@@ -252,7 +252,7 @@ public static class CleanupClassifier
         foreach (var root in scanRoots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (root.Managed || snapshot.ManagedRegions.Any(region => region.Covers(root.Path))) continue;
+            if (root.Managed || snapshot.ManagedRegions.Any(region => region.ObserveCoverage(root.Path) != false)) continue;
             IEnumerator<string>? children;
             try { children = Directory.EnumerateDirectories(root.Path).GetEnumerator(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
@@ -270,7 +270,7 @@ public static class CleanupClassifier
                     if (!hasNext) break;
 
                     var child = children.Current;
-                    if (snapshot.ManagedRegions.Any(region => region.Covers(child))) continue;
+                    if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
                     var resolved = PathResolver.Resolve(child);
                     if (resolved is null) continue;
                     if (knownResolved.Contains(PathIdentity.NormalizeKey(resolved))) continue;

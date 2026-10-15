@@ -38,8 +38,8 @@ internal sealed partial class ManagedSkillDiscovery
         ImmutableDictionary<string, string> Witnesses, bool TopologyIncomplete)
     {
         internal bool Complete => Incomplete.IsEmpty;
-        internal IEnumerable<SkillPackage> Claims(InstalledSkill skill) => Regions.Where(region =>
-            region.Covers(skill.ResolvedPath) || skill.Agents.Any(agent => region.Covers(agent.Path)))
+        internal IEnumerable<SkillPackage> Claims(InstalledSkill skill, ICollection<DiscoveryLocation>? failures = null) => Regions.Where(region =>
+            Observed(region, skill.ResolvedPath, failures) || skill.Agents.Any(agent => Observed(region, agent.Path, failures)))
             // Container and version observations are both useful, but the most
             // specific boundary supplies each provider's distributor identity.
             .GroupBy(region => region.Provider, StringComparer.Ordinal)
@@ -51,6 +51,14 @@ internal sealed partial class ManagedSkillDiscovery
                 return (registered.Length == 0 ? selected.Take(1) : registered)
                     .Select(region => region.Claim(skill));
             });
+
+        private static bool Observed(ManagedSkillRegion region, string path, ICollection<DiscoveryLocation>? failures)
+        {
+            var covered = region.ObserveCoverage(path);
+            if (covered is null && failures is { Count: < 128 })
+                failures.Add(new(region.Path, "unsupported", "Managed ownership comparison could not be inspected."));
+            return covered == true;
+        }
     }
 
     internal static Observation Capture(ProcessRunner runner, IEnumerable<ScanRoot> ordinaryRoots,
@@ -119,7 +127,7 @@ internal sealed partial class ManagedSkillDiscovery
                 var candidate = OwnershipPath.CanonicalCandidate(payload.Path);
                 if (candidate is null || !PathIdentity.IsInside(candidate, parent)) continue;
                 var alias = Path.GetFullPath(Path.GetRelativePath(parent, candidate), ordinary.Path);
-                var region = regions.Where(region => region.Provider == payload.ManagedProvider && region.Covers(candidate))
+                var region = regions.Where(region => region.Provider == payload.ManagedProvider && CoversForObservation(region, candidate))
                     .OrderByDescending(region => region.PluginId is not null).FirstOrDefault();
                 if (region is not null) Root(alias, region, ordinary);
             }
@@ -207,7 +215,7 @@ internal sealed partial class ManagedSkillDiscovery
     private void Embedded(string path, ScanRoot ordinary, int depth, bool allowHidden)
     {
         token.ThrowIfCancellationRequested();
-        if (!DirectoryExists(path) || regions.Any(region => region.Covers(path))) return;
+        if (!DirectoryExists(path) || regions.Any(region => CoversForObservation(region, path))) return;
         if (!visited.Add(PathIdentity.NormalizeKey(path) + "\0" + ordinary.Scope + "\0" + ordinary.Context + "\0" + ordinary.Profile)) return;
         if (ObserveEmbeddedPlugin(path, true, ordinary)) return;
         if (Exists(Path.Combine(path, LocalSkillScanner.SkillFileName))) return;
@@ -220,7 +228,7 @@ internal sealed partial class ManagedSkillDiscovery
                 if (PathResolver.Resolve(child) is { } physical)
                 {
                     Ancestors(physical, true, ordinary);
-                    foreach (var region in regions.Where(region => region.Covers(physical)).ToArray())
+                    foreach (var region in regions.Where(region => CoversForObservation(region, physical)).ToArray())
                     {
                         var alias = region with { Path = child, ObservedCanonicalPath = null };
                         AddRegion(alias);
@@ -234,7 +242,7 @@ internal sealed partial class ManagedSkillDiscovery
     }
     private void Ancestors(string path, bool discover, ScanRoot? context)
     {
-        if (regions.Any(region => region.Covers(path))) return;
+        if (regions.Any(region => CoversForObservation(region, path))) return;
         string? cursor = Path.GetFullPath(path, cwd);
         for (var depth = 0; cursor is not null && depth < 128; depth++, cursor = Path.GetDirectoryName(cursor))
         {
@@ -300,7 +308,13 @@ internal sealed partial class ManagedSkillDiscovery
         token.ThrowIfCancellationRequested();
         try { _ = File.GetAttributes(path); return true; }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return false; }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Incomplete(path, ex.Message); return true; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { topologyIncomplete = true; Incomplete(path, ex.Message); return false; }
+    }
+    private bool CoversForObservation(ManagedSkillRegion region, string path)
+    {
+        var covered = region.ObserveCoverage(path);
+        if (covered is null) { topologyIncomplete = true; Incomplete(region.Path, "Managed ownership comparison could not be inspected."); }
+        return covered == true;
     }
     private bool DirectoryExists(string path)
     {

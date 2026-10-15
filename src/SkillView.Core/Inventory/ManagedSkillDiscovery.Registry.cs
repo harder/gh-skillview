@@ -67,7 +67,7 @@ internal sealed partial class ManagedSkillDiscovery
                         payloadBoundaries: contained ? null : explicitRoots);
                     // Preserve the observed user/project registration in addition
                     // to cached presence. Both retain unknown enabled/session state.
-                    foreach (var payload in roots.Where(payload => payload.ManagedProvider == "claude-plugin" && region.Covers(payload.Path)).ToArray())
+                    foreach (var payload in roots.Where(payload => payload.ManagedProvider == "claude-plugin" && CoversForObservation(region, payload.Path)).ToArray())
                         Root(payload.Path, region, new(payload.Path, knownScope.Value, "claude") { Context = context ?? storage });
                 }
             }

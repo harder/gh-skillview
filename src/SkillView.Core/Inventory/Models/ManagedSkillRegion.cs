@@ -7,6 +7,13 @@ public sealed record ManagedSkillRegion(string Path, string Provider, string Age
     public string? ObservedCanonicalPath { get; init; }
     public Scope? RegistrationScope { get; init; }
     public string? RegistrationPath { get; init; }
+    // Read-only consumers report an unknown comparison as partial coverage.
+    // Mutation admission always uses the strict Covers/IsInside predicates.
+    internal bool? ObserveCoverage(string path)
+    {
+        try { return Covers(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
     // Reverse containment also matters: an ordinary install root can contain a
     // managed child through an ancestor alias. Keep the captured boundary even
     // if that alias is subsequently retargeted.

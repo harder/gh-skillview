@@ -148,16 +148,18 @@ public class GhCliContractTests
         var root = Directory.CreateTempSubdirectory("skillview-recorded-base-contract-");
         try
         {
+            // Fixture HOME/config contains protected managed roots. Keep it
+            // outside the install destination, as it is on an ordinary machine.
+            var installRoot = Path.Combine(root.FullName, "skills");
             var logger = new Logger();
             var runner = new ProcessRunner(logger, environment:
                 await AuthenticatedFixtureEnvironmentAsync(ghPath!, root.FullName, logger), defaultWorkingDirectory: root.FullName);
             var installer = new GhSkillInstallService(runner, logger);
             var installed = await installer.InstallAsync(ghPath!, "cli/cli", "skills/gh-skill",
-                new GhSkillInstallService.Options(Path: root.FullName,
+                new GhSkillInstallService.Options(Path: installRoot,
                     Version: "33789149b9def6b66ddf247438a79fac94e22074", Pin: true), TestContext.Current.CancellationToken);
             Assert.True(installed.Succeeded, installed.StdErr);
-            var skillPath = Directory.EnumerateDirectories(root.FullName)
-                .Single(directory => Path.GetFileName(directory) != ".fixture");
+            var skillPath = Directory.EnumerateDirectories(installRoot).Single();
             var markdown = Path.Combine(skillPath, "SKILL.md");
             var text = File.ReadAllText(markdown);
             text = System.Text.RegularExpressions.Regex.Replace(text,
@@ -166,7 +168,7 @@ public class GhCliContractTests
                 @"(?m)^[ \t]+github-pinned:.*\n", "");
             File.WriteAllText(markdown, text);
             var target = Assert.Single(new SkillView.Inventory.LocalSkillScanner(logger).Scan(
-                [new SkillView.Inventory.Models.ScanRoot(root.FullName, SkillView.Inventory.Models.Scope.Custom, null)]));
+                [new SkillView.Inventory.Models.ScanRoot(installRoot, SkillView.Inventory.Models.Scope.Custom, null)]));
             Assert.False(target.Pinned);
             Assert.Equal("refs/heads/trunk", target.FrontMatter.GithubRef);
             var result = await new SkillView.Maintenance.SkillUpdateCoordinator(installer,

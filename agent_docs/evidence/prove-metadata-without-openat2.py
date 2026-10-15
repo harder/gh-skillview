@@ -37,6 +37,9 @@ with tempfile.TemporaryDirectory(prefix='skillview-no-openat2-') as temporary:
         'source': 'fixture/repository', 'sourceType': 'github',
         'skillPath': 'skills/owned/SKILL.md'
     }}}))
+    builtin = home / '.codex/skills/.system/builtin'
+    builtin.mkdir(parents=True)
+    builtin.joinpath('SKILL.md').write_text('---\nname: builtin\ndescription: Built-in fixture\n---\nBody\n')
     gh = root / 'gh'
     gh.write_text('''#!/bin/sh
 case "$*" in
@@ -62,13 +65,16 @@ esac
         inventory_process = run(['list', '--json'])
         assert inventory_process.returncode == 0, (inventory_process.stdout, inventory_process.stderr)
         inventory = json.loads(inventory_process.stdout)
-        assert {row['name'] for row in inventory['skills']} == {'owned', 'unowned'}, inventory
+        assert {row['name'] for row in inventory['skills']} == {'owned', 'unowned', 'builtin'}, inventory
         assert all(row['validity'] == 'Valid' for row in inventory['skills']), inventory
         assert any(owner['source'] == 'fixture/repository' for owner in inventory['ownerRecords']), inventory
+        observed_builtin = next(row for row in inventory['skills'] if row['name'] == 'builtin')
+        assert any(owner['provider'] == 'codex-builtin' and owner['readOnly'] for owner in observed_builtin['ownerRecords']), observed_builtin
         removal = run(['remove', 'unowned', '--yes', '--json'])
         assert removal.returncode != 0, removal.stdout
         assert 'openat2' in removal.stdout + removal.stderr, (removal.stdout, removal.stderr)
         assert all(Path(path).read_bytes() == content for path, content in before.items()), 'Fixture changed after refused removal'
         results.append({'deniedErrno': denial, 'validMetadataObserved': True,
-                        'ownerLockObserved': True, 'removalCapabilityRefusedWithoutMutation': True})
+                        'ownerLockObserved': True, 'managedBuiltinObservedReadOnly': True,
+                        'removalCapabilityRefusedWithoutMutation': True})
 print(json.dumps(results, indent=2))

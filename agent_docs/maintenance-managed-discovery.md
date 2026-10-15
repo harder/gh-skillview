@@ -133,3 +133,26 @@ actual prior native host through `--legacy`, the new `--app`,
 managed roots, then inspects, interrupts old Apply, recovers and undoes using the
 new host. This network fixture requires gh authentication captured before HOME
 isolation; the skill is never executed. Both local native hosts pass.
+
+## Platform verification corrections
+
+The first exact-head PR run passed all 1,467 default tests on Linux, macOS and
+Windows, then exposed two native proof failures. Linux's deliberately denied
+`openat2` capability also disabled read-only canonicalization, making managed
+inventory throw. Canonicalization now uses the verified Unix ABI independently;
+destructive operations retain their original capability refusal. The Linux
+capability proof additionally checks managed built-in provenance under both
+EPERM and ENOSYS.
+
+The macOS denied-root proof exposed unreadable manifest paths being treated as
+observed manifests. Read errors now retain partial topology without inventing a
+plugin. Unknown read-only coverage comparisons remain bounded diagnostics in
+discovery, scanning and enrichment; cleanup conservatively skips unknown paths.
+Both ordinary denied roots and a managed home below an inaccessible ancestor
+retain an accessible control and refuse unsupported mutation.
+
+The moved-branch contract fixture nested its private agent HOME inside the
+installation destination. Move that HOME/config to a sibling of the fixture's
+skills directory, preserving the install guard and the actual update contract.
+These follow-up changes require fresh source and platform evidence; the first
+checkpoint remains attributed to the earlier source and native binaries.

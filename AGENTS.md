@@ -575,6 +575,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Isolated staging and disposable proofs must override Codex/Claude plugin homes
   and clear explicit plugin/seed lists alongside HOME. See
   `agent_docs/maintenance-managed-discovery.md`.
+  Read-only canonicalization must remain available on verified Unix ABIs when
+  Linux `openat2` is unavailable; that never enables removal or relocation.
+  Inaccessible ownership comparisons report partial inventory, and cleanup
+  skips unknown coverage. An unreadable manifest path is unknown, not evidence
+  that an ordinary directory is a plugin.
 - File-log aggregate retention is enforced as the active part grows, not only
   when a writer opens or rotates. Maintain incremental byte accounting and a
   bounded retry threshold for undeletable files so the fix does not enumerate

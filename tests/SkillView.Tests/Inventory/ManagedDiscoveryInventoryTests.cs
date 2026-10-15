@@ -599,6 +599,44 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
         Assert.Equal("local-claude-plugin", Assert.Single(skill.AllOwnershipClaims).Provider);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InaccessibleOrdinaryOrManagedAncestorReportsPartialWithoutHidingAccessibleControl(bool managedAncestor)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var control = Skill("home/.agents/skills/control", "control");
+        var denied = DirectoryAt("denied");
+        var inaccessibleCodex = DirectoryAt("denied/codex");
+        Skill("denied/codex/skills/.system/builtin", "builtin");
+        var runner = Runner(managedAncestor ? new Dictionary<string, string> { ["CODEX_HOME"] = inaccessibleCodex } : null);
+        var mode = File.GetUnixFileMode(denied);
+        File.SetUnixFileMode(denied, UnixFileMode.None);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => File.GetAttributes(inaccessibleCodex));
+            var inventory = await Capture(managedAncestor ? [] : [denied], runner);
+            Assert.True(inventory.IsPartial);
+            Assert.Equal(control, Assert.Single(inventory.Skills).ResolvedPath);
+            Assert.Empty(inventory.Skills[0].AllOwnershipClaims);
+            var cleanup = CleanupClassifier.ClassifyWithCancellation(inventory, inventory.ScannedRoots, null, Token);
+            Assert.DoesNotContain(cleanup, candidate => candidate.Kind is CleanupClassifier.CandidateKind.Untracked
+                or CleanupClassifier.CandidateKind.SourceOrphaned or CleanupClassifier.CandidateKind.Duplicate);
+            if (managedAncestor)
+            {
+                Assert.Contains(inventory.ManagedRegions, region => PathIdentity.IsInside(region.Path, inaccessibleCodex));
+                Assert.Contains(inventory.Providers, provider => provider.Provider == "managed" && !provider.Succeeded);
+            }
+            else
+            {
+                Assert.DoesNotContain(inventory.ManagedRegions, region => PathIdentity.Equals(region.Path, denied));
+                Assert.Contains(inventory.Diagnostics.Locations, location => PathIdentity.Equals(location.Path, denied) && location.State == "inaccessible");
+            }
+            Assert.Throws<IOException>(() => ManagedSkillDiscovery.RefusePaths([managedAncestor ? control : denied], Token, runner));
+        }
+        finally { File.SetUnixFileMode(denied, mode); }
+    }
+
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {
         public void Report(T value) => report(value);
