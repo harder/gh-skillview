@@ -11,4 +11,7 @@ public sealed record ScanRoot(
 {
     public string? Profile { get; init; }
     public string? Context { get; init; }
+    internal bool Managed { get; init; }
+    internal bool DirectSkill { get; init; }
+    internal string? ManagedProvider { get; init; }
 }

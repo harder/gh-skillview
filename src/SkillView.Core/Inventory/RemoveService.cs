@@ -98,7 +98,7 @@ public sealed class RemoveService
 
     /// Removes a previously-validated skill directory. Callers MUST run
     /// `RemoveValidator.Validate` first and honor its errors and warnings;
-    /// this method does NOT re-run the policy rules. Execution still rechecks
+    /// this method rechecks managed ownership at execution. Execution also rechecks
     /// that the selected filesystem object still has the identity captured by
     /// validation. Native traversal holds directory handles while enumerating
     /// and deleting children, so replacing an ancestor pathname cannot redirect
@@ -152,6 +152,27 @@ public sealed class RemoveService
             progressTracker.Publish(1, 0, 0, 1, target,
                 force: true, isCompleted: true, targetsDeleted: 0);
             return RemoveReport.Refused(target, reason);
+        }
+
+        if (!options.DryRun)
+        {
+            try
+            {
+                var authority = validation.ExecutionIdentity?.CanonicalPath ?? validation.ExecutionLinkIdentity?.CanonicalPath ?? target;
+                ManagedSkillDiscovery.RefusePaths(validation.OwnershipPaths.Append(target).Append(authority),
+                    cancellationToken, validation.OwnershipRunner);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.Error("remove", "refused: " + ex.Message);
+                progressTracker.Publish(1, 0, 0, 1, target, force: true, isCompleted: true, targetsDeleted: 0);
+                return RemoveReport.Refused(target, ex.Message);
+            }
+            catch (OperationCanceledException)
+            {
+                progressTracker.Publish(0, 0, 0, 0, target, force: true, isCanceled: true);
+                throw;
+            }
         }
 
         if (!options.DryRun

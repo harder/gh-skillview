@@ -48,12 +48,23 @@ public sealed class GhSkillInstallService
         var args = BuildArgs(repo, skillName, options);
         try
         {
-            var mutates = options.All || !string.IsNullOrEmpty(skillName) || options.FromLocal;
+            var mutates = options.All || !string.IsNullOrEmpty(skillName);
             var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
             var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
+            if (options.All && context?.NeedsManagedSelectors(destinations) == true)
+                throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
             IReadOnlyList<string>? resolvedSelectors = null;
             string? registryHome = null;
             System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;
+            if (options.FromLocal && mutates && (context?.Claims.IsEmpty == false || context?.NeedsManagedSelectors(destinations) == true))
+            {
+                var listing = await ListRepoSkillsAsync(ghPath, repo, allowHiddenDirs: options.AllowHiddenDirs,
+                    cancellationToken: cancellationToken, processEnvironment: options.ProcessEnvironment,
+                    workingDirectory: options.WorkingDirectory, fromLocal: true).ConfigureAwait(false);
+                if (!listing.Succeeded) throw new IOException("Cannot establish local install selectors: " + listing.ErrorMessage);
+                resolvedSelectors = ResolveWriteSelectors(listing.Skills, skillName, options.All);
+                if (resolvedSelectors.Count == 0) throw new IOException("The exact local materialization names are unresolved; no write was admitted.");
+            }
             if (!options.FromLocal && (options.All || !string.IsNullOrEmpty(skillName)))
             {
                 var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
@@ -61,7 +72,7 @@ public sealed class GhSkillInstallService
                 var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
                 registryHome = home;
                 capturedRegistry = records;
-                if (!records.IsEmpty || context?.Claims.IsEmpty == false)
+                if (!records.IsEmpty || context?.Claims.IsEmpty == false || context?.NeedsManagedSelectors(destinations) == true)
                 {
                     if (skillName is { } direct && records.ContainsKey(direct.Split('@')[0]))
                         throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
@@ -89,7 +100,10 @@ public sealed class GhSkillInstallService
                 if (!destinations.SequenceEqual(latestDestinations, StringComparer.Ordinal))
                     throw new IOException("Installation destinations changed during preparation; refresh before installing.");
                 var latestContext = GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken);
+                if (options.All && latestContext.NeedsManagedSelectors(destinations))
+                    throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
                 GhInstallOwnershipGuard.ValidateUnchanged(context!, cancellationToken);
+                GhInstallOwnershipGuard.Validate(context!, destinations, resolvedSelectors, cancellationToken);
                 GhInstallOwnershipGuard.Validate(latestContext, destinations, resolvedSelectors, cancellationToken);
                 // No discovery await may separate these checks from launch.
                 if (capturedRegistry is not null)
@@ -137,9 +151,10 @@ public sealed class GhSkillInstallService
         bool allowHiddenDirs = false,
         CancellationToken cancellationToken = default,
         IReadOnlyDictionary<string, string>? processEnvironment = null,
-        string? workingDirectory = null)
+        string? workingDirectory = null,
+        bool fromLocal = false)
     {
-        var args = BuildListArgs(repo, version, allowHiddenDirs);
+        var args = BuildListArgs(repo, version, allowHiddenDirs, fromLocal);
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
             environment: processEnvironment, workingDirectory: workingDirectory).ConfigureAwait(false);
         if (!result.Succeeded)
@@ -168,11 +183,13 @@ public sealed class GhSkillInstallService
     internal static IReadOnlyList<string> BuildListArgs(
         string repo,
         string? version,
-        bool allowHiddenDirs)
+        bool allowHiddenDirs,
+        bool fromLocal = false)
     {
         // Deliberately no skill name and no `--all`: that combination triggers
         // gh's non-interactive "list available skills" path (cli/cli#13548).
         var args = new List<string> { "skill", "install" };
+        if (fromLocal) args.Add("--from-local");
         if (allowHiddenDirs)
         {
             args.Add("--allow-hidden-dirs");

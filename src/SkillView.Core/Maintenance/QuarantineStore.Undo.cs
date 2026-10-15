@@ -10,7 +10,7 @@ internal sealed partial class QuarantineStore
     {
         token.ThrowIfCancellationRequested();
         if (!ValidId(id)) throw new IOException("Undo requires a lowercase 32-character operation ID.");
-        CheckStatePlacement(inventory);
+        CheckStatePlacement(inventory, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token, allowCreate: false);
         using var writer = state.OpenExistingFile("writer.lock", true, token);
         if (writer.Length != 0) throw new IOException("Operation writer lock must be empty.");
@@ -55,6 +55,7 @@ internal sealed partial class QuarantineStore
         VerifyRecordedPayload(record, before);
         try
         {
+            ManagedSkillDiscovery.RefusePaths([record.OriginalPath], token, runner);
             lease.MoveToSlot(record.RootPath, record.OriginalPath, record.RootAfter.Value, record.ParentAfter.Value, token);
             using var reconciliation = new CancellationSource(TimeSpan.FromSeconds(30),
                 CancellationCallbackReporter.For(logger, "Undo reconciliation"));
@@ -79,7 +80,7 @@ internal sealed partial class QuarantineStore
     internal IReadOnlyList<QuarantineResult> History(InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        CheckStatePlacement(inventory);
+        CheckStatePlacement(inventory, token);
         try { _ = File.GetAttributes(Root); }
         catch (FileNotFoundException) { return []; }
         catch (DirectoryNotFoundException) { return []; }
@@ -130,9 +131,10 @@ internal sealed partial class QuarantineStore
         InstalledAt = null
     };
 
-    private static void AdmitRecovery(InstalledSkill original, QuarantineRecord record, InventorySnapshot inventory, CancellationToken token)
+    private void AdmitRecovery(InstalledSkill original, QuarantineRecord record, InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        ManagedSkillDiscovery.RefuseTarget(original, token, runner);
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512
             || !inventory.ScannedRoots.Any(scan => scan.Scope == Scope.Custom && OwnershipPath.Same(scan.Path, record.RootPath)))
             throw new IOException("Recovery requires the same explicit custom scan root and complete inventory.");

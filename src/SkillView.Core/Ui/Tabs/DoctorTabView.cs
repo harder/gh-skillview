@@ -1,4 +1,5 @@
 using SkillView.Diagnostics;
+using SkillView.Inventory.Models;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -55,9 +56,9 @@ internal sealed class DoctorTabView : FrameView
 
     /// Replace the rendered body with a fresh report. Call this on activate
     /// so capability/auth changes during the session are reflected.
-    internal void SetReport(EnvironmentReport report)
+    internal void SetReport(EnvironmentReport report, InventorySnapshot? inventory = null)
     {
-        _body.Text = DoctorScreen.Render(report);
+        _body.Text = TerminalEscapeSanitizer.Sanitize(DoctorScreen.Render(report, inventory)) ?? "";
     }
 
     /// Activate the Doctor view as a drill-in from the Changes workspace.

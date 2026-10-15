@@ -107,7 +107,8 @@ internal static class RemoveTargetResolver
             }
             var skill = target.Skills[0];
             cancellationToken.ThrowIfCancellationRequested();
-            var validation = RemoveValidator.ValidateSymlink(link.Path, snapshot.ScannedRoots);
+            var validation = RemoveValidator.ValidateSymlink(link.Path, snapshot.ProtectedRoots.ToArray(), cancellationToken: cancellationToken,
+                ownershipRunner: skill.OwnershipRunner);
             if (skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty)
                 validation = validation with
                 {
@@ -127,7 +128,7 @@ internal static class RemoveTargetResolver
             cancellationToken.ThrowIfCancellationRequested();
             items.Add(new RemoveTargetItem(
                 skill,
-                RemoveValidator.Validate(skill, snapshot.ScannedRoots, snapshot.Skills, cancellationToken)));
+                RemoveValidator.Validate(skill, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken)));
         }
 
         return new RemoveTargetEvaluation(target, items.ToImmutable());

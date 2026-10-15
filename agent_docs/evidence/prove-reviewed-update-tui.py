@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
     home = root / "home"
     home.mkdir()
     state = root / "state"
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env = {k: v for k, v in os.environ.items() if k not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not k.startswith("GIT_")}
     env.update(
         HOME=str(home),
         USERPROFILE=str(home),

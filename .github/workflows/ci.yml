@@ -154,6 +154,11 @@ jobs:
         run: |
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
+      - name: Prove managed and built-in discovery preserves read-only resources
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
+          python agent_docs/evidence/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
       - name: Prove standalone quarantine and undo using native hosts
         shell: bash
         run: |

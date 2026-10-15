@@ -165,7 +165,7 @@ public sealed class GhSharedLockGuardTests
                 var result = await service.InstallAsync(fake, "different/repo", "demo",
                     new(Path: destination, Overwrite: true, FromLocal: local), TestContext.Current.CancellationToken);
                 Assert.False(result.Succeeded);
-                Assert.Contains(local ? "owned destination" : "contextual owner", result.ErrorMessage, StringComparison.Ordinal);
+                Assert.Contains("contextual owner", result.ErrorMessage, StringComparison.Ordinal);
                 Assert.False(File.Exists(marker));
                 Assert.Equal(content, File.ReadAllText(payload));
                 Assert.Equal(bytes, File.ReadAllText(lockPath));

@@ -21,7 +21,7 @@ internal sealed partial class ReplacementPlanStore
         // A configured state home may be beneath .agents (outside skills).
         // Create its private ancestors before capturing the registry namespace
         // witness; never refresh that witness after staging begins.
-        CheckPlacement(inventory);
+        CheckPlacement(inventory, token);
         using (var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token))
         {
             using var writer = state.OpenFile("writer.lock", true, token);

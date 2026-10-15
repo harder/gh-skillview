@@ -98,9 +98,11 @@ public sealed class LocalInventoryService
         providers.Add(new ProviderObservation("lockfiles", local.LockDiagnostics.IsEmpty,
             local.Roots.Select(root => root.Path).ToImmutableArray(), DateTimeOffset.UtcNow,
             local.LockDiagnostics.IsEmpty ? null : string.Join("; ", local.LockDiagnostics.Take(6).Select(d => $"{d.Path}: {d.Message}"))));
+        providers.Add(new("managed", local.Managed.Complete, local.Managed.Roots.Select(root => root.Path).Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            DateTimeOffset.UtcNow, local.Managed.Complete ? null : string.Join("; ", local.Managed.Incomplete.Take(6))));
         if (ghPath is not null)
         {
-            foreach (var root in local.Roots)
+            foreach (var root in local.Roots.Where(root => !root.Managed))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var custom = await _listAdapter.CaptureAsync(ghPath, directory: root.Path,
@@ -116,6 +118,19 @@ public sealed class LocalInventoryService
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
         // written by `npx skills`). Free signal — best-effort.
         merged = EnrichOwnership(merged, local.Packages, cancellationToken);
+        merged = merged.Select(skill =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var claims = local.Managed.Claims(skill).ToImmutableArray();
+            return skill with
+            {
+                OwnershipClaims = skill.AllOwnershipClaims.Concat(claims).ToImmutableArray(),
+                Package = claims.FirstOrDefault() ?? skill.Package,
+                OwnershipRunner = _contextRunner
+            };
+        }).ToImmutableArray();
+        var managedRecords = merged.SelectMany(skill => skill.AllOwnershipClaims
+            .Where(claim => claim.InstallationMode == "managed-read-only")).Distinct().ToImmutableArray();
         if (!local.LockDiagnostics.IsEmpty)
             merged = merged.Select(skill =>
             {
@@ -158,11 +173,13 @@ public sealed class LocalInventoryService
             ScannedRoots = local.Roots,
             ConfiguredRoots = local.ConfiguredRoots,
             ConfiguredRootsComplete = local.ConfigurationComplete,
+            ManagedRegions = local.Managed.Regions,
             UsedGhSkillList = usedGhList,
             CapturedAt = DateTimeOffset.UtcNow,
             Diagnostics = diagnostics,
             Providers = providers.ToImmutable(),
-            OwnershipRecords = local.Packages.Select(package => package.Package).ToImmutableArray(),
+            OwnershipRecords = local.Packages.Select(package => package.Package)
+                .Concat(managedRecords).ToImmutableArray(),
             OwnershipReadDiagnostics = local.LockDiagnostics,
         };
     }
@@ -214,9 +231,13 @@ public sealed class LocalInventoryService
         _logger.Info("inventory", $"scan roots resolved: {roots.Length}");
         var fsSw = Stopwatch.StartNew();
         var locations = new List<DiscoveryLocation>();
+        var managed = ManagedSkillDiscovery.Capture(_contextRunner, roots, cancellationToken, allowHidden: options.AllowHiddenDirs);
+        locations.AddRange(managed.Locations);
+        inaccessible.AddRange(managed.Incomplete);
+        var allRoots = roots.AddRange(managed.Roots);
         var scanned = _scanner.ScanWithCancellation(
-            roots,
-            new LocalSkillScanner.Options(options.AllowHiddenDirs),
+            allRoots,
+            new LocalSkillScanner.Options(options.AllowHiddenDirs) { Managed = managed },
             cancellationToken, inaccessible, locations);
         var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(
@@ -226,8 +247,8 @@ public sealed class LocalInventoryService
         _logger.Info(
             "inventory",
             $"filesystem scan found {scanned.Length} skill(s) in {fsSw.ElapsedMilliseconds}ms");
-        return new LocalCapture(roots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray(),
-            lockDiagnostics.ToImmutableArray(), locations.ToImmutableArray(), configuration.Roots, configuration.IsComplete);
+        return new LocalCapture(allRoots, scanned, packages, fsSw.Elapsed, inaccessible.Distinct(StringComparer.Ordinal).ToImmutableArray(),
+            lockDiagnostics.ToImmutableArray(), locations.ToImmutableArray(), configuration.Roots, configuration.IsComplete, managed);
     }
 
     internal static ImmutableArray<InstalledSkill> EnrichOwnership(ImmutableArray<InstalledSkill> skills,
@@ -299,7 +320,7 @@ public sealed class LocalInventoryService
         ImmutableArray<LockReadDiagnostic> LockDiagnostics,
         ImmutableArray<DiscoveryLocation> Locations,
         ImmutableArray<ScanRoot> ConfiguredRoots,
-        bool ConfigurationComplete);
+        bool ConfigurationComplete, ManagedSkillDiscovery.Observation Managed);
 
     private sealed record GhCapture(
         ImmutableArray<GhSkillListRecord> Records,
@@ -390,9 +411,25 @@ public sealed class LocalInventoryService
         };
         var memberships = first.Agents.Concat(next.Agents)
             .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope, agent.Profile))
-            .Select(group => group.OrderByDescending(agent => agent.IsSymlink)
-                .ThenByDescending(agent => agent.DiscoveryRoot is not null).First() with
-            { AgentId = group.Key.Item1 })
+            .SelectMany(group =>
+            {
+                // Missing gh context is an incomplete observation of the same
+                // placement, not a new consumer. Preserve every known context,
+                // without adding synthetic null consumers to old saved plans.
+                var contextual = group.Where(agent => agent.Context is not null).ToArray();
+                var contextualRoots = contextual.Where(agent => agent.DiscoveryRoot is not null)
+                    .Select(agent => PathIdentity.NormalizeKey(agent.DiscoveryRoot!)).ToHashSet(StringComparer.Ordinal);
+                return group.Where(agent => contextual.Length == 0 || agent.Context is not null
+                        || agent.DiscoveryRoot is { } root && !contextualRoots.Contains(PathIdentity.NormalizeKey(root)))
+                    .GroupBy(agent => agent.Context is null ? null : PathIdentity.NormalizeKey(agent.Context))
+                    .SelectMany(context =>
+                    {
+                        var rooted = context.Where(agent => agent.DiscoveryRoot is not null).ToArray();
+                        return (rooted.Length == 0 ? context : rooted.AsEnumerable())
+                            .GroupBy(agent => agent.DiscoveryRoot is null ? null : PathIdentity.NormalizeKey(agent.DiscoveryRoot))
+                            .Select(root => root.OrderByDescending(agent => agent.IsSymlink).First() with { AgentId = group.Key.Item1 });
+                    });
+            })
             .ToImmutableArray();
         return first with
         {

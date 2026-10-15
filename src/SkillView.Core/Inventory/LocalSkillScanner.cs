@@ -41,7 +41,10 @@ public sealed class LocalSkillScanner
         _openMetadata = openMetadataForTests ?? RegularFileInspection.Open;
     }
 
-    public sealed record Options(bool AllowHiddenDirs = false);
+    public sealed record Options(bool AllowHiddenDirs = false)
+    {
+        internal ManagedSkillDiscovery.Observation? Managed { get; init; }
+    }
 
     public ImmutableArray<InstalledSkill> Scan(
         IReadOnlyList<ScanRoot> roots,
@@ -60,10 +63,23 @@ public sealed class LocalSkillScanner
         var caseSensitivityByParent = new Dictionary<string, bool>(StringComparer.Ordinal);
         var budget = new ScanBudget();
 
-        foreach (var root in roots)
+        var completedManaged = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var root in roots.OrderByDescending(root => root.Managed))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ScanRoot(root, options, byResolved, caseSensitivityByParent, cancellationToken, inaccessiblePaths, budget, locations);
+            if (root.Managed && root.DirectSkill)
+            {
+                var errors = inaccessiblePaths?.Count ?? 0;
+                ConsiderCandidate(root, root.Path, byResolved, caseSensitivityByParent, cancellationToken, budget, inaccessiblePaths);
+                if (!budget.Exhausted && (inaccessiblePaths?.Count ?? 0) == errors) completedManaged.Add(PathIdentity.NormalizeKey(root.Path));
+                continue;
+            }
+            if (!root.Managed && ManagedBoundary(root.Path, root, options, completedManaged, inaccessiblePaths, locations)) continue;
+            var errorsBeforeWalk = inaccessiblePaths?.Count ?? 0;
+            var result = Walk(root.Path, 0, root, options, byResolved, caseSensitivityByParent,
+                cancellationToken, inaccessiblePaths, budget, locations, completedManaged);
+            if (root.Managed && result.Complete && (inaccessiblePaths?.Count ?? 0) == errorsBeforeWalk)
+                completedManaged.Add(PathIdentity.NormalizeKey(root.Path));
         }
 
         var builder = ImmutableArray.CreateBuilder<InstalledSkill>(byResolved.Count);
@@ -96,16 +112,10 @@ public sealed class LocalSkillScanner
         internal bool Exhausted;
     }
 
-    private void ScanRoot(ScanRoot root, Options opts, Dictionary<string, Builder> acc,
-        Dictionary<string, bool> caseSensitivityByParent, CancellationToken cancellationToken,
-        ICollection<string>? inaccessiblePaths, ScanBudget budget,
-        ICollection<DiscoveryLocation>? locations) =>
-        Walk(root.Path, 0, root, opts, acc, caseSensitivityByParent, cancellationToken, inaccessiblePaths, budget, locations);
-
     private (bool Found, bool Complete) Walk(string directory, int depth, ScanRoot root, Options opts,
         Dictionary<string, Builder> acc, Dictionary<string, bool> caseSensitivityByParent,
         CancellationToken token, ICollection<string>? inaccessible, ScanBudget budget,
-        ICollection<DiscoveryLocation>? locations)
+        ICollection<DiscoveryLocation>? locations, HashSet<string> completedManaged)
     {
         token.ThrowIfCancellationRequested();
         if (budget.Exhausted || depth >= MaxScanDepth || ++budget.Directories > MaxScanDirectories)
@@ -136,6 +146,8 @@ public sealed class LocalSkillScanner
                 _candidateObservedForTests?.Invoke(child);
                 token.ThrowIfCancellationRequested();
                 var leaf = Path.GetFileName(child);
+                if (!root.Managed && ManagedBoundary(child, root, opts, completedManaged, inaccessible, locations))
+                    continue;
                 if (!opts.AllowHiddenDirs && leaf.StartsWith('.'))
                 {
                     if (locations is { Count: < 128 }) locations.Add(new(child, "excluded", "Hidden entry; use --allow-hidden-dirs to observe it."));
@@ -171,14 +183,14 @@ public sealed class LocalSkillScanner
                     }
                     continue;
                 }
-                var nested = Walk(child, depth + 1, root, opts, acc, caseSensitivityByParent, token, inaccessible, budget, locations);
+                var nested = Walk(child, depth + 1, root, opts, acc, caseSensitivityByParent, token, inaccessible, budget, locations, completedManaged);
                 complete &= nested.Complete;
                 if (nested.Found)
                 {
                     found = true;
                     if (locations is { Count: < 128 }) locations.Add(new(child, "container", "Namespace/package container; payloads are its skill descendants."));
                 }
-                else if (nested.Complete)
+                else if (nested.Complete && !root.Managed)
                 {
                     ConsiderCandidate(root, child, acc, caseSensitivityByParent, token, budget, inaccessible);
                     found = true;
@@ -197,6 +209,23 @@ public sealed class LocalSkillScanner
         {
             if (locations is { Count: < 128 }) locations.Add(new(directory, state, reason));
         }
+    }
+
+    private static bool ManagedBoundary(string path, ScanRoot root, Options options, HashSet<string> completed,
+        ICollection<string>? incomplete, ICollection<DiscoveryLocation>? locations)
+    {
+        if (options.Managed is not { } managed) return false;
+        var boundary = managed.Regions.FirstOrDefault(region => region.Covers(path));
+        if (boundary is null) return false;
+        var required = managed.Roots.Where(candidate => boundary.Covers(candidate.Path)).ToArray();
+        var covered = !managed.TopologyIncomplete
+            && !managed.Locations.Any(location => location.State == "unsupported" && boundary.Covers(location.Path))
+            && required.All(candidate => completed.Contains(PathIdentity.NormalizeKey(candidate.Path)));
+        if (!covered) incomplete?.Add(path);
+        if (locations is { Count: < 128 }) locations.Add(new(path, covered ? "managed" : "unsupported",
+            covered ? "Managed resources observed separately; only declared skill payloads are scanned."
+                : "Managed resources remain protected; discovery coverage is incomplete."));
+        return true;
     }
 
     private void ConsiderCandidate(

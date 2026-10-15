@@ -128,11 +128,12 @@
       "title": "Discover namespace containers, agent roots and contexts correctly",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Shared catalog, namespaces, profiles, workspaces and bounded discovery",
-      "remaining": "Managed/built-in discovery adapters and final acceptance verification",
+      "implementedEvidenceSummary": "Shared catalog, namespaces, ancestor workspaces, profiles, aliases and bounded Codex/Claude managed/built-in discovery with read-only provenance, registration contexts and live mutation admission",
+      "remaining": "Exact-head platform/full-suite and native artifact verification, then reviewed merge and final original acceptance recording",
       "acceptance": "Namespaced gh installs, monorepo ancestors, alternate profiles, custom paths and shared roots appear with correct ownership and context. Containers are not offered as malformed skills. Scan budgets report partial coverage and never manufacture orphan conclusions when hit.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": false,
+      "localAcceptanceEvidence": "evidence/maintenance-batch-11-managed-discovery-checkpoint.json"
     },
     {
       "id": "M11",

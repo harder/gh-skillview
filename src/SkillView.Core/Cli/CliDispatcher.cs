@@ -91,14 +91,18 @@ public static partial class CliDispatcher
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        var inventory = options.SubcommandArgs.Contains("--inventory")
+            ? await services.InventoryService.CaptureAsync(report.GhPath,
+                new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), cancellationToken).ConfigureAwait(false)
+            : null;
         var json = options.SubcommandArgs.Contains("--json");
         if (json)
         {
-            WriteDoctorJson(report, options);
+            WriteDoctorJson(report, options, inventory);
         }
         else
         {
-            WriteDoctorText(report, options);
+            WriteDoctorText(report, options, inventory);
         }
 
         if (!report.GhFound)
@@ -116,10 +120,10 @@ public static partial class CliDispatcher
         return ExitCodes.Success;
     }
 
-    private static void WriteDoctorText(EnvironmentReport r, AppOptions options)
-        => Console.Out.Write(RenderDoctorText(r, options));
+    private static void WriteDoctorText(EnvironmentReport r, AppOptions options, InventorySnapshot? inventory = null)
+        => Console.Out.Write(RenderDoctorText(r, options, inventory));
 
-    internal static string RenderDoctorText(EnvironmentReport r, AppOptions options)
+    internal static string RenderDoctorText(EnvironmentReport r, AppOptions options, InventorySnapshot? inventory = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"invocation    : {options.InvocationMode}");
@@ -132,6 +136,7 @@ public static partial class CliDispatcher
         sb.AppendLine($"log directory : {r.LogDirectory ?? "(unset)"}");
         sb.AppendLine($"scan roots    : {(options.ScanRoots.Count == 0 ? "(default)" : string.Join(", ", options.ScanRoots))}");
         sb.AppendLine($"baseline      : {(r.BaselineOk ? "ok" : "degraded")}");
+        if (inventory is not null) sb.Append(DoctorScreen.RenderManagedInventory(inventory));
         return sb.ToString();
     }
 
@@ -147,13 +152,13 @@ public static partial class CliDispatcher
         return $"{acct}@{host}{others}";
     }
 
-    private static void WriteDoctorJson(EnvironmentReport r, AppOptions options)
-        => WriteJson(w => WriteDoctorJson(w, r, options));
+    private static void WriteDoctorJson(EnvironmentReport r, AppOptions options, InventorySnapshot? inventory = null)
+        => WriteJson(w => WriteDoctorJson(w, r, options, inventory));
 
-    internal static string RenderDoctorJson(EnvironmentReport r, AppOptions options)
-        => RenderJson(w => WriteDoctorJson(w, r, options));
+    internal static string RenderDoctorJson(EnvironmentReport r, AppOptions options, InventorySnapshot? inventory = null)
+        => RenderJson(w => WriteDoctorJson(w, r, options, inventory));
 
-    private static void WriteDoctorJson(Utf8JsonWriter writer, EnvironmentReport r, AppOptions options)
+    private static void WriteDoctorJson(Utf8JsonWriter writer, EnvironmentReport r, AppOptions options, InventorySnapshot? inventory = null)
     {
         writer.WriteStartObject();
         writer.WriteString("invocation", options.InvocationMode.ToString());
@@ -182,6 +187,12 @@ public static partial class CliDispatcher
         writer.WriteStartArray("scanRoots");
         foreach (var root in options.ScanRoots) writer.WriteStringValue(root);
         writer.WriteEndArray();
+
+        if (inventory is not null)
+        {
+            writer.WritePropertyName("inventory");
+            WriteListJson(writer, inventory);
+        }
 
         writer.WriteEndObject();
     }
@@ -360,6 +371,26 @@ public static partial class CliDispatcher
         foreach (var owner in snapshot.OwnershipRecords) WriteOwnerRecord(w, owner);
         w.WriteEndArray();
 
+        w.WriteStartArray("managedRegions");
+        foreach (var region in snapshot.ManagedRegions)
+        {
+            w.WriteStartObject();
+            w.WriteString("path", region.Path);
+            w.WriteString("canonicalBoundaryPath", region.ObservedCanonicalPath);
+            w.WriteString("provider", region.Provider);
+            w.WriteString("agent", region.AgentId);
+            w.WriteString("kind", region.Kind);
+            w.WriteString("plugin", region.PluginId);
+            w.WriteString("distributorVersion", region.PackageVersion);
+            w.WriteString("context", region.Context);
+            w.WriteString("registrationScope", region.RegistrationScope?.ToString());
+            w.WriteString("registrationPath", region.RegistrationPath);
+            w.WriteBoolean("readOnly", true);
+            w.WriteString("activeSessionState", "unknown");
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
         w.WriteStartArray("scannedRoots");
         foreach (var r in snapshot.ScannedRoots)
         {
@@ -519,7 +550,7 @@ public static partial class CliDispatcher
             var inventory = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
                 new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner);
-            var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger);
+            var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger, runner: services.Runner);
             IReadOnlyList<SkillView.Maintenance.QuarantineResult> results;
             if (command == "quarantine-history") results = await Task.Run(() => store.History(inventory, token), token).ConfigureAwait(false);
             else if (command == "undo") results = [await Task.Run(() => store.Undo(id!, inventory, execute, token), token).ConfigureAwait(false)];
@@ -582,7 +613,7 @@ public static partial class CliDispatcher
         { Console.Error.WriteLine("skillview: history --id requires a lowercase 32-character backup ID"); return ExitCodes.InvalidUsage; }
         try
         {
-            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner));
+            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner), services.Runner);
             var entries = await Task.Run(() => store.ReadHistory(token), token).ConfigureAwait(false);
             if (id is not null) entries = entries.Where(entry => entry.Id == id).ToArray();
             if (json) WriteJson(w =>
@@ -646,9 +677,9 @@ public static partial class CliDispatcher
         try
         {
             if (!snapshot.ConfiguredRootsComplete) throw new IOException("Configured agent/workspace root coverage is incomplete; resolve omitted or unavailable contexts before backup.");
-            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner));
+            var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner), services.Runner);
             var record = await Task.Run(() => store.Capture(selected[0], token, snapshot.Skills,
-                snapshot.ConfiguredRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
+                snapshot.ProtectedRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", true);
@@ -1646,8 +1677,8 @@ public static partial class CliDispatcher
 
         var target = matches[0];
         var validation = parsed.Yes
-            ? RemoveValidator.Validate(target, snapshot.ScannedRoots, snapshot.Skills, cancellationToken)
-            : RemoveValidator.ValidateForPreview(target, snapshot.ScannedRoots, snapshot.Skills, cancellationToken);
+            ? RemoveValidator.Validate(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken)
+            : RemoveValidator.ValidateForPreview(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken);
 
         RemoveService.RemoveReport result;
         if (!validation.Allowed)
@@ -1857,7 +1888,7 @@ public static partial class CliDispatcher
             foreach (var c in selection.Unique)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var validation = ValidateCleanupCandidate(c, snapshot.ScannedRoots, snapshot.Skills, cancellationToken);
+                var validation = ValidateCleanupCandidate(c, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken, services.Runner);
                 if (!validation.Allowed || validation.RequiresSecondConfirm)
                 {
                     environmentRefusal |= IsEnvironmentRefusal(validation);
@@ -1948,14 +1979,14 @@ public static partial class CliDispatcher
         CleanupClassifier.Candidate candidate,
         IReadOnlyList<ScanRoot> scanRoots,
         IReadOnlyList<InstalledSkill> allSkills,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, SkillView.Subprocess.ProcessRunner? ownershipRunner = null)
     {
         return candidate.ReviewOnly ? RefuseUnsupportedCleanupCandidate(candidate) : candidate.Kind switch
         {
             CleanupClassifier.CandidateKind.BrokenSymlink =>
-                RemoveValidator.ValidateBrokenSymlink(candidate.Path, scanRoots),
+                RemoveValidator.ValidateBrokenSymlink(candidate.Path, scanRoots, cancellationToken, ownershipRunner),
             CleanupClassifier.CandidateKind.EmptyDirectory =>
-                RemoveValidator.ValidateEmptyDirectory(candidate.Path, scanRoots, cancellationToken),
+                RemoveValidator.ValidateEmptyDirectory(candidate.Path, scanRoots, cancellationToken, ownershipRunner),
             _ when candidate.Skill is not null => RemoveValidator.Validate(candidate.Skill, scanRoots, allSkills, cancellationToken),
             _ => RefuseUnsupportedCleanupCandidate(candidate),
         };
@@ -2170,7 +2201,7 @@ public static partial class CliDispatcher
 
             | Subcommand | Purpose | Key options |
             | --- | --- | --- |
-            | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and scan roots. | `--json`, `--clear-logs` |
+            | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |

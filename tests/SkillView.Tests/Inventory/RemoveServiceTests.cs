@@ -402,7 +402,7 @@ public class RemoveServiceTests : IDisposable
         Directory.CreateDirectory(parent);
         var link = Path.Combine(parent, "broken");
         if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-first"))) return;
-        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() }, TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
         Assert.NotNull(validation.ExecutionLinkIdentity);
 
@@ -427,7 +427,7 @@ public class RemoveServiceTests : IDisposable
         Directory.CreateDirectory(parent);
         var link = Path.Combine(parent, "broken");
         if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-original"))) return;
-        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() }, TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
         Assert.NotNull(validation.ExecutionLinkIdentity);
 
@@ -454,7 +454,7 @@ public class RemoveServiceTests : IDisposable
     {
         var link = Path.Combine(_tempRoot, "broken-link-canceled");
         if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-canceled"))) return;
-        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() }, TestContext.Current.CancellationToken);
         Assert.True(validation.Allowed, string.Join(System.Environment.NewLine, validation.Errors));
         using var cancellation = new CancellationTokenSource();
         var service = new RemoveService(

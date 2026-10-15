@@ -94,6 +94,17 @@ public class CliDispatcherJsonSnapshotTests
         Assert.Contains("present", body);
     }
 
+    [Fact]
+    public void Doctor_OptionalInventoryRetainsTheListContractAndManagedBoundaries()
+    {
+        var inventory = Snapshot(Skill("managed")) with
+        { ManagedRegions = [new("/p", "codex-builtin", "codex", "bundled skills")] };
+        var document = Parse(CliDispatcher.RenderDoctorJson(SampleReport(), DefaultOptions(), inventory));
+        Assert.Equal("managed", document.GetProperty("inventory").GetProperty("skills")[0].GetProperty("name").GetString());
+        Assert.True(document.GetProperty("inventory").GetProperty("managedRegions")[0].GetProperty("readOnly").GetBoolean());
+        Assert.False(Parse(CliDispatcher.RenderDoctorJson(SampleReport(), DefaultOptions())).TryGetProperty("inventory", out _));
+    }
+
     // --- list ------------------------------------------------------------
 
     [Fact]

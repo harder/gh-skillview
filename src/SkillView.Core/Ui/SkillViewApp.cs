@@ -909,7 +909,7 @@ public sealed class SkillViewApp
         // Make sure the report is fresh — probe lazily if we never have.
         if (Volatile.Read(ref _lastReport) is { } cachedReport)
         {
-            _doctorTab.SetReport(cachedReport);
+            _doctorTab.SetReport(cachedReport, _installedTab?.CurrentSnapshot);
             _doctorTab.Visible = true;
             _doctorTab.SetFocus();
             return;
@@ -957,7 +957,7 @@ public sealed class SkillViewApp
             {
                 if (!IsDoctorWorkspaceActive(doctorGeneration)) return;
                 ClearBusy();
-                _doctorTab?.SetReport(probed);
+                _doctorTab?.SetReport(probed, _installedTab?.CurrentSnapshot);
                 _doctorTab?.SetFocus();
             });
         }

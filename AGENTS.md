@@ -169,7 +169,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the
   standalone app continue to resolve through PATH.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.101.0 (still 48 entries; gh 2.97.0 replaced `windsurf`
+  list as of `gh` 2.102.0 (52 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
@@ -562,6 +562,19 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `PI_CODING_AGENT_DIR/skills` (gh 2.99+). Scan the default user root alongside
   either override so older/manual skills remain visible, and use the same Pi
   override when pre-checking install-agent boxes and rendering Doctor.
+- `ManagedSkillDiscovery` observes built-ins and plugin payloads without granting
+  mutation authority. Keep protection boundaries separate from payload traversal
+  scope and provider coverage: lexical/retained alias evidence can deny a write,
+  but only canonical containment or an explicit bounded root can authorize reads.
+  Preserve both captured canonical and reviewed boundary paths in state exclusions.
+  Recheck managed ownership at execution, including removal and state placement;
+  registry adoption need not change a payload's native identity. Carry captured
+  HOME/CWD/agent overrides through removal validation, cleanup and execution.
+  A destination containing managed children permits exact named imports but
+  refuses `--all`: a preflight listing cannot bind gh's later mutable target set.
+  Isolated staging and disposable proofs must override Codex/Claude plugin homes
+  and clear explicit plugin/seed lists alongside HOME. See
+  `agent_docs/maintenance-managed-discovery.md`.
 - File-log aggregate retention is enforced as the active part grows, not only
   when a writer opens or rotates. Maintain incremental byte accounting and a
   bounded retry threshold for undeletable files so the fix does not enumerate

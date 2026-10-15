@@ -1,6 +1,7 @@
 using System.Text;
 using SkillView.Diagnostics;
 using SkillView.Gh;
+using SkillView.Inventory.Models;
 
 namespace SkillView.Ui;
 
@@ -10,7 +11,7 @@ namespace SkillView.Ui;
 /// the 3 DoctorScreenTests pass unchanged.
 public static class DoctorScreen
 {
-    public static string Render(EnvironmentReport r)
+    public static string Render(EnvironmentReport r, InventorySnapshot? inventory = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("## Environment");
@@ -78,7 +79,30 @@ public static class DoctorScreen
         sb.AppendLine("| --- | --- |");
         sb.AppendLine($"| directory | {MarkdownTableFormatter.FormatCodeSpan(r.LogDirectory ?? "(unset)")} |");
 
+        if (inventory is not null) sb.Append(RenderManagedInventory(inventory));
+        else sb.AppendLine("\nManaged skill diagnostics: open Installed, or run `skillview doctor --inventory`.");
         return sb.ToString();
+    }
+
+    internal static string RenderManagedInventory(InventorySnapshot inventory)
+    {
+        var rows = inventory.Skills.Where(skill => skill.AllOwnershipClaims.Any(owner => owner.InstallationMode == "managed-read-only")).ToArray();
+        var sb = new StringBuilder("\n## Managed resources\n\n");
+        sb.AppendLine($"{rows.Length} managed skill installation(s) observed; capture {inventory.CapturedAt:O}.");
+        sb.AppendLine(inventory.IsPartial ? "Coverage is partial; inspect inventory diagnostics." : "Configured inventory coverage is complete.");
+        sb.AppendLine("Read-only resources; enabled and active session state are unknown.");
+        sb.AppendLine();
+        sb.AppendLine("| Provider | Distributor version | Path |");
+        sb.AppendLine("| --- | --- | --- |");
+        foreach (var skill in rows.Take(32))
+        {
+            var owner = skill.AllOwnershipClaims.First(owner => owner.InstallationMode == "managed-read-only");
+            sb.AppendLine($"| {MarkdownTableFormatter.FormatTableCell(owner.Provider)} | {MarkdownTableFormatter.FormatTableCell(owner.PackageVersion ?? "unknown")} | {MarkdownTableFormatter.FormatCodeSpan(skill.ResolvedPath)} |");
+        }
+        if (rows.Length > 32) sb.AppendLine("Additional managed rows are available in Installed or `list --json`.");
+        foreach (var location in inventory.Diagnostics.Locations.Where(location => location.State == "unsupported").Take(16))
+            sb.AppendLine($"- {MarkdownTableFormatter.FormatCodeSpan(location.Path)}: {MarkdownTableFormatter.FormatTableCell(location.Reason)}");
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
     }
 
     /// Mirrors the heuristic in `InstallScreen.DetectInstalledAgents` so the

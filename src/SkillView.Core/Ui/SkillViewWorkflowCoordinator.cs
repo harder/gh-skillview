@@ -273,8 +273,8 @@ internal sealed class SkillViewWorkflowCoordinator
                         _services.RemoveService,
                         _services.Logger,
                         candidates,
-                        snapshot.ScannedRoots,
-                        snapshot.Skills);
+                        snapshot.ProtectedRoots.ToArray(),
+                        snapshot.Skills, ownershipRunner: _services.Runner);
                     screen.Show();
                     if (screen.RemovedCount > 0
                         || screen.RemovedFileCount > 0

@@ -1,7 +1,8 @@
 # Managed and built-in skill discovery (M10, in progress)
 
-This is the next implementation batch after PR #58. No managed-discovery
-implementation is claimed by this plan.
+This implementation batch follows PR #58. Managed discovery is implemented in
+the working branch and remains under review and final verification; this
+document does not claim M10 acceptance or a merge yet.
 
 ## Reproduction and source evidence
 
@@ -91,3 +92,44 @@ created before managed discovery is enabled.
 M10 remains incomplete until implementation, separate review, final verification
 and merge. Plugin lifecycle mutations and effective-loading analysis remain their
 own original findings.
+
+## Review corrections implemented
+
+The shared probe retains canonical protection boundaries independently of payload
+coverage, parses supported Claude v2 registry contexts, limits external reads to
+explicit physical subtrees, and preserves both agent-specific manifest conventions.
+The v2 registry shape was checked against the local installed registry; unknown
+schemas stay partial and cannot authorize writes. Registry presence is not evidence
+of enabled or session-loaded state.
+
+Install admission checks the original and latest observations, canonical ancestor
+aliases, exact selected children and namespaces containing managed plugins.
+`--all` is refused beside managed resources because its final mutable set cannot
+be authorized by a separate listing; unrelated exact named local imports remain
+available. Removal carries frozen agent context through native execution and
+rechecks external adoption. Backup, quarantine and replacement check live state
+ownership immediately before writable opens, as well as retaining prior exclusions.
+Saved replacement context hashes keep their historical configured-root contract.
+
+Disposable proof environments and C# staging explicitly isolate every newly read
+managed-directory override. Doctor can include inventory with `--inventory`;
+the TUI uses an already captured Installed snapshot without adding UI-thread I/O.
+Final tests, native RID proofs, persisted-plan compatibility and merge evidence
+are still required before updating the original acceptance ledger.
+
+
+## Native verification commands
+
+Publish both product hosts sequentially. Run `prove-managed-discovery.py` with
+`--app /absolute/native/host`, repeat `--gh /absolute/gh` for minimum/current,
+and supply `--output /tmp/evidence.json`. The private offline fixture verifies
+built-ins, two package versions, managed ownership and nonempty exposures,
+Doctor inventory, unchanged protected native objects/bytes/modes on refusals,
+and a positive unrelated exact named import. CI runs both hosts on all four RIDs.
+
+For historical compatibility, run `prove-legacy-owner-compatibility.py` with an
+actual prior native host through `--legacy`, the new `--app`,
+`--managed-discovery-fixtures` and an output path. It saves the plan before adding
+managed roots, then inspects, interrupts old Apply, recovers and undoes using the
+new host. This network fixture requires gh authentication captured before HOME
+isolation; the skill is never executed. Both local native hosts pass.

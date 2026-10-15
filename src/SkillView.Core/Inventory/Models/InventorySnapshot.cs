@@ -11,6 +11,13 @@ public sealed record InventorySnapshot
     /// Includes expected missing placements, not observations of installations.
     public ImmutableArray<ScanRoot> ConfiguredRoots { get; init; } = [];
     public bool ConfiguredRootsComplete { get; init; } = true;
+    public ImmutableArray<ManagedSkillRegion> ManagedRegions { get; init; } = [];
+    // Keep historical configured-root hashes stable for saved plans. Managed
+    // storage boundaries are additional live policy, including absent roots.
+    internal IEnumerable<ScanRoot> ProtectedRoots => ConfiguredRoots.Concat(ScannedRoots)
+        .Concat(ManagedRegions.SelectMany(region => new[] { region.Path, region.ObservedCanonicalPath }
+            .OfType<string>().Distinct(StringComparer.Ordinal)
+            .Select(path => new ScanRoot(path, Scope.User, region.AgentId) { Managed = true })));
     public required bool UsedGhSkillList { get; init; }
     public required DateTimeOffset CapturedAt { get; init; }
 
