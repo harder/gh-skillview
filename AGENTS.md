@@ -768,3 +768,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   permitted in-place data edits. Initialize validated private state ancestors
   before capturing that witness when state is beneath `.agents`; never refresh
   it after staging to accept an unexplained namespace change.
+  Windows additionally pins a bounded immediate namespace fingerprint from the
+  held parent opened with enumeration access: names, full IDs, creation times
+  and entry types. Child content, ChangeTime and reparse payload are excluded so
+  in-place registry writes and moves beneath `skills` remain valid. Parent
+  ChangeTime alone can miss a sibling addition/removal/replacement; test those
+  cases with timestamps explicitly held equal, alongside a distinct-generation
+  create/delete case and successful ordinary writes.

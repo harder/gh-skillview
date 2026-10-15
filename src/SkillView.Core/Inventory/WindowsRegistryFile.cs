@@ -9,7 +9,7 @@ internal sealed partial class WindowsSecureRemovalBackend
     internal static NativeRegistryFileLease OpenRegistryFile(string path, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        var parent = OpenCanonicalDirectory(Path.GetDirectoryName(path)!);
+        var parent = OpenCanonicalDirectory(Path.GetDirectoryName(path)!, enumerateDirectory: true);
         FileStream? stream = null;
         SafeFileHandle? file = null;
         try
@@ -27,19 +27,34 @@ internal sealed partial class WindowsSecureRemovalBackend
             stream = new FileStream(file, FileAccess.ReadWrite, bufferSize: 1);
             file = null;
             var canonical = Path.Combine(ReadFinalPath(parent), name);
-            var lease = new WindowsRegistryFile(parent, stream, name, canonical, ReadIdentity(parent));
+            var lease = new WindowsRegistryFile(parent, stream, name, canonical,
+                CaptureRegistryParentIdentity(parent, token));
             lease.ValidateLocation(token);
             return lease;
         }
         catch { try { stream?.Dispose(); file?.Dispose(); } finally { parent.Dispose(); } throw; }
     }
 
+    private static SecureFileIdentity CaptureRegistryParentIdentity(SafeFileHandle parent, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var before = ReadIdentity(parent);
+        var canonical = ReadFinalPath(parent);
+        var inspector = new WindowsSecureRemovalBackend();
+        var fingerprint = inspector.CaptureDirectoryFingerprint(parent, canonical, token, namespaceOnly: true);
+        var repeated = inspector.CaptureDirectoryFingerprint(parent, canonical, token, namespaceOnly: true);
+        var after = ReadIdentity(parent);
+        if (before != after || fingerprint != repeated || ReadFinalPath(parent) != canonical)
+            throw new IOException("Registry parent namespace changed during capture.");
+        return ToSecureIdentity(after, canonical) with { DirectoryFingerprint = fingerprint };
+    }
+
     private sealed class WindowsRegistryFile(SafeFileHandle parent, FileStream stream, string name,
-        string canonical, NativeIdentity parentIdentity) : NativeRegistryFileLease
+        string canonical, SecureFileIdentity parentIdentity) : NativeRegistryFileLease
     {
         protected override FileStream File => stream;
         internal override string CanonicalPath => canonical;
-        internal override SecureFileIdentity ParentIdentity => ToSecureIdentity(parentIdentity, Path.GetDirectoryName(canonical)!);
+        internal override SecureFileIdentity ParentIdentity => parentIdentity;
         protected override SecureFileIdentity CurrentIdentity(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -48,10 +63,10 @@ internal sealed partial class WindowsSecureRemovalBackend
         protected override void ValidateNative(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var heldParent = ReadIdentity(parent);
+            var heldParent = CaptureRegistryParentIdentity(parent, token);
             var heldFile = ReadIdentity(stream.SafeFileHandle);
             using var named = OpenEntryAt(parent, name, directory: false, enumerateDirectory: false, requestDeleteAccess: false);
-            if (ToSecureIdentity(heldParent, ReadFinalPath(parent)) != ParentIdentity
+            if (heldParent != ParentIdentity
                 || ReadFinalPath(parent) != Path.GetDirectoryName(canonical) || ReadFinalPath(stream.SafeFileHandle) != canonical
                 || heldFile.IsDirectory || heldFile.IsReparsePoint || !Matches(heldFile, ReadIdentity(named)))
                 throw new IOException("Registry parent, address or native file identity changed.");

@@ -44,7 +44,7 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ParentEntryGenerationChangesRefuseDespiteUnchangedRegistryObjectAndBytes(bool removeEntry)
+    public void ParentNamespaceChangesRefuseDespiteUnchangedRegistryObjectAndBytes(bool removeEntry)
     {
         using var lease = NativeRegistryFileLease.Open(Registry, Token);
         var parent = lease.ParentIdentity;
@@ -52,6 +52,11 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
         var entry = Path.Combine(Parent, "namespace-change");
         System.IO.File.WriteAllText(entry, "Namespace generation changed");
         if (removeEntry) System.IO.File.Delete(entry);
+        // A create/delete pair restores the same membership. Windows does not
+        // promise a distinct timestamp for rapid namespace operations, so make
+        // this generation-only case deterministic instead of relying on a tick.
+        if (OperatingSystem.IsWindows() && removeEntry)
+            SetWindowsParentChangeTime(checked(parent.WindowsChangeTime + TimeSpan.TicksPerSecond));
         var method = lease.GetType().GetMethod("CurrentIdentity", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         var identity = Assert.IsType<SecureFileIdentity>(method.Invoke(lease, [Token]));
         Assert.Equal(before.Identity, identity);
@@ -61,6 +66,93 @@ public sealed class NativeRegistryFileLeaseTests : IDisposable
         using var reopened = NativeRegistryFileLease.Open(Registry, Token);
         Assert.NotEqual(parent, reopened.ParentIdentity);
         Assert.Equal(Original, reopened.Read(Token).Bytes);
+    }
+
+    [Theory]
+    [InlineData("create")]
+    [InlineData("remove")]
+    [InlineData("replace")]
+    public void WindowsParentNamespaceChangesRefuseWithUnchangedParentTimestamps(string action)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var entry = Path.Combine(Parent, "namespace-entry");
+        if (action != "create") System.IO.File.WriteAllText(entry, "original sibling");
+        // Keep a replaced object's ID alive while its pathname is reused.
+        using var heldEntry = action == "replace"
+            ? WindowsNative.CreateFileW(entry, 0x80, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero) : null;
+        if (heldEntry is not null) Assert.False(heldEntry.IsInvalid);
+        using var lease = NativeRegistryFileLease.Open(Registry, Token);
+        var parent = lease.ParentIdentity;
+        var before = lease.Read(Token);
+        if (action == "replace") System.IO.File.Move(entry, Path.Combine(temporary.FullName, "retained-sibling"));
+        else if (action == "remove") System.IO.File.Delete(entry);
+        if (action != "remove") System.IO.File.WriteAllText(entry, "new sibling");
+        SetWindowsParentChangeTime(parent.WindowsChangeTime);
+        Assert.Throws<IOException>(() => lease.Write(before, Encoding.UTF8.GetBytes("replacement"), Token));
+        Assert.False(lease.MutationAttempted);
+        lease.Dispose();
+        using var reopened = NativeRegistryFileLease.Open(Registry, Token);
+        Assert.True(NativeDirectoryMoveLease.SameObject(parent, reopened.ParentIdentity));
+        Assert.Equal(parent.WindowsCreationTime, reopened.ParentIdentity.WindowsCreationTime);
+        Assert.Equal(parent.WindowsChangeTime, reopened.ParentIdentity.WindowsChangeTime);
+        Assert.NotNull(parent.DirectoryFingerprint);
+        Assert.NotEqual(parent.DirectoryFingerprint, reopened.ParentIdentity.DirectoryFingerprint);
+        Assert.Equal(before.Identity, reopened.Read(Token).Identity);
+        Assert.Equal(Original, reopened.Read(Token).Bytes);
+    }
+
+    [Fact]
+    public void RegistryParentNamespaceWitnessAllowsMutationBelowExistingSkillsDirectory()
+    {
+        var skills = Directory.CreateDirectory(Path.Combine(Parent, "skills")).FullName;
+        using var lease = NativeRegistryFileLease.Open(Registry, Token);
+        var parent = lease.ParentIdentity;
+        var before = lease.Read(Token);
+        System.IO.File.WriteAllText(Path.Combine(skills, "moved-payload"), "child content");
+        var desired = Encoding.UTF8.GetBytes("desired registry\n");
+        Assert.Equal(desired, lease.Write(before, desired, Token).Bytes);
+        lease.Dispose();
+        using var reopened = NativeRegistryFileLease.Open(Registry, Token);
+        Assert.Equal(parent, reopened.ParentIdentity);
+        Assert.Equal(desired, reopened.Read(Token).Bytes);
+    }
+
+    private void SetWindowsParentChangeTime(long value)
+    {
+        using var parent = WindowsNative.CreateFileW(Parent, 0x180, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+        Assert.False(parent.IsInvalid);
+        var information = new WindowsNative.BasicInfo { ChangeTime = value };
+        Assert.True(WindowsNative.SetFileInformationByHandle(parent, 0, ref information, Marshal.SizeOf<WindowsNative.BasicInfo>()),
+            $"set parent generation error {Marshal.GetLastPInvokeError()}");
+        Assert.True(WindowsNative.GetFileInformationByHandleEx(parent, 0, out information, Marshal.SizeOf<WindowsNative.BasicInfo>()));
+        Assert.Equal(value, information.ChangeTime);
+    }
+
+    private static class WindowsNative
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BasicInfo
+        {
+            internal long CreationTime;
+            internal long LastAccessTime;
+            internal long LastWriteTime;
+            internal long ChangeTime;
+            internal uint Attributes;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern SafeFileHandle CreateFileW(string name, uint access, uint sharing,
+            IntPtr security, uint creation, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetFileInformationByHandle(SafeFileHandle handle,
+            int informationClass, ref BasicInfo information, int size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetFileInformationByHandleEx(SafeFileHandle handle,
+            int informationClass, out BasicInfo information, int size);
     }
 
     [Fact]

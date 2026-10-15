@@ -519,7 +519,8 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
     private string CaptureDirectoryFingerprint(
         SafeFileHandle directory,
         string displayPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool namespaceOnly = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var entries = new List<(string Name, byte[] Digest)>();
@@ -545,7 +546,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                 throw new IOException("directory entry identity changed during validation");
             cancellationToken.ThrowIfCancellationRequested();
             byte[] reparseData = [];
-            if (before.IsReparsePoint)
+            if (before.IsReparsePoint && !namespaceOnly)
             {
                 var buffer = new byte[MaxReparseDataBytes];
                 if (!WindowsNative.DeviceIoControl(child, FsctlGetReparsePoint,
@@ -556,7 +557,10 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                 reparseData = buffer.AsSpan(0, (int)returned).ToArray();
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Matches(before, ReadIdentity(child)))
+            var after = ReadIdentity(child);
+            if (namespaceOnly
+                ? (before with { ChangeTime = 0 }) != (after with { ChangeTime = 0 })
+                : !Matches(before, after))
                 throw new IOException("directory entry identity changed during validation");
             using var encoded = new MemoryStream();
             using (var writer = new BinaryWriter(encoded, Encoding.UTF8, leaveOpen: true))
@@ -565,7 +569,9 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                 writer.Write(before.FileIdLow);
                 writer.Write(before.FileIdHigh);
                 writer.Write(before.CreationTime);
-                writer.Write(before.ChangeTime);
+                // A registry parent's namespace witness must survive in-place
+                // data writes and mutations beneath its skills directory.
+                if (!namespaceOnly) writer.Write(before.ChangeTime);
                 writer.Write(before.IsDirectory);
                 writer.Write(before.IsReparsePoint);
                 writer.Write(reparseData.Length);

@@ -266,12 +266,18 @@ public class LoggerTests
         });
 
         var writes = Task.WhenAll(
-            Task.Run(
+            // Both callbacks block at the barrier. Dedicated workers keep
+            // thread-pool starvation from masquerading as a logger deadlock.
+            Task.Factory.StartNew(
                 () => first.Info("test", "first-outer"),
-                TestContext.Current.CancellationToken),
-            Task.Run(
+                TestContext.Current.CancellationToken,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default),
+            Task.Factory.StartNew(
                 () => second.Info("test", "second-outer"),
-                TestContext.Current.CancellationToken));
+                TestContext.Current.CancellationToken,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default));
         await writes.WaitAsync(
             TimeSpan.FromSeconds(5),
             TestContext.Current.CancellationToken);

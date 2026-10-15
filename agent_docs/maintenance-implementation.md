@@ -705,3 +705,23 @@ attributed to its original checkpoint. See
 `evidence/maintenance-batch-6-proof-admission-refinement.json` for the new local
 native proof and independent review; final-head Windows/native CI remains the
 merge gate. No original acceptance criterion is closed by a fixture correction.
+
+## Batch 6 refinement: Windows registry namespace evidence
+
+Run 38698483453 verifies the LF proof fix on all four native targets, including
+both Windows architectures. Its Windows test job exposed a separate production
+gap: parent ChangeTime can remain equal after a new sibling appears. A registry
+lease now captures and revalidates a bounded immediate namespace fingerprint
+through its held parent handle, opened with enumeration access. It retains full
+native entry IDs, creation times, names and types across reopened leases, while
+excluding mutable child times/content so registry writes and payload moves below
+`skills` remain supported. Double captures bracket the parent's identity/path.
+
+Windows regressions explicitly preserve the parent's timestamps across sibling
+creation, removal and replacement; the replaced object remains held outside the
+registry parent to prevent native-ID reuse without a delete-pending pathname.
+A create/delete generation-only case sets and verifies a distinct timestamp.
+The concurrent cross-logger barrier regression now uses dedicated workers so
+shared-pool starvation cannot masquerade as lock inversion. Separate reviews
+and re-review addressed parent enumeration access and replacement fixture
+semantics. See `evidence/maintenance-batch-6-windows-namespace-refinement.json`.
