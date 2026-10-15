@@ -783,3 +783,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   ChangeTime alone can miss a sibling addition/removal/replacement; test those
   cases with timestamps explicitly held equal, alongside a distinct-generation
   create/delete case and successful ordinary writes.
+
+- Raw tracking compatibility must be tested before gh catalog enrichment: merged
+  rows can acquire source/ref fields from gh list even if the parser regresses.
+  Use `GhMetadataContractTests` for actual remote/pinned/local installs, including
+  Installed details, and `prove-tracking-roundtrip.py` for native CLI parity and
+  unchanged payload/registry evidence. Default-suite early returns are not proof
+  that opt-in gh contracts executed.
