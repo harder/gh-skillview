@@ -40,6 +40,7 @@ public sealed class CleanupScreen
     private readonly IReadOnlyList<ScanRoot> _scanRoots;
     private readonly IReadOnlyList<InstalledSkill> _allSkills;
     private readonly Func<string, int> _confirmBatchRemoval;
+    private readonly SkillView.Subprocess.ProcessRunner? _ownershipRunner;
 
     public int RemovedCount { get; private set; }
     public int RemovedFileCount { get; private set; }
@@ -53,7 +54,8 @@ public sealed class CleanupScreen
         ImmutableArray<CleanupClassifier.Candidate> candidates,
         IReadOnlyList<ScanRoot> scanRoots,
         IReadOnlyList<InstalledSkill> allSkills,
-        Func<string, int>? confirmBatchRemoval = null)
+        Func<string, int>? confirmBatchRemoval = null,
+        SkillView.Subprocess.ProcessRunner? ownershipRunner = null)
     {
         _app = app;
         _remove = remove;
@@ -62,6 +64,7 @@ public sealed class CleanupScreen
         _scanRoots = scanRoots;
         _allSkills = allSkills;
         _confirmBatchRemoval = confirmBatchRemoval ?? ConfirmBatchRemoval;
+        _ownershipRunner = ownershipRunner;
     }
 
     public void Show()
@@ -443,9 +446,9 @@ public sealed class CleanupScreen
             var validation = candidate.ReviewOnly ? RefuseUnsupportedCandidate(candidate) : candidate.Kind switch
             {
                 CleanupClassifier.CandidateKind.BrokenSymlink =>
-                    RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots),
+                    RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots, cancellationToken, _ownershipRunner),
                 CleanupClassifier.CandidateKind.EmptyDirectory =>
-                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, cancellationToken),
+                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, cancellationToken, _ownershipRunner),
                 _ when candidate.Skill is not null =>
                     RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, cancellationToken),
                 _ => RefuseUnsupportedCandidate(candidate),

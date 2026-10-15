@@ -904,3 +904,74 @@ current checks, same-tree repairs and later remote failures. Exact-head remote
 verification and merge remain required before M07 closure; local results and
 hashes are retained in `evidence/maintenance-batch-10-update-outcomes-checkpoint.json`. See
 `maintenance-update-outcomes.md` for semantics and proof commands.
+
+
+Batch 10 final acceptance: PR #58 merged at
+`9c4df912ffe632b4740bf7c4dd1e537f2beea9a1`, with the same tree as reviewed head
+`9fe638699192e7fcc4e327b55e8f7ed64fee0077`. Copilot found an exact legacy
+owner-transition compatibility regression; persisted tests reproduced it before
+the fix, and actual plans saved by the prior native binary reproduced the same
+inspection refusal. Validation now accepts only exact fresh or historical
+serialization, preserving unapproved-field rejection. Both rebuilt native hosts
+inspect, recover and undo old plans after the old Apply process is killed.
+
+All 13 PR checks pass. Linux, macOS and Windows each pass 1,429 tests without
+failures/skips; the exact-head minimum/current gh lanes each pass all 17 opt-in
+contracts. All 84 native proof files / 292 fixture rows across four RIDs were
+inspected, including 48 outcome rows. Final independent source, ownership,
+evidence and original-criterion reviews are clear. Full final-source results,
+hashes, legacy restart proofs and remote artifact attribution are retained in
+`evidence/maintenance-batch-10-final.json`; the earlier checkpoint remains
+historical evidence and is not attributed to the compatibility fix.
+M01, M02, M04, M05, M06 and M07 are complete; 15 original items remain.
+
+
+## Batch 11: managed and built-in skill discovery
+
+M10 adds bounded Codex built-in and Codex/Claude plugin discovery while retaining
+ordinary namespaces, ancestor workspaces, profiles and custom/shared roots.
+Payload ownership, distributor versions and registration contexts remain separate
+from authored source and unknown active-loading state. Doctor can include the
+captured inventory; Installed details show managed provenance.
+
+A shared live probe enforces read-only ownership in install/update/remove, cleanup
+and maintenance state placement. It retains boundaries even when metadata is
+malformed or omitted, limits external reads to explicit scopes, and preserves
+captured agent environments through execution. Exact unrelated named imports
+remain available; mutable --all sets beside managed children require immutable
+staging before they can be supported.
+
+Separate source/consumer/evidence reviews found alias, profile, late-adoption,
+manifest and proof gaps; those corrections were re-reviewed clear. Final local
+Inventory coverage passes 317 tests. Both sequential native publishes and all
+36 managed-discovery rows pass across both hosts and gh 2.97.0/2.102.0. Both new
+hosts inspect an actual old saved plan, recover the old Apply process after a
+forced stop, and undo with original native objects/bytes/modes and exact registry
+bytes restored, even after newly discoverable managed roots appear.
+
+The final full suite passes all 1,467 tests with no failures/skips. Build/style,
+Node automation tests, site build and actionlint pass. Exact-head remote checks,
+all-RID native artifact inspection and merge remain required before closing M10. The acceptance ledger remains incomplete
+until those results are recorded. Effective loading and plugin lifecycle remain
+their separate original findings.
+
+
+The first PR #59 source passed 1,467 tests on each platform, but native Linux
+verification exposed unavailable-openat2 inventory failure and macOS verification
+exposed incorrect inaccessible-root classification. Review identified the related
+unknown-boundary cleanup path. These are fixed, permission regressions pass, and
+all 319 Inventory tests plus both 17-case actual-gh contract suites pass. Source
+and evidence re-review are clear. The follow-up checkpoint preserves attribution;
+final full-suite, native and exact-head remote results remain required.
+
+
+Copilot's PR #59 review added linked cache/synced entry-point, narrow unregistered
+scope, reverse removal containment, proof-isolation and namespace classification
+findings. Five new deterministic cases failed before corrections. Re-review also
+covered nested synced links in metadata-only admission and direct-skill profiles
+inside cached containers. Both independent reviewers are clear after those fixes;
+all 326 Inventory tests pass. Known package observations survive contextual
+rediscovery, captured managed roots are rechecked at removal execution, and
+explicit physical payload reads do not expand to siblings. The original retargeted
+alias test now independently proves captured state exclusion despite intentionally
+partial linked-storage coverage. Final-source full/native/platform gates remain.

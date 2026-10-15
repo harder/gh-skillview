@@ -51,6 +51,7 @@ public sealed class SkillUpdateCoordinator(
             IReadOnlyDictionary<string, string>? mutationEnvironment = null;
             try
             {
+                ManagedSkillDiscovery.RefuseTarget(target, cancellationToken, sourceRunner ?? updater.Runner);
                 if (!target.MetadataConflicts.IsDefaultOrEmpty)
                     throw new IOException("Resolve conflicting tracking observations before updating.");
                 if (!target.OwnershipDiagnostics.IsDefaultOrEmpty)
@@ -180,6 +181,7 @@ public sealed class SkillUpdateCoordinator(
                         Targets = [target],
                         ProcessEnvironment = mutationEnvironment
                     };
+                    ManagedSkillDiscovery.RefuseTarget(target, cancellationToken, sourceRunner ?? updater.Runner);
                     var result = await updater.UpdateAsync(ghPath, exact, cancellationToken).ConfigureAwait(false);
                     targetAttempted = result.MutationAttempted;
                     attempted |= targetAttempted;
@@ -289,6 +291,12 @@ public sealed class SkillUpdateCoordinator(
         {
             ["HOME"] = home,
             ["USERPROFILE"] = home,
+            ["CODEX_HOME"] = Path.Combine(home, ".codex"),
+            ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, ".claude"),
+            ["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = Path.Combine(home, ".claude", "plugins"),
+            ["CLAUDE_CODE_PLUGIN_DIRS"] = "",
+            ["CLAUDE_CODE_PLUGIN_SEED_DIR"] = "",
+            ["PI_CODING_AGENT_DIR"] = Path.Combine(home, ".pi", "agent"),
             ["GH_CONFIG_DIR"] = Path.GetFullPath(config),
             ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
             ["XDG_CACHE_HOME"] = Path.Combine(home, "cache"),

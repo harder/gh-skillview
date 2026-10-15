@@ -20,6 +20,7 @@ namespace SkillView.Gh;
 /// from the parsed textual result.
 public sealed class GhSkillUpdateService
 {
+    internal ProcessRunner Runner => _runner;
     internal string EffectiveHome => ResolveHome(null);
 
     private string ResolveHome(IReadOnlyDictionary<string, string>? environment)

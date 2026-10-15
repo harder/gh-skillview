@@ -10,14 +10,17 @@ namespace SkillView.Maintenance;
 /// Durable payload evidence outside installed skills. This archive format stores
 /// file bytes, entry Unix modes and native link bytes; it is not yet an in-place
 /// restore contract for ACLs, extended attributes or owner registries.
-public sealed partial class MaintenanceBackupStore(string root)
+public sealed partial class MaintenanceBackupStore(string root, ProcessRunner? runner = null)
 {
     private readonly Action<string>? _entryArchivedForTests;
     private readonly Action? _beforeArchiveForTests;
-    internal MaintenanceBackupStore(string root, Action<string> entryArchivedForTests, Action? beforeArchiveForTests = null) : this(root)
+    private readonly Action? _beforeStateOpenForTests;
+    internal MaintenanceBackupStore(string root, Action<string> entryArchivedForTests, Action? beforeArchiveForTests = null,
+        Action? beforeStateOpenForTests = null, ProcessRunner? ownershipRunner = null) : this(root, ownershipRunner)
     {
         _entryArchivedForTests = entryArchivedForTests;
         _beforeArchiveForTests = beforeArchiveForTests;
+        _beforeStateOpenForTests = beforeStateOpenForTests;
     }
     public const long MaxStoredBytes = 1024L * 1024 * 1024;
     public const int MaxStoreEntries = 4096;
@@ -43,10 +46,13 @@ public sealed partial class MaintenanceBackupStore(string root)
         IReadOnlyList<InstalledSkill>? knownInstallations = null, IReadOnlyList<ScanRoot>? managedRoots = null)
     {
         token.ThrowIfCancellationRequested();
+        ManagedSkillDiscovery.RefusePaths([Root], token, runner ?? target.OwnershipRunner);
         var before = PayloadSnapshot.CaptureEvidence(target.ResolvedPath, token);
         var excluded = new[] { before.Path, target.ResolvedPath }
             .Concat((knownInstallations ?? []).Select(skill => skill.ResolvedPath))
             .Concat((managedRoots ?? []).Select(scan => scan.Path)).ToArray();
+        _beforeStateOpenForTests?.Invoke();
+        ManagedSkillDiscovery.RefusePaths([Root], token, runner ?? target.OwnershipRunner);
         using var owner = NativeStateDirectory.OpenOrCreate(Root, excluded, token);
         using var writerLock = owner.OpenFile("writer.lock", writerLock: true, token);
         if (!writerLock.CanSeek || writerLock.Length != 0) throw new IOException("Maintenance writer lock must be an empty regular file.");

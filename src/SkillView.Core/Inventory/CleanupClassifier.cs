@@ -153,6 +153,10 @@ public static class CleanupClassifier
                 continue;
             }
 
+            // Cache versions and built-ins are intentional managed resources.
+            // Their absence from gh's loose-skill registry is not cleanup evidence.
+            if (skill.AllOwnershipClaims.Any(owner => owner.InstallationMode == "managed-read-only")) continue;
+
             // Tracking absence is only an untracked review observation, never
             // evidence that the payload is unused or its upstream was deleted.
             if (WasCovered(snapshot, skill) && skill.Provenance == Provenance.FsScan)
@@ -199,7 +203,8 @@ public static class CleanupClassifier
         foreach (var (name, bucket) in byName)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var copies = bucket.DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).ToArray();
+            var copies = bucket.Where(skill => !skill.AllOwnershipClaims.Any(owner => owner.InstallationMode == "managed-read-only"))
+                .DistinctBy(skill => PathIdentity.NormalizeKey(skill.ResolvedPath)).ToArray();
             if (copies.Length < 2) continue;
             foreach (var copy in copies)
             {
@@ -247,6 +252,7 @@ public static class CleanupClassifier
         foreach (var root in scanRoots)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (root.Managed || snapshot.ManagedRegions.Any(region => region.ObserveCoverage(root.Path) != false)) continue;
             IEnumerator<string>? children;
             try { children = Directory.EnumerateDirectories(root.Path).GetEnumerator(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
@@ -264,6 +270,7 @@ public static class CleanupClassifier
                     if (!hasNext) break;
 
                     var child = children.Current;
+                    if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
                     var resolved = PathResolver.Resolve(child);
                     if (resolved is null) continue;
                     if (knownResolved.Contains(PathIdentity.NormalizeKey(resolved))) continue;

@@ -48,6 +48,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Label _footer;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
+    internal InventorySnapshot? CurrentSnapshot => _snapshot;
     private IReadOnlyList<InstalledSkill> _rows = Array.Empty<InstalledSkill>();
     private IReadOnlyList<InstalledSkill> _all = Array.Empty<InstalledSkill>();
     private SortMode _sort = SortMode.Name;

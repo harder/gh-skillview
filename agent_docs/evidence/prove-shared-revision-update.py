@@ -53,7 +53,7 @@ def prove_guard():
             root.joinpath(name + '-link').symlink_to(outside, target_is_directory=True)
         before = manifest(outside)
         for linked in (None, 'home', 'state'):
-            env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+            env = {key: value for key, value in os.environ.items() if key not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not key.startswith('GIT_')}
             home = root / ('home-link' if linked == 'home' else 'home')
             state = root / ('state-link' if linked == 'state' else 'state')
             env.update(HOME=str(home), USERPROFILE=str(home), SKILLVIEW_STATE_HOME=str(state),
@@ -78,7 +78,7 @@ for gh_path in args.gh:
         home = root / 'home'
         home.mkdir()
         root.joinpath('disposable-proof-marker').write_bytes(b'SkillView disposable process proof\n')
-        env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        env = {key: value for key, value in os.environ.items() if key not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_TOKEN=auth, GH_EXTENSION='1', GH_PATH=str(gh),
                    GH_CONFIG_DIR=str(root / 'gh-config'), SKILLVIEW_STATE_HOME=str(root / 'state'),
                    XDG_CONFIG_HOME=str(root / 'config'), XDG_STATE_HOME=str(root / 'xdg-state'),

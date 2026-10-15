@@ -122,6 +122,12 @@ internal static class SecureRemovalBackend
         out string canonicalPath,
         out string? error)
     {
+        // Read-only ownership discovery needs an opened-object address even on
+        // Linux hosts without openat2. This path uses realpath/open/readlink;
+        // it grants no removal or relocation authority and leaves Current null.
+        if (Current is null && (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            && UnixSecureRemovalBackend.IsRegularFileInspectionSupported)
+            return new UnixSecureRemovalBackend().TryCanonicalizePath(path, out canonicalPath, out error);
         if (Current is null)
         {
             canonicalPath = string.Empty;

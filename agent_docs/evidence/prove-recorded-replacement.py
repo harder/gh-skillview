@@ -43,7 +43,7 @@ for gh_path in gh_paths:
         builtin = home / '.codex' / 'skills' / '.system' / 'builtin-fixture'
         builtin.mkdir(parents=True)
         builtin.joinpath('SKILL.md').write_text('---\nname: builtin-fixture\ndescription: Hidden built-in fixture\n---\nInstructions\n')
-        env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        env = {key: value for key, value in os.environ.items() if key not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_TOKEN=auth, GH_EXTENSION='1', GH_PATH=str(gh),
                    GH_CONFIG_DIR=str(root / 'gh-config'), SKILLVIEW_STATE_HOME=str(root / 'state'),
                    XDG_CONFIG_HOME=str(root / 'config'), XDG_STATE_HOME=str(root / 'xdg-state'),

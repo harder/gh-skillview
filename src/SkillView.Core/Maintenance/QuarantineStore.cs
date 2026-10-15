@@ -11,7 +11,8 @@ namespace SkillView.Maintenance;
 
 /// Relocates one explicitly reviewed standalone custom-directory installation.
 /// No manager records, archive extraction, replacement or recursive deletion.
-internal sealed partial class QuarantineStore(string root, Logger logger, Action<string>? afterJournal = null)
+internal sealed partial class QuarantineStore(string root, Logger logger, Action<string>? afterJournal = null,
+    SkillView.Subprocess.ProcessRunner? runner = null, Action? beforeStateOpenForTests = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     internal const int MaxOperations = 64;
@@ -21,7 +22,7 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
     internal QuarantineRecord Preview(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
     {
         Admit(target, inventory, token);
-        CheckStatePlacement(inventory);
+        CheckStatePlacement(inventory, token);
         var scanRoot = inventory.ScannedRoots.Where(scan => scan.Scope == Scope.Custom
                 && PathIdentity.IsInside(OwnershipPath.CanonicalCandidate(target.ResolvedPath) ?? target.ResolvedPath, OwnershipPath.CanonicalCandidate(scan.Path) ?? scan.Path))
             .OrderByDescending(scan => scan.Path.Length).FirstOrDefault()
@@ -46,6 +47,8 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
         if (!standaloneConfirmed) throw new IOException("Confirm this is a standalone copy with --standalone; native packages and manager-owned installs are excluded.");
         var preview = Preview(target, inventory, token);
         if (preview.ReviewFingerprint != expectedReview) throw new IOException("The reviewed installation/context changed. Preview again before applying.");
+        beforeStateOpenForTests?.Invoke();
+        CheckStatePlacement(inventory, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token);
         if (writer.Length != 0) throw new IOException("Operation writer lock must be empty.");
@@ -63,6 +66,7 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
         WriteRecord(operation, "prepared.json", prepared, token);
         try
         {
+            ManagedSkillDiscovery.RefusePaths([before.Path], token, runner ?? target.OwnershipRunner);
             lease.MoveToState(operation, "payload", token);
             using var reconciliation = new CancellationSource(TimeSpan.FromSeconds(30),
                 CancellationCallbackReporter.For(logger, "Quarantine reconciliation"));
@@ -92,20 +96,22 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
         }
     }
 
-    private void CheckStatePlacement(InventorySnapshot inventory)
+    private void CheckStatePlacement(InventorySnapshot inventory, CancellationToken token)
     {
+        ManagedSkillDiscovery.RefusePaths([Root], token, runner);
         var candidate = OwnershipPath.CanonicalCandidate(Root) ?? Root;
         NativeStateDirectory.CheckExcluded(candidate, Exclusions(inventory).Select(path => OwnershipPath.CanonicalCandidate(path) ?? path).ToArray());
         if (ScanRootResolver.FindGitRoot(candidate) is not null)
             throw new IOException("Quarantine state must be outside Git working trees; choose SKILLVIEW_STATE_HOME accordingly.");
     }
 
-    private static string[] Exclusions(InventorySnapshot inventory) => inventory.ConfiguredRoots.Select(scan => scan.Path)
-        .Concat(inventory.ScannedRoots.Select(scan => scan.Path)).Concat(inventory.Skills.Select(skill => skill.ResolvedPath)).ToArray();
+    private static string[] Exclusions(InventorySnapshot inventory) => inventory.ProtectedRoots.Select(scan => scan.Path)
+        .Concat(inventory.Skills.Select(skill => skill.ResolvedPath)).ToArray();
 
-    private static void Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
+    private void Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        ManagedSkillDiscovery.RefuseTarget(target, token, runner);
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512)
             throw new IOException("Complete bounded agent/workspace inventory is required before quarantine or undo.");
         if (target.Scope != Scope.Custom || target.Validity != ValidityState.Valid || target.IsSymlinked
@@ -122,7 +128,7 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
             || part.Equals("extensions", StringComparison.OrdinalIgnoreCase)))
             throw new IOException("Plugin/extension locations are excluded; use the owning manager.");
         EnsureNoConsumers(target.ResolvedPath, inventory, token, target);
-        var validation = RemoveValidator.Validate(target, inventory.ScannedRoots, inventory.Skills, token);
+        var validation = RemoveValidator.Validate(target, inventory.ProtectedRoots.ToArray(), inventory.Skills, token);
         if (!validation.Allowed || !validation.Warnings.IsEmpty)
             throw new IOException("Standalone quarantine policy refused: " + string.Join("; ",
                 validation.Errors.Select(error => error.Detail).Concat(validation.Warnings.Select(warning => warning.Detail))));

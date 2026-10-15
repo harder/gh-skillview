@@ -8,30 +8,50 @@ namespace SkillView.Gh;
 
 internal static class GhInstallOwnershipGuard
 {
-    internal sealed record Context(ImmutableArray<SkillPackage> Claims);
+    internal sealed record Context(ImmutableArray<SkillPackage> Claims, ManagedSkillDiscovery.Observation Managed,
+        ProcessRunner Runner, GhSkillInstallService.Options Options)
+    {
+        internal bool NeedsManagedSelectors(IReadOnlyList<string> destinations) => Managed.Regions.Any(region =>
+            destinations.Any(destination => region.Covers(destination) || region.IsInside(destination)));
+    }
 
     internal static Context Capture(IReadOnlyList<string> destinations, ProcessRunner runner,
         GhSkillInstallService.Options options, Logger logger, CancellationToken token)
     {
         var home = runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
         var state = runner.GetEffectiveEnvironmentVariable("XDG_STATE_HOME", options.ProcessEnvironment);
-        var workingDirectory = Path.GetFullPath(options.WorkingDirectory ?? Environment.CurrentDirectory);
+        var workingDirectory = Path.GetFullPath(options.WorkingDirectory ?? runner.EffectiveWorkingDirectory);
         if (!string.IsNullOrEmpty(home)) home = Path.GetFullPath(home, workingDirectory);
         if (!string.IsNullOrEmpty(state)) state = Path.GetFullPath(state, workingDirectory);
         var diagnostics = new List<LockReadDiagnostic>();
         var discoveryRoots = destinations.SelectMany(destination => new[] { destination, CanonicalCandidate(destination) })
             .Distinct(StringComparer.Ordinal).ToArray();
+        var managed = ManagedSkillDiscovery.Capture(runner, discoveryRoots.Select(path => new ScanRoot(path, Scope.Custom, null)),
+            token, options.ProcessEnvironment, workingDirectory, allowHidden: true);
+        ManagedSkillDiscovery.Refuse(managed, destinations);
         var observations = new SkillLockFileReader(logger).LoadObservations(discoveryRoots, token, new(home, state), diagnostics);
         bool Covers(IEnumerable<string> roots) => roots.Any(root => destinations.Any(destination => SameDirectory(root, destination)));
         if (diagnostics.Any(diagnostic => diagnostic.CoveredRoots.IsEmpty || Covers(diagnostic.CoveredRoots)))
             throw new IOException("Destination ownership is incomplete; resolve its lockfile diagnostics before installing.");
         return new(observations.Where(observation => Covers(observation.Package.CoveredRoots))
-            .Select(observation => observation.Package).ToImmutableArray());
+            .Select(observation => observation.Package).ToImmutableArray(), managed, runner, options);
     }
 
     internal static void Validate(Context context, IReadOnlyList<string> destinations, IReadOnlyList<string>? selectors,
         CancellationToken token)
     {
+        if ((selectors is null || selectors.Count == 0) && context.NeedsManagedSelectors(destinations))
+            throw new IOException("Managed destination children require exact source selectors before installation.");
+        var replacements = destinations.SelectMany(destination => (selectors ?? []).Select(selector =>
+            Path.Combine(destination, selector.Split('/')[^1]))).ToArray();
+        var selected = destinations.Concat(replacements).ToArray();
+        ManagedSkillDiscovery.Refuse(context.Managed, selected);
+        ManagedSkillDiscovery.Refuse(context.Managed, replacements, includeContainedRegions: true);
+        var live = ManagedSkillDiscovery.Capture(context.Runner,
+            selected.Select(path => new ScanRoot(path, Scope.Custom, null)), token,
+            context.Options.ProcessEnvironment, context.Options.WorkingDirectory, discoverPayloads: false);
+        ManagedSkillDiscovery.Refuse(live, selected);
+        ManagedSkillDiscovery.Refuse(live, replacements, includeContainedRegions: true);
         if (context.Claims.IsEmpty) return;
         if (selectors is null || selectors.Count == 0)
             throw new IOException("The source's exact installation names are unresolved in an owned destination; use a coordinated maintenance plan.");

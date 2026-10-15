@@ -9,6 +9,25 @@ namespace SkillView.Tests.Inventory;
 public class LocalInventoryServiceMergeTests
 {
     [Fact]
+    public void KnownDiscoveryRootsSurviveIncompleteContextWhileBareGhObservationCollapses()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "skillview-context-merge", "demo");
+        var rootA = Path.Combine(Path.GetTempPath(), "root-a");
+        var rootB = Path.Combine(Path.GetTempPath(), "root-b");
+        var context = Path.Combine(Path.GetTempPath(), "known-context");
+        var first = Scan("demo", path) with
+        { Agents = [new("codex", path, false, Scope.User, DiscoveryRoot: rootA)] };
+        var second = first with
+        { Agents = [new("codex", path, false, Scope.User, Context: context, DiscoveryRoot: rootB)] };
+        var result = Assert.Single(LocalInventoryService.Merge([first, second],
+            [new() { Name = "demo", Path = path, Agent = "codex", Scope = "user" }]));
+        Assert.Equal(2, result.Agents.Length);
+        Assert.Contains(result.Agents, agent => agent.DiscoveryRoot == rootA && agent.Context is null);
+        Assert.Contains(result.Agents, agent => agent.DiscoveryRoot == rootB && agent.Context == context);
+        Assert.DoesNotContain(result.Agents, agent => agent.Context is null && agent.DiscoveryRoot is null);
+    }
+
+    [Fact]
     public void OwnershipKeepsBothContextualLocksAndLeavesUnrelatedCopyUnowned()
     {
         var root = Path.Combine(Path.GetTempPath(), "owners");

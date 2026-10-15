@@ -22,7 +22,7 @@ for gh in args.gh or [None]:
         home.mkdir()
         templates = root / 'templates'
         templates.mkdir()
-        env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        env = {key: value for key, value in os.environ.items() if key not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_CONFIG_DIR=str(root / 'gh-config'),
                    XDG_CONFIG_HOME=str(root / 'config'), XDG_STATE_HOME=str(root / 'state'),
                    APPDATA=str(root / 'appdata'), LOCALAPPDATA=str(root / 'localappdata'),

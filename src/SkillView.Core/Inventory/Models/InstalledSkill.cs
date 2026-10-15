@@ -47,6 +47,9 @@ public sealed record InstalledSkill
     public IEnumerable<SkillPackage> AllOwnershipClaims => OwnershipClaims.IsDefaultOrEmpty
         ? Package is { } package ? [package] : [] : OwnershipClaims;
     public ImmutableArray<string> OwnershipDiagnostics { get; init; } = [];
+    // Live policy uses the captured subprocess context, including config-home
+    // overrides. This is never serialized into inventory or saved plans.
+    internal SkillView.Subprocess.ProcessRunner? OwnershipRunner { get; init; }
     public string? PayloadFingerprint { get; init; }
     public SkillSourceIdentity SourceIdentity => SkillSourceIdentity.From(this);
     public SkillRevision Revision => new(FrontMatter.Version, FrontMatter.GithubRef ?? Package?.RepositoryRef,

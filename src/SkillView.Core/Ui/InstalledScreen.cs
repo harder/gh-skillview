@@ -123,6 +123,14 @@ public static class InstalledScreen
             sb.AppendLine();
             AppendDetailItem(sb, "Package source", MarkdownTableFormatter.FormatCodeSpan(pkg.Source));
             AppendDetailItem(sb, "Package type", MarkdownTableFormatter.FormatTableCell(pkg.SourceType));
+            if (pkg.InstallationMode == "managed-read-only")
+            {
+                AppendDetailItem(sb, "Managed by", MarkdownTableFormatter.FormatTableCell(pkg.Provider));
+                if (pkg.PluginName is { } plugin) AppendDetailItem(sb, "Plugin", MarkdownTableFormatter.FormatTableCell(plugin));
+                if (pkg.PackageVersion is { } version) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatTableCell(version));
+                AppendDetailItem(sb, "Maintenance", "Read-only; use the owning agent or package manager");
+                AppendDetailItem(sb, "Loading", "Enabled and active session state unknown");
+            }
             if (pkg.SourceUrl is { Length: > 0 } url)
             {
                 AppendDetailItem(sb, "Package URL", FormatTableLink(url));

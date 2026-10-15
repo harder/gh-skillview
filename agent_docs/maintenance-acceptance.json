@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "16258ff62122ce7cbb7397c4994fc31013a59086",
+  "verifiedMainCommit": "9c4df912ffe632b4740bf7c4dd1e537f2beea9a1",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -90,13 +90,16 @@
       "id": "M07",
       "title": "Preserve both output streams and verify partial outcomes",
       "priority": "P1",
-      "status": "incomplete",
+      "status": "complete",
       "implementedEvidenceSummary": "Independent outcomes and bounded both-stream queue retention; fresh current checks preserve installed objects/owner bytes without saved-plan quota; same-tree reviewed repairs retain edited originals; cancellation reconciliation and actual-gh partial failures verified locally",
-      "remaining": "Exact-head platform/native CI artifact inspection and merge after the batch-10 source, ownership and criterion reviews",
+      "remaining": null,
       "acceptance": "Fixtures for updated, pinned, untracked, remote failure, force reinstall, no-op, partial failure and cancellation. First target succeeds/second fails: preserve stdout and report the first change. Force restoration with unchanged tree SHA still appears as a real file change.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false,
-      "localAcceptanceEvidence": "evidence/maintenance-batch-10-update-outcomes-checkpoint.json"
+      "finalAcceptanceProven": true,
+      "localAcceptanceEvidence": "evidence/maintenance-batch-10-update-outcomes-checkpoint.json",
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-10-final.json",
+      "verifiedCommit": "9c4df912ffe632b4740bf7c4dd1e537f2beea9a1",
+      "mergedPullRequest": 58
     },
     {
       "id": "M08",
@@ -125,11 +128,12 @@
       "title": "Discover namespace containers, agent roots and contexts correctly",
       "priority": "P1",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Shared catalog, namespaces, profiles, workspaces and bounded discovery",
-      "remaining": "Managed/built-in discovery adapters and final acceptance verification",
+      "implementedEvidenceSummary": "Shared catalog, namespaces, ancestor workspaces, profiles, aliases and bounded Codex/Claude managed/built-in discovery with read-only provenance, registration contexts and live mutation admission",
+      "remaining": "Exact-head platform/full-suite and native artifact verification, then reviewed merge and final original acceptance recording",
       "acceptance": "Namespaced gh installs, monorepo ancestors, alternate profiles, custom paths and shared roots appear with correct ownership and context. Containers are not offered as malformed skills. Scan budgets report partial coverage and never manufacture orphan conclusions when hit.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": false,
+      "localAcceptanceEvidence": "evidence/maintenance-batch-11-managed-discovery-checkpoint.json"
     },
     {
       "id": "M11",

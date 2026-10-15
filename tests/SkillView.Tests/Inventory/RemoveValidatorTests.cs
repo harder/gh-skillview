@@ -284,7 +284,7 @@ public class RemoveValidatorTests : IDisposable
         var link = Path.Combine(_tempRoot, "broken-link");
         if (!TryCreateDirectoryLink(link, Path.Combine(_tempRoot, "missing-target"))) return;
 
-        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() }, TestContext.Current.CancellationToken);
 
         Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
         Assert.True(validation.RemovesLinkOnly);
@@ -308,7 +308,7 @@ public class RemoveValidatorTests : IDisposable
         Directory.CreateDirectory(target);
         if (!TryCreateDirectoryLink(link, target)) return;
 
-        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() });
+        var validation = RemoveValidator.ValidateBrokenSymlink(link, new[] { Root() }, TestContext.Current.CancellationToken);
 
         Assert.False(validation.Allowed);
         Assert.Contains(validation.Errors,
@@ -330,7 +330,7 @@ public class RemoveValidatorTests : IDisposable
 
         var validation = RemoveValidator.ValidateSymlink(
             linkedPath,
-            [new ScanRoot(linkedRoot, Scope.User, "claude")]);
+            [new ScanRoot(linkedRoot, Scope.User, "claude")], cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(validation.Allowed, string.Join(", ", validation.Errors));
         Assert.NotNull(validation.ExecutionLinkIdentity);

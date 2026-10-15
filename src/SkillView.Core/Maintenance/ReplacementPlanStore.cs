@@ -13,7 +13,8 @@ namespace SkillView.Maintenance;
 /// Saved, exact-payload replacement. Both old and displaced directories are
 /// retained by exclusive native rename. Only never-published, verified unchanged
 /// private staging operations may be removed; installed payloads are never deleted.
-internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null)
+internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null,
+    Action? beforeStateOpenForTests = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     private const int MaxJournalBytes = 16 * 1024 * 1024;
@@ -37,7 +38,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         target = target with { ResolvedPath = canonicalPath, ScanRoot = containingRoot };
         using (var initialOwner = OpenOwner(revision?.Owner, token, requireBefore: true))
             inventory = Admit(target, inventory, token, owner: initialOwner);
-        CheckPlacement(inventory);
+        CheckPlacement(inventory, token);
         using var original = NativeDirectoryMoveLease.Open(Canonical(target.ScanRoot), target.ResolvedPath, token);
         var before = original.Capture(token);
         var live = PayloadSnapshot.Capture(target.ResolvedPath, token);
@@ -52,6 +53,8 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         string context;
         using (var initialOwner = OpenOwner(revision?.Owner, token, requireBefore: true))
             context = Context(target, inventory, token, owner: initialOwner);
+        beforeStateOpenForTests?.Invoke();
+        CheckPlacement(inventory, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token);
         CheckWriter(writer);
@@ -533,6 +536,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
 
     private ImmutableArray<SkillPackage> ReadOwners(InstalledSkill target, CancellationToken token, OwnerContext? owner = null)
     {
+        ManagedSkillDiscovery.RefuseTarget(target, token, runner);
         var diagnostics = new List<LockReadDiagnostic>();
         var destinations = target.Agents.Select(agent => agent.DiscoveryRoot ?? Path.GetDirectoryName(agent.Path)!)
             .Append(target.ScanRoot).Append(Path.GetDirectoryName(target.ResolvedPath)!)
@@ -558,13 +562,14 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             throw new IOException("Recorded restore cannot change source, revision, pin policy or owner records.");
     }
 
-    private void CheckPlacement(InventorySnapshot inventory)
+    private void CheckPlacement(InventorySnapshot inventory, CancellationToken token)
     {
+        ManagedSkillDiscovery.RefusePaths([Root], token, runner);
         NativeStateDirectory.CheckExcluded(Canonical(Root), Exclusions(inventory).Select(Canonical).ToArray());
         if (ScanRootResolver.FindGitRoot(Root) is not null) throw new IOException("Replacement state must remain outside Git working trees.");
     }
     private static string Canonical(string path) => OwnershipPath.CanonicalCandidate(path) ?? Path.GetFullPath(path);
-    private static string[] Exclusions(InventorySnapshot inventory) => inventory.ConfiguredRoots.Concat(inventory.ScannedRoots)
+    private static string[] Exclusions(InventorySnapshot inventory) => inventory.ProtectedRoots
         .Select(scan => scan.Path).Concat(inventory.Skills.Select(skill => skill.ResolvedPath)).ToArray();
     private static void CheckWriter(FileStream writer) { if (writer.Length != 0) throw new IOException("Replacement writer lock must be empty."); }
     private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -637,7 +642,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     {
         token.ThrowIfCancellationRequested();
         if (!QuarantineStore.ValidId(id)) throw new IOException("A lowercase 32-character plan ID is required.");
-        CheckPlacement(inventory);
+        CheckPlacement(inventory, token);
         NativeStateDirectory? state = null, operation = null;
         FileStream? writer = null, operationWriter = null;
         try

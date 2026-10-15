@@ -309,6 +309,29 @@ are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
 removal of an unowned chosen install remains available through the Installed workflow.
 An incomplete scan is marked in the Installed footer and Changes summary.
 
+Inventory also observes Codex bundled/admin skills and versioned Codex/Claude
+plugin caches. Managed rows show their distributor and package version separately
+from authored source metadata. A cached plugin or installation record does not
+prove that an agent has enabled or loaded it. These resources are read-only in
+SkillView; use the owning agent or package manager to maintain them.
+
+Managed discovery honors `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
+`CLAUDE_CODE_PLUGIN_CACHE_DIR`, `CLAUDE_CODE_PLUGIN_DIRS`, and
+`CLAUDE_CODE_PLUGIN_SEED_DIR`, retaining default homes alongside overrides.
+Claude registry contexts are observed separately when their schema is supported.
+External registered plugins require an explicit `--scan-root` before their
+payloads are read; a root inside one plugin does not authorize sibling scans.
+Malformed metadata, inaccessible locations and exceeded budgets remain visible
+as diagnostics. They cannot make a protected installation writable.
+
+Exact named installs into unrelated ordinary siblings remain available. Installing
+`--all` into a root containing managed resources requires an immutable staged
+maintenance workflow; a separate source listing cannot authorize gh's later
+rediscovery of a mutable set. `list --json` includes `managedRegions` for these
+protection boundaries independently of the roots whose skill payloads were read.
+Use `doctor --inventory --json` for environment and inventory diagnostics together.
+The TUI Doctor includes the latest Installed snapshot when one has been captured.
+
 Observe another workspace or a named agent profile with global flags before
 `list`, other CLI commands, or the TUI:
 

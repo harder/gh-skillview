@@ -47,6 +47,9 @@ public static class RemoveValidator
         internal SecureLinkIdentity? ExecutionLinkIdentity { get; init; }
         internal bool RequiresEmptyDirectory { get; init; }
         internal bool RemovesLinkOnly { get; init; }
+        internal SkillView.Subprocess.ProcessRunner? OwnershipRunner { get; init; }
+        internal ImmutableArray<string> OwnershipPaths { get; init; } = [];
+        internal ImmutableArray<ScanRoot> ManagedRoots { get; init; } = [];
     }
 
     /// Validate removal of `target`. `knownRoots` is the union of scan roots
@@ -78,13 +81,15 @@ public static class RemoveValidator
         IReadOnlyList<ScanRoot> knownRoots,
         IReadOnlyList<InstalledSkill> otherSkills,
         bool allowUnpinnedPreview,
-        bool secureBackendSupported) =>
+        bool secureBackendSupported,
+        Action<string>? beforeManagedOwnershipForTests = null) =>
         ValidateCore(
             target,
             knownRoots,
             otherSkills,
             allowUnpinnedPreview,
-            secureBackendSupported);
+            secureBackendSupported,
+            beforeManagedOwnershipForTests: beforeManagedOwnershipForTests);
 
     private static RemoveValidation ValidateCore(
         InstalledSkill target,
@@ -92,7 +97,8 @@ public static class RemoveValidator
         IReadOnlyList<InstalledSkill> otherSkills,
         bool allowUnpinnedPreview,
         bool? secureBackendSupportedOverride = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? beforeManagedOwnershipForTests = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var errors = ImmutableArray.CreateBuilder<Error>();
@@ -284,6 +290,10 @@ public static class RemoveValidator
             }
         }
 
+        beforeManagedOwnershipForTests?.Invoke(resolved);
+        var ownershipRunner = ManagedSkillDiscovery.CaptureContext(target.OwnershipRunner);
+        var ownershipPaths = target.Agents.Select(agent => agent.Path).Append(target.ResolvedPath).Append(resolved).Distinct(StringComparer.Ordinal).ToImmutableArray();
+        CheckManagedOwnership(ownershipPaths, knownRoots, errors, cancellationToken, ownershipRunner);
         return new RemoveValidation(
             errors.ToImmutable(),
             warnings.ToImmutable(),
@@ -291,13 +301,16 @@ public static class RemoveValidator
             incoming)
         {
             ExecutionIdentity = executionIdentity,
+            OwnershipRunner = ownershipRunner,
+            OwnershipPaths = ownershipPaths,
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
     }
 
     internal static RemoveValidation ValidateEmptyDirectory(
         string path,
         IReadOnlyList<ScanRoot> knownRoots,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, SkillView.Subprocess.ProcessRunner? ownershipRunner = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var errors = ImmutableArray.CreateBuilder<Error>();
@@ -386,6 +399,8 @@ public static class RemoveValidator
                 $"'{resolved}' is no longer empty"));
         }
 
+        ownershipRunner = ManagedSkillDiscovery.CaptureContext(ownershipRunner);
+        CheckManagedOwnership([fullPath, resolved], knownRoots, errors, cancellationToken, ownershipRunner);
         return new RemoveValidation(
             errors.ToImmutable(),
             ImmutableArray<Warning>.Empty,
@@ -394,19 +409,25 @@ public static class RemoveValidator
         {
             ExecutionIdentity = executionIdentity,
             RequiresEmptyDirectory = true,
+            OwnershipRunner = ownershipRunner,
+            OwnershipPaths = [fullPath, resolved],
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
     }
 
     internal static RemoveValidation ValidateBrokenSymlink(
         string path,
-        IReadOnlyList<ScanRoot> knownRoots) =>
-        ValidateSymlink(path, knownRoots, requireBroken: true);
+        IReadOnlyList<ScanRoot> knownRoots, CancellationToken cancellationToken = default,
+        SkillView.Subprocess.ProcessRunner? ownershipRunner = null) =>
+        ValidateSymlink(path, knownRoots, requireBroken: true, cancellationToken, ownershipRunner);
 
     internal static RemoveValidation ValidateSymlink(
         string path,
         IReadOnlyList<ScanRoot> knownRoots,
-        bool requireBroken = false)
+        bool requireBroken = false, CancellationToken cancellationToken = default,
+        SkillView.Subprocess.ProcessRunner? ownershipRunner = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var errors = ImmutableArray.CreateBuilder<Error>();
         var fullPath = Path.GetFullPath(path);
         var resolved = fullPath;
@@ -476,6 +497,8 @@ public static class RemoveValidator
             }
         }
 
+        ownershipRunner = ManagedSkillDiscovery.CaptureContext(ownershipRunner);
+        CheckManagedOwnership([fullPath, resolved], knownRoots, errors, cancellationToken, ownershipRunner);
         return new RemoveValidation(
             errors.ToImmutable(),
             ImmutableArray<Warning>.Empty,
@@ -484,7 +507,24 @@ public static class RemoveValidator
         {
             ExecutionLinkIdentity = executionLinkIdentity,
             RemovesLinkOnly = true,
+            OwnershipRunner = ownershipRunner,
+            OwnershipPaths = [fullPath, resolved],
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
+    }
+
+    private static void CheckManagedOwnership(IEnumerable<string> selected, IReadOnlyList<ScanRoot> roots,
+        ImmutableArray<Error>.Builder errors, CancellationToken token, SkillView.Subprocess.ProcessRunner? runner = null)
+    {
+        if (errors.Any(error => error.Kind == ErrorKind.OwnerRecordNeedsPlan)) return;
+        try
+        {
+            var paths = selected.ToArray();
+            ManagedSkillDiscovery.RefuseKnownRoots(roots, paths, token);
+            ManagedSkillDiscovery.RefusePaths(paths, token, runner);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { errors.Add(new(ErrorKind.OwnerRecordNeedsPlan, ex.Message)); }
     }
 
     private static ScanRoot? FindContainingRoot(

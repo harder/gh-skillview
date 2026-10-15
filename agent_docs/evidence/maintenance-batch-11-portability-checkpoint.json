@@ -1,0 +1,1710 @@
+{
+  "schemaVersion": 1,
+  "status": "focused-verified-awaiting-final-full-suite-native-and-remote",
+  "previousReviewedHead": "52e625280b73327e044ae824ec82f9c528ca698f",
+  "sourceFingerprint": "3af61ba12d1d907cfb22dd39d3fade10df8dc381d8f581c6357766201bc73598",
+  "sourceManifest": [
+    {
+      "path": ".github/CODEOWNERS",
+      "sha256": "2b630b4f880ba619ae7583d19b5da18a264d2ed58cbf9fa7671dc7ae4ce835b2"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "sha256": "15a532ffb070880e9e0bab20ed143e876990cd2ce3140f1bc6d05791ae67b580"
+    },
+    {
+      "path": ".github/actionlint.yaml",
+      "sha256": "9d6be88af50e898ea902a5e46393e8f5e81f0d1ada7759e11b014cd59025bb59"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "sha256": "ea5a333c4032618fc8fb0230f94a3bdd39c0e363bb241bb837f8b81156ef9ee3"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "sha256": "bd60a796384bba5bd24eb7ecb52e13a782f14f001472512feb4ebd0a0c5959ee"
+    },
+    {
+      "path": ".github/release.yml",
+      "sha256": "9420ddee065cdcd524ded48cdb20ccf5bece65279c33acf017148d9d2c32415b"
+    },
+    {
+      "path": ".github/scripts/critical-dependencies.js",
+      "sha256": "948a04af8119df384b83a5a50e3ccf6c1200350e0eb555ca6452a2211e90092b"
+    },
+    {
+      "path": ".github/scripts/critical-dependencies.test.js",
+      "sha256": "dcc536cb2da6eeb7c2d2baeadc6f61f763aadc23a26e4067caa95668998b7952"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-assessment.js",
+      "sha256": "7907f8cdadce1d1f2deb002f1126d1296201f3e2f2cef734dca7b416611dc1f6"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-assessment.test.js",
+      "sha256": "2528f2c93f63cb09adbf54566ef5f2f89360324aa4fe4c4ff20d6d1a5e65c4ee"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-prompt.md",
+      "sha256": "8005e6e1e417c600633e0f9528202bcfc0c8b4bdb94e9c5c84df5bf92ed64bd0"
+    },
+    {
+      "path": ".github/scripts/test_homebrew_formula.py",
+      "sha256": "2a008f95ad41630c4bf09ef16f03fadceaa9150bc9359e497839e7804c3dc8fb"
+    },
+    {
+      "path": ".github/workflows/README.md",
+      "sha256": "49d6ed36530eeda6922564d4064473bdac20842c1ab38adb877b31136034bb63"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "d54cd670f31bd344f113d1319f5547f7fe8a6bfaed0e1424babc093c32915678"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "sha256": "1b2ca0f53dd5b0290500efad6b5e8662337f2d1b98fbc683fb5260ccda4b7718"
+    },
+    {
+      "path": ".github/workflows/contract-tests.yml",
+      "sha256": "147d2413f59103e16578fc35880496304fb1f2add08ef70ba505bd19bab8a9b7"
+    },
+    {
+      "path": ".github/workflows/critical-dependencies.yml",
+      "sha256": "06717ae757025af4d4f0c8c43b4fa3407ec6fdd283d5ce35e9079435f8c2545b"
+    },
+    {
+      "path": ".github/workflows/pages.yml",
+      "sha256": "f83f368c100bd2085414cab10075f1f603e4db9ef5526e1bdadd72ff144e5791"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "6d7289cac6600c572ef5e2fdf6bef9d386b2feca2708aaf9aa743db24ee7b46e"
+    },
+    {
+      "path": "Directory.Build.props",
+      "sha256": "9a5a2930248d4529c00714a6d1225f583e2a629e94b9220b72a9a7500577abeb"
+    },
+    {
+      "path": "SkillView.sln",
+      "sha256": "f111aacfd781f87c9a5865e7d2addd794e5c1394f5f397cedf2e4c21787b6184"
+    },
+    {
+      "path": "agent_docs/evidence/prove-gitfile-protection.py",
+      "sha256": "cd659f9d0f9db2ce7ad7b70ca4ce4a4f0f2e7f91edec5290216643f4ab5d1783"
+    },
+    {
+      "path": "agent_docs/evidence/prove-inventory-denied-root.py",
+      "sha256": "e388897c1926c1e4838b248a4e195c604f6549a318ca026b8b1a3e9730089cdb"
+    },
+    {
+      "path": "agent_docs/evidence/prove-inventory-filter.py",
+      "sha256": "8dc232bce6684d58844ee150ea907949e1665a868710690e02dbe53e2620c9c0"
+    },
+    {
+      "path": "agent_docs/evidence/prove-legacy-owner-compatibility.py",
+      "sha256": "3a151e00968abb93fdc7473c99a238ec0dbf6839423dc0fa3961c3129d97efcb"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-backup.py",
+      "sha256": "c1eef26a475217ce6b8febf39b1d974a76fe3135ede0ce4e4ca6bb19c8cefe97"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-2.py",
+      "sha256": "82869ab7c3b4bdf508889c42c6c59b6482e15d708e810ea2375c94083155c5e2"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-3.py",
+      "sha256": "92ea236054f4fd28f96ff0bdb3bda1deb3b5e449ab4704f77cfb4d88a9b30f9e"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-3b.py",
+      "sha256": "1702b8445a84f0df5cf78b11e598c8b958057c99b8e5e0d196301872aa0e4ff5"
+    },
+    {
+      "path": "agent_docs/evidence/prove-managed-discovery.py",
+      "sha256": "b48373e6e35f1a8e3f7a2b2d6ccea1581ffb9649ec7918bb61e4f74f19642cd8"
+    },
+    {
+      "path": "agent_docs/evidence/prove-metadata-without-openat2.py",
+      "sha256": "04b37792645564cb626ccb14a46cd4e14f64275604230d3c7ba5e3d620b3a7fd"
+    },
+    {
+      "path": "agent_docs/evidence/prove-native-object-evidence.py",
+      "sha256": "1ee4cabb0b5149accfc6a1a35c9fd5bfbb2db7d8cc7f685e692915344fdc34b3"
+    },
+    {
+      "path": "agent_docs/evidence/prove-quarantine-undo.py",
+      "sha256": "7a3dfbd91d5a0e62f0846bcb616f0d8eae84057f3360ea0269cb8c8de24d584f"
+    },
+    {
+      "path": "agent_docs/evidence/prove-recorded-replacement.py",
+      "sha256": "2688ff6818aaeae2cb20b6dc68ccf69d09579d91d4ee0a1ebb9de273b3690fe5"
+    },
+    {
+      "path": "agent_docs/evidence/prove-reviewed-update-tui.py",
+      "sha256": "934c098c5f42c057d279c495976bbf896fd3c850538d801afcbfc1d4de72e00d"
+    },
+    {
+      "path": "agent_docs/evidence/prove-revision-update.py",
+      "sha256": "b830d17adc1817417c964e97327d3089bfe8f972c32261b1aa501bf3d65216fc"
+    },
+    {
+      "path": "agent_docs/evidence/prove-shared-revision-update.py",
+      "sha256": "c39dda34baece1ba8694890b3e8de8b1819d5414a05a6b0b8bff9964a28458af"
+    },
+    {
+      "path": "agent_docs/evidence/prove-tracking-roundtrip.py",
+      "sha256": "0d6a6fe1785e5e242a7781ba322995a53aedef9c746474dca5246f7bf10eef0f"
+    },
+    {
+      "path": "agent_docs/evidence/prove-update-outcomes.py",
+      "sha256": "f052c28d787f755565d298832d055d5b0040857cf0b24cdd3f8d90c3eeadb8fc"
+    },
+    {
+      "path": "global.json",
+      "sha256": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a"
+    },
+    {
+      "path": "src/SkillView.App/Program.cs",
+      "sha256": "bf4072e2581a4368e765a832e42d23ebb1e5cac144ce333e6c7513a4bca6a367"
+    },
+    {
+      "path": "src/SkillView.App/SkillView.App.csproj",
+      "sha256": "94fdc5ec3fbe2ebd5dba71031849fa2d0c53b2588af94e43a39cbbacf41e771d"
+    },
+    {
+      "path": "src/SkillView.App/packages.lock.json",
+      "sha256": "50e7a0e853a38ba938c9a354918a1bc8e01f9b2de067c8a8cba3474cbd04ce44"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/AppOptions.cs",
+      "sha256": "db0ac9380a8337544eed6041791b8d72bbc0f62905d17467019be39562e04387"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/AppTheme.cs",
+      "sha256": "72f05453431854283ac4ac23e3ee3f8ff69bdb4d2fffa6b20ede079ea49b23cd"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/ArgParser.cs",
+      "sha256": "8972812fa75b331dedb03d05c9053a249b4bd15efab8791d1e31cbdf3440b36b"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/DispatchMode.cs",
+      "sha256": "b308f6620f1d7fce0efc725bd839a4a2692ab726d9a11a8a4eb5199f61a058d6"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/EntryPoint.cs",
+      "sha256": "babc52eff8db35f567c0a5840a10bdb42ec31d18bdec119645e1567f510f0d65"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/ExitCodes.cs",
+      "sha256": "8c0674f49b0b9381aeebb1803ad84c6c8827d316f159e1fdb71a0f25b549a347"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/InvocationMode.cs",
+      "sha256": "24b7a5b207ad25ddec78c5cacf2cfc91cf6d2814a43f086c49f9dfee5dd15afb"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/RootCancellation.cs",
+      "sha256": "72438b64ca2b2c7c85193632bbdb3625a1e330d0af536619aaedf27474d38085"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/CliDispatcher.Restore.cs",
+      "sha256": "96a1c8b937100f73fcbcb4f88dbd981138e7294d9619ce48c5e909faa44ccdd7"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/CliDispatcher.cs",
+      "sha256": "51294931f1b2910ce6fd120d27130f1b59f659197fe9f964365d1e07d5978338"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/Utf8TextWriterStream.cs",
+      "sha256": "19ac0975caef34ca3b8eacbddd1190a5f989fe6814d8d59f4e653a204c5af907"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/EnvironmentProbe.cs",
+      "sha256": "a32de883ad65581ad2f6742a9e0a38d1f4ba789a7cc809688781ef2db4f08f80"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/EnvironmentReport.cs",
+      "sha256": "a422b44618cab7bf2927f0b3ad8478bd96c700a8b2c081dad6eeccadf7b0d705"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/SemVer.cs",
+      "sha256": "0970b1090e48902987b6837f2c653f5c9b846a99cbab98252256476eb00596b4"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthService.cs",
+      "sha256": "f3bbfa0c724f75ba22f6869f4ef6eda0524a00d94087e4f93705d783c3879209"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthStatus.cs",
+      "sha256": "c3db740518ef1cd2c94c00309489558110b6effaf7ab32ee3a3be815989bc02a"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthStatusParser.cs",
+      "sha256": "d297dcf52f184e0d1e36e239a05a83f552343f945983290f10069bd9b7db634f"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhBinaryLocator.cs",
+      "sha256": "2d40ff1dd77306983ee922eca5e239cf278a0034b578abbbb7d4f6215b90018b"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhInstallOwnershipGuard.cs",
+      "sha256": "17743c5006977d9263345f48ba77006833d6eea55b8540e64b6e70e82ad8af9a"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhJsonContext.cs",
+      "sha256": "8a38f9499f560e9f10d02b614fdbc6afc50003ac1c2130865a3307e629098f5d"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhPlacementCatalog.cs",
+      "sha256": "d2fe95dc861b49e112747bbda1c9ed6ecbebcdefdb4f671932bb3eb2f53ee301"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillInstallService.cs",
+      "sha256": "584f1446f3b8388e4752fdd33083c15e1ea2a06ecd9a6acf98de080a534183ef"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillListAdapter.cs",
+      "sha256": "5dcb7a210ea0023b563183f36ab5a4fe94f2ce49d06a6aa7698a8c99b43a48cb"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillListCache.cs",
+      "sha256": "ca70641f91674d94daba372ce0370a4b166ae33755cca4e2ac024b74dbff37f0"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillPreviewService.cs",
+      "sha256": "acb661067c9983a69bd0e4e902ff74d07a056014268de25dbc85f7ad21421c96"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillSearchService.cs",
+      "sha256": "f69c8417785e745211ad17af85f132be88c41249859caa34fd85be0f507d3f50"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillUpdateService.cs",
+      "sha256": "2d776ecfd0a60c2729aca6dabcb775eade502254af2818b4f3d55d1a457b34ef"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/GhSkillListRecord.cs",
+      "sha256": "bfb2ba7026a931441af5ee5667e129119de1835e84b1d96cd1f7bf3145dc09d6"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/InstallResult.cs",
+      "sha256": "79b31ae4cc83c51077c122d9da22fe44bc365243e038c9d6eed905c15376c3e2"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/PreviewResult.cs",
+      "sha256": "8cd99367e651eb63d5a0d04347fa1f994e1af5a41f2eafe2a110c615f6fbd7f9"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/RepoSkill.cs",
+      "sha256": "417117f2a331caf2bbbc07deea0073630560443b34bbe57867a1a7c2ed35e1cf"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/RepoSkillListing.cs",
+      "sha256": "07ac57ed32af3b0cbd32335e1fba17a25ae57d98480f94f7c9bae957f155745c"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/SearchResultSkill.cs",
+      "sha256": "a9be23bfe87b125269ec295f1ade976308f0501949b93dce8052cd620e35b7c2"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/UpdateResult.cs",
+      "sha256": "4e1172ca35273d02ca888dd4e5b4bb2470d5bc28ad4d8fdea01b2aacade5faf4"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/AgentIdentity.cs",
+      "sha256": "9fe6e4e072e6a86bfabef6541b21579c165d828c0e35a0c6dfed89299b9d0c4a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/CleanupClassifier.cs",
+      "sha256": "0bb64f976a21055ee3df57e0a737ef01c3b208fb92efb3653e37c188473f723c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/FrontMatterParser.cs",
+      "sha256": "07821527d1def4c370870969ec3a6a384538ba3ae5c7fe83e337869bf12e25cf"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/IgnoreMarker.cs",
+      "sha256": "7926e29c1afdb4b7e28c17cfc0aaf24a417d99560e958e608f814f4e529ccd0d"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/LocalInventoryService.cs",
+      "sha256": "dcf3a34c39b381a371a788bb3858c041bc7bcd2ce8b9f0418ca72326f17dab37"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/LocalSkillScanner.cs",
+      "sha256": "5a5492ab3be7e64df945c1f19d903d1c92081a9d2e36fb4d78947232563bfc7a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.Manifests.cs",
+      "sha256": "5b7e1a23457779ffb5ef4fb92b4f97903bea25011c8cebc15a99bd12a206d126"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.Registry.cs",
+      "sha256": "fdcfd97c414c5c2246d3becaa5e1211bb4b2d3b7d917ccade0e520edafdd21fb"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.cs",
+      "sha256": "d3de62a520545c54356a3b0e7abaafd9e27af41346158027e4f3308bcdbb0c5b"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/AgentMembership.cs",
+      "sha256": "f5f9a1f4bd694bc898b21157e85ccb99440d513f96f7b9868ff7e2f43e67c70a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/InstalledSkill.cs",
+      "sha256": "d7ecf4eacd4b175d2ab58861689b03ba9a00376a06d845f915231c7377d36150"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/InventorySnapshot.cs",
+      "sha256": "7dc2736eb553a0a96c3b5452d531657f29b09b85975479d9ca856cccadb4d62e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ManagedSkillRegion.cs",
+      "sha256": "d59bbcd7d13e25143c27d14a28afd3c83079591c4a4b20357a11d0713d4d3f8c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/Provenance.cs",
+      "sha256": "906ada73169f3512e48957b9398d05f307a8e0ebdebdbfea066f3d3c8e1616e0"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ScanRoot.cs",
+      "sha256": "054bd6119d9fe3831c8ce26e9e955403d29492d221cef1801b4385e2df9cce4e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/Scope.cs",
+      "sha256": "02b1d2bf5bd81bc520bbfba35e45718729bef445ed5ca88b77f6e5b125f4a340"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillFrontMatter.cs",
+      "sha256": "ccb5f5cfa196991eb06d8119ab61390b484be19eda4420540fe0ce5a832a93ac"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillIdentity.cs",
+      "sha256": "2359fd01fe345adc8d77769867178c4c69b7890f2641f5d32cab65cdec192499"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillPackage.cs",
+      "sha256": "fc0683e5ea3ca24c894e14e819ad113e124dfd18ff002130645feb6736840619"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ValidityState.cs",
+      "sha256": "9b642226395a3cfc4571286c34ba9b06261d6c5049695d78f8e3998406ab52c7"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeDirectoryMoveLease.cs",
+      "sha256": "e8b7bf70c512f5a2a5cf4bce53905812aaee69c6df13052f5aedf05cceccdadf"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeRegistryFileLease.cs",
+      "sha256": "a8b01472497f7244e51d386c043a16d1983edb91f339e9046873f773b5b429c1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeStateDirectory.cs",
+      "sha256": "7b1127bfc4b615a4d6afc7d4c03eb894bf13b738ca7a9905aef09f57e2a655e1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/OwnershipPath.cs",
+      "sha256": "110e5337ae6811031d228e6500222b5f9b9a448239d5a14721be3cc435bb0bbe"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/OwnershipRecordFingerprint.cs",
+      "sha256": "6c8a725855b9f4c88fc8eca3347879f108ca722c99a107f0866695f860f63378"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/PathIdentity.cs",
+      "sha256": "1d549a7890afb93fa5caf96a1fe717c1fec3c7229dd8e333317defdd0d08f71e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/PathResolver.cs",
+      "sha256": "b45686212467ffe94c8bfc8a5b9e2f51f9ddcbdc9ecc43a06d1c3df74a6988b1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RegularFileInspection.cs",
+      "sha256": "8692bf7945517466b31dad8d99835b5e09ab12d4d2c76d612462ee64f806e157"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveService.cs",
+      "sha256": "0dbf7061208b473897ea37ee7de02d1a8e8ed9852e208687d0e79af1d9c10591"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveTargetResolver.cs",
+      "sha256": "6b61fcaafa23e80402e4a796fc95f0f6e62188b073a3a07c9d573227d7ca6a7e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveValidator.cs",
+      "sha256": "61adb8dba097ec831574c0f63f6bdcf4721d89d78c42590323a86bb60393eeb7"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ScanRootResolver.cs",
+      "sha256": "cc91357a70444d138ff24cce1d3ffbb07a7b170fed943a66ddf1bf7440ba79c3"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SecurePayloadWalker.cs",
+      "sha256": "0fffcd76af6fb3297c5970dc2ed9f64cc56b8ff9f49d7c1c98cc8098fdb03a8e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SecureRemovalBackend.cs",
+      "sha256": "4c502ea073c2b6ac23b6a1ab063e87c237b2790b768c184e3fdc081f984ec221"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SkillLockFileReader.cs",
+      "sha256": "b842cc89899e7cc03270ee29bc22a2597d166623de73a39954b507ce65fad320"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixDirectoryMove.cs",
+      "sha256": "bed02f0549a8c95857463215a93be58bc86ef07991b535e522eea8a1881c824c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixRegistryFile.cs",
+      "sha256": "33118c6901c89660af6044033f8e294b9a94561952cff52fa0e930e726be60a6"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixSecureRemovalBackend.cs",
+      "sha256": "fe6b55c65ab19f5ad11e0631e0f16ddd92c2a204ac8511d1bd94084e9f4884dc"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixStateDirectory.cs",
+      "sha256": "53baadb9ab179199ff66e19876f7fc20e440fa2f5c309ebf0fde95f7884adc8c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsDirectoryMove.cs",
+      "sha256": "9a74dec0e0f20b7164d0b42cb065c5444d015e8c82c5774c6a70301759bb9a89"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsRegistryFile.cs",
+      "sha256": "0bf601ff18c3f9d1c96f2dac63b7f339cde1edcf05d7db247a02d3a253c7ebb8"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsSecureRemovalBackend.cs",
+      "sha256": "558b5a3b0ba995e4d1f1f684bbd82429ddbd7849fda3e5c62418fb12fad84739"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsStateDirectory.cs",
+      "sha256": "49ebfdb54358c69a99607232a2fe6537277ccd81f0ffb132f2c109218e3390fa"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/FileLogSink.cs",
+      "sha256": "47e7bb0b8b8416ec8c7832c97131fe2d61512181383afbee578b0ed7825c342d"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogEntry.cs",
+      "sha256": "ef0ad9568757874d97f7f1abda1ca4226eafca0f72418e4867d372dad4db899a"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogLevel.cs",
+      "sha256": "b4559a81c21ede6779c0187bf71dacd91554dca2ebaeb586ddeed39edd909535"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogPaths.cs",
+      "sha256": "c83ace08ce944bbeebf0e837d424af66a85ea541be4fae96c270b7b19a08d940"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/Logger.cs",
+      "sha256": "5949f92cf1bc3a994d6de32b24f299d08708ddc842990218342b42d5b7b0f168"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/Redactor.cs",
+      "sha256": "17f985c69e4c71bdd9e32fc12ac5a58f54a500d4795cebd07e7cedf7024ab0ae"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhPresentationComparison.cs",
+      "sha256": "2a488b2311e5ffaf81cd6a4e722fa3fab351ee094ad0eabeeec434c610c93381"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRecordedTreeStager.cs",
+      "sha256": "336605f297a88613faf743569fc7b7329ab2a4d7dab6a25f24cf7462a0a8f619"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRegistryEditor.cs",
+      "sha256": "bdab0c4a124ca1a52e9ac4945243257093147f8f764a08bf9112e8f63b798423"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRegistryWriteSession.cs",
+      "sha256": "ae20a224218f165aa634906231f6e4752a14256cbb4adbffa541bf5c82a841ff"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRevisionResolver.cs",
+      "sha256": "38858d51cb96d15a75014ca89418cf550b92640f700b66452e11ff56a26da542"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhSharedLockGuard.cs",
+      "sha256": "f4bde19c0c1f227189fe47fdec0dc241a9f14ab034a4060170e6e61bf8136553"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhSourceRequestException.cs",
+      "sha256": "b1132122b07e1c1ebf5042ce4cec1ffa125a0f4411c3c6e5d64b2a8b932868bb"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/InstallerMetadataNormalizer.cs",
+      "sha256": "43910483c78667a8356558c03cc1b48bc9189c27a6da24b202ed1354fce30244"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/MaintenanceBackupHistory.cs",
+      "sha256": "d12574b070876d6c0d127dd6d73f09cc86dbef57e6781a0c3be6bc1038e0d933"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/MaintenanceBackupStore.cs",
+      "sha256": "fbbc9d47b85893d834060451234dbf304876c5775720d2697e523741ddcd6d13"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/PayloadSnapshot.cs",
+      "sha256": "284161b80bb0976afa56c34cade4f7d379ee4534d4c02b5cd8b960e1d7928fcf"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineRecord.cs",
+      "sha256": "042746c7f5e9448047f30cb5bdb43ede2e9bd954cbf193d740156ddce938ad3e"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.Consumers.cs",
+      "sha256": "0e5e147b02521b06193fef05d1f1ffa3479627d13a2c944b89da508348bbf788"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.Undo.cs",
+      "sha256": "8303176bd6d75e163d513fb594841659ee72ea98c3c5d9058b94cd1c3673dfcd"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.cs",
+      "sha256": "d3559cb5ced48f10795d6c550b80185c8a6226de9911ceba4b7c462ca11323f6"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/RecordedTrackingWriter.cs",
+      "sha256": "97160f8d1eb0b8a44005bb0f3fdde15a75dab9256d1b1c466889aa4b3cd1c9cf"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlan.cs",
+      "sha256": "9fae36b425908dc5228394a3f12a752d64e4a87201e6723f8218ba23e301586d"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Owner.cs",
+      "sha256": "bc27da32a0951db966b23bc74ad30bf8c72a0cef843068f71aeb7192882c0cf1"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerJournal.cs",
+      "sha256": "03b534a5aaf80c13be7cfe613d10227e72ef4e3bbd990a9e6e5942c960f13e10"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerRepair.cs",
+      "sha256": "d7531232d05f71fc8826bebc786108bbec150955480caeba2db683163044c915"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unchanged.cs",
+      "sha256": "9c31b7f75768e289d1801416a07f604f3b6377f6db08cdcb4c094725ccc5f362"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Update.cs",
+      "sha256": "e4c059db819ff279e37fa829ce5e3b7dfa55d7b0f737d7ed8fd1b9331f5b3e7c"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs",
+      "sha256": "f366715d826ad12388917c08fa8d4887031c0c8aa4edcb0d4bc6f61bb51db177"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs",
+      "sha256": "e61417de85ef119b3d1dfacb8405b0ef31c8ad58ab9f81b60fee41169772e2ae"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SkillComparisonService.cs",
+      "sha256": "08e3e4f3b681c5ce4117bbb49502bd1c399e0be7f492522834d515b1e89c1258"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SkillUpdateCoordinator.cs",
+      "sha256": "3eb7bda97ee4b8a550e68e516d069ed474fb5bf2911e15bbf28f46cff8bfb28a"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/UpdateResultAccumulator.cs",
+      "sha256": "9d67ece0af2ae65ecf4d462e02179fe5fd61b0d0ef01d7f23811b9e102c9b7de"
+    },
+    {
+      "path": "src/SkillView.Core/SkillView.Core.csproj",
+      "sha256": "4c9d865c630c4aec11f6fee1adc3577861db2f7bf8e22f345885d0c3301d053f"
+    },
+    {
+      "path": "src/SkillView.Core/Subprocess/ProcessResult.cs",
+      "sha256": "25ac45b0793b28f3e7890d0c1ff8700db426715dfe5d1bd57d0c85fe9bc8ead4"
+    },
+    {
+      "path": "src/SkillView.Core/Subprocess/ProcessRunner.cs",
+      "sha256": "5f66e054d86a566c04072e7b5c0db476d7006ce6241dad4984f77130a054a9e6"
+    },
+    {
+      "path": "src/SkillView.Core/Threading/CancellationCallbackReporter.cs",
+      "sha256": "382cb5dda40b55f29b92112dff723f673562eacf40fda76952d17c03cef3a42a"
+    },
+    {
+      "path": "src/SkillView.Core/Threading/CancellationSource.cs",
+      "sha256": "c99b9bff82ff52d431231560bfd5bd6d49f747737a83b47a86e9d3be9e4477b0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/AgentCheckboxGrid.cs",
+      "sha256": "73811d02c1b9ace6596edb60ef0f8140959f682510d07126fddf5058cd3cfe0b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/BackgroundTaskTracker.cs",
+      "sha256": "c2508ebe87eebd9946cf48b88d7344fd5f1d45141943bb5038a99eebf1e6e1bc"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CallbackProgress.cs",
+      "sha256": "069e6e70571b53673c4f55c1749e716fb57f6060b2171980d921e07b2c9a3a4c"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CancellationOperationSlot.cs",
+      "sha256": "265bc8a5e180d3cbe07bacd6602f68bd453849cdcadadbbefc969020ce28ab15"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ChangesQueueBuilder.cs",
+      "sha256": "7a4b78ca0f6bf5194db8f012d37fbdb97e5ddc511a15896d906cd72949629401"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CleanupScreen.cs",
+      "sha256": "bba63b141cf7b733f1f335503855912dc9578c643953ec350b5f6ffdaf81077c"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ContextBarView.cs",
+      "sha256": "62cde0b6946072b2687cc0339e7e32734371d79083340739b4d735992a5fa10d"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/DiscoverFiltersDialog.cs",
+      "sha256": "9e63e7a0c169c91511d7bfde192a94819f449c166c241ed4aac824c58d44d505"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/DoctorScreen.cs",
+      "sha256": "d46f4d8d27188cc7beed8b1786c714398aded4e4ec24653af7b4e3942ea917cc"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/HelpOverlay.cs",
+      "sha256": "bec801b93579ecee244cd941c3210d75db439c0d8a0b76f0aacde2c5f1834bd0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallAgentCatalog.cs",
+      "sha256": "e24db87892bd4888dbe7c50c85af12cd2e2bc01d23fedbbdbef3d71e21f0db40"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallConfirmModal.cs",
+      "sha256": "3fe544c8456379d70314d5e89c18c019cdd796faef2eefff44057687fd39bb03"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallScreen.cs",
+      "sha256": "75d95636cafd65f0b2b91e0db765f399ffad5d184e6f916b3c2edb8dbfa4d209"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstalledInventoryFormatter.cs",
+      "sha256": "1a0c2e694529f6df69dc8ed4a8f267df6e871da75cd35a993e6273e9aa344bb0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstalledScreen.cs",
+      "sha256": "8621ea1e3f15105bac65957f6bb926c74b7e393489bbdcf3f44879519fd6c198"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/LatestRequestGate.cs",
+      "sha256": "24c95299a0709af1751b044b28808d00969ef5914109a448b756063729cb39bb"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/MarkdownTableFormatter.cs",
+      "sha256": "967d0eca60eae4f8bfac7971bef883532921a191198c64e2c9cdd0acc7048520"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ModalOperationTracker.cs",
+      "sha256": "76a0606f3643619ca1ea3bce3a246e52328f277a084f7712186f428385c9886b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemovalReportState.cs",
+      "sha256": "5a521aeccb8143801ab57e3d63ef1d81fcbedef092d7e37ac283bd1d4d141db5"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveConfirmModal.cs",
+      "sha256": "75fef8cd4cfddb0d1a81624f529e94753b0ae329e8003b6465c9cf3e56fd77d2"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveScreen.cs",
+      "sha256": "38c853318cad07ddc143f6282b66d4855b7a7ff370720f2c637d9c817d9a7043"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveWizardContent.cs",
+      "sha256": "27113eef44ea7e093c08d4d339edd51cd831fe914e4bbdcc208d85091291fb51"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RepoSkillPickerModal.cs",
+      "sha256": "48dad8acb244697b4ec64db7fad165e912af98ab80dbddaccdf98320cffe6029"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SearchAgentMetadataCache.cs",
+      "sha256": "43bd30641058798ad6d76a62af2bad653b42a37a206d1f80090a5accd68f009f"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SearchAgentMetadataLoader.cs",
+      "sha256": "537ac98323ae788e33be4fa69eb2d2e963fbbff671ab3a6c4270b8efc9d3f4a8"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SharedAsyncOperation.cs",
+      "sha256": "f06cea296f8384e7d8e265867e7be6bfa6e563282cf4257bce5e2249cfe152a4"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillDetailPaneView.cs",
+      "sha256": "a1222aeff289a8ab9539f24164873299cb419106c40ff80904a0d6c5b7f1bd01"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillHealthFormatter.cs",
+      "sha256": "1b7ef6940ef14df5e691eb49746f97b436aeb7fb396e792c5c92df957ecfd193"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewApp.cs",
+      "sha256": "bb298d9f09247e7eb1282e31f5d68e39855ebaefe236155bcb2f3538aa65516d"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewStyling.cs",
+      "sha256": "def546e305d68e4928139e5a1e9b6758397442397ef925c47b63060d9c957b32"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs",
+      "sha256": "2b5c57255b97554709b6a1c32cf7c97cf77e7155b1225a847e948948e10ac49f"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/StatusStripView.cs",
+      "sha256": "c5c5bd3a2718f307e0123f5a8a649bb943128f766054e61744a3da7448526379"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TabBarView.cs",
+      "sha256": "29cee46c3272e905c47198cdcbcb960f935dbf8c26259f76b6206820770b790b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/ChangesTabView.cs",
+      "sha256": "7f581d3a8e98cbf1c748b6c650db4266ab32eac3efd486c0ead872a9f54f4de0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/DiscoverTabView.cs",
+      "sha256": "192e52c2a0f3bd8ce99c7f6700bd8b3a37d1aa01f5359f89078f7c804ad1c2a5"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/DoctorTabView.cs",
+      "sha256": "968e4b263aa2c7d8664a9079bb26689bbd9771bc1685c1e6557521d8707fad13"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs",
+      "sha256": "6d1328220c1ce86f550886c96f46c686ac5278edcdf5b8674715950cb22b0202"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/UpdatesTabView.Review.cs",
+      "sha256": "03ad3696a098524e0efa30fd0da81311c18eb234b24c40f2a379f8f89a9a3a63"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/UpdatesTabView.cs",
+      "sha256": "67c04eebeb69615f3befabe32e7334de43c85d19ecbb48164a8d9d21ef3b36e7"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TerminalEscapeSanitizer.cs",
+      "sha256": "b8b1fed2fddc54da594cd168e84f26dd755593739640d84a1314792cd55f8d9b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TerminalSizeGuardView.cs",
+      "sha256": "e02f8a0e1a210a6733f2ed673410cb18adf55d10ab431f09d967b2a95e207368"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Theming/WingetTuiTheme.cs",
+      "sha256": "40a3fc3ed5ec28b5cd3e68f39b4d59b89ac78ac9fa4efd0745c420554f81cbc7"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TuiHelpers.cs",
+      "sha256": "4b45bd4080f76697f9cf8961f9588273a62ff2f9cedc1fafca2c3464fdbe332b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TuiServices.cs",
+      "sha256": "eb52bafe792137ae503eebb43a207287113f49e6222c114b9ea270a8adfb17d2"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/UpdateScreen.cs",
+      "sha256": "bdcc175c6c6ed0bb9a0dbb0d40d5d6f6981cee46ff6887780f6497fcfdf594d6"
+    },
+    {
+      "path": "src/SkillView.Core/packages.lock.json",
+      "sha256": "2ddfd09ec75d4c69a5c1b5f057487158aac9a309e92af79479add8eb9b6488ec"
+    },
+    {
+      "path": "src/SkillView.GhExtension/Program.cs",
+      "sha256": "bf4072e2581a4368e765a832e42d23ebb1e5cac144ce333e6c7513a4bca6a367"
+    },
+    {
+      "path": "src/SkillView.GhExtension/SkillView.GhExtension.csproj",
+      "sha256": "732996bdb14a5bf5fa0d708d728db7bf00ebee9e728834a23407bfc02cf3ae40"
+    },
+    {
+      "path": "src/SkillView.GhExtension/packages.lock.json",
+      "sha256": "50e7a0e853a38ba938c9a354918a1bc8e01f9b2de067c8a8cba3474cbd04ce44"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+      "sha256": "5d86ae58a5afb4879aafd59e5fd89ae961fd7244c24ffc521d98e3ca3d1990c5"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/Ui/SkillViewAppIntegrationTests.cs",
+      "sha256": "b233d6d52125575e2d7afec9e926a8e94f37bd50af2906ab9ed48c02fb0f69ec"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/packages.lock.json",
+      "sha256": "016e1b0776dd5dd827218c57a9a2383d645e611a91974794999e53e31ac84b4c"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/Program.cs",
+      "sha256": "d0816093f3306e3ab912ced94b32488e999f841ff8510e24113c2c29ea6cfb83"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+      "sha256": "64698a5b85b31ad017831247acea0767817cb2ea2c3dec5d5303f30c1536bd66"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/packages.lock.json",
+      "sha256": "6368bebacec8f7106c0875c0e582007a0e3128ce2dba4e79b62383a750860f4d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/ArgParserTests.cs",
+      "sha256": "51dfa1967197e39363526e8f4b039bd98598b64dc4b8638ff4eb51931288ab4a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/ExitCodesTests.cs",
+      "sha256": "0fa5afc1cc2edc21f289d4e4d3ef4bd7cf9b69a4b46bd28cdf86cafda9b80faf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/RootCancellationTests.cs",
+      "sha256": "58b910ec4c7274eadc6cf62c02ae920f6c94d3bed1a70966dc7ef5514511128d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Build/PackageReferenceTests.cs",
+      "sha256": "4fbb46f609282602ec813d9baec05751f84952bcc780b3996b06c493946efdb9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliConsoleCapture.cs",
+      "sha256": "ff24c659dda5e6b92753b9f5b9b29205d108887f9296dfb69b99b5d5cc4b2bf4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs",
+      "sha256": "ffa20db79e1309161f3f33b8426dfc51b5c647a10d42f03a900587a076281cdf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs",
+      "sha256": "40c5a5a62a8a45b0ac2c2560066cdaaefe358bb150bde629e818346d825ffa2a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherInstallTests.cs",
+      "sha256": "14203e588c6b312fe743d3c35470dd411ce00971e5512b0bbbd00818fa0ff03b"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherJsonSnapshotTests.cs",
+      "sha256": "5ac8a38a37d335696d36a54ab6b5f5c55479e370f6fed29987333a6c98d28e23"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherParserTests.cs",
+      "sha256": "4b3998b8f236aaee6c12c4e7a79257420556fcb7547491c2b26a9e8d00a02fef"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherUpdateTests.cs",
+      "sha256": "88c2129f4d90086d9c95f6ddf2cc408bb2dbf59054082fbcc23d997323180168"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/Utf8TextWriterStreamTests.cs",
+      "sha256": "d213900cb6e538a538d6fce5209d15fe12e1b3c52131dc97fd28b26484232dff"
+    },
+    {
+      "path": "tests/SkillView.Tests/Environment/EnvironmentProbeTests.cs",
+      "sha256": "184a8edf71d56272012cc585753187d003521f22f56cd743b6637119ab4b6e33"
+    },
+    {
+      "path": "tests/SkillView.Tests/Environment/SemVerTests.cs",
+      "sha256": "27076c9f91ddc4d07af0d6d86a013e0cc405f6e7b4051ecde65f6011f86de146"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhAuthStatusParserTests.cs",
+      "sha256": "cca0d540d90a75a9dac916ba6718bd23a42668c4bf3372fc536dfaa6b5dea23a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhBinaryLocatorTests.cs",
+      "sha256": "17729a27d399f8afdb879de2943b074b31562844965e05bb9d536485c773ad72"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhCliContractTests.cs",
+      "sha256": "45d6ba828af13c8a027317d8b6275d940903eca05ca81db32c9860ce0a8bc0e1"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhJsonContextTests.cs",
+      "sha256": "ca6a23afef2080c0730dab288b9ea413513ce1a566cdb0bfa33167c0678dac24"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhMetadataContractTests.cs",
+      "sha256": "7556cc1ca007ee5bbb91ab888bea906059968f31c4c155faa7c52f48ad1fc2d7"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillInstallServiceTests.cs",
+      "sha256": "47dee60f487eb91a80427e10d43d07ed1284636b1ba4381321ef06c1d3ee1c70"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillListAdapterTests.cs",
+      "sha256": "bd1b9e909c82235d728fb6261982c954c224a414a47132c590c759c112511f00"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillListCacheTests.cs",
+      "sha256": "7a2d30995fc934c9c7ac9ab9fd43d83b40c580974b27526889d6056fd27e9982"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillPreviewServiceTests.cs",
+      "sha256": "b2e85310b6b97431bb87a14f1877b178779a16aed1594e9cef0889359693465c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillSearchServiceTests.cs",
+      "sha256": "0f498c221afafb1dc3cf11ec864fe7338635fcbd2d0a1de530fbc2b80b76baeb"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillUpdateServiceTests.cs",
+      "sha256": "1da1a86dbfc327ccac68ad21131ec46eda5708f1f38ffcb7961ea9e7dd974558"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhUpdateOutcomeContractTests.cs",
+      "sha256": "c4a7befc3cf99787e48dba1982784c3a3f7bcae8e7fd1e453adf97ac53f3e31a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/CleanupClassifierTests.cs",
+      "sha256": "9f8a30ed117d65b877852e0f0a4398717fb593ff68e5271db1803a7122e32480"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/DiscoveryTests.cs",
+      "sha256": "4028ac3830cdcd6655a18d87c3bdab590f3f358d3a4a5cdb68b5eab449c417fe"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/FrontMatterParserTests.cs",
+      "sha256": "36b64a6f68282bdd8cb338f72453ebb1095c3f596fad38e944c30c2c7a7acf39"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/IgnoreMarkerTests.cs",
+      "sha256": "9decbb7bc65a0845b90b8bebacd58e306e20ca70a6c3e4d4eed8b3379e083d08"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/InventoryFilterTests.cs",
+      "sha256": "ec63e2ba027fceb3f5533d458414225aa6f05f98bad6d172e55fb59bdfb2e64d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/InventoryProviderOutcomeTests.cs",
+      "sha256": "72fa21188642abfd16d68bec70910ac5dfa705669d95588f34f02f4e2237b542"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/LocalInventoryServiceMergeTests.cs",
+      "sha256": "ad60141ec1a780fe33bcb8e8f5cec90a5593a64185b9ab004059ebdf21131d9a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/LocalSkillScannerTests.cs",
+      "sha256": "2009b08647e10fa84df2cdbe7628f394854304b8e739cb85fdb93948cb9b5514"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/MaintenanceInventoryRegressionTests.cs",
+      "sha256": "66a2084c7b86179a10e26306f2ba6d6ba53914e2d62ce927b35b38dec5d67151"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/ManagedDiscoveryInventoryTests.cs",
+      "sha256": "814d18c1f08eff6bba391039689c0c7202255c879fb256b95c3fdc5331f77cf1"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/MetadataAcceptanceTests.cs",
+      "sha256": "c13818b9ddf4b7dbca11b1d287d99c4f26b76cfb811104d76c0353268bc097b9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/PathIdentityTests.cs",
+      "sha256": "a405c2fe73f568bdea9ac41f37dcf9dca783c9b197a8186f4199443e298f7b50"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveServiceTests.cs",
+      "sha256": "344b814e45acff5cfc5b76767398fa558822c8b3e5faa7ade808740b95b3cd6a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveTargetResolverTests.cs",
+      "sha256": "ce9cca53a89baf9b6bd752ff6674067296eb86337e1046143a41ab065c625866"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveValidatorTests.cs",
+      "sha256": "706b5ee079335a4dc49a2c63b798f4c6f00a47979f2463afdc0926b8cdc0b73d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/ScanRootResolverTests.cs",
+      "sha256": "e5f44dd61c2b2271cad95918139f38919e868710a63f12cabe82b621bad6278b"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/SkillLockFileReaderTests.cs",
+      "sha256": "7447dfc6850358cb835dc521bff571e9b85277bf3ff8a90ee476b7c398457541"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/UnixSecureRemovalBackendTests.cs",
+      "sha256": "cdd3f255a17208b86eedc4392f5153a4d0814863e1115bd09084ce96b6b6cc75"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/WindowsSecureRemovalBackendTests.cs",
+      "sha256": "7d8466be06ce5cd64bfbe737b524beb06feac310bbaa489185e370eedb96386f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/FileLogSinkTests.cs",
+      "sha256": "02ebae99116353630116f0808fb907cefc4fc5b80551746d44c746b305c50a32"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/LogPathsTests.cs",
+      "sha256": "9380910f8fc8470214f80c1feb1fc2998a7a63571831d5749e984bf80524b682"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/LoggerTests.cs",
+      "sha256": "d68be410b2bd755f89d69be68e7a8d508b81eed598cea5751518b828767736b4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/RedactorTests.cs",
+      "sha256": "d3f3931c5fbcc6ef857d01174bc4e21de36a3455dba700ad56d762b806f86c43"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhInstallOwnershipTests.cs",
+      "sha256": "8de7a14b9a03bf4782479915de41211bda268d509a0b3730063db14a91da0c25"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhPresentationComparisonTests.cs",
+      "sha256": "f7c3a62b10684e555233d3477ce796321fe89e0e10f5510410b2989b26ecc2cc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRecordedTreeStagerTests.cs",
+      "sha256": "53aa00a9119678291131bd3be3425ee1ee438b4f180507537b472aecfd16a60f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRegistryEditorTests.cs",
+      "sha256": "f5a4073c93898694bfcdb1ab123334a9abfe47047c9aa1b670db4bdf20e58fab"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRegistryWriteSessionTests.cs",
+      "sha256": "ea1c0ed1d92782475ed5bd957b8c39f2348e52441be7cac812782070fc3a5f70"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRevisionResolverTests.cs",
+      "sha256": "a05afa423e9e0398b173d7d193994bdacea8a2b717784260ec24728a8429d51c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhSharedLockGuardTests.cs",
+      "sha256": "df8fd263d48052e9ad2834d5c820d5265804ac6764204c6052f42e61d019bfbf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/MaintenanceBackupHistoryTests.cs",
+      "sha256": "1e9c6978f0719a3aa34c02a7b06927232ebd25955eb7fe2dd099d83ea1587fc6"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/MaintenanceBackupStoreTests.cs",
+      "sha256": "90746e59e4c541f37afcbdf945a2a6b42de4adad38b35e5c1c5ad74c5a4d3c7c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeRegistryFileLeaseTests.cs",
+      "sha256": "26abe3b720ab663423f9658791db89ec08cb11a6c3b475391de54a36f79d4cef"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeStagingTests.cs",
+      "sha256": "c0c952be5ad1c664b5956d6b112dbee03e82580692cb43ef515f9cf1278fa6f0"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeStateWriterLockTests.cs",
+      "sha256": "55e0a8dc6042e5cefa4e449b95a976bb80b395f108edf9428907f5ea363a8ce4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/PayloadSnapshotTests.cs",
+      "sha256": "3064569ade05d206de13b7b7c33de76aee621ed5a022cff86077003aa9a7acb8"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/QuarantineStoreTests.cs",
+      "sha256": "0a6ed27d0e1d65c75078bd021ef5eb83fdeb6be6d1df6697a50f55bf299f2c3a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/RecordedTrackingWriterTests.cs",
+      "sha256": "3245056802210ba9ed9fc4eb6524e473b7ec54e8b9b6c7b11e78dc11b4b792d3"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/ReplacementPlanStoreTests.cs",
+      "sha256": "80a825c9e7c67461d9545eb20d2e1d337b472a45d61223ea2a3dd9b91239f413"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/ReplacementRevisionTests.cs",
+      "sha256": "a87b55b96d4c24775b2eada606340568a0f13110bd9af5fce3c5692d91c4f605"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SharedReplacementRevisionTests.Legacy.cs",
+      "sha256": "3fe0d77b4c99a6a8910d572a952f48b150775de39aab25f682be04b3d820f169"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SharedReplacementRevisionTests.cs",
+      "sha256": "e76b9916ca4ea88989ae7337b83d52814df3c12c0e963ee8b03517cada02670c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SkillComparisonTests.cs",
+      "sha256": "9a87ecbd97d49b93dba1037e80f3decea03ed3bb4bee01f6515f87ddf19e0087"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/StagingEnvironmentTests.cs",
+      "sha256": "359681995d9bf51835e8d667effdd3f7d22b7c0fff3a855b7cd1c2711534a4dc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/UnixDescriptorInheritanceTests.cs",
+      "sha256": "c1b058f1175aa1664dd8c61d9de6ae2c9b9dda83c4347099aec07b5ee3d71b49"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/UpdateResultAccumulatorTests.cs",
+      "sha256": "70c0614813413b0194e09685c2d1148cb6592dcb1092b10f5849d3ea3c94a6c9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/WindowsPayloadSnapshotTests.cs",
+      "sha256": "b0316fdc00234f52f4fcf8bae20bf437c0664c756435b2ad23899cd1137f3b91"
+    },
+    {
+      "path": "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "sha256": "cfa52662c128359af6f73e6340fdf589316904ecad05855669fba2bedaf20ae5"
+    },
+    {
+      "path": "tests/SkillView.Tests/Subprocess/ProcessRunnerTests.cs",
+      "sha256": "8bc86b5323deb3569402231109f6e25228617d3161987160fa1faf85a8f22084"
+    },
+    {
+      "path": "tests/SkillView.Tests/Threading/CancellationSourceResourceTests.cs",
+      "sha256": "2397ab65278d10c96d304230bf3df29b8687b6dd9612904922d416f82fa5a674"
+    },
+    {
+      "path": "tests/SkillView.Tests/Threading/CancellationSourceTests.cs",
+      "sha256": "3d648db40aeb4ebd947f47d3d9fd90794d6908c53f434a3e63319ccabc314d13"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/AgentCheckboxGridTests.cs",
+      "sha256": "3c0b3d8d28886bfb852b6000c070f25009da2c629584fdde5c713a019f4afba0"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/BackgroundTaskTrackerTests.cs",
+      "sha256": "3ea0580f3d61405c1c1f8deba2669ab54c4f11982493537ed0a30efa0d6fa35e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/CancellationOperationSlotTests.cs",
+      "sha256": "e39f14e05eca82a8bea2ced669e86a0b2a3ebe04478304bd6767e4f5b90bdc5e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ChangesQueueBuilderTests.cs",
+      "sha256": "d003d98198dd34d5b04ddc2cef1d863a492c496e9da096a04ba4b9884a7bfe13"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ChangesTabViewTests.cs",
+      "sha256": "d0cfa56a76c41f91b99b0b9be049b9c835465f2f3524e15447a0d8dc60a0a983"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/CleanupScreenTests.cs",
+      "sha256": "3c8c38d81532d6cd9e1a8a160dfcaeb6d7f144fce18bb30ec5cb617bb0896022"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ContextBarViewTests.cs",
+      "sha256": "36f0cfd78ac2199bc9945e8d6c678246abfc93b6f9c952db5f579cd295c08737"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DiscoverFiltersDialogTests.cs",
+      "sha256": "ee5006c5b47bc270467da5768d2e3f51450598e16272ae18baf728a2a3c21a5e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DiscoverTabViewTests.cs",
+      "sha256": "2bc53adaf8c6365303f521b8b56ed3c36363edd65eba9001898e593140d35957"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DoctorScreenTests.cs",
+      "sha256": "68d2d6cf34339376dec9b68fc7f3f9309e0842b0dae97dfb3020b0fb23d3d1a6"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/HelpOverlayTests.cs",
+      "sha256": "2838bbcb099893ec38eb16c2ead366c796d13fdf31b62a832de3a7a518340a42"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallAgentCatalogTests.cs",
+      "sha256": "c3adb06e12c29010c8a53e13da9e44e9163a58bb8c98845abe0cacdd85a1b373"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallConfirmModalTests.cs",
+      "sha256": "e1d57916af5454b2351e52076ddb82f7a6ffcd0e1f26b3cc1f395a68f27457fc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallScreenTests.cs",
+      "sha256": "4a7ba7a57abfe06c4253ac51769fe1e88333721219c8a79568efcba1bb1bae41"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledInventoryFormatterTests.cs",
+      "sha256": "c3f7ebf4b94afc8fa6af7efa17f967ac3c4734f309512bc9c72fbdcd2390e3fe"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledNavigationTests.cs",
+      "sha256": "b2ab5e22e530217c9af638ede1e3384c6fb014997e46311c68faf7309c3a8906"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledScreenTests.cs",
+      "sha256": "f821b3527146a0664164b34f1edaebb7e97e919f2ad1722268ee0888bec6b11c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledTabViewTests.cs",
+      "sha256": "de54282652b66c72d84313bd4c4fc03aa5cf713a6621dc7015ee3a79203093a9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/LatestRequestGateTests.cs",
+      "sha256": "d5d7ae54fb0d78a3611a4bef034ae229f9da6f733ca08dc2422e36755de17656"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs",
+      "sha256": "d879042f8bdb3c763671f3f471cb2f3a259e2363426777d3a95bf515837fadad"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/PtyStartupTests.cs",
+      "sha256": "7d5241b38188ede6d2ce886f1686192e6dfcd8ae7f94c0752e2688db1ed94172"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemovalReportStateTests.cs",
+      "sha256": "ea278c3d09685803ecdeb5679f8b24931a7f004a36966b6490eaba51f856bce1"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveConfirmModalTests.cs",
+      "sha256": "3850a3b10be006b3d8088f2918c031d10c5faccbbcf28a9759229473c3c7657f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveScreenTests.cs",
+      "sha256": "fa21e0850728943507862a18f16c9b0e588faabbfb38f71474978fe48d1bf689"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveWizardContentTests.cs",
+      "sha256": "efd7c15710d30a6de96b2d8bceb5c9dd0de132bbc463ed79f6dac56844b37767"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ResourceStressTests.cs",
+      "sha256": "8fc3ca16e79e1b127bcc08a95e3f30f3c32926760986e09f55dec748a17ac6c9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ReviewedUpdatesTabTests.cs",
+      "sha256": "3712676f4215aee21dedefcd3c36a279040bb26c9fb49311ce6a74f3c4acefbf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchAgentMetadataCacheTests.cs",
+      "sha256": "23220554b4819d3d76de20af227342a8caee5fe41cf7ea4074b1a75865a0c13d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchAgentMetadataLoaderTests.cs",
+      "sha256": "3d3378e3a98761db8887b15aefda132af9309714913343132c75dd9c1f7ed500"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchSortAndPinFilterTests.cs",
+      "sha256": "715f63212cc7443b593dd3bc5b357851dcbaa264d99aeb0aa06c422e431db811"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SharedAsyncOperationTests.cs",
+      "sha256": "1b5d371c67650e4b4d656b74a9bf6ac7f1717bbeb7a77ceb239a088337719d78"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillHealthFormatterTests.cs",
+      "sha256": "6f2aad798f029f7df66c9d85f3bbf9f202d0fa83fe232da96e93627434358ab9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewAppTests.cs",
+      "sha256": "68dc39195ce1db5157c5ee95102d5f6dcbd6210a5f3d09269d7286939434535c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewFailureTests.cs",
+      "sha256": "6bf19a1ae74bb03d8a6be0ab9466148c1813715896b7e161e68b9793bd760b29"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewWorkflowCoordinatorTests.cs",
+      "sha256": "e81b9597dc55a8c68b5432a59ddacbb4ad4c7b5adf8e47daa28c4e46aeaf8454"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/StatusStripViewTests.cs",
+      "sha256": "2fe4cfcfe1dbd73a9d7cc3e8c3af79eecb6760f0173323a32a83d3e98111abeb"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TerminalEscapeSanitizerTests.cs",
+      "sha256": "ead9caf44ac873fecf7450be12829b5868387b9d46e9b58cac75d0c1a3ab5e4a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TerminalSizeGuardViewTests.cs",
+      "sha256": "f36dd99c9ac4de70d8365f6102d61871ebffe161f84549f2d03ba48a3af8ff84"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TestCollections.cs",
+      "sha256": "608b246fb25c2c37496d461fbede974f26d6b35b6c7629d1e8fb4478963b7e63"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TuiHelpersTests.cs",
+      "sha256": "96fe7b942c10b7f87de9e0b0b575d4913b038ee9386780fba2fc86733108971a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/UpdateScreenTests.cs",
+      "sha256": "fc4fd6536a52cefa5d9506008bf72ea11442592eb2b1290477b00025673fa3a2"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/UpdatesTabViewTests.cs",
+      "sha256": "936be1dfa358d506db031cd29272506ab186d4105cd9b98960bd20fe55430f53"
+    },
+    {
+      "path": "tests/SkillView.Tests/packages.lock.json",
+      "sha256": "016e1b0776dd5dd827218c57a9a2383d645e611a91974794999e53e31ac84b4c"
+    }
+  ],
+  "corrections": [
+    "Permit verified-ABI opened-object read-only canonicalization independently of Linux openat2; destructive capability remains disabled.",
+    "Unreadable manifest paths retain partial topology without inventing plugins.",
+    "Unknown read-only ownership comparisons report bounded partial diagnostics; cleanup skips unknown paths; mutation predicates remain strict.",
+    "Moved-branch contract installs outside private agent HOME/config."
+  ],
+  "verification": {
+    "build": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "inventorySuite": {
+      "passed": 319,
+      "failed": 0,
+      "skipped": 0
+    },
+    "actualGhContracts": [
+      {
+        "gh": "2.97.0",
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "gh": "2.102.0",
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "formatVerified": true,
+    "logs": [
+      {
+        "name": "skillview-managed-discovery-portability-build.log",
+        "sha256": "88697b17b1a82123347e3e482a3a5a92b9609d2e3f5d8d4e5d84c87ae7fd8b1e"
+      },
+      {
+        "name": "skillview-managed-discovery-portability-inventory-tests.log",
+        "sha256": "ce7ae7609e43b9c4046a52f2506b5290d9fdf224fda120e25f38ae7fe87f1979"
+      },
+      {
+        "name": "skillview-managed-discovery-portability-minimum-contracts.log",
+        "sha256": "77d33ec1572a926c8d3d6e1ae6f8792222a2e4337b6bcfa9b79d57c88a61733c"
+      },
+      {
+        "name": "skillview-managed-discovery-portability-current-contracts.log",
+        "sha256": "896e551e80ac11d56ca2cd5524a7fd237b525393bf8722fb1a87ffb6549c19c3"
+      },
+      {
+        "name": "skillview-managed-discovery-portability-format-verify.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "skillview-managed-discovery-denied-final-managed-host-proof.log",
+        "sha256": "096e383f096ca48455e23309d019f64c91b583957b9ff7596d7da348553a6923"
+      }
+    ],
+    "managedHostDeniedRootProof": {
+      "name": "managed-discovery-denied-final-managed-host-proof.json",
+      "sha256": "3bd838ef84589964a21668fb4ed875d1c2a44456bcb0bf0d8361484d285020b0",
+      "results": [
+        {
+          "nativeHost": "/Users/kharder/.codex/worktrees/skill-maintenance/gh-skillview/src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview",
+          "nativeSha256": "64fd3a39539e20b85a6a71b548aededd6ce7f26c659d9f2ace4fe79c6061cbd8",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "actualPosixPermissionDenialObserved": true,
+          "readableControlRetained": true,
+          "partialAndInaccessibleDiagnostics": true,
+          "absenceCleanupSuppressed": true,
+          "installedObjectsBytesAndModesUnchanged": true,
+          "captures": {
+            "list": {
+              "capturedAt": "2026-10-15T18:13:06.9254500+00:00",
+              "usedGhSkillList": true,
+              "schemaVersion": 3,
+              "partial": true,
+              "inaccessiblePaths": [
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied"
+              ],
+              "providers": [
+                {
+                  "provider": "gh-default",
+                  "succeeded": true,
+                  "error": null,
+                  "coveredRoots": []
+                },
+                {
+                  "provider": "lockfiles",
+                  "succeeded": true,
+                  "error": null,
+                  "coveredRoots": [
+                    "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable",
+                    "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied"
+                  ]
+                },
+                {
+                  "provider": "gh",
+                  "succeeded": true,
+                  "error": null,
+                  "coveredRoots": [
+                    "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable"
+                  ]
+                },
+                {
+                  "provider": "gh",
+                  "succeeded": false,
+                  "error": "gh list exited 1: could not scan directory: could not read skills directory: open /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied: permission denied",
+                  "coveredRoots": [
+                    "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied"
+                  ]
+                },
+                {
+                  "provider": "managed",
+                  "succeeded": false,
+                  "error": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json' is denied.; /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json' is denied.; /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json' is denied.; /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md' is denied.; /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied' is denied.",
+                  "coveredRoots": []
+                }
+              ],
+              "discoveryLocations": [
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied",
+                  "state": "unsupported",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied' is denied."
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied",
+                  "state": "inaccessible",
+                  "reason": "Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied' is denied."
+                }
+              ],
+              "ownerRecords": [],
+              "managedRegions": [
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/skills/.system",
+                  "canonicalBoundaryPath": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/skills/.system",
+                  "provider": "codex-builtin",
+                  "agent": "codex",
+                  "kind": "bundled skills",
+                  "plugin": null,
+                  "distributorVersion": null,
+                  "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/skills",
+                  "registrationScope": null,
+                  "registrationPath": null,
+                  "readOnly": true,
+                  "activeSessionState": "unknown"
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/plugins",
+                  "canonicalBoundaryPath": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/plugins",
+                  "provider": "codex-plugin",
+                  "agent": "codex",
+                  "kind": "plugin storage",
+                  "plugin": null,
+                  "distributorVersion": null,
+                  "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.codex/plugins",
+                  "registrationScope": null,
+                  "registrationPath": null,
+                  "readOnly": true,
+                  "activeSessionState": "unknown"
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.claude/plugins",
+                  "canonicalBoundaryPath": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.claude/plugins",
+                  "provider": "claude-plugin",
+                  "agent": "claude",
+                  "kind": "plugin storage",
+                  "plugin": null,
+                  "distributorVersion": null,
+                  "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/home/.claude/plugins",
+                  "registrationScope": null,
+                  "registrationPath": null,
+                  "readOnly": true,
+                  "activeSessionState": "unknown"
+                },
+                {
+                  "path": "/etc/codex/skills",
+                  "canonicalBoundaryPath": "/private/etc/codex/skills",
+                  "provider": "codex-admin",
+                  "agent": "codex",
+                  "kind": "administrator skills",
+                  "plugin": null,
+                  "distributorVersion": null,
+                  "context": "/etc/codex",
+                  "registrationScope": null,
+                  "registrationPath": null,
+                  "readOnly": true,
+                  "activeSessionState": "unknown"
+                }
+              ],
+              "scannedRoots": [
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable",
+                  "scope": "Custom",
+                  "agentHint": null,
+                  "profile": null,
+                  "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh"
+                },
+                {
+                  "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied",
+                  "scope": "Custom",
+                  "agentHint": null,
+                  "profile": null,
+                  "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh"
+                }
+              ],
+              "skills": [
+                {
+                  "name": "visible",
+                  "installationId": "321bea1fa847d050683ebf8f6c5fe1eead06df49d37124fed98755f59deba704",
+                  "resolvedPath": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable/visible",
+                  "scanRoot": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable",
+                  "scope": "Custom",
+                  "provenance": "Both",
+                  "validity": "Valid",
+                  "pinned": false,
+                  "isSymlinked": false,
+                  "ignored": false,
+                  "githubTreeSha": null,
+                  "version": null,
+                  "description": "Private permission fixture",
+                  "source": null,
+                  "repositoryRef": null,
+                  "sourcePath": null,
+                  "pinnedRef": null,
+                  "localSourcePath": null,
+                  "sourceIdentity": {
+                    "id": null,
+                    "provider": "unknown",
+                    "origin": null,
+                    "subpath": null,
+                    "evidence": "unknown",
+                    "conflicted": false
+                  },
+                  "revision": {
+                    "authoredVersion": null,
+                    "repositoryRef": null,
+                    "recordedTree": null,
+                    "pinnedRef": null,
+                    "payloadFingerprint": null,
+                    "ownerRecordedHash": null,
+                    "ownerHashKind": null,
+                    "distributorVersion": null
+                  },
+                  "physicalInstallation": {
+                    "id": "321bea1fa847d050683ebf8f6c5fe1eead06df49d37124fed98755f59deba704",
+                    "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable/visible",
+                    "materialization": "directory",
+                    "nativeIdentityCaptured": false
+                  },
+                  "ownerRecords": [],
+                  "diagnostics": [],
+                  "agents": [
+                    {
+                      "id": "unknown",
+                      "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable/visible",
+                      "isSymlink": false,
+                      "scope": "Custom",
+                      "context": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh",
+                      "discoveryRoot": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/readable",
+                      "profile": null,
+                      "agentVersion": null,
+                      "enabled": null,
+                      "loadingRule": "filesystem-placement; effective loading unknown",
+                      "activeSessionState": "unknown"
+                    }
+                  ]
+                }
+              ]
+            },
+            "cleanup": {
+              "apply": false,
+              "partial": true,
+              "inaccessiblePaths": [
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.codex-plugin/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/.claude-plugin/plugin.json' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied/SKILL.md' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied: Access to the path '/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied' is denied.",
+                "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-denied-inventory-fsro01dh/denied"
+              ],
+              "candidates": 0,
+              "entries": []
+            }
+          }
+        }
+      ]
+    },
+    "previousHeadPlatformResults": {
+      "head": "52e625280b73327e044ae824ec82f9c528ca698f",
+      "run": 38782253516,
+      "jobs": [
+        {
+          "lane": "linux",
+          "job": 116585185214,
+          "passed": 1467,
+          "failed": 0,
+          "skipped": 0,
+          "logSha256": "0a0a52826ca7723314bf8dd37877844092b75657611ce071437b92b0f2a1c6b2"
+        },
+        {
+          "lane": "macos",
+          "job": 116585185483,
+          "passed": 1467,
+          "failed": 0,
+          "skipped": 0,
+          "logSha256": "59266f027b0eb086adf0f225657e9f7cf93942cff6e327f2e55a7439a22a2e05"
+        },
+        {
+          "lane": "windows",
+          "job": 116585185115,
+          "passed": 1467,
+          "failed": 0,
+          "skipped": 0,
+          "logSha256": "489b2b7f5d409a7d1731fa3ccd8befc4c79c79714a6f7088520d0293abfd82b0"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "reviews": [
+    {
+      "reviewer": "replacement_design_review",
+      "result": "clear after partial-observation and cleanup findings were fixed and re-reviewed"
+    },
+    {
+      "reviewer": "object_evidence_review",
+      "result": "canonicalization, seccomp proof and contract isolation clear"
+    }
+  ],
+  "remaining": "Final full suite and both native hosts, exact-head platform/contract/native checks, independent artifact inspection and merge. M10 remains incomplete."
+}

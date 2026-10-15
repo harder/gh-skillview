@@ -25,7 +25,7 @@ internal static class InstallAgentCatalog
         }
     }
 
-    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.101.0).
+    // Mirrors `gh skill install --help`'s full `--agent` list (gh 2.102.0).
     // Update this array when new agents are added to the gh skill ecosystem —
     // re-diff against `gh skill install --help` when bumping the gh minimum.
     internal static readonly ImmutableArray<Entry> Entries =
