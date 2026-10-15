@@ -84,6 +84,12 @@ public sealed class GhSkillListAdapter
             _logger.Warn("gh.skill.list", error);
             return new GhSkillListCache.LoadResult([], ShouldCache: false, Error: error);
         }
+        if (result.StdOutTruncated)
+        {
+            const string error = "gh list output was truncated; inventory coverage is incomplete.";
+            _logger.Warn("gh.skill.list", error);
+            return new GhSkillListCache.LoadResult([], ShouldCache: false, Error: error);
+        }
         return ParseLoadResult(result.StdOut, _logger);
     }
 

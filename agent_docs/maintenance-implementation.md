@@ -771,3 +771,47 @@ the proof. Every unchanged comparison now re-enumerates payload descendants;
 positive results require a nonempty 64-hex installation ID. Both hosts pass
 the refreshed minimum/current gh matrix, and separate re-review clears the
 assertions. Product C# and its already verified 1,344-test baseline are unchanged.
+
+## Batch 7 final merge and M02 acceptance
+
+PR #54 merged as `8029b4f86e85445433d3b142dab3ca65150825c1` from reviewed head `9ac90f3da3cc8e461e07c0e69e618f7e38468dff`;
+the trees match. CI run 38708923310 passes all 1,344 tests on each of Linux,
+macOS and Windows, all four native targets and workflow/site/dependency checks.
+CodeQL run 38708923210 passes. All 64 proof JSONs were downloaded and inspected,
+including 88 filter cases and the existing recovery/process-death matrix.
+`evidence/maintenance-batch-7-final.json` preserves their full results.
+
+Independent review mapped every original M02 criterion to the current tests and
+actual native proofs. M02 is complete alongside M05 and M06; the remaining
+18 original items retain their acceptance requirements.
+
+## Batch 8: full-capture inventory outcomes
+
+Ten new CaptureAsync cases exercise credential/network process errors, malformed
+and incompatible JSON, explicit truncation, valid empty inventory, successful
+default discovery with failed custom-root coverage, denied enumeration and a
+missing required custom root. They assert retained filesystem rows, provider and
+JSON diagnostics, retry versus cache admission, explicit root coverage and no
+absence-based cleanup. Valid empty coverage yields only review-only Untracked.
+
+The baseline passes nine cases and fails only explicit stdout truncation: an
+exit-zero process result with valid retained JSON and StdOutTruncated was accepted.
+The adapter now refuses that result before parsing, leaving it retryable. The
+current real runner already appends a non-JSON truncation marker; this closes
+the explicit adapter completeness contract, not an observed runner bypass.
+Separate review passes 49 affected tests, including all ten new cases.
+
+The new native POSIX proof uses actual denied directory permissions and a
+readable control in private HOME/CWD, checks list/cleanup partial diagnostics,
+restores mode in finally and verifies fresh object/byte/mode manifests. CI runs
+both hosts on Linux/macOS; the deterministic enumeration-error test runs on all
+three test platforms. Final full-suite/native/platform proof and merge remain
+required before closing original M04.
+
+The local full suite passes all 1,354 tests (zero failed/skipped), build has zero
+warnings/errors and style verification passes. Formatter changes only line
+breaks in the new test source; that final source was rebuilt and all ten cases
+rerun. Both native macOS hosts publish and pass actual denied-root proofs under
+gh 2.97.0 and 2.102.0. `evidence/maintenance-batch-8-provider-checkpoint.json`
+preserves exact source/log/binary/proof attribution. Final committed-head
+platform proof and merge remain the M04 acceptance gate.

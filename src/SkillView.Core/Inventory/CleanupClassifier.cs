@@ -153,7 +153,8 @@ public static class CleanupClassifier
                 continue;
             }
 
-            // Source-orphaned: CLI knows nothing about it but filesystem has it.
+            // Tracking absence is only an untracked review observation, never
+            // evidence that the payload is unused or its upstream was deleted.
             if (WasCovered(snapshot, skill) && skill.Provenance == Provenance.FsScan)
             {
                 result.Add(new Candidate(

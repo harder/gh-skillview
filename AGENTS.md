@@ -437,6 +437,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   entries; observer callbacks must never write to any `Logger`. Rejecting all
   callback-originated logging before ring mutation prevents both same-thread
   recursion and cross-thread, cross-logger lock cycles (A → B and B → A).
+- Explicit `StdOutTruncated` inventory captures cannot establish coverage or
+  enter the cache, even when their retained text parses as JSON. Keep full-capture
+  failure/empty/root-coverage tests and the native POSIX denied-root proof.
 - A successful `gh skill list` process result is cacheable only when its JSON
   parses as the expected inventory schema. Preserve the distinction between a
   valid empty `[]` payload and malformed, truncated, or schema-incompatible
