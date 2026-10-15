@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Inventory;
+using SkillView.Inventory.Models;
 using SkillView.Maintenance;
 using SkillView.Ui;
 
@@ -46,6 +47,7 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
+        OperationImpact? frozenImpact = null;
         try
         {
             if (path is not null) path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory);
@@ -53,7 +55,8 @@ public static partial class CliDispatcher
             var inventory = await services.InventoryService.CaptureAsync(gh,
                 new LocalInventoryService.Options(options.ScanRoots, allowHidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
-            var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger, runner: services.Runner);
+            var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger,
+                runner: services.Runner, subjectObserved: impact => frozenImpact = impact);
             ReplacementResult result;
             if (command == "restore-plan")
             {
@@ -62,6 +65,7 @@ public static partial class CliDispatcher
                     : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
                 if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
                 var target = selected[0];
+                frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
                 if (latest)
                 {
                     var preparation = await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false);
@@ -72,9 +76,11 @@ public static partial class CliDispatcher
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                             w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
                             w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
+                            WriteImpact(w, frozenImpact);
                             w.WriteEndObject();
                         });
                         else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"));
+                        if (!json) WriteImpactText(frozenImpact);
                         return current.CleanupWarning is null ? ExitCodes.Success : ExitCodes.UserError;
                     }
                     result = preparation.Plan!;
@@ -100,18 +106,23 @@ public static partial class CliDispatcher
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
+                WriteImpact(w, result.Impact is { } impact ? impact with { Operation = requestedCommand } : frozenImpact);
                 w.WriteEndObject();
             });
             else Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
                 + string.Join("\n", result.ChangedPaths.Select(change => "Changed: " + change)) + "\n" + result.Message));
+            if (!json) WriteImpactText(result.Impact ?? frozenImpact);
             return result.Canceled ? ExitCodes.Cancelled : result.Succeeded ? ExitCodes.Success : ExitCodes.UserError;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException
+            || ex is OperationCanceledException && token.IsCancellationRequested)
         {
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message);
+                w.WriteBoolean("canceled", ex is OperationCanceledException);
+                WriteImpact(w, frozenImpact is { } impact ? impact with { Operation = requestedCommand } : null);
                 if (ex is GhSourceRequestException source)
                 { w.WriteString("stdout", source.StdOut); w.WriteString("stderr", source.StdErr); }
                 w.WriteEndObject();
@@ -125,7 +136,8 @@ public static partial class CliDispatcher
                     if (!string.IsNullOrWhiteSpace(source.StdErr)) Console.Error.WriteLine(TerminalEscapeSanitizer.Sanitize(source.StdErr));
                 }
             }
-            return ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
+            if (!json) WriteImpactText(frozenImpact);
+            return ex is OperationCanceledException ? ExitCodes.Cancelled : ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
         }
     }
 }

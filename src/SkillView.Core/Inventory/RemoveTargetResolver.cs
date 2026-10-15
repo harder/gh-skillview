@@ -109,6 +109,14 @@ internal static class RemoveTargetResolver
             cancellationToken.ThrowIfCancellationRequested();
             var validation = RemoveValidator.ValidateSymlink(link.Path, snapshot.ProtectedRoots.ToArray(), cancellationToken: cancellationToken,
                 ownershipRunner: skill.OwnershipRunner);
+            validation = validation with
+            {
+                Impact = OperationImpact.Link(OperationSubject.From(skill), link) with
+                {
+                    ExecutionEvidence = validation.ExecutionLinkIdentity is { } observed
+                        ? NativeObjectObservation.From(observed.LinkIdentity, DateTimeOffset.UtcNow, "link-removal-validation-evidence") : null
+                }
+            };
             if (skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty)
                 validation = validation with
                 {
@@ -157,15 +165,16 @@ internal static class RemoveTargetResolver
         {
             return null;
         }
+        var identities = selected.AllOwnershipClaims.Select(SkillDistributorIdentity.From).Select(identity => identity.Id)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        if (identities.Length != 1) return null;
+        var packageIdentity = identities[0];
 
         var matches = snapshot.Skills
             .Where(skill =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return string.Equals(
-                    skill.Package?.Source,
-                    package.Source,
-                    StringComparison.OrdinalIgnoreCase);
+                return skill.AllOwnershipClaims.Any(owner => SkillDistributorIdentity.From(owner).Id == packageIdentity);
             })
             .DistinctBy(skill =>
             {
@@ -180,7 +189,7 @@ internal static class RemoveTargetResolver
                 $"Remove package: {package.Source}",
                 $"Delete all {matches.Length} skills installed from the same package.",
                 matches,
-                GroupKey: package.Source)
+                GroupKey: packageIdentity)
             : null;
     }
 

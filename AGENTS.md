@@ -545,6 +545,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
   remote content and is separate from Terminal.Gui's pasted-input sanitization.
 - Payload equality and native object continuity are separate evidence.
+  InstallationId remains an address identifier, including across native object
+  replacement at the same path. Inventory captures `OperationSubject` off the
+  UI thread; render `OperationImpact` from that frozen evidence through refusal,
+  failure and cancellation. Link-only impact includes every context of the
+  canonical link entry. Do not infer a commit from a tree or authored version.
+  Transient identity projections must stay out of saved subject/owner JSON and
+  its hashes; verify actual old-native restart compatibility when changing this
+  area. See `agent_docs/maintenance-identities.md`.
   `PayloadSnapshot.ObjectStateFingerprint` retains full native IDs/generations
   for the root and every observed leaf/directory, plus observed Unix modes.
   Backup capture rechecks both raw bytes and this evidence before publishing a

@@ -88,6 +88,8 @@ public static class InstalledScreen
         sb.AppendLine("## Summary");
         sb.AppendLine();
         AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
+        if (s.ObservedSubject is { } subject)
+            OperationImpactFormatter.Append(sb, OperationImpact.Payload(subject, "inspect"));
         AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeLocation(s)));
         AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeProvenance(s)));
         AppendDetailItem(sb, "Health", MarkdownTableFormatter.FormatTableCell(

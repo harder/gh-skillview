@@ -530,7 +530,8 @@ public sealed class RemoveScreen
             {
                 LastReport = RemovalReportState.Accumulate(
                     LastReport,
-                    RemovalReportState.Canceled(lastProgress));
+                    RemovalReportState.Canceled(lastProgress) with
+                    { Impacts = evaluation.Items.Select(item => item.Validation.Impact).OfType<SkillView.Inventory.Models.OperationImpact>().ToImmutableArray() });
                 _logger.Debug("remove", "removal canceled");
                 operation.InvokeTerminalIfActive(() =>
                 {
@@ -545,7 +546,8 @@ public sealed class RemoveScreen
                 _logger.Error("remove", ex.Message);
                 LastReport = RemovalReportState.Accumulate(
                     LastReport,
-                    RemovalReportState.Failed(lastProgress, ex.Message));
+                    RemovalReportState.Failed(lastProgress, ex.Message) with
+                    { Impacts = evaluation.Items.Select(item => item.Validation.Impact).OfType<SkillView.Inventory.Models.OperationImpact>().ToImmutableArray() });
                 operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;

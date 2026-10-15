@@ -35,6 +35,14 @@ public sealed record SkillSourceIdentity(string Provider, string? Origin, string
         if (skill.FrontMatter.Upstream is { Length: > 0 } remote)
             return new("repository", NormalizeRepository(remote), NormalizeSubpath(skill.FrontMatter.GithubPath),
                 "recorded-tracking", !skill.MetadataConflicts.IsEmpty);
+        var claims = skill.AllOwnershipClaims.ToArray();
+        if (claims.Length > 1)
+        {
+            var sources = claims.Select(claim => From(skill with { Package = claim, OwnershipClaims = [] }))
+                .DistinctBy(source => (source.Provider, source.Origin, source.Subpath, source.Conflicted)).ToArray();
+            return sources.Length == 1 ? sources[0]
+                : new("unknown", null, null, "conflicting-owner-sources", true);
+        }
         if ((skill.Package ?? skill.AllOwnershipClaims.FirstOrDefault()) is { } package)
         {
             if (package.ReadOnly || package.SourceType == "unknown")

@@ -994,3 +994,12 @@ acceptance review are clear. Full final-source hashes/results are retained in
 M01, M02, M04, M05, M06, M07 and M10 are complete; 14 original findings remain.
 The original Installed down-arrow crash was never reproduced; this closure does
 not claim otherwise.
+
+
+Batch 12 in progress: M11 identity and operation subjects follows merged PR #59.
+The reviewed design and current implementation/review checkpoint are in
+`maintenance-identities.md`. Separate source/consumer reviews were addressed and
+re-reviewed clear. Inventory tests passed 344 cases at the earlier checkpoint;
+the debug native App passed 16 disposable command rows across minimum/current
+gh. Final-source full/platform/native/compatibility gates are pending. No original
+finding is marked complete by this checkpoint.

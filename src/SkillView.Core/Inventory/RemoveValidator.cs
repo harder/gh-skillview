@@ -43,6 +43,7 @@ public static class RemoveValidator
     {
         public bool Allowed => Errors.IsDefaultOrEmpty || Errors.Length == 0;
         public bool RequiresSecondConfirm => Warnings.Length > 0;
+        public OperationImpact? Impact { get; init; }
         internal SecureFileIdentity? ExecutionIdentity { get; init; }
         internal SecureLinkIdentity? ExecutionLinkIdentity { get; init; }
         internal bool RequiresEmptyDirectory { get; init; }
@@ -301,6 +302,11 @@ public static class RemoveValidator
             incoming)
         {
             ExecutionIdentity = executionIdentity,
+            Impact = OperationImpact.Payload(OperationSubject.From(target), "remove") with
+            {
+                ExecutionEvidence = executionIdentity is { } observed
+                    ? NativeObjectObservation.From(observed, DateTimeOffset.UtcNow, "removal-validation-evidence") : null
+            },
             OwnershipRunner = ownershipRunner,
             OwnershipPaths = ownershipPaths,
             ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),

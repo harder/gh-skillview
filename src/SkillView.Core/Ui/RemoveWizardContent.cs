@@ -54,6 +54,9 @@ internal static class RemoveWizardContent
             sb.AppendLine($"| {MarkdownTableFormatter.FormatTableCell(skill.Name)} | {MarkdownTableFormatter.FormatCodeSpan(skill.ResolvedPath)} |");
         }
 
+        foreach (var item in evaluation.Items)
+            if (item.Validation.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
+
         if (!evaluation.Errors.IsDefaultOrEmpty)
         {
             sb.AppendLine();
@@ -116,6 +119,8 @@ internal static class RemoveWizardContent
             }
         }
 
+        foreach (var item in evaluation.Items)
+            if (item.Validation.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 

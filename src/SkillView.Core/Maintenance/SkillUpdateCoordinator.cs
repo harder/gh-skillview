@@ -41,6 +41,7 @@ public sealed class SkillUpdateCoordinator(
             if (cancellationToken.IsCancellationRequested) { canceled = true; break; }
             if (!seen.Add(target.InstallationId)) continue;
             var exposures = target.Agents.Select(a => $"{a.AgentId}: {a.Path}").ToImmutableArray();
+            var impact = OperationImpact.Payload(OperationSubject.From(target), options.DryRun ? "update-preview" : "update");
             PayloadSnapshot? before = null;
             PayloadSnapshot? after = null;
             string? message = null;
@@ -234,12 +235,14 @@ public sealed class SkillUpdateCoordinator(
             var changedFiles = before is not null && after is not null
                 ? PayloadSnapshot.Differences(before, after, ignoreInstallerMetadata: false) : [];
             outcomes.Add(new(target.InstallationId, target.ResolvedPath, status, before?.Fingerprint,
-                after?.Fingerprint, changedFiles.Take(128).ToImmutableArray(), changedFiles.Length, exposures, message));
+                after?.Fingerprint, changedFiles.Take(128).ToImmutableArray(), changedFiles.Length, exposures, message)
+            { Impact = impact });
             if (canceled) break;
         }
         foreach (var target in targets.Where(t => !seen.Contains(t.InstallationId)))
             outcomes.Add(new(target.InstallationId, target.ResolvedPath, "not-attempted", null, null, [], 0,
-                target.Agents.Select(a => $"{a.AgentId}: {a.Path}").ToImmutableArray(), "Canceled before this target."));
+                target.Agents.Select(a => $"{a.AgentId}: {a.Path}").ToImmutableArray(), "Canceled before this target.")
+            { Impact = OperationImpact.Payload(OperationSubject.From(target), options.DryRun ? "update-preview" : "update") });
         return new UpdateResult
         {
             DryRun = options.DryRun,

@@ -47,9 +47,7 @@ internal sealed partial class ManagedSkillDiscovery
             {
                 var detailed = group.Where(region => region.PluginId is not null).ToArray();
                 var selected = detailed.Length == 0 ? group.ToArray() : detailed;
-                var registered = selected.Where(region => region.RegistrationPath is not null).ToArray();
-                return (registered.Length == 0 ? selected.Take(1) : registered)
-                    .Select(region => region.Claim(skill));
+                return selected.Distinct().Select(region => region.Claim(skill));
             });
 
         private static bool Observed(ManagedSkillRegion region, string path, ICollection<DiscoveryLocation>? failures)

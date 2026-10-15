@@ -297,6 +297,22 @@ local source and metadata diagnostics are retained. Source identity, physical
 installation, contextual owner records and revision/hash domains have separate
 fields; agent profile/version/enabled state stays unknown when not observed.
 
+Installation IDs identify addresses. Replacing a directory at the same address
+retains that ID; the separately captured native object ID and generation can
+change. Inventory observations do not authorize mutation: execution validates
+the native object again. Distributor IDs describe observed package labels and
+providers; delivery IDs retain version, location and registration context. An
+observed marketplace label is not a verified upstream origin.
+
+Use `remove --path <path>` or `remove --install-id <id>` to select one of several
+same-name copies. `--agent` accepts the same aliases as inventory filters. Update,
+remove and cleanup results include a frozen `impact` with the selected address,
+native evidence, owner claims and structured affected exposures. Link-only removal
+enumerates every known profile/context sharing that link entry while retaining
+the payload and other links. Coverage describes the captured configured roots;
+unscanned contexts and active sessions remain unknown. Refusal and cancellation
+retain the pre-attempt facts. Historical plans report only what they recorded.
+
 Combined filters such as `list --scope user --agent codex` require a matching
 user Codex exposure. A project exposure for another agent cannot supply either
 half of that match. Matching rows still show every consumer of the shared

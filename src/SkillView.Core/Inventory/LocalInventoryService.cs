@@ -170,7 +170,7 @@ public sealed class LocalInventoryService
             Locations = local.Locations.AddRange(managedFailures),
         };
 
-        return new InventorySnapshot
+        var snapshot = new InventorySnapshot
         {
             Skills = merged,
             ScannedRoots = local.Roots,
@@ -185,6 +185,16 @@ public sealed class LocalInventoryService
                 .Concat(managedRecords).ToImmutableArray(),
             OwnershipReadDiagnostics = local.LockDiagnostics,
         };
+        var observed = await Task.Run(() => snapshot.Skills.Select(skill =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return skill with
+            {
+                ObservedSubject = SkillIdentityObserver.Capture(skill, snapshot.CapturedAt,
+                !snapshot.IsPartial && snapshot.ConfiguredRootsComplete, cancellationToken, snapshot.ManagedRegions)
+            };
+        }).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
+        return snapshot with { Skills = observed };
     }
 
     internal static bool MatchesFilters(InstalledSkill skill, Scope? scope, string? agent)

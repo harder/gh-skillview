@@ -159,6 +159,11 @@ jobs:
         run: |
           python agent_docs/evidence/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
           python agent_docs/evidence/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
+      - name: Prove physical installation identities and frozen operation subjects
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-installation-identities.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/identities-app-proof.json
+          python agent_docs/evidence/prove-installation-identities.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/identities-extension-proof.json
       - name: Prove standalone quarantine and undo using native hosts
         shell: bash
         run: |

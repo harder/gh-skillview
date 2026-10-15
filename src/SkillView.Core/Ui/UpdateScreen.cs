@@ -36,7 +36,8 @@ public static class UpdateScreen
                 sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(outcome.Path)} | " +
                     $"{MarkdownTableFormatter.FormatTableCell(outcome.Status)} | " +
                     $"{MarkdownTableFormatter.FormatTableCell(outcome.Message ?? outcome.ChangedFileCount + " changed file(s)")} |");
-                foreach (var exposure in outcome.Exposures)
+                if (outcome.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
+                else foreach (var exposure in outcome.Exposures)
                     sb.AppendLine($"Affected exposure: {MarkdownTableFormatter.FormatCodeSpan(exposure)}  ");
             }
             sb.AppendLine();
@@ -107,7 +108,8 @@ public static class UpdateScreen
                 Field("Owner fingerprints", owner.BeforeFingerprint + " -> " + owner.DesiredFingerprint);
             }
         }
-        foreach (var agent in plan.Subject.Agents) Field("Affected consumer", $"{agent.AgentId}: {agent.Path}");
+        if (plan.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
+        else foreach (var agent in plan.Subject.Agents) Field("Affected consumer", $"{agent.AgentId}: {agent.Path}");
         foreach (var path in plan.ChangedPaths) Field("Changed path", path);
         sb.AppendLine("The original directory, including local edits and extras, is retained for explicit recovery/undo. Agent session state is unknown.");
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";

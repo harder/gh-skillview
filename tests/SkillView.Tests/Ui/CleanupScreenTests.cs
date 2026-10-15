@@ -11,6 +11,30 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
+    public async Task BatchReviewAndCanceledResultRetainAllCapturedContexts()
+    {
+        var skill = Skill("demo", Path.Combine(Path.GetTempPath(), "skillview-cleanup-subject", "demo")) with
+        {
+            Agents = [new("codex", "/fixture/shared", false, Scope.User, Context: "context-one", Profile: "one"),
+            new("claude", "/fixture/shared", false, Scope.Project, Context: "context-two", Profile: "two")]
+        };
+        var impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup");
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "review", skill, true)
+        { Impact = impact };
+        var text = CleanupScreen.BuildRemoveConfirmationText([candidate]);
+        Assert.Contains(impact.Subject.InstallationId, text);
+        Assert.Contains("context-one", text); Assert.Contains("context-two", text);
+        var screen = CreateScreen([candidate], []);
+        var summary = await screen.RemoveSelectedAsync([0], TestContext.Current.CancellationToken);
+        Assert.Same(impact, Assert.Single(summary.Impacts));
+        Assert.Same(impact, Assert.Single(screen.LastReport!.Impacts));
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => screen.RemoveSelectedAsync([0], cancel.Token));
+        Assert.True(screen.LastReport!.IsCanceled);
+        Assert.Same(impact, Assert.Single(screen.LastReport.Impacts));
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_ReviewOnlyCollisionCannotDeleteValidPayload()
     {
         var root = Directory.CreateTempSubdirectory("skillview-review-only-");
@@ -496,7 +520,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void BuildRemoveConfirmationText_ShowsFirstFewPathsOnly()
+    public void BuildRemoveConfirmationText_EnumeratesEverySelectedPath()
     {
         var candidates = Enumerable.Range(0, 5)
             .Select(i => new CleanupClassifier.Candidate(
@@ -511,8 +535,8 @@ public sealed class CleanupScreenTests
         Assert.Contains("/tmp/0", text);
         Assert.Contains("/tmp/1", text);
         Assert.Contains("/tmp/2", text);
-        Assert.DoesNotContain("/tmp/3", text);
-        Assert.Contains("…and 2 more", text);
+        Assert.Contains("/tmp/3", text);
+        Assert.Contains("/tmp/4", text);
     }
 
     private static InstalledSkill Skill(string name, string resolvedPath) => new()

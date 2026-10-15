@@ -21,4 +21,8 @@ internal partial class QuarantineJsonContext : JsonSerializerContext;
 
 internal sealed record QuarantineResult(string Id, string Status, bool Succeeded, bool MutationObserved,
     bool Canceled, string OriginalPath, string RetainedPath, string? ReviewFingerprint,
-    string Message);
+    string Message)
+{
+    [JsonIgnore]
+    internal OperationImpact? Impact { get; init; }
+}

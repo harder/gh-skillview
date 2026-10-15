@@ -1,4 +1,4 @@
-# Next batch after PR59: M11 identity and operation subjects
+# Identity and operation subjects (M11, in progress)
 
 Original acceptance (verbatim): "Represent a shared user install, a pinned project copy,
 a locally edited fork and a plugin-bundled copy of the same display name without
@@ -74,3 +74,34 @@ Focused acceptance:
 Review this design against current source before implementation. Make the batch
 small enough to close M11's original representation/impact criterion; do not add
 manager command mutation or effective-loading inference.
+
+
+## Implementation and review checkpoint
+
+The working implementation adds frozen `OperationSubject`/`OperationImpact`
+projections, read-only native identity/generation capture, separate distributor
+and delivery identities, exact CLI remove selectors, and structured affected
+contexts in update/remove/cleanup and retained-operation output. Saved subject,
+owner and journal serialization stays unchanged; transient managed-region and
+result projections are explicitly ignored.
+
+Two independent source reviews found and verified fixes for lost source conflicts,
+collapsed managed contexts, cancellation and unexpected-failure subject loss,
+plain-text output omissions, cleanup batch review/result omissions, live
+quarantine source loss, retention-location ambiguity, and ambiguous newline
+encoding of delivery roots. Independent re-review is clear. The earlier full
+suite was intentionally stopped after review changes were required; its partial
+log is not a passing verification result.
+
+Final full tests, both AOT hosts, minimum/current gh disposable proofs, actual old
+native persisted-plan restart, all platform gates and merge remain required.
+This checkpoint does not close original M11 acceptance or increase the completed
+finding count. M01/M02/M04/M05/M06/M07/M10 remain the seven completed findings.
+
+
+Final-source preparation: build passes with zero warnings/errors; maintenance
+385/385 and cleanup 18/18 tests pass. Inventory's earlier 344-case checkpoint
+is retained as intermediate evidence; the full final-source suite is next.
+The native proof now checks ambiguity diagnostics plus unchanged object/byte/mode
+fixtures, and independently reads native IDs and generation values. Native AOT,
+old-host restart and remote checks remain pending.

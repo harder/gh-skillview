@@ -61,6 +61,8 @@ public sealed class RemoveService
     {
         public int ErrorCount { get; init; } = Errors.Length;
         public bool IsCanceled { get; init; }
+        public OperationImpact? Impact { get; init; }
+        public bool NotAttempted { get; init; }
 
         public static RemoveReport Refused(string resolved, string reason) => new(
             Succeeded: false,
@@ -82,6 +84,7 @@ public sealed class RemoveService
         public int ErrorCount { get; init; } = Errors.Length;
         public bool IsCanceled { get; init; }
         public int TargetsSkipped { get; init; }
+        public ImmutableArray<OperationImpact> Impacts { get; init; } = [];
 
         public static BatchRemoveReport FromSingle(RemoveReport report, int targetsDeleted) => new(
             Succeeded: report.Succeeded,
@@ -93,6 +96,7 @@ public sealed class RemoveService
         {
             ErrorCount = report.ErrorCount,
             IsCanceled = report.IsCanceled,
+            Impacts = report.Impact is { } impact ? [impact] : [],
         };
     }
 
@@ -108,6 +112,13 @@ public sealed class RemoveService
         Options? options = null,
         CancellationToken cancellationToken = default,
         IProgress<RemoveProgress>? progress = null)
+        => RemoveCore(validation, options, cancellationToken, progress) with { Impact = validation.Impact };
+
+    private RemoveReport RemoveCore(
+        RemoveValidator.RemoveValidation validation,
+        Options? options,
+        CancellationToken cancellationToken,
+        IProgress<RemoveProgress>? progress)
     {
         options ??= new Options();
         var target = Path.GetFullPath(validation.ResolvedPath);
@@ -400,6 +411,32 @@ public sealed class RemoveService
         IProgress<RemoveProgress>? progress = null) =>
         Task.Run(() => Remove(validation, options, cancellationToken, progress));
 
+    /// Orchestrators need a terminal result even after partial cancellation.
+    /// Preserve the throwing low-level API while retaining its exact terminal
+    /// progress and the already frozen subject; never reopen the removed path.
+    internal async Task<RemoveReport> RemoveWithOutcomeAsync(
+        RemoveValidator.RemoveValidation validation, Options? options = null,
+        CancellationToken cancellationToken = default, IProgress<RemoveProgress>? progress = null)
+    {
+        var capture = new OutcomeProgress(progress);
+        try { return await RemoveAsync(validation, options, cancellationToken, capture).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var last = capture.Last;
+            var errors = Math.Max(0, last?.Errors ?? 0);
+            return new(false, validation.ResolvedPath, Math.Max(0, last?.FilesProcessed ?? 0),
+                Math.Max(0, last?.DirectoriesProcessed ?? 0), errors == 0 ? []
+                    : [$"… {errors} runtime error detail(s) unavailable after cancellation; see logs"], options?.DryRun ?? false)
+            { IsCanceled = true, ErrorCount = errors, Impact = validation.Impact };
+        }
+    }
+
+    private sealed class OutcomeProgress(IProgress<RemoveProgress>? inner) : IProgress<RemoveProgress>
+    {
+        internal RemoveProgress? Last { get; private set; }
+        public void Report(RemoveProgress value) { Last = value; inner?.Report(value); }
+    }
+
     private RemoveReport RemoveLinkWithSecureBackend(
         SecureLinkIdentity expectedIdentity,
         string target,
@@ -686,6 +723,7 @@ public sealed class RemoveService
         var filesDeleted = 0;
         var directoriesDeleted = 0;
         var progressAdapter = new BatchProgressAdapter(progress, _logger);
+        var impacts = ImmutableArray.CreateBuilder<OperationImpact>();
 
         try
         {
@@ -701,6 +739,7 @@ public sealed class RemoveService
                 }
 
                 var report = Remove(validation, options, cancellationToken, progressAdapter);
+                if (validation.Impact is { } impact) impacts.Add(impact);
                 filesDeleted += report.FilesDeleted;
                 directoriesDeleted += report.DirectoriesDeleted;
                 if (report.Succeeded)
@@ -741,6 +780,7 @@ public sealed class RemoveService
         {
             ErrorCount = errors.Count,
             TargetsSkipped = targetsSkipped,
+            Impacts = impacts.ToImmutable(),
         };
     }
 

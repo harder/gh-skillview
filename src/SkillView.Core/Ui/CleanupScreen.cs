@@ -20,6 +20,7 @@ public sealed class CleanupScreen
     internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed)
     {
         internal int Skipped { get; init; }
+        internal ImmutableArray<OperationImpact> Impacts { get; init; } = ImmutableArray<OperationImpact>.Empty;
     }
 
     internal sealed class RemovalAttemptState
@@ -46,6 +47,7 @@ public sealed class CleanupScreen
     public int RemovedFileCount { get; private set; }
     public int RemovedDirectoryCount { get; private set; }
     public int IgnoredCount { get; private set; }
+    public RemoveService.BatchRemoveReport? LastReport { get; private set; }
 
     public CleanupScreen(
         IApplication app,
@@ -362,6 +364,34 @@ public sealed class CleanupScreen
         IProgress<RemoveService.RemoveProgress>? progress = null,
         RemovalAttemptState? attemptState = null)
     {
+        var impacts = checkedRows.Where(index => index >= 0 && index < _candidates.Length)
+            .Select(index => _candidates[index].Impact).OfType<OperationImpact>().ToImmutableArray();
+        if (impacts.IsEmpty) impacts = ImmutableArray<OperationImpact>.Empty;
+        LastReport = null;
+        RemoveService.RemoveProgress? last = null;
+        var capture = new CallbackProgress<RemoveService.RemoveProgress>(value => { last = value; progress?.Report(value); });
+        try
+        {
+            var summary = await RemoveSelectedCoreAsync(checkedRows, cancellationToken, capture, attemptState).ConfigureAwait(false);
+            if (LastReport is { } report) LastReport = report with { Impacts = impacts };
+            return summary with { Impacts = impacts };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            LastReport = RemovalReportState.Canceled(last) with { Impacts = impacts };
+            throw;
+        }
+        catch (Exception ex)
+        {
+            LastReport = RemovalReportState.Failed(last, ex.Message) with { Impacts = impacts };
+            throw;
+        }
+    }
+
+    private async Task<RemovalSummary> RemoveSelectedCoreAsync(
+        HashSet<int> checkedRows, CancellationToken cancellationToken,
+        IProgress<RemoveService.RemoveProgress>? progress, RemovalAttemptState? attemptState)
+    {
         var selected = checkedRows
             .Where(i => i >= 0 && i < _candidates.Length)
             .Select(i => _candidates[i])
@@ -407,6 +437,7 @@ public sealed class CleanupScreen
             };
         }
         var removed = report.TargetsDeleted;
+        LastReport = report;
         var failed = CountFailedSelections(selected.Length, report);
         RemovedCount += removed;
         RemovedFileCount += report.FilesDeleted;
@@ -453,6 +484,7 @@ public sealed class CleanupScreen
                     RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, cancellationToken),
                 _ => RefuseUnsupportedCandidate(candidate),
             };
+            validation = validation with { Impact = validation.Impact ?? candidate.Impact };
             if (!validation.Allowed || validation.RequiresSecondConfirm)
             {
                 _logger.Warn("cleanup", $"skipped {candidate.Path}: {(validation.Allowed ? "needs second confirm" : "validation refused")}");
@@ -482,17 +514,12 @@ public sealed class CleanupScreen
 
         sb.AppendLine();
         sb.AppendLine("Paths:");
-        foreach (var candidate in selected.Take(3))
+        foreach (var candidate in selected)
         {
-            sb.AppendLine($"- {candidate.Path}");
+            sb.AppendLine($"- {MarkdownTableFormatter.FormatCodeSpan(candidate.Path)}");
+            if (candidate.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         }
-
-        if (selected.Count > 3)
-        {
-            sb.AppendLine($"- …and {selected.Count - 3} more");
-        }
-
-        return sb.ToString().TrimEnd();
+        return TerminalEscapeSanitizer.Sanitize(sb.ToString().TrimEnd()) ?? "";
     }
 
     private void DoIgnore(HashSet<int> checkedRows, Label status)
@@ -560,6 +587,7 @@ public sealed class CleanupScreen
         sb.AppendLine($"| Kind | **{MarkdownTableFormatter.FormatTableCell(c.Kind.ToString())}** |");
         sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(c.Path)} |");
         sb.AppendLine($"| Reason | {MarkdownTableFormatter.FormatTableCell(c.Reason)} |");
+        if (c.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         if (c.Skill is { } s)
         {
             sb.AppendLine();
@@ -600,11 +628,26 @@ public sealed class CleanupScreen
         public int Path;
     }
 
-    private int ConfirmBatchRemoval(string message) =>
-        MessageBox.Query(
-            _app,
-            "Confirm cleanup removal",
-            message,
-            "Cancel",
-            "Remove") ?? 0;
+    private int ConfirmBatchRemoval(string message)
+    {
+        var response = 0;
+        using var dialog = new Dialog { Title = "Confirm cleanup removal", Width = Dim.Percent(90), Height = Dim.Percent(90) };
+        var review = new Markdown
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+            Text = message,
+            ViewportSettings = ViewportSettingsFlags.HasVerticalScrollBar
+        };
+        TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
+        var cancel = new Button { Text = "Cancel", X = Pos.Center() - 12, Y = Pos.AnchorEnd(1), IsDefault = true };
+        var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1) };
+        cancel.Accepting += (_, args) => { args.Handled = true; _app.RequestStop(); };
+        remove.Accepting += (_, args) => { args.Handled = true; response = 1; _app.RequestStop(); };
+        dialog.Add(review, cancel, remove);
+        _app.Run(dialog);
+        return response;
+    }
 }

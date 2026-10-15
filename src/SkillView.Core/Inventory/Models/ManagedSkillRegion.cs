@@ -46,6 +46,7 @@ public sealed record ManagedSkillRegion(string Path, string Provider, string Age
         IsExclusiveOwner = true,
         PluginName = PluginId,
         PackageVersion = PackageVersion,
+        ManagedRegion = this,
         InstallationMode = "managed-read-only",
         InstallationRoot = System.IO.Path.GetDirectoryName(skill.ResolvedPath),
         CoveredRoots = [System.IO.Path.GetDirectoryName(skill.ResolvedPath)!],
