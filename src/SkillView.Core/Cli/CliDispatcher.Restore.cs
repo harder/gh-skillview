@@ -16,8 +16,10 @@ public static partial class CliDispatcher
         string? path = null, installId = null, id = null, expected = null, disposition = null;
         var execute = false;
         var json = false;
+        var allowHidden = false;
         for (var index = 0; index < args.Count; index++)
         {
+            if (args[index] == "--allow-hidden-dirs" && !allowHidden) { allowHidden = true; continue; }
             if (args[index] == "--json" && !json) { json = true; continue; }
             if (args[index] == "--yes" && !execute && command is not ("restore-plan" or "restore-inspect")) { execute = true; continue; }
             if (index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
@@ -44,7 +46,7 @@ public static partial class CliDispatcher
             if (path is not null) path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory);
             var gh = services.GhLocator.FindOnPath();
             var inventory = await services.InventoryService.CaptureAsync(gh,
-                new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
+                new LocalInventoryService.Options(options.ScanRoots, allowHidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger, runner: services.Runner);
             ReplacementResult result;

@@ -1005,8 +1005,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         {
             var error = Marshal.GetLastPInvokeError();
             handle.Dispose();
-            throw new IOException(
-                $"open canonical directory '{path}' failed: {new Win32Exception(error).Message}");
+            throw new WindowsOpenException(path, error, "canonical directory");
         }
         return handle;
     }
@@ -1503,8 +1502,8 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
 
     private sealed class WindowsOpenException : IOException
     {
-        internal WindowsOpenException(string name, int nativeError)
-            : base($"open relative entry '{name}' failed: "
+        internal WindowsOpenException(string name, int nativeError, string operation = "relative entry")
+            : base($"open {operation} '{name}' failed: "
                 + new Win32Exception(nativeError).Message) =>
             NativeError = nativeError;
 

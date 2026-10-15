@@ -282,7 +282,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             || target.FrontMatter.LocalPath is not null || string.IsNullOrWhiteSpace(target.FrontMatter.Upstream)
             || target.TreeSha is not { Length: 40 } tree || !tree.All(char.IsAsciiHexDigit)
             || string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
-            throw new IOException("Recorded restore requires complete inventory and an unambiguous gh remote revision.");
+            throw new IOException("Recorded restore requires complete inventory and an unambiguous gh remote revision. Use --allow-hidden-dirs when hidden agent containers make coverage partial.");
         if (!inventory.ScannedRoots.Any(scan => OwnershipPath.Same(scan.Path, target.ScanRoot)))
             throw new IOException("The original scan root must be included in the current inventory.");
         if (target.AllOwnershipClaims.Any(claim => claim.Provider != "gh-vercel-global" || claim.ReadOnly || claim.IsExclusiveOwner)
@@ -319,7 +319,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
         }
-        var fresh = new LocalSkillScanner(logger).ScanWithCancellation(liveRoots, null, token, inaccessible, locations);
+        var fresh = new LocalSkillScanner(logger).ScanWithCancellation(liveRoots, new LocalSkillScanner.Options(AllowHiddenDirs: true), token, inaccessible, locations);
         if (inaccessible.Count != 0 || locations.Any(location => location.State == "partial"))
             throw new IOException("Live consumer discovery is incomplete; replacement is refused.");
         var matching = inventory.Skills.Concat(fresh).Where(skill => OwnershipPath.Same(skill.ResolvedPath, target.ResolvedPath)).ToArray();

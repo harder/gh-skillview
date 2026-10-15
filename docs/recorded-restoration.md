@@ -10,6 +10,11 @@ Source, revision, pin policy and manager records remain unchanged.
 skillview --scan-root /path/to/skills restore-plan --path /path/to/skills/demo --json
 ```
 
+Repeat the same discovery flags for each command. If hidden agent containers
+(such as Codex’s `.system`) make inventory partial, add `--allow-hidden-dirs`
+to each restore command. Fresh transition checks always inspect hidden entries
+within their bounded configured-root scan.
+
 Review the returned `changedPaths`, root modes, `subject` (source, pin and all
 captured consumers), and the complete original/candidate manifests in `planPath`.
 A `/` changed path means the root Unix mode differs. The plan binds the original

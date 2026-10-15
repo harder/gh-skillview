@@ -718,3 +718,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Keep its writer handle alive for native publication barriers. Flush staged
   files and directory namespaces before publishing a ready plan. See
   `docs/recorded-restoration.md` and the real-gh replacement proof.
+  Windows can report `Directory.Exists` for a dangling directory symlink. State
+  exclusion pinning must accept only native file/path-not-found from the target
+  open as absence, retain the excluded address, and propagate access/sharing
+  failures. Keep shared-link restart coverage for both vacant-original slots.

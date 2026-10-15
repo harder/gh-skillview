@@ -40,6 +40,9 @@ for gh_path in gh_paths:
         root = Path(temporary).resolve()
         home = root / 'home'
         home.mkdir()
+        builtin = home / '.codex' / 'skills' / '.system' / 'builtin-fixture'
+        builtin.mkdir(parents=True)
+        builtin.joinpath('SKILL.md').write_text('---\nname: builtin-fixture\ndescription: Hidden built-in fixture\n---\nInstructions\n')
         env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_TOKEN=auth, GH_EXTENSION='1', GH_PATH=str(gh),
                    GH_CONFIG_DIR=str(root / 'gh-config'), SKILLVIEW_STATE_HOME=str(root / 'state'),
@@ -69,7 +72,7 @@ for gh_path in gh_paths:
 
         def run(command, *arguments, ok=True):
             process = subprocess.run([str(app), '--scan-root', str(first), '--scan-root', str(second), command,
-                                      *map(str, arguments), '--json'], env=env, cwd=root, capture_output=True, text=True, timeout=180)
+                                      *map(str, arguments), '--allow-hidden-dirs', '--json'], env=env, cwd=root, capture_output=True, text=True, timeout=180)
             assert (process.returncode == 0) == ok, (process.returncode, process.stdout, process.stderr)
             return json.loads(process.stdout)
 
@@ -113,7 +116,7 @@ for gh_path in gh_paths:
             restart_plan = run('restore-plan', '--path', payload)['operation']
             command = [str(app), '--scan-root', str(first), '--scan-root', str(second), 'restore-apply',
                        '--id', restart_plan['id'], '--yes', '--disposition', 'retain-original',
-                       '--expect', restart_plan['planFingerprint'], '--json']
+                       '--expect', restart_plan['planFingerprint'], '--allow-hidden-dirs', '--json']
             process = subprocess.Popen(command, env=env, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             deadline = time.monotonic() + 60
             killed = False
@@ -136,7 +139,7 @@ for gh_path in gh_paths:
             rows.append(dict(shared=shared_target, localEditsExtrasExclusionAndEmptyDirectoryRestored=True,
                              stagedNativeDirectoryPromoted=True, originalNativeDirectoryRestored=True,
                              registryBytesUnchanged=True, unrelatedSameNameUnchanged=True,
-                             nativeProcessKillRestartAndUndoVerified=True, pinnedRef=restored['subject']['metadata']['pinnedRef']))
+                             nativeProcessKillRestartAndUndoVerified=True, hiddenBuiltinCoverageObserved=True, pinnedRef=restored['subject']['metadata']['pinnedRef']))
         results.append(dict(nativeHost=str(app), gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0], fixtures=rows))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))

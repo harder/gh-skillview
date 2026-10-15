@@ -298,6 +298,15 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 
+    [Fact]
+    public async Task RestoreAcceptsExplicitHiddenInventoryScanFlag()
+    {
+        var (code, output, _) = await RunCliAsync("skillview", ["restore-inspect", "--id", new string('0', 32), "--allow-hidden-dirs", "--json"]);
+        Assert.Equal(ExitCodes.UserError, code);
+        using var document = JsonDocument.Parse(output);
+        Assert.False(document.RootElement.GetProperty("succeeded").GetBoolean());
+    }
+
     // --- update parser edge cases ----------------------------------------
 
     [Fact]

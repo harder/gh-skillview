@@ -45,8 +45,16 @@ internal sealed partial class WindowsSecureRemovalBackend
                 token.ThrowIfCancellationRequested();
                 if (!Directory.Exists(excludedPath)) continue;
                 if (pinned.Count >= 4096) throw new IOException("State exclusion identity limit exceeded.");
-                var captured = OpenCanonicalDirectory(excludedPath);
-                held.Add(captured); pinned.Add(ReadIdentity(captured));
+                try
+                {
+                    var captured = OpenCanonicalDirectory(excludedPath);
+                    held.Add(captured); pinned.Add(ReadIdentity(captured));
+                }
+                // Directory.Exists can report a dangling directory link as an
+                // existing directory on Windows. There is no target object to
+                // pin during a retained-original recovery interval. Keep its
+                // excluded address, and only accept native absence here.
+                catch (WindowsOpenException ex) when (ex.NativeError is ErrorFileNotFound or ErrorPathNotFound) { }
             }
             var exclusions = new WindowsStateExclusions(excluded, pinned);
             var canonical = OwnershipPath.CanonicalCandidate(cursor) ?? throw new IOException("Cannot canonicalize state ancestor.");

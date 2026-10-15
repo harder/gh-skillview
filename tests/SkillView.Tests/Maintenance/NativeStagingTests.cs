@@ -41,7 +41,16 @@ public sealed class NativeStagingTests : IDisposable
         using var operation = NativeStateDirectory.OpenOrCreate(path, [], Token);
         using var writer = operation.OpenFile("writer.lock", true, Token);
         using var stage = operation.CreateStagingDirectory("candidate", Token);
-        Directory.Move(path, path + "-moved");
+        writer.Dispose(); // Release Windows' exclusive child-file lock before testing the held-directory guard.
+        try { Directory.Move(path, path + "-moved"); }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && ex is IOException or UnauthorizedAccessException)
+        {
+            // Refusing the ancestor rename is also safe. All source authority
+            // remains at the original address; no replacement was installed.
+            Assert.True(Directory.Exists(path)); Assert.False(Directory.Exists(path + "-moved"));
+            Assert.False(File.Exists(Path.Combine(stage.CanonicalPath, "SKILL.md")));
+            return;
+        }
         Directory.CreateDirectory(Path.Combine(path, "candidate"));
         File.WriteAllText(Path.Combine(path, "candidate", "SKILL.md"), "unrelated keep");
         Assert.Throws<IOException>(() => stage.OpenFile("SKILL.md", false, Token));

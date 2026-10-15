@@ -194,8 +194,8 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     {
         var plan = await Plan();
         Store(name => { if (name == "retain-moved") throw new IOException("Interrupted"); }).Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var broken = Path.Combine(State, plan.Id, "step-0001.json"); File.WriteAllText(broken, "{\"sequence\":");
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(broken, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        var broken = Path.Combine(State, plan.Id, "step-0001.json");
+        WritePrivateJournal(broken, System.Text.Encoding.UTF8.GetBytes("{\"sequence\":"));
         var inspected = Store().Inspect(plan.Id, Inventory(), Token);
         var recovered = Store().Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), false, Token);
         Assert.True(recovered.Succeeded, recovered.Message);
@@ -228,6 +228,40 @@ public sealed class ReplacementPlanStoreTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(agentRoot, "demo"), Payload);
         Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(agent), Token));
         Assert.True(Directory.Exists(Payload)); Assert.False(Directory.Exists(plan.RetainedPath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InterruptedSharedReplacementCanRestartWithTemporarilyDanglingConsumer(bool undo)
+    {
+        var agentRoot = Directory.CreateDirectory(Path.Combine(temporary.FullName, "agent")).FullName;
+        var link = Path.Combine(agentRoot, "demo");
+        Directory.CreateSymbolicLink(link, Payload);
+        var root = new ScanRoot(agentRoot, Scope.User, "claude");
+        var inventory = Inventory(root);
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var plan = await Store().PlanAsync(Assert.Single(inventory.Skills), inventory, Stage, Token);
+        var checkpoint = undo ? "displace-moved" : "retain-moved";
+        var interruptedStore = Store(name => { if (name == checkpoint) throw new IOException("Interrupted"); });
+        if (undo)
+        {
+            Assert.True(Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(root), Token).Succeeded);
+            var current = Store().Inspect(plan.Id, Inventory(root), Token);
+            Assert.False(interruptedStore.Recover(plan.Id, current.ReviewFingerprint, Inventory(root), true, Token).Succeeded);
+        }
+        else Assert.False(interruptedStore.Apply(plan.Id, plan.PlanFingerprint, Inventory(root), Token).Succeeded);
+        Assert.False(File.Exists(Path.Combine(link, "SKILL.md")));
+        Assert.True(PathResolver.IsSymlink(link));
+        var restarted = Store().Inspect(plan.Id, Inventory(root), Token);
+        Assert.Equal(undo ? "replacement-retained" : "original-retained", restarted.Status);
+        var restored = Store().Recover(plan.Id, restarted.ReviewFingerprint, Inventory(root), true, Token);
+        Assert.True(restored.Succeeded, restored.Message);
+        Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
+        Assert.True(PathResolver.IsSymlink(link));
+        Assert.Equal(File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")), File.ReadAllBytes(Path.Combine(link, "SKILL.md")));
+        Assert.Equal("User extra", File.ReadAllText(Path.Combine(link, "extra")));
+        Assert.True(NativeDirectoryMoveLease.SameObject(before.RootIdentity!.Value, PayloadSnapshot.Capture(Payload, Token).RootIdentity!.Value));
     }
 
     [Fact]
@@ -330,8 +364,7 @@ public sealed class ReplacementPlanStoreTests : IDisposable
         for (var index = 1; index < 32; index++)
         {
             var path = Path.Combine(operation, $"step-{index:D4}.json");
-            File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(first with { Sequence = index }, ReplacementJsonContext.Default.ReplacementStep));
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            WritePrivateJournal(path, JsonSerializer.SerializeToUtf8Bytes(first with { Sequence = index }, ReplacementJsonContext.Default.ReplacementStep));
         }
         var inspected = Store().Inspect(plan.Id, Inventory(), Token);
         Assert.Throws<IOException>(() => Store().Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), false, Token));
@@ -345,14 +378,13 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     {
         var plan = await Plan(); Apply(plan);
         var operation = Path.Combine(State, plan.Id);
-        var recovery = Directory.CreateDirectory(Path.Combine(operation, "undo-recovery")).FullName;
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(recovery, (UnixFileMode)448);
+        var recovery = Path.Combine(operation, "undo-recovery");
+        using (var directory = NativeStateDirectory.OpenOrCreate(recovery, [], Token)) { }
         var first = JsonSerializer.Deserialize(File.ReadAllBytes(Path.Combine(operation, "step-0000.json")), ReplacementJsonContext.Default.ReplacementStep)!;
         for (var index = 0; index < 29; index++)
         {
             var path = Path.Combine(recovery, $"step-{index:D4}.json");
-            File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(first with { Sequence = index, Status = "displace-intent" }, ReplacementJsonContext.Default.ReplacementStep));
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            WritePrivateJournal(path, JsonSerializer.SerializeToUtf8Bytes(first with { Sequence = index, Status = "displace-intent" }, ReplacementJsonContext.Default.ReplacementStep));
         }
         var installed = PayloadSnapshot.Capture(Payload, Token);
         var inspected = Store().Inspect(plan.Id, Inventory(), Token);
@@ -365,7 +397,7 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     public async Task WhitespaceNamedLocalExtraSurvivesPlanApplyAndUndo()
     {
         var path = Path.Combine(Payload, " ");
-        if (OperatingSystem.IsWindows()) path = @"\\?\" + Path.GetFullPath(path);
+        if (OperatingSystem.IsWindows()) path = @"\\?\" + path;
         File.WriteAllText(path, "Keep whitespace-named extra");
         var before = PayloadSnapshot.Capture(Payload, Token);
         var plan = await Plan(); Assert.Contains(" ", plan.ChangedPaths); Apply(plan);
@@ -374,6 +406,38 @@ public sealed class ReplacementPlanStoreTests : IDisposable
         Assert.True(restored.Succeeded, restored.Message);
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
         Assert.Equal("Keep whitespace-named extra", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public async Task CompleteHiddenConsumerInventoryRemainsUsableThroughApplyAndUndo()
+    {
+        var container = Directory.CreateDirectory(Path.Combine(Skills, ".hidden")).FullName;
+        var link = Path.Combine(container, "demo"); Directory.CreateSymbolicLink(link, Payload);
+        InventorySnapshot Capture()
+        {
+            ScanRoot[] roots = [new(Skills, Scope.Custom, null)];
+            var inaccessible = new List<string>();
+            var skills = new LocalSkillScanner(new Logger()).ScanWithCancellation(roots,
+                new LocalSkillScanner.Options(AllowHiddenDirs: true), Token, inaccessible);
+            Assert.Empty(inaccessible);
+            return InventorySnapshot.Empty with { Skills = skills, ScannedRoots = roots.ToImmutableArray(), ConfiguredRoots = roots.ToImmutableArray() };
+        }
+        var inventory = Capture(); var target = Assert.Single(inventory.Skills);
+        Assert.Equal(2, target.Agents.Length);
+        var plan = await Store().PlanAsync(target, inventory, Stage, Token);
+        var applied = Store().Apply(plan.Id, plan.PlanFingerprint, Capture(), Token);
+        Assert.True(applied.Succeeded, applied.Message);
+        var inspected = Store().Inspect(plan.Id, Capture(), Token);
+        var restored = Store().Recover(plan.Id, inspected.ReviewFingerprint, Capture(), true, Token);
+        Assert.True(restored.Succeeded, restored.Message); Assert.True(File.Exists(Path.Combine(link, "extra")));
+    }
+
+    private void WritePrivateJournal(string path, byte[] bytes)
+    {
+        using var directory = NativeStateDirectory.OpenOrCreate(Path.GetDirectoryName(path)!, [], Token);
+        using var writer = directory.OpenFile("writer.lock", true, Token);
+        using (var file = directory.OpenFile(Path.GetFileName(path), false, Token)) { file.Write(bytes); file.Flush(true); }
+        directory.FlushPublication(Token);
     }
 
 }

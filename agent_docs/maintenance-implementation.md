@@ -531,3 +531,17 @@ This batch does not complete all of M08 or M15: newer revision/owner transitions
 local forks/dispositions, suppression state, native package adapters, generalized
 plans and the unified TUI maintenance queue remain in the original acceptance
 ledger. Full platform CI and the final 21-item acceptance audit remain required.
+
+Real-machine read-only inventory exposed hidden Codex containers as partial
+coverage. Every restore command now accepts `--allow-hidden-dirs`, and fresh
+transition scans include hidden entries within existing bounds. Initial Windows
+CI found private-ACL and extended-path fixture assumptions plus a real restart
+failure: a dangling directory exposure can satisfy `Directory.Exists` while its
+target is retained. Native state pinning now accepts only native file/path
+absence for that target, retains its exclusion address and propagates other
+errors. Shared-consumer tests interrupt both retention and undo displacement.
+The full local run also exposed a pre-existing 10 ms timer-test registration
+race. Deadline tests now defer arming a real system timer until registration,
+using the optional TimeProvider seam inside the existing suppressed context.
+Production keeps the system provider; callback failure and context assertions
+remain unchanged. Independent review cleared this follow-up.

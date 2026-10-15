@@ -38,6 +38,7 @@
             "registryBytesUnchanged": true,
             "unrelatedSameNameUnchanged": true,
             "nativeProcessKillRestartAndUndoVerified": true,
+            "hiddenBuiltinCoverageObserved": true,
             "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
           },
           {
@@ -48,6 +49,7 @@
             "registryBytesUnchanged": true,
             "unrelatedSameNameUnchanged": true,
             "nativeProcessKillRestartAndUndoVerified": true,
+            "hiddenBuiltinCoverageObserved": true,
             "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
           }
         ]
@@ -64,6 +66,7 @@
             "registryBytesUnchanged": true,
             "unrelatedSameNameUnchanged": true,
             "nativeProcessKillRestartAndUndoVerified": true,
+            "hiddenBuiltinCoverageObserved": true,
             "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
           },
           {
@@ -74,6 +77,7 @@
             "registryBytesUnchanged": true,
             "unrelatedSameNameUnchanged": true,
             "nativeProcessKillRestartAndUndoVerified": true,
+            "hiddenBuiltinCoverageObserved": true,
             "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
           }
         ]
@@ -84,16 +88,154 @@
       "failed": 0,
       "skipped": 0
     },
-    "finalFullSuite": {
+    "style": "passed",
+    "preFollowupFullSuite": {
       "passed": 1162,
       "failed": 0,
       "skipped": 0
     },
-    "style": "passed"
+    "nativeAotProofs": {
+      "app": [
+        {
+          "nativeHost": "/private/tmp/skillview-maintenance/replacement-final/app/skillview",
+          "gh": "gh version 2.97.0 (2026-07-31)",
+          "fixtures": [
+            {
+              "shared": false,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            },
+            {
+              "shared": true,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            }
+          ]
+        },
+        {
+          "nativeHost": "/private/tmp/skillview-maintenance/replacement-final/app/skillview",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "fixtures": [
+            {
+              "shared": false,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            },
+            {
+              "shared": true,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            }
+          ]
+        }
+      ],
+      "ext": [
+        {
+          "nativeHost": "/private/tmp/skillview-maintenance/replacement-final/ext/gh-skillview",
+          "gh": "gh version 2.97.0 (2026-07-31)",
+          "fixtures": [
+            {
+              "shared": false,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            },
+            {
+              "shared": true,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            }
+          ]
+        },
+        {
+          "nativeHost": "/private/tmp/skillview-maintenance/replacement-final/ext/gh-skillview",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "fixtures": [
+            {
+              "shared": false,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            },
+            {
+              "shared": true,
+              "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+              "stagedNativeDirectoryPromoted": true,
+              "originalNativeDirectoryRestored": true,
+              "registryBytesUnchanged": true,
+              "unrelatedSameNameUnchanged": true,
+              "nativeProcessKillRestartAndUndoVerified": true,
+              "hiddenBuiltinCoverageObserved": true,
+              "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+            }
+          ]
+        }
+      ]
+    }
   },
   "requiredBeforeMerge": [
     "Both native AOT hosts with minimum/current gh proofs",
     "Linux/macOS/Windows tests and four-RID native CI proof"
   ],
-  "remaining": "Original all-21 acceptance ledger remains incomplete; recorded restoration does not implement newer-revision/owner transitions or general maintenance topology."
+  "remaining": "Original all-21 acceptance ledger remains incomplete; recorded restoration does not implement newer-revision/owner transitions or general maintenance topology.",
+  "initialCi": {
+    "run": "https://github.com/harder/gh-skillview/actions/runs/38676934337",
+    "linuxAndMacTestsAndNativeProofs": "passed",
+    "windowsFailures": [
+      "Fixture journals inherited non-private ACLs; fixtures now create journal files through the native state API",
+      "Windows can refuse a held-directory ancestor rename; fixture accepts only unchanged safe refusal",
+      "Extended Windows whitespace path must not pass through trimming normalization",
+      "Interrupted shared restoration leaves a dangling directory link; Windows state pinning now tolerates only native target absence while retaining the exclusion address"
+    ]
+  },
+  "followupVerification": {
+    "hiddenInventory": "Explicit --allow-hidden-dirs accepted by every restore command; fresh bounded transition scans include hidden entries",
+    "sharedRestartCoverage": "Forward-retain and undo-displace interruptions with a captured shared consumer link",
+    "independentReview": "Both reviewers clear on Windows recovery, hidden scans and fixtures; separate timer follow-up review clear",
+    "nativeDebugHiddenAndRestartProof": "passed with gh 2.97.0 and 2.102.0",
+    "finalFullSuite": "rerun pending after deterministic timer admission fix; preceding run passed 1165/1166 with one pre-existing 10ms registration race",
+    "nativeAotBuilds": "App and extension passed sequentially; App IL2026/IL3050/IL3053 promoted to errors",
+    "nativeAotHiddenAndRestartProof": "App and extension passed with gh 2.97.0 and 2.102.0 before unrelated timer-test injection follow-up",
+    "timerRegression": "9/9 CancellationSource tests passed with deferred arming of real system timer; production default remains TimeProvider.System"
+  }
 }
