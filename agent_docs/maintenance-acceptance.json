@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "657800503ddb3890560cad2923a617fcbee83207",
+  "verifiedMainCommit": "8029b4f86e85445433d3b142dab3ca65150825c1",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -20,12 +20,15 @@
       "id": "M02",
       "title": "Merge physical installs once while preserving all observations",
       "priority": "P0",
-      "status": "incomplete",
+      "status": "complete",
       "implementedEvidenceSummary": "Physical inventory reconciliation, contexts and aliases",
-      "remaining": "Complete criterion-by-criterion acceptance verification",
+      "remaining": null,
       "acceptance": "One physical row for direct, symlink and ancestor aliases; multiple exposures survive. Conflicting metadata remains visible. Same target exposed in project and user contexts preserves both. Scope/agent filters produce the expected installs without generating artificial duplicates.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-7-final.json",
+      "verifiedCommit": "8029b4f86e85445433d3b142dab3ca65150825c1",
+      "mergedPullRequest": 54
     },
     {
       "id": "M03",

@@ -95,3 +95,20 @@ output path; all skill, agent and manager fixture state is disposable.
 
 Use the built host, never `dotnet run`. This opt-in proof requires gh authentication
 and network access to `cli/cli`; it does not execute the installed skill.
+
+### Inventory failure and coverage acceptance
+
+`InventoryProviderOutcomeTests` drives actual `LocalInventoryService.CaptureAsync`
+with the list adapter's internal process-result seam. It distinguishes process
+errors, incompatible/truncated JSON, valid empty inventory, failed per-root
+coverage, denied enumeration and missing required custom roots. Failures remain
+retryable and cannot establish absence; a valid empty result may produce only a
+review-only Untracked observation.
+
+`python agent_docs/evidence/prove-inventory-denied-root.py --app /absolute/host
+--output /tmp/denied-root-proof.json` additionally uses actual POSIX permission
+denial under a private HOME/CWD. Run as a non-root user on Linux or macOS. It
+restores the denied root's mode in `finally`, verifies the readable control and
+compares freshly enumerated object/byte/mode manifests. CI runs both native
+hosts on those platforms; the deterministic enumeration-failure test also runs
+on Windows. Pass `--gh /absolute/gh` to select another supported gh version.

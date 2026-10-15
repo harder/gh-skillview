@@ -70,7 +70,7 @@ public sealed class LocalInventoryService
             return CaptureLocal(options, cancellationToken, activeProject, contextError, currentDirectory);
         }, cancellationToken);
 
-        // `gh skill list` is the primary inventory source (gh ≥ 2.95 is
+        // `gh skill list` is the primary inventory source (gh ≥ 2.97 is
         // required, so it's always available); the filesystem scan above
         // supplements it with symlink/anomaly/package data gh doesn't emit.
         var usedGhList = false;
