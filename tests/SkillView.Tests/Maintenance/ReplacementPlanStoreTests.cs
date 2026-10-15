@@ -96,6 +96,93 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     }
 
     [Theory]
+    [InlineData("source")]
+    [InlineData("tree")]
+    [InlineData("ref")]
+    [InlineData("pin")]
+    public async Task TrackingChangedAfterInventoryRefusesPlanningBeforeStaging(string field)
+    {
+        var inventory = Inventory(); var target = Assert.Single(inventory.Skills);
+        var file = Path.Combine(Payload, "SKILL.md");
+        var text = File.ReadAllText(file);
+        text = field switch
+        {
+            "source" => text.Replace("https://github.com/harder/fixture", "https://github.com/harder/other"),
+            "tree" => text.Replace(new string('a', 40), new string('b', 40)),
+            "ref" => text.Replace("refs/heads/main", "refs/heads/other"),
+            _ => text.Replace("  github-ref:", "  github-pinned: new-pin\n  github-ref:")
+        };
+        File.WriteAllText(file, text);
+        var stageCalled = false;
+        await Assert.ThrowsAsync<IOException>(() => Store().PlanAsync(target, inventory, (directory, ct) =>
+        { stageCalled = true; return Stage(directory, ct); }, Token));
+        Assert.False(stageCalled); Assert.False(Directory.Exists(State));
+        Assert.Equal(text, File.ReadAllText(file));
+    }
+
+    [Theory]
+    [InlineData("none", false)]
+    [InlineData("retain-moved", false)]
+    [InlineData("displace-moved", false)]
+    [InlineData("none", true)]
+    [InlineData("retain-moved", true)]
+    [InlineData("displace-moved", true)]
+    public async Task SingletonNestedNamespaceSupportsApplyRestartRecoveryAndUndo(string checkpoint, bool readme)
+    {
+        var parent = Directory.CreateDirectory(Path.Combine(Skills, "publisher", "collection")).FullName;
+        var payload = Path.Combine(parent, "demo"); Directory.Move(Payload, payload);
+        if (readme) File.WriteAllText(Path.Combine(parent, "README.md"), "Namespace documentation");
+        var inventory = Inventory(); var before = PayloadSnapshot.Capture(payload, Token);
+        var plan = await Store().PlanAsync(Assert.Single(inventory.Skills), inventory, Stage, Token);
+        var interrupted = Store(name => { if (name == checkpoint) throw new IOException("Interrupted"); });
+        var applied = (checkpoint == "retain-moved" ? interrupted : Store())
+            .Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        if (checkpoint == "retain-moved") Assert.False(applied.Succeeded);
+        else Assert.True(applied.Succeeded, applied.Message);
+        if (checkpoint == "displace-moved")
+        {
+            var inspected = Store().Inspect(plan.Id, Inventory(), Token);
+            Assert.False(interrupted.Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), true, Token).Succeeded);
+        }
+        var current = Store().Inspect(plan.Id, Inventory(), Token);
+        if (checkpoint == "retain-moved")
+        {
+            Assert.Equal("original-retained", current.Status);
+            Assert.True(Store().Recover(plan.Id, current.ReviewFingerprint, Inventory(), false, Token).Succeeded);
+            current = Store().Inspect(plan.Id, Inventory(), Token);
+        }
+        else Assert.Equal(checkpoint == "none" ? "installed" : "replacement-retained", current.Status);
+        var restored = Store().Recover(plan.Id, current.ReviewFingerprint, Inventory(), true, Token);
+        Assert.True(restored.Succeeded, restored.Message);
+        var final = PayloadSnapshot.Capture(payload, Token);
+        Assert.Equal(before.Fingerprint, final.Fingerprint);
+        Assert.True(NativeDirectoryMoveLease.SameObject(before.RootIdentity!.Value, final.RootIdentity!.Value));
+        if (readme) Assert.Equal("Namespace documentation", File.ReadAllText(Path.Combine(parent, "README.md")));
+    }
+
+    [Theory]
+    [InlineData("skill")]
+    [InlineData("owner")]
+    public async Task NewlyManagedNamespaceAfterInterruptionRemainsARefusal(string kind)
+    {
+        var parent = Directory.CreateDirectory(Path.Combine(Skills, "publisher")).FullName;
+        var payload = Path.Combine(parent, "demo"); Directory.Move(Payload, payload);
+        var inventory = Inventory();
+        var plan = await Store().PlanAsync(Assert.Single(inventory.Skills), inventory, Stage, Token);
+        var interrupted = Store(name => { if (name == "retain-moved") throw new IOException("Interrupted"); })
+            .Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        Assert.False(interrupted.Succeeded);
+        // A .skill-lock.json beside the physical installation root is the
+        // reader's package-ownership convention, including namespace roots.
+        var file = kind == "skill" ? Path.Combine(parent, "SKILL.md") : Path.Combine(Skills, ".skill-lock.json");
+        var content = kind == "skill" ? Metadata.Replace("name: demo", "name: publisher") : "{\"version\":999,\"skills\":{}}";
+        File.WriteAllText(file, content);
+        Assert.Throws<IOException>(() => Store().Inspect(plan.Id, Inventory(), Token));
+        Assert.True(Directory.Exists(plan.RetainedPath)); Assert.True(Directory.Exists(plan.CandidatePath));
+        Assert.Equal(content, File.ReadAllText(file));
+    }
+
+    [Theory]
     [InlineData("retain-moved", "original-retained")]
     [InlineData("step-0001.json", "original-retained")]
     [InlineData("install-moved", "installed")]

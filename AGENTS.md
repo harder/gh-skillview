@@ -710,6 +710,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   workflow. Hash plan JSON canonically, sorting object properties: immutable
   dictionary enumeration can differ across processes. Capture the installation
   ID once; path key casing can change while its original slot is vacant.
+  Bind live parsed tracking to the held original's raw and native fingerprints
+  before staging; inventory metadata can change before planning begins.
+  A namespace parent may appear as MissingSkillMd while its only child is
+  retained, and that row can remain in a caller's stale inventory after restore.
+  Recognize only the saved native parent without its own skill/Git/observed
+  ownership. Ordinary README files remain outside the moved child. Use canonical
+  parent addresses with native root-relative validation, and reread owner records
+  for the physical namespace installation root as well as discovery roots.
 - Replacement transitions rescan currently existing configured roots, including
   previously missing roots, and reread contextual owner records before moving.
   Partial step journals are retained as non-authoritative evidence; explicit

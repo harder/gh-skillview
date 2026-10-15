@@ -33,6 +33,15 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         CheckPlacement(inventory);
         using var original = NativeDirectoryMoveLease.Open(Canonical(target.ScanRoot), target.ResolvedPath, token);
         var before = original.Capture(token);
+        var live = PayloadSnapshot.Capture(target.ResolvedPath, token);
+        if (live.FrontMatter is not { } liveMetadata || !liveMetadata.Diagnostics.IsEmpty
+            || live.Fingerprint != before.Fingerprint || live.ObjectStateFingerprint != before.ObjectStateFingerprint)
+            throw new IOException("Live tracking metadata could not be bound to the captured installation; refresh before planning.");
+        SameTracking(target.FrontMatter, liveMetadata);
+        original.Revalidate(token);
+        var afterMetadata = original.Capture(token);
+        if (afterMetadata.Fingerprint != before.Fingerprint || afterMetadata.ObjectStateFingerprint != before.ObjectStateFingerprint)
+            throw new IOException("The installation changed while reading tracking metadata; refresh before planning.");
         var context = Context(target, inventory, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token);
@@ -203,7 +212,7 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         InventorySnapshot inventory, CancellationToken token)
     {
         var subject = Subject(plan);
-        inventory = Admit(subject, inventory, token);
+        inventory = Admit(subject, inventory, token, plan);
         if (Context(subject, inventory, token, plan.Subject.InstallationId) != plan.ContextFingerprint)
             throw new IOException("Ownership, exposures or configured roots changed; the saved plan needs renewed review.");
         operation.ValidateLocation(token);
@@ -273,7 +282,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         InstalledAt = null
     };
 
-    private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
+    private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token,
+        ReplacementPlan? activePlan = null)
     {
         token.ThrowIfCancellationRequested();
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512
@@ -354,10 +364,27 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
         {
             Skills = inventory.Skills.Concat(fresh).Where(skill => !OwnershipPath.Same(skill.ResolvedPath, target.ResolvedPath)
                 && !(skill.Validity == ValidityState.BrokenSymlink && !skill.Agents.IsEmpty
-                    && skill.Agents.All(agent => knownPaths.Contains(Path.GetFullPath(agent.Path))))).Append(target).ToImmutableArray()
+                    && skill.Agents.All(agent => knownPaths.Contains(Path.GetFullPath(agent.Path))))
+                && !ExpectedNamespace(skill)).Append(target).ToImmutableArray()
         };
         QuarantineStore.EnsureNoConsumers(target.ResolvedPath, others, token, target);
         return others;
+
+        bool ExpectedNamespace(InstalledSkill skill)
+        {
+            // Removing the only payload makes the scanner report its namespace
+            // parent as malformed, even with a README present. That observation
+            // can also remain in the caller's inventory after child restoration.
+            // Only the saved native parent without its own skill/Git metadata
+            // can be this container; all other consumer rows remain in policy.
+            return activePlan is not null && skill.Validity == ValidityState.MissingSkillMd
+                && !skill.IsSymlinked && !skill.AllOwnershipClaims.Any() && skill.OwnershipDiagnostics.IsEmpty
+                && OwnershipPath.Same(skill.ResolvedPath, activePlan.ParentIdentity.CanonicalPath)
+                && SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(activePlan.RootPath,
+                    activePlan.ParentIdentity.CanonicalPath, out var snapshot, out _, token)
+                && !snapshot.Directory.HasSkillFile && !snapshot.Directory.HasGitDirectory
+                && NativeDirectoryMoveLease.SameObject(activePlan.ParentIdentity, snapshot.Directory.Identity);
+        }
     }
 
     private string Context(InstalledSkill target, InventorySnapshot inventory, CancellationToken token, string? fixedId = null)
@@ -389,7 +416,8 @@ internal sealed class ReplacementPlanStore(string root, Logger logger, Action<st
     {
         var diagnostics = new List<LockReadDiagnostic>();
         var destinations = target.Agents.Select(agent => agent.DiscoveryRoot ?? Path.GetDirectoryName(agent.Path)!)
-            .Append(target.ScanRoot).Distinct(StringComparer.Ordinal).ToArray();
+            .Append(target.ScanRoot).Append(Path.GetDirectoryName(target.ResolvedPath)!)
+            .Distinct(StringComparer.Ordinal).ToArray();
         var home = runner?.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
         var stateHome = runner?.GetEffectiveEnvironmentVariable("XDG_STATE_HOME");
         var cwd = runner?.EffectiveWorkingDirectory ?? Environment.CurrentDirectory;

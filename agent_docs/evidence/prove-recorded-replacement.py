@@ -68,6 +68,11 @@ for gh_path in gh_paths:
         registry = lock.read_bytes()
         unrelated = second / 'gh-skill'
         unrelated_before = manifest(unrelated)
+        namespace = first / 'publisher' / 'collection'
+        namespace.mkdir(parents=True)
+        namespace.joinpath('README.md').write_text('Namespace documentation\n')
+        namespaced_payload = namespace / 'gh-skill'
+        shutil.copytree(unrelated, namespaced_payload)
         rows = []
 
         def run(command, *arguments, ok=True):
@@ -76,7 +81,7 @@ for gh_path in gh_paths:
             assert (process.returncode == 0) == ok, (process.returncode, process.stdout, process.stderr)
             return json.loads(process.stdout)
 
-        for payload, shared_target in ((first / 'gh-skill', False), (shared_payload, True)):
+        for payload, shared_target in ((first / 'gh-skill', False), (shared_payload, True), (namespaced_payload, False)):
             payload.joinpath('SKILL.md').write_bytes(payload.joinpath('SKILL.md').read_bytes() + b'\nUser modifications\n')
             payload.joinpath('user-extra').write_bytes(b'\x00\xffKeep extra')
             payload.joinpath('.skillview-ignore').write_text('User exclusion\n')
@@ -136,7 +141,7 @@ for gh_path in gh_paths:
             undone = run('restore-undo', '--id', restart_plan['id'], '--yes', '--expect', inspection['reviewFingerprint'])['operation']
             assert undone['succeeded'] and manifest(payload) == original and payload.stat().st_ino == identity
             assert lock.read_bytes() == registry and manifest(unrelated) == unrelated_before
-            rows.append(dict(shared=shared_target, localEditsExtrasExclusionAndEmptyDirectoryRestored=True,
+            rows.append(dict(shared=shared_target, namespaced=payload == namespaced_payload, localEditsExtrasExclusionAndEmptyDirectoryRestored=True,
                              stagedNativeDirectoryPromoted=True, originalNativeDirectoryRestored=True,
                              registryBytesUnchanged=True, unrelatedSameNameUnchanged=True,
                              nativeProcessKillRestartAndUndoVerified=True, hiddenBuiltinCoverageObserved=True, pinnedRef=restored['subject']['metadata']['pinnedRef']))

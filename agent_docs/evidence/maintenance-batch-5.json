@@ -233,9 +233,42 @@
     "sharedRestartCoverage": "Forward-retain and undo-displace interruptions with a captured shared consumer link",
     "independentReview": "Both reviewers clear on Windows recovery, hidden scans and fixtures; separate timer follow-up review clear",
     "nativeDebugHiddenAndRestartProof": "passed with gh 2.97.0 and 2.102.0",
-    "finalFullSuite": "rerun pending after deterministic timer admission fix; preceding run passed 1165/1166 with one pre-existing 10ms registration race",
+    "finalFullSuite": "running with stale tracking and namespace acceptance regressions",
     "nativeAotBuilds": "App and extension passed sequentially; App IL2026/IL3050/IL3053 promoted to errors",
     "nativeAotHiddenAndRestartProof": "App and extension passed with gh 2.97.0 and 2.102.0 before unrelated timer-test injection follow-up",
-    "timerRegression": "9/9 CancellationSource tests passed with deferred arming of real system timer; production default remains TimeProvider.System"
+    "timerRegression": "9/9 CancellationSource tests passed with deferred arming of real system timer; production default remains TimeProvider.System",
+    "fullSuiteBeforeCopilotFindings": {
+      "passed": 1166,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "copilotReview": {
+    "reviewedHead": "b49ee6760049208f058affe89214a28e71628769",
+    "acceptedFindings": [
+      "https://github.com/harder/gh-skillview/pull/52#discussion_r4278788376",
+      "https://github.com/harder/gh-skillview/pull/52#discussion_r4278788409"
+    ],
+    "fixes": [
+      "Bind parsed live tracking to the held original raw/native evidence before state or remote staging",
+      "Recognize only the saved native namespace parent without its own SKILL/Git/observed ownership, including README and stale scanner rows after restoration",
+      "Recheck contextual owner records for the physical namespace installation root"
+    ],
+    "targetedNamespaceCases": {
+      "passed": 6,
+      "failed": 0
+    },
+    "targetedAliasCases": {
+      "passed": 4,
+      "failed": 0
+    },
+    "independentReReview": "No source findings after namespace rule refinement; final owner-fixture correction under re-review"
+  },
+  "followupCi": {
+    "head": "57122c55baf636edfb93b70f00c3f99a66df6a1a",
+    "run": "https://github.com/harder/gh-skillview/actions/runs/38678607893",
+    "nativeAotHostsAndProofs": "passed on all four RIDs, both hosts",
+    "linuxAndMacTests": "passed",
+    "windowsTest": "1165/1166; absolute alias-parent target fixture corrected to verify preserved relative spelling"
   }
 }

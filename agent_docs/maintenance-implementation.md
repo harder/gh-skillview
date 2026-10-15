@@ -545,3 +545,13 @@ race. Deadline tests now defer arming a real system timer until registration,
 using the optional TimeProvider seam inside the existing suppressed context.
 Production keeps the system provider; callback failure and context assertions
 remain unchanged. Independent review cleared this follow-up.
+
+Copilot found stale tracking before planning and singleton namespace recovery
+gaps. Planning now binds parsed current tracking to the held original's raw and
+native fingerprints before staging. Transition scans recognize only the saved
+native namespace parent without its own skill/Git/observed ownership, preserving
+README files and handling stale malformed-parent rows after child restoration.
+Owner revalidation includes the physical namespace installation root. Focused
+coverage includes source/tree/ref/pin drift, normal and interrupted namespace
+apply/undo with and without README, and newly introduced contextual ownership.
+The native proof also exercises a nested namespaced installation.
