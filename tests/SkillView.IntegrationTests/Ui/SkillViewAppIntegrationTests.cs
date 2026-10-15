@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using SkillView.Bootstrapping;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -34,45 +35,64 @@ public sealed class SkillViewAppIntegrationTests
             }).ToImmutableArray(),
         };
         SkillViewApp? skillview = null;
-        var step = 0;
+        var keysSent = 0;
+        var ticks = 0;
+        var downDraws = 0;
+        var upDraws = 0;
+        var expectedRow = 0;
+        string? observedName = null;
+        var listFocused = false;
+        var elapsed = Stopwatch.StartNew();
         var boundaryChecked = false;
+        string Progress() => $"phase={(keysSent < count + 10 ? "down" : "up")}; ticks={ticks}; keys={keysSent}; "
+            + $"expected={expectedRow}; observed={observedName}; focused={listFocused}; "
+            + $"draws={downDraws}/{upDraws}; elapsed={elapsed.Elapsed}";
         var options = new AppOptions(
             InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []);
         skillview = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), options, () =>
         {
             var terminal = Application.Create().Init("ansi");
             terminal.Driver!.SetScreenSize(120, 36);
+            terminal.LayoutAndDrawComplete += (_, _) =>
+            {
+                if (keysSent > 0 && keysSent <= count + 10) downDraws++;
+                else if (keysSent > count + 10) upDraws++;
+            };
             terminal.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
             {
+                ticks++;
                 var installed = skillview!.InstalledTabForTests!;
-                if (step == 0)
+                if (keysSent == 0)
                 {
                     installed.LoadSeeded(snapshot);
                     skillview.ForceActiveTabForTests(SkillViewTab.Installed);
                     installed.FocusList();
                 }
-                if (step < count + 10)
+                if (keysSent == 2 * (count + 10))
                 {
-                    terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorDown));
-                }
-                else if (step < 2 * (count + 10))
-                {
-                    if (step == count + 10)
-                    {
-                        Assert.Equal("skill-039", installed.GetSelectedSkill()?.Name);
-                        Assert.True(installed.TableHasFocusForTests);
-                    }
-                    terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorUp));
-                }
-                else
-                {
-                    Assert.Equal("skill-000", installed.GetSelectedSkill()?.Name);
-                    Assert.True(installed.TableHasFocusForTests);
+                    observedName = installed.GetSelectedSkill()?.Name;
+                    listFocused = installed.TableHasFocusForTests;
+                    Assert.True(observedName == "skill-000" && listFocused, Progress());
+                    Assert.True(downDraws > 0 && upDraws > 0, Progress());
                     boundaryChecked = true;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Q | KeyCode.CtrlMask));
                     return false;
                 }
-                step++;
+                // A terminal can deliver several repeat keys before one draw.
+                // Keep every key and both boundary checks without requiring 101
+                // full redraws to fit the watchdog on a loaded Windows runner.
+                for (var repeat = 0; repeat < 5; repeat++)
+                {
+                    var down = keysSent < count + 10;
+                    terminal.Keyboard.RaiseKeyDownEvent(new Key(down ? KeyCode.CursorDown : KeyCode.CursorUp));
+                    keysSent++;
+                    expectedRow = down ? Math.Min(keysSent, count - 1)
+                        : Math.Max(count - 1 - (keysSent - count - 10), 0);
+                    observedName = installed.GetSelectedSkill()?.Name;
+                    listFocused = installed.TableHasFocusForTests;
+                    Assert.True(observedName == $"skill-{expectedRow:D3}", Progress());
+                    Assert.True(listFocused, Progress());
+                }
                 return true;
             });
             return terminal;
@@ -81,8 +101,9 @@ public sealed class SkillViewAppIntegrationTests
 
         var exitCode = await skillview.RunAsync(deadline.Token);
 
-        Assert.True(boundaryChecked);
-        Assert.False(deadline.IsCancellationRequested);
+        Assert.True(boundaryChecked, Progress());
+        Assert.Equal(2 * (count + 10), keysSent);
+        Assert.False(deadline.IsCancellationRequested, Progress());
         Assert.Equal(ExitCodes.Success, exitCode);
     }
 

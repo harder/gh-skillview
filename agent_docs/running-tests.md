@@ -131,3 +131,14 @@ including authored local descriptions/version and distinct repository refs/pins.
 Repeat `--gh /absolute/gh` to prove multiple gh versions. CI runs both native
 hosts on each AOT RID and retains the results with maintenance proof artifacts.
 The fixture never invokes skill code.
+
+### Arrow-navigation stress
+
+The ANSI Installed regression sends all 50 Down and 50 Up events through real
+keyboard routing in five-event bursts. It checks the selected row and focus after
+every event, requires drawing in both directions, and checks the final boundary
+on the following tick. Keep the 20-second watchdog and progress diagnostics.
+Requiring 101 separate timer/redraw cycles made this correctness test sensitive
+to loaded Windows runners; batching preserves the key/boundary checks without
+turning redraw throughput into the acceptance criterion. A watchdog timeout alone
+does not establish a product navigation failure or reproduce the original crash.
