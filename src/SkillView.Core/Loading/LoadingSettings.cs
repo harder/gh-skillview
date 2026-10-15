@@ -32,7 +32,8 @@ internal sealed record LoadingSettings(ImmutableArray<LoadingSettingsLayer> Laye
             || layer.Applicability == "conditional" && HasPolicy(layer.Document.Root)));
 
     private static bool HasPolicy(LoadingValue? value) => value?.Fields.Keys.Any(key => key is
-        "skills" or "skillOverrides" or "permissions" or "permission" or "tools" or "agent" or "strictPluginOnlyCustomization") == true;
+        "skills" or "skillOverrides" or "permissions" or "permission" or "tools" or "agent" or "mode" or "default_agent"
+        or "enabledPlugins" or "security" or "strictPluginOnlyCustomization" or "allowManagedPermissionRulesOnly") == true;
 
     // Only apply known local sources. Return a separate uncertainty signal;
     // never silently merge a trust-gated document into the effective policy.

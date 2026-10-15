@@ -12,6 +12,8 @@ internal sealed record CapturedLoadingConfiguration(SkillLoadingContext Context,
     string SystemDirectory, ImmutableArray<string> Diagnostics)
 {
     internal ImmutableArray<GeminiExtensionExpectation> GeminiExtensions { get; init; } = [];
+    internal ImmutableArray<LoadingDiscoveryRoot> DiscoveryRoots { get; init; } = [];
+    internal ImmutableArray<string> DiscoveryLimitations { get; init; } = [];
 }
 
 /// Captures local files only. No client startup, network, plugin initialization,
@@ -28,9 +30,9 @@ internal sealed class LoadingConfigurationCapture(ProcessRunner runner, string? 
         if (request.Profile is { } profile && (profile.Length is < 1 or > 128
             || profile.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_'))))
             throw new ArgumentException("Loading profile names must use 1-128 ASCII letters, digits, hyphens or underscores.");
-        var cwd = Path.GetFullPath(request.WorkingDirectory ?? request.ProjectDirectory ?? runner.EffectiveWorkingDirectory,
-            runner.EffectiveWorkingDirectory);
-        var project = Path.GetFullPath(request.ProjectDirectory ?? ScanRootResolver.FindGitRootWithCancellation(cwd, token) ?? cwd, cwd);
+        var explicitProject = request.ProjectDirectory is { } selectedProject ? Path.GetFullPath(selectedProject, runner.EffectiveWorkingDirectory) : null;
+        var cwd = Path.GetFullPath(request.WorkingDirectory ?? explicitProject ?? runner.EffectiveWorkingDirectory, runner.EffectiveWorkingDirectory);
+        var project = explicitProject ?? ScanRootResolver.FindGitRootWithCancellation(cwd, token) ?? cwd;
         if (!PathIdentity.IsInside(cwd, project)) throw new ArgumentException("The loading working directory must be inside the selected project.");
         string? Env(string name) => runner.GetEffectiveEnvironmentVariable(name) is { Length: > 0 } value ? value : null;
         string? EnvPath(string name) => Env(name) is { } value ? Path.GetFullPath(value, cwd) : null;
@@ -52,6 +54,10 @@ internal sealed class LoadingConfigurationCapture(ProcessRunner runner, string? 
         var blockers = ImmutableArray.CreateBuilder<string>();
         var diagnostics = ImmutableArray.CreateBuilder<string>();
         var extensions = ImmutableArray<GeminiExtensionExpectation>.Empty;
+        var openCodeDirectories = ImmutableArray<string>.Empty;
+        var discoveryRoots = ImmutableArray<LoadingDiscoveryRoot>.Empty;
+        var discoveryLimitations = ImmutableArray<string>.Empty;
+        var capturedFacts = ImmutableArray.CreateBuilder<string>();
         var projectApplicability = request.ProjectTrust switch { "trusted" => "applied", "untrusted" => "excluded", _ => "conditional" };
         if (request.ProjectTrust != "unknown") diagnostics.Add("Project trust is an explicit analysis assumption, not an observation of an active client session.");
         if (request.Profile is not null && request.ConfigDirectory is null && agent != "codex")
@@ -111,17 +117,17 @@ internal sealed class LoadingConfigurationCapture(ProcessRunner runner, string? 
                 AddPair(config, "global");
                 if (EnvPath("OPENCODE_CONFIG") is { } custom) Add(custom, "custom-config", syntax: LoadingJsonSyntax.Jsonc);
                 var ancestors = Ancestors(cwd, project, token);
-                var disableProject = Env("OPENCODE_DISABLE_PROJECT_CONFIG");
-                if (disableProject is not (null or "" or "false" or "0"))
-                    blockers.Add("OPENCODE_DISABLE_PROJECT_CONFIG is present; exact native environment-flag semantics need confirmation.");
-                foreach (var directory in ancestors.Reverse())
+                var disableProjectValue = runner.GetEffectiveEnvironmentVariable("OPENCODE_DISABLE_PROJECT_CONFIG");
+                var disableProject = disableProjectValue?.ToLowerInvariant() is "true" or "1";
+                capturedFacts.Add(SkillView.Inventory.Models.SkillDistributorIdentity.Digest("OPENCODE_DISABLE_PROJECT_CONFIG", disableProjectValue));
+                foreach (var directory in disableProject ? [] : ancestors.Reverse())
                 {
                     AddPair(directory, "project");
                 }
                 var agentCapture = new OpenCodeAgentCapture();
-                var configDirectories = new[] { config }.Concat(ancestors.Select(directory => Path.Combine(directory, ".opencode")))
-                    .Concat(new[] { Path.Combine(home, ".opencode"), EnvPath("OPENCODE_CONFIG_DIR") }.OfType<string>()).Distinct(StringComparer.Ordinal);
-                foreach (var directory in configDirectories)
+                openCodeDirectories = new[] { config }.Concat(disableProject ? [] : ancestors.Select(directory => Path.Combine(directory, ".opencode")))
+                    .Concat(new[] { Path.Combine(home, ".opencode"), EnvPath("OPENCODE_CONFIG_DIR") }.OfType<string>()).Distinct(StringComparer.Ordinal).ToImmutableArray();
+                foreach (var directory in openCodeDirectories)
                 {
                     if (directory.EndsWith(".opencode", StringComparison.Ordinal) || directory == EnvPath("OPENCODE_CONFIG_DIR")) AddPair(directory, "config-directory");
                     agentCapture.Capture(directory, files, layers, blockers, token);
@@ -145,16 +151,30 @@ internal sealed class LoadingConfigurationCapture(ProcessRunner runner, string? 
         }
 
         token.ThrowIfCancellationRequested();
+        if (agent == "opencode")
+        {
+            var intermediate = new LoadingSettings(layers.ToImmutable(), unknown.ToImmutable()) { LocalPolicyBlockers = blockers.ToImmutable() };
+            var discovery = OpenCodeDiscoveryCapture.Capture(cwd, project, home, openCodeDirectories, intermediate,
+                key => runner.GetEffectiveEnvironmentVariable(key), blockers, token);
+            discoveryRoots = discovery.Roots; discoveryLimitations = discovery.Limitations;
+            capturedFacts.AddRange(discovery.Facts);
+            capturedFacts.AddRange(discoveryRoots.Select(root => SkillView.Inventory.Models.SkillDistributorIdentity.Digest(root.Path, root.Placement,
+                root.IncludeHidden.ToString(), root.Applicability, root.Reason, root.SourceEvidence)));
+            capturedFacts.AddRange(discoveryLimitations);
+            if (intermediate.HasUncertainLocalPolicy)
+                discoveryLimitations = discoveryLimitations.Add("OpenCode configuration is unavailable or conditional; additional loading roots cannot be ruled out.");
+        }
         var settings = new LoadingSettings(layers.ToImmutable(), unknown.ToImmutable())
         {
             LocalPolicyBlockers = blockers.ToImmutable(),
-            CapturedFacts = diagnostics.ToImmutable(),
+            CapturedFacts = diagnostics.ToImmutable().AddRange(capturedFacts),
             ExpectedProjectTrust = projectApplicability switch { "applied" => "trusted", "excluded" => "untrusted", _ => "unknown" }
         };
         var rules = AgentLoadingRules.Find(agent);
         var context = SkillLoadingContext.Capture(agent, request.Profile, project, cwd, home, config,
             request.ClientVersion, request.AgentName, request.ProjectTrust, settings.Fingerprint, rules?.Revision ?? "unsupported");
-        return new(context, settings, system, diagnostics.ToImmutable()) { GeminiExtensions = extensions };
+        return new(context, settings, system, diagnostics.ToImmutable())
+        { GeminiExtensions = extensions, DiscoveryRoots = discoveryRoots, DiscoveryLimitations = discoveryLimitations };
 
         void Add(string path, string scope, string applicability = "applied", LoadingJsonSyntax syntax = LoadingJsonSyntax.Strict,
             LoadingContentFormat format = LoadingContentFormat.Json)

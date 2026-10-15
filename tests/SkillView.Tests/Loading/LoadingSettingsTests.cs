@@ -66,6 +66,15 @@ public sealed class LoadingSettingsTests : IDisposable
         Assert.Null(Evaluate("opencode", new([Layer("{\"agent\":{\"build\":" + agent + "}}")], [])).Enabled);
     }
 
+    [Theory]
+    [InlineData("false")]
+    [InlineData("{\"paths\":\"folder\"}")]
+    [InlineData("{\"urls\":[false]}")]
+    public void InvalidOpenCodeDiscoverySettingsCannotProveNativeConfigurationDecodes(string skills)
+    {
+        Assert.Null(Evaluate("opencode", new([Layer("{\"skills\":" + skills + "}")], [])).Enabled);
+    }
+
     [Fact]
     public void OversizedPermissionPatternsBecomeUnknownInsteadOfCrashingOrAllowing()
     {
@@ -148,6 +157,20 @@ public sealed class LoadingSettingsTests : IDisposable
         Assert.Null(Evaluate("gemini-cli", new([Layer(disabled, "conditional")], [])).Enabled);
         Assert.True(Evaluate("gemini-cli", new([Layer(disabled, "excluded")], [])).Enabled);
         Assert.False(Evaluate("gemini-cli", new([Layer(disabled)], [])).Enabled);
+    }
+
+    [Theory]
+    [InlineData("opencode", "{\"mode\":{\"build\":{\"permission\":{\"skill\":\"deny\"}}}}")]
+    [InlineData("opencode", "{\"default_agent\":\"review\"}")]
+    [InlineData("claude-code", "{\"enabledPlugins\":{\"demo@market\":false}}")]
+    [InlineData("claude-code", "{\"allowManagedPermissionRulesOnly\":true}")]
+    [InlineData("gemini-cli", "{\"security\":{\"folderTrust\":{\"enabled\":false}}}")]
+    public void ConditionalConsumedKeysCannotProduceAnEnabledDefault(string agent, string json)
+    {
+        var conditional = new LoadingSettings([Layer(json, "conditional")], []);
+        Assert.True(conditional.HasUncertainLocalPolicy);
+        Assert.Null(Evaluate(agent, conditional).Enabled);
+        Assert.False(new LoadingSettings([Layer(json, "excluded")], []).HasUncertainLocalPolicy);
     }
 
     [Fact]

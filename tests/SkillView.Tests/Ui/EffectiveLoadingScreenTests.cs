@@ -15,6 +15,34 @@ namespace SkillView.Tests.Ui;
 public sealed class EffectiveLoadingScreenTests
 {
     [Fact]
+    public void FrozenInstallationIdentityRetainsAllEntriesAcrossPathSpellingsWithoutIo()
+    {
+        var subject = OperationSubject.FromRecorded("selected-install", "/original/demo", "demo", Scope.User, SkillFrontMatter.Empty, [], []);
+        var selected = new InstalledSkill
+        {
+            Name = "demo",
+            ResolvedPath = "invalid\0old-spelling",
+            ScanRoot = "invalid\0root",
+            Scope = Scope.User,
+            Agents = [],
+            FrontMatter = SkillFrontMatter.Empty,
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = false,
+            InstalledAt = null,
+            ObservedSubject = subject
+        };
+        var first = new EffectiveSkillCandidate("one", subject with { Path = "invalid\0new-spelling" }, [], "demo", "personal", ExpectedSkillLoading.Unknown("fixture"), [], [], []);
+        var second = first with { LoadingKey = "two", EntryPath = "other-exposure" };
+        var unrelated = first with { LoadingKey = "three", Subject = subject with { InstallationId = "another-install", Path = selected.ResolvedPath } };
+        var context = new SkillLoadingContext("codex", null, "invalid\0", "invalid\0", "invalid\0", "invalid\0", null, null, "unknown", "fixture", "fixture", "fixture");
+        var analysis = new EffectiveSkillAnalysis(context, null, "fixture", DateTimeOffset.UtcNow, false, [first, second, unrelated], [],
+            NativeLoadingObservation.Unavailable(context, "fixture"), []);
+        Assert.Equal(new[] { "one", "two" }, EffectiveLoadingScreen.SelectInstallCandidates(analysis, selected).Select(row => row.LoadingKey));
+    }
+
+    [Fact]
     public async Task CancelingAnActiveAnalysisDrainsItsWorkerBeforeTheModalReturns()
     {
         var started = 0; var canceled = 0; var cancelRequested = false; var timedOut = false;

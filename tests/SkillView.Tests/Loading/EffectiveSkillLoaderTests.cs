@@ -58,7 +58,10 @@ public sealed class EffectiveSkillLoaderTests : IDisposable
             ["OPENCODE_CONFIG_DIR"] = "",
             ["OPENCODE_CONFIG_CONTENT"] = "",
             ["OPENCODE_PERMISSION"] = "",
-            ["OPENCODE_DISABLE_PROJECT_CONFIG"] = ""
+            ["OPENCODE_DISABLE_PROJECT_CONFIG"] = "",
+            ["OPENCODE_DISABLE_EXTERNAL_SKILLS"] = "false",
+            ["OPENCODE_DISABLE_CLAUDE_CODE"] = "false",
+            ["OPENCODE_DISABLE_CLAUDE_CODE_SKILLS"] = "false"
         };
         return new LoadingConfigurationCapture(new(new Logger(), environment: environment, defaultWorkingDirectory: Project), SystemDirectory)
             .Capture(new(agent, ProjectDirectory: Project, ClientVersion: agent == "gemini" ? "0.46.0" : null, ProjectTrust: trust), Token);
@@ -79,6 +82,22 @@ public sealed class EffectiveSkillLoaderTests : IDisposable
         Assert.Equal("selected", analysis.Candidates.Single(row => row.Subject.Path == personal.ResolvedPath).Expected.Selection);
         Assert.Equal("unknown", analysis.Candidates[0].SessionState);
         Assert.Equal("unavailable", analysis.Native.State);
+    }
+
+    [Fact]
+    public void UninspectableSupplementalRootQualifiesWinnerAndFrozenConsumerCoverage()
+    {
+        var personal = Skill(Path.Combine(Home, ".claude", "skills", "demo"));
+        personal = personal with { ObservedSubject = OperationSubject.From(personal) };
+        var project = Skill(Path.Combine(Project, ".claude", "skills", "demo"));
+        var observation = LoadingDiscoveryCapture.Probe([Path.Combine(SystemDirectory, ".claude", "skills")], Token,
+            _ => throw new UnauthorizedAccessException());
+        var analysis = EffectiveSkillLoader.Capture(observation.Apply(Inventory(personal, project)), Configuration("claude"), Token);
+        var highest = analysis.Candidates.Single(row => row.EntryPath == personal.ResolvedPath);
+        Assert.Equal("conditional-selection", highest.Expected.Selection);
+        Assert.Equal("unknown", highest.Expected.ManualInvocation);
+        Assert.False(highest.Subject.ExposureCoverageComplete);
+        Assert.Equal("shadowed", analysis.Candidates.Single(row => row.EntryPath == project.ResolvedPath).Expected.Selection);
     }
 
     [Fact]

@@ -17,6 +17,17 @@
   before merging; overwritten keys retain their original position. Markdown
   agents/modes load during each config-directory phase; JSON modes fold last.
   Missing/bounded/linked-container observations cannot imply default allow.
+- OpenCode effective analysis freezes all config-directory `skill`/`skills`
+  roots and final merged `skills.paths`. Its bounded scanner mode includes
+  root `SKILL.md` and continues into skill-bearing directories; ordinary
+  maintenance keeps leaf semantics. External compatibility roots include dot
+  entries; config/path globs exclude them. Effect runtime disable flags use
+  exact case-sensitive boolean tokens; project-config disabling uses a separate
+  lowercase true/1 contract. Empty/malformed Effect values remain unknown.
+- Effective captures pass selected CWD and Claude/Codex config homes through a
+  child-only runner to managed discovery. Never change the parent environment.
+  Supplemental root inspection must distinguish missing roots from access/I/O
+  failures and propagate incomplete coverage into frozen subjects and selection.
 - Gemini 0.46.0 saved trust is below live IDE trust. Extension overrides use
   exact manifest keys and case-sensitive stored rules, with last match winning;
   they do not normalize stored paths. Keep these provider-specific comparisons

@@ -15,18 +15,34 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
         IReadOnlyList<ScanRootResolver.AgentProfileRoot> profiles, CancellationToken token)
     {
         var configuration = await Task.Run(() => new LoadingConfigurationCapture(runner).Capture(request, token), token).ConfigureAwait(false);
-        var roots = await Task.Run(() =>
+        var discovery = await Task.Run(() =>
         {
             token.ThrowIfCancellationRequested();
-            var supplemental = new[] { Path.Combine(configuration.Context.ConfigDirectory, "skills"), Path.Combine(configuration.Context.HomeDirectory, ".agents", "skills"),
-                Path.Combine(configuration.SystemDirectory, configuration.Context.AgentId == "claude-code" ? ".claude/skills" : "skills") };
-            return scanRoots.Concat(supplemental.Where(Directory.Exists))
-                .Concat(configuration.GeminiExtensions.Select(extension => Path.Combine(extension.PayloadDirectory, "skills")).Where(Directory.Exists))
-                .Distinct(StringComparer.Ordinal).ToArray();
+            string[] supplemental = configuration.Context.AgentId switch
+            {
+                "claude-code" => [Path.Combine(configuration.Context.ConfigDirectory, "skills"), Path.Combine(configuration.SystemDirectory, ".claude", "skills")],
+                "gemini-cli" => [Path.Combine(configuration.Context.ConfigDirectory, "skills"), Path.Combine(configuration.Context.HomeDirectory, ".agents", "skills")],
+                "codex" => [Path.Combine(configuration.Context.ConfigDirectory, "skills"), Path.Combine(configuration.Context.HomeDirectory, ".agents", "skills"), Path.Combine(configuration.SystemDirectory, "skills")],
+                _ => []
+            };
+            return LoadingDiscoveryCapture.Probe(supplemental
+                .Concat(configuration.GeminiExtensions.Select(extension => Path.Combine(extension.PayloadDirectory, "skills")))
+                .Concat(configuration.DiscoveryRoots.Where(root => root.Applicability != "excluded").Select(root => root.Path)), token);
         }, token).ConfigureAwait(false);
+        var roots = scanRoots.Concat(discovery.Roots).Distinct(StringComparer.Ordinal).ToArray();
         var contexts = workspaces.Concat(new[] { configuration.Context.ProjectDirectory, configuration.Context.WorkingDirectory }).Distinct(StringComparer.Ordinal).ToArray();
-        var inventory = await inventoryService.CaptureAsync(ghPath, new(roots, false, WorkspaceDirectories: contexts, Profiles: profiles), token).ConfigureAwait(false);
-        return await Task.Run(() => Capture(inventory, configuration, token), token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        var selectedEnvironment = configuration.Context.AgentId switch
+        {
+            "claude-code" => new Dictionary<string, string> { ["CLAUDE_CONFIG_DIR"] = configuration.Context.ConfigDirectory },
+            "codex" => new Dictionary<string, string> { ["CODEX_HOME"] = configuration.Context.ConfigDirectory },
+            _ => new Dictionary<string, string>()
+        };
+        var selectedRunner = runner.WithContext(configuration.Context.WorkingDirectory, selectedEnvironment);
+        var inventory = await inventoryService.InContext(selectedRunner).CaptureAsync(ghPath,
+            new(roots, configuration.Context.AgentId == "opencode", WorkspaceDirectories: contexts, Profiles: profiles)
+            { DiscoverNestedSkillFiles = configuration.Context.AgentId == "opencode" }, token).ConfigureAwait(false);
+        return await Task.Run(() => Capture(discovery.Apply(inventory), configuration, token), token).ConfigureAwait(false);
     }
 
     internal Task<EffectiveSkillAnalysis> CaptureAsync(InventorySnapshot inventory, LoadingCaptureRequest request,
@@ -40,6 +56,8 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
         CancellationToken token, NativeLoadingObservation? native = null)
     {
         token.ThrowIfCancellationRequested();
+        if (!configuration.DiscoveryLimitations.IsEmpty) inventory = new LoadingRootObservation([], configuration.DiscoveryLimitations
+            .Select(reason => new DiscoveryLocation(configuration.Context.ConfigDirectory, "unsupported", reason)).ToImmutableArray()).Apply(inventory);
         var metadata = new LoadingConfigurationReader(8192, 16 * 1024 * 1024);
         var observations = new Dictionary<string, (LoadingConfigurationDocument Header, LoadingConfigurationDocument? OpenAi)>(StringComparer.Ordinal);
         var pluginNames = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -81,6 +99,7 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
         var diagnostics = configuration.Diagnostics.ToBuilder();
         diagnostics.AddRange(configuration.Settings.UnobservedSources);
         diagnostics.AddRange(configuration.Settings.LocalPolicyBlockers);
+        diagnostics.AddRange(configuration.DiscoveryLimitations);
         foreach (var location in inventory.Diagnostics.InaccessiblePaths) diagnostics.Add("Inventory location unobserved: " + location);
         foreach (var provider in inventory.Providers.Where(provider => !provider.Succeeded))
             diagnostics.Add("Inventory provider " + provider.Provider + " incomplete: " + (provider.Error ?? "unknown error"));
@@ -107,7 +126,7 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
             foreach (var entry in entries)
             {
                 token.ThrowIfCancellationRequested();
-                var placement = Placement(context, configuration.SystemDirectory, inventory, entry.Path, entry.Exposures, pluginNames, configuration.GeminiExtensions, token);
+                var placement = Placement(context, configuration.SystemDirectory, inventory, entry.Path, entry.Exposures, pluginNames, configuration.GeminiExtensions, configuration.DiscoveryRoots, token);
                 var name = observed.Header.Root?.Get("name") is { Kind: "string", Text: { Length: > 0 } declared }
                     ? declared : Path.GetFileName(entry.Path);
                 var directoryName = Path.GetFileName(entry.Path);
@@ -213,7 +232,8 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
             !inventory.IsPartial && inventory.ConfiguredRootsComplete && !configuration.Settings.HasUncertainLocalPolicy
                 && configuration.Settings.UnobservedSources.IsEmpty && native.State == "observed" && native.Coverage == "complete-selected-context"
                 && evidence.All(file => file.State is "observed" or "missing"),
-            rows.Select(row => row.Candidate).ToImmutableArray(), evidence.ToImmutable(), native, diagnostics.ToImmutable());
+            rows.Select(row => row.Candidate).ToImmutableArray(), evidence.ToImmutable(), native, diagnostics.ToImmutable())
+        { DiscoveryRoots = configuration.DiscoveryRoots };
 
         void Replace(int index, string selection, bool shadowed, string reason)
         {
@@ -230,11 +250,11 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
     }
 
     private sealed record PlacementRule(string Kind, string Family, int Rank, string? Root = null, string? Namespace = null,
-        string? DistributorId = null, bool Registered = false, GeminiExtensionExpectation? Extension = null);
+        string? DistributorId = null, bool Registered = false, GeminiExtensionExpectation? Extension = null, string? DiscoveryRestriction = null);
 
     private static PlacementRule Placement(SkillLoadingContext context, string system, InventorySnapshot inventory,
         string entry, ImmutableArray<ObservedSkillExposure> exposures, IReadOnlyDictionary<string, string?> pluginNames,
-        ImmutableArray<GeminiExtensionExpectation> extensions, CancellationToken token)
+        ImmutableArray<GeminiExtensionExpectation> extensions, ImmutableArray<LoadingDiscoveryRoot> discoveryRoots, CancellationToken token)
     {
         if (exposures.Length > 0 && exposures.All(exposure => exposure.Membership.Profile is { } profile && profile != context.Profile))
             return new("other-profile", "outside", 0);
@@ -281,17 +301,22 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
             if (deliveries.Length > 0) return new("gemini-extension", "ordinary", 10, Extension: deliveries.Length == 1 ? deliveries[0]
                 : deliveries[0] with { Enabled = null, Reasons = ["Multiple extension deliveries expose this physical entry; each saved enablement is retained, and runtime selection is unobserved."] });
         }
-        else if (context.AgentId is "codex" or "opencode")
+        else if (context.AgentId == "opencode")
         {
-            var roots = context.AgentId == "codex" ? new[] { Path.Combine(context.HomeDirectory, ".agents", "skills"),
-                Path.Combine(context.ConfigDirectory, "skills", ".system"), Path.Combine(system, "skills") }
-                : new[] { Path.Combine(context.ConfigDirectory, "skills"), Path.Combine(context.HomeDirectory, ".claude", "skills"), Path.Combine(context.HomeDirectory, ".agents", "skills") };
+            var matches = discoveryRoots.Where(root => root.Covers(entry)).ToArray();
+            var applicable = matches.FirstOrDefault(root => root.Applicability == "applied");
+            if (applicable is not null) return new(applicable.Placement, "ordinary", 1, applicable.Path);
+            var conditional = matches.FirstOrDefault(root => root.Applicability == "conditional");
+            if (conditional is not null) return new("conditional-discovery-root", "ordinary", 1, DiscoveryRestriction: conditional.Reason);
+            if (matches.Length > 0) return new("excluded-discovery-root", "outside", 0, DiscoveryRestriction: matches[0].Reason);
+        }
+        else if (context.AgentId == "codex")
+        {
+            var roots = new[] { Path.Combine(context.HomeDirectory, ".agents", "skills"),
+                Path.Combine(context.ConfigDirectory, "skills", ".system"), Path.Combine(system, "skills") };
             if (roots.Any(Under)) return new("user-or-system", "ordinary", 1);
             foreach (var directory in LoadingConfigurationCapture.Ancestors(context.WorkingDirectory, context.ProjectDirectory, token))
-            {
-                var names = context.AgentId == "codex" ? new[] { ".agents" } : new[] { ".opencode", ".claude", ".agents" };
-                if (names.Any(name => Under(Path.Combine(directory, name, "skills")))) return new("project", "ordinary", 1);
-            }
+                if (Under(Path.Combine(directory, ".agents", "skills"))) return new("project", "ordinary", 1);
         }
         return new("outside-documented-roots", "outside", 0);
     }
@@ -309,6 +334,10 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
             return new("incompatible", "no", "no", "no", "not-applicable", "reserved-name", "documented-reserved-ordinary-name", "rename-and-reload",
                 ["Claude reserves this ordinary directory name for synced/account skill delivery."])
             { SlashInvocation = "no" };
+        if (placement.Kind == "excluded-discovery-root") return new("disabled", "no", "no", "no", "not-applicable", "excluded-discovery-root",
+            "not-proven-incompatible", "client-reload-session-unknown", [placement.DiscoveryRestriction ?? "Provider configuration excludes this discovery root."])
+        { SlashInvocation = "no" };
+        if (placement.Kind == "conditional-discovery-root") return ExpectedSkillLoading.Unknown(placement.DiscoveryRestriction ?? "Discovery root applicability is unknown.");
         if (placement.Rank == 0) return ExpectedSkillLoading.Unknown("This entry lies outside the selected profile/project's documented discovery paths.") with { Discoverability = "not-by-default", Selection = "outside-context" };
         if (context.AgentId == "gemini-cli" && (header.Root.Get("name")?.Kind != "string" || header.Root.Get("description")?.Kind != "string"))
             return ExpectedSkillLoading.Unknown("Gemini requires name/description; its fallback parser has not been modeled for this metadata, so eligibility is unproven.");

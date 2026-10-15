@@ -18,6 +18,14 @@ namespace SkillView.Ui;
 /// controls are disposed. Changing context never edits agent configuration.
 internal static class EffectiveLoadingScreen
 {
+    internal static ImmutableArray<EffectiveSkillCandidate> SelectInstallCandidates(EffectiveSkillAnalysis analysis, InstalledSkill selected)
+    {
+        var id = selected.ObservedSubject?.InstallationId;
+        return analysis.Candidates.Where(candidate => id is not null
+            ? string.Equals(candidate.Subject.InstallationId, id, StringComparison.Ordinal)
+            : string.Equals(candidate.Subject.Path, selected.ResolvedPath, StringComparison.Ordinal)).ToImmutableArray();
+    }
+
     internal static void Show(IApplication app, Logger logger, InstalledSkill selected, string workingDirectory,
         Func<LoadingCaptureRequest, CancellationToken, Task<EffectiveSkillAnalysis>> capture,
         Action<Dialog>? readyForTests = null)
@@ -73,7 +81,7 @@ internal static class EffectiveLoadingScreen
                     token.ThrowIfCancellationRequested();
                     // Compare captured strings only; rendering never probes a
                     // path to recover a physical/context key on the UI thread.
-                    var selectedRows = result.Candidates.Where(candidate => string.Equals(candidate.Subject.Path, selected.ResolvedPath, StringComparison.Ordinal)).ToImmutableArray();
+                    var selectedRows = SelectInstallCandidates(result, selected);
                     var relevant = selectedRows.Select(candidate => candidate.LoadingKey).Concat(selectedRows.SelectMany(candidate => candidate.SelectionPeers)).ToHashSet(StringComparer.Ordinal);
                     var rendered = CliDispatcher.RenderEffectiveText(result with { Candidates = result.Candidates.Where(candidate => relevant.Contains(candidate.LoadingKey)).ToImmutableArray() });
                     operation.InvokeTerminalIfActive(() =>

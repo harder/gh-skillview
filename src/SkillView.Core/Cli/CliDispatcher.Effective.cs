@@ -109,6 +109,14 @@ public static partial class CliDispatcher
             writer.WriteEndObject();
         }
         writer.WriteEndArray();
+        writer.WriteStartArray("discoveryRoots");
+        foreach (var root in analysis.DiscoveryRoots)
+        {
+            writer.WriteStartObject(); writer.WriteString("path", root.Path); writer.WriteString("placement", root.Placement);
+            writer.WriteString("pattern", "**/SKILL.md"); writer.WriteBoolean("includeHidden", root.IncludeHidden);
+            writer.WriteString("applicability", root.Applicability); writer.WriteString("reason", root.Reason); writer.WriteString("sourceEvidence", root.SourceEvidence); writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
         writer.WriteStartArray("configurationEvidence");
         foreach (var file in analysis.Configuration)
         {
@@ -167,6 +175,8 @@ public static partial class CliDispatcher
             }
             if (candidate.SelectionPeerCoverage != "complete") result.AppendLine("  Competitor references are bounded; all physical candidates remain in JSON.");
         }
+        foreach (var root in analysis.DiscoveryRoots)
+            result.AppendLine($"Discovery root: {root.Path}; {root.Applicability}; hidden={root.IncludeHidden}; {root.Placement}; {root.Reason}");
         result.AppendLine("Observed local configuration evidence:");
         foreach (var file in analysis.Configuration.Where(file => file.State != "missing" && file.Purpose != "bounded skill frontmatter"))
             result.AppendLine($"  {file.Path}: {file.State}; {file.Purpose}{(file.Diagnostic is null ? "" : "; " + file.Diagnostic)}");

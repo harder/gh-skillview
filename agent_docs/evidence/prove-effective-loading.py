@@ -34,7 +34,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     app, gh = args.app.resolve(), args.gh.resolve()
-    assert app.is_file() and gh.is_file()
+    assert app.is_file(), ("Published product host is missing", str(app))
+    assert gh.is_file(), ("Native gh path is missing", str(gh))
     reports = []
     with tempfile.TemporaryDirectory(prefix="skillview-effective-proof-") as temporary:
         root = Path(temporary).resolve()
@@ -59,7 +60,9 @@ def main():
             "GEMINI_CLI_SYSTEM_DEFAULTS_PATH": str(root / "absent-system-defaults.json"), "GEMINI_CLI_TRUST_WORKSPACE": "",
             "GEMINI_CLI_TRUSTED_FOLDERS_PATH": str(home / ".gemini/trustedFolders.json"),
             "OPENCODE_CONFIG": "", "OPENCODE_CONFIG_DIR": "", "OPENCODE_CONFIG_CONTENT": "", "OPENCODE_PERMISSION": "",
-            "OPENCODE_DISABLE_PROJECT_CONFIG": "", "CLAUDE_CODE_PLUGIN_DIRS": "", "CLAUDE_CODE_PLUGIN_SEED_DIR": "",
+            "OPENCODE_DISABLE_PROJECT_CONFIG": "", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "false",
+            "OPENCODE_DISABLE_CLAUDE_CODE": "false", "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "false",
+            "CLAUDE_CODE_PLUGIN_DIRS": "", "CLAUDE_CODE_PLUGIN_SEED_DIR": "",
             "CLAUDE_CODE_PLUGIN_CACHE_DIR": "", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_CONFIG_COUNT": "0", "GIT_TEMPLATE_DIR": str(root / "empty-git-template"),
             "PATH": str(bins) + os.pathsep + env.get("PATH", ""),
@@ -89,26 +92,39 @@ def main():
         alternate_home = root / "gemini-home"
         alternate_skill = alternate_home / ".agents/skills/demo"
         skill(alternate_skill)
+        alternate_claude = root / "alternate-claude"
+        alternate_plugin = alternate_claude / "plugins/cache/market/package/1.0.0"
+        write(alternate_plugin / ".claude-plugin/plugin.json", '{"name":"package","skills":"./skills/"}\n')
+        skill(alternate_plugin / "skills/demo")
+        opencode_config = root / "opencode-config"
+        bundle = project_a / "loading-bundle"
+        for path in (opencode_config / "skill/demo", home / ".opencode/skills/demo", bundle, bundle / "outer", bundle / "outer/nested"):
+            skill(path)
+        write(project_a / "opencode.json", '{"skills":{"paths":["loading-bundle"]}}\n')
 
         def snapshot():
             observed = {}
             # SkillView's own logs/state are deliberately outside these trees.
             # Both filenames and bytes are compared; added files are changes.
             for directory in (home / ".agents", home / ".claude", home / ".codex", home / ".config/opencode",
-                              project_a / ".claude", project_a / ".gemini", project_b / ".gemini", alternate_home, home / ".gemini", extension_payload):
+                              project_a / ".claude", project_a / ".gemini", project_b / ".gemini", alternate_home, home / ".gemini", extension_payload,
+                              alternate_claude, opencode_config, bundle, home / ".opencode"):
                 for path in sorted(directory.rglob("*")):
                     observed[str(path.relative_to(root))] = "directory" if path.is_dir() else sha(path)
+            observed[str((project_a / "opencode.json").relative_to(root))] = sha(project_a / "opencode.json")
             return observed
 
         before = snapshot()
 
-        def run(agent, project=project_a, overrides=None, version=None):
+        def run(agent, project=project_a, overrides=None, version=None, config=None):
             child = env.copy()
             if overrides:
                 child.update(overrides)
             command = [str(app), "effective", "--agent", agent, "--project", str(project), "--cwd", str(project), "--trust", "trusted", "--json"]
             if version:
                 command += ["--client-version", version]
+            if config:
+                command += ["--config-dir", str(config)]
             process = subprocess.run(command, env=child, cwd=project, capture_output=True, text=True, timeout=90)
             assert process.returncode == 0, (agent, process.returncode, process.stderr[-2000:])
             document = json.loads(process.stdout)
@@ -147,13 +163,25 @@ def main():
         assert rows(claude, personal)[0]["expected"]["selection"] in ("selected", "conditional-selection")
         assert rows(claude, project_skill)[0]["expected"]["selection"] == "shadowed"
         assert rows(claude, project_skill)[0]["selectionPeers"]
+        alternate_plugin_analysis = run("claude-code", config=alternate_claude)
+        plugin_row = rows(alternate_plugin_analysis, alternate_plugin / "skills/demo")[0]
+        assert plugin_row["placement"] == "managed-plugin"
+        assert plugin_row["invocationName"] == "package:demo"
         codex = run("codex")
         assert rows(codex, universal)[0]["expected"]["automaticInvocation"] == "no"
         assert any(item["path"] == str(home / ".codex/config.toml") and item["state"] == "observed" for item in codex["configurationEvidence"])
-        opencode = run("opencode")
+        opencode = run("opencode", overrides={"OPENCODE_CONFIG_DIR": str(opencode_config)})
         assert rows(opencode, universal)[0]["expected"]["approval"] == "ask"
         assert rows(opencode, universal)[0]["expected"]["slashInvocation"] == "no"
         assert any(item["path"].endswith("policy.md") and item["state"] == "observed" for item in opencode["configurationEvidence"])
+        for path in (opencode_config / "skill/demo", home / ".opencode/skills/demo", bundle, bundle / "outer", bundle / "outer/nested"):
+            assert rows(opencode, path)[0]["expected"]["discoverability"] == "expected"
+        assert any(Path(item["path"]).resolve() == bundle.resolve() for item in opencode["discoveryRoots"])
+        excluded = run("opencode", overrides={"OPENCODE_DISABLE_EXTERNAL_SKILLS": "true", "OPENCODE_CONFIG_DIR": str(opencode_config)})
+        assert rows(excluded, universal)[0]["placement"] == "excluded-discovery-root"
+        assert rows(excluded, universal)[0]["expected"]["manualInvocation"] == "no"
+        assert rows(excluded, bundle)[0]["expected"]["discoverability"] == "expected"
+        assert opencode["context"]["id"] != excluded["context"]["id"]
         assert before == snapshot()
         output = {
             "proofSchema": 1, "scope": "disposable-native-product-fixtures; no AI-client conformance claimed",

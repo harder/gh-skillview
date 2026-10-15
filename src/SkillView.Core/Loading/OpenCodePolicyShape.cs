@@ -9,6 +9,12 @@ internal static class OpenCodePolicyShape
     internal static bool Supported(LoadingValue root)
     {
         if (root.Kind != "table" || !Permission(root.Get("permission")) || !Tools(root.Get("tools"))) return false;
+        if (root.Get("skills") is { } skills)
+        {
+            if (skills.Kind != "table") return false;
+            foreach (var key in new[] { "paths", "urls" })
+                if (skills.Get(key) is { } values && (values.Kind != "array" || values.Items.Any(value => value.Kind != "string"))) return false;
+        }
         foreach (var key in new[] { "agent", "mode" })
         {
             var agents = root.Get(key);

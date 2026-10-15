@@ -77,7 +77,11 @@ public sealed class EffectiveCliTests : IDisposable
     {
         var analysis = Analysis();
         var candidate = analysis.Candidates[0];
-        analysis = analysis with { Candidates = [candidate with { InvocationName = "demo\x1b[31m", EntryPath = "unavailable\0path" }] };
+        analysis = analysis with
+        {
+            Candidates = [candidate with { InvocationName = "demo\x1b[31m", EntryPath = "unavailable\0path" }],
+            DiscoveryRoots = [new("unavailable\0root\x1b[31m", "configured-path", false, SourceEvidence: "frozen source")]
+        };
         // These invalid addresses would throw if either renderer probed them.
         var text = CliDispatcher.RenderEffectiveText(analysis);
         Assert.DoesNotContain('\x1b', text);
@@ -85,6 +89,9 @@ public sealed class EffectiveCliTests : IDisposable
         Assert.Contains("active-session state: unknown", text);
         using var json = JsonDocument.Parse(CliDispatcher.RenderEffectiveJson(analysis));
         Assert.Single(json.RootElement.GetProperty("candidates").EnumerateArray());
+        var root = Assert.Single(json.RootElement.GetProperty("discoveryRoots").EnumerateArray());
+        Assert.Equal("configured-path", root.GetProperty("placement").GetString());
+        Assert.Equal("frozen source", root.GetProperty("sourceEvidence").GetString());
     }
 
     [Fact]

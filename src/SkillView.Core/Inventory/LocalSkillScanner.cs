@@ -44,6 +44,9 @@ public sealed class LocalSkillScanner
     public sealed record Options(bool AllowHiddenDirs = false)
     {
         internal ManagedSkillDiscovery.Observation? Managed { get; init; }
+        // OpenCode's **/SKILL.md observation includes root files and skills
+        // nested inside other skills. Ordinary maintenance keeps leaf semantics.
+        internal bool DiscoverNestedSkillFiles { get; init; }
     }
 
     public ImmutableArray<InstalledSkill> Scan(
@@ -67,7 +70,7 @@ public sealed class LocalSkillScanner
         foreach (var root in roots.OrderByDescending(root => root.Managed))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (root.Managed && root.DirectSkill)
+            if (root.Managed && root.DirectSkill && !options.DiscoverNestedSkillFiles)
             {
                 var errors = inaccessiblePaths?.Count ?? 0;
                 ConsiderCandidate(root, root.Path, byResolved, caseSensitivityByParent, cancellationToken, budget, inaccessiblePaths);
@@ -76,6 +79,8 @@ public sealed class LocalSkillScanner
             }
             if (!root.Managed && ManagedBoundary(root.Path, root, options, completedManaged, inaccessiblePaths, locations)) continue;
             var errorsBeforeWalk = inaccessiblePaths?.Count ?? 0;
+            if (options.DiscoverNestedSkillFiles && (root.Managed && root.DirectSkill || File.Exists(Path.Combine(root.Path, SkillFileName))))
+                ConsiderCandidate(root, root.Path, byResolved, caseSensitivityByParent, cancellationToken, budget, inaccessiblePaths);
             var result = Walk(root.Path, 0, root, options, byResolved, caseSensitivityByParent,
                 cancellationToken, inaccessiblePaths, budget, locations, completedManaged);
             if (root.Managed && result.Complete && (inaccessiblePaths?.Count ?? 0) == errorsBeforeWalk)
@@ -175,7 +180,8 @@ public sealed class LocalSkillScanner
                     complete = false;
                     continue;
                 }
-                if (File.Exists(Path.Combine(child, SkillFileName)) || linked)
+                var candidateObserved = File.Exists(Path.Combine(child, SkillFileName)) || linked;
+                if (candidateObserved)
                 {
                     ConsiderCandidate(root, child, acc, caseSensitivityByParent, token, budget, inaccessible);
                     found = true;
@@ -184,7 +190,14 @@ public sealed class LocalSkillScanner
                         Record("budget-exceeded", "Aggregate metadata byte limit reached.");
                         return (found, false);
                     }
-                    continue;
+                    if (!opts.DiscoverNestedSkillFiles) continue;
+                    if (linked)
+                    {
+                        inaccessible?.Add(child);
+                        if (locations is { Count: < 128 }) locations.Add(new(child, "unsupported", "Linked skill subtree is not traversed; native recursive discovery may find additional skills."));
+                        complete = false;
+                        continue;
+                    }
                 }
                 var nested = Walk(child, depth + 1, root, opts, acc, caseSensitivityByParent, token, inaccessible, budget, locations, completedManaged);
                 complete &= nested.Complete;
@@ -193,7 +206,7 @@ public sealed class LocalSkillScanner
                     found = true;
                     if (locations is { Count: < 128 }) locations.Add(new(child, "container", "Namespace/package container; payloads are its skill descendants."));
                 }
-                else if (nested.Complete && !root.Managed)
+                else if (nested.Complete && !root.Managed && !candidateObserved)
                 {
                     ConsiderCandidate(root, child, acc, caseSensitivityByParent, token, budget, inaccessible);
                     found = true;

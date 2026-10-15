@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
+using SkillView.Inventory;
 using SkillView.Loading;
 using SkillView.Logging;
 using SkillView.Subprocess;
@@ -38,7 +39,10 @@ public sealed class LoadingConfigurationCaptureTests : IDisposable
             ["OPENCODE_CONFIG_DIR"] = "",
             ["OPENCODE_CONFIG_CONTENT"] = "",
             ["OPENCODE_PERMISSION"] = "",
-            ["OPENCODE_DISABLE_PROJECT_CONFIG"] = ""
+            ["OPENCODE_DISABLE_PROJECT_CONFIG"] = "",
+            ["OPENCODE_DISABLE_EXTERNAL_SKILLS"] = "false",
+            ["OPENCODE_DISABLE_CLAUDE_CODE"] = "false",
+            ["OPENCODE_DISABLE_CLAUDE_CODE_SKILLS"] = "false"
         };
         if (overrides is not null) foreach (var pair in overrides) environment[pair.Key] = pair.Value;
         return new(new Logger(), environment: environment, defaultWorkingDirectory: Project);
@@ -90,7 +94,7 @@ public sealed class LoadingConfigurationCaptureTests : IDisposable
         var defaults = Write(Path.Combine(_temporary.FullName, "defaults.conf"), """{"skills":{"disabled":["other"]}}""");
         var capture = Capture("gemini", new Dictionary<string, string>
         { ["GEMINI_CLI_HOME"] = selectedHome, ["GEMINI_CLI_SYSTEM_DEFAULTS_PATH"] = defaults });
-        Assert.Equal(selectedHome, capture.Context.HomeDirectory);
+        Assert.Equal(PathIdentity.Normalize(selectedHome), capture.Context.HomeDirectory);
         Assert.False(Policy(capture).Enabled);
         Assert.Equal(defaults, capture.Settings.Layers[0].Document.Evidence.Path);
     }
@@ -121,13 +125,49 @@ public sealed class LoadingConfigurationCaptureTests : IDisposable
     [Theory]
     [InlineData("OPENCODE_CONFIG_CONTENT", "{\"permission\":{\"skill\":\"deny\"}}")]
     [InlineData("OPENCODE_PERMISSION", "{\"skill\":\"deny\"}")]
-    [InlineData("OPENCODE_DISABLE_PROJECT_CONFIG", "true")]
     public void KnownUninterpretedRuntimePolicyPreventsAnEnabledDefault(string key, string value)
     {
         var capture = Capture("opencode", new Dictionary<string, string> { [key] = value });
         Assert.NotEmpty(capture.Settings.LocalPolicyBlockers);
         Assert.Null(Policy(capture).Enabled);
         Assert.DoesNotContain(value, string.Join("", capture.Settings.Evidence));
+    }
+
+    [Fact]
+    public void RelativeProjectAndCwdResolveOnceAgainstTheOriginalWorkingDirectory()
+    {
+        var runner = Runner();
+        var parent = new LoadingConfigurationCapture(runner, System).Capture(new("codex", ProjectDirectory: "child"), Token);
+        Assert.Equal(PathIdentity.Normalize(Path.Combine(Project, "child")), parent.Context.ProjectDirectory);
+        Assert.Equal(parent.Context.ProjectDirectory, parent.Context.WorkingDirectory);
+        var nested = new LoadingConfigurationCapture(runner, System).Capture(new("codex", ProjectDirectory: "child", WorkingDirectory: "child/nested"), Token);
+        Assert.Equal(parent.Context.ProjectDirectory, nested.Context.ProjectDirectory);
+        Assert.Equal(PathIdentity.Normalize(Path.Combine(Project, "child", "nested")), nested.Context.WorkingDirectory);
+    }
+
+    [Fact]
+    public void ConditionalLegacyTomlModeKeepsNativeMigrationPolicyUnknown()
+    {
+        Write(Path.Combine(Home, ".config", "opencode", "config"), "[mode.build.permission]\nskill = 'deny'\n");
+        var capture = Capture("opencode");
+        Assert.True(capture.Settings.HasUncertainLocalPolicy); Assert.Null(Policy(capture).Enabled);
+        Assert.Contains(capture.DiscoveryLimitations, reason => reason.Contains("conditional", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("TRUE", true)]
+    [InlineData("1", true)]
+    [InlineData("yes", false)]
+    [InlineData("false", false)]
+    public void ProjectConfigFlagUsesItsOwnNativeBooleanContract(string value, bool excluded)
+    {
+        Write(Path.Combine(Project, "opencode.json"), "{\"permission\":{\"skill\":\"deny\"}}");
+        var capture = Capture("opencode", new Dictionary<string, string> { ["OPENCODE_DISABLE_PROJECT_CONFIG"] = value });
+        Assert.Equal(!excluded, capture.Settings.Layers.Any(layer => layer.Scope == "project"));
+        Assert.Equal(!excluded, capture.DiscoveryRoots.Any(root => PathIdentity.Equals(root.Path, Path.Combine(Project, ".opencode", "skills"))));
+        Assert.Equal(excluded, Policy(capture).Enabled);
+        Assert.NotEqual(Capture("opencode").Context.ContextId, capture.Context.ContextId);
     }
 
     [Fact]

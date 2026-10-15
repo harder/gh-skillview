@@ -92,4 +92,7 @@ internal sealed record EffectiveSkillAnalysis(SkillLoadingContext Context,
     AgentLoadingRuleSet? Rules, string RuleApplicability, DateTimeOffset CapturedAt,
     bool Complete, ImmutableArray<EffectiveSkillCandidate> Candidates,
     ImmutableArray<LoadingFileEvidence> Configuration,
-    NativeLoadingObservation Native, ImmutableArray<string> Diagnostics);
+    NativeLoadingObservation Native, ImmutableArray<string> Diagnostics)
+{
+    internal ImmutableArray<LoadingDiscoveryRoot> DiscoveryRoots { get; init; } = [];
+}

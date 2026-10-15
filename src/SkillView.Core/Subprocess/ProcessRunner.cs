@@ -45,6 +45,16 @@ public sealed class ProcessRunner
         _defaultWorkingDirectory = defaultWorkingDirectory is null ? null : Path.GetFullPath(defaultWorkingDirectory);
     }
 
+    internal ProcessRunner WithContext(string workingDirectory, IReadOnlyDictionary<string, string> overrides)
+    {
+        var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+            if (entry.Key is string key && entry.Value is string value) values[key] = value;
+        if (_environment is not null) foreach (var pair in _environment) values[pair.Key] = pair.Value;
+        foreach (var pair in overrides) values[pair.Key] = pair.Value;
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory);
+    }
+
     public async Task<ProcessResult> RunAsync(
         string executable,
         IReadOnlyList<string> arguments,

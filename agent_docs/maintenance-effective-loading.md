@@ -141,3 +141,19 @@ Resumed review checkpoint (M12 acceptance still open):
   saved trust evidence and a named OpenCode Markdown override, and CI invokes it
   for both native hosts on every AOT target. These remain product fixtures, not
   actual AI-client conformance or observations of the user's running sessions.
+
+Copilot review follow-up (acceptance remains pending):
+- All consumed conditional policy keys now retain uncertainty, including legacy
+  OpenCode modes and Claude plugin enablement. Relative project/CWD inputs
+  resolve once against the original runner directory. Selected Claude/Codex homes
+  reach managed discovery through an isolated child runner.
+- Frozen OpenCode discovery roots cover every configuration directory's singular
+  and plural skill trees, external compatibility roots and final `skills.paths`.
+  Exact native disable flags, hidden-entry rules, CWD-relative paths and tilde
+  joining are separate provider contracts. Recursive root/nested skills use an
+  opt-in bounded observation mode; ordinary inventory retains leaf semantics.
+  Remote URLs, unresolved substitutions and unreadable roots remain incomplete.
+- Native product fixtures now cover alternate Claude plugin homes, custom
+  OpenCode config directories, root/nested configured skills and disable flags.
+  CI resolves gh with Python's native executable lookup: Git Bash's `command -v`
+  can return an MSYS path that native Windows Python cannot inspect.
