@@ -125,8 +125,12 @@ internal sealed partial class ManagedSkillDiscovery
             {
                 token.ThrowIfCancellationRequested();
                 var candidate = OwnershipPath.CanonicalCandidate(payload.Path);
-                if (candidate is null || !PathIdentity.IsInside(candidate, parent)) continue;
-                var alias = Path.GetFullPath(Path.GetRelativePath(parent, candidate), ordinary.Path);
+                if (candidate is null) continue;
+                var contained = PathIdentity.IsInside(candidate, parent);
+                var narrower = !payload.DirectSkill && (ordinary.Scope == Scope.Custom || ordinary.Profile is not null)
+                    && PathIdentity.IsInside(parent, candidate);
+                if (!contained && !narrower) continue;
+                var alias = narrower ? ordinary.Path : Path.GetFullPath(Path.GetRelativePath(parent, candidate), ordinary.Path);
                 var region = regions.Where(region => region.Provider == payload.ManagedProvider && CoversForObservation(region, candidate))
                     .OrderByDescending(region => region.PluginId is not null).FirstOrDefault();
                 if (region is not null) Root(alias, region, ordinary);
@@ -147,6 +151,21 @@ internal sealed partial class ManagedSkillDiscovery
     {
         var paths = target.Agents.Select(agent => agent.Path).Append(target.ResolvedPath).Distinct(StringComparer.Ordinal).ToArray();
         RefusePaths(paths, token, runner ?? target.OwnershipRunner);
+    }
+
+    internal static void RefuseKnownRoots(IEnumerable<ScanRoot> roots, IReadOnlyList<string> paths, CancellationToken token)
+    {
+        foreach (var root in roots.Where(root => root.Managed))
+        {
+            token.ThrowIfCancellationRequested();
+            var region = new ManagedSkillRegion(root.Path, "managed", root.AgentHint ?? "unknown", "managed skills");
+            foreach (var path in paths)
+            {
+                token.ThrowIfCancellationRequested();
+                if (region.Covers(path) || region.IsInside(path))
+                    throw new IOException("Managed skill resources require their owning agent or package manager.");
+            }
+        }
     }
 
     internal static void RefusePaths(IEnumerable<string> selected, CancellationToken token, ProcessRunner? runner = null)
@@ -179,14 +198,16 @@ internal sealed partial class ManagedSkillDiscovery
         var region = new ManagedSkillRegion(path, provider, agent, "plugin storage", Context: path);
         if (regions.Any(existing => existing.Path == region.Path && existing.Provider == region.Provider)) return;
         AddRegion(region);
+        if (SkipLinkedContainer(path, region)) return;
         if (!DirectoryExists(path)) return;
         if (provider == "claude-plugin") ClaudeRegistry(path, discover);
         Cache(Path.Combine(path, "cache"), region, 0, [], discover);
         var synced = Path.Combine(path, "synced");
-        if (DirectoryExists(synced) && discover) Synced(synced, region, 0);
+        Synced(synced, region, 0, discover);
     }
     private void Cache(string path, ManagedSkillRegion region, int depth, string[] names, bool discover)
     {
+        if (SkipLinkedContainer(path, region)) return;
         if (!DirectoryExists(path)) return;
         foreach (var entry in Children(path))
         {
@@ -206,19 +227,42 @@ internal sealed partial class ManagedSkillDiscovery
             else Cache(entry, region, depth + 1, next, discover);
         }
     }
-    private void Synced(string path, ManagedSkillRegion region, int depth)
+    private void Synced(string path, ManagedSkillRegion region, int depth, bool discover)
     {
-        if (depth >= 4) { Incomplete(path, "Unrecognized synced plugin structure exceeds discovery depth."); return; }
-        if (HasManifest(path)) { Plugin(path, region.Provider, region.AgentId, Path.GetFileName(path) + "@synced", null, true); return; }
-        foreach (var child in Children(path)) if (DirectoryEntry(child)) Synced(child, region, depth + 1);
+        if (SkipLinkedContainer(path, region) || !DirectoryExists(path)) return;
+        if (depth >= 4) { topologyIncomplete = true; Incomplete(path, "Unrecognized synced plugin structure exceeds discovery depth."); return; }
+        if (HasManifest(path) || DirectoryExists(Path.Combine(path, "skills")))
+        {
+            if (discover) Plugin(path, region.Provider, region.AgentId, Path.GetFileName(path) + "@synced", null, true);
+            else AddRegion(region with { Path = path, Kind = "synced plugin", PluginId = Path.GetFileName(path) + "@synced", ObservedCanonicalPath = null });
+            return;
+        }
+        foreach (var child in Children(path))
+            if (!SkipLinkedContainer(child, region) && DirectoryEntry(child)) Synced(child, region, depth + 1, discover);
+    }
+    private bool SkipLinkedContainer(string path, ManagedSkillRegion region)
+    {
+        if (!IsLink(path)) return false;
+        AddRegion(region with { Path = path, Kind = "linked plugin storage", ObservedCanonicalPath = null });
+        Incomplete(path, "Linked managed container is observed but not traversed; add its physical target explicitly.");
+        return true;
     }
     private void Embedded(string path, ScanRoot ordinary, int depth, bool allowHidden)
     {
         token.ThrowIfCancellationRequested();
-        if (!DirectoryExists(path) || regions.Any(region => CoversForObservation(region, path))) return;
+        if (!DirectoryExists(path) || regions.Any(region => CoversForObservation(region, path))
+            && !NeedsExplicitTraversal(ordinary)) return;
         if (!visited.Add(PathIdentity.NormalizeKey(path) + "\0" + ordinary.Scope + "\0" + ordinary.Context + "\0" + ordinary.Profile)) return;
         if (ObserveEmbeddedPlugin(path, true, ordinary)) return;
-        if (Exists(Path.Combine(path, LocalSkillScanner.SkillFileName))) return;
+        if (Exists(Path.Combine(path, LocalSkillScanner.SkillFileName)))
+        {
+            if (ordinary.Scope == Scope.Custom || ordinary.Profile is not null)
+            {
+                var owner = regions.FirstOrDefault(region => CoversForObservation(region, path));
+                if (owner is not null) Root(path, owner, ordinary);
+            }
+            return;
+        }
         if (depth >= MaxDepth) { topologyIncomplete = true; Incomplete(path, "Embedded plugin discovery depth exceeded."); return; }
         foreach (var child in Children(path))
         {
@@ -242,7 +286,7 @@ internal sealed partial class ManagedSkillDiscovery
     }
     private void Ancestors(string path, bool discover, ScanRoot? context)
     {
-        if (regions.Any(region => CoversForObservation(region, path))) return;
+        if (regions.Any(region => CoversForObservation(region, path)) && !NeedsExplicitTraversal(context)) return;
         string? cursor = Path.GetFullPath(path, cwd);
         for (var depth = 0; cursor is not null && depth < 128; depth++, cursor = Path.GetDirectoryName(cursor))
         {
@@ -251,6 +295,17 @@ internal sealed partial class ManagedSkillDiscovery
         }
         if (cursor is not null) { topologyIncomplete = true; Incomplete(path, "Managed ancestor inspection depth exceeded."); }
     }
+    private bool NeedsExplicitTraversal(ScanRoot? context)
+    {
+        if (context is null || context.Scope != Scope.Custom && context.Profile is null) return false;
+        var boundary = OwnershipPath.CanonicalCandidate(context.Path);
+        if (boundary is null)
+        { topologyIncomplete = true; Incomplete(context.Path, "Explicit managed payload boundary could not be inspected."); return false; }
+        // Already discovered payloads get alias/profile exposures below. Only a
+        // still-unobserved explicit physical scope needs a separate narrow scan.
+        return !roots.Any(root => OwnershipPath.CanonicalCandidate(root.Path) is { } payload
+            && PathIdentity.IsInside(boundary, payload));
+    }
     private bool HasManifest(string path) => Exists(Path.Combine(path, ".codex-plugin", "plugin.json"))
         || Exists(Path.Combine(path, ".claude-plugin", "plugin.json")) || Exists(Path.Combine(path, "plugin.json"));
 
@@ -258,8 +313,14 @@ internal sealed partial class ManagedSkillDiscovery
     {
         var codex = Exists(Path.Combine(path, "plugin.json")) || Exists(Path.Combine(path, ".codex-plugin", "plugin.json"));
         var claude = Exists(Path.Combine(path, ".claude-plugin", "plugin.json"));
-        if (codex) Plugin(path, "local-codex-plugin", "codex", Path.GetFileName(path), null, discover, context);
-        if (claude) Plugin(path, "local-claude-plugin", "claude", Path.GetFileName(path), null, discover, context);
+        var codexOwner = codex ? regions.FirstOrDefault(region => region.PluginId is not null
+            && region.Provider.Contains("codex", StringComparison.Ordinal) && OwnershipPath.Same(region.Path, path)) : null;
+        var claudeOwner = claude ? regions.FirstOrDefault(region => region.PluginId is not null
+            && region.Provider.Contains("claude", StringComparison.Ordinal) && OwnershipPath.Same(region.Path, path)) : null;
+        if (codex) Plugin(path, codexOwner?.Provider ?? "local-codex-plugin", "codex", codexOwner?.PluginId ?? Path.GetFileName(path), codexOwner?.PackageVersion, discover, context,
+            payloadBoundaries: context is null ? null : [context]);
+        if (claude) Plugin(path, claudeOwner?.Provider ?? "local-claude-plugin", "claude", claudeOwner?.PluginId ?? Path.GetFileName(path), claudeOwner?.PackageVersion, discover, context,
+            payloadBoundaries: context is null ? null : [context]);
         return codex || claude;
     }
 
@@ -338,6 +399,7 @@ internal sealed partial class ManagedSkillDiscovery
     {
         token.ThrowIfCancellationRequested();
         try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return false; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { topologyIncomplete = true; Incomplete(path, ex.Message); return true; }
     }
     private void Incomplete(string path, string reason)

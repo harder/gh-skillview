@@ -156,3 +156,12 @@ installation destination. Move that HOME/config to a sibling of the fixture's
 skills directory, preserving the install guard and the actual update contract.
 These follow-up changes require fresh source and platform evidence; the first
 checkpoint remains attributed to the earlier source and native binaries.
+
+
+Copilot follow-up additionally covers initial and nested cache/synced links,
+including metadata-only admission; explicit unregistered payload intersections;
+narrow profiles within cached containers; reverse containment before removal and
+at execution; managed namespace classification; and private Pi proof configuration.
+Five new cases failed before correction. Both source re-reviews are clear and the
+326-case Inventory suite passes. These results do not replace final full/native
+and exact-head platform verification.

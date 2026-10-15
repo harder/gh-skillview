@@ -147,7 +147,10 @@ public sealed class LocalSkillScanner
                 token.ThrowIfCancellationRequested();
                 var leaf = Path.GetFileName(child);
                 if (!root.Managed && ManagedBoundary(child, root, opts, completedManaged, inaccessible, locations))
+                {
+                    found = true;
                     continue;
+                }
                 if (!opts.AllowHiddenDirs && leaf.StartsWith('.'))
                 {
                     if (locations is { Count: < 128 }) locations.Add(new(child, "excluded", "Hidden entry; use --allow-hidden-dirs to observe it."));

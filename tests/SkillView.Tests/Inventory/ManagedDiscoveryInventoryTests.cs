@@ -285,10 +285,12 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
         var runner = Runner(new Dictionary<string, string> { ["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = alias });
         var payload = Skill("ordinary/skills/control", "control");
         var inventory = await Capture([Path.GetDirectoryName(payload)!], runner);
-        Assert.False(inventory.IsPartial);
+        Assert.True(inventory.IsPartial);
         Directory.Delete(alias);
         Directory.CreateSymbolicLink(alias, replacement);
         var state = Path.Combine(original, "state");
+        Assert.Throws<IOException>(() => NativeStateDirectory.CheckExcluded(
+            OwnershipPath.CanonicalCandidate(state)!, inventory.ProtectedRoots.Select(root => root.Path).ToArray()));
         Assert.Throws<IOException>(() => new QuarantineStore(state, logger, runner: runner)
             .Preview(Assert.Single(inventory.Skills), inventory, Token));
         Assert.False(Directory.Exists(state));
@@ -635,6 +637,113 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
             Assert.Throws<IOException>(() => ManagedSkillDiscovery.RefusePaths([managedAncestor ? control : denied], Token, runner));
         }
         finally { File.SetUnixFileMode(denied, mode); }
+    }
+
+    [Theory]
+    [InlineData("cache")]
+    [InlineData("synced")]
+    public async Task LinkedInitialPluginContainersAreProtectedWithoutImplicitExternalReads(string container)
+    {
+        var external = DirectoryAt("external");
+        var plugin = container == "cache" ? DirectoryAt("external/market/plugin/1.0.0") : DirectoryAt("external/plugin");
+        Directory.CreateDirectory(Path.Combine(plugin, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(plugin, ".claude-plugin/plugin.json"), "{\"name\":\"plugin\"}");
+        var selected = Skill(Path.Combine(plugin, "skills/selected"), "selected");
+        Skill(Path.Combine(plugin, "skills/unselected"), "unselected");
+        Directory.CreateDirectory(Path.Combine(Claude, "plugins"));
+        Directory.CreateSymbolicLink(Path.Combine(Claude, "plugins", container), external);
+        var inventory = await Capture();
+        Assert.Empty(inventory.Skills);
+        Assert.True(inventory.IsPartial);
+        Assert.Contains(inventory.ManagedRegions, region => region.ObservedCanonicalPath is { } address
+            && PathIdentity.Equals(address, OwnershipPath.CanonicalCandidate(external)!));
+        Assert.Throws<IOException>(() => ManagedSkillDiscovery.RefusePaths([Path.Combine(plugin, "resources")], Token, Runner()));
+        var manifestless = Path.Combine(external, "private-resources");
+        Assert.Throws<IOException>(() => GhInstallOwnershipGuard.Capture([manifestless], Runner(),
+            new GhSkillInstallService.Options(Path: manifestless), logger, Token));
+        var explicitInventory = await Capture([selected]);
+        Assert.Equal("selected", Assert.Single(explicitInventory.Skills).Name);
+        Assert.All(explicitInventory.Skills[0].AllOwnershipClaims, owner => Assert.True(owner.ReadOnly));
+        Assert.DoesNotContain(explicitInventory.ScannedRoots, root => PathIdentity.Equals(root.Path, Path.Combine(plugin, "skills")));
+    }
+
+    [Fact]
+    public async Task NarrowUnregisteredPluginScopeDoesNotReadSiblingSkills()
+    {
+        var plugin = DirectoryAt("local-plugin");
+        Directory.CreateDirectory(Path.Combine(plugin, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(plugin, ".claude-plugin/plugin.json"), "{\"name\":\"plugin\",\"skills\":[\"./other\"]}");
+        var selected = Skill(Path.Combine(plugin, "skills/selected"), "selected");
+        Skill(Path.Combine(plugin, "skills/unselected"), "unselected");
+        Skill(Path.Combine(plugin, "other/private"), "private");
+        var inventory = await Capture([selected]);
+        Assert.Equal("selected", Assert.Single(inventory.Skills).Name);
+        Assert.DoesNotContain(inventory.ScannedRoots, root => PathIdentity.Equals(root.Path, Path.Combine(plugin, "skills"))
+            || PathIdentity.Equals(root.Path, Path.Combine(plugin, "other")));
+    }
+
+    [Fact]
+    public async Task OrdinaryRemovalCannotContainAKnownManagedPlugin()
+    {
+        var ordinary = Skill("ordinary/demo", "demo");
+        var plugin = DirectoryAt("ordinary/demo/resources/plugin");
+        Directory.CreateDirectory(Path.Combine(plugin, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(plugin, ".claude-plugin/plugin.json"), "{\"name\":\"plugin\"}");
+        Skill(Path.Combine(plugin, "skills/bundled"), "bundled");
+        var inventory = await Capture([Path.GetDirectoryName(ordinary)!, plugin]);
+        var skill = Assert.Single(inventory.Skills, skill => skill.Name == "demo");
+        var validation = RemoveValidator.Validate(skill, inventory.ProtectedRoots.ToArray(), inventory.Skills, Token);
+        Assert.False(validation.Allowed);
+        Assert.Contains(validation.Errors, error => error.Kind == RemoveValidator.ErrorKind.OwnerRecordNeedsPlan);
+    }
+
+    [Fact]
+    public async Task ManagedPluginInsideNamespaceDoesNotInventMalformedContainerSkill()
+    {
+        var root = DirectoryAt("ordinary");
+        var plugin = DirectoryAt("ordinary/namespace/plugin");
+        Directory.CreateDirectory(Path.Combine(plugin, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(plugin, ".claude-plugin/plugin.json"), "{\"name\":\"plugin\"}");
+        Skill(Path.Combine(plugin, "skills/demo"), "demo");
+        var inventory = await Capture([root]);
+        Assert.Equal("demo", Assert.Single(inventory.Skills).Name);
+        Assert.All(inventory.Skills, skill => Assert.Equal(ValidityState.Valid, skill.Validity));
+    }
+
+    [Fact]
+    public async Task NarrowProfileInsideCachedContainerKeepsOnlyItsSelectedExposureAndOriginalOwner()
+    {
+        var plugin = Plugin("claude", "1.0.0");
+        var selected = Skill(Path.Combine(plugin, "skills/selected"), "selected");
+        Skill(Path.Combine(plugin, "skills/unselected"), "unselected");
+        var inventory = await Capture(profiles: [new("codex", selected, "narrow")]);
+        var skill = Assert.Single(inventory.Skills, skill => skill.Name == "selected");
+        Assert.Contains(skill.Agents, agent => AgentIdentity.Matches(agent.AgentId, "codex") && agent.Profile == "narrow");
+        Assert.DoesNotContain(Assert.Single(inventory.Skills, skill => skill.Name == "unselected").Agents, agent => agent.Profile == "narrow");
+        Assert.Equal("claude-plugin", Assert.Single(skill.AllOwnershipClaims).Provider);
+        Assert.False(inventory.IsPartial);
+    }
+
+    [Fact]
+    public async Task NestedSyncedLinkRetainsManifestlessExternalBoundaryInInventoryAndAdmission()
+    {
+        var external = DirectoryAt("external-manifestless");
+        var selected = Skill(Path.Combine(external, "skills/selected"), "selected");
+        Skill(Path.Combine(external, "skills/unselected"), "unselected");
+        var parent = Directory.CreateDirectory(Path.Combine(Claude, "plugins/synced/market")).FullName;
+        Directory.CreateSymbolicLink(Path.Combine(parent, "plugin"), external);
+        var inventory = await Capture();
+        Assert.True(inventory.IsPartial);
+        Assert.Empty(inventory.Skills);
+        var destination = Path.Combine(external, "resources");
+        Assert.Throws<IOException>(() => GhInstallOwnershipGuard.Capture([destination], Runner(),
+            new GhSkillInstallService.Options(Path: destination), logger, Token));
+        var explicitInventory = await Capture([selected]);
+        var skill = Assert.Single(explicitInventory.Skills);
+        Assert.Equal("selected", skill.Name);
+        Assert.NotEmpty(skill.AllOwnershipClaims);
+        Assert.All(skill.AllOwnershipClaims, owner => Assert.True(owner.ReadOnly));
+        Assert.DoesNotContain(explicitInventory.ScannedRoots, root => PathIdentity.Equals(root.Path, Path.Combine(external, "skills")));
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>

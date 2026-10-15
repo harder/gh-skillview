@@ -159,7 +159,9 @@ public sealed class RemoveService
             try
             {
                 var authority = validation.ExecutionIdentity?.CanonicalPath ?? validation.ExecutionLinkIdentity?.CanonicalPath ?? target;
-                ManagedSkillDiscovery.RefusePaths(validation.OwnershipPaths.Append(target).Append(authority),
+                var ownershipPaths = validation.OwnershipPaths.Append(target).Append(authority).ToArray();
+                ManagedSkillDiscovery.RefuseKnownRoots(validation.ManagedRoots, ownershipPaths, cancellationToken);
+                ManagedSkillDiscovery.RefusePaths(ownershipPaths,
                     cancellationToken, validation.OwnershipRunner);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

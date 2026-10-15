@@ -963,3 +963,15 @@ unknown-boundary cleanup path. These are fixed, permission regressions pass, and
 all 319 Inventory tests plus both 17-case actual-gh contract suites pass. Source
 and evidence re-review are clear. The follow-up checkpoint preserves attribution;
 final full-suite, native and exact-head remote results remain required.
+
+
+Copilot's PR #59 review added linked cache/synced entry-point, narrow unregistered
+scope, reverse removal containment, proof-isolation and namespace classification
+findings. Five new deterministic cases failed before corrections. Re-review also
+covered nested synced links in metadata-only admission and direct-skill profiles
+inside cached containers. Both independent reviewers are clear after those fixes;
+all 326 Inventory tests pass. Known package observations survive contextual
+rediscovery, captured managed roots are rechecked at removal execution, and
+explicit physical payload reads do not expand to siblings. The original retargeted
+alias test now independently proves captured state exclusion despite intentionally
+partial linked-storage coverage. Final-source full/native/platform gates remain.

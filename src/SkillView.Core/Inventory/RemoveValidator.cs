@@ -49,6 +49,7 @@ public static class RemoveValidator
         internal bool RemovesLinkOnly { get; init; }
         internal SkillView.Subprocess.ProcessRunner? OwnershipRunner { get; init; }
         internal ImmutableArray<string> OwnershipPaths { get; init; } = [];
+        internal ImmutableArray<ScanRoot> ManagedRoots { get; init; } = [];
     }
 
     /// Validate removal of `target`. `knownRoots` is the union of scan roots
@@ -302,6 +303,7 @@ public static class RemoveValidator
             ExecutionIdentity = executionIdentity,
             OwnershipRunner = ownershipRunner,
             OwnershipPaths = ownershipPaths,
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
     }
 
@@ -409,6 +411,7 @@ public static class RemoveValidator
             RequiresEmptyDirectory = true,
             OwnershipRunner = ownershipRunner,
             OwnershipPaths = [fullPath, resolved],
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
     }
 
@@ -506,6 +509,7 @@ public static class RemoveValidator
             RemovesLinkOnly = true,
             OwnershipRunner = ownershipRunner,
             OwnershipPaths = [fullPath, resolved],
+            ManagedRoots = knownRoots.Where(root => root.Managed).ToImmutableArray(),
         };
     }
 
@@ -516,9 +520,7 @@ public static class RemoveValidator
         try
         {
             var paths = selected.ToArray();
-            if (roots.Where(root => root.Managed).Any(root => paths.Any(path =>
-                new ManagedSkillRegion(root.Path, "managed", root.AgentHint ?? "unknown", "managed skills").Covers(path))))
-                throw new IOException("Managed skill resources require their owning agent or package manager.");
+            ManagedSkillDiscovery.RefuseKnownRoots(roots, paths, token);
             ManagedSkillDiscovery.RefusePaths(paths, token, runner);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
