@@ -687,3 +687,21 @@ The final local suite passes all 1,327 tests with zero failures. The duplicate-
 descriptor release regressions fail all four cases against pre-fix commit
 8527301 and pass with the fix. Final PR-head platform checks/readiness review
 remain before merge; the original 21-item acceptance audit is unchanged.
+
+## Batch 6 refinement: cross-platform process-proof admission
+
+PR-head 9102474 passes all three platform test jobs and both Linux/macOS native
+jobs. The Windows x64/ARM64 native jobs reached the shared-owner process proof,
+then the proof host refused its marker before the first checkpoint: Python text
+output translated the required LF marker into CRLF. The fixture now writes exact
+bytes while preserving the host's strict disposable-workspace guard. A positive
+ordinary HOME/state control must pass that guard before the two linked-directory
+negative controls can count as containment evidence. Merged, bounded host output
+also makes early exits visible immediately instead of hiding their diagnostics
+behind the checkpoint timeout.
+
+This changes the proof harness only. Historical product/source evidence remains
+attributed to its original checkpoint. See
+`evidence/maintenance-batch-6-proof-admission-refinement.json` for the new local
+native proof and independent review; final-head Windows/native CI remains the
+merge gate. No original acceptance criterion is closed by a fixture correction.

@@ -63,6 +63,11 @@ kills the paused process without teardown, then uses the actual product CLI for
 fresh inspection, explicit torn-image repair, recovery and undo. Auth is captured
 before HOME isolation, passed only through the child environment, and never
 included in proof output. The proof host pause is bounded to two minutes.
+Write exact marker and registry-image fixtures as bytes: Python text output
+translates LF on Windows. Keep a positive disposable-workspace admission control
+alongside linked HOME/state refusals, so an invalid marker cannot make negative
+containment checks appear to pass. Drain host stderr with stdout and report an
+early exit before waiting for a checkpoint timeout.
 
 ### Reviewed update PTY proof (POSIX)
 

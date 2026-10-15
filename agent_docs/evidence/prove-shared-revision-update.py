@@ -13,6 +13,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
@@ -46,12 +47,12 @@ def prove_guard():
         root.mkdir()
         outside.mkdir()
         outside.joinpath('sentinel').write_text('Unchanged outside authority\n')
-        root.joinpath('disposable-proof-marker').write_text('SkillView disposable process proof\n')
+        root.joinpath('disposable-proof-marker').write_bytes(b'SkillView disposable process proof\n')
         for name in ('home', 'state'):
             root.joinpath(name).mkdir()
             root.joinpath(name + '-link').symlink_to(outside, target_is_directory=True)
         before = manifest(outside)
-        for linked in ('home', 'state'):
+        for linked in (None, 'home', 'state'):
             env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
             home = root / ('home-link' if linked == 'home' else 'home')
             state = root / ('state-link' if linked == 'state' else 'state')
@@ -60,7 +61,11 @@ def prove_guard():
             result = subprocess.run([str(host), str(root), str(args.gh[-1].resolve()), '0' * 32,
                                      '0' * 64, 'apply', 'registry-truncated'], env=env, cwd=root,
                                     capture_output=True, text=True, timeout=20)
-            assert result.returncode == 2 and 'marked disposable' in result.stderr, (result.returncode, result.stdout, result.stderr)
+            assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
+            if linked is None:
+                assert 'maintenance-proof:' in result.stderr and 'marked disposable' not in result.stderr, result.stderr
+            else:
+                assert 'marked disposable' in result.stderr, result.stderr
             assert manifest(outside) == before
 
 
@@ -72,7 +77,7 @@ for gh_path in args.gh:
         root = Path(temporary).resolve()
         home = root / 'home'
         home.mkdir()
-        root.joinpath('disposable-proof-marker').write_text('SkillView disposable process proof\n')
+        root.joinpath('disposable-proof-marker').write_bytes(b'SkillView disposable process proof\n')
         env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
         env.update(HOME=str(home), USERPROFILE=str(home), GH_TOKEN=auth, GH_EXTENSION='1', GH_PATH=str(gh),
                    GH_CONFIG_DIR=str(root / 'gh-config'), SKILLVIEW_STATE_HOME=str(root / 'state'),
@@ -133,20 +138,29 @@ for gh_path in args.gh:
         def kill_at(saved, action, checkpoint, expected):
             process = subprocess.Popen([str(host), str(root), str(gh), saved['id'], expected, action, checkpoint],
                                        env=env, cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE, text=True)
+                                       stderr=subprocess.STDOUT, text=True)
             ready = threading.Event()
+            exited = threading.Event()
             output = []
 
             def consume():
-                for line in process.stdout:
-                    output.append(line)
-                    if line.strip() == 'READY ' + checkpoint:
-                        ready.set()
+                try:
+                    for line in process.stdout:
+                        if len(output) < 128:
+                            output.append(line[:4096])
+                        if line.strip() == 'READY ' + checkpoint:
+                            ready.set()
+                finally:
+                    exited.set()
 
             reader = threading.Thread(target=consume, daemon=True)
             reader.start()
             try:
-                assert ready.wait(60), 'Proof host missed checkpoint: ' + ''.join(output)
+                deadline = time.monotonic() + 60
+                while not ready.wait(0.05) and not exited.is_set() and time.monotonic() < deadline:
+                    pass
+                assert ready.is_set(), ('Proof host missed ' + action + '/' + checkpoint
+                                        + '; exit=' + str(process.poll()) + ': ' + ''.join(output))
                 assert process.poll() is None, 'Proof host exited before process kill'
                 process.kill()
                 assert process.wait(timeout=15) != 0
@@ -158,10 +172,7 @@ for gh_path in args.gh:
                     process.wait(timeout=15)
                 process.stdin.close()
                 reader.join(timeout=5)
-                errors = process.stderr.read()
                 process.stdout.close()
-                process.stderr.close()
-            assert ready.is_set(), errors
 
         def assert_original():
             assert manifest(payload) == original_payload
