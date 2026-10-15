@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -61,8 +62,11 @@ for gh_path in gh_paths:
                    ALL_PROXY='http://127.0.0.1:9', NO_PROXY='')
         subprocess.run(['git', 'init', '--quiet', str(project)], env=env, cwd=root,
                        capture_output=True, text=True, check=True, timeout=30)
-        observed = [payload, *sorted(payload.rglob('*')), *links, alias]
-        before = manifest(observed)
+        def installed_manifest():
+            # Enumerate again so additions cannot hide outside a frozen path list.
+            return manifest([payload, *sorted(payload.rglob('*')), *links, alias])
+
+        before = installed_manifest()
         baseline = None
         rows = []
         for scope, agent, expected in [
@@ -85,13 +89,14 @@ for gh_path in gh_paths:
                 skill = skills[0]
                 if baseline is None:
                     baseline = skill
+                    assert re.fullmatch(r'[0-9a-f]{64}', skill['installationId'] or ''), skill
                     exposures = {(a['id'], a['scope']) for a in skill['agents']}
                     assert {('codex', 'User'), ('claude-code', 'Project')}.issubset(exposures), skill
                     assert any(a['profile'] == 'alias-profile' for a in skill['agents']), skill
                     assert any(Path(a['path']) == alias / 'demo' for a in skill['agents']), skill
                 assert skill['installationId'] == baseline['installationId'], skill
                 assert skill['agents'] == baseline['agents'], (scope, agent, skill, baseline)
-            assert manifest(observed) == before
+            assert installed_manifest() == before
             rows.append(dict(scope=scope, agent=agent, expectedRows=expected, actualRows=len(skills),
                              exitCode=process.returncode, selectedInstallationId=skills[0]['installationId'] if skills else None))
         results.append(dict(nativeHost=str(app), nativeSha256=hashlib.sha256(app.read_bytes()).hexdigest(),

@@ -1993,7 +1993,7 @@
     "nativeProofs": [
       {
         "host": "app",
-        "sha256": "271a2112d0fd1f5ff3d3c6020eec42988935eb14f8377bd334a184cdce5a0c7a",
+        "sha256": "14d839fbc40a9269a85a204a72840f51399c84bd5aed4c69cec5c6f5f77269bb",
         "results": [
           {
             "nativeHost": "/private/tmp/skillview-maintenance/update-plan/inventory-filter-aot-app/skillview",
@@ -2012,7 +2012,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "user",
@@ -2020,7 +2020,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "project",
@@ -2028,7 +2028,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "project",
@@ -2036,7 +2036,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "user",
@@ -2060,7 +2060,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": null,
@@ -2068,7 +2068,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": null,
@@ -2076,7 +2076,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "custom",
@@ -2084,7 +2084,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "9aa409dac81a8b72617982a4823effafc1230d87fd7eff25584e691860c5dc73"
+                "selectedInstallationId": "902aae5cabed206ce9cccc12c6885d7c7bda3ca750ae8a44fd97ebb24ec7e154"
               },
               {
                 "scope": "custom",
@@ -2113,7 +2113,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "user",
@@ -2121,7 +2121,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "project",
@@ -2129,7 +2129,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "project",
@@ -2137,7 +2137,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "user",
@@ -2161,7 +2161,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": null,
@@ -2169,7 +2169,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": null,
@@ -2177,7 +2177,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "custom",
@@ -2185,7 +2185,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "7ea86a5f506ed40e892bd8829e821e3df2e122e6479a1b3006f9e5830f42a281"
+                "selectedInstallationId": "2db9808138fbc1a7240f07105b708203165dcfedded7753ae850e44a0db02105"
               },
               {
                 "scope": "custom",
@@ -2201,7 +2201,7 @@
       },
       {
         "host": "ext",
-        "sha256": "9db2667d0de515d7ee1aad32f2c91fb0ff26019c7537d33a343faad3599da66e",
+        "sha256": "15d36902505bc51ddff97daa74554e1ac0ae6bb6b0a88c4f1e41f81f9968198f",
         "results": [
           {
             "nativeHost": "/private/tmp/skillview-maintenance/update-plan/inventory-filter-aot-ext/gh-skillview",
@@ -2220,7 +2220,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "user",
@@ -2228,7 +2228,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "project",
@@ -2236,7 +2236,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "project",
@@ -2244,7 +2244,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "user",
@@ -2268,7 +2268,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": null,
@@ -2276,7 +2276,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": null,
@@ -2284,7 +2284,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "custom",
@@ -2292,7 +2292,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "e7f1ad903302ba4c836da1508b97eaf86fa61340ea34e5ec36ccff96285d7a74"
+                "selectedInstallationId": "e2603210e689ca28d0be8d7803809ab0411ce16bc70d389f800500f3549d7756"
               },
               {
                 "scope": "custom",
@@ -2321,7 +2321,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "user",
@@ -2329,7 +2329,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "project",
@@ -2337,7 +2337,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "project",
@@ -2345,7 +2345,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "user",
@@ -2369,7 +2369,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": null,
@@ -2377,7 +2377,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": null,
@@ -2385,7 +2385,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "custom",
@@ -2393,7 +2393,7 @@
                 "expectedRows": 1,
                 "actualRows": 1,
                 "exitCode": 0,
-                "selectedInstallationId": "f6059df17ae042e0c241f68c7193ca736ae29e9ef744956e0f97f2e517953137"
+                "selectedInstallationId": "ff790a9110552fe8de788cf9cd164e9b6d553b231c0d6c065b47a7504f6b2489"
               },
               {
                 "scope": "custom",
@@ -2445,5 +2445,25 @@
     "M05": "Prior PR53 final evidence retained separately",
     "M06": "Prior PR53 final evidence retained separately"
   },
-  "remaining": "Pass final PR-head CI/CodeQL and independently inspect all native artifacts before merge. Original remaining 19 acceptance items retain their requirements."
+  "remaining": "Pass final PR-head CI/CodeQL and independently inspect all native artifacts before merge. Original remaining 19 acceptance items retain their requirements.",
+  "proofHarness": {
+    "path": "agent_docs/evidence/prove-inventory-filter.py",
+    "sha256": "735ab2521cf11fd2318d31f7c45f0f205ae321609523d6832bbd83d0aad5684f",
+    "freshPayloadEnumeration": true,
+    "nonempty64HexInstallationIds": true
+  },
+  "evidenceReview": {
+    "reviewer": "object_evidence_review",
+    "agreedFindingsAddressed": [
+      "Freshly enumerate payload descendants for every unchanged comparison",
+      "Require nonempty 64-hex installation IDs in proof and artifact validation"
+    ],
+    "finalReReview": "no actionable findings"
+  },
+  "copilotReview": {
+    "reviewedHead": "240a82bceac80aafb2a1690cc878dd06def45b1a",
+    "agreedFinding": "Fresh payload enumeration",
+    "finding": "https://github.com/harder/gh-skillview/pull/54#discussion_r4280952548",
+    "addressed": true
+  }
 }

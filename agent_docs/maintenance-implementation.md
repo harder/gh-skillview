@@ -765,3 +765,9 @@ review reports no actionable findings. See
 `evidence/maintenance-batch-7-inventory-checkpoint.json`. CI now executes this
 proof against both hosts on all four native targets. Final platform evidence
 and merge remain required before M02 acceptance closure.
+
+Evidence review and Copilot independently identified a frozen-path-list gap in
+the proof. Every unchanged comparison now re-enumerates payload descendants;
+positive results require a nonempty 64-hex installation ID. Both hosts pass
+the refreshed minimum/current gh matrix, and separate re-review clears the
+assertions. Product C# and its already verified 1,344-test baseline are unchanged.
