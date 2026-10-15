@@ -14,7 +14,7 @@ namespace SkillView.Maintenance;
 /// retained by exclusive native rename. Only never-published, verified unchanged
 /// private staging operations may be removed; installed payloads are never deleted.
 internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null,
-    Action? beforeStateOpenForTests = null)
+    Action? beforeStateOpenForTests = null, Action<OperationImpact>? subjectObserved = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     private const int MaxJournalBytes = 16 * 1024 * 1024;
@@ -605,7 +605,27 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, "candidate"), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, "plan.json"),
-            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner);
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner)
+        {
+            Impact = PlanImpact(plan, status)
+        };
+
+    private OperationImpact PlanImpact(ReplacementPlan plan, string? status = null) => OperationImpact.Payload(
+        OperationSubject.FromRecorded(plan.Subject.InstallationId, plan.OriginalPath, plan.Subject.Name,
+            plan.Subject.Scope, plan.Subject.Metadata, plan.Subject.Agents, plan.Subject.Owners, plan.CreatedAt,
+            NativeObjectObservation.From(plan.Original.Identity, plan.CreatedAt, "saved-original-evidence"),
+            plan.Original.Payload), plan.Purpose) with
+    {
+        PayloadRetained = true,
+        RetainedPayloadPath = status switch
+        {
+            "planned" or "ready" or "unchanged" or "restored" => plan.OriginalPath,
+            "original-retained" or "installed" or "replacement-retained" => Path.Combine(Root, plan.Id, "original"),
+            _ => null
+        },
+        RetentionEvidence = status is "planned" or "ready" or "unchanged" or "restored" or "original-retained" or "installed" or "replacement-retained"
+            ? "result-observed-original-location; later changes unknown" : "saved preservation contract; current location requires inspection"
+    };
 
     private void Write<T>(NativeStateDirectory operation, string name, T value, JsonTypeInfo<T> type, CancellationToken token)
     {
@@ -668,6 +688,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 || plan.Subject.Owners.Any(owner => owner is null))
                 throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
             ValidateEvidence(plan.Original); ValidateEvidence(plan.Candidate);
+            subjectObserved?.Invoke(PlanImpact(plan));
             ValidateRevision(plan, operation.CanonicalPath, token);
             var stepCount = 0;
             ReplacementStep? latestOwnerStep = null;

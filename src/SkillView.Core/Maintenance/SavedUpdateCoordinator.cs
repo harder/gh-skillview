@@ -96,7 +96,8 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
         if (disposition != "retain-original")
-            return UpdateResult.Failure(false, 2, "Explicit retain-original approval is required.", []) with { SavedPlan = review };
+            return UpdateResult.Failure(false, 2, "Explicit retain-original approval is required.", []) with
+            { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "Explicit retain-original approval is required.")] };
         var result = Empty(false) with { SavedPlan = review };
         var attempted = false;
         try
@@ -185,11 +186,15 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
 
     private static InstallationUpdateOutcome Outcome(InstalledSkill target, string status, string message) =>
         new(target.InstallationId, target.ResolvedPath, status, null, null, [], 0,
-            target.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(), message);
+            target.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(), message)
+        {
+            Impact = OperationImpact.ObservedRetention(OperationSubject.From(target), "update-prepare")
+        };
 
     private static InstallationUpdateOutcome FromPlan(ReplacementResult plan, string status, string message) =>
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
             status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
-            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with update-inspect --id {plan.Id} before recovery or undo.");
+            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with update-inspect --id {plan.Id} before recovery or undo.")
+        { Impact = plan.Impact };
 }

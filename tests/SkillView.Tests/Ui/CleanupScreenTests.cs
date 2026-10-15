@@ -11,6 +11,30 @@ namespace SkillView.Tests.Ui;
 public sealed class CleanupScreenTests
 {
     [Fact]
+    public async Task BatchReviewAndCanceledResultRetainAllCapturedContexts()
+    {
+        var skill = Skill("demo", Path.Combine(Path.GetTempPath(), "skillview-cleanup-subject", "demo")) with
+        {
+            Agents = [new("codex", "/fixture/shared", false, Scope.User, Context: "context-one", Profile: "one"),
+            new("claude", "/fixture/shared", false, Scope.Project, Context: "context-two", Profile: "two")]
+        };
+        var impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup");
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "review", skill, true)
+        { Impact = impact };
+        var text = CleanupScreen.BuildRemoveConfirmationText([candidate]);
+        Assert.Contains(impact.Subject.InstallationId, text);
+        Assert.Contains("context-one", text); Assert.Contains("context-two", text);
+        var screen = CreateScreen([candidate], []);
+        var summary = await screen.RemoveSelectedAsync([0], TestContext.Current.CancellationToken);
+        Assert.Same(impact, Assert.Single(summary.Impacts));
+        Assert.Same(impact, Assert.Single(screen.LastReport!.Impacts));
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => screen.RemoveSelectedAsync([0], cancel.Token));
+        Assert.True(screen.LastReport!.IsCanceled);
+        Assert.Same(impact, Assert.Single(screen.LastReport.Impacts));
+    }
+
+    [Fact]
     public async Task RemoveSelectedAsync_ReviewOnlyCollisionCannotDeleteValidPayload()
     {
         var root = Directory.CreateTempSubdirectory("skillview-review-only-");
@@ -210,8 +234,10 @@ public sealed class CleanupScreenTests
         }
     }
 
-    [Fact]
-    public async Task RemoveSelectedAsync_CancellationPublishesDuplicateSkipCount()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemoveSelectedAsync_CancellationPublishesDuplicateSkipCount(bool supplyState)
     {
         if (!SecureRemovalBackend.IsSupported) return;
 
@@ -258,18 +284,110 @@ public sealed class CleanupScreenTests
                     [0, 1],
                     cancellation.Token,
                     progress: null,
-                    attemptState: attemptState));
+                    attemptState: supplyState ? attemptState : null));
 
-            Assert.Equal(1, attemptState.PreValidationSkipped);
+            Assert.Equal(1, screen.LastReport!.TargetsSkipped);
+            Assert.True(screen.LastReport.IsCanceled);
+            Assert.Equal(0, screen.RemovedCount);
+            if (supplyState) Assert.Equal(1, attemptState.PreValidationSkipped);
             Assert.Equal(1, CleanupScreen.CountFailedSelections(
                 selectedCount: 2,
                 removedCount: 0,
-                skippedCount: attemptState.PreValidationSkipped));
+                skippedCount: screen.LastReport.TargetsSkipped));
         }
         finally
         {
             try { Directory.Delete(root, recursive: true); } catch { }
         }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task InterruptedPartialRemovalPreservesSkipsMutationTotalsAndRetry(bool cancel, bool supplyState)
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var root = Directory.CreateTempSubdirectory("skillview-cleanup-partial-");
+        var directory = Directory.CreateDirectory(Path.Combine(root.FullName, "demo")).FullName;
+        File.WriteAllText(Path.Combine(directory, "SKILL.md"), "body");
+        File.WriteAllText(Path.Combine(directory, "extra"), "preserve until retry");
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        try
+        {
+            var skill = Skill("demo", directory) with { ScanRoot = root.FullName };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, directory, "fixture", skill),
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Duplicate, directory, "fixture duplicate", skill));
+            var deleting = 0;
+            var remove = new RemoveService(new Logger(), null, (_, _) =>
+            {
+                if (++deleting != 2) return;
+                if (cancel) cancellation.Cancel();
+                else throw new InvalidOperationException("fixture unexpected removal failure");
+            });
+            var screen = CreateScreen(candidates, [new(root.FullName, Scope.Custom, null)], [skill], remove);
+            var state = supplyState ? new CleanupScreen.RemovalAttemptState() : null;
+            if (cancel)
+                await Assert.ThrowsAsync<OperationCanceledException>(() => screen.RemoveSelectedAsync([0, 1], cancellation.Token, attemptState: state));
+            else
+                await Assert.ThrowsAsync<InvalidOperationException>(() => screen.RemoveSelectedAsync([0, 1], cancellation.Token, attemptState: state));
+            Assert.Equal(1, screen.LastReport!.TargetsSkipped);
+            Assert.Equal(cancel, screen.LastReport.IsCanceled);
+            Assert.Equal(cancel ? 0 : 1, screen.LastReport.ErrorCount);
+            Assert.Equal(1, screen.LastReport.FilesDeleted);
+            Assert.Equal(1, screen.RemovedFileCount);
+            Assert.Equal(0, screen.RemovedDirectoryCount);
+            Assert.Equal(0, screen.RemovedCount);
+            Assert.Single(Directory.EnumerateFiles(directory));
+            // A declined/empty attempt cannot carry a prior known skip or add
+            // that attempt's mutations a second time.
+            await screen.RemoveSelectedAsync([], TestContext.Current.CancellationToken, attemptState: state);
+            Assert.Null(screen.LastReport);
+            if (state is not null) Assert.Equal(0, state.PreValidationSkipped);
+            Assert.Equal(1, screen.RemovedFileCount);
+            var retry = await screen.RemoveSelectedAsync([0, 1], TestContext.Current.CancellationToken, attemptState: state);
+            Assert.Equal(1, retry.Removed); Assert.Equal(1, retry.Skipped);
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(2, screen.RemovedFileCount);
+            Assert.Equal(1, screen.RemovedDirectoryCount);
+            Assert.False(Directory.Exists(directory));
+        }
+        finally { root.Delete(true); }
+    }
+
+    [Fact]
+    public async Task UnexpectedSecondTargetFailureRetainsCompletedTargetTotals()
+    {
+        if (!SecureRemovalBackend.IsSupported) return;
+        var root = Directory.CreateTempSubdirectory("skillview-cleanup-completed-");
+        var first = Directory.CreateDirectory(Path.Combine(root.FullName, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(root.FullName, "second")).FullName;
+        File.WriteAllText(Path.Combine(first, "SKILL.md"), "body");
+        File.WriteAllText(Path.Combine(second, "SKILL.md"), "body");
+        try
+        {
+            var one = Skill("first", first) with { ScanRoot = root.FullName };
+            var two = Skill("second", second) with { ScanRoot = root.FullName };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, first, "fixture", one),
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, second, "fixture", two));
+            var canonicalSecond = OwnershipPath.CanonicalCandidate(second)!;
+            var remove = new RemoveService(new Logger(), null, (path, _) =>
+            {
+                if (PathIdentity.IsInside(path, canonicalSecond)) throw new InvalidOperationException("fixture second target failure");
+            });
+            var screen = CreateScreen(candidates, [new(root.FullName, Scope.Custom, null)], [one, two], remove);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => screen.RemoveSelectedAsync([0, 1], TestContext.Current.CancellationToken));
+            Assert.False(Directory.Exists(first)); Assert.True(Directory.Exists(second));
+            Assert.Equal(1, screen.LastReport!.TargetsDeleted);
+            Assert.Equal(1, screen.RemovedCount);
+            Assert.Equal(1, screen.RemovedFileCount);
+            Assert.Equal(1, screen.RemovedDirectoryCount);
+            Assert.Equal(1, screen.LastReport.ErrorCount);
+        }
+        finally { root.Delete(true); }
     }
 
     [Fact]
@@ -496,7 +614,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void BuildRemoveConfirmationText_ShowsFirstFewPathsOnly()
+    public void BuildRemoveConfirmationText_EnumeratesEverySelectedPath()
     {
         var candidates = Enumerable.Range(0, 5)
             .Select(i => new CleanupClassifier.Candidate(
@@ -511,8 +629,8 @@ public sealed class CleanupScreenTests
         Assert.Contains("/tmp/0", text);
         Assert.Contains("/tmp/1", text);
         Assert.Contains("/tmp/2", text);
-        Assert.DoesNotContain("/tmp/3", text);
-        Assert.Contains("…and 2 more", text);
+        Assert.Contains("/tmp/3", text);
+        Assert.Contains("/tmp/4", text);
     }
 
     private static InstalledSkill Skill(string name, string resolvedPath) => new()

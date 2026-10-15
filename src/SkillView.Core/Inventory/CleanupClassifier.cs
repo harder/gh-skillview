@@ -32,7 +32,10 @@ public static class CleanupClassifier
         string Path,
         string Reason,
         InstalledSkill? Skill,
-        bool ReviewOnly = false);
+        bool ReviewOnly = false)
+    {
+        public OperationImpact? Impact { get; init; }
+    }
 
     internal sealed record CandidateSelection(
         ImmutableArray<Candidate> Unique,
@@ -305,7 +308,17 @@ public static class CleanupClassifier
             }
         }
 
-        return result.ToImmutable();
+        return result.Select(candidate =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var impact = candidate.Skill is { } skill
+                ? OperationImpact.Payload(OperationSubject.From(skill), "cleanup")
+                : SkillIdentityObserver.CaptureEntry(candidate.Path, "cleanup", snapshot.CapturedAt, cancellationToken);
+            if (candidate.Kind is CandidateKind.BrokenSharedMapping or CandidateKind.BrokenSymlink
+                && candidate.Skill is { } linked && linked.Agents.FirstOrDefault(agent => agent.IsSymlink && PathIdentity.Equals(agent.Path, candidate.Path)) is { } membership)
+                impact = OperationImpact.Link(OperationSubject.From(linked), membership);
+            return candidate with { Impact = impact };
+        }).ToImmutableArray();
     }
 
     private static bool WasCovered(InventorySnapshot snapshot, InstalledSkill skill)

@@ -17,13 +17,13 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     private string Payload => Path.Combine(Skills, "demo");
     private string State => Path.Combine(temporary.FullName, "state");
     private const string Metadata = "---\nname: demo\ndescription: Fixture\nmetadata:\n  github-repo: https://github.com/harder/fixture\n  github-ref: refs/heads/main\n  github-tree-sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n---\n";
-    private ReplacementPlanStore Store(Action<string>? checkpoint = null) => new(State, new Logger(), checkpoint,
+    private ReplacementPlanStore Store(Action<string>? checkpoint = null, Action<OperationImpact>? subjectObserved = null) => new(State, new Logger(), checkpoint,
         new ProcessRunner(new Logger(), environment: new Dictionary<string, string>
         {
             ["HOME"] = temporary.FullName,
             ["USERPROFILE"] = temporary.FullName,
             ["XDG_STATE_HOME"] = Path.Combine(temporary.FullName, "xdg-state")
-        }, defaultWorkingDirectory: temporary.FullName));
+        }, defaultWorkingDirectory: temporary.FullName), subjectObserved: subjectObserved);
     public ReplacementPlanStoreTests()
     {
         Directory.CreateDirectory(Payload);
@@ -69,22 +69,67 @@ public sealed class ReplacementPlanStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task TransientIdentityProjectionsDoNotAlterSavedSubjectOrResultSerialization()
+    {
+        var plan = await Plan();
+        Assert.NotNull(plan.Impact);
+        Assert.Equal(JsonSerializer.Serialize(plan with { Impact = null }, ReplacementJsonContext.Default.ReplacementResult),
+            JsonSerializer.Serialize(plan, ReplacementJsonContext.Default.ReplacementResult));
+        var owner = new SkillPackage("fixture/plugin", "unknown", null, null, null) { Provider = "codex-plugin" };
+        var recorded = plan.Subject with { Owners = [owner] };
+        var observed = recorded with
+        {
+            Owners = [owner with
+            { ManagedRegion = new(Payload, "codex-plugin", "codex", "plugin", "fixture/plugin", "1", "extra-live-context") }]
+        };
+        Assert.Equal(JsonSerializer.Serialize(recorded, ReplacementJsonContext.Default.ReplacementSubject),
+            JsonSerializer.Serialize(observed, ReplacementJsonContext.Default.ReplacementSubject));
+        var bytes = File.ReadAllBytes(plan.PlanPath);
+        Assert.DoesNotContain("\"impact\"", System.Text.Encoding.UTF8.GetString(bytes));
+        Assert.DoesNotContain("managedRegion", System.Text.Encoding.UTF8.GetString(bytes));
+    }
+
+    [Fact]
+    public async Task SavedSubjectSurvivesRefusalAndVacantOriginalAddress()
+    {
+        var plan = await Plan();
+        OperationImpact? frozen = null;
+        var store = Store(subjectObserved: impact => frozen = impact);
+        Assert.Throws<IOException>(() => store.Apply(plan.Id, new string('0', 64), Inventory(), Token));
+        Assert.NotNull(frozen);
+        Assert.Equal(plan.Subject.InstallationId, frozen.Subject.InstallationId);
+        Assert.Equal("saved-original-evidence", frozen.Subject.NativeObject.Role);
+        Assert.False(frozen.ExposureCoverageComplete);
+        var before = frozen.Subject.NativeObject;
+        Directory.Move(Payload, Payload + "-elsewhere");
+        frozen = null;
+        Assert.Throws<IOException>(() => store.Inspect(plan.Id, Inventory(), Token));
+        Assert.NotNull(frozen);
+        Assert.Equal(before, frozen.Subject.NativeObject);
+        Assert.Equal(plan.OriginalPath, frozen.Subject.Path);
+        Assert.False(Directory.Exists(Payload));
+    }
+
+    [Fact]
     public async Task SavedPlanPromotesExactStageAndUndoRetainsBothNativeObjects()
     {
         var before = PayloadSnapshot.Capture(Payload, Token);
         var plan = await Plan();
         Assert.Equal("planned", plan.Status); Assert.False(plan.MutationObserved);
+        Assert.Equal(plan.OriginalPath, plan.Impact!.RetainedPayloadPath);
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
         Assert.Contains("extra", plan.ChangedPaths); Assert.Contains(".skillview-ignore", plan.ChangedPaths);
         if (!OperatingSystem.IsWindows()) Assert.Contains("/", plan.ChangedPaths);
         var staged = PayloadSnapshot.Capture(plan.CandidatePath, Token);
         var applied = Apply(plan);
+        Assert.Equal(applied.RetainedPath, applied.Impact!.RetainedPayloadPath);
         var installed = PayloadSnapshot.Capture(Payload, Token);
         Assert.Equal(staged.Fingerprint, installed.Fingerprint);
         Assert.True(NativeDirectoryMoveLease.SameObject(staged.RootIdentity!.Value, installed.RootIdentity!.Value));
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(applied.RetainedPath, Token).Fingerprint);
         var inspected = Store().Inspect(plan.Id, Inventory(), Token);
         var restored = Store().Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), true, Token);
+        Assert.Equal(restored.OriginalPath, restored.Impact!.RetainedPayloadPath);
         Assert.True(restored.Succeeded, restored.Message); Assert.Equal("restored", restored.Status);
         var final = PayloadSnapshot.Capture(Payload, Token);
         Assert.Equal(before.Fingerprint, final.Fingerprint); Assert.Equal(before.RootUnixMode, final.RootUnixMode);

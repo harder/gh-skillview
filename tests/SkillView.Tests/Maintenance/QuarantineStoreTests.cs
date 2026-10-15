@@ -43,6 +43,35 @@ public sealed class QuarantineStoreTests : IDisposable
     }
 
     [Fact]
+    public void LiveQuarantineRetainsSourceScopeAndOriginalSubjectWhileHistoryUsesRecordedFacts()
+    {
+        var inventory = Inventory();
+        var target = inventory.Skills[0] with
+        { FrontMatter = new() { Upstream = "https://github.com/fixture/repo", GithubPath = "skills/demo", Version = "authored" } };
+        target = target with { ObservedSubject = SkillIdentityObserver.Capture(target, DateTimeOffset.UtcNow, true, Token) };
+        // Bind the same metadata to the actual fixture before native validation.
+        File.WriteAllText(Path.Combine(Payload, "SKILL.md"), "---\nname: demo\ndescription: Fixture\nversion: authored\nmetadata:\n  github-repo: https://github.com/fixture/repo\n  github-path: skills/demo\n---\nBody\n");
+        inventory = inventory with { Skills = [target] };
+        var review = Store.Preview(target, inventory, Token);
+        var result = Store.Apply(target, inventory, review.ReviewFingerprint, true, Token);
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Same(target.ObservedSubject, result.Impact!.Subject);
+        Assert.Equal("authored", result.Impact.Subject.Revision.AuthoredVersion);
+        Assert.Equal(Scope.Custom, result.Impact.Subject.Scope);
+        Assert.True(result.Impact.PayloadRetained);
+        Assert.Equal(result.RetainedPath, result.Impact.RetainedPayloadPath);
+        Assert.Equal("saved-quarantine-evidence", result.Impact.ExecutionEvidence!.Role);
+        var historical = Assert.Single(Store.History(Inventory(), Token));
+        Assert.Null(historical.Impact!.Subject.Source.Key);
+        Assert.Null(historical.Impact.Subject.Revision.AuthoredVersion);
+        Assert.Equal(result.RetainedPath, historical.Impact.RetainedPayloadPath);
+        Assert.False(historical.Impact.ExposureCoverageComplete);
+        var restored = Store.Undo(result.Id, Inventory(), true, Token);
+        Assert.True(restored.Succeeded, restored.Message);
+        Assert.Equal(restored.OriginalPath, restored.Impact!.RetainedPayloadPath);
+    }
+
+    [Fact]
     public void PreviewIsReadOnlyAndRepeatedHeldCapturesAreComplete()
     {
         var inventory = Inventory(); var target = Assert.Single(inventory.Skills);

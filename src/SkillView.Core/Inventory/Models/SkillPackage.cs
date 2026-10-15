@@ -33,6 +33,9 @@ public sealed record SkillPackage(
     public string? RecordFingerprint { get; init; }
     public string? EntryFingerprint { get; init; }
     public string? PackageVersion { get; init; }
+    // Live observation only; saved schema1/2 owner JSON and hashes stay exact.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal ManagedSkillRegion? ManagedRegion { get; init; }
 
     /// A same-name lock entry is evidence only within its installation context.
     public bool Describes(InstalledSkill skill)

@@ -124,7 +124,9 @@ for gh in args.gh or [None]:
         retained2 = Path(second['retainedPath'])
         payload.mkdir()
         payload.joinpath('replacement').write_text('keep')
-        run('undo', '--id', second['id'], '--yes', ok=False)
+        occupied_refusal = run('undo', '--id', second['id'], '--yes', ok=False)
+        assert occupied_refusal['impact']['operation'] == 'undo'
+        assert occupied_refusal['impact']['subject']['installationId'] == second['impact']['subject']['installationId']
         assert payload.joinpath('replacement').read_text() == 'keep' and retained2.exists()
         assert not retained2.parent.joinpath('undo-prepared.json').exists()
         assert not list(root.rglob('*.svbackup')), 'Quarantine unexpectedly extracted/copied an archive'
@@ -133,7 +135,7 @@ for gh in args.gh or [None]:
                             staleReviewRefusedBeforeState=True, originalDirectoryIdentityRetained=True,
                             payloadBytesModesLinksAndEmptyDirectoriesPreserved=True, undoPreviewReadOnly=True,
                             undoRestoredOriginalDirectory=True, repeatedUndoVerifiedNoOp=True,
-                            occupiedRestorePathPreserved=True, completeJournalHistory=True,
+                            occupiedRestorePathPreserved=True, undoFailurePreservesRequestedOperation=True, completeJournalHistory=True,
                             securityIsolationClaimed=False, archiveExtractionUsed=False,
                             subtreeQuarantineConsumerRefused=True, danglingUndoDestinationRefused=True,
                             subtreeUndoConsumerRefused=True, outwardNestedRootRefused=True,

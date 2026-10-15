@@ -63,7 +63,11 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     bool Canceled, string OriginalPath, string RetainedPath, string CandidatePath, string DisplacedPath,
     string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null)
+{
+    [JsonIgnore]
+    internal OperationImpact? Impact { get; init; }
+}
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, WriteIndented = true, RespectRequiredConstructorParameters = true)]

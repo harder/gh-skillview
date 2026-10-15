@@ -63,6 +63,7 @@ internal sealed class RemoveConfirmModal
     {
         if (evaluation.Target.Kind != RemoveTargetKind.CurrentInstall) return false;
         if (evaluation.Items.Length != 1) return false;
+        if (evaluation.Items[0].Validation.Impact is { AffectedExposures.Length: > 1 }) return false;
         if (evaluation.RequiresSecondConfirm) return false;
         if (!evaluation.CanExecute) return false;
         if (evaluation.Errors.Length > 0) return false;
@@ -112,12 +113,15 @@ internal sealed class RemoveConfirmModal
         var warningsText = _evaluation.Warnings.Length > 0
             ? "  ⚠ " + string.Join("; ", _evaluation.Warnings.Select(w => w.Detail))
             : string.Empty;
+        if (validation.Impact is { } impact)
+            warningsText += $"  {impact.AffectedExposures.Length} known exposure(s); "
+                + string.Join("; ", impact.AffectedExposures.Select(OperationImpactFormatter.Exposure));
         var warnings = new Label
         {
             X = 1,
             Y = 3,
             Width = Dim.Fill(2),
-            Text = warningsText,
+            Text = TerminalEscapeSanitizer.Sanitize(warningsText) ?? "",
             Visible = warningsText.Length > 0,
         };
 
@@ -231,7 +235,7 @@ internal sealed class RemoveConfirmModal
             {
                 report = RemovalReportState.Accumulate(
                     report,
-                    RemovalReportState.Canceled(validation.ResolvedPath, lastProgress));
+                    RemovalReportState.Canceled(validation.ResolvedPath, lastProgress) with { Impact = validation.Impact });
                 outcome = Outcome.Cancelled;
                 _logger.Debug("remove.compact", "removal canceled");
                 InvokeIfActive(() =>
@@ -249,7 +253,8 @@ internal sealed class RemoveConfirmModal
                     RemovalReportState.Failed(
                         validation.ResolvedPath,
                         lastProgress,
-                        ex.Message));
+                        ex.Message) with
+                    { Impact = validation.Impact });
                 outcome = Outcome.Failed;
                 InvokeIfActive(() =>
                 {

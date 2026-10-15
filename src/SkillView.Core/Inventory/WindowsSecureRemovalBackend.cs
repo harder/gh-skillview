@@ -268,10 +268,14 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         return buffer.AsSpan(0, (int)returned).ToArray();
     }
 
-    public bool TryCaptureIdentity(
-        string path,
-        out SecureFileIdentity identity,
-        out string? error)
+    public bool TryCaptureIdentity(string path, out SecureFileIdentity identity, out string? error) =>
+        TryCaptureIdentityCore(path, requestDeleteAccess: true, out identity, out error);
+
+    internal bool TryObserveIdentity(string path, out SecureFileIdentity identity, out string? error) =>
+        TryCaptureIdentityCore(path, requestDeleteAccess: false, out identity, out error);
+
+    private static bool TryCaptureIdentityCore(string path, bool requestDeleteAccess,
+        out SecureFileIdentity identity, out string? error)
     {
         identity = default;
         error = null;
@@ -280,7 +284,8 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
             using var handle = OpenEntry(
                 path,
                 directory: true,
-                enumerateDirectory: false);
+                enumerateDirectory: false,
+                requestDeleteAccess: requestDeleteAccess);
             var information = ReadIdentity(handle);
             identity = new SecureFileIdentity(
                 information.Volume,

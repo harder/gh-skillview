@@ -101,6 +101,18 @@ internal static class SecureRemovalBackend
     internal static bool IsSupported => Current is not null;
     internal static string? UnsupportedReason => Selection.Error;
 
+    // Observation does not depend on Linux openat2 removal admission. It uses
+    // verified native stat layouts and never authorizes mutation.
+    internal static bool TryObserveIdentity(string path, out SecureFileIdentity identity, out string? error)
+    {
+        if (OperatingSystem.IsWindows())
+            return new WindowsSecureRemovalBackend().TryObserveIdentity(path, out identity, out error);
+        if ((OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            && UnixSecureRemovalBackend.IsRegularFileInspectionSupported)
+            return new UnixSecureRemovalBackend().TryCaptureIdentity(path, out identity, out error);
+        return TryCaptureIdentity(path, out identity, out error);
+    }
+
     internal static bool TryCaptureIdentity(
         string path,
         out SecureFileIdentity identity,

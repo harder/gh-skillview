@@ -12,7 +12,8 @@ namespace SkillView.Maintenance;
 /// Relocates one explicitly reviewed standalone custom-directory installation.
 /// No manager records, archive extraction, replacement or recursive deletion.
 internal sealed partial class QuarantineStore(string root, Logger logger, Action<string>? afterJournal = null,
-    SkillView.Subprocess.ProcessRunner? runner = null, Action? beforeStateOpenForTests = null)
+    SkillView.Subprocess.ProcessRunner? runner = null, Action? beforeStateOpenForTests = null,
+    Action<OperationImpact>? subjectObserved = null)
 {
     internal string Root { get; } = Path.GetFullPath(root);
     internal const int MaxOperations = 64;
@@ -41,6 +42,25 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
     }
 
     internal QuarantineResult Apply(InstalledSkill target, InventorySnapshot inventory, string expectedReview,
+        bool standaloneConfirmed, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var subject = OperationSubject.From(target);
+        var result = ApplyCore(target, inventory, expectedReview, standaloneConfirmed, token);
+        return result.Impact is { } impact ? result with
+        {
+            Impact = impact with
+            {
+                Subject = subject,
+                AffectedExposures = subject.Exposures,
+                ExposureCoverageComplete = subject.ExposureCoverageComplete,
+                ExposureCoverage = subject.ExposureCoverage,
+                ExecutionEvidence = impact.Subject.NativeObject
+            }
+        } : result;
+    }
+
+    private QuarantineResult ApplyCore(InstalledSkill target, InventorySnapshot inventory, string expectedReview,
         bool standaloneConfirmed, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -168,7 +188,25 @@ internal sealed partial class QuarantineStore(string root, Logger logger, Action
 
     private QuarantineResult Result(QuarantineRecord record, bool succeeded, bool observed, bool canceled, string message) =>
         new(record.Id, record.Status, succeeded, observed, canceled, record.OriginalPath,
-            Path.Combine(Root, record.Id, "payload"), record.ReviewFingerprint, message);
+            Path.Combine(Root, record.Id, "payload"), record.ReviewFingerprint, message)
+        { Impact = RecordedImpact(record) };
+
+    private OperationImpact RecordedImpact(QuarantineRecord record) => OperationImpact.Payload(
+        OperationSubject.FromRecorded(record.InstallationId, record.OriginalPath, record.Name, null,
+            null, record.Agents, [], record.CreatedAt,
+            NativeObjectObservation.From(record.OriginalTarget, record.CreatedAt, "saved-quarantine-evidence"),
+            record.PayloadFingerprint), "quarantine") with
+    {
+        PayloadRetained = true,
+        RetainedPayloadPath = record.Status switch
+        {
+            "preview" or "restored" => record.OriginalPath,
+            "quarantined" => Path.Combine(Root, record.Id, "payload"),
+            _ => null
+        },
+        RetentionEvidence = record.Status is "preview" or "restored" or "quarantined"
+                ? "journal-recorded-original-location; current location not inferred" : "saved preservation contract; current location requires inspection"
+    };
 
     private void WriteRecord(NativeStateDirectory operation, string name, QuarantineRecord record, CancellationToken token)
     {

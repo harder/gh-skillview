@@ -20,6 +20,7 @@ internal sealed partial class QuarantineStore
         var names = Names(operation, token);
         var prepared = ReadRecord(operation, "prepared.json", token);
         if (prepared.Id != id || prepared.Status != "prepared") throw new IOException("Prepared operation identity/status is invalid.");
+        subjectObserved?.Invoke(RecordedImpact(prepared));
         var original = OriginalObservation(prepared);
         AdmitRecovery(original, prepared, inventory, token);
         if (names.Contains("restored.json"))

@@ -442,6 +442,7 @@ public static partial class CliDispatcher
             w.WriteString("recordedTree", revision.RecordedTree);
             w.WriteString("pinnedRef", revision.PinnedRef);
             w.WriteString("payloadFingerprint", revision.PayloadFingerprint);
+            w.WriteNull("resolvedCommit");
             w.WriteString("ownerRecordedHash", revision.OwnerRecordedHash);
             w.WriteString("ownerHashKind", revision.OwnerHashKind);
             w.WriteString("distributorVersion", revision.DistributorVersion);
@@ -450,10 +451,14 @@ public static partial class CliDispatcher
             w.WriteString("id", skill.InstallationId);
             w.WriteString("path", skill.ResolvedPath);
             w.WriteString("materialization", skill.PhysicalInstallation.Materialization);
-            w.WriteBoolean("nativeIdentityCaptured", false);
+            w.WriteString("idRole", "installation-address");
+            w.WriteBoolean("nativeIdentityCaptured", skill.ObservedSubject?.NativeObject.Status == "observed");
+            WriteNativeObservation(w, "nativeObject", skill.ObservedSubject?.NativeObject);
             w.WriteEndObject();
+            if (skill.ObservedSubject is { } subject) WriteSubject(w, subject);
+            WriteDistributors(w, skill.ObservedSubject?.Distributors ?? skill.AllOwnershipClaims.Select(SkillDistributorIdentity.From).ToImmutableArray());
             w.WriteStartArray("ownerRecords");
-            foreach (var owner in skill.OwnershipClaims)
+            foreach (var owner in skill.AllOwnershipClaims)
                 WriteOwnerRecord(w, owner);
             w.WriteEndArray();
             w.WriteStartArray("diagnostics");
@@ -544,13 +549,15 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: quarantine needs one --path/--install-id; apply needs --yes --standalone --expect <preview fingerprint>. Undo needs --id <operation ID>.");
             return ExitCodes.InvalidUsage;
         }
+        OperationImpact? frozenImpact = null;
         try
         {
             if (path is not null) path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory);
             var inventory = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(),
                 new LocalInventoryService.Options(options.ScanRoots, false, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner);
-            var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger, runner: services.Runner);
+            var store = new SkillView.Maintenance.QuarantineStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "quarantine"), services.Logger, runner: services.Runner,
+                subjectObserved: impact => frozenImpact = impact with { Operation = command! });
             IReadOnlyList<SkillView.Maintenance.QuarantineResult> results;
             if (command == "quarantine-history") results = await Task.Run(() => store.History(inventory, token), token).ConfigureAwait(false);
             else if (command == "undo") results = [await Task.Run(() => store.Undo(id!, inventory, execute, token), token).ConfigureAwait(false)];
@@ -558,15 +565,26 @@ public static partial class CliDispatcher
             {
                 var selected = inventory.Skills.Where(skill => id is not null ? skill.InstallationId == id : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
                 if (selected.Length != 1) throw new IOException("Select one captured standalone payload; put its --scan-root before quarantine.");
+                frozenImpact = OperationImpact.Payload(OperationSubject.From(selected[0]), command!);
                 if (execute) results = [await Task.Run(() => store.Apply(selected[0], inventory, expected!, standalone, token), token).ConfigureAwait(false)];
                 else
                 {
                     var preview = await Task.Run(() => store.Preview(selected[0], inventory, token), token).ConfigureAwait(false);
                     results = [new(preview.Id, "preview", true, false, false, preview.OriginalPath,
                         Path.Combine(store.Root, preview.Id, "payload"), preview.ReviewFingerprint,
-                        "Preview only: relocate this standalone directory on the same filesystem. Retains live permissions and links; agent sessions were not observed. Apply requires --yes --standalone --expect <reviewFingerprint>.")];
+                        "Preview only: relocate this standalone directory on the same filesystem. Retains live permissions and links; agent sessions were not observed. Apply requires --yes --standalone --expect <reviewFingerprint>.")
+                    {
+                        Impact = frozenImpact with
+                        {
+                            PayloadRetained = true,
+                            RetainedPayloadPath = preview.OriginalPath,
+                            RetentionEvidence = "quarantine-preview; original payload observed; no relocation attempted"
+                        }
+                    }];
                 }
             }
+            results = results.Select(result => result with
+            { Impact = result.Impact is { } impact ? impact with { Operation = command! } : frozenImpact }).ToArray();
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("preview", !execute && command != "quarantine-history");
@@ -576,15 +594,18 @@ public static partial class CliDispatcher
             });
             else foreach (var result in results) Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nReview: {result.ReviewFingerprint}\n{result.Message}"));
+            if (!json) foreach (var result in results) WriteImpactText(result.Impact);
             return results.Any(result => result.Canceled) ? ExitCodes.Cancelled
                 : command == "quarantine-history" ? results.Any(result => result.Status is "prepared" or "undo-prepared" or "needs-inspection" or "unrecognized") ? ExitCodes.UserError : ExitCodes.Success
                 : results.All(result => result.Succeeded) ? ExitCodes.Success : ExitCodes.UserError;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException
+            || ex is OperationCanceledException && token.IsCancellationRequested)
         {
-            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
+            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteBoolean("canceled", ex is OperationCanceledException); WriteImpact(w, frozenImpact); w.WriteEndObject(); });
             else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
-            return ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
+            if (!json) WriteImpactText(frozenImpact);
+            return ex is OperationCanceledException ? ExitCodes.Cancelled : ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
         }
     }
 
@@ -594,7 +615,7 @@ public static partial class CliDispatcher
         w.WriteBoolean("succeeded", result.Succeeded); w.WriteBoolean("mutationObserved", result.MutationObserved);
         w.WriteBoolean("canceled", result.Canceled); w.WriteString("originalPath", result.OriginalPath);
         w.WriteString("retainedPath", result.RetainedPath); w.WriteString("reviewFingerprint", result.ReviewFingerprint);
-        w.WriteString("message", result.Message); w.WriteEndObject();
+        w.WriteString("message", result.Message); WriteImpact(w, result.Impact); w.WriteEndObject();
     }
 
     private static async Task<int> HistoryAsync(AppOptions options, TuiServices services, CancellationToken token)
@@ -674,12 +695,19 @@ public static partial class CliDispatcher
             : PathIdentity.Equals(skill.ResolvedPath, path!) || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path!))).ToArray();
         if (selected.Length != 1)
         { Console.Error.WriteLine("skillview: backup selector must identify one captured payload; include its --scan-root before backup"); return ExitCodes.NoMatches; }
+        var impact = OperationImpact.ObservedRetention(OperationSubject.From(selected[0]), "backup");
         try
         {
             if (!snapshot.ConfiguredRootsComplete) throw new IOException("Configured agent/workspace root coverage is incomplete; resolve omitted or unavailable contexts before backup.");
             var store = new SkillView.Maintenance.MaintenanceBackupStore(SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(services.Runner), services.Runner);
             var record = await Task.Run(() => store.Capture(selected[0], token, snapshot.Skills,
                 snapshot.ProtectedRoots.Where(scan => scan.AgentHint is not null).ToArray()), token).ConfigureAwait(false);
+            impact = impact with
+            {
+                PayloadRetained = true,
+                RetainedPayloadPath = record.Path,
+                RetentionEvidence = "verified-backup-capture; original payload was not mutated"
+            };
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", true);
@@ -687,16 +715,19 @@ public static partial class CliDispatcher
                 w.WriteString("fingerprint", record.BeforeFingerprint); w.WriteString("archiveHash", record.ArchiveHash);
                 w.WriteString("archivePath", record.ArchivePath); w.WriteString("status", record.Status);
                 w.WriteString("metadataContract", "file bytes, entry Unix modes and native link bytes; in-place restore requires a reviewed plan");
+                WriteImpact(w, impact);
                 w.WriteEndObject();
             });
             else Console.WriteLine("Payload evidence captured: " + TerminalEscapeSanitizer.Sanitize(record.ArchivePath));
+            if (!json) WriteImpactText(impact);
             return ExitCodes.Success;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException || ex is OperationCanceledException && token.IsCancellationRequested)
         {
-            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteEndObject(); });
+            if (json) WriteJson(w => { w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message); w.WriteBoolean("canceled", ex is OperationCanceledException); WriteImpact(w, impact); w.WriteEndObject(); });
             else Console.Error.WriteLine("skillview: " + TerminalEscapeSanitizer.Sanitize(ex.Message));
-            return ExitCodes.EnvironmentError;
+            if (!json) WriteImpactText(impact);
+            return ex is OperationCanceledException ? ExitCodes.Cancelled : ExitCodes.EnvironmentError;
         }
     }
 
@@ -1372,7 +1403,10 @@ public static partial class CliDispatcher
         if (!string.IsNullOrWhiteSpace(r.StdOut)) Console.Out.WriteLine(r.StdOut.TrimEnd());
         if (!string.IsNullOrWhiteSpace(r.StdErr)) Console.Error.WriteLine(r.StdErr.TrimEnd());
         foreach (var outcome in r.Outcomes)
+        {
             Console.Out.WriteLine($"  {outcome.Status}: {outcome.Path} · {outcome.Message ?? outcome.ChangedFileCount + " changed file(s)"}");
+            WriteImpactText(outcome.Impact);
+        }
 
         if (r.Entries.Length > 0)
         {
@@ -1482,6 +1516,7 @@ public static partial class CliDispatcher
             w.WriteStartArray("exposures");
             foreach (var exposure in outcome.Exposures) w.WriteStringValue(exposure);
             w.WriteEndArray();
+            WriteImpact(w, outcome.Impact);
             w.WriteEndObject();
         }
         w.WriteEndArray();
@@ -1641,11 +1676,17 @@ public static partial class CliDispatcher
         CancellationToken cancellationToken)
     {
         var parsed = ParseRemoveArgs(options.SubcommandArgs);
-        if (parsed.Name is null)
+        if (parsed.Error is not null || parsed.Name is null && parsed.Path is null && parsed.InstallationId is null)
         {
-            Console.Error.WriteLine("skillview: remove requires a skill name");
-            Console.Error.WriteLine("usage: skillview remove <name> [--agent <id>] [--yes] [--json]");
+            Console.Error.WriteLine("skillview: " + (parsed.Error ?? "remove requires a skill name or exact selector"));
+            Console.Error.WriteLine("usage: skillview remove [name] [--path <path> | --install-id <id>] [--agent <id>] [--yes] [--json]");
             return ExitCodes.InvalidUsage;
+        }
+        if (parsed.Path is { } path)
+        {
+            try { parsed = parsed with { Path = Path.GetFullPath(path, services.Runner.EffectiveWorkingDirectory) }; }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            { Console.Error.WriteLine("skillview: invalid remove path: " + TerminalEscapeSanitizer.Sanitize(ex.Message)); return ExitCodes.InvalidUsage; }
         }
 
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
@@ -1657,61 +1698,30 @@ public static partial class CliDispatcher
             cancellationToken
         ).ConfigureAwait(false);
 
-        var matches = snapshot.Skills
-            .Where(s => string.Equals(s.Name, parsed.Name, StringComparison.OrdinalIgnoreCase))
-            .Where(s => parsed.Agent is null || s.Agents.Any(a => string.Equals(a.AgentId, parsed.Agent, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
+        var matches = SelectRemoveTargets(snapshot, parsed);
 
         if (matches.Count == 0)
         {
-            Console.Error.WriteLine($"skillview: no installed skill named '{parsed.Name}'" +
+            Console.Error.WriteLine($"skillview: no installed skill matches '{parsed.Name ?? parsed.Path ?? parsed.InstallationId}'" +
                 (parsed.Agent is null ? "" : $" for agent '{parsed.Agent}'"));
             return ExitCodes.NoMatches;
         }
         if (matches.Count > 1)
         {
-            Console.Error.WriteLine($"skillview: {matches.Count} skills match '{parsed.Name}' — narrow with --agent");
+            Console.Error.WriteLine($"skillview: {matches.Count} skills match '{parsed.Name}' — select --path or --install-id");
             foreach (var m in matches) Console.Error.WriteLine($"  · {m.ResolvedPath} ({string.Join(",", m.Agents.Select(a => a.AgentId))})");
             return ExitCodes.UserError;
         }
 
         var target = matches[0];
-        var validation = parsed.Yes
-            ? RemoveValidator.Validate(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken)
-            : RemoveValidator.ValidateForPreview(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken);
-
-        RemoveService.RemoveReport result;
-        if (!validation.Allowed)
-        {
-            result = new RemoveService.RemoveReport(
-                Succeeded: false,
-                ResolvedPath: validation.ResolvedPath,
-                FilesDeleted: 0,
-                DirectoriesDeleted: 0,
-                Errors: validation.Errors.Select(e => $"{e.Kind}: {e.Detail}").ToImmutableArray(),
-                DryRun: false);
-        }
-        else if (!parsed.Yes)
-        {
-            result = await services.RemoveService.RemoveAsync(
-                validation,
-                new RemoveService.Options(DryRun: true),
-                cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            result = await services.RemoveService.RemoveAsync(
-                validation,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (result.Succeeded)
-            {
-                services.ListAdapter.Invalidate();
-            }
-        }
+        var (validation, result) = await RemoveTargetAsync(target, snapshot, parsed.Yes,
+            services.RemoveService, cancellationToken).ConfigureAwait(false);
+        if (result.Succeeded && parsed.Yes) services.ListAdapter.Invalidate();
 
         if (parsed.Json) WriteRemoveJson(result, target, parsed, validation);
         else WriteRemoveText(result, target, parsed, validation);
 
+        if (result.IsCanceled) return ExitCodes.Cancelled;
         if (!validation.Allowed)
         {
             return IsEnvironmentRefusal(validation)
@@ -1722,23 +1732,64 @@ public static partial class CliDispatcher
         return ExitCodes.Success;
     }
 
-    internal record ParsedRemoveArgs(string? Name, string? Agent, bool Yes, bool Json);
+    internal static async Task<(RemoveValidator.RemoveValidation Validation, RemoveService.RemoveReport Report)> RemoveTargetAsync(
+        InstalledSkill target, InventorySnapshot snapshot, bool execute, RemoveService service, CancellationToken token,
+        IProgress<RemoveService.RemoveProgress>? progress = null)
+    {
+        var impact = OperationImpact.Payload(OperationSubject.From(target), "remove");
+        RemoveValidator.RemoveValidation validation;
+        try
+        {
+            validation = execute
+                ? RemoveValidator.Validate(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, token)
+                : RemoveValidator.ValidateForPreview(target, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            validation = new([], [], target.ResolvedPath, []) { Impact = impact };
+            return (validation, new(false, target.ResolvedPath, 0, 0, [], !execute)
+            { IsCanceled = true, Impact = impact });
+        }
+        var result = await service.RemoveWithOutcomeAsync(validation, new(DryRun: !execute), token, progress).ConfigureAwait(false);
+        return (validation, result);
+    }
+
+    internal record ParsedRemoveArgs(string? Name, string? Agent, bool Yes, bool Json,
+        string? Path = null, string? InstallationId = null, string? Error = null);
+
+    internal static List<InstalledSkill> SelectRemoveTargets(InventorySnapshot snapshot, ParsedRemoveArgs parsed) => snapshot.Skills
+        .Where(skill => parsed.Name is null || string.Equals(skill.Name, parsed.Name, StringComparison.OrdinalIgnoreCase))
+        .Where(skill => parsed.Agent is null || skill.Agents.Any(agent => AgentIdentity.Matches(agent.AgentId, parsed.Agent)))
+        .Where(skill => parsed.Path is null || PathIdentity.Equals(skill.ResolvedPath, parsed.Path)
+            || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, parsed.Path)))
+        .Where(skill => parsed.InstallationId is null || string.Equals(skill.InstallationId, parsed.InstallationId, StringComparison.OrdinalIgnoreCase))
+        .ToList();
 
     internal static ParsedRemoveArgs ParseRemoveArgs(IReadOnlyList<string> args)
     {
-        string? name = null, agent = null;
+        string? name = null, agent = null, path = null, id = null, error = null;
         bool yes = false, json = false;
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
             if (a == "--json") { json = true; continue; }
             if (a == "--yes" || a == "-y") { yes = true; continue; }
-            if (a.StartsWith("--agent=", StringComparison.Ordinal)) { agent = a["--agent=".Length..]; continue; }
-            if (a == "--agent" && i + 1 < args.Count) { agent = args[++i]; continue; }
-            if (a.StartsWith("--", StringComparison.Ordinal)) continue;
-            if (name is null) name = a;
+            var key = a.Split('=', 2)[0];
+            if (key is "--agent" or "--path" or "--install-id")
+            {
+                var value = a.Contains('=') ? a[(a.IndexOf('=') + 1)..]
+                    : i + 1 < args.Count && !args[i + 1].StartsWith('-') ? args[++i] : null;
+                if (string.IsNullOrWhiteSpace(value)) { error = key + " requires a nonempty value"; continue; }
+                if (key == "--agent") { if (agent is not null) error = "repeat --agent is unsupported"; agent = value; }
+                else if (key == "--path") { if (path is not null) error = "repeat --path is unsupported"; path = value; }
+                else { if (id is not null) error = "repeat --install-id is unsupported"; id = value; }
+                continue;
+            }
+            if (a.StartsWith('-')) { error = "unsupported remove flag: " + a; continue; }
+            if (name is null) name = a; else error = "remove accepts one name";
         }
-        return new ParsedRemoveArgs(name, agent, yes, json);
+        if (path is not null && id is not null) error = "select only one of --path and --install-id";
+        return new ParsedRemoveArgs(name, agent, yes, json, path, id, error);
     }
 
     private static void WriteRemoveText(
@@ -1751,6 +1802,7 @@ public static partial class CliDispatcher
         Console.Out.WriteLine($"  path     : {target.ResolvedPath}");
         Console.Out.WriteLine($"  resolved : {validation.ResolvedPath}");
         Console.Out.WriteLine($"  scope    : {target.Scope}");
+        WriteImpactText(r.Impact ?? validation.Impact);
         if (validation.Errors.Length > 0)
         {
             Console.Error.WriteLine("REFUSED:");
@@ -1808,10 +1860,12 @@ public static partial class CliDispatcher
         w.WriteStartObject();
         w.WriteBoolean("dryRun", r.DryRun);
         w.WriteBoolean("succeeded", r.Succeeded);
+        w.WriteBoolean("canceled", r.IsCanceled);
         w.WriteBoolean("allowed", validation.Allowed);
         w.WriteString("name", target.Name);
         w.WriteString("resolvedPath", validation.ResolvedPath);
         w.WriteString("scope", target.Scope.ToString());
+        WriteImpact(w, r.Impact ?? validation.Impact);
         w.WriteNumber("filesDeleted", r.FilesDeleted);
         w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
         w.WriteNumber("runtimeErrorCount", removalAttempted ? r.ErrorCount : 0);
@@ -1877,38 +1931,13 @@ public static partial class CliDispatcher
                 Console.Error.WriteLine("skillview: cleanup --apply requires --yes");
                 return ExitCodes.UserError;
             }
-            // Resolve every key before the first removal. A candidate may be
-            // emitted under multiple cleanup kinds; validating its second
-            // occurrence after the first was deleted would falsely report an
-            // identity/environment failure.
-            var selection = CleanupClassifier.DeduplicateByPath(
-                candidates,
-                cancellationToken);
-            duplicateSkips = selection.Duplicates;
-            foreach (var c in selection.Unique)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var validation = ValidateCleanupCandidate(c, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, cancellationToken, services.Runner);
-                if (!validation.Allowed || validation.RequiresSecondConfirm)
-                {
-                    environmentRefusal |= IsEnvironmentRefusal(validation);
-                    var reason = validation.Allowed
-                        ? "requires second-confirm"
-                        : string.Join("; ", validation.Errors.Select(error =>
-                            $"{error.Kind}: {error.Detail}"));
-                    applied.Add((c, RemoveService.RemoveReport.Refused(validation.ResolvedPath,
-                        reason)));
-                    continue;
-                }
-                var removal = await services.RemoveService.RemoveAsync(
-                    validation,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
-                applied.Add((c, removal));
-                if (removal.Succeeded)
-                {
-                    services.ListAdapter.Invalidate();
-                }
-            }
+            var execution = await ApplyCleanupAsync(candidates, snapshot, services.RemoveService,
+                services.Runner, cancellationToken).ConfigureAwait(false);
+            applied.AddRange(execution.Applied);
+            duplicateSkips = execution.Duplicates;
+            environmentRefusal = execution.EnvironmentRefusal;
+            if (execution.Applied.Any(item => item.R.Succeeded || item.R.FilesDeleted > 0 || item.R.DirectoriesDeleted > 0))
+                services.ListAdapter.Invalidate();
         }
 
         if (parsed.Json) WriteCleanupJson(candidates, applied, duplicateSkips, parsed, snapshot);
@@ -1928,11 +1957,51 @@ public static partial class CliDispatcher
             }
         }
 
+        if (applied.Any(item => item.R.IsCanceled)) return ExitCodes.Cancelled;
         if (candidates.Length == 0) return ExitCodes.Success;
         if (parsed.Apply && environmentRefusal) return ExitCodes.EnvironmentError;
         if (parsed.Apply && applied.Any(a => !a.R.Succeeded)) return ExitCodes.UserError;
         return ExitCodes.Success;
     }
+
+    internal sealed record CleanupExecution(
+        IReadOnlyList<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)> Applied,
+        ImmutableArray<CleanupClassifier.Candidate> Duplicates, bool EnvironmentRefusal);
+
+    internal static async Task<CleanupExecution> ApplyCleanupAsync(ImmutableArray<CleanupClassifier.Candidate> candidates,
+        InventorySnapshot snapshot, RemoveService service, SkillView.Subprocess.ProcessRunner? runner, CancellationToken token)
+    {
+        var applied = new List<(CleanupClassifier.Candidate C, RemoveService.RemoveReport R)>();
+        CleanupClassifier.CandidateSelection selection;
+        try { selection = CleanupClassifier.DeduplicateByPath(candidates, token); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return new(candidates.Select(candidate => (candidate, CanceledBeforeStart(candidate))).ToArray(), [], false);
+        }
+        var environmentRefusal = false;
+        foreach (var candidate in selection.Unique)
+        {
+            if (token.IsCancellationRequested) { applied.Add((candidate, CanceledBeforeStart(candidate))); continue; }
+            RemoveValidator.RemoveValidation validation;
+            try { validation = ValidateCleanupCandidate(candidate, snapshot.ProtectedRoots.ToArray(), snapshot.Skills, token, runner); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            { applied.Add((candidate, CanceledBeforeStart(candidate))); continue; }
+            validation = validation with { Impact = validation.Impact ?? candidate.Impact };
+            if (!validation.Allowed || validation.RequiresSecondConfirm)
+            {
+                environmentRefusal |= IsEnvironmentRefusal(validation);
+                var reason = validation.Allowed ? "requires second-confirm"
+                    : string.Join("; ", validation.Errors.Select(error => $"{error.Kind}: {error.Detail}"));
+                applied.Add((candidate, RemoveService.RemoveReport.Refused(validation.ResolvedPath, reason) with { Impact = validation.Impact }));
+                continue;
+            }
+            applied.Add((candidate, await service.RemoveWithOutcomeAsync(validation, cancellationToken: token).ConfigureAwait(false)));
+        }
+        return new(applied, selection.Duplicates, environmentRefusal);
+    }
+
+    private static RemoveService.RemoveReport CanceledBeforeStart(CleanupClassifier.Candidate candidate) =>
+        new(false, candidate.Path, 0, 0, [], false) { IsCanceled = true, NotAttempted = true, Impact = candidate.Impact };
 
     private static bool IsEnvironmentRefusal(
         RemoveValidator.RemoveValidation validation) =>
@@ -2013,6 +2082,7 @@ public static partial class CliDispatcher
         {
             Console.Out.WriteLine($"  {c.Kind,-22}  {c.Path}");
             Console.Out.WriteLine($"    why: {c.Reason}");
+            WriteImpactText(c.Impact);
         }
         if (applied.Count > 0 || duplicateSkips.Count > 0)
         {
@@ -2059,7 +2129,8 @@ public static partial class CliDispatcher
     {
         w.WriteStartObject();
         w.WriteBoolean("apply", p.Apply);
-        w.WriteBoolean("partial", snapshot?.IsPartial ?? false);
+        w.WriteBoolean("partial", (snapshot?.IsPartial ?? false) || applied.Any(item => item.R.IsCanceled));
+        w.WriteBoolean("canceled", applied.Any(item => item.R.IsCanceled));
         w.WriteStartArray("inaccessiblePaths");
         foreach (var path in snapshot?.Diagnostics.InaccessiblePaths ?? []) w.WriteStringValue(path);
         w.WriteEndArray();
@@ -2073,6 +2144,7 @@ public static partial class CliDispatcher
             w.WriteString("path", c.Path);
             w.WriteString("reason", c.Reason);
             w.WriteString("name", c.Skill?.Name);
+            WriteImpact(w, c.Impact);
             w.WriteEndObject();
         }
         w.WriteEndArray();
@@ -2085,6 +2157,9 @@ public static partial class CliDispatcher
                 w.WriteStartObject();
                 w.WriteString("path", c.Path);
                 w.WriteBoolean("succeeded", r.Succeeded);
+                w.WriteBoolean("canceled", r.IsCanceled);
+                w.WriteString("status", r.NotAttempted ? "not-attempted" : r.IsCanceled ? "canceled" : r.Succeeded ? "completed" : "refused-or-failed");
+                WriteImpact(w, r.Impact ?? c.Impact);
                 w.WriteNumber("filesDeleted", r.FilesDeleted);
                 w.WriteNumber("directoriesDeleted", r.DirectoriesDeleted);
                 w.WriteStartArray("errors");
@@ -2221,7 +2296,7 @@ public static partial class CliDispatcher
             | `undo` | Preview or restore an unchanged quarantined directory to its vacant original location. | `--id`, `--yes`, `--json` |
             | `quarantine-history` | Inspect recorded relocation states; incomplete operations require inspection. | `--json` |
             | `history` | Verify retained backup journals and every payload blob; reports interrupted, orphaned and corrupt evidence without extracting it. | `--id`, `--json` |
-            | `remove <SKILL>` | Safely remove an installed skill. Defaults to dry-run until you pass confirmation. | `--agent`, `--yes`, `--json` |
+            | `remove [SKILL]` | Safely remove one exact installation. Defaults to dry-run until you pass confirmation. | `--path` or `--install-id`, `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
 
             ## Common examples

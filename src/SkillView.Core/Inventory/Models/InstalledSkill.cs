@@ -50,18 +50,27 @@ public sealed record InstalledSkill
     // Live policy uses the captured subprocess context, including config-home
     // overrides. This is never serialized into inventory or saved plans.
     internal SkillView.Subprocess.ProcessRunner? OwnershipRunner { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public OperationSubject? ObservedSubject { get; init; }
     public string? PayloadFingerprint { get; init; }
     public SkillSourceIdentity SourceIdentity => SkillSourceIdentity.From(this);
-    public SkillRevision Revision => new(FrontMatter.Version, FrontMatter.GithubRef ?? Package?.RepositoryRef,
-        TreeSha ?? (Package?.HashKind == "recorded-git-tree" ? Package.ContentHash : null),
-        FrontMatter.PinnedRef ?? Package?.PinnedRef, PayloadFingerprint, Package?.ContentHash, Package?.HashKind, Package?.PackageVersion);
+    public SkillRevision Revision => new(FrontMatter.Version, FrontMatter.GithubRef ?? AgreedOwnerValue(owner => owner.RepositoryRef),
+        TreeSha ?? AgreedOwnerValue(owner => owner.HashKind == "recorded-git-tree" ? owner.ContentHash : null),
+        FrontMatter.PinnedRef ?? AgreedOwnerValue(owner => owner.PinnedRef), PayloadFingerprint,
+        AgreedOwnerValue(owner => owner.ContentHash), AgreedOwnerValue(owner => owner.HashKind), AgreedOwnerValue(owner => owner.PackageVersion));
+    private string? AgreedOwnerValue(Func<SkillPackage, string?> value)
+    {
+        var values = AllOwnershipClaims.Select(value).Distinct(StringComparer.Ordinal).Take(2).ToArray();
+        return values.Length == 1 ? values[0] : null;
+    }
     public PhysicalSkillInstallation PhysicalInstallation => new(InstallationId, ResolvedPath,
-        Validity == ValidityState.BrokenSymlink ? "broken-link" : "directory", OwnershipClaims);
+        Validity == ValidityState.BrokenSymlink ? "broken-link" : "directory", AllOwnershipClaims.ToImmutableArray());
 
     /// Disagreements remain visible; they must not silently authorize maintenance.
     public ImmutableArray<string> MetadataConflicts { get; init; } = [];
-    public string InstallationId => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
-        System.Text.Encoding.UTF8.GetBytes(PathIdentity.NormalizeKey(ResolvedPath))));
+    public string InstallationId => AddressId(ResolvedPath);
+    internal static string AddressId(string path) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(PathIdentity.NormalizeKey(path))));
 
     public string? TreeSha => FrontMatter.GithubTreeSha;
     public bool Pinned => FrontMatter.Pinned;

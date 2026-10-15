@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "9c4df912ffe632b4740bf7c4dd1e537f2beea9a1",
+  "verifiedMainCommit": "d8405957c2d73167e60f50dad8ace8e6f000a58d",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -127,13 +127,16 @@
       "id": "M10",
       "title": "Discover namespace containers, agent roots and contexts correctly",
       "priority": "P1",
-      "status": "incomplete",
+      "status": "complete",
       "implementedEvidenceSummary": "Shared catalog, namespaces, ancestor workspaces, profiles, aliases and bounded Codex/Claude managed/built-in discovery with read-only provenance, registration contexts and live mutation admission",
-      "remaining": "Exact-head platform/full-suite and native artifact verification, then reviewed merge and final original acceptance recording",
+      "remaining": null,
       "acceptance": "Namespaced gh installs, monorepo ancestors, alternate profiles, custom paths and shared roots appear with correct ownership and context. Containers are not offered as malformed skills. Scan budgets report partial coverage and never manufacture orphan conclusions when hit.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false,
-      "localAcceptanceEvidence": "evidence/maintenance-batch-11-managed-discovery-checkpoint.json"
+      "finalAcceptanceProven": true,
+      "localAcceptanceEvidence": "evidence/maintenance-batch-11-managed-discovery-checkpoint.json",
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-11-final.json",
+      "verifiedCommit": "d8405957c2d73167e60f50dad8ace8e6f000a58d",
+      "mergedPullRequest": 59
     },
     {
       "id": "M11",

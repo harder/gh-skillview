@@ -975,3 +975,31 @@ rediscovery, captured managed roots are rechecked at removal execution, and
 explicit physical payload reads do not expand to siblings. The original retargeted
 alias test now independently proves captured state exclusion despite intentionally
 partial linked-storage coverage. Final-source full/native/platform gates remain.
+
+
+Batch 11 final acceptance: PR #59 merged at `d8405957c2d73167e60f50dad8ace8e6f000a58d`, with a tree
+identical to reviewed head `5617ffdcaee408763ef8373d0d379cab5bd227a3`. All 13
+checks pass. Local and each Linux/macOS/Windows suite pass 1,476 tests without
+failures/skips. Both exact-head gh lanes pass 17 actual contracts (2.97.0 and
+2.102.0). All 92 native proof files / 364 fixture rows across four RIDs were
+inspected. Both local AOT hosts also pass 36 managed fixture rows, inherited-Pi
+isolation and actual old-plan inspection, killed Apply recovery and undo with
+original objects/bytes/modes and registry restored. Linux unavailable-openat2
+proofs retain managed read access and destructive refusal.
+
+Copilot findings and separate-model follow-ups are fixed and re-reviewed clear;
+all six review threads are resolved. Final independent evidence and original-M10
+acceptance review are clear. Full final-source hashes/results are retained in
+`evidence/maintenance-batch-11-final.json`; earlier checkpoints remain historical.
+M01, M02, M04, M05, M06, M07 and M10 are complete; 14 original findings remain.
+The original Installed down-arrow crash was never reproduced; this closure does
+not claim otherwise.
+
+
+Batch 12 in progress: M11 identity and operation subjects follows merged PR #59.
+The reviewed design and current implementation/review checkpoint are in
+`maintenance-identities.md`. Separate source/consumer reviews were addressed and
+re-reviewed clear. Inventory tests passed 344 cases at the earlier checkpoint;
+the debug native App passed 16 disposable command rows across minimum/current
+gh. Final-source full/platform/native/compatibility gates are pending. No original
+finding is marked complete by this checkpoint.

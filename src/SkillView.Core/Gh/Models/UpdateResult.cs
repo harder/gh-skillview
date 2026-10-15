@@ -48,7 +48,10 @@ public sealed record UpdateNotice(string Stream, string Text);
 public sealed record InstallationUpdateOutcome(string InstallationId, string Path,
     string Status, string? BeforeFingerprint, string? AfterFingerprint,
     ImmutableArray<string> ChangedFiles, int ChangedFileCount,
-    ImmutableArray<string> Exposures, string? Message);
+    ImmutableArray<string> Exposures, string? Message)
+{
+    public SkillView.Inventory.Models.OperationImpact? Impact { get; init; }
+}
 
 /// One row from a `gh skill update`(--dry-run) body. `Status` is a loose
 /// classification (`updated`, `up-to-date`, `pinned`, `skipped`, `failed`,

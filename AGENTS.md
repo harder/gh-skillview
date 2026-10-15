@@ -545,6 +545,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
   remote content and is separate from Terminal.Gui's pasted-input sanitization.
 - Payload equality and native object continuity are separate evidence.
+  InstallationId remains an address identifier, including across native object
+  replacement at the same path. Inventory captures `OperationSubject` off the
+  UI thread; render `OperationImpact` from that frozen evidence through refusal,
+  failure and cancellation. Link-only impact includes every context of the
+  canonical link entry. Do not infer a commit from a tree or authored version.
+  Transient identity projections must stay out of saved subject/owner JSON and
+  its hashes; verify actual old-native restart compatibility when changing this
+  area. See `agent_docs/maintenance-identities.md`.
   `PayloadSnapshot.ObjectStateFingerprint` retains full native IDs/generations
   for the root and every observed leaf/directory, plus observed Unix modes.
   Backup capture rechecks both raw bytes and this evidence before publishing a
@@ -825,3 +833,19 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   admission correctly refuses a second global-selector overwrite. Capture gh
   credentials before changing fixture HOME; keychain-backed lookup afterward
   can become unauthenticated. Preserve all update/local-change assertions.
+
+- Retention output must distinguish observed directories from broken links and
+  unknown historical materialization. Freeze the subject before work; only a
+  verified capture or recorded transition may strengthen its retention evidence.
+  An updater exception after mutation admission requires bounded verification,
+  inventory invalidation and conservative mutation accounting. Failure callbacks
+  must retain the requested operation (for example, `undo`).
+- Cleanup cancellation and unexpected failure must preserve duplicate skips and
+  exact partial mutation totals through both progress throttles. Accumulate one
+  terminal report per attempt, including failed attempts, so workflow rescans
+  cannot miss a deleted file. Keep retry and omitted-attempt-state coverage.
+
+- CLI removal orchestration must convert unexpected removal faults into a failed
+  subject-bearing result using captured progress, with one added error. Preserve
+  earlier cleanup rows and continue independent targets; low-level removal APIs
+  still throw, and unrelated cancellation must not be labeled owned cancellation.

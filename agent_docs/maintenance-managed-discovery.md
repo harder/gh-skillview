@@ -1,8 +1,9 @@
-# Managed and built-in skill discovery (M10, in progress)
+# Managed and built-in skill discovery (M10, complete)
 
-This implementation batch follows PR #58. Managed discovery is implemented in
-the working branch and remains under review and final verification; this
-document does not claim M10 acceptance or a merge yet.
+PR #59 merged the reviewed managed-discovery batch after source/acceptance reviews,
+all platform and native checks, and independent artifact inspection. Final-source
+results and merge attribution are in `evidence/maintenance-batch-11-final.json`.
+The sections below retain implementation requirements and intermediate findings.
 
 ## Reproduction and source evidence
 
@@ -89,9 +90,8 @@ created before managed discovery is enabled.
 - Disposable native fixtures on all four RIDs prove observable managed resources,
   zero mutation on refusal, and compatibility of pre-existing saved plans.
 
-M10 remains incomplete until implementation, separate review, final verification
-and merge. Plugin lifecycle mutations and effective-loading analysis remain their
-own original findings.
+M10 acceptance is complete. Plugin lifecycle mutations and effective-loading
+analysis remain their own original findings.
 
 ## Review corrections implemented
 

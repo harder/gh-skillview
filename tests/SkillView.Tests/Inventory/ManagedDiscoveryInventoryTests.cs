@@ -315,7 +315,8 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
             Assert.Contains(skill.Agents, agent => agent.Scope == Scope.Project && agent.Context == project && agent.Enabled is null);
             Assert.Contains(skill.AllOwnershipClaims, owner => owner.ContextRoot == project && owner.ReadOnly && owner.LockFilePath is null);
         }
-        Assert.Equal(2, skill.AllOwnershipClaims.Count());
+        Assert.Equal(3, skill.AllOwnershipClaims.Count());
+        Assert.Contains(skill.AllOwnershipClaims, owner => owner.ContextRoot == plugin && owner.ManagedRegion?.RegistrationPath is null);
         Assert.DoesNotContain(skill.Agents, agent => agent.Context is null);
         using var json = JsonDocument.Parse(CliDispatcher.RenderListJson(inventory));
         var contexts = json.RootElement.GetProperty("skills")[0].GetProperty("agents").EnumerateArray()
@@ -343,7 +344,9 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
         var explicitInventory = await Capture([plugin], runner);
         Assert.False(explicitInventory.IsPartial);
         Assert.Equal("demo", Assert.Single(explicitInventory.Skills).Name);
-        Assert.True(Assert.Single(explicitInventory.Skills[0].AllOwnershipClaims).ReadOnly);
+        Assert.Equal(2, explicitInventory.Skills[0].AllOwnershipClaims.Count());
+        Assert.All(explicitInventory.Skills[0].AllOwnershipClaims, owner => Assert.True(owner.ReadOnly));
+        Assert.Equal(new[] { plugin, Path.Combine(Claude, "plugins") }.Order(), explicitInventory.Skills[0].AllOwnershipClaims.Select(owner => owner.ContextRoot).Order());
     }
 
     [Theory]
@@ -580,7 +583,8 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
         Assert.False(inventory.IsPartial);
         Assert.Contains(skill.Agents, agent => AgentIdentity.Matches(agent.AgentId, "codex") && agent.Profile == "explicit-codex");
         Assert.DoesNotContain(skill.Agents, agent => AgentIdentity.Matches(agent.AgentId, "claude") && agent.Profile == "explicit-codex");
-        Assert.Equal("claude-plugin", Assert.Single(skill.AllOwnershipClaims).Provider);
+        Assert.Equal(2, skill.AllOwnershipClaims.Count());
+        Assert.All(skill.AllOwnershipClaims, owner => Assert.Equal("claude-plugin", owner.Provider));
     }
 
     [Fact]
