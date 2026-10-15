@@ -228,9 +228,13 @@ public sealed class QuarantineStoreTests : IDisposable
         }
         var result = Apply();
         var destination = kind == "alias" ? Path.Combine(alias, "demo") : Payload;
-        if (kind == "alias-parent") destination = alias + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + "demo";
+        // Win32 may normalize dot components in an absolute link target at
+        // creation. A relative target retains the alias/../.. spelling whose
+        // ambiguous physical destination this regression intends to exercise.
+        if (kind == "alias-parent") destination = Path.GetRelativePath(agentRoot, alias) + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + "demo";
         if (kind == "relative") destination = Path.GetRelativePath(agentRoot, destination);
         Directory.CreateSymbolicLink(Path.Combine(agentRoot, "demo"), destination);
+        if (kind == "alias-parent") Assert.Equal(destination, new DirectoryInfo(Path.Combine(agentRoot, "demo")).LinkTarget);
         var inventory = Inventory(); Assert.Contains(inventory.Skills, skill => skill.Validity == ValidityState.BrokenSymlink);
         Assert.Throws<IOException>(() => Store.Undo(result.Id, inventory, true, Token));
         Assert.False(File.Exists(Path.Combine(State, result.Id, "undo-prepared.json")));

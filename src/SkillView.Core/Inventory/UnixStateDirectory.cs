@@ -201,9 +201,35 @@ internal sealed partial class UnixSecureRemovalBackend
     }
 
     private sealed class UnixStateSession(List<SafeUnixHandle> held, SafeUnixHandle root, string canonical,
-        UnixStateExclusions excluded) : NativeStateDirectory
+        UnixStateExclusions excluded, Action<CancellationToken>? stagingGuard = null) : NativeStateDirectory
     {
         private SafeFileHandle? _barrier;
+        private bool sealedStage;
+        internal override NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token)
+        {
+            ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            if (RetryOnInterrupted(() => { token.ThrowIfCancellationRequested(); return StateNative.mkdirat(root.FileDescriptor, name, 0x1C0); }) != 0)
+                throw new IOException(LastError("create exclusive staging directory failed"));
+            var child = OpenDirectoryAt(root, name, refuseNestedMount: true);
+            try
+            {
+                var address = Path.Combine(canonical, name);
+                if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Staging directory moved during creation.");
+                FlushStateDirectory(root, token);
+                return new UnixStateSession([child], child, address, excluded, ValidateLocation);
+            }
+            catch { child.Dispose(); throw; }
+        }
+        internal override void SealStagingDirectory(int unixMode, CancellationToken token)
+        {
+            if (stagingGuard is null || unixMode is not (448 or 493)) throw new IOException("Only new staging directories may be sealed.");
+            ValidateLocation(token);
+            using var borrowed = new SafeFileHandle(new IntPtr(root.FileDescriptor), ownsHandle: false);
+            if (OperatingSystem.IsWindows()) throw new IOException("Unix staging is unavailable on Windows.");
+            File.SetUnixFileMode(borrowed, (UnixFileMode)unixMode);
+            FlushStateDirectory(root, token);
+            sealedStage = true;
+        }
         internal override string CanonicalPath => canonical;
         internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token)
         {
@@ -217,7 +243,9 @@ internal sealed partial class UnixSecureRemovalBackend
         {
             token.ThrowIfCancellationRequested();
             if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("State directory moved; retained evidence needs review.");
-            CheckStateAncestors(root, excluded, token);
+            if (sealedStage) throw new IOException("Staging directory is sealed; no more writes are admitted.");
+            if (stagingGuard is null) CheckStateAncestors(root, excluded, token);
+            else stagingGuard(token);
             using var buffer = new StatBuffer();
             if ((ReadStat(root, buffer.Pointer).Mode & 0xFFF) != 0x1C0) throw new IOException("State privacy changed; review its permissions.");
             CheckStateOwner(buffer.Pointer);
@@ -303,6 +331,7 @@ internal sealed partial class UnixSecureRemovalBackend
         internal override void FlushPublication(CancellationToken token)
         {
             ValidateLocation(token);
+            if (stagingGuard is not null) { FlushStateDirectory(root, token); return; }
             CheckStateAncestors(root, excluded, token, flush: true);
             if (OperatingSystem.IsMacOS())
             {

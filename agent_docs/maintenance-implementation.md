@@ -493,3 +493,65 @@ Three fixtures and a native empty-root refusal proof cover this case.
 Entry-address checks strip a trailing directory separator before identifying the
 final entry, preserving an outward root link as a link entry. A trailing-root
 regression and native refusal proof cover that spelling.
+
+## Batch 5: saved recorded-revision replacement and restart recovery
+
+The full original 21-finding objective is active again. The immutable audit is
+now checked in as `maintenance-audit.json`, with a separate acceptance ledger in
+`maintenance-acceptance.json`. Protective foundations alone do not complete an
+item; missing capabilities and criterion-by-criterion proof remain explicit.
+
+This batch advances M08/M13/M15/M20/M21 with usable CLI recorded restoration.
+Plans stage the exact recorded Git tree through authenticated gh APIs, verify
+Git tree/blob identities, preserve authored markdown bytes while rebinding only
+installer tracking, and save canonical JSON fingerprints plus full manifests.
+Apply retains the original live directory and promotes the reviewed stage via
+exclusive native moves. Explicit fingerprint-bound inspection/recovery handles
+interrupted moves; undo retains the replacement before returning the original.
+Source/tree/pin and contextual owner entries remain unchanged.
+
+Native staged directory/file creation is relative to held parent authorities.
+No path truncation is used. Unix file and bottom-up directory barriers precede
+ready-plan publication; Windows creation uses write-through. Consumer checks
+rescan configured roots that newly exist, and live owner reads revalidate both
+captured claims and prior absence. Complete remaining transitions reserve journal
+capacity, with a separate bounded undo journal when forward records are exhausted.
+Partial journal files remain untouched and non-authoritative.
+
+Independent review/re-review addressed BOM loss, partial-journal recovery, new
+consumer/owner detection, root mode review, missing-root discovery, journal
+capacity, namespace durability, path-write authority, malformed YAML, subtree
+ordering and whitespace-named local extras. The native real-gh proof covers both
+gh2.97.0 and2.102.0, direct and shared pinned copies, same-name isolation, exact
+staged/native original identity, raw registry preservation and a killed CLI
+followed by separate-process inspect/recover/undo. See
+`evidence/prove-recorded-replacement.py` and `docs/recorded-restoration.md`.
+
+This batch does not complete all of M08 or M15: newer revision/owner transitions,
+local forks/dispositions, suppression state, native package adapters, generalized
+plans and the unified TUI maintenance queue remain in the original acceptance
+ledger. Full platform CI and the final 21-item acceptance audit remain required.
+
+Real-machine read-only inventory exposed hidden Codex containers as partial
+coverage. Every restore command now accepts `--allow-hidden-dirs`, and fresh
+transition scans include hidden entries within existing bounds. Initial Windows
+CI found private-ACL and extended-path fixture assumptions plus a real restart
+failure: a dangling directory exposure can satisfy `Directory.Exists` while its
+target is retained. Native state pinning now accepts only native file/path
+absence for that target, retains its exclusion address and propagates other
+errors. Shared-consumer tests interrupt both retention and undo displacement.
+The full local run also exposed a pre-existing 10 ms timer-test registration
+race. Deadline tests now defer arming a real system timer until registration,
+using the optional TimeProvider seam inside the existing suppressed context.
+Production keeps the system provider; callback failure and context assertions
+remain unchanged. Independent review cleared this follow-up.
+
+Copilot found stale tracking before planning and singleton namespace recovery
+gaps. Planning now binds parsed current tracking to the held original's raw and
+native fingerprints before staging. Transition scans recognize only the saved
+native namespace parent without its own skill/Git/observed ownership, preserving
+README files and handling stale malformed-parent rows after child restoration.
+Owner revalidation includes the physical namespace installation root. Focused
+coverage includes source/tree/ref/pin drift, normal and interrupted namespace
+apply/undo with and without README, and newly introduced contextual ownership.
+The native proof also exercises a nested namespaced installation.

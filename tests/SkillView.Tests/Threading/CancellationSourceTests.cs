@@ -29,13 +29,14 @@ public sealed class CancellationSourceTests
         var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var reported = new TaskCompletionSource<AggregateException>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var clock = new DeferredDeadlineTimeProvider();
         using var source = new CancellationSource(
-            CancellationToken.None,
             TimeSpan.FromMilliseconds(10),
-            ex => reported.TrySetResult(ex));
+            ex => reported.TrySetResult(ex), timeProvider: clock);
         using var canceledRegistration = source.Token.Register(canceled.SetResult);
         using var failingRegistration = source.Token.Register(() =>
             throw new InvalidOperationException("deadline callback failed"));
+        clock.Start();
 
         await canceled.Task.WaitAsync(TestContext.Current.CancellationToken);
         var failure = await reported.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -140,14 +141,16 @@ public sealed class CancellationSourceTests
         ambient.Value = "caller context";
         var observed = new TaskCompletionSource<string?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var clock = new DeferredDeadlineTimeProvider();
         using var source = new CancellationSource(
             TimeSpan.FromMilliseconds(10),
-            _ => observed.TrySetResult(ambient.Value));
+            _ => observed.TrySetResult(ambient.Value), timeProvider: clock);
         using var registration = source.Token.UnsafeRegister(
             static _ => throw new InvalidOperationException("callback failed"),
             state: null);
 
         ambient.Value = null;
+        clock.Start();
         var deadlineContext = await observed.Task.WaitAsync(
             TestContext.Current.CancellationToken);
 
@@ -168,6 +171,32 @@ public sealed class CancellationSourceTests
             _ = token.IsCancellationRequested;
             source.TryCancel();
             source.Dispose();
+        }
+    }
+
+    // Create the real timer inside production's ExecutionContext boundary, but
+    // arm it only after the test's cancellation callbacks have been registered.
+    // This still exercises a real timer thread without a scheduling-speed race.
+    private sealed class DeferredDeadlineTimeProvider : TimeProvider
+    {
+        private DeferredTimer? timer;
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Assert.Null(timer);
+            var native = TimeProvider.System.CreateTimer(callback, state, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            timer = new DeferredTimer(native);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+        internal void Start() => Assert.IsType<DeferredTimer>(timer).Start();
+        private sealed class DeferredTimer(ITimer native) : ITimer
+        {
+            private TimeSpan dueTime;
+            private TimeSpan period;
+            public bool Change(TimeSpan due, TimeSpan repeat) { dueTime = due; period = repeat; return true; }
+            internal void Start() => Assert.True(native.Change(dueTime, period));
+            public void Dispose() => native.Dispose();
+            public ValueTask DisposeAsync() => native.DisposeAsync();
         }
     }
 }

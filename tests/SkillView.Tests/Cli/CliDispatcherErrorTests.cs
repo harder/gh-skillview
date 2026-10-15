@@ -281,6 +281,14 @@ public class CliDispatcherErrorTests : IDisposable
     [InlineData("undo", "")]
     [InlineData("undo", "--id ../outside --yes")]
     [InlineData("quarantine-history", "--yes")]
+    [InlineData("restore-plan", "")]
+    [InlineData("restore-plan", "--path demo --yes")]
+    [InlineData("restore-plan", "--path first --install-id second")]
+    [InlineData("restore-inspect", "--id ../outside")]
+    [InlineData("restore-apply", "--id 00000000000000000000000000000000 --yes --expect bad")]
+    [InlineData("restore-apply", "--id 00000000000000000000000000000000 --yes --disposition overwrite --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("restore-recover", "--id 00000000000000000000000000000000 --yes")]
+    [InlineData("restore-undo", "--id 00000000000000000000000000000000 --expect bad")]
     public async Task QuarantineInvalidConfirmationOrSelectorIsRejectedBeforeInventory(string command, string arguments)
     {
         var argv = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -288,6 +296,15 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.Equal(ExitCodes.InvalidUsage, code);
         Assert.Contains("skillview:", error);
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Fact]
+    public async Task RestoreAcceptsExplicitHiddenInventoryScanFlag()
+    {
+        var (code, output, _) = await RunCliAsync("skillview", ["restore-inspect", "--id", new string('0', 32), "--allow-hidden-dirs", "--json"]);
+        Assert.Equal(ExitCodes.UserError, code);
+        using var document = JsonDocument.Parse(output);
+        Assert.False(document.RootElement.GetProperty("succeeded").GetBoolean());
     }
 
     // --- update parser edge cases ----------------------------------------

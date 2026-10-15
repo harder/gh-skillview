@@ -26,6 +26,9 @@ public class CliDispatcherHelpTests
         Assert.Contains("WinGet manifests are generated for release review", stdout);
         Assert.Contains("automation-friendly", stdout);
         Assert.Contains("| `quarantine` |", stdout);
+        Assert.Contains("| `restore-plan` |", stdout);
+        Assert.Contains("| `restore-inspect` |", stdout);
+        Assert.Contains("| `restore-apply` |", stdout);
         Assert.Contains("| `undo` |", stdout);
         Assert.Contains("| `quarantine-history` |", stdout);
         Assert.Contains("SkillView requires `gh` 2.97.0 or newer", stdout);
@@ -43,6 +46,11 @@ public class CliDispatcherHelpTests
     [InlineData("quarantine", 600)]
     [InlineData("undo", 600)]
     [InlineData("quarantine-history", 600)]
+    [InlineData("restore-plan", 600)]
+    [InlineData("restore-inspect", 600)]
+    [InlineData("restore-apply", 600)]
+    [InlineData("restore-recover", 600)]
+    [InlineData("restore-undo", 600)]
     public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
     {
         Assert.Equal(TimeSpan.FromSeconds(seconds), CliDispatcher.TimeoutFor(subcommand));

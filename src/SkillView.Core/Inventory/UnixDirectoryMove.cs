@@ -58,6 +58,10 @@ internal sealed partial class UnixSecureRemovalBackend
             PayloadSnapshot.CaptureEvidence(CurrentPath,
                 (depth, observe, ct) => WalkOpenedPayload(target, Parent, originalName, depth, observe, ct), token);
 
+        internal override PayloadSnapshot FlushPayload(CancellationToken token) =>
+            PayloadSnapshot.CaptureEvidence(CurrentPath,
+                (depth, observe, ct) => WalkOpenedPayload(target, Parent, originalName, depth, observe, ct, flushToDisk: true), token);
+
         internal override void Revalidate(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();

@@ -5,7 +5,7 @@ namespace SkillView.Maintenance;
 
 internal sealed partial class QuarantineStore
 {
-    private static void EnsureNoConsumers(string boundaryPath, InventorySnapshot inventory,
+    internal static void EnsureNoConsumers(string boundaryPath, InventorySnapshot inventory,
         CancellationToken token, InstalledSkill? selected = null)
     {
         var boundary = ResolveExposureAddress(boundaryPath, token);
@@ -39,7 +39,7 @@ internal sealed partial class QuarantineStore
     // A broken exposure's inventory address is the link itself. Resolve its
     // intended destination as well, including relative targets, missing suffixes
     // and aliases. This is non-destructive policy evidence, never move authority.
-    private static string ResolveExposureAddress(string path, CancellationToken token)
+    internal static string ResolveExposureAddress(string path, CancellationToken token)
     {
         var full = Path.GetFullPath(path);
         for (var hop = 0; hop < 32; hop++)

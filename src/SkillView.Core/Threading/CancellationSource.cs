@@ -13,7 +13,7 @@ internal sealed class CancellationSource : IDisposable
     private readonly object _gate = new();
     private readonly CancellationTokenSource _source;
     private readonly CancellationTokenRegistration[] _parentRegistrations;
-    private readonly Timer? _deadlineTimer;
+    private readonly ITimer? _deadlineTimer;
     private readonly Action<AggregateException>? _onCallbackException;
     private int _activeCancellations;
     private bool _disposeRequested;
@@ -25,8 +25,9 @@ internal sealed class CancellationSource : IDisposable
 
     internal CancellationSource(
         TimeSpan timeout,
-        Action<AggregateException>? onCallbackException = null)
-        : this([], timeout, onCallbackException)
+        Action<AggregateException>? onCallbackException = null,
+        TimeProvider? timeProvider = null)
+        : this([], timeout, onCallbackException, timeProvider)
     {
     }
 
@@ -56,7 +57,8 @@ internal sealed class CancellationSource : IDisposable
     private CancellationSource(
         IReadOnlyList<CancellationToken> parents,
         TimeSpan? timeout,
-        Action<AggregateException>? onCallbackException)
+        Action<AggregateException>? onCallbackException,
+        TimeProvider? timeProvider = null)
     {
         if (timeout is { } value && !IsSupportedTimeout(value))
         {
@@ -121,7 +123,7 @@ internal sealed class CancellationSource : IDisposable
             // assigned. If creation or arming fails, Dispose uses the normal
             // active-cancellation deferral protocol rather than racing a
             // parent or timer callback from a partially built owner.
-            _deadlineTimer = CreateDisabledDeadlineTimer();
+            _deadlineTimer = CreateDisabledDeadlineTimer(timeProvider ?? TimeProvider.System);
             if (!_deadlineTimer.Change(dueTime, Timeout.InfiniteTimeSpan))
             {
                 throw new InvalidOperationException("The cancellation deadline could not be scheduled.");
@@ -256,7 +258,7 @@ internal sealed class CancellationSource : IDisposable
         _source.Dispose();
     }
 
-    private Timer CreateDisabledDeadlineTimer()
+    private ITimer CreateDisabledDeadlineTimer(TimeProvider timeProvider)
     {
         if (ExecutionContext.IsFlowSuppressed())
         {
@@ -268,7 +270,7 @@ internal sealed class CancellationSource : IDisposable
             return CreateTimer();
         }
 
-        Timer CreateTimer() => new(
+        ITimer CreateTimer() => timeProvider.CreateTimer(
             static state => ((CancellationSource)state!).TryCancel(),
             this,
             Timeout.InfiniteTimeSpan,
