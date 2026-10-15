@@ -294,6 +294,12 @@ local source and metadata diagnostics are retained. Source identity, physical
 installation, contextual owner records and revision/hash domains have separate
 fields; agent profile/version/enabled state stays unknown when not observed.
 
+Combined filters such as `list --scope user --agent codex` require a matching
+user Codex exposure. A project exposure for another agent cannot supply either
+half of that match. Matching rows still show every consumer of the shared
+installation. Legacy observations without their own scope use the installation's
+declared scope.
+
 A same-name collision is not proof of duplicate content. Collisions, malformed
 metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit

@@ -69,6 +69,15 @@ alongside linked HOME/state refusals, so an invalid marker cannot make negative
 containment checks appear to pass. Drain host stderr with stdout and report an
 early exit before waiting for a checkpoint timeout.
 
+The cross-platform `agent_docs/evidence/prove-inventory-filter.py` proof runs
+eleven actual CLI scope/agent queries against one physical payload exposed by
+user/project links, an ancestor root alias and a named profile. It requires
+complete inventory, stable identity/consumer evidence and unchanged installed
+objects/bytes. HOME/CWD/state are private, network proxies are blocked and Git
+transport is disabled. Use `--app <built host> --output <evidence.json>` and repeat
+`--gh <binary>` for minimum/current contracts. CI runs it on both native hosts
+for every RID.
+
 ### Reviewed update PTY proof (POSIX)
 
 After building, run `agent_docs/evidence/prove-reviewed-update-tui.py` with an

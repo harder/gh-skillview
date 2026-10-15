@@ -27,9 +27,9 @@ internal sealed class InstalledTabView : FrameView
     /// Maps to: All rows · only pinned · only unpinned.
     internal enum PinFilter { All, PinnedOnly, UnpinnedOnly }
 
-    /// Scope filter cycle. "user"/"project" push down to `gh skill list
-    /// --scope`; "custom" filters in-process (gh's --scope only accepts
-    /// project|user). "All" captures everything.
+    /// Scope filter cycle. Inventory is reconciled before selecting physical
+    /// rows so every consumer remains visible; agent and scope must match
+    /// the same exposure. "All" captures everything.
     internal enum ScopeFilter { All, User, Project, Custom }
 
     private readonly Func<Action, Task> _runOnUi;

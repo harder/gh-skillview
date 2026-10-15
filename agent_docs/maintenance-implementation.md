@@ -725,3 +725,43 @@ The concurrent cross-logger barrier regression now uses dedicated workers so
 shared-pool starvation cannot masquerade as lock inversion. Separate reviews
 and re-review addressed parent enumeration access and replacement fixture
 semantics. See `evidence/maintenance-batch-6-windows-namespace-refinement.json`.
+
+## Batch 6 final merge and acceptance closure
+
+PR #53 merged as `657800503ddb3890560cad2923a617fcbee83207` from reviewed head
+`f02c6e15c4bef2d09f0a040d27f27fcaefdcc58e`; their trees are identical.
+CI run 38700736316 passes 1,331 tests on each of Linux, macOS and Windows, all
+four native AOT targets and the workflow/site/dependency checks. CodeQL run
+38700736280 also passes. All four artifacts were downloaded and all 56 proof
+JSONs inspected, including 120 fixture rows and 48 actual shared-owner process
+kills across both hosts. The complete results are preserved in
+`evidence/maintenance-batch-6-final.json`, beyond the CI artifact retention period.
+
+Independent criterion review closes original M05 and M06. It matched all native
+and historical PTY evidence hashes and verified that later C# changes affected
+Windows execution validation and tests, leaving the attributed macOS TUI routing
+proof intact. Exact-target refusal is permitted by M06; unrelated native manager
+lifecycle features remain obligations of other findings. The other 19 items
+retain their original implementation and final acceptance requirements.
+
+## Batch 7: reconciled inventory filtering
+
+A disposable actual-CLI fixture reproduced incorrect cross-context matching:
+user Codex and project Claude exposures of one physical payload also matched
+user Claude and project Codex queries. Filters now require one exposure to
+match both predicates, while keeping all consumers, aliases, profiles and
+metadata conflicts in the selected row. The default gh catalog is captured
+before filtering so another agent's observation cannot disappear. Legacy
+unscoped memberships retain the installation-scope fallback; agentless custom
+rows still support scope-only filtering. The deterministic provider fixture
+also changes filters while reusing one complete catalog and asserts the
+additional consumer and conflicting sources survive in CLI JSON.
+
+The final local build has zero warnings/errors, style passes and all 1,344 tests
+pass (zero failed/skipped). Both native macOS hosts pass the eleven-case matrix
+under minimum gh 2.97.0 and current gh 2.102.0, including complete provider
+coverage and unchanged native objects/bytes. Independent final source/test/proof
+review reports no actionable findings. See
+`evidence/maintenance-batch-7-inventory-checkpoint.json`. CI now executes this
+proof against both hosts on all four native targets. Final platform evidence
+and merge remain required before M02 acceptance closure.

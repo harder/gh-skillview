@@ -44,7 +44,7 @@ internal static class HelpOverlay
 
 - **s / S** — cycle sort in Discover or Installed
 - **P** — cycle Installed pin filter
-- **G** — cycle Installed scope filter (pushes `--scope` to gh)
+- **G** — cycle Installed scope filter (preserves all shared consumers)
 - **e** — toggle raw / rendered preview
 - **l** — show / hide logs
 - **r** — refresh the active tab
