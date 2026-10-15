@@ -31,6 +31,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
 
         var targets = options.Targets.DistinctBy(target => target.InstallationId).ToArray();
         var outcomes = ImmutableArray.CreateBuilder<InstallationUpdateOutcome>();
+        var diagnostics = new UpdateResultAccumulator();
         ReplacementResult? prepared = null;
         var canceled = false;
         var failed = false;
@@ -53,18 +54,33 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             {
                 try
                 {
-                    prepared = await plans.PlanLatestAsync(ghPath, target, inventory, options.Unpin, token).ConfigureAwait(false);
-                    status = "review-required";
-                    message = "Exact candidate saved; installed payload unchanged. Review the manifest and explicitly retain the original before apply.";
+                    var preparation = await plans.PlanLatestAsync(ghPath, target, inventory, options.Unpin, token).ConfigureAwait(false);
+                    prepared = preparation.Plan;
+                    if (preparation.Unchanged is { } current)
+                    {
+                        status = "unchanged";
+                        message = current.Message;
+                        if (current.CleanupWarning is { } warning) { failed = true; message += " " + warning; }
+                    }
+                    else
+                    {
+                        status = "review-required";
+                        message = "Exact candidate saved; installed payload unchanged. Review the manifest and explicitly retain the original before apply.";
+                    }
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 { canceled = true; status = "canceled"; message = "Preparation canceled; installed payload unchanged. Private staging evidence may remain."; }
+                catch (GhSourceRequestException ex)
+                {
+                    failed = true; status = "refused"; message = ex.Message;
+                    diagnostics.Append(UpdateResult.Failure(false, 2, ex.StdErr, [], ex.StdOut));
+                }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or JsonException or EntryPointNotFoundException)
                 { failed = true; status = "refused"; message = ex.Message; }
             }
             outcomes.Add(Outcome(target, status, message));
         }
-        return Empty(false) with
+        return diagnostics.Append(Empty(false) with
         {
             Succeeded = !failed && !canceled,
             ExitCode = canceled ? 130 : failed ? 2 : 0,
@@ -73,7 +89,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             Outcomes = outcomes.ToImmutable(),
             SavedPlan = prepared,
             Notices = options.Force ? [new("review", "--force does not approve replacement or local-change disposition. Apply the saved plan with explicit retain-original approval.")] : []
-        };
+        });
     }
 
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
@@ -88,6 +104,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             token.ThrowIfCancellationRequested();
             attempted = true;
             var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token);
+            if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
                 SavedPlan = applied,
@@ -95,7 +112,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
                 ExitCode = applied.Canceled ? 130 : applied.Succeeded ? 0 : 2,
                 Cancelled = applied.Canceled,
                 ErrorMessage = applied.Succeeded ? null : applied.Message,
-                Outcomes = [FromPlan(applied, applied.Succeeded ? "changed" : "recovery-required", applied.Message)]
+                Outcomes = [FromPlan(applied, applied.Succeeded ? applied.Status == "unchanged" ? "unchanged" : "changed" : "recovery-required", applied.Message)]
             };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -172,7 +189,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
 
     private static InstallationUpdateOutcome FromPlan(ReplacementResult plan, string status, string message) =>
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
-            plan.ChangedPaths.Take(128).ToImmutableArray(), plan.ChangedPaths.Length,
+            status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
             $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with update-inspect --id {plan.Id} before recovery or undo.");
 }

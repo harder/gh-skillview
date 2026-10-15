@@ -5,6 +5,19 @@ using SkillView.Inventory.Models;
 
 namespace SkillView.Maintenance;
 
+internal sealed record ReplacementUnchanged(string InstallationId, string Path,
+    string PayloadFingerprint, string Message, string? CleanupWarning);
+
+internal sealed record ReplacementPreparation
+{
+    internal ReplacementResult? Plan { get; }
+    internal ReplacementUnchanged? Unchanged { get; }
+    private ReplacementPreparation(ReplacementResult? plan, ReplacementUnchanged? unchanged)
+    { Plan = plan; Unchanged = unchanged; }
+    internal static ReplacementPreparation Saved(ReplacementResult plan) => new(plan, null);
+    internal static ReplacementPreparation Current(ReplacementUnchanged unchanged) => new(null, unchanged);
+}
+
 internal sealed record ReplacementEvidence(string Payload, string Objects, int? Mode,
     SecureFileIdentity Identity, ImmutableArray<PayloadEntry> Entries,
     ImmutableArray<PayloadObjectEvidence> Children)
@@ -55,6 +68,7 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, WriteIndented = true, RespectRequiredConstructorParameters = true)]
 [JsonSerializable(typeof(ReplacementResult))]
+[JsonSerializable(typeof(ReplacementUnchanged))]
 [JsonSerializable(typeof(ReplacementPlan))]
 [JsonSerializable(typeof(ReplacementStep))]
 [JsonSerializable(typeof(ReplacementObservation))]

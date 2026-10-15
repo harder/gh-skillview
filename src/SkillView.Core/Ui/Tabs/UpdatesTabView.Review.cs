@@ -18,6 +18,7 @@ internal sealed partial class UpdatesTabView
     private Queue<InstalledSkill> _queue = new();
     private GhSkillUpdateService.Options? _queueOptions;
     private readonly List<InstallationUpdateOutcome> _queueOutcomes = [];
+    private UpdateResultAccumulator _queueResults = new();
     private long _reviewGeneration;
 
     private void InitializeReviewControls()
@@ -122,7 +123,7 @@ internal sealed partial class UpdatesTabView
                     SaveOutcomes(result.Outcomes);
                     _review = applying ? null : result.SavedPlan;
                     _retainBox.Value = CheckState.UnChecked;
-                    result = result with { Outcomes = _queueOutcomes.ToImmutableArray() };
+                    result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
                 }
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, []);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"

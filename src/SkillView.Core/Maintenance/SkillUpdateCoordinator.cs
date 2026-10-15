@@ -137,7 +137,7 @@ public sealed class SkillUpdateCoordinator(
                             new GhSkillInstallService.Options(Path: refDestination, Version: recordedRef, Pin: true,
                                 ProcessEnvironment: stageEnvironment),
                             cancellationToken).ConfigureAwait(false);
-                        if (!staged.Succeeded) throw new IOException($"Cannot stage recorded base: {staged.ErrorMessage}");
+                        if (!staged.Succeeded) throw new GhSourceRequestException($"Cannot stage recorded base: {staged.ErrorMessage}", staged.StdOut, staged.StdErr);
                         var stagedPaths = Directory.EnumerateDirectories(refDestination).Take(2).ToArray();
                         if (stagedPaths.Length != 1) throw new IOException("Recorded source did not materialize one exact skill.");
                         var stagedPath = stagedPaths[0];
@@ -156,7 +156,7 @@ public sealed class SkillUpdateCoordinator(
                                 new GhSkillInstallService.Options(Path: materialized, FromLocal: true, All: true,
                                     ProcessEnvironment: stageEnvironment),
                                 cancellationToken).ConfigureAwait(false);
-                            if (!import.Succeeded) throw new IOException($"Cannot materialize recorded tree: {import.ErrorMessage}");
+                            if (!import.Succeeded) throw new GhSourceRequestException($"Cannot materialize recorded tree: {import.ErrorMessage}", import.StdOut, import.StdErr);
                             var basePaths = Directory.EnumerateDirectories(materialized).Take(2).ToArray();
                             if (basePaths.Length != 1) throw new IOException("Recorded tree did not materialize one exact skill.");
                             basePayload = PayloadSnapshot.Capture(basePaths[0], cancellationToken);
@@ -200,6 +200,11 @@ public sealed class SkillUpdateCoordinator(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             { canceled = true; status = "canceled"; message = "Canceled; any attempted mutation is verified separately."; }
+            catch (GhSourceRequestException ex)
+            {
+                failed = true; status = "refused"; message = ex.Message;
+                AppendBounded(stdout, ex.StdOut); AppendBounded(stderr, ex.StdErr);
+            }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             { failed = true; status = "refused"; message = ex.Message; }
             finally

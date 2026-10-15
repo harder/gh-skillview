@@ -19,6 +19,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     public int? RootUnixMode { get; init; }
     internal SecureFileIdentity? RootIdentity { get; init; }
     internal ImmutableArray<PayloadObjectEvidence> Objects { get; init; } = [];
+    internal string? GhPresentationFingerprint { get; init; }
 
     public const int MaxEntries = 10_000;
     public const long MaxBytes = 256L * 1024 * 1024;
@@ -51,6 +52,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         var objects = ImmutableArray.CreateBuilder<PayloadObjectEvidence>();
         long totalBytes = 0;
         SkillView.Inventory.Models.SkillFrontMatter? frontMatter = null;
+        string? presentation = null;
         var nativeWalk = walk ?? ((depth, callback, token) => SecurePayloadWalker.Walk(root, depth, callback, token));
         var identity = nativeWalk(MaxDepth, item =>
         {
@@ -66,6 +68,8 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             RootIdentity = identity.Identity,
             RootUnixMode = identity.UnixMode,
             Objects = objectEvidence,
+            GhPresentationFingerprint = presentation is null ? null : Digest(ordered.Select(entry => entry.Path == LocalSkillScanner.SkillFileName
+                ? entry with { ContentHash = presentation } : entry).ToImmutableArray(), false),
             ObjectStateFingerprint = DigestObjects(identity, objectEvidence, cancellationToken)
         };
 
@@ -121,8 +125,12 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
                     var (_, parsedMetadata, parsed) = FrontMatterParser.Parse(text);
                     if (!parsed && strictMetadata) throw new IOException("invalid frontmatter during payload comparison");
                     frontMatter = parsedMetadata;
-                    if (parsed) comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-                        InstallerMetadataNormalizer.Normalize(text))));
+                    if (parsed)
+                    {
+                        var normalized = InstallerMetadataNormalizer.Normalize(text);
+                        comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
+                        presentation = GhPresentationComparison.Fingerprint(normalized);
+                    }
                 }
                 catch (Exception ex) when (ex is YamlException or DecoderFallbackException)
                 { if (strictMetadata) throw new IOException("invalid frontmatter encoding or YAML during comparison", ex); }

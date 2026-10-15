@@ -5,6 +5,7 @@ namespace SkillView.Inventory;
 internal abstract class NativeStateDirectory : IDisposable
 {
     internal abstract string CanonicalPath { get; }
+    internal abstract OwnedDirectoryLease CaptureOwnership(CancellationToken token);
     internal abstract FileStream OpenFile(string name, bool writerLock, CancellationToken token);
     internal abstract FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token);
     internal abstract IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token);

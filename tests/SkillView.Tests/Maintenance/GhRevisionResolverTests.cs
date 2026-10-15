@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SkillView.Maintenance;
+using SkillView.Subprocess;
 using Xunit;
 
 namespace SkillView.Tests.Maintenance;
@@ -62,7 +63,7 @@ public sealed class GhRevisionResolverTests
     public async Task AuthenticationRateLimitAndServerFailureNeverFallBack(int status)
     {
         responses[callsLatest] = new(status, "{}");
-        await Assert.ThrowsAsync<IOException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", Token));
+        await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", Token));
         Assert.Equal(new[] { callsLatest }, calls);
     }
 
@@ -70,7 +71,7 @@ public sealed class GhRevisionResolverTests
     public async Task MissingTagDoesNotFallBackAfterReleaseWasSelected()
     {
         responses["repos/harder/fixture/git/ref/tags/v2"] = new(404, "{}");
-        await Assert.ThrowsAsync<IOException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", Token));
+        await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", Token));
         Assert.DoesNotContain("repos/harder/fixture", calls);
     }
 
@@ -148,5 +149,32 @@ public sealed class GhRevisionResolverTests
     {
         await Assert.ThrowsAsync<OperationCanceledException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", new(true)));
         Assert.Empty(calls);
+    }
+
+    [Fact]
+    public async Task RemoteFailureRetainsBothActualProcessStreamsWithoutRefFallback()
+    {
+        const string stdout = "HTTP/2.0 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{\"message\":\"API rate limit exceeded\"}";
+        const string stderr = "gh: API rate limit exceeded (HTTP 403)";
+        var process = new ProcessResult("gh", [], 1, stdout, stderr, TimeSpan.Zero);
+        responses[callsLatest] = GhRevisionResolver.CaptureResponse(process);
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveLatestAsync(Repository, "skills/demo", Token));
+        Assert.Equal(stdout, error.StdOut);
+        Assert.Equal(stderr, error.StdErr);
+        Assert.Equal(new[] { callsLatest }, calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InvalidOrTruncatedHttpCaptureRetainsBoundedDiagnostics(bool truncated)
+    {
+        var stdout = truncated ? new string('x', 100_000) : "incomplete HTTP response";
+        var error = Assert.Throws<GhSourceRequestException>(() => GhRevisionResolver.CaptureResponse(
+            new("gh", [], 1, stdout, "remote diagnostic", TimeSpan.Zero) { StdOutTruncated = truncated }));
+        Assert.Equal("remote diagnostic", error.StdErr);
+        Assert.StartsWith(stdout[..Math.Min(stdout.Length, 64 * 1024)], error.StdOut);
+        Assert.InRange(error.StdOut.Length, 1, 64 * 1024 + 100);
+        if (truncated) Assert.Contains("omitted", error.StdOut);
     }
 }

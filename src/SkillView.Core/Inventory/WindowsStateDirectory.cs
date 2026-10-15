@@ -275,6 +275,19 @@ internal sealed partial class WindowsSecureRemovalBackend
             ValidateLocation(token);
             sealedStage = true;
         }
+        internal override OwnedDirectoryLease CaptureOwnership(CancellationToken token)
+        {
+            ValidateLocation(token);
+            token.ThrowIfCancellationRequested();
+            if (!WindowsNative.DuplicateHandle(WindowsNative.GetCurrentProcess(), root,
+                    WindowsNative.GetCurrentProcess(), out var duplicate, 0, false, 2))
+            {
+                var error = LastErrorMessage();
+                duplicate?.Dispose();
+                throw new IOException("Duplicate owned state directory failed: " + error);
+            }
+            return CreateOwnedDirectoryLease(duplicate);
+        }
         internal override string CanonicalPath => canonical;
         internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token)
         {

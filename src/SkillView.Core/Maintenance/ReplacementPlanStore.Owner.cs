@@ -96,8 +96,9 @@ internal sealed partial class ReplacementPlanStore
         var before = EntryRegistry(transition.Selector, transition.BeforeEntry);
         var patch = GhRegistryEditor.Prepare(before, transition.Selector, transition.BeforeFingerprint, source.Tree, null, transition.UpdatedAt, token);
         var desired = GhRegistryEditor.CaptureEntry(EntryRegistry(transition.Selector, transition.DesiredEntry), transition.Selector, token);
-        if (desired.Fingerprint != transition.DesiredFingerprint || patch.DesiredEntryFingerprint != transition.DesiredFingerprint
-            || !GhRegistryEditor.CaptureEntry(patch.DesiredBytes, transition.Selector, token).Bytes.AsSpan().SequenceEqual(transition.DesiredEntry))
+        if (!Matches(patch))
+            patch = GhRegistryEditor.RecreateSavedTransition(before, transition.Selector, transition.BeforeFingerprint, source.Tree, null, transition.UpdatedAt, token);
+        if (!Matches(patch))
             throw new IOException("Saved owner transition changes fields outside the approved tree/pin/timestamp policy.");
         using var document = JsonDocument.Parse(transition.BeforeEntry);
         string? Text(string name) => document.RootElement.TryGetProperty(name, out var value) && value.GetString() is { Length: > 0 } text ? text : null;
@@ -118,6 +119,10 @@ internal sealed partial class ReplacementPlanStore
             OwnershipClaims = claims
         };
         GhSharedLockGuard.ValidateUpdateRecords(ImmutableDictionary<string, GhSharedLockGuard.Record>.Empty.Add(transition.Selector, record), [target]);
+
+        bool Matches(GhRegistryPatch expected) => desired.Fingerprint == transition.DesiredFingerprint
+            && expected.DesiredEntryFingerprint == transition.DesiredFingerprint
+            && GhRegistryEditor.CaptureEntry(expected.DesiredBytes, transition.Selector, token).Bytes.AsSpan().SequenceEqual(transition.DesiredEntry);
     }
 
     private static byte[] EntryRegistry(string selector, byte[] entry)

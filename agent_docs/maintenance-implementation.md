@@ -858,3 +858,49 @@ The older mutating fixtures also capture credentials before private HOME and
 use private config/CWD/agent paths plus stripped Git overrides. Final source
 build/style checks pass; all 15 opt-in contracts pass under both gh versions.
 Separate review confirms both fixture corrections. Production code is unchanged.
+
+Batch 9 final acceptance: PR #56 merged at `16258ff62122ce7cbb7397c4994fc31013a59086`,
+with a tree identical to final reviewed head `dd36128005907722b0fc51d648538dbba7af3ee8`.
+All 13 PR checks pass; each platform passes 1,380 tests with zero failures/skips.
+The exact-head minimum/current gh lanes each pass all 15 opt-in contracts. All 76
+native proof files / 244 fixture rows were inspected, including 32 tracking cases
+in eight native host proofs across four RIDs. Independent final review confirms
+every original M01 criterion. Full results are retained in
+`evidence/maintenance-batch-9-final.json`.
+M01, M02, M04, M05 and M06 are complete; 16 original items remain.
+
+## Batch 10: independent outcomes and unchanged updates
+
+The M07 audit reproduced two remaining defects: equal updates replaced installed
+native objects and consumed saved-plan slots, and later queue results erased
+earlier stdout/stderr/notices. Regressions failed before the fixes. Independent
+review also caught forward recovery bypassing the legacy equal-plan guard; its
+regression failed before that path was corrected.
+
+Fresh current checks now preserve the installed native objects, owner bytes and
+timestamps without publishing a plan. Cleanup is limited to the never-published
+private operation, through ownership duplicated from its held native handle.
+Failure exposes the exact retained location. Apply and never-started ready-state
+recovery of legacy equal plans avoid mutation; interrupted plans still recover.
+Same-tree local repairs remain explicit reviewed replacements that retain the
+edited original and report real file changes.
+
+The Updates queue retains bounded output, diagnostics, notices, errors and earlier
+mutation/failure evidence while keeping only the current plan as its Apply target.
+Failed source requests retain both streams through staging wrappers and CLI/UI
+rendering. Actual-gh tests prove first-success/second-failure behavior in both the
+low-level adapter and the product saved-update queue.
+
+Local build and style verification pass. All 1,426 default tests pass with zero
+failures/skips, and all 17 opt-in contracts pass against gh 2.97.0 and 2.102.0.
+Independent source, recovery, native ownership and proof reviews are clear after
+addressing their findings. The raw-gh current fixture also exposed YAML key ordering and body-delimiter
+presentation differences. A conservative same-revision comparison now preserves
+those bytes while recognizing current content; new trees and meaningful changes
+still require review. Its strict metadata snapshots are bound to held raw payload
+and native object evidence. Both sequential AOT publishes pass. All 24 outcome
+fixtures pass across both native hosts and both gh versions, including raw-gh
+current checks, same-tree repairs and later remote failures. Exact-head remote
+verification and merge remain required before M07 closure; local results and
+hashes are retained in `evidence/maintenance-batch-10-update-outcomes-checkpoint.json`. See
+`maintenance-update-outcomes.md` for semantics and proof commands.

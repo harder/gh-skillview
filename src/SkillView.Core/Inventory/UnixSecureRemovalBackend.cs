@@ -69,6 +69,11 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         var canonicalParent = RealPath(Path.GetDirectoryName(full) ?? throw new IOException("payload directory has no parent"));
         var handle = OpenAbsoluteDirectory(Path.Combine(canonicalParent, Path.GetFileName(full)), out var parent, out _);
         parent.Dispose();
+        return CreateOwnedDirectoryLease(handle);
+    }
+
+    private static OwnedDirectoryLease CreateOwnedDirectoryLease(SafeUnixHandle handle)
+    {
         try
         {
             var canonical = ReadFinalPath(handle);

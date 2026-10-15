@@ -77,8 +77,8 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
         var result = await runner.RunAsync(ghPath,
             ["api", "--hostname", "github.com", "--", $"repos/{repo}/git/trees/{treeSha}?recursive=1"],
             cancellationToken: token).ConfigureAwait(false);
-        if (result.StdOutTruncated || result.StdErrTruncated) throw new IOException("Recorded tree capture was truncated.");
-        if (!result.Succeeded) throw new IOException($"Recorded tree is inaccessible: {result.StdErr}");
+        if (result.StdOutTruncated || result.StdErrTruncated) throw new GhSourceRequestException("Recorded tree capture was truncated.", result);
+        if (!result.Succeeded) throw new GhSourceRequestException($"Recorded tree is inaccessible: {result.StdErr}", result);
         using var document = ParseTreeResponse(result.StdOut, treeSha);
         var tree = document.RootElement.GetProperty("tree");
         await MaterializeAsync(tree, treeSha, destination, async (blobSha, ct) =>
@@ -86,8 +86,8 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
             var blob = await runner.RunAsync(ghPath,
                 ["api", "--hostname", "github.com", "--jq", ".content", "--", $"repos/{repo}/git/blobs/{blobSha}"],
                 cancellationToken: ct).ConfigureAwait(false);
-            if (blob.StdOutTruncated || blob.StdErrTruncated) throw new IOException("Recorded blob capture was truncated.");
-            if (!blob.Succeeded) throw new IOException($"Recorded blob is inaccessible: {blob.StdErr}");
+            if (blob.StdOutTruncated || blob.StdErrTruncated) throw new GhSourceRequestException("Recorded blob capture was truncated.", blob);
+            if (!blob.Succeeded) throw new GhSourceRequestException($"Recorded blob is inaccessible: {blob.StdErr}", blob);
             return Convert.FromBase64String(blob.StdOut);
         }, skillTransform, token).ConfigureAwait(false);
     }

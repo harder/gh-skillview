@@ -166,6 +166,13 @@ jobs:
         run: |
           python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/tracking-app-proof.json
           python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/tracking-extension-proof.json
+      - name: Prove update outcomes, same-tree repairs and no-op object preservation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python agent_docs/evidence/prove-update-outcomes.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/update-outcomes-app-proof.json
+          python agent_docs/evidence/prove-update-outcomes.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/update-outcomes-extension-proof.json
       - name: Prove recorded restoration and undo with real gh and native hosts
         shell: bash
         env:
