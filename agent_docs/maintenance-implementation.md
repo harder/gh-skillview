@@ -1253,3 +1253,24 @@ acceptance remains 9/21, with M19 incomplete and all other original obligations
 retained. See `maintenance-static-package-check.md` and
 `evidence/maintenance-static-package-check-local.json` for scope, source hashes,
 review records and exact verification receipts.
+
+### Batch 16: final native verification and merge
+
+PR #66 merged reviewed head `c919199` as
+`ab23a7b1f3c0719926a78d3178f78849d1aa0ea2`; the fetched merge tree exactly
+matches the reviewed tree. Final same-head CI succeeds: all 15 observed PR
+statuses, both actual CodeQL analyses and minimum/current gh contracts pass.
+The failure-only contract notification job is skipped; no configured required
+GitHub statuses were reported. Initial-attempt platform totals are 1,987 each
+(including 9 integration tests), with 207 metadata tests on each Windows host.
+Failed-only attempt2 replaces the four quota-failed AOT jobs, all successful.
+
+All four fresh final-head native artifacts are independently reviewed: 182
+members, 144 positive unpin process-kill/recovery rows and 24 actual old-native
+schema1–3 fixtures from baseline `0dba59be`. Linux positive proofs run in the
+private privileged filesystem; ordinary refusals are recorded separately and
+excluded. Prior source/fixture/path/network/quota failures remain attributed in
+the earlier records. Standalone unpin is now merged; selected-consumer detach
+and the other M08 obligations remain open. Original acceptance stays 9/21 and
+the original Mac Down-arrow crash remains unreproduced. See
+`evidence/maintenance-batch-16-final.json`.

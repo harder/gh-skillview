@@ -1,0 +1,1382 @@
+{
+  "schemaVersion": 1,
+  "batch": 16,
+  "reviewedHead": "c919199a6861b9aaf9301e31c4b2945e098da799",
+  "merge": {
+    "pullRequest": {
+      "baseRefName": "main",
+      "headRefOid": "c919199a6861b9aaf9301e31c4b2945e098da799",
+      "mergeCommit": {
+        "oid": "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2"
+      },
+      "mergedAt": "2026-10-16T21:28:53Z",
+      "state": "MERGED",
+      "url": "https://github.com/harder/gh-skillview/pull/66"
+    },
+    "mergeCommit": "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2",
+    "mergeTree": "3521c7b8c5717ae0d81212be62b69c97ab8d2267",
+    "reviewedHead": "c919199a6861b9aaf9301e31c4b2945e098da799",
+    "parents": [
+      "0dba59be59776e6e654123aa1ce1e5496074763e",
+      "c919199a6861b9aaf9301e31c4b2945e098da799"
+    ],
+    "reviewedHeadEqualsMergedTree": true,
+    "originMainVerified": true,
+    "localMainReset": false,
+    "featureCheckoutHead": "c919199a6861b9aaf9301e31c4b2945e098da799",
+    "featureCheckoutStatus": "?? HANDOFF-2026-10-16-WSL.md"
+  },
+  "sourceFinalSummary": {
+    "path": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/final-summary.json",
+    "sha256": "91697f9bdcbaf61563271d9f2edd4118b922a68655f621d6ace97fffbbd4d2cb"
+  },
+  "finalVerification": {
+    "attemptHistory": {
+      "attempt1": "All four AOT lanes failed due GitHub Actions installation API HTTP 403 quota; preserved in job logs/artifacts API snapshot.",
+      "attempt2": "Failed-only rerun after observed reset on unchanged exact head; all four AOT lanes succeeded. Successful retained tests/metadata/CodeQL/contracts are attributed to initial run jobs."
+    },
+    "ciRun": {
+      "allJobConclusions": {
+        "AOT publish smoke (linux-x64)": "success",
+        "AOT publish smoke (osx-arm64)": "success",
+        "AOT publish smoke (win-arm64)": "success",
+        "AOT publish smoke (win-x64)": "success",
+        "Windows metadata (windows-11-arm)": "success",
+        "Windows metadata (windows-latest)": "success",
+        "dependency-review": "success",
+        "site-check": "success",
+        "test (macos-15)": "success",
+        "test (ubuntu-latest)": "success",
+        "test (windows-latest)": "success",
+        "workflow-lint": "success"
+      },
+      "attempt": 2,
+      "conclusion": "success",
+      "createdAt": "2026-10-16T19:44:48Z",
+      "id": 38957175984,
+      "status": "completed",
+      "updatedAt": "2026-10-16T21:26:14Z",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/38957175984"
+    },
+    "codeql": {
+      "conclusion": "success",
+      "headSha": "c919199a6861b9aaf9301e31c4b2945e098da799",
+      "jobs": {
+        "Analyze (actions)": "success",
+        "Analyze (csharp)": "success"
+      },
+      "runId": 38957176056,
+      "status": "completed"
+    },
+    "contracts": {
+      "conclusion": "success",
+      "headSha": "c919199a6861b9aaf9301e31c4b2945e098da799",
+      "jobs": {
+        "gh 2.97.0 contract tests": "success",
+        "gh latest contract tests": "success",
+        "notify-failure": "skipped"
+      },
+      "runId": 38957220702,
+      "status": "completed"
+    },
+    "copilotReviewThread": [
+      {
+        "commentUrls": [
+          "https://github.com/harder/gh-skillview/pull/66#discussion_r4298043577"
+        ],
+        "id": "PRRT_kwDOSKLicM6tVHab",
+        "path": "agent_docs/evidence/prepare-gh-proof-tool.py",
+        "resolved": true
+      }
+    ],
+    "evidenceDirectory": "/tmp/skillview-unpin-evidence/ci-executable-path-fix",
+    "headSha": "c919199a6861b9aaf9301e31c4b2945e098da799",
+    "independentFinalArtifactReview": {
+      "actualOldNativeSchemas1To3Fixtures": 24,
+      "artifactMembersVerified": 182,
+      "passedReviewChecks": 533,
+      "path": "/tmp/skillview-unpin-review/c919-attempt2-four-rid-independent-summary.json",
+      "qualification": "Linux positives came from privileged private tmpfs proofs; ordinary CAP_SYS_ADMIN refusals are not counted.",
+      "sha256": "152710881f30aff3566f9a64e494d08d32ca7f44bcd7eba8a2abf2e44b229843",
+      "standaloneUnpinActualKillRows": 144,
+      "verdict": "all four fresh native artifact reviews clear"
+    },
+    "mergeReceipt": {
+      "path": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/merge-verified.json",
+      "sha256": "bf0e643ea0b9230994dac876f660eb700ec1c25d5eced925138965de3cdcb80a"
+    },
+    "nativeArtifactsFinal": [
+      {
+        "artifactId": 12073339088,
+        "createdAt": "2026-10-16T20:44:45Z",
+        "githubDigest": "sha256:4f8eba8eaffd2bd044dd57fefcb92d983e48a0528e245561790c8c24006f6040",
+        "localZipSha256": "4f8eba8eaffd2bd044dd57fefcb92d983e48a0528e245561790c8c24006f6040",
+        "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/linux-attempt2/artifact-members.sha256",
+        "memberManifestSha256": "f0bcb6093a79716bed14b4dc5399ccb613efe7bc2048508b6178bc1a4c66aaed",
+        "members": 60,
+        "name": "native-maintenance-evidence-linux-x64",
+        "rid": "linux-x64"
+      },
+      {
+        "artifactId": 12075160359,
+        "createdAt": "2026-10-16T20:56:35Z",
+        "githubDigest": "sha256:96408d203a19ca15ea2f1a58595b41e4ea5aa5714d551bd4db3be63a61590fb2",
+        "localZipSha256": "96408d203a19ca15ea2f1a58595b41e4ea5aa5714d551bd4db3be63a61590fb2",
+        "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/macos-attempt2/artifact-members.sha256",
+        "memberManifestSha256": "caebfd7e45112dd9b4e3e5e879ecd69f2ee1c3d1a03a282c8788bbe337b88635",
+        "members": 42,
+        "name": "native-maintenance-evidence-osx-arm64",
+        "rid": "osx-arm64"
+      },
+      {
+        "artifactId": 12076017993,
+        "createdAt": "2026-10-16T21:24:06Z",
+        "githubDigest": "sha256:e8d06cf80f4df080573204153927433ca220d54e5750b15dbf6a7898828d6520",
+        "localZipSha256": "e8d06cf80f4df080573204153927433ca220d54e5750b15dbf6a7898828d6520",
+        "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/win-arm64-attempt2/artifact-members.sha256",
+        "memberManifestSha256": "e445d5abab64c24dc13d4cd93624488d110fe7c95e49b5a855911cb344efd8ce",
+        "members": 40,
+        "name": "native-maintenance-evidence-win-arm64",
+        "rid": "win-arm64"
+      },
+      {
+        "artifactId": 12076340864,
+        "createdAt": "2026-10-16T21:26:09Z",
+        "githubDigest": "sha256:6ad4a8253506256c2b599f1024e60a4e8bf8e21ccb811c58b6238310b83786ff",
+        "localZipSha256": "6ad4a8253506256c2b599f1024e60a4e8bf8e21ccb811c58b6238310b83786ff",
+        "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/win-x64-attempt2/artifact-members.sha256",
+        "memberManifestSha256": "9b080dea5fe13153f95db37471a61ef0480c28a4233342bee67571f4693b1d73",
+        "members": 40,
+        "name": "native-maintenance-evidence-win-x64",
+        "rid": "win-x64"
+      }
+    ],
+    "nativeAssertions": {
+      "linux-x64": "Privileged private-tmpfs proof includes App+extension and actual old-native schemas1/2/3; registryExtensionsIncluded false/true/true. Ordinary EPERM refusal is not counted as publication success.",
+      "oldNativeAllRids": "App/extension proofs include schemas1/2/3 with registryExtensionsIncluded false/true/true.",
+      "perRid": {
+        "newStandaloneUnpin": "App and extension \u00d7 gh 2.97.0/2.102.0 \u00d7 nine actual-process-kill recovery fixtures; schema4 verified, no source resolution, equivalent raw reformat refused, exact owner/original native undo asserted."
+      }
+    },
+    "observedCheckPolicy": {
+      "allObservedConclusions": "success",
+      "configuredRequiredChecks": "none reported by gh pr checks; this record does not assert branch-protection required statuses",
+      "contractNotifyFailure": "skipped as expected; both actual gh contract lanes succeeded",
+      "observedPRChecks": 15
+    },
+    "pr": {
+      "headRefOid": "c919199a6861b9aaf9301e31c4b2945e098da799",
+      "mergeCommit": "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2",
+      "mergeStateStatus": "CLEAN",
+      "mergeTree": "3521c7b8c5717ae0d81212be62b69c97ab8d2267",
+      "mergedAt": "2026-10-16T21:28:53Z",
+      "number": 66,
+      "originMainVerified": true,
+      "parents": [
+        "0dba59be59776e6e654123aa1ce1e5496074763e",
+        "c919199a6861b9aaf9301e31c4b2945e098da799"
+      ],
+      "reviewedHeadEqualsMergedTree": true,
+      "state": "MERGED",
+      "url": "https://github.com/harder/gh-skillview/pull/66"
+    },
+    "rawSnapshots": {
+      "final-artifacts.json": "d475cf387201f66e4a1cc90f83b10cc81ecfa39e31bc3f233dca3520440f06c4",
+      "final-codeql.json": "2563ce1120130bf3786bd6eb85f069574a4b51c2ef3ee7ad90d84438166828db",
+      "final-contracts.json": "0a6d876163ca8937317b1bcb0a317941ea001509ea574b12f78263f9908c2e39",
+      "final-pr.json": "e2b28016e8621bb927f0085bd99fd790433a527d1817e78ee6e2c1aa0bf0bf36",
+      "final-review-threads.json": "466102a84ed8227f273efa143f777fa3a27ee6f7a5644210161314046d25da79",
+      "final-run.json": "12d27c96004d6fe8d4d3df0d527b961f3147a58ba0f05bc78e5e736d4328cc37",
+      "merge-verified.json": "bf0e643ea0b9230994dac876f660eb700ec1c25d5eced925138965de3cdcb80a"
+    },
+    "retainedSameHeadChecks": {
+      "jobEvidence": {
+        "macos-15": {
+          "jobId": 117179567647,
+          "logPath": "job-117179567647.log",
+          "logSha256": "7e3cc49ad5c758c3bb290028cf2d5e2bf4e563de68fd80454e220b95a3e435df",
+          "passed": 1987,
+          "testTotal": 1987
+        },
+        "ubuntu-latest": {
+          "jobId": 117179612877,
+          "logPath": "job-117179612877.log",
+          "logSha256": "fda6735e9b0bab5de74224dc091139a4987c85f1a48b313f0d85526b7a585f79",
+          "passed": 1987,
+          "testTotal": 1987
+        },
+        "windows-latest": {
+          "jobId": 117179567031,
+          "logPath": "job-117179567031.log",
+          "logSha256": "bd364bf7cc7c470c7401cbb54d141b3ad1d82e2b5f49f04d273631c2bee0a9cc",
+          "passed": 1987,
+          "testTotal": 1987
+        }
+      },
+      "note": "All three successful test jobs ran on this exact head in the initial run attempt; --failed retry only re-ran failed AOT jobs. Each platform total 1,987 includes 9 IntegrationTests; this is not an all-unit-test count.",
+      "platforms": [
+        "ubuntu-latest",
+        "macos-15",
+        "windows-latest"
+      ],
+      "testTotalsPerPlatform": 1987
+    },
+    "windowsMetadata": {
+      "artifacts": {
+        "windows-11-arm": {
+          "artifactId": 12071515911,
+          "artifactZipPath": "metadata-attempt1-arm/artifact.zip",
+          "githubDigest": "sha256:cccac24ffabe9960f4f18971cad70846c9a3463356f3a4b3b15b676187f86d3d",
+          "member": "windows-metadata-tests.log",
+          "memberSha256": "735f5c627cc6e0e7ccb623b6862be98d4f2e994758cec03c8da7371b6deceddf"
+        },
+        "windows-latest": {
+          "artifactId": 12071765361,
+          "artifactZipPath": "metadata-attempt1-x64/artifact.zip",
+          "githubDigest": "sha256:04a85e08f7c8debb19797b51c817668ce183b9f74e5d0434481cbd73ff3fbd9f",
+          "member": "windows-metadata-tests.log",
+          "memberSha256": "92df25fee42c8196fe282050facd5a368ebf35ad7d5000af9a4ff5622f88ff26"
+        }
+      },
+      "evidence": {
+        "windows-11-arm": {
+          "artifactId": 12071515911,
+          "githubDigest": "sha256:cccac24ffabe9960f4f18971cad70846c9a3463356f3a4b3b15b676187f86d3d",
+          "jobId": 117179603210,
+          "logPath": "job-117179603210.log",
+          "logSha256": "5a14317e1bf62b5a07cecc94084821c6db1bce954b7157a6385a1be640969c5b",
+          "passed": 207,
+          "total": 207
+        },
+        "windows-latest": {
+          "artifactId": 12071765361,
+          "githubDigest": "sha256:04a85e08f7c8debb19797b51c817668ce183b9f74e5d0434481cbd73ff3fbd9f",
+          "jobId": 117179566532,
+          "logPath": "job-117179566532.log",
+          "logSha256": "ac2be0759c5453a6f986dac9deff450d507df5f9d1eb14591579550d5bca8968",
+          "passed": 207,
+          "total": 207
+        }
+      },
+      "jobs": [
+        "windows-latest",
+        "windows-11-arm"
+      ],
+      "note": "Successful metadata jobs retained from initial attempt on same exact head.",
+      "testsPerJob": 207
+    }
+  },
+  "nativeArtifactsSelected": {
+    "linux-x64": {
+      "artifactId": 12073339088,
+      "createdAt": "2026-10-16T20:44:45Z",
+      "githubDigest": "sha256:4f8eba8eaffd2bd044dd57fefcb92d983e48a0528e245561790c8c24006f6040",
+      "localZipSha256": "4f8eba8eaffd2bd044dd57fefcb92d983e48a0528e245561790c8c24006f6040",
+      "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/linux-attempt2/artifact-members.sha256",
+      "memberManifestSha256": "f0bcb6093a79716bed14b4dc5399ccb613efe7bc2048508b6178bc1a4c66aaed",
+      "members": 60,
+      "name": "native-maintenance-evidence-linux-x64",
+      "rid": "linux-x64",
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "5cfdfc9b7e37939bbe88e8a790c763f76384d060009f008b280ab01052412c15"
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "8786afdd2987af11fda4827503534980f6e6b15c0c043f15a59fa03cec6344c4"
+        },
+        {
+          "path": "disk-full-proof/container-tools.log",
+          "sha256": "e1eaebe98feee48446bde0872f1aef9fca87e0c80d55699f560680cf0c3d96fe"
+        },
+        {
+          "path": "disk-full-proof/disk-full-displace-moved.json",
+          "sha256": "5436f2689fb1a643ec892373ef1a866ea85d379080fe93b6ae5d0c3ceef7a1fa"
+        },
+        {
+          "path": "disk-full-proof/disk-full-displace-moved.log",
+          "sha256": "9cea263da17e20f625afdcdbff4f1294f2d8440bd93a9f12921619c90bfb2574"
+        },
+        {
+          "path": "disk-full-proof/disk-full-install-moved.json",
+          "sha256": "a23650735d0fbcfeaa9083b5554da2dd0c4e93d3c32d766f5a4381f2ae804969"
+        },
+        {
+          "path": "disk-full-proof/disk-full-install-moved.log",
+          "sha256": "838f0667641f9fc0b591ccbbddba70f64d551b100d37362bf4fee1da4cf355d9"
+        },
+        {
+          "path": "disk-full-proof/disk-full-restore-moved.json",
+          "sha256": "af53933d236f61c846923c5465457631ca8020f95a0011a6354d5244edcbb985"
+        },
+        {
+          "path": "disk-full-proof/disk-full-restore-moved.log",
+          "sha256": "5e1c52f8cac3d46d51a1d630600e13e1622cb8019deb87970d721a0387a6bb19"
+        },
+        {
+          "path": "disk-full-proof/disk-full-retain-moved.json",
+          "sha256": "602315105aec0306d7204fa71b4f1e5eedeaaae9082fa6ceea66bbf475ae7af5"
+        },
+        {
+          "path": "disk-full-proof/disk-full-retain-moved.log",
+          "sha256": "b6c771164c38a4f833eac28eb20156b3adacc6e64418413a26189441832eef6b"
+        },
+        {
+          "path": "disk-full-proof/docker.log",
+          "sha256": "19daf7b7a0de276852d769565163ab0712e4e8d803229545302862894be03636"
+        },
+        {
+          "path": "disk-full-proof/guard-ordinary.log",
+          "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4"
+        },
+        {
+          "path": "disk-full-proof/guard-oversized.log",
+          "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4"
+        },
+        {
+          "path": "disk-full-proof/guard-shared-small.log",
+          "sha256": "9e5a6ea9f8807f71e2512327647f7a842c709c26a704cdef2b41aa15b99fc2d3"
+        },
+        {
+          "path": "disk-full-proof/inputs.json",
+          "sha256": "6b2b4a323353ded658aaac2a82dac6838f866486e12d50b0f64e8b957cdc06ee"
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "7e0d8a662f938f9215dcd60885c6ac27e34717bfc3ca8bc924c5974cdd366e3e"
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "da6e6fa66a69f00ce3b1aee48b4e2f1d4becc353154ff279391fa2f19ac85feb"
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "8c20095c6efb13c57d13edb0bd0d26c6bf627d85f915a21d6bc0d869cee47e8a"
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "1563f2e2cd0222cbabdfc5bfae9041f0f92b7000434638d6f0b5724f3e32c4f2"
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "98e62485f5f071310809303fb108d4d5ad6ae2a3366c4d92b6d2dcde3e72a424"
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "ebadc39320d9ab84206bc5c2548ae0524adf926b558d36f5f911841607041280"
+        },
+        {
+          "path": "inventory-denied-app-proof.json",
+          "sha256": "3cce9a787a937343ec0049d52a8ebf05b6edbb68e1399ac11e7d9ddeb0920cbf"
+        },
+        {
+          "path": "inventory-denied-extension-proof.json",
+          "sha256": "2d81b535d0dbc51c66106a6319532d4b8be0ec1d7b9090f730de561ae3d65040"
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "4fa85a3a881140cec2a14b177896ec40d59e9a4a12c3764deb44ca5a172fb4a8"
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "c0a978e38a30ffa1a9625dfa5e895e0efa2a14319109fb9517cbd66a8ad21005"
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "64cfe7a90b8949f654d6a5b6bcfdae41c25daadee324033adf37174732dc9628"
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "e7c2e2b7a74becf5b2d3b01255550a53c66b781d95263b17c7457c7e3441adcf"
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "53fdad640c5feef1018820d65e95d442eb92fdca2f7da5b666492308fc8f16e7"
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "b6c0b45a3878a1db3e82478f272bbd81a078c816ca00482222d936d19ae821e3"
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "13ae156b567cd35b14fa6a2589ff37a5d6683e10975a0aa0de953297e826bec1"
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "d6ad0e85299bac39064fa9cf386c95f2fa3dfa7c2cdf25b0bb9bee757fa9d4ea"
+        },
+        {
+          "path": "old-native-app-proof.json",
+          "sha256": "fd46c972e10392797b418f6be0d472f2a279bf6c29b2a3abce03590a55da5b5b"
+        },
+        {
+          "path": "old-native-extension-proof.json",
+          "sha256": "3117f2c35dbc508e97ac958948dbeff2c111f7e94aecd7eced7aa63f2a2e8cd5"
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "06059236fd9259c0920aa06e75ea46a59ccab8be69f0f932a35f3de4a2ed299b"
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "c7ee3b098fe902eacd4098fa799cec276dabb0b2263c6d8bff58a1526eaf42a3"
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "cc7f2bf2fff942e644fafade61cac289df9e93ce97abd78c3781e5b1933c6a5b"
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "f1b09c1a85c083ba8002812f3e76548f37040cc9c291e0475e23900322ba4b98"
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "6df7044f86cbf0eeee480b2c0a3b1017cc3b7661da11bdf5c21a9fd422a62961"
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "3efa8972639eda620b6f3d7077a98acd3a2c31e83bccc97c070ba214068a6672"
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "cf2b0e78ae0f98735132e258258792370721400229b178d4cbaaaafa6ac2b448"
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "1220bc4b3c9ed1080abda770a035fe444d5f1410597ceacd67f958efd62aac04"
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "145f7cb43be0b505f7f5687f2e94529ec126c81bbd41ee10fff5261ab22efbcf"
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "50b9fdb365cb6fb1fdfb5fa83b220e72d9073ea650ec495773eb0b851daa3a9c"
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "f84dc18dde43daebf05246a40c6a4eaaf76349b1013c6d5694110f78cd208076"
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "3f597749b8a217e6e0609e7517bd082ef5264469c3657935d8b8ca6437108747"
+        },
+        {
+          "path": "unpin-app-proof.json",
+          "sha256": "250ba351add071f546c53b8a2147d3d4dc3cd82ecfe62b57f333d08622733a18"
+        },
+        {
+          "path": "unpin-extension-proof.json",
+          "sha256": "0727e6eae84de4987e0d2d87127e16a8d3f4841f93018b2d13bcdd4109be8d30"
+        },
+        {
+          "path": "unpin-privileged-app-proof/container-tools.log",
+          "sha256": "e1eaebe98feee48446bde0872f1aef9fca87e0c80d55699f560680cf0c3d96fe"
+        },
+        {
+          "path": "unpin-privileged-app-proof/docker.log",
+          "sha256": "b95546d99abfed7e1448ec88586ee2a0e010b061ce419ebd427098e965c3af95"
+        },
+        {
+          "path": "unpin-privileged-app-proof/inputs.json",
+          "sha256": "6359b8a8249e5c71d63b855450f56424a29eebfb39e7e8b640ae02ba95595b51"
+        },
+        {
+          "path": "unpin-privileged-app-proof/old-native-proof.json",
+          "sha256": "7413c9eddb5403dde466e305f6f8c2bf584b1f315fefb6f47cc01668c2270f40"
+        },
+        {
+          "path": "unpin-privileged-app-proof/standalone-unpin-proof.json",
+          "sha256": "5328c8cde11e15e6819d4112dfe3c8079260d24c2fbc77edfb7cf03c044e8e70"
+        },
+        {
+          "path": "unpin-privileged-ext-proof/container-tools.log",
+          "sha256": "e1eaebe98feee48446bde0872f1aef9fca87e0c80d55699f560680cf0c3d96fe"
+        },
+        {
+          "path": "unpin-privileged-ext-proof/docker.log",
+          "sha256": "b5d3d79bf80ed662be1b03f2fd3426528f955a5d303c895b6ded6c0acf7ab7ff"
+        },
+        {
+          "path": "unpin-privileged-ext-proof/inputs.json",
+          "sha256": "aa2efe59232d5a14445b1dd55685de81c99b038de486ed26e16728087e78ebb2"
+        },
+        {
+          "path": "unpin-privileged-ext-proof/old-native-proof.json",
+          "sha256": "409ea8cce01fbffc4ce8515990f85a63bfc0bbd0edc3ece9f40f15a143f5e4d4"
+        },
+        {
+          "path": "unpin-privileged-ext-proof/standalone-unpin-proof.json",
+          "sha256": "2e941f5c4c1c34dde835fbacf5eb969b514f36a6c0832fbeebd37cb80e452966"
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "e63e71077cda7fb79ff70bc20e7496eef61bdc52581bde883e12ac71e0e65869"
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "4e810940cbb1c670a6eee8c6dde5e4023eeea7e7dbc7c0c0fe5817e59811ab76"
+        }
+      ],
+      "review": {
+        "path": "/tmp/skillview-unpin-review/linux-c919-attempt2/review.json",
+        "sha256": "9823d293d2a9a1102f962fb8d5224d0812add6cbe3d3d98e084afaaa063209ce"
+      },
+      "reviewChecks": 153,
+      "proofMatrices": [
+        {
+          "family": "App",
+          "currentBinarySha256": "88b9b399d1fccf63526d39422dd80221277acd47d45714c23a66470e3efc77c5",
+          "oldBinarySha256": "afff1afb7a97d050c7b60608b6174117058a316b5143c90c9af77df81d6c78b2",
+          "proofHostSha256": "4bf311f5d94145fc41b661efee823dfb99eceac4335718b8d8372db10d268d67",
+          "unpinContracts": [
+            {
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "ghSha256": "7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b",
+              "killRows": 9
+            },
+            {
+              "gh": "gh version 2.97.0 (2026-07-31)",
+              "ghSha256": "141507c337e8b202ad398550c3b73d72f5af92e86f71665214538a81efd4c409",
+              "killRows": 9
+            }
+          ],
+          "oldNativeBoundary": "retain-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        },
+        {
+          "family": "GhExtension",
+          "currentBinarySha256": "916212422467939304edb3e31f0eb8cd04cd5c926e638154e1d068a4dbb8eab5",
+          "oldBinarySha256": "afff1afb7a97d050c7b60608b6174117058a316b5143c90c9af77df81d6c78b2",
+          "proofHostSha256": "4bf311f5d94145fc41b661efee823dfb99eceac4335718b8d8372db10d268d67",
+          "unpinContracts": [
+            {
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "ghSha256": "7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b",
+              "killRows": 9
+            },
+            {
+              "gh": "gh version 2.97.0 (2026-07-31)",
+              "ghSha256": "141507c337e8b202ad398550c3b73d72f5af92e86f71665214538a81efd4c409",
+              "killRows": 9
+            }
+          ],
+          "oldNativeBoundary": "install-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "totals": {
+        "privilegedStandaloneUnpinKillRows": 36,
+        "privilegedOldNativeSchemas1To3Fixtures": 6,
+        "ordinaryUnpinRefusals": 4
+      }
+    },
+    "osx-arm64": {
+      "artifactId": 12075160359,
+      "createdAt": "2026-10-16T20:56:35Z",
+      "githubDigest": "sha256:96408d203a19ca15ea2f1a58595b41e4ea5aa5714d551bd4db3be63a61590fb2",
+      "localZipSha256": "96408d203a19ca15ea2f1a58595b41e4ea5aa5714d551bd4db3be63a61590fb2",
+      "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/macos-attempt2/artifact-members.sha256",
+      "memberManifestSha256": "caebfd7e45112dd9b4e3e5e879ecd69f2ee1c3d1a03a282c8788bbe337b88635",
+      "members": 42,
+      "name": "native-maintenance-evidence-osx-arm64",
+      "rid": "osx-arm64",
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "8896e09e900ef463129106ee6b669d88f3a38c1dbdcd6ac45913a21c10a32427"
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "9fb4122a580978219897593873f2262fc96e31d2a86715ae1974ee8ead47592c"
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "03228009d174eccc26e516b97a70c0d8fafa0e05f90d5f60ef96b9d83bf4326a"
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "eeb9344eb8182ea8d1b3cd3ce1cc862aa28e51303c06d69e27af8bd93953d715"
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "be26dd4a80468c3124909dc7413828dbd3f42f9ca5223cabf22d9b8e6b3d5f3d"
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "7c4d01a3ea0c5a0136bbf21c1d39b963072a83e1b9b407fc2263be205dd58f51"
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "d65dfe1f97513dcc883e3e60fd07a1fdb6e0043476bca76a56acdd75cb4a1cf2"
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "c42e87c348d681a8e702b80a6c617679a74c1bbef8a81910c45636ca5512c949"
+        },
+        {
+          "path": "inventory-denied-app-proof.json",
+          "sha256": "1c47e4de9dbeb85ab343f24f57a1bd8445f4bd87ce05a8b1b6b19b8257e2fdc1"
+        },
+        {
+          "path": "inventory-denied-extension-proof.json",
+          "sha256": "989dc34677ea60f62e2de24a319bed3e504fa7be097706ace56617579428923d"
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "8cf5066f7a83af039ddcefd6cdc1dc8f17c89431ed7ceaa70c242a5d4a783b98"
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "f061ae929981323376b65ff091396a8b62344d9e3de98aa8a5d4452d70f312af"
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "c7372f3dc67f064b7822ce97e6ff98e9591cc53f40ddc064fcda124c1cdad2cc"
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "9ece5117f069d21b41af5fd614bb3c7f87869808de660249bc31e9ee82b49a87"
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "083ee026c60180af05e53ef7d9e9df9eb63fdff1d2591b4176d1f4e88f9bac39"
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "698c52d877b650ad3a492d563e89f686c20a409f98e61a8f314cfeb4721a09bf"
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "0701e995e28b69320fb9c2c59df0f994feb10797a9fdcc8d765e1b5360122f49"
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "19d982ae578a0b0af1ba5e3ec711d3b805c58322fb125054d3f4a80b678880de"
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "de2722eb47592e36b3102de729c8eab691880c56f66ac5b6a5e0275789cbbb69"
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "3a42eae18e423ff93888161befb6b25430af2216d6adde01e869ae3fb150039c"
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "cd0931a2d17b3c6d0b07c68d294c80e74695a93a75f17313cb453c45e2233444"
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "b078e8679f4031e4ee87941ea23c5518a4e6b60fdb57e086cdff12af7ca0d958"
+        },
+        {
+          "path": "old-native-app-proof.json",
+          "sha256": "356c89e261f4cfc27f9b207a3bdd87be2148f850f4a462b16eb6e849a3c896e9"
+        },
+        {
+          "path": "old-native-extension-proof.json",
+          "sha256": "0bfe6a8faf94bbcae5324d3eac48b9219c39be3e66d74331b5a051296d3e8a8f"
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "8e92708db10a36d99be0bdce9400f607d2f17417dcbe2f0400565015e4ead2d9"
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "dafe98682b6dc41064f918cbd793958fd5fe8a0c1d10c535105202f8946bd059"
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "ab2521fc8f5ad1540f91815a1205cf12260c3291d76ef03af407137ad1902629"
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "6f5af7cc547beb89e01e5c41f4ee3d689d8452977e371d79a8f955246eae6cfe"
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "95bf4689cd36ebe773436c4ed6bad47e9e726fa5a134a0e24914fc6111149b8c"
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "96fac649d1abaab3f151abaf338b38f221ad991372f92a9510249016586766df"
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "c04faeffbaead209cea10de2d8445a73b476a8dc3451a38fc0dfca3c4c31c6dc"
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "716d07752ba50cb9781de4d9fd1fa5f0133dd48af48ca3711ba7c98866ba676b"
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "8cff020221ae6d2af07eba20e95e8f0d3de8caf1694f006be6ead9beeca23a6e"
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "9a290c8770fc46368240bfe41d0ff62ddf0259c114474e0239245a9e9a63edcf"
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "e003026386af035b4cae6ed8d1964b69da911ad97ab6b63f7d8c496840ea83f7"
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "7f8e0c2d6598c122770bf8bb79ebb02e35b6032817f173498d98e373ca5421aa"
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "d089bf67c7fdd2414bc6c65c352dc0535761539a69cf7875a3910ddfd7fa486a"
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "39ec97308225da4bbb16d4cbec1a825fa1640480390b58f5430f99b31560b320"
+        },
+        {
+          "path": "unpin-app-proof.json",
+          "sha256": "7f5adf36546bc1d2b241aaaa46ca4ba606f16559fb224b425491f11b2c62afb6"
+        },
+        {
+          "path": "unpin-extension-proof.json",
+          "sha256": "97c4f1c12d29d8ca64252b8c5c0dce5053c6f3ee7a309ae34d035161194eccc9"
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "5c416bee2c967a49457124ecff2214f90bf3cac6dc5c28f06038076a5dfa1647"
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "330b6b96bafd9a924b122aa5be2bbe0185e3db56125b57a5125d6466bb1ccbc3"
+        }
+      ],
+      "review": {
+        "path": "/tmp/skillview-unpin-review/macos-c919-attempt2/review.json",
+        "sha256": "1ec12f26df5444aa9b5b4c0ee9efcbee9bf967087234970ed34446f07ac00262"
+      },
+      "reviewChecks": 128,
+      "proofMatrices": [
+        {
+          "family": "App",
+          "currentBinarySha256": "dde24a6f779955eb87f0f347103621b18e039bfce08f42449392c624dda57d51",
+          "proofBinarySha256": "ee8a93c52524079ffc8e84815d178535a35661760bc081e7f20c0d7e20770211",
+          "oldBinarySha256": "4f59871dd83c08c26a4b50db587a7fbc838267e9d1cafe4aa727bd49463db9b3",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "0d17dddf96bcc1dc50f3420a064d593d64016b0be16286a6c26121f2a5cb8316",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "8a4258433c81106343144857750316241759d06dcf16265cf3c4864a8f2f2ad6",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "retain-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        },
+        {
+          "family": "GhExtension",
+          "currentBinarySha256": "7defc3db45a3f80d00a5a8b448084865d63ac46dcaedf5414b5ffc9fd2fdbaad",
+          "proofBinarySha256": "ee8a93c52524079ffc8e84815d178535a35661760bc081e7f20c0d7e20770211",
+          "oldBinarySha256": "4f59871dd83c08c26a4b50db587a7fbc838267e9d1cafe4aa727bd49463db9b3",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "0d17dddf96bcc1dc50f3420a064d593d64016b0be16286a6c26121f2a5cb8316",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "8a4258433c81106343144857750316241759d06dcf16265cf3c4864a8f2f2ad6",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "install-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "totals": {
+        "standaloneUnpinActualKillRows": 36,
+        "actualOldNativeSchemas1To3Fixtures": 6
+      }
+    },
+    "win-arm64": {
+      "artifactId": 12076017993,
+      "createdAt": "2026-10-16T21:24:06Z",
+      "githubDigest": "sha256:e8d06cf80f4df080573204153927433ca220d54e5750b15dbf6a7898828d6520",
+      "localZipSha256": "e8d06cf80f4df080573204153927433ca220d54e5750b15dbf6a7898828d6520",
+      "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/win-arm64-attempt2/artifact-members.sha256",
+      "memberManifestSha256": "e445d5abab64c24dc13d4cd93624488d110fe7c95e49b5a855911cb344efd8ce",
+      "members": 40,
+      "name": "native-maintenance-evidence-win-arm64",
+      "rid": "win-arm64",
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "e0b20932b18b006ec9d1ed3b30c59693bcffe5c3e9112d853009a28e7e3eb212"
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "be96f6f62b6e5a35d3001fe921e69403487381c19086675cd5d2aa953439498c"
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "553ac61c46660bf68acfceb94c276a726a0927bbf1e1a4a1b36396501695ea22"
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "1c80d70b013588074887b45d341e28a7ec26b12adf014ae2b0b7fe71c0d06b86"
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "d4891ef0c16241992aa6b09d157da6169a1700a4a5ef44b27f5d302836aecdf9"
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "0cbfdc278f9d59cfad5ae464d9c6e8e754ba12fb07e5ef3f0000f7c39b4f087c"
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "786af355f0aa6f540d376d89a7b97f1c4668163463bef011ff0fe0e26ad36f78"
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "2cfd2883465e9f23905511f0cd75f0f0d43c21411ef14db1631935d35b6feae6"
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "fbe45f1cd51ccc2c6a3d6856a189676073472a3e7a3d9dbc81546f55b91562b5"
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "eefb98147cd7951d2c1f55948218e37cb2fb5b3d059e20d7f6b05e3ae3dd9ffd"
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "c259e2e984965cec8c48d8497ba8bd480fd6f646b629aee4c69dadb4e2e08980"
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "5345e9d1f48a9f0f2f4fc234aa80e44e5b912ca89618ba81bb0bede9fec38132"
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "a1c7381b7547a939b048e9aa75438f62ce4d222b403e0868be6ce4a5391e4fcd"
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "2184dba69748be8f70222b1225e921b2b94dcbcf745d33459db045c5da063cb6"
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "13187709fab93a603ad03c64919aa6a7f54bb6569c8d656acbd47531df1421cf"
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "b5806bd372b2fdb3668f93a018f3ce33837dd2ff91db5d3c499c942012d1dd39"
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "974313c04a449b01f6d7fdf6bfa881ec5d74d8e6f63a70c7f6d01d1953374453"
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "ae4d9d450892db21c73bb1c219d8ff60569ddae5355874f27e43905a262ffb38"
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "1b9ca9a59770f28968f3b7e04908ebf07b51a3fba75c07705e83d5f306da183c"
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "a3c8d54563c1bf03e9a9df1b53db3bc60a613b03e2bd3b23ac69d4e59c318bf3"
+        },
+        {
+          "path": "old-native-app-proof.json",
+          "sha256": "67284f5b1b967591e87dbd0173966ee9958ec7b670d0ba6168da64a06efa776c"
+        },
+        {
+          "path": "old-native-extension-proof.json",
+          "sha256": "6175dfa397dbd13503e0a097d90f0b163e0734caeec23bed91c7dfa29b4b577a"
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "dc708122a916e5f56ca9a34172a9284444dd65e0dc310d702dbc81875b38ba46"
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "60aa02cc13f52a6231bfb0eeb12645c4b6d192a62f14db4d1f3292ed3b6d90ad"
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "c070a0b75b83b558ab311974c81602255b9c4de510e60fa5e03127b48066d1a1"
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "e10b50d8054d6bc199b198cd4a99e06ac2821e023bcd28076624f1a8bc5aafb3"
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "27eac7b8b7bcaa242959beab31359668037ad68f5bc7eca76631d9f0ca6c3e83"
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "edc19aaa12e2dca532b187a37143522d106f882e0a331db66eeb546117760f9d"
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "19600e4ef43ba363b685b0ebf3c1c473888982983df7755314a1388aba159af4"
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "432595c20cbb8b0e836a6f3671d5d36bda2f25cade3769fba5e1cd3d2fb0da43"
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "9595db0bcfa571197cd22b1a7e3a06bc7b8ada4f42cae79007f175901e6d30a2"
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "1c79563fc17be844dd0b05564c101a91e0e67efeaa9ef032dd0ed967cf05b6ae"
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "7fe180472d854cbc25d08ae798a3288300764ae4aed22ece072d9284957d80a2"
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "da994d96e7ffc6c12603132b22f3bc2e6b9deeb411009656bf56f7ccbad55dd5"
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "062345c3f5ed4da10358ddf3a4c63157ef469150a71df381ee4ea0d9c99945b6"
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "f9dca130defb360d9b72465796f223ec107925c60c791f564238f46bb60cb628"
+        },
+        {
+          "path": "unpin-app-proof.json",
+          "sha256": "708f0b76b9051c0de4c500885983095f1038831eac4e8261efe7b6e1005192bd"
+        },
+        {
+          "path": "unpin-extension-proof.json",
+          "sha256": "451477f62e9b424fe5d96a9d92840531cc94e3923d44dfb6d10ca31611b5d74e"
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "6e52b3ae73d0b3c7aeb010b5d4eb2e59ead725e99c8a6dfb3efd5af37a3d91b1"
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "b7e863b08670598cae751085ee6af9f212533f61e170e70e501db216dfd9eb45"
+        }
+      ],
+      "review": {
+        "path": "/tmp/skillview-unpin-review/win-arm64-c919-attempt2/review.json",
+        "sha256": "8924898821b17b1dca9bb90a8b3d5468621d985888a3870db9622591e06392c3"
+      },
+      "reviewChecks": 126,
+      "proofMatrices": [
+        {
+          "family": "App",
+          "currentBinarySha256": "0dd885b150a8ec9b098c1b35bed3c973c7c898a3e1fbdb90fbb45074f34dee16",
+          "proofBinarySha256": "e7fb3624ac856eb50212f02c57d911ce13c35edeeb9b809fcd197938a02551d7",
+          "oldBinarySha256": "464654c0a5365e5f0a43c8a74666697a2f7e51c5d6a513b768a55385b337c079",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "e92564e62dcb4525f0decfd8a87d9e2656391f78a342de07cf65dc940f2cdf28",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "dc00f279e01efef3ca5785eb5f793f7281d60712db2e2735795f3e1ca9e4bfbe",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "retain-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        },
+        {
+          "family": "GhExtension",
+          "currentBinarySha256": "35883a5274bb7203c4b27bf704a00b2fadc430c5d61781bedd8c265bbcd09abf",
+          "proofBinarySha256": "e7fb3624ac856eb50212f02c57d911ce13c35edeeb9b809fcd197938a02551d7",
+          "oldBinarySha256": "464654c0a5365e5f0a43c8a74666697a2f7e51c5d6a513b768a55385b337c079",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "e92564e62dcb4525f0decfd8a87d9e2656391f78a342de07cf65dc940f2cdf28",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "dc00f279e01efef3ca5785eb5f793f7281d60712db2e2735795f3e1ca9e4bfbe",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "install-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "totals": {
+        "standaloneUnpinActualKillRows": 36,
+        "actualOldNativeSchemas1To3Fixtures": 6
+      }
+    },
+    "win-x64": {
+      "artifactId": 12076340864,
+      "createdAt": "2026-10-16T21:26:09Z",
+      "githubDigest": "sha256:6ad4a8253506256c2b599f1024e60a4e8bf8e21ccb811c58b6238310b83786ff",
+      "localZipSha256": "6ad4a8253506256c2b599f1024e60a4e8bf8e21ccb811c58b6238310b83786ff",
+      "memberManifestPath": "/tmp/skillview-unpin-evidence/ci-executable-path-fix/win-x64-attempt2/artifact-members.sha256",
+      "memberManifestSha256": "9b080dea5fe13153f95db37471a61ef0480c28a4233342bee67571f4693b1d73",
+      "members": 40,
+      "name": "native-maintenance-evidence-win-x64",
+      "rid": "win-x64",
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "1bfb66c4393d20bf783629098bd8a4af339be998d278c3015b1f63e1cabc9eda"
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "a32bdee92033a5b79a10f7c5a2d9cba719412d11cedb0468d147cb6b7f689e1a"
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "d4c42ef4098712e293e8e6275b754455a7756b6df84cd1b7658ee9579c2b72cc"
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "ba77ddf929ca19e040fd7a7d176ba329d2ecf319b3fccc72ff538cc2fb57e75e"
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "651ae8d82390249fa6b542d475aaf9744e0c0ac503970d3042fd834d0797e3e1"
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "b859df0f35b3d370317fca626f9debab5cbffa8df642c04c638d59a956d5d9e6"
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "57da375fac188b1504013a7def8b7586deaf4cebb6c63d656a5c9ad9c6590eb1"
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "adf9df97e30317aa5c1932084aceb57d61537f91ea3d25e1acdcaf770a69df14"
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "cbbd64cce00e3936f8c91516382ef1ccdde57b8f73890eb84bebb0321b07181e"
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "40bd389e6953b3ca63a001a03b7e82abd2a04b68a297e815c62136948f4c8f46"
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "e6a82e42ecf68940095e0a1d61931cf02bacfd30d2ee0c014b26eaf43f19f0a7"
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "dfde96dc47f4869f70a98bc95727c4273deb93b92d563127c6692f7f7dec1329"
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "f2c95e87fa4e18c8f098ae9ee83c2bc8cc548a9f7e0a3918e7e5be1ebd271e5e"
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "bc68abed16c2caacaae8473f7665ab4a213a0f7915afb9c94362824c47b6cfe8"
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "817c6d162f0b15591012ed78270c1947a6e321969c4928c4f6c4d1d6f8fecfce"
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "bef67fefc8b41381e61a079c21ae985df8f92ecd0c289aa54f9ec4962e079a3a"
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "4d4c2f1a2314734ccbb924f65bfe8580e465f53a0963f6963c84111e652ad115"
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "66d66d6883cf92a9aff996594d6108d775f5c21743ec7d55a230156bb30761bd"
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "98b677385fb490aa2c4c0a995d8c58dde94a8e987c6b858b543599dabf8d2cf2"
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "77a665013f4ed10aa9f2ce944df27e19fbf2c5dba241da79c8c62f1045990dee"
+        },
+        {
+          "path": "old-native-app-proof.json",
+          "sha256": "073d28041ee97ea7d8b1730e58311a01466942f0f8c5e9a56e25d50bc7fcef8c"
+        },
+        {
+          "path": "old-native-extension-proof.json",
+          "sha256": "a48f0e1761abde3c2d2f3efc3c09ef7931d47d60cd414ea0a478e777b1cba5ec"
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "a566a3eff9e6cb86f50c7870712a77718284267d58efda9ffb66d9892868b1a0"
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "98b2a4654de313722bb1cb80ffe36d46abc681d028f627190360daacdd6e8c5c"
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "2052a290b99fba3c3288c0bd34d97942112efc9501db9bde75f459b5c49914c6"
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "4405d61348c9a0efe2579a18ad9e714901d1be17045ee3b83f131088591f3a6c"
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "89369db129e9d37b7a55a38658b070decc8a8a982d969d58e8e90aeaa55ff1c4"
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "000ee717fa4b8d0ce2cc630a7bc20a748d7315a91774655c5f28e321df6ac525"
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "8cb2ef8058e90853c55b192676898524b1ecfabe6c4d4bb516863b5e132e5767"
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "7e801a4fa63d86818ddf9f084463264cdfe58354883b23ddf12382f3e111bb86"
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "cfa03d4d2a423d040420966947224185077124b2915d0c23651e4a27a3423b82"
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "fefd83e5f25435b41518be0d764c5314b6ff826c259cb1b60dfbb92414fd0e93"
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "11d18c3f3cfd235ba7d8586245ff177c6d1a8bb971e427a0eae2feefc93d1285"
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "152ff5d178beb494a9c14ba907e1ac30934e4ec8ad2a83d708e1e72acbec88df"
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "744ab7bd4c8ba47a47746a538233b5e58c9f1ff2e9ec391e802638dfdc23ed99"
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "ec7c2d0a3fddc1b37fd13f80061395638d67e4ff9dd35729696bf96170106461"
+        },
+        {
+          "path": "unpin-app-proof.json",
+          "sha256": "00545612d01afb89688d0a598680e22c7f35db711777264848c092d9b7ecb232"
+        },
+        {
+          "path": "unpin-extension-proof.json",
+          "sha256": "57022f91b4162157a922f0ec7453cd06a21215e424e8ff7a087163c7fa211887"
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "5b1aad1d22701620c63c1aff6ac243b57d403e138daa9354c881025419022c55"
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "300798a5e19650173340c1decc945cb026593f8f03d4b19df930050e9dbbdc23"
+        }
+      ],
+      "review": {
+        "path": "/tmp/skillview-unpin-review/win-x64-c919-attempt2/review.json",
+        "sha256": "8bdc3638db324d6ad651429fbb328ed448eead3c53cb4053df52f4de495333a7"
+      },
+      "reviewChecks": 126,
+      "proofMatrices": [
+        {
+          "family": "App",
+          "currentBinarySha256": "f22ad93571fb390238456931ab6a1509f84d9b7f61803fd62a4d9ed69179c8f0",
+          "proofBinarySha256": "ab89670342ca0519d27fefe534410fd4df7101814e8ae57be33e860d85ae47c1",
+          "oldBinarySha256": "1067c5afd0594c87a8161fcd9a3fea93e2e9e9d73580643ea7bbc5bafa0f226e",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "e2efa10a5d2ce93cac9bc4b676932b62947c0967c01c8f2c3a9cb4437ad358d3",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "756724853cc579510b58e65e7a7429ad6b1af29cf99ef19b3a95f3b701c5c580",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "retain-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        },
+        {
+          "family": "GhExtension",
+          "currentBinarySha256": "13143939aab22d0b309616b47e9bc671854a90ec812d5ef83d1875ea07228db3",
+          "proofBinarySha256": "ab89670342ca0519d27fefe534410fd4df7101814e8ae57be33e860d85ae47c1",
+          "oldBinarySha256": "1067c5afd0594c87a8161fcd9a3fea93e2e9e9d73580643ea7bbc5bafa0f226e",
+          "unpinGh": [
+            {
+              "version": "gh version 2.97.0 (2026-07-31)",
+              "sha256": "e2efa10a5d2ce93cac9bc4b676932b62947c0967c01c8f2c3a9cb4437ad358d3",
+              "actualKillRows": 9
+            },
+            {
+              "version": "gh version 2.102.0 (2026-09-30)",
+              "sha256": "756724853cc579510b58e65e7a7429ad6b1af29cf99ef19b3a95f3b701c5c580",
+              "actualKillRows": 9
+            }
+          ],
+          "oldNativeBoundary": "install-moved",
+          "oldNativeSchemas": [
+            1,
+            2,
+            3
+          ],
+          "registryExtensionsIncluded": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "totals": {
+        "standaloneUnpinActualKillRows": 36,
+        "actualOldNativeSchemas1To3Fixtures": 6
+      }
+    }
+  },
+  "independentReviews": {
+    "linux-x64": {
+      "path": "/tmp/skillview-unpin-review/linux-c919-attempt2/review.json",
+      "sha256": "9823d293d2a9a1102f962fb8d5224d0812add6cbe3d3d98e084afaaa063209ce"
+    },
+    "osx-arm64": {
+      "path": "/tmp/skillview-unpin-review/macos-c919-attempt2/review.json",
+      "sha256": "1ec12f26df5444aa9b5b4c0ee9efcbee9bf967087234970ed34446f07ac00262"
+    },
+    "win-arm64": {
+      "path": "/tmp/skillview-unpin-review/win-arm64-c919-attempt2/review.json",
+      "sha256": "8924898821b17b1dca9bb90a8b3d5468621d985888a3870db9622591e06392c3"
+    },
+    "win-x64": {
+      "path": "/tmp/skillview-unpin-review/win-x64-c919-attempt2/review.json",
+      "sha256": "8bdc3638db324d6ad651429fbb328ed448eead3c53cb4053df52f4de495333a7"
+    }
+  },
+  "verifiedNativeMembers": 182,
+  "positiveStandaloneUnpinActualKillRows": 144,
+  "actualOldNativeSchemas1To3Fixtures": 24,
+  "qualifications": [
+    "The 1,987 tests per platform include 9 integration tests; these and 207-per-Windows metadata checks were successful same-head initial-attempt jobs retained by the failed-only AOT rerun.",
+    "Ordinary Linux CAP_SYS_ADMIN refusals and unsupported schema3 observations are excluded from positive publication and compatibility counts. Positive Linux evidence is from private privileged filesystem proofs.",
+    "Artifact proof reports and copied-input/job bindings are independently checked; transient native fixture trees and tool binaries are not independently re-created locally.",
+    "All 15 observed PR statuses pass. No configured GitHub required statuses were reported; failure-only contract notification is skipped.",
+    "The raw final-pr.json snapshot records the pre-merge state; merge-verified.json and the merged summary record the later verified merge."
+  ],
+  "previousEvidence": [
+    {
+      "path": "agent_docs/evidence/maintenance-batch-16-local-checkpoint.json",
+      "sha256": "8315c715d52ddaa52a5228d8a12a43f09d71b7a7c3a055a17210b598bfbae295"
+    },
+    {
+      "path": "agent_docs/evidence/maintenance-batch-16-ci-fixes.json",
+      "sha256": "426302b5fd5fd9ff9bc88223c1e4df8957237aad12c7b77f1e6de6334bc904ff"
+    },
+    {
+      "path": "agent_docs/evidence/maintenance-batch-16-legacy-fixture-fix.json",
+      "sha256": "aee535945bb9bec0f5f5fe64cfae69846baf4ac6558d62d72fcfeafd6e890cda"
+    },
+    {
+      "path": "agent_docs/evidence/maintenance-batch-16-harness-path-fix.json",
+      "sha256": "682d1d7c65deb3a20b60cd2ba0704893b3fb60ba58dd01ab45cff8e6e76aec65"
+    }
+  ],
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "incomplete",
+    "M17": "incomplete",
+    "remaining": "Fork/source switch/local import, selected-consumer detach, other native owner transitions, remaining suppression/preference recovery, and all other original open criteria.",
+    "originalMacDownArrowCrash": "never reproduced"
+  }
+}
