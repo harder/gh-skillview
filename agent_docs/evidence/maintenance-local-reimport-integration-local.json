@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 1,
+  "scope": "Local reimport integrated onto reviewed static package checking. Local managed proof only; native/AOT product proof remains pending.",
+  "sourceCommit": "c22459eba0a8fcdd36aeeac8795e963ba9ef9ed7",
+  "baseCommit": "e6fff3b60dfe48331d9a2c7e60c4e12cb06ac9fa",
+  "priorIsolatedLocalCandidate": "25d77aa53948cbafef6ed315d36f5fc5ced07bb9",
+  "unpublishedRebaseOnly": true,
+  "integration": {
+    "resolvedConflicts": [
+      "agent_docs/maintenance-implementation.md",
+      "src/SkillView.Core/Ui/SkillViewApp.cs",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs"
+    ],
+    "behavior": "Both Installed K/R callbacks, filter typing, CLI command families, native proof steps and artifact globs retained. Shared modal fix identical. Same-view actual keyboard regression checks both callbacks after each filter key and individual list shortcut.",
+    "historicalEvidence": "Original isolated 2044+9 and package-checker 2025+9 results retain their original snapshots. Combined execution below supersedes those counts for this integrated candidate; it does not rerun or replace historical native evidence."
+  },
+  "independentReview": {
+    "path": "/tmp/skillview-local-reimport-review/combined-integration-review.json",
+    "sha256": "423cab9fb28900a8064b9d466a2eb9e7b7825f6429f7d0e4fb2417c9cfc0385e"
+  },
+  "sourceManifest": {
+    "path": "/tmp/skillview-local-reimport-evidence/combined-integration/source-hashes-final.json",
+    "sha256": "c503bb2e00887fae4bca383b2ea68b7557ff53f556843c49a70126db5cc060fd"
+  },
+  "sourceFiles": {
+    ".github/workflows/ci.yml": "eae0d55313ba33dad752b53986a202d086f0b47eeb9ec7b95d6f31daa4cd1390",
+    "AGENTS.md": "29e62bc1fe09aa85f6b7a4a5669804f28287977efdbdc44d1cf6341c5da9137b",
+    "agent_docs/evidence/prove-local-reimport.py": "546e285a228b85340aa19b93dfa67ad4ffa4d5286fc08ac98f3071a5846c9a03",
+    "agent_docs/evidence/prove-old-native-unpin.py": "9d390a5f77cc526d261d548285af4f3be167b2767c2e7abf41edda11a20f88e2",
+    "agent_docs/evidence/prove-static-package-check.py": "b895357fe361a374330086183ab1c8ef431cdde2c394227559728872eaf1be4f",
+    "agent_docs/evidence/run-local-merge-disk-full-docker.py": "320700d81622accb30c4c5892d23d35980bf2c5dda9abefb726ba4e4ab753a3a",
+    "agent_docs/maintenance-local-reimport.md": "38f8be06f56ec6e71aba32485e1280525a6a3b4daf44b516afb39d243f18f19e",
+    "agent_docs/maintenance-static-package-check.md": "d8f08314791ad297a0a3bfe6a215de8e22876e999abd73ef101e07e2ae98f3cc",
+    "docs/usage.md": "a63cae06d5c3251aa28fcb9b0d050c9861fd87dba753a7bfacbb56e52c3950e3",
+    "src/SkillView.Core/Cli/CliDispatcher.Check.cs": "2ae3e927314ca9232e7a469973abb4ad34545aff5a931e760b980e8acdeb2b25",
+    "src/SkillView.Core/Cli/CliDispatcher.Restore.cs": "665ce6e8d0d94ba9933ed6ec1ecae48a1fd5b2938e8c5c3c70e635578e0d18c4",
+    "src/SkillView.Core/Cli/CliDispatcher.cs": "aedc58faed9e35ecde12d7a69fabe2dcf99d112c7f2a9784bfd0728215ebabf8",
+    "src/SkillView.Core/Maintenance/CapturedPayloadArchive.Persistence.cs": "eb7011046a2a1afce7233855615b500a4af0587f239e4e256fbb5a5dd9fcdb16",
+    "src/SkillView.Core/Maintenance/GhLocalImportStager.cs": "0c31c430eaee52fadd9437ef27bddbb7f24a2b1eb62ff3abf904b26a262a7f3d",
+    "src/SkillView.Core/Maintenance/InstalledPayloadMaterializer.cs": "036a7967d9b89d0e62c1626863df21a07f21d0ceee10ed6a5a510e1c14d3540d",
+    "src/SkillView.Core/Maintenance/LocalTrackingWriter.cs": "da765b739f5d10bff16ee012b3adbfb3321d7ede1ca3cb40d8b472ccd9e48574",
+    "src/SkillView.Core/Maintenance/PayloadMetadataReview.cs": "8899eea61ed4d247b01b26fe2bb50aa5f84cbd7043f2ab01059891ec2af97912",
+    "src/SkillView.Core/Maintenance/ReplacementLocalImport.cs": "239fbe63002e8f4b51779b2c2ca2c38cbf5519a4c3a2e2a29bb81ae826d24c1d",
+    "src/SkillView.Core/Maintenance/ReplacementPlan.cs": "f4213d200f7649741c170d9345729aac33300872de38bbfffdaf037b75be38d8",
+    "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.Validation.cs": "41f6391e964ed126d5e657dce221822361c1ff7a97f4d74f9863f3d62e3d5d73",
+    "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.cs": "12c50df7071f24d9d0cf39433d3ffb64eed03444d55f45d6206286e3168652d3",
+    "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unpin.cs": "dc5fa84dafa379e254ae96d962e34063478022978f47aac018d9ac92f372c0e9",
+    "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs": "7ed5bbc2675a78a29420c332fcfa2353c6590e14536a4b1d96f015c87d21b76a",
+    "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs": "30b4a5fc20313f1c489f453346804026a3e77d4998fec4e6654fce6cab9113e5",
+    "src/SkillView.Core/PackageChecking/MarkdownPackageReferences.cs": "14ee2961ac86074a8a74725b88fb1c61100098491d045a4df774319217093f02",
+    "src/SkillView.Core/PackageChecking/PackageCheckReport.cs": "c640397d98508673ae9fcc246ea3c7cf1030402b5de41f5c35285c0a2e322491",
+    "src/SkillView.Core/PackageChecking/StaticPackageChecker.cs": "72597ea0add8de5c26542e1cd97128b70c7d4b6d1f9d3b8cb1262dda7662031b",
+    "src/SkillView.Core/Ui/InstalledScreen.cs": "3fe78335e376f76f6ee1ba10daec55254e8cbf5730b21dd6f3e03628b1587a60",
+    "src/SkillView.Core/Ui/LocalReimportScreen.cs": "b9ba30ca251856318ea3a45e134661edd49d1865fe8902b60d0c74f178dc4cbf",
+    "src/SkillView.Core/Ui/ModalOperationTracker.cs": "e5df98efd5dcb6c373a43413e9cf94b0b13a1a0910dcca21e49ac8141a44db8a",
+    "src/SkillView.Core/Ui/PackageCheckScreen.cs": "09f8f77cfc329aaea87b6bb583ec24ba7c9f082b715fb9070d88e7b8fb11a8a2",
+    "src/SkillView.Core/Ui/SkillViewApp.cs": "7a032086e2cc3360cb792e4c62f40122eff0a9fcc5168f80870c74bfe8f741c9",
+    "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "07b1cc0321b437d418a5a115e9c63870c48bc0e840847ceb9a1ac7c5c50f1fd8",
+    "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "cdf07af9b90649b64665156d0b49354c08a3fce21e97e8c87bd36ac9de228d1a",
+    "src/SkillView.Core/Ui/UpdateScreen.cs": "e5821754d3114035fb69b5e4ae736854b80e83413625753f9f47fc42e067d4ad",
+    "tests/SkillView.MaintenanceProof/Program.cs": "a2496d65d84f1508b5b44d52a1d7a449f7ebeb7f7e20282e0bcbf3111db1ccca",
+    "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs": "1a023eed20dfb5219ba37b9e44581f96636353160f9726a9f0f4adefc3c2eb5b",
+    "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs": "045a433ccc1bc6bf0f410998ef5f62c12a56f3766fcfdacc2ae3c7a22d283253",
+    "tests/SkillView.Tests/Cli/CliDispatcherLocalReimportTests.cs": "086154eee9f67bf4eb3399a9665eaf0b2de7c5099eabf74756722dbcc64ee299",
+    "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs": "8821364eb38c717ea4fad5120631e162c927f423e38a68f659821a2c16415120",
+    "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs": "207a2aedb278fddf459fd9d26a30d0319cf1cc3035ae8246bb1b80fffaae9bb4",
+    "tests/SkillView.Tests/Maintenance/LocalReimportAdmissionTests.cs": "8f1d30458869c50b55de6f57989da41ca35b35086a76e939f341c09cb9646d0e",
+    "tests/SkillView.Tests/Maintenance/LocalTrackingWriterTests.cs": "888d8914722728a5dcfd36426b1c187b6678962a22ae9b88aadf53846169824d",
+    "tests/SkillView.Tests/PackageChecking/MarkdownPackageReferencesTests.cs": "409ddf29774bedecfae1912b58cd8083859003ec1ff81464a847fc9c0751b92d",
+    "tests/SkillView.Tests/PackageChecking/StaticPackageCheckerTests.cs": "6ca7a267214b27e3f3f8d6081dfcb8272af803adea704a47989709c3e4c3f179",
+    "tests/SkillView.Tests/Ui/LocalReimportScreenTests.cs": "324ab29fcad009a82875f873ef7cbea72e4b3331ddae2798f8657718d5bb368c",
+    "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs": "709b6e2d952652e9ad1e5487cee8c001c2b1d42f071b5a28ce999ed696d50a45",
+    "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs": "0937436fef8f31c80abdbd26a966956dc28d2c72d4a544789724fcc79af54a86"
+  },
+  "checks": [
+    {
+      "name": "format-core",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "format",
+        "src/SkillView.Core/SkillView.Core.csproj",
+        "--no-restore",
+        "--verify-no-changes"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:01:48.795643+00:00",
+      "finishedAt": "2026-10-16T21:02:11.549521+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/format-core.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "format-tests",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "format",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-restore",
+        "--verify-no-changes"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:02:11.549923+00:00",
+      "finishedAt": "2026-10-16T21:02:23.773831+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/format-tests.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "format-integration",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "format",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "--no-restore",
+        "--verify-no-changes"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:02:23.774335+00:00",
+      "finishedAt": "2026-10-16T21:02:29.584054+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/format-integration.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "format-proof",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "format",
+        "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+        "--no-restore",
+        "--verify-no-changes"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:02:29.584300+00:00",
+      "finishedAt": "2026-10-16T21:02:35.212554+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/format-proof.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "build-tests-final",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "build",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-restore"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:02:35.213047+00:00",
+      "finishedAt": "2026-10-16T21:02:39.611159+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/build-tests-final.log",
+      "logSha256": "67368c96d39fb98f3c8da6c1770262cc877a6a208d9a4be3a3a48dad1f391230"
+    },
+    {
+      "name": "tests-full-final",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-build"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:02:39.611459+00:00",
+      "finishedAt": "2026-10-16T21:03:15.443089+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/tests-full-final.log",
+      "logSha256": "a6e8f3a420bf07f7e58c2244b1ba118405fc110d9a3b14d1bfe13edc63e9f9e2"
+    },
+    {
+      "name": "build-integration-final",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "build",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "--no-restore"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:03:15.443721+00:00",
+      "finishedAt": "2026-10-16T21:03:16.551478+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/build-integration-final.log",
+      "logSha256": "7640bc8a77ef979e3dc17c9a644152c7a49fa2e49c95615f18833a5059ae1690"
+    },
+    {
+      "name": "tests-integration-final",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "--no-build"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:03:16.551726+00:00",
+      "finishedAt": "2026-10-16T21:03:21.199474+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/tests-integration-final.log",
+      "logSha256": "7733a7839a0244f91bd0cf1615b8207885046518f9531b57d535d1c0c4cf0e30"
+    },
+    {
+      "name": "build-proof-final",
+      "argv": [
+        "/home/kevin/.dotnet/dotnet",
+        "build",
+        "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+        "--no-restore"
+      ],
+      "cwd": "/home/kevin/code/gh-skillview-local-reimport",
+      "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+      "startedAt": "2026-10-16T21:03:21.200035+00:00",
+      "finishedAt": "2026-10-16T21:03:32.095599+00:00",
+      "exitCode": 0,
+      "log": "/tmp/skillview-local-reimport-evidence/combined-integration/build-proof-final.log",
+      "logSha256": "3d080fb08076b4498021c48496ff6ff609d25cef808b93b8203d0113a3cc953d"
+    }
+  ],
+  "tests": {
+    "total": 2090,
+    "failed": 0,
+    "succeeded": 2090,
+    "skipped": 0
+  },
+  "integrationTests": {
+    "total": 9,
+    "failed": 0,
+    "succeeded": 9,
+    "skipped": 0
+  },
+  "builds": "Tests/Integration/MaintenanceProof: zero warnings/errors",
+  "formatting": "Core/Tests/Integration/MaintenanceProof verify-no-changes: passed",
+  "childTMPDIR": "/var/tmp/skillview-local-reimport-tests",
+  "sameSourceThroughExecution": true,
+  "nativeAndProductRuntime": "pending; no App/extension/four-RID new-feature proof claimed",
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "incomplete",
+    "M18": "incomplete",
+    "M19": "incomplete",
+    "originalMacDownArrowCrash": "never reproduced"
+  }
+}

@@ -1350,3 +1350,19 @@ shared dialog ownership race is reproduced/fixed; the original Mac Down-arrow
 crash remains unreproduced. Acceptance stays 9/21; M08/M18 remain incomplete.
 See evidence/maintenance-local-reimport-local.json for hashes, exact local
 receipts, proof scope and remaining gates.
+
+### Local reimport: combined package-checker integration
+
+The unpublished local reimport candidate is integrated onto the reviewed static
+package checker. Both Installed K/R actions, CLI families and native proof steps
+remain available. A same-view keyboard regression verifies filter typing invokes
+neither callback and each list shortcut invokes only its selected action. The
+eight overlapping source/docs/CI files and ledger resolution passed independent
+review; shared modal ownership code is identical.
+
+The integrated snapshot passes 2,090 Tests and 9 Integration tests, zero skipped;
+Tests/Integration/MaintenanceProof builds have no warnings/errors and all four
+scoped formatting checks pass. The earlier isolated counts retain their original
+source scopes. New-feature App/extension runtime and four-RID native proof remain
+pending. Acceptance stays 9/21; M08/M18/M19 remain incomplete. See
+`evidence/maintenance-local-reimport-integration-local.json`.
