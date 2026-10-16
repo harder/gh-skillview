@@ -203,7 +203,7 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
     }
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static void SetFixtureOwner(string path)
+    internal static void SetFixtureOwner(string path)
     {
         using var identity = WindowsIdentity.GetCurrent();
         var sid = identity.User!;

@@ -49,7 +49,8 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     ReplacementSubject Subject, string ContextFingerprint, ReplacementEvidence Original,
     ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -65,7 +66,8 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     string PlanFingerprint, string ReviewFingerprint, ImmutableArray<string> ChangedPaths, string Message, ReplacementSubject Subject, string PlanPath, int? OriginalRootMode, int? CandidateRootMode,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null)
 {
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }

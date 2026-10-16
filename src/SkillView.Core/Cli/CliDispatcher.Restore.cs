@@ -13,8 +13,10 @@ public static partial class CliDispatcher
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
         var requestedCommand = options.SubcommandName!;
+        var unpinOnly = requestedCommand.StartsWith("unpin-", StringComparison.Ordinal);
         var command = requestedCommand.StartsWith("update-", StringComparison.Ordinal)
-            ? "restore-" + requestedCommand[7..] : requestedCommand;
+            ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : requestedCommand;
+        var expectedPurpose = unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
         string? path = null, installId = null, id = null, expected = null, disposition = null;
@@ -41,10 +43,10 @@ public static partial class CliDispatcher
         }
         if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
-            || command == "restore-apply" && (!execute || !(disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-apply" && (!execute || !(unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (or merge-reviewed for a merged update) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         OperationImpact? frozenImpact = null;
@@ -60,22 +62,24 @@ public static partial class CliDispatcher
             ReplacementResult result;
             if (command == "restore-plan")
             {
-                if (gh is null) throw new IOException("Saved replacement staging requires GitHub CLI.");
+                if (gh is null && !unpinOnly) throw new IOException("Saved replacement staging requires GitHub CLI.");
                 var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
                     : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
                 if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
                 var target = selected[0];
                 frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
-                if (latest)
+                if (latest || unpinOnly)
                 {
-                    var preparation = await Task.Run(() => store.PlanLatestAsync(gh, target, inventory, unpin, token), token).ConfigureAwait(false);
+                    var preparation = unpinOnly
+                        ? await Task.Run(() => store.PlanUnpin(target, inventory, token), token).ConfigureAwait(false)
+                        : await Task.Run(() => store.PlanLatestAsync(gh!, target, inventory, unpin, token), token).ConfigureAwait(false);
                     if (preparation.Unchanged is { } current)
                     {
                         frozenImpact = frozenImpact with
                         {
                             PayloadRetained = true,
                             RetainedPayloadPath = current.Path,
-                            RetentionEvidence = "verified-update-plan-no-op; original payload remains installed"
+                            RetentionEvidence = unpinOnly ? "verified-unpin-plan-no-op; original payload remains installed" : "verified-update-plan-no-op; original payload remains installed"
                         };
                         if (json) WriteJson(w =>
                         {
@@ -93,7 +97,7 @@ public static partial class CliDispatcher
                 }
                 else result = await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
                 {
-                    await new GhRecordedTreeStager(services.Runner).StageIntoAsync(gh, target.FrontMatter.Upstream!, target.TreeSha!, destination, bytes =>
+                    await new GhRecordedTreeStager(services.Runner).StageIntoAsync(gh!, target.FrontMatter.Upstream!, target.TreeSha!, destination, bytes =>
                     {
                         if (bytes.Length > PayloadSnapshot.MaxSkillBytes) throw new IOException("Staged SKILL.md exceeds its metadata budget.");
                         var text = new UTF8Encoding(false, true).GetString(bytes);
@@ -103,15 +107,22 @@ public static partial class CliDispatcher
             }
             else result = await Task.Run(() => command switch
             {
-                "restore-inspect" => store.Inspect(id!, inventory, token),
-                "restore-apply" => store.Apply(id!, expected!, inventory, token, disposition!),
-                "restore-repair-owner" => store.RepairOwner(id!, expected!, inventory, token),
-                _ => store.Recover(id!, expected!, inventory, command == "restore-undo", token)
+                "restore-inspect" => store.Inspect(id!, inventory, token, expectedPurpose),
+                "restore-apply" => store.Apply(id!, expected!, inventory, token, disposition!, expectedPurpose),
+                "restore-repair-owner" => store.RepairOwner(id!, expected!, inventory, token, expectedPurpose),
+                _ => store.Recover(id!, expected!, inventory, command == "restore-undo", token, expectedPurpose)
             }, token).ConfigureAwait(false);
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
+                if (unpinOnly && command == "restore-plan")
+                {
+                    w.WriteStartArray("applyArguments");
+                    foreach (var argument in new[] { "unpin-apply", "--id", result.Id, "--yes", "--disposition", "unpin-only", "--expect", result.PlanFingerprint }) w.WriteStringValue(argument);
+                    if (allowHidden) w.WriteStringValue("--allow-hidden-dirs");
+                    w.WriteEndArray();
+                }
                 WriteImpact(w, result.Impact is { } impact ? impact with { Operation = requestedCommand } : frozenImpact);
                 w.WriteEndObject();
             });
@@ -119,6 +130,8 @@ public static partial class CliDispatcher
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
                 + string.Join("\n", result.ChangedPaths.Select(change => "Changed: " + change)) + "\n" + result.Message));
             if (!json) WriteImpactText(result.Impact ?? frozenImpact);
+            if (!json && unpinOnly && command == "restore-plan")
+                Console.WriteLine($"Apply: skillview unpin-apply --id {result.Id} --yes --disposition unpin-only --expect {result.PlanFingerprint}{(allowHidden ? " --allow-hidden-dirs" : "")}");
             return result.Canceled ? ExitCodes.Cancelled : result.Succeeded ? ExitCodes.Success : ExitCodes.UserError;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException

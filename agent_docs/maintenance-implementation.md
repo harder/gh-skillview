@@ -1144,3 +1144,20 @@ x64, macOS ARM64, Windows x64 and Windows ARM64. Original acceptance remains
 9/21; M08 fork/source/local-import/standalone unpin, required detach, other-owner
 transitions, remaining preference recovery and the original criterion audit
 remain open. The original Installed Down-arrow crash was never reproduced.
+
+## Batch 16: standalone unpin (local checkpoint)
+
+The pre-candidate working tree adds schema 4 `unpin-only`, which binds captured
+installed content and pin policy without fabricated revision/base evidence. It
+removes verified raw pin members while retaining source/ref/tree and physical
+exposures, and uses checked effective-owner state across save, recovery and undo.
+Local final-targeted verification passes the scoped build, 18 standalone-unpin
+tests, and Core/test formatting. The earlier 1,959-test full-suite result belongs
+to the source snapshot before the final reviewed source changes; it is recorded as
+pre-final evidence, not a final-source full-suite claim. Native AOT on four RIDs
+and compatibility with gh 2.97.0/2.102.0 remain pending CI. M08 and original
+acceptance remain incomplete at 9/21; other original obligations are unchanged.
+The original Mac Down-arrow crash was never reproduced. See
+`maintenance-standalone-unpin.md` and
+`evidence/maintenance-batch-16-local-checkpoint.json` for the design and bounded
+local evidence.

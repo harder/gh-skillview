@@ -68,6 +68,37 @@ internal static class GhRegistryEditor
         { throw new IOException("Desired registry entry is malformed or incompatible.", ex); }
     }
 
+    internal static GhRegistryPatch PrepareUnpin(byte[] current, string selector, string expectedEntryFingerprint,
+        CancellationToken token)
+    {
+        var entry = CaptureEntry(current, selector, token);
+        if (entry.Fingerprint != expectedEntryFingerprint) throw new IOException("Selected owner record changed; review a new unpin plan.");
+        var reader = new Utf8JsonReader(entry.Bytes, new JsonReaderOptions { MaxDepth = 32 });
+        var previousEnd = 1;
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            if (reader.TokenType != JsonTokenType.PropertyName || reader.CurrentDepth != 1) continue;
+            var selected = reader.GetString() == "pinnedRef";
+            var start = checked((int)reader.TokenStartIndex);
+            reader.Read(); reader.Skip();
+            var end = checked((int)reader.BytesConsumed);
+            if (!selected) { previousEnd = end; continue; }
+            if (reader.TokenType != JsonTokenType.String || string.IsNullOrWhiteSpace(reader.GetString()))
+                throw new IOException("Owner pin is not a verified nonempty string.");
+            // Consume one adjacent comma while preserving every other byte.
+            var following = end;
+            while (following < entry.Bytes.Length && entry.Bytes[following] is (byte)' ' or (byte)'\r' or (byte)'\n' or (byte)'\t') following++;
+            if (following < entry.Bytes.Length && entry.Bytes[following] == ',') end = following + 1;
+            else if (previousEnd > 1) start = previousEnd;
+            var desired = new byte[entry.Bytes.Length - (end - start)];
+            entry.Bytes.AsSpan(0, start).CopyTo(desired);
+            entry.Bytes.AsSpan(end).CopyTo(desired.AsSpan(start));
+            return ReplaceEntry(current, selector, expectedEntryFingerprint, desired, token);
+        }
+        return new(current.ToArray(), current.ToArray(), entry.Fingerprint, entry.Fingerprint);
+    }
+
     internal static GhRegistryPatch Prepare(byte[] current, string selector, string expectedEntryFingerprint,
         string desiredTree, string? desiredPin, DateTimeOffset updatedAt, CancellationToken token) =>
         PrepareCore(current, selector, expectedEntryFingerprint, desiredTree, desiredPin, updatedAt, token, preserveUnchanged: true);

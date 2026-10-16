@@ -369,6 +369,17 @@ public class CliDispatcherErrorTests : IDisposable
     [InlineData("update-plan", "")]
     [InlineData("update-plan", "--path demo --yes")]
     [InlineData("update-plan", "--path demo --unpin --unpin")]
+    [InlineData("unpin-plan", "")]
+    [InlineData("unpin-plan", "--path first --install-id second")]
+    [InlineData("unpin-plan", "--path demo --yes")]
+    [InlineData("unpin-plan", "--path demo --unpin")]
+    [InlineData("unpin-plan", "--all")]
+    [InlineData("unpin-inspect", "--id ../outside")]
+    [InlineData("unpin-apply", "--id 00000000000000000000000000000000 --yes --expect bad")]
+    [InlineData("unpin-apply", "--id 00000000000000000000000000000000 --yes --disposition retain-original --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("unpin-recover", "--id 00000000000000000000000000000000 --yes")]
+    [InlineData("unpin-undo", "--id 00000000000000000000000000000000 --expect bad")]
+    [InlineData("unpin-repair-owner", "--id 00000000000000000000000000000000 --yes --expect bad")]
     [InlineData("update-inspect", "--id ../outside")]
     [InlineData("update-apply", "--id 00000000000000000000000000000000 --yes --expect bad")]
     [InlineData("update-recover", "--id 00000000000000000000000000000000 --yes")]
@@ -389,6 +400,19 @@ public class CliDispatcherErrorTests : IDisposable
         var (code, _, error) = await RunCliAsync("skillview", [command, .. argv]);
         Assert.Equal(ExitCodes.InvalidUsage, code);
         Assert.Contains("skillview:", error);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Theory]
+    [InlineData("--path", "missing-installation")]
+    [InlineData("--install-id", "missing-installation-id")]
+    public async Task UnpinExactSelectorIsAcceptedAndMissingTargetRefusesWithoutPrivateState(string selector, string value)
+    {
+        var (code, output, _) = await RunCliAsync("skillview", "unpin-plan", selector, value, "--allow-hidden-dirs", "--json");
+        Assert.Equal(ExitCodes.UserError, code);
+        using var result = JsonDocument.Parse(output);
+        Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
+        Assert.Contains("one exact captured installation", result.RootElement.GetProperty("error").GetString());
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 

@@ -111,6 +111,9 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.WindowsBackupReadStreamTests \
             --filter-class SkillView.Tests.Maintenance.WindowsSecurityDescriptorQueryTests \
             --filter-class SkillView.Tests.Maintenance.RecordedTrackingWriterTests \
+            --filter-class SkillView.Tests.Maintenance.PinTrackingWriterTests \
+            --filter-class SkillView.Tests.Maintenance.StandaloneUnpinTests \
+            --filter-class SkillView.Tests.Maintenance.SharedReplacementRevisionTests \
             --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
@@ -129,7 +132,7 @@ jobs:
     if: inputs.verification != 'windows-metadata'
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -173,6 +176,26 @@ jobs:
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
             -o dist/ext
+      - name: Build exact previous native host for saved-plan compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline_sha=0dba59be59776e6e654123aa1ce1e5496074763e
+          baseline_path="$RUNNER_TEMP/skillview-unpin-baseline"
+          git fetch --no-tags origin "$baseline_sha"
+          git worktree add --detach "$baseline_path" "$baseline_sha"
+          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
+            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
+            -o "$baseline_path/dist/app"
+          printf 'SKILLVIEW_LEGACY_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
+      - name: Prepare checksum-verified minimum and recorded current gh proof hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.97.0 --rid '${{ matrix.rid }}' --output "$RUNNER_TEMP/skillview-proof-gh-minimum"
+          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output "$RUNNER_TEMP/skillview-proof-gh-current"
       - name: Smoke-test native binaries
         shell: bash
         run: |
@@ -287,6 +310,56 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
+      - name: Prove standalone unpin without source access on both native hosts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
+          proof_gh_minimum="$RUNNER_TEMP/skillview-proof-gh-minimum/gh${{ matrix.ext }}"
+          prove_unpin() {
+            if [ "$RUNNER_OS" = Linux ]; then
+              python agent_docs/evidence/prove-shared-revision-update.py --unpin-only --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-shared-revision-update.py --unpin-only "$@"
+            fi
+          }
+          prove_unpin --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-app-proof.json
+          prove_unpin --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-extension-proof.json
+      - name: Prove actual previous native saved plans survive the new schema boundary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
+          prove_legacy() {
+            if [ "$RUNNER_OS" = Linux ]; then
+              python agent_docs/evidence/prove-old-native-plans.py --expect-schema3-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-old-native-plans.py "$@"
+            fi
+          }
+          prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-app-proof.json
+          prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-extension-proof.json
+      - name: Prove privileged Linux unpin and native schema compatibility on private tmpfs
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            proof_boundary=retain-moved
+            if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
+            python3 agent_docs/evidence/run-local-merge-disk-full-docker.py --unpin-only \
+              --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
+              --gh "$RUNNER_TEMP/skillview-proof-gh-current/gh" --extra-gh "$RUNNER_TEMP/skillview-proof-gh-minimum/gh" \
+              --legacy-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
+              --output "dist/unpin-privileged-$proof_name-proof" --platform linux/amd64
+          done
       - name: Prove reviewed local dispositions and frozen resolutions
         shell: bash
         env:
@@ -336,5 +409,6 @@ jobs:
           path: |
             dist/*-proof.json
             dist/disk-full-proof/**
+            dist/unpin-privileged-*-proof/**
           if-no-files-found: warn
           retention-days: 14

@@ -563,8 +563,20 @@ internal sealed class SkillViewWorkflowCoordinator
     {
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
-        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, review.LocalDisposition is null ? "retain-original" : "merge-reviewed", inventory,
+        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed", inventory,
             reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
+    }
+
+    internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUnpinAsync(InstalledSkill selected, bool allowHidden, CancellationToken token)
+    {
+        var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);
+        return await Task.Run(() =>
+        {
+            var target = inventory.Skills.SingleOrDefault(skill => skill.InstallationId == selected.InstallationId
+                && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath))
+                ?? throw new IOException("The selected physical installation changed; refresh before planning unpin.");
+            return _services.SavedUpdates.PrepareUnpin(target, inventory, token);
+        }, token).ConfigureAwait(false);
     }
 
     private Task<InventorySnapshot> CaptureUpdateInventoryAsync(string? ghPath, bool allowHidden, CancellationToken token) =>

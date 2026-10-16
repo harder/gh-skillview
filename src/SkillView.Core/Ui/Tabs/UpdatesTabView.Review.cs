@@ -64,7 +64,10 @@ internal sealed partial class UpdatesTabView
         var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
         _retainBox.Enabled = idle && applicable;
         _applyButton.Enabled = idle && applicable && _applyRunner is not null && _retainBox.Value == CheckState.Checked;
-        _applyButton.Text = _review?.LocalDisposition is null ? "Replace reviewed" : "Apply reviewed merge";
+        _applyButton.Text = _review?.PinPolicy is not null ? "Apply unpin only" : _review?.LocalDisposition is null ? "Replace reviewed" : "Apply reviewed merge";
+        _retainBox.Text = _review?.PinPolicy is not null
+            ? "Retain original; clear only pin policy for all affected consumers"
+            : "Retain original, including local edits; apply this reviewed plan";
         _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0);
         RefreshLocalReviewControls(idle);
     }
@@ -84,7 +87,8 @@ internal sealed partial class UpdatesTabView
             || _localReviewStarted && captured.LocalDisposition is null
             || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
         var hidden = _queueOptions?.AllowHiddenDirectories ?? false;
-        await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), dryRun: false, applying: true).ConfigureAwait(false);
+        await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), dryRun: false, applying: true,
+            unpinOnly: captured.PinPolicy is not null).ConfigureAwait(false);
     }
 
     private Task SkipAndPrepareNextAsync()
@@ -105,7 +109,7 @@ internal sealed partial class UpdatesTabView
         return Task.CompletedTask;
     }
 
-    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool dryRun, bool applying = false)
+    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool dryRun, bool applying = false, bool unpinOnly = false)
     {
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
@@ -113,7 +117,8 @@ internal sealed partial class UpdatesTabView
         var token = ownership.Token;
         SetBusy(true);
         SetOperationControlsEnabled(false);
-        _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…" : " preparing one exact candidate…";
+        _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…"
+            : unpinOnly ? " capturing installed content for a pin-only review…" : " preparing one exact candidate…";
         try
         {
             var result = await operation(token).ConfigureAwait(false);
@@ -131,8 +136,9 @@ internal sealed partial class UpdatesTabView
                     _retainBox.Value = CheckState.UnChecked;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
                 }
-                _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, []);
+                _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, [], unpinOnly);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"
+                    : _review?.PinPolicy is not null ? " pin-only review required · inspect all consumers, approve retention, then Apply unpin only"
                     : _review is not null ? $" review required · {_queue.Count} remaining · choose preserve, local review, or approve Replace reviewed"
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
                     : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)} · {_queue.Count} remaining"

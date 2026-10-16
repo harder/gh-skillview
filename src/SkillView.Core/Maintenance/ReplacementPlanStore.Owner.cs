@@ -8,7 +8,8 @@ namespace SkillView.Maintenance;
 
 internal sealed partial class ReplacementPlanStore
 {
-    private ReplacementOwnerTransition? PrepareOwner(InstalledSkill target, ResolvedSkillRevision source, InventorySnapshot inventory, CancellationToken token)
+    private ReplacementOwnerTransition? PrepareOwner(InstalledSkill target, ResolvedSkillRevision? source, InventorySnapshot inventory, CancellationToken token,
+        bool unpinOnly = false, bool initializeState = true)
     {
         var claims = target.AllOwnershipClaims.ToArray();
         if (claims.Length == 0) return null;
@@ -22,8 +23,9 @@ internal sealed partial class ReplacementPlanStore
         // Create its private ancestors before capturing the registry namespace
         // witness; never refresh that witness after staging begins.
         CheckPlacement(inventory, token);
-        using (var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token))
+        if (initializeState)
         {
+            using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
             using var writer = state.OpenFile("writer.lock", true, token);
             CheckWriter(writer);
         }
@@ -33,12 +35,13 @@ internal sealed partial class ReplacementPlanStore
             throw new IOException("The captured shared owner is outside the effective gh global registry context.");
         var snapshot = held.Read(token);
         var updated = DateTimeOffset.UtcNow;
-        var patch = GhRegistryEditor.Prepare(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, source.Tree, null, updated, token);
+        var patch = unpinOnly ? GhRegistryEditor.PrepareUnpin(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, token)
+            : GhRegistryEditor.Prepare(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, source!.Tree, null, updated, token);
         var before = GhRegistryEditor.CaptureEntry(patch.BeforeBytes, claim.Selector!, token);
         var desired = GhRegistryEditor.CaptureEntry(patch.DesiredBytes, claim.Selector!, token);
         var transition = new ReplacementOwnerTransition(held.CanonicalPath, claim.Selector!, snapshot.Identity,
             before.Bytes, desired.Bytes, before.Fingerprint, desired.Fingerprint, updated, held.ParentIdentity);
-        ValidateOwnerTransition(target.FrontMatter, claims.ToImmutableArray(), source, transition, token);
+        ValidateOwnerTransition(target.FrontMatter, claims.ToImmutableArray(), source, transition, token, unpinOnly);
         return transition;
     }
 
@@ -53,7 +56,7 @@ internal sealed partial class ReplacementPlanStore
     }
 
     private OwnerContext? OpenOwner(ReplacementOwnerTransition? transition, CancellationToken token, bool requireBefore = false,
-        Session? recoverySession = null, InventorySnapshot? inventory = null)
+        Session? recoverySession = null, InventorySnapshot? inventory = null, bool exactEntryBytes = false)
     {
         if (transition is null) return null;
         if (!PathIdentity.Equals(transition.RegistryPath, GlobalRegistryPath()))
@@ -61,7 +64,7 @@ internal sealed partial class ReplacementPlanStore
         var held = new GhRegistryWriteSession(transition.RegistryPath, transition.Selector, logger, token, checkpoint, rawRecovery: recoverySession is not null);
         try
         {
-            var owner = new OwnerContext(transition, held);
+            var owner = new OwnerContext(transition, held, exactEntryBytes);
             var observed = owner.Observe(token);
             if (observed.State == "torn" && recoverySession is not null)
             {
@@ -79,7 +82,7 @@ internal sealed partial class ReplacementPlanStore
     }
 
     private static void ValidateOwnerTransition(SkillFrontMatter metadata, ImmutableArray<SkillPackage> claims,
-        ResolvedSkillRevision source, ReplacementOwnerTransition transition, CancellationToken token)
+        ResolvedSkillRevision? source, ReplacementOwnerTransition transition, CancellationToken token, bool unpinOnly = false)
     {
         if (string.IsNullOrWhiteSpace(transition.Selector) || !Path.IsPathFullyQualified(transition.RegistryPath)
             || Path.GetFileName(transition.RegistryPath) != SkillLockFileReader.FileName
@@ -94,10 +97,11 @@ internal sealed partial class ReplacementPlanStore
                 || claim.Selector != transition.Selector || claim.EntryFingerprint != transition.BeforeFingerprint))
             throw new IOException("Saved gh owner authority or captured claim is inconsistent.");
         var before = EntryRegistry(transition.Selector, transition.BeforeEntry);
-        var patch = GhRegistryEditor.Prepare(before, transition.Selector, transition.BeforeFingerprint, source.Tree, null, transition.UpdatedAt, token);
+        var patch = unpinOnly ? GhRegistryEditor.PrepareUnpin(before, transition.Selector, transition.BeforeFingerprint, token)
+            : GhRegistryEditor.Prepare(before, transition.Selector, transition.BeforeFingerprint, source!.Tree, null, transition.UpdatedAt, token);
         var desired = GhRegistryEditor.CaptureEntry(EntryRegistry(transition.Selector, transition.DesiredEntry), transition.Selector, token);
-        if (!Matches(patch))
-            patch = GhRegistryEditor.RecreateSavedTransition(before, transition.Selector, transition.BeforeFingerprint, source.Tree, null, transition.UpdatedAt, token);
+        if (!unpinOnly && !Matches(patch))
+            patch = GhRegistryEditor.RecreateSavedTransition(before, transition.Selector, transition.BeforeFingerprint, source!.Tree, null, transition.UpdatedAt, token);
         if (!Matches(patch))
             throw new IOException("Saved owner transition changes fields outside the approved tree/pin/timestamp policy.");
         using var document = JsonDocument.Parse(transition.BeforeEntry);
@@ -153,7 +157,7 @@ internal sealed partial class ReplacementPlanStore
         observation.Owner?.State == (undo ? "before" : "desired")
         || owner.Transition.BeforeFingerprint == owner.Transition.DesiredFingerprint && observation.Owner?.State == "before";
 
-    private sealed class OwnerContext(ReplacementOwnerTransition transition, GhRegistryWriteSession held) : IDisposable
+    private sealed class OwnerContext(ReplacementOwnerTransition transition, GhRegistryWriteSession held, bool exactEntryBytes) : IDisposable
     {
         internal ReplacementOwnerTransition Transition { get; } = transition;
         internal GhRegistryWriteSession Held { get; } = held;
@@ -181,8 +185,10 @@ internal sealed partial class ReplacementPlanStore
                 return new("torn", Transition.RegistryPath, Transition.Selector, snapshot.ContentHash, snapshot.Bytes.Length, snapshot.Identity, repairReview);
             }
             var entry = GhRegistryEditor.CaptureEntry(snapshot.Bytes, Transition.Selector, token);
-            var state = entry.Fingerprint == Transition.BeforeFingerprint ? "before"
-                : entry.Fingerprint == Transition.DesiredFingerprint ? "desired" : "foreign";
+            var state = entry.Fingerprint == Transition.BeforeFingerprint
+                && (!exactEntryBytes || entry.Bytes.AsSpan().SequenceEqual(Transition.BeforeEntry)) ? "before"
+                : entry.Fingerprint == Transition.DesiredFingerprint
+                    && (!exactEntryBytes || entry.Bytes.AsSpan().SequenceEqual(Transition.DesiredEntry)) ? "desired" : "foreign";
             return new(state, Transition.RegistryPath, Transition.Selector, snapshot.ContentHash, snapshot.Bytes.Length, snapshot.Identity);
         }
         internal byte[]? ReadFor(string path, CancellationToken token)

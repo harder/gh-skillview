@@ -13,6 +13,46 @@ namespace SkillView.Maintenance;
 internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
+    internal UpdateResult PrepareUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
+    {
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            var preparation = plans.PlanUnpin(target, inventory, token);
+            return Empty(false) with
+            {
+                SavedPlan = preparation.Plan,
+                Outcomes = [preparation.Plan is { } plan
+                    ? FromPlan(plan, "review-required", "Pin-only candidate saved. Review all affected consumers and approve retention before applying.")
+                    : Outcome(target, "unchanged", preparation.Unchanged!.Message)]
+            };
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            // The owning view may disappear before queued completion. Keep the
+            // exact retained evidence address in the application log as well.
+            logger.Warn("unpin", ex.ToString());
+            return Empty(false) with
+            {
+                Succeeded = false,
+                Cancelled = true,
+                ExitCode = 130,
+                ErrorMessage = ex.Message,
+                Outcomes = [Outcome(target, "canceled", ex.Message)]
+            };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or JsonException or EntryPointNotFoundException)
+        {
+            return Empty(false) with
+            {
+                Succeeded = false,
+                ExitCode = 2,
+                ErrorMessage = ex.Message,
+                Outcomes = [Outcome(target, "refused", ex.Message)]
+            };
+        }
+    }
+
     internal async Task<UpdateResult> PrepareAsync(string ghPath, GhSkillUpdateService.Options options,
         InventorySnapshot inventory, CancellationToken token)
     {
@@ -95,8 +135,9 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
-        if (disposition != (review.LocalDisposition is null ? "retain-original" : "merge-reviewed"))
-            return UpdateResult.Failure(false, 2, "Explicit " + (review.LocalDisposition is null ? "retain-original" : "merge-reviewed") + " approval is required.", []) with
+        var requiredDisposition = review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
+        if (disposition != requiredDisposition)
+            return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
             { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "The saved local-change disposition needs explicit approval.")] };
         var result = Empty(false) with { SavedPlan = review };
         var attempted = false;
@@ -104,7 +145,8 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         {
             token.ThrowIfCancellationRequested();
             attempted = true;
-            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition);
+            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
+                review.PinPolicy is not null ? "unpin-only" : null);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
@@ -195,6 +237,6 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
             status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
-            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with update-inspect --id {plan.Id} before recovery or undo.")
+            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
         { Impact = plan.Impact };
 }
