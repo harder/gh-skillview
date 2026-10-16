@@ -40,6 +40,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
+    private readonly Action<InstalledSkill>? _onEffectiveLoading;
     private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
@@ -78,7 +79,8 @@ internal sealed class InstalledTabView : FrameView
         Action? onStateChange = null,
         Func<string?, CancellationToken, Task<InventorySnapshot>>? scopedSnapshotLoader = null,
         CancellationToken lifetimeToken = default,
-        Action<AggregateException>? onCancellationCallbackException = null)
+        Action<AggregateException>? onCancellationCallbackException = null,
+        Action<InstalledSkill>? onEffectiveLoading = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -88,6 +90,7 @@ internal sealed class InstalledTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
+        _onEffectiveLoading = onEffectiveLoading;
         _lifetimeToken = lifetimeToken;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
@@ -490,7 +493,7 @@ internal sealed class InstalledTabView : FrameView
     internal static string BuildSearchScopeText() => "name · path · agent · package";
 
     internal static string BuildLegendText() =>
-        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review";
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -589,6 +592,13 @@ internal sealed class InstalledTabView : FrameView
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        if (!_filterField.HasFocus && key.AsRune.Value == 'E' && _onEffectiveLoading is not null
+            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
+        {
+            key.Handled = true;
+            if (GetSelectedSkill() is { } selected) _onEffectiveLoading(selected);
+            return;
+        }
         // `P` (capital) cycles the pin filter — handled here rather than via
         // InstalledScreen.DecideShortcut so the static test surface stays
         // unchanged. Only fires when the filter field doesn't own focus so

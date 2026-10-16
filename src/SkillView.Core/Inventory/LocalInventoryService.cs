@@ -36,13 +36,20 @@ public sealed class LocalInventoryService
         _contextRunner = contextRunner ?? new ProcessRunner(logger);
     }
 
+    internal LocalInventoryService InContext(ProcessRunner runner) => new(_resolver, _scanner,
+        new GhSkillListAdapter(runner, _logger), _logger, runner);
+
     public sealed record Options(
         IReadOnlyList<string> ScanRoots,
         bool AllowHiddenDirs,
         string? FilterScope = null,
         string? FilterAgent = null,
         IReadOnlyList<string>? WorkspaceDirectories = null,
-        IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null);
+        IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null)
+    {
+        internal bool DiscoverNestedSkillFiles { get; init; }
+        internal bool IncludeRootSkillFiles { get; init; }
+    }
 
     public async Task<InventorySnapshot> CaptureAsync(
         string? ghPath,
@@ -250,7 +257,8 @@ public sealed class LocalInventoryService
         var allRoots = roots.AddRange(managed.Roots);
         var scanned = _scanner.ScanWithCancellation(
             allRoots,
-            new LocalSkillScanner.Options(options.AllowHiddenDirs) { Managed = managed },
+            new LocalSkillScanner.Options(options.AllowHiddenDirs)
+            { Managed = managed, DiscoverNestedSkillFiles = options.DiscoverNestedSkillFiles, IncludeRootSkillFiles = options.IncludeRootSkillFiles },
             cancellationToken, inaccessible, locations);
         var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(

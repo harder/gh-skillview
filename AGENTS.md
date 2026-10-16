@@ -9,6 +9,40 @@
   skill discovery. Startup TUI capture must use the workflow coordinator so
   workspace/profile options match later rescans.
 
+- Effective loading is a conditional, frozen local-policy view, separate from
+  physical subjects and native/session evidence. Do not launch AI clients just
+  to populate it: a read-only list handler does not establish zero-write startup.
+  Keep the source/version and explicit unavailable reason in each result.
+- OpenCode 1.19.1 normalizes scalar permissions and agent tools per source
+  before merging; overwritten keys retain their original position. Markdown
+  agents/modes load during each config-directory phase; JSON modes fold last.
+  Missing/bounded/linked-container observations cannot imply default allow.
+  Valid legacy JSON and Markdown modes become primary roles at their respective
+  merge boundaries; do not normalize unsupported headers into valid policy.
+  OpenCode permission wildcards normalize separators and ignore case on Windows;
+  keep that matcher separate from Claude's case-sensitive selectors.
+- OpenCode effective analysis freezes all config-directory `skill`/`skills`
+  roots and final merged `skills.paths`. Its bounded scanner mode includes
+  root `SKILL.md` and continues into skill-bearing directories; ordinary
+  maintenance keeps leaf semantics. External compatibility roots include dot
+  entries; config/path globs exclude them. Effect runtime disable flags use
+  exact case-sensitive boolean tokens; project-config disabling uses a separate
+  lowercase true/1 contract. Empty/malformed Effect values remain unknown.
+- Effective captures pass selected CWD and Claude/Codex config homes through a
+  child-only runner to managed discovery. Never change the parent environment.
+  Supplemental root inspection must distinguish missing roots from access/I/O
+  failures and propagate incomplete coverage into frozen subjects and selection.
+- Gemini 0.46.0 saved trust is below live IDE trust. Extension overrides use
+  exact manifest keys and case-sensitive stored rules, with last match winning;
+  they do not normalize stored paths. Keep these provider-specific comparisons
+  separate from SkillView's path identity and mutation authority.
+  Gemini's discovery includes the root `SKILL.md` and immediate-child skills;
+  enable root admission separately from OpenCode's recursive observation mode.
+  Retain framing separately from parsed YAML: Gemini rejects a leading BOM and
+  requires a closing `---`. A bounded observation ending at YAML `...` cannot
+  prove no later Gemini delimiter exists unless EOF was captured. Include this
+  distinction in the contextual fingerprint; do not change saved payload hashes.
+
 ## Repo
 
 `gh-skillview` is a .NET 10 / Terminal.Gui v2 terminal UI and CLI for browsing,

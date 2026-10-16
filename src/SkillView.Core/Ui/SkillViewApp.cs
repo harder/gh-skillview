@@ -475,7 +475,8 @@ public sealed class SkillViewApp
             scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
-                CancellationCallbackReporter.For(_services.Logger, "installed tab"))
+                CancellationCallbackReporter.For(_services.Logger, "installed tab"),
+            onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill))
         {
             X = 0,
             Y = 2,

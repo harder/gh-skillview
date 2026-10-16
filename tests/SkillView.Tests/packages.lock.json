@@ -288,6 +288,11 @@
           "TextMateSharp": "2.0.4"
         }
       },
+      "Tomlyn": {
+        "type": "Transitive",
+        "resolved": "2.10.1",
+        "contentHash": "ykjOY3IpYmC4SpPcAZRTl/w2jTmhPMDydHq8xcV7tTBAQ22nKBsOkPqauIrZlMjHm03cmKfV23UOPscKp+J4Og=="
+      },
       "Wcwidth": {
         "type": "Transitive",
         "resolved": "4.0.1",
@@ -371,6 +376,7 @@
         "dependencies": {
           "Terminal.Gui": "[2.5.0, )",
           "Terminal.Gui.Editor": "[2.5.7, )",
+          "Tomlyn": "[2.10.1, )",
           "YamlDotNet": "[18.1.0, )"
         }
       }

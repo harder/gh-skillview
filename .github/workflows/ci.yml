@@ -125,6 +125,12 @@ jobs:
           test -s 'dist/ext/gh-skillview${{ matrix.ext }}'
           'dist/app/skillview${{ matrix.ext }}' --version
           'dist/ext/gh-skillview${{ matrix.ext }}' --version
+      - name: Prove contextual agent loading without starting AI clients
+        shell: bash
+        run: |
+          proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
+          python agent_docs/evidence/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
+          python agent_docs/evidence/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
       - name: Prove native backup evidence and unchanged installed copies
         shell: bash
         run: |

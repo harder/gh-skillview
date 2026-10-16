@@ -91,6 +91,7 @@ public static class DoctorScreen
         sb.AppendLine($"{rows.Length} managed skill installation(s) observed; capture {inventory.CapturedAt:O}.");
         sb.AppendLine(inventory.IsPartial ? "Coverage is partial; inspect inventory diagnostics." : "Configured inventory coverage is complete.");
         sb.AppendLine("Read-only resources; enabled and active session state are unknown.");
+        sb.AppendLine("For contextual loading rules, select a skill in Installed and press E, or run `skillview effective --agent <id> --project <directory> --json`.");
         sb.AppendLine();
         sb.AppendLine("| Provider | Distributor version | Path |");
         sb.AppendLine("| --- | --- | --- |");

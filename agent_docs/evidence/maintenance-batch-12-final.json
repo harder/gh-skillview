@@ -1,0 +1,3422 @@
+{
+  "schemaVersion": 1,
+  "status": "merged-and-acceptance-proven",
+  "pullRequest": 61,
+  "reviewedHead": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+  "baseCommit": "d8405957c2d73167e60f50dad8ace8e6f000a58d",
+  "sourceManifest": [
+    {
+      "path": ".github/CODEOWNERS",
+      "sha256": "2b630b4f880ba619ae7583d19b5da18a264d2ed58cbf9fa7671dc7ae4ce835b2"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "sha256": "15a532ffb070880e9e0bab20ed143e876990cd2ce3140f1bc6d05791ae67b580"
+    },
+    {
+      "path": ".github/actionlint.yaml",
+      "sha256": "9d6be88af50e898ea902a5e46393e8f5e81f0d1ada7759e11b014cd59025bb59"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "sha256": "ea5a333c4032618fc8fb0230f94a3bdd39c0e363bb241bb837f8b81156ef9ee3"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "sha256": "bd60a796384bba5bd24eb7ecb52e13a782f14f001472512feb4ebd0a0c5959ee"
+    },
+    {
+      "path": ".github/release.yml",
+      "sha256": "9420ddee065cdcd524ded48cdb20ccf5bece65279c33acf017148d9d2c32415b"
+    },
+    {
+      "path": ".github/scripts/critical-dependencies.js",
+      "sha256": "948a04af8119df384b83a5a50e3ccf6c1200350e0eb555ca6452a2211e90092b"
+    },
+    {
+      "path": ".github/scripts/critical-dependencies.test.js",
+      "sha256": "dcc536cb2da6eeb7c2d2baeadc6f61f763aadc23a26e4067caa95668998b7952"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-assessment.js",
+      "sha256": "7907f8cdadce1d1f2deb002f1126d1296201f3e2f2cef734dca7b416611dc1f6"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-assessment.test.js",
+      "sha256": "2528f2c93f63cb09adbf54566ef5f2f89360324aa4fe4c4ff20d6d1a5e65c4ee"
+    },
+    {
+      "path": ".github/scripts/critical-dependency-prompt.md",
+      "sha256": "8005e6e1e417c600633e0f9528202bcfc0c8b4bdb94e9c5c84df5bf92ed64bd0"
+    },
+    {
+      "path": ".github/scripts/test_homebrew_formula.py",
+      "sha256": "2a008f95ad41630c4bf09ef16f03fadceaa9150bc9359e497839e7804c3dc8fb"
+    },
+    {
+      "path": ".github/workflows/README.md",
+      "sha256": "49d6ed36530eeda6922564d4064473bdac20842c1ab38adb877b31136034bb63"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "69b54f350bddb8aae8c11520dd4e18f915ffa0b4f82cdab25de7ce75c7013af1"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "sha256": "1b2ca0f53dd5b0290500efad6b5e8662337f2d1b98fbc683fb5260ccda4b7718"
+    },
+    {
+      "path": ".github/workflows/contract-tests.yml",
+      "sha256": "147d2413f59103e16578fc35880496304fb1f2add08ef70ba505bd19bab8a9b7"
+    },
+    {
+      "path": ".github/workflows/critical-dependencies.yml",
+      "sha256": "06717ae757025af4d4f0c8c43b4fa3407ec6fdd283d5ce35e9079435f8c2545b"
+    },
+    {
+      "path": ".github/workflows/pages.yml",
+      "sha256": "f83f368c100bd2085414cab10075f1f603e4db9ef5526e1bdadd72ff144e5791"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "6d7289cac6600c572ef5e2fdf6bef9d386b2feca2708aaf9aa743db24ee7b46e"
+    },
+    {
+      "path": "Directory.Build.props",
+      "sha256": "9a5a2930248d4529c00714a6d1225f583e2a629e94b9220b72a9a7500577abeb"
+    },
+    {
+      "path": "SkillView.sln",
+      "sha256": "f111aacfd781f87c9a5865e7d2addd794e5c1394f5f397cedf2e4c21787b6184"
+    },
+    {
+      "path": "agent_docs/evidence/prove-gitfile-protection.py",
+      "sha256": "cd659f9d0f9db2ce7ad7b70ca4ce4a4f0f2e7f91edec5290216643f4ab5d1783"
+    },
+    {
+      "path": "agent_docs/evidence/prove-installation-identities.py",
+      "sha256": "72814cf61dd3e2acc1f2b7eb249e9ea83953b9f23065616b939b53396dc37798"
+    },
+    {
+      "path": "agent_docs/evidence/prove-inventory-denied-root.py",
+      "sha256": "e388897c1926c1e4838b248a4e195c604f6549a318ca026b8b1a3e9730089cdb"
+    },
+    {
+      "path": "agent_docs/evidence/prove-inventory-filter.py",
+      "sha256": "8dc232bce6684d58844ee150ea907949e1665a868710690e02dbe53e2620c9c0"
+    },
+    {
+      "path": "agent_docs/evidence/prove-legacy-owner-compatibility.py",
+      "sha256": "3a151e00968abb93fdc7473c99a238ec0dbf6839423dc0fa3961c3129d97efcb"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-backup.py",
+      "sha256": "c1eef26a475217ce6b8febf39b1d974a76fe3135ede0ce4e4ca6bb19c8cefe97"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-2.py",
+      "sha256": "82869ab7c3b4bdf508889c42c6c59b6482e15d708e810ea2375c94083155c5e2"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-3.py",
+      "sha256": "92ea236054f4fd28f96ff0bdb3bda1deb3b5e449ab4704f77cfb4d88a9b30f9e"
+    },
+    {
+      "path": "agent_docs/evidence/prove-maintenance-batch-3b.py",
+      "sha256": "1702b8445a84f0df5cf78b11e598c8b958057c99b8e5e0d196301872aa0e4ff5"
+    },
+    {
+      "path": "agent_docs/evidence/prove-managed-discovery.py",
+      "sha256": "d153c0b1231fad3c463496310bb0f0ed13e8565dab79895b50c9adfcaba64ad8"
+    },
+    {
+      "path": "agent_docs/evidence/prove-metadata-without-openat2.py",
+      "sha256": "04b37792645564cb626ccb14a46cd4e14f64275604230d3c7ba5e3d620b3a7fd"
+    },
+    {
+      "path": "agent_docs/evidence/prove-native-object-evidence.py",
+      "sha256": "1ee4cabb0b5149accfc6a1a35c9fd5bfbb2db7d8cc7f685e692915344fdc34b3"
+    },
+    {
+      "path": "agent_docs/evidence/prove-quarantine-undo.py",
+      "sha256": "e66b21eb795711fd3e1c866102dd339bba71d3c265e460aaa3862a6b99bb8195"
+    },
+    {
+      "path": "agent_docs/evidence/prove-recorded-replacement.py",
+      "sha256": "2688ff6818aaeae2cb20b6dc68ccf69d09579d91d4ee0a1ebb9de273b3690fe5"
+    },
+    {
+      "path": "agent_docs/evidence/prove-reviewed-update-tui.py",
+      "sha256": "934c098c5f42c057d279c495976bbf896fd3c850538d801afcbfc1d4de72e00d"
+    },
+    {
+      "path": "agent_docs/evidence/prove-revision-update.py",
+      "sha256": "b830d17adc1817417c964e97327d3089bfe8f972c32261b1aa501bf3d65216fc"
+    },
+    {
+      "path": "agent_docs/evidence/prove-shared-revision-update.py",
+      "sha256": "c39dda34baece1ba8694890b3e8de8b1819d5414a05a6b0b8bff9964a28458af"
+    },
+    {
+      "path": "agent_docs/evidence/prove-tracking-roundtrip.py",
+      "sha256": "0d6a6fe1785e5e242a7781ba322995a53aedef9c746474dca5246f7bf10eef0f"
+    },
+    {
+      "path": "agent_docs/evidence/prove-update-outcomes.py",
+      "sha256": "a60db46e82c00774387bb6f8a65bc93da6a3a8c8abbdac3ec6fda6f6512cfd1c"
+    },
+    {
+      "path": "global.json",
+      "sha256": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a"
+    },
+    {
+      "path": "src/SkillView.App/Program.cs",
+      "sha256": "bf4072e2581a4368e765a832e42d23ebb1e5cac144ce333e6c7513a4bca6a367"
+    },
+    {
+      "path": "src/SkillView.App/SkillView.App.csproj",
+      "sha256": "94fdc5ec3fbe2ebd5dba71031849fa2d0c53b2588af94e43a39cbbacf41e771d"
+    },
+    {
+      "path": "src/SkillView.App/packages.lock.json",
+      "sha256": "50e7a0e853a38ba938c9a354918a1bc8e01f9b2de067c8a8cba3474cbd04ce44"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/AppOptions.cs",
+      "sha256": "db0ac9380a8337544eed6041791b8d72bbc0f62905d17467019be39562e04387"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/AppTheme.cs",
+      "sha256": "72f05453431854283ac4ac23e3ee3f8ff69bdb4d2fffa6b20ede079ea49b23cd"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/ArgParser.cs",
+      "sha256": "8972812fa75b331dedb03d05c9053a249b4bd15efab8791d1e31cbdf3440b36b"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/DispatchMode.cs",
+      "sha256": "b308f6620f1d7fce0efc725bd839a4a2692ab726d9a11a8a4eb5199f61a058d6"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/EntryPoint.cs",
+      "sha256": "babc52eff8db35f567c0a5840a10bdb42ec31d18bdec119645e1567f510f0d65"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/ExitCodes.cs",
+      "sha256": "8c0674f49b0b9381aeebb1803ad84c6c8827d316f159e1fdb71a0f25b549a347"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/InvocationMode.cs",
+      "sha256": "24b7a5b207ad25ddec78c5cacf2cfc91cf6d2814a43f086c49f9dfee5dd15afb"
+    },
+    {
+      "path": "src/SkillView.Core/Bootstrapping/RootCancellation.cs",
+      "sha256": "72438b64ca2b2c7c85193632bbdb3625a1e330d0af536619aaedf27474d38085"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/CliDispatcher.Identity.cs",
+      "sha256": "b3d8e3fd2d15c86e8a2a8b4262fec3c418596340710a74dbe058d6d017d0d501"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/CliDispatcher.Restore.cs",
+      "sha256": "d15fe54d422379556072b0ef9329016f248d58812590510e1bceb6c2917849ad"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/CliDispatcher.cs",
+      "sha256": "c8e8ddecc4bcef82bc6a6bdaab19e459db2bddccc66255a6ce9e909188b8ba71"
+    },
+    {
+      "path": "src/SkillView.Core/Cli/Utf8TextWriterStream.cs",
+      "sha256": "19ac0975caef34ca3b8eacbddd1190a5f989fe6814d8d59f4e653a204c5af907"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/EnvironmentProbe.cs",
+      "sha256": "a32de883ad65581ad2f6742a9e0a38d1f4ba789a7cc809688781ef2db4f08f80"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/EnvironmentReport.cs",
+      "sha256": "a422b44618cab7bf2927f0b3ad8478bd96c700a8b2c081dad6eeccadf7b0d705"
+    },
+    {
+      "path": "src/SkillView.Core/Environment/SemVer.cs",
+      "sha256": "0970b1090e48902987b6837f2c653f5c9b846a99cbab98252256476eb00596b4"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthService.cs",
+      "sha256": "f3bbfa0c724f75ba22f6869f4ef6eda0524a00d94087e4f93705d783c3879209"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthStatus.cs",
+      "sha256": "c3db740518ef1cd2c94c00309489558110b6effaf7ab32ee3a3be815989bc02a"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhAuthStatusParser.cs",
+      "sha256": "d297dcf52f184e0d1e36e239a05a83f552343f945983290f10069bd9b7db634f"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhBinaryLocator.cs",
+      "sha256": "2d40ff1dd77306983ee922eca5e239cf278a0034b578abbbb7d4f6215b90018b"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhInstallOwnershipGuard.cs",
+      "sha256": "17743c5006977d9263345f48ba77006833d6eea55b8540e64b6e70e82ad8af9a"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhJsonContext.cs",
+      "sha256": "8a38f9499f560e9f10d02b614fdbc6afc50003ac1c2130865a3307e629098f5d"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhPlacementCatalog.cs",
+      "sha256": "d2fe95dc861b49e112747bbda1c9ed6ecbebcdefdb4f671932bb3eb2f53ee301"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillInstallService.cs",
+      "sha256": "584f1446f3b8388e4752fdd33083c15e1ea2a06ecd9a6acf98de080a534183ef"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillListAdapter.cs",
+      "sha256": "5dcb7a210ea0023b563183f36ab5a4fe94f2ce49d06a6aa7698a8c99b43a48cb"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillListCache.cs",
+      "sha256": "ca70641f91674d94daba372ce0370a4b166ae33755cca4e2ac024b74dbff37f0"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillPreviewService.cs",
+      "sha256": "acb661067c9983a69bd0e4e902ff74d07a056014268de25dbc85f7ad21421c96"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillSearchService.cs",
+      "sha256": "f69c8417785e745211ad17af85f132be88c41249859caa34fd85be0f507d3f50"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/GhSkillUpdateService.cs",
+      "sha256": "2d776ecfd0a60c2729aca6dabcb775eade502254af2818b4f3d55d1a457b34ef"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/GhSkillListRecord.cs",
+      "sha256": "bfb2ba7026a931441af5ee5667e129119de1835e84b1d96cd1f7bf3145dc09d6"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/InstallResult.cs",
+      "sha256": "79b31ae4cc83c51077c122d9da22fe44bc365243e038c9d6eed905c15376c3e2"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/PreviewResult.cs",
+      "sha256": "8cd99367e651eb63d5a0d04347fa1f994e1af5a41f2eafe2a110c615f6fbd7f9"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/RepoSkill.cs",
+      "sha256": "417117f2a331caf2bbbc07deea0073630560443b34bbe57867a1a7c2ed35e1cf"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/RepoSkillListing.cs",
+      "sha256": "07ac57ed32af3b0cbd32335e1fba17a25ae57d98480f94f7c9bae957f155745c"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/SearchResultSkill.cs",
+      "sha256": "a9be23bfe87b125269ec295f1ade976308f0501949b93dce8052cd620e35b7c2"
+    },
+    {
+      "path": "src/SkillView.Core/Gh/Models/UpdateResult.cs",
+      "sha256": "c8bb696f3a836764df8479a2c45ba5b172e6b41e3fe805a2c58d7281ed21b55e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/AgentIdentity.cs",
+      "sha256": "9fe6e4e072e6a86bfabef6541b21579c165d828c0e35a0c6dfed89299b9d0c4a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/CleanupClassifier.cs",
+      "sha256": "74c3c67673d022cd91933faa08b70dec8b9fc27dab6b7cfacf9c1f7b6fdedcb5"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/FrontMatterParser.cs",
+      "sha256": "07821527d1def4c370870969ec3a6a384538ba3ae5c7fe83e337869bf12e25cf"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/IgnoreMarker.cs",
+      "sha256": "7926e29c1afdb4b7e28c17cfc0aaf24a417d99560e958e608f814f4e529ccd0d"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/LocalInventoryService.cs",
+      "sha256": "615ead5f49d5bc12f6ae855774c992a62b2accaffd05433fd4ac3480e2ae3bd2"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/LocalSkillScanner.cs",
+      "sha256": "5c975896bdb15bcb7f6c8098bf5db9e32bfee20ee66e83d55bd0f26d440dbce6"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.Manifests.cs",
+      "sha256": "5b7e1a23457779ffb5ef4fb92b4f97903bea25011c8cebc15a99bd12a206d126"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.Registry.cs",
+      "sha256": "fdcfd97c414c5c2246d3becaa5e1211bb4b2d3b7d917ccade0e520edafdd21fb"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ManagedSkillDiscovery.cs",
+      "sha256": "4bf061aef0cda06bbb3df882faa6a01a1808e873209a95a2b52367b1c0b9b3d7"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/AgentMembership.cs",
+      "sha256": "f5f9a1f4bd694bc898b21157e85ccb99440d513f96f7b9868ff7e2f43e67c70a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/InstalledSkill.cs",
+      "sha256": "8a79d8da26931ac769f7d380c0b9e70289bfe5e4b672866b765af1f577af2dcc"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/InventorySnapshot.cs",
+      "sha256": "7dc2736eb553a0a96c3b5452d531657f29b09b85975479d9ca856cccadb4d62e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ManagedSkillRegion.cs",
+      "sha256": "d55fc4e660775bc16bb80b2c7bb1908a31b992fa8844ff7bf66ebaa3584bb708"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/OperationSubject.cs",
+      "sha256": "207d446396b3811e0a7ae3de38587ca98a9e66a455cc5ff50722bf0064561185"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/Provenance.cs",
+      "sha256": "906ada73169f3512e48957b9398d05f307a8e0ebdebdbfea066f3d3c8e1616e0"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ScanRoot.cs",
+      "sha256": "054bd6119d9fe3831c8ce26e9e955403d29492d221cef1801b4385e2df9cce4e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/Scope.cs",
+      "sha256": "02b1d2bf5bd81bc520bbfba35e45718729bef445ed5ca88b77f6e5b125f4a340"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillFrontMatter.cs",
+      "sha256": "ccb5f5cfa196991eb06d8119ab61390b484be19eda4420540fe0ce5a832a93ac"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillIdentity.cs",
+      "sha256": "07c094ecbf1f0920c313056ed697ab013b068ed17ccf136c43b2c76d2d78183b"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/SkillPackage.cs",
+      "sha256": "1ef584455a0cc1b67141536adb0b2e7b2ce72761b11c6754cbc9d374a5be3cd1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/Models/ValidityState.cs",
+      "sha256": "9b642226395a3cfc4571286c34ba9b06261d6c5049695d78f8e3998406ab52c7"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeDirectoryMoveLease.cs",
+      "sha256": "e8b7bf70c512f5a2a5cf4bce53905812aaee69c6df13052f5aedf05cceccdadf"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeRegistryFileLease.cs",
+      "sha256": "a8b01472497f7244e51d386c043a16d1983edb91f339e9046873f773b5b429c1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeStateDirectory.cs",
+      "sha256": "7b1127bfc4b615a4d6afc7d4c03eb894bf13b738ca7a9905aef09f57e2a655e1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/OwnershipPath.cs",
+      "sha256": "110e5337ae6811031d228e6500222b5f9b9a448239d5a14721be3cc435bb0bbe"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/OwnershipRecordFingerprint.cs",
+      "sha256": "6c8a725855b9f4c88fc8eca3347879f108ca722c99a107f0866695f860f63378"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/PathIdentity.cs",
+      "sha256": "1d549a7890afb93fa5caf96a1fe717c1fec3c7229dd8e333317defdd0d08f71e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/PathResolver.cs",
+      "sha256": "b45686212467ffe94c8bfc8a5b9e2f51f9ddcbdc9ecc43a06d1c3df74a6988b1"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RegularFileInspection.cs",
+      "sha256": "8692bf7945517466b31dad8d99835b5e09ab12d4d2c76d612462ee64f806e157"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveService.cs",
+      "sha256": "87391574147d1a010718843f17a8fb9cc1b355d72df5ecbca4c09950ad81d5c0"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveTargetResolver.cs",
+      "sha256": "21b15d45139472cd4329d5264d384781a3757a2ffe9a97f6a391b11f0b73ff4a"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/RemoveValidator.cs",
+      "sha256": "2d3238f684837343fd7479a80d6acfa51f737e33d06040abe2706d273a42c9a3"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/ScanRootResolver.cs",
+      "sha256": "cc91357a70444d138ff24cce1d3ffbb07a7b170fed943a66ddf1bf7440ba79c3"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SecurePayloadWalker.cs",
+      "sha256": "0fffcd76af6fb3297c5970dc2ed9f64cc56b8ff9f49d7c1c98cc8098fdb03a8e"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SecureRemovalBackend.cs",
+      "sha256": "e3e4030fa417781d2d9588b863157dc57823d5c1f55c7eb28cea5203a238a333"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SkillIdentityObserver.cs",
+      "sha256": "0e098ea771c36f2be9050d9346c209d0ff6237e23db808b2c8ee9bd3ae9232d6"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/SkillLockFileReader.cs",
+      "sha256": "b842cc89899e7cc03270ee29bc22a2597d166623de73a39954b507ce65fad320"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixDirectoryMove.cs",
+      "sha256": "bed02f0549a8c95857463215a93be58bc86ef07991b535e522eea8a1881c824c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixRegistryFile.cs",
+      "sha256": "33118c6901c89660af6044033f8e294b9a94561952cff52fa0e930e726be60a6"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixSecureRemovalBackend.cs",
+      "sha256": "fe6b55c65ab19f5ad11e0631e0f16ddd92c2a204ac8511d1bd94084e9f4884dc"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixStateDirectory.cs",
+      "sha256": "53baadb9ab179199ff66e19876f7fc20e440fa2f5c309ebf0fde95f7884adc8c"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsDirectoryMove.cs",
+      "sha256": "9a74dec0e0f20b7164d0b42cb065c5444d015e8c82c5774c6a70301759bb9a89"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsRegistryFile.cs",
+      "sha256": "0bf601ff18c3f9d1c96f2dac63b7f339cde1edcf05d7db247a02d3a253c7ebb8"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsSecureRemovalBackend.cs",
+      "sha256": "ff4aab5aa832752a5be3853763c0a6f2daaa451aa70ee7a492878c528a96fea0"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsStateDirectory.cs",
+      "sha256": "49ebfdb54358c69a99607232a2fe6537277ccd81f0ffb132f2c109218e3390fa"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/FileLogSink.cs",
+      "sha256": "47e7bb0b8b8416ec8c7832c97131fe2d61512181383afbee578b0ed7825c342d"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogEntry.cs",
+      "sha256": "ef0ad9568757874d97f7f1abda1ca4226eafca0f72418e4867d372dad4db899a"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogLevel.cs",
+      "sha256": "b4559a81c21ede6779c0187bf71dacd91554dca2ebaeb586ddeed39edd909535"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/LogPaths.cs",
+      "sha256": "c83ace08ce944bbeebf0e837d424af66a85ea541be4fae96c270b7b19a08d940"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/Logger.cs",
+      "sha256": "5949f92cf1bc3a994d6de32b24f299d08708ddc842990218342b42d5b7b0f168"
+    },
+    {
+      "path": "src/SkillView.Core/Logging/Redactor.cs",
+      "sha256": "17f985c69e4c71bdd9e32fc12ac5a58f54a500d4795cebd07e7cedf7024ab0ae"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhPresentationComparison.cs",
+      "sha256": "2a488b2311e5ffaf81cd6a4e722fa3fab351ee094ad0eabeeec434c610c93381"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRecordedTreeStager.cs",
+      "sha256": "336605f297a88613faf743569fc7b7329ab2a4d7dab6a25f24cf7462a0a8f619"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRegistryEditor.cs",
+      "sha256": "bdab0c4a124ca1a52e9ac4945243257093147f8f764a08bf9112e8f63b798423"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRegistryWriteSession.cs",
+      "sha256": "ae20a224218f165aa634906231f6e4752a14256cbb4adbffa541bf5c82a841ff"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhRevisionResolver.cs",
+      "sha256": "38858d51cb96d15a75014ca89418cf550b92640f700b66452e11ff56a26da542"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhSharedLockGuard.cs",
+      "sha256": "f4bde19c0c1f227189fe47fdec0dc241a9f14ab034a4060170e6e61bf8136553"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/GhSourceRequestException.cs",
+      "sha256": "b1132122b07e1c1ebf5042ce4cec1ffa125a0f4411c3c6e5d64b2a8b932868bb"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/InstallerMetadataNormalizer.cs",
+      "sha256": "43910483c78667a8356558c03cc1b48bc9189c27a6da24b202ed1354fce30244"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/MaintenanceBackupHistory.cs",
+      "sha256": "d12574b070876d6c0d127dd6d73f09cc86dbef57e6781a0c3be6bc1038e0d933"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/MaintenanceBackupStore.cs",
+      "sha256": "fbbc9d47b85893d834060451234dbf304876c5775720d2697e523741ddcd6d13"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/PayloadSnapshot.cs",
+      "sha256": "284161b80bb0976afa56c34cade4f7d379ee4534d4c02b5cd8b960e1d7928fcf"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineRecord.cs",
+      "sha256": "2101dc5fcc1a359caa82a31b93c2e4f5af6fd19686487efd5e67656389f33e14"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.Consumers.cs",
+      "sha256": "0e5e147b02521b06193fef05d1f1ffa3479627d13a2c944b89da508348bbf788"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.Undo.cs",
+      "sha256": "283a75111ea3e6c5f91f68e437e9b7b65eb502e9b1ba06aad139afb5b185b985"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/QuarantineStore.cs",
+      "sha256": "05010b9ade6b59956547082e079448508d848e00a8f87b73d2cb6b952ff7e9d1"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/RecordedTrackingWriter.cs",
+      "sha256": "97160f8d1eb0b8a44005bb0f3fdde15a75dab9256d1b1c466889aa4b3cd1c9cf"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlan.cs",
+      "sha256": "bce2b5593eb3f429b40bbc747e206a8193d452793099e336f1145b7a2d773b2d"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Owner.cs",
+      "sha256": "bc27da32a0951db966b23bc74ad30bf8c72a0cef843068f71aeb7192882c0cf1"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerJournal.cs",
+      "sha256": "03b534a5aaf80c13be7cfe613d10227e72ef4e3bbd990a9e6e5942c960f13e10"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerRepair.cs",
+      "sha256": "d7531232d05f71fc8826bebc786108bbec150955480caeba2db683163044c915"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unchanged.cs",
+      "sha256": "9c31b7f75768e289d1801416a07f604f3b6377f6db08cdcb4c094725ccc5f362"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.Update.cs",
+      "sha256": "e4c059db819ff279e37fa829ce5e3b7dfa55d7b0f737d7ed8fd1b9331f5b3e7c"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs",
+      "sha256": "fce8a4586ed97fc554f06eb82d038ab54047a700f8920f9f93c0577faf98879f"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs",
+      "sha256": "9c9fd53920fa76a6f4b836ff624b98210ea5dc063a4f3a4bbcb6d4def16405fc"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SkillComparisonService.cs",
+      "sha256": "08e3e4f3b681c5ce4117bbb49502bd1c399e0be7f492522834d515b1e89c1258"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/SkillUpdateCoordinator.cs",
+      "sha256": "ec704c5dde00399c0887090eb9086b37d7c3945167271cc5fec1727a6ea7a1e8"
+    },
+    {
+      "path": "src/SkillView.Core/Maintenance/UpdateResultAccumulator.cs",
+      "sha256": "9d67ece0af2ae65ecf4d462e02179fe5fd61b0d0ef01d7f23811b9e102c9b7de"
+    },
+    {
+      "path": "src/SkillView.Core/SkillView.Core.csproj",
+      "sha256": "4c9d865c630c4aec11f6fee1adc3577861db2f7bf8e22f345885d0c3301d053f"
+    },
+    {
+      "path": "src/SkillView.Core/Subprocess/ProcessResult.cs",
+      "sha256": "25ac45b0793b28f3e7890d0c1ff8700db426715dfe5d1bd57d0c85fe9bc8ead4"
+    },
+    {
+      "path": "src/SkillView.Core/Subprocess/ProcessRunner.cs",
+      "sha256": "5f66e054d86a566c04072e7b5c0db476d7006ce6241dad4984f77130a054a9e6"
+    },
+    {
+      "path": "src/SkillView.Core/Threading/CancellationCallbackReporter.cs",
+      "sha256": "382cb5dda40b55f29b92112dff723f673562eacf40fda76952d17c03cef3a42a"
+    },
+    {
+      "path": "src/SkillView.Core/Threading/CancellationSource.cs",
+      "sha256": "c99b9bff82ff52d431231560bfd5bd6d49f747737a83b47a86e9d3be9e4477b0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/AgentCheckboxGrid.cs",
+      "sha256": "73811d02c1b9ace6596edb60ef0f8140959f682510d07126fddf5058cd3cfe0b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/BackgroundTaskTracker.cs",
+      "sha256": "c2508ebe87eebd9946cf48b88d7344fd5f1d45141943bb5038a99eebf1e6e1bc"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CallbackProgress.cs",
+      "sha256": "069e6e70571b53673c4f55c1749e716fb57f6060b2171980d921e07b2c9a3a4c"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CancellationOperationSlot.cs",
+      "sha256": "265bc8a5e180d3cbe07bacd6602f68bd453849cdcadadbbefc969020ce28ab15"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ChangesQueueBuilder.cs",
+      "sha256": "7a4b78ca0f6bf5194db8f012d37fbdb97e5ddc511a15896d906cd72949629401"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/CleanupScreen.cs",
+      "sha256": "ec8b95ffc5bc3572629e36bee38f930dff01527f8a5d8228f45de6c3dafb45fe"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ContextBarView.cs",
+      "sha256": "62cde0b6946072b2687cc0339e7e32734371d79083340739b4d735992a5fa10d"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/DiscoverFiltersDialog.cs",
+      "sha256": "9e63e7a0c169c91511d7bfde192a94819f449c166c241ed4aac824c58d44d505"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/DoctorScreen.cs",
+      "sha256": "d46f4d8d27188cc7beed8b1786c714398aded4e4ec24653af7b4e3942ea917cc"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/HelpOverlay.cs",
+      "sha256": "bec801b93579ecee244cd941c3210d75db439c0d8a0b76f0aacde2c5f1834bd0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallAgentCatalog.cs",
+      "sha256": "e24db87892bd4888dbe7c50c85af12cd2e2bc01d23fedbbdbef3d71e21f0db40"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallConfirmModal.cs",
+      "sha256": "3fe544c8456379d70314d5e89c18c019cdd796faef2eefff44057687fd39bb03"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstallScreen.cs",
+      "sha256": "75d95636cafd65f0b2b91e0db765f399ffad5d184e6f916b3c2edb8dbfa4d209"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstalledInventoryFormatter.cs",
+      "sha256": "1a0c2e694529f6df69dc8ed4a8f267df6e871da75cd35a993e6273e9aa344bb0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/InstalledScreen.cs",
+      "sha256": "14b5ba2e041afad6c2125c7cc33c3e862577487aba7f2c2a1376b6f61a7e3fff"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/LatestRequestGate.cs",
+      "sha256": "24c95299a0709af1751b044b28808d00969ef5914109a448b756063729cb39bb"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/MarkdownTableFormatter.cs",
+      "sha256": "967d0eca60eae4f8bfac7971bef883532921a191198c64e2c9cdd0acc7048520"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/ModalOperationTracker.cs",
+      "sha256": "76a0606f3643619ca1ea3bce3a246e52328f277a084f7712186f428385c9886b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/OperationImpactFormatter.cs",
+      "sha256": "59573a7b3946be8dfe6cb010e7f1ff274485355e56d102f9524839e3a59fd15e"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemovalReportState.cs",
+      "sha256": "5a521aeccb8143801ab57e3d63ef1d81fcbedef092d7e37ac283bd1d4d141db5"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveConfirmModal.cs",
+      "sha256": "55990b62d9e0a2c31a82f1a80af570726eefed08c8ea2cf3cf954b20df9b6c3a"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveScreen.cs",
+      "sha256": "d47c9526a0786fa238cbc7187bb9b1b3dd3707b74a1c68f67c30566f3c2d24f4"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RemoveWizardContent.cs",
+      "sha256": "63ce6093e5700961363a1aa4d34122abf359a7d8ba253b076b97de12b2129caf"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/RepoSkillPickerModal.cs",
+      "sha256": "48dad8acb244697b4ec64db7fad165e912af98ab80dbddaccdf98320cffe6029"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SearchAgentMetadataCache.cs",
+      "sha256": "43bd30641058798ad6d76a62af2bad653b42a37a206d1f80090a5accd68f009f"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SearchAgentMetadataLoader.cs",
+      "sha256": "537ac98323ae788e33be4fa69eb2d2e963fbbff671ab3a6c4270b8efc9d3f4a8"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SharedAsyncOperation.cs",
+      "sha256": "f06cea296f8384e7d8e265867e7be6bfa6e563282cf4257bce5e2249cfe152a4"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillDetailPaneView.cs",
+      "sha256": "a1222aeff289a8ab9539f24164873299cb419106c40ff80904a0d6c5b7f1bd01"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillHealthFormatter.cs",
+      "sha256": "1b7ef6940ef14df5e691eb49746f97b436aeb7fb396e792c5c92df957ecfd193"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewApp.cs",
+      "sha256": "bb298d9f09247e7eb1282e31f5d68e39855ebaefe236155bcb2f3538aa65516d"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewStyling.cs",
+      "sha256": "def546e305d68e4928139e5a1e9b6758397442397ef925c47b63060d9c957b32"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs",
+      "sha256": "2b5c57255b97554709b6a1c32cf7c97cf77e7155b1225a847e948948e10ac49f"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/StatusStripView.cs",
+      "sha256": "c5c5bd3a2718f307e0123f5a8a649bb943128f766054e61744a3da7448526379"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TabBarView.cs",
+      "sha256": "29cee46c3272e905c47198cdcbcb960f935dbf8c26259f76b6206820770b790b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/ChangesTabView.cs",
+      "sha256": "7f581d3a8e98cbf1c748b6c650db4266ab32eac3efd486c0ead872a9f54f4de0"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/DiscoverTabView.cs",
+      "sha256": "192e52c2a0f3bd8ce99c7f6700bd8b3a37d1aa01f5359f89078f7c804ad1c2a5"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/DoctorTabView.cs",
+      "sha256": "968e4b263aa2c7d8664a9079bb26689bbd9771bc1685c1e6557521d8707fad13"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs",
+      "sha256": "6d1328220c1ce86f550886c96f46c686ac5278edcdf5b8674715950cb22b0202"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/UpdatesTabView.Review.cs",
+      "sha256": "03ad3696a098524e0efa30fd0da81311c18eb234b24c40f2a379f8f89a9a3a63"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Tabs/UpdatesTabView.cs",
+      "sha256": "67c04eebeb69615f3befabe32e7334de43c85d19ecbb48164a8d9d21ef3b36e7"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TerminalEscapeSanitizer.cs",
+      "sha256": "b8b1fed2fddc54da594cd168e84f26dd755593739640d84a1314792cd55f8d9b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TerminalSizeGuardView.cs",
+      "sha256": "e02f8a0e1a210a6733f2ed673410cb18adf55d10ab431f09d967b2a95e207368"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/Theming/WingetTuiTheme.cs",
+      "sha256": "40a3fc3ed5ec28b5cd3e68f39b4d59b89ac78ac9fa4efd0745c420554f81cbc7"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TuiHelpers.cs",
+      "sha256": "4b45bd4080f76697f9cf8961f9588273a62ff2f9cedc1fafca2c3464fdbe332b"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/TuiServices.cs",
+      "sha256": "eb52bafe792137ae503eebb43a207287113f49e6222c114b9ea270a8adfb17d2"
+    },
+    {
+      "path": "src/SkillView.Core/Ui/UpdateScreen.cs",
+      "sha256": "86a75fc0b5e916b3e633a5a255e94e32582386679df63e5146bf2082f6578517"
+    },
+    {
+      "path": "src/SkillView.Core/packages.lock.json",
+      "sha256": "2ddfd09ec75d4c69a5c1b5f057487158aac9a309e92af79479add8eb9b6488ec"
+    },
+    {
+      "path": "src/SkillView.GhExtension/Program.cs",
+      "sha256": "bf4072e2581a4368e765a832e42d23ebb1e5cac144ce333e6c7513a4bca6a367"
+    },
+    {
+      "path": "src/SkillView.GhExtension/SkillView.GhExtension.csproj",
+      "sha256": "732996bdb14a5bf5fa0d708d728db7bf00ebee9e728834a23407bfc02cf3ae40"
+    },
+    {
+      "path": "src/SkillView.GhExtension/packages.lock.json",
+      "sha256": "50e7a0e853a38ba938c9a354918a1bc8e01f9b2de067c8a8cba3474cbd04ce44"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+      "sha256": "5d86ae58a5afb4879aafd59e5fd89ae961fd7244c24ffc521d98e3ca3d1990c5"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/Ui/SkillViewAppIntegrationTests.cs",
+      "sha256": "edc2842f58d8071726f0f0894721d834804d227b588bc4a18b659a36c3b0ac7e"
+    },
+    {
+      "path": "tests/SkillView.IntegrationTests/packages.lock.json",
+      "sha256": "016e1b0776dd5dd827218c57a9a2383d645e611a91974794999e53e31ac84b4c"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/Program.cs",
+      "sha256": "d0816093f3306e3ab912ced94b32488e999f841ff8510e24113c2c29ea6cfb83"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+      "sha256": "64698a5b85b31ad017831247acea0767817cb2ea2c3dec5d5303f30c1536bd66"
+    },
+    {
+      "path": "tests/SkillView.MaintenanceProof/packages.lock.json",
+      "sha256": "6368bebacec8f7106c0875c0e582007a0e3128ce2dba4e79b62383a750860f4d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/ArgParserTests.cs",
+      "sha256": "51dfa1967197e39363526e8f4b039bd98598b64dc4b8638ff4eb51931288ab4a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/ExitCodesTests.cs",
+      "sha256": "0fa5afc1cc2edc21f289d4e4d3ef4bd7cf9b69a4b46bd28cdf86cafda9b80faf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Bootstrapping/RootCancellationTests.cs",
+      "sha256": "58b910ec4c7274eadc6cf62c02ae920f6c94d3bed1a70966dc7ef5514511128d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Build/PackageReferenceTests.cs",
+      "sha256": "4fbb46f609282602ec813d9baec05751f84952bcc780b3996b06c493946efdb9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliConsoleCapture.cs",
+      "sha256": "ff24c659dda5e6b92753b9f5b9b29205d108887f9296dfb69b99b5d5cc4b2bf4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs",
+      "sha256": "f67f316474c8f68b8ced85bccbec4d36613af8e4ac8c4691b87c9da76f43e6e6"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs",
+      "sha256": "40c5a5a62a8a45b0ac2c2560066cdaaefe358bb150bde629e818346d825ffa2a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherInstallTests.cs",
+      "sha256": "14203e588c6b312fe743d3c35470dd411ce00971e5512b0bbbd00818fa0ff03b"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherJsonSnapshotTests.cs",
+      "sha256": "5ac8a38a37d335696d36a54ab6b5f5c55479e370f6fed29987333a6c98d28e23"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherParserTests.cs",
+      "sha256": "4b3998b8f236aaee6c12c4e7a79257420556fcb7547491c2b26a9e8d00a02fef"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/CliDispatcherUpdateTests.cs",
+      "sha256": "88c2129f4d90086d9c95f6ddf2cc408bb2dbf59054082fbcc23d997323180168"
+    },
+    {
+      "path": "tests/SkillView.Tests/Cli/Utf8TextWriterStreamTests.cs",
+      "sha256": "d213900cb6e538a538d6fce5209d15fe12e1b3c52131dc97fd28b26484232dff"
+    },
+    {
+      "path": "tests/SkillView.Tests/Environment/EnvironmentProbeTests.cs",
+      "sha256": "184a8edf71d56272012cc585753187d003521f22f56cd743b6637119ab4b6e33"
+    },
+    {
+      "path": "tests/SkillView.Tests/Environment/SemVerTests.cs",
+      "sha256": "27076c9f91ddc4d07af0d6d86a013e0cc405f6e7b4051ecde65f6011f86de146"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhAuthStatusParserTests.cs",
+      "sha256": "cca0d540d90a75a9dac916ba6718bd23a42668c4bf3372fc536dfaa6b5dea23a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhBinaryLocatorTests.cs",
+      "sha256": "17729a27d399f8afdb879de2943b074b31562844965e05bb9d536485c773ad72"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhCliContractTests.cs",
+      "sha256": "45d6ba828af13c8a027317d8b6275d940903eca05ca81db32c9860ce0a8bc0e1"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhJsonContextTests.cs",
+      "sha256": "ca6a23afef2080c0730dab288b9ea413513ce1a566cdb0bfa33167c0678dac24"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhMetadataContractTests.cs",
+      "sha256": "7556cc1ca007ee5bbb91ab888bea906059968f31c4c155faa7c52f48ad1fc2d7"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillInstallServiceTests.cs",
+      "sha256": "47dee60f487eb91a80427e10d43d07ed1284636b1ba4381321ef06c1d3ee1c70"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillListAdapterTests.cs",
+      "sha256": "bd1b9e909c82235d728fb6261982c954c224a414a47132c590c759c112511f00"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillListCacheTests.cs",
+      "sha256": "7a2d30995fc934c9c7ac9ab9fd43d83b40c580974b27526889d6056fd27e9982"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillPreviewServiceTests.cs",
+      "sha256": "b2e85310b6b97431bb87a14f1877b178779a16aed1594e9cef0889359693465c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillSearchServiceTests.cs",
+      "sha256": "0f498c221afafb1dc3cf11ec864fe7338635fcbd2d0a1de530fbc2b80b76baeb"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhSkillUpdateServiceTests.cs",
+      "sha256": "1da1a86dbfc327ccac68ad21131ec46eda5708f1f38ffcb7961ea9e7dd974558"
+    },
+    {
+      "path": "tests/SkillView.Tests/Gh/GhUpdateOutcomeContractTests.cs",
+      "sha256": "c4a7befc3cf99787e48dba1982784c3a3f7bcae8e7fd1e453adf97ac53f3e31a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/CleanupClassifierTests.cs",
+      "sha256": "9f8a30ed117d65b877852e0f0a4398717fb593ff68e5271db1803a7122e32480"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/DiscoveryTests.cs",
+      "sha256": "4028ac3830cdcd6655a18d87c3bdab590f3f358d3a4a5cdb68b5eab449c417fe"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/FrontMatterParserTests.cs",
+      "sha256": "36b64a6f68282bdd8cb338f72453ebb1095c3f596fad38e944c30c2c7a7acf39"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/IgnoreMarkerTests.cs",
+      "sha256": "9decbb7bc65a0845b90b8bebacd58e306e20ca70a6c3e4d4eed8b3379e083d08"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/InventoryFilterTests.cs",
+      "sha256": "ec63e2ba027fceb3f5533d458414225aa6f05f98bad6d172e55fb59bdfb2e64d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/InventoryProviderOutcomeTests.cs",
+      "sha256": "72fa21188642abfd16d68bec70910ac5dfa705669d95588f34f02f4e2237b542"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/LocalInventoryServiceMergeTests.cs",
+      "sha256": "ad60141ec1a780fe33bcb8e8f5cec90a5593a64185b9ab004059ebdf21131d9a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/LocalSkillScannerTests.cs",
+      "sha256": "2009b08647e10fa84df2cdbe7628f394854304b8e739cb85fdb93948cb9b5514"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/MaintenanceInventoryRegressionTests.cs",
+      "sha256": "66a2084c7b86179a10e26306f2ba6d6ba53914e2d62ce927b35b38dec5d67151"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/ManagedDiscoveryInventoryTests.cs",
+      "sha256": "b5c9b426da7f8423e6b4dac5666344dfd6eea224c8a4b12c2714e2ead9f5b3f9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/MetadataAcceptanceTests.cs",
+      "sha256": "c13818b9ddf4b7dbca11b1d287d99c4f26b76cfb811104d76c0353268bc097b9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/PathIdentityTests.cs",
+      "sha256": "a405c2fe73f568bdea9ac41f37dcf9dca783c9b197a8186f4199443e298f7b50"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveServiceTests.cs",
+      "sha256": "344b814e45acff5cfc5b76767398fa558822c8b3e5faa7ade808740b95b3cd6a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveTargetResolverTests.cs",
+      "sha256": "ce9cca53a89baf9b6bd752ff6674067296eb86337e1046143a41ab065c625866"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/RemoveValidatorTests.cs",
+      "sha256": "706b5ee079335a4dc49a2c63b798f4c6f00a47979f2463afdc0926b8cdc0b73d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/ScanRootResolverTests.cs",
+      "sha256": "e5f44dd61c2b2271cad95918139f38919e868710a63f12cabe82b621bad6278b"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/SkillIdentityTests.cs",
+      "sha256": "44f170f556ce0a36d208455363c707eb519e985e130244be858d1a0a8a59c824"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/SkillLockFileReaderTests.cs",
+      "sha256": "7447dfc6850358cb835dc521bff571e9b85277bf3ff8a90ee476b7c398457541"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/UnixSecureRemovalBackendTests.cs",
+      "sha256": "cdd3f255a17208b86eedc4392f5153a4d0814863e1115bd09084ce96b6b6cc75"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/WindowsSecureRemovalBackendTests.cs",
+      "sha256": "7d8466be06ce5cd64bfbe737b524beb06feac310bbaa489185e370eedb96386f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/FileLogSinkTests.cs",
+      "sha256": "02ebae99116353630116f0808fb907cefc4fc5b80551746d44c746b305c50a32"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/LogPathsTests.cs",
+      "sha256": "9380910f8fc8470214f80c1feb1fc2998a7a63571831d5749e984bf80524b682"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/LoggerTests.cs",
+      "sha256": "d68be410b2bd755f89d69be68e7a8d508b81eed598cea5751518b828767736b4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Logging/RedactorTests.cs",
+      "sha256": "d3f3931c5fbcc6ef857d01174bc4e21de36a3455dba700ad56d762b806f86c43"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhInstallOwnershipTests.cs",
+      "sha256": "8de7a14b9a03bf4782479915de41211bda268d509a0b3730063db14a91da0c25"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhPresentationComparisonTests.cs",
+      "sha256": "f7c3a62b10684e555233d3477ce796321fe89e0e10f5510410b2989b26ecc2cc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRecordedTreeStagerTests.cs",
+      "sha256": "53aa00a9119678291131bd3be3425ee1ee438b4f180507537b472aecfd16a60f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRegistryEditorTests.cs",
+      "sha256": "f5a4073c93898694bfcdb1ab123334a9abfe47047c9aa1b670db4bdf20e58fab"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRegistryWriteSessionTests.cs",
+      "sha256": "ea1c0ed1d92782475ed5bd957b8c39f2348e52441be7cac812782070fc3a5f70"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhRevisionResolverTests.cs",
+      "sha256": "a05afa423e9e0398b173d7d193994bdacea8a2b717784260ec24728a8429d51c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/GhSharedLockGuardTests.cs",
+      "sha256": "df8fd263d48052e9ad2834d5c820d5265804ac6764204c6052f42e61d019bfbf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/MaintenanceBackupHistoryTests.cs",
+      "sha256": "1e9c6978f0719a3aa34c02a7b06927232ebd25955eb7fe2dd099d83ea1587fc6"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/MaintenanceBackupStoreTests.cs",
+      "sha256": "90746e59e4c541f37afcbdf945a2a6b42de4adad38b35e5c1c5ad74c5a4d3c7c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeRegistryFileLeaseTests.cs",
+      "sha256": "26abe3b720ab663423f9658791db89ec08cb11a6c3b475391de54a36f79d4cef"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeStagingTests.cs",
+      "sha256": "c0c952be5ad1c664b5956d6b112dbee03e82580692cb43ef515f9cf1278fa6f0"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/NativeStateWriterLockTests.cs",
+      "sha256": "55e0a8dc6042e5cefa4e449b95a976bb80b395f108edf9428907f5ea363a8ce4"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/PayloadSnapshotTests.cs",
+      "sha256": "3064569ade05d206de13b7b7c33de76aee621ed5a022cff86077003aa9a7acb8"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/QuarantineStoreTests.cs",
+      "sha256": "d9fc1fe35f5f47b709dc2d245b8d264cc020a44a118c56fde93c4a1e28697887"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/RecordedTrackingWriterTests.cs",
+      "sha256": "3245056802210ba9ed9fc4eb6524e473b7ec54e8b9b6c7b11e78dc11b4b792d3"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/ReplacementPlanStoreTests.cs",
+      "sha256": "55237e5f77354aecf57596157d71447cc481fbec1f877d4950dc6cb9af29d027"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/ReplacementRevisionTests.cs",
+      "sha256": "a87b55b96d4c24775b2eada606340568a0f13110bd9af5fce3c5692d91c4f605"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SharedReplacementRevisionTests.Legacy.cs",
+      "sha256": "3fe0d77b4c99a6a8910d572a952f48b150775de39aab25f682be04b3d820f169"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SharedReplacementRevisionTests.cs",
+      "sha256": "e76b9916ca4ea88989ae7337b83d52814df3c12c0e963ee8b03517cada02670c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/SkillComparisonTests.cs",
+      "sha256": "9a87ecbd97d49b93dba1037e80f3decea03ed3bb4bee01f6515f87ddf19e0087"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/StagingEnvironmentTests.cs",
+      "sha256": "359681995d9bf51835e8d667effdd3f7d22b7c0fff3a855b7cd1c2711534a4dc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/UnixDescriptorInheritanceTests.cs",
+      "sha256": "c1b058f1175aa1664dd8c61d9de6ae2c9b9dda83c4347099aec07b5ee3d71b49"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/UpdateResultAccumulatorTests.cs",
+      "sha256": "70c0614813413b0194e09685c2d1148cb6592dcb1092b10f5849d3ea3c94a6c9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/WindowsPayloadSnapshotTests.cs",
+      "sha256": "b0316fdc00234f52f4fcf8bae20bf437c0664c756435b2ad23899cd1137f3b91"
+    },
+    {
+      "path": "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "sha256": "cfa52662c128359af6f73e6340fdf589316904ecad05855669fba2bedaf20ae5"
+    },
+    {
+      "path": "tests/SkillView.Tests/Subprocess/ProcessRunnerTests.cs",
+      "sha256": "8bc86b5323deb3569402231109f6e25228617d3161987160fa1faf85a8f22084"
+    },
+    {
+      "path": "tests/SkillView.Tests/Threading/CancellationSourceResourceTests.cs",
+      "sha256": "2397ab65278d10c96d304230bf3df29b8687b6dd9612904922d416f82fa5a674"
+    },
+    {
+      "path": "tests/SkillView.Tests/Threading/CancellationSourceTests.cs",
+      "sha256": "3d648db40aeb4ebd947f47d3d9fd90794d6908c53f434a3e63319ccabc314d13"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/AgentCheckboxGridTests.cs",
+      "sha256": "3c0b3d8d28886bfb852b6000c070f25009da2c629584fdde5c713a019f4afba0"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/BackgroundTaskTrackerTests.cs",
+      "sha256": "3ea0580f3d61405c1c1f8deba2669ab54c4f11982493537ed0a30efa0d6fa35e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/CancellationOperationSlotTests.cs",
+      "sha256": "e39f14e05eca82a8bea2ced669e86a0b2a3ebe04478304bd6767e4f5b90bdc5e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ChangesQueueBuilderTests.cs",
+      "sha256": "d003d98198dd34d5b04ddc2cef1d863a492c496e9da096a04ba4b9884a7bfe13"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ChangesTabViewTests.cs",
+      "sha256": "d0cfa56a76c41f91b99b0b9be049b9c835465f2f3524e15447a0d8dc60a0a983"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/CleanupScreenTests.cs",
+      "sha256": "eabe9c5a480aaa7feeefa3f7cb6f9f29d557a4477bd776b987b96ad1ad5bddd0"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ContextBarViewTests.cs",
+      "sha256": "36f0cfd78ac2199bc9945e8d6c678246abfc93b6f9c952db5f579cd295c08737"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DiscoverFiltersDialogTests.cs",
+      "sha256": "ee5006c5b47bc270467da5768d2e3f51450598e16272ae18baf728a2a3c21a5e"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DiscoverTabViewTests.cs",
+      "sha256": "2bc53adaf8c6365303f521b8b56ed3c36363edd65eba9001898e593140d35957"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/DoctorScreenTests.cs",
+      "sha256": "68d2d6cf34339376dec9b68fc7f3f9309e0842b0dae97dfb3020b0fb23d3d1a6"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/HelpOverlayTests.cs",
+      "sha256": "2838bbcb099893ec38eb16c2ead366c796d13fdf31b62a832de3a7a518340a42"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallAgentCatalogTests.cs",
+      "sha256": "c3adb06e12c29010c8a53e13da9e44e9163a58bb8c98845abe0cacdd85a1b373"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallConfirmModalTests.cs",
+      "sha256": "e1d57916af5454b2351e52076ddb82f7a6ffcd0e1f26b3cc1f395a68f27457fc"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstallScreenTests.cs",
+      "sha256": "4a7ba7a57abfe06c4253ac51769fe1e88333721219c8a79568efcba1bb1bae41"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledInventoryFormatterTests.cs",
+      "sha256": "c3f7ebf4b94afc8fa6af7efa17f967ac3c4734f309512bc9c72fbdcd2390e3fe"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledNavigationTests.cs",
+      "sha256": "b2ab5e22e530217c9af638ede1e3384c6fb014997e46311c68faf7309c3a8906"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledScreenTests.cs",
+      "sha256": "f821b3527146a0664164b34f1edaebb7e97e919f2ad1722268ee0888bec6b11c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/InstalledTabViewTests.cs",
+      "sha256": "de54282652b66c72d84313bd4c4fc03aa5cf713a6621dc7015ee3a79203093a9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/LatestRequestGateTests.cs",
+      "sha256": "d5d7ae54fb0d78a3611a4bef034ae229f9da6f733ca08dc2422e36755de17656"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs",
+      "sha256": "d879042f8bdb3c763671f3f471cb2f3a259e2363426777d3a95bf515837fadad"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/PtyStartupTests.cs",
+      "sha256": "7d5241b38188ede6d2ce886f1686192e6dfcd8ae7f94c0752e2688db1ed94172"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemovalReportStateTests.cs",
+      "sha256": "ea278c3d09685803ecdeb5679f8b24931a7f004a36966b6490eaba51f856bce1"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveConfirmModalTests.cs",
+      "sha256": "3850a3b10be006b3d8088f2918c031d10c5faccbbcf28a9759229473c3c7657f"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveScreenTests.cs",
+      "sha256": "fa21e0850728943507862a18f16c9b0e588faabbfb38f71474978fe48d1bf689"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/RemoveWizardContentTests.cs",
+      "sha256": "efd7c15710d30a6de96b2d8bceb5c9dd0de132bbc463ed79f6dac56844b37767"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ResourceStressTests.cs",
+      "sha256": "8fc3ca16e79e1b127bcc08a95e3f30f3c32926760986e09f55dec748a17ac6c9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/ReviewedUpdatesTabTests.cs",
+      "sha256": "3712676f4215aee21dedefcd3c36a279040bb26c9fb49311ce6a74f3c4acefbf"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchAgentMetadataCacheTests.cs",
+      "sha256": "23220554b4819d3d76de20af227342a8caee5fe41cf7ea4074b1a75865a0c13d"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchAgentMetadataLoaderTests.cs",
+      "sha256": "3d3378e3a98761db8887b15aefda132af9309714913343132c75dd9c1f7ed500"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SearchSortAndPinFilterTests.cs",
+      "sha256": "715f63212cc7443b593dd3bc5b357851dcbaa264d99aeb0aa06c422e431db811"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SharedAsyncOperationTests.cs",
+      "sha256": "1b5d371c67650e4b4d656b74a9bf6ac7f1717bbeb7a77ceb239a088337719d78"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillHealthFormatterTests.cs",
+      "sha256": "6f2aad798f029f7df66c9d85f3bbf9f202d0fa83fe232da96e93627434358ab9"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewAppTests.cs",
+      "sha256": "68dc39195ce1db5157c5ee95102d5f6dcbd6210a5f3d09269d7286939434535c"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewFailureTests.cs",
+      "sha256": "6bf19a1ae74bb03d8a6be0ab9466148c1813715896b7e161e68b9793bd760b29"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/SkillViewWorkflowCoordinatorTests.cs",
+      "sha256": "e81b9597dc55a8c68b5432a59ddacbb4ad4c7b5adf8e47daa28c4e46aeaf8454"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/StatusStripViewTests.cs",
+      "sha256": "2fe4cfcfe1dbd73a9d7cc3e8c3af79eecb6760f0173323a32a83d3e98111abeb"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TerminalEscapeSanitizerTests.cs",
+      "sha256": "ead9caf44ac873fecf7450be12829b5868387b9d46e9b58cac75d0c1a3ab5e4a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TerminalSizeGuardViewTests.cs",
+      "sha256": "f36dd99c9ac4de70d8365f6102d61871ebffe161f84549f2d03ba48a3af8ff84"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TestCollections.cs",
+      "sha256": "608b246fb25c2c37496d461fbede974f26d6b35b6c7629d1e8fb4478963b7e63"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/TuiHelpersTests.cs",
+      "sha256": "96fe7b942c10b7f87de9e0b0b575d4913b038ee9386780fba2fc86733108971a"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/UpdateScreenTests.cs",
+      "sha256": "fc4fd6536a52cefa5d9506008bf72ea11442592eb2b1290477b00025673fa3a2"
+    },
+    {
+      "path": "tests/SkillView.Tests/Ui/UpdatesTabViewTests.cs",
+      "sha256": "936be1dfa358d506db031cd29272506ab186d4105cd9b98960bd20fe55430f53"
+    },
+    {
+      "path": "tests/SkillView.Tests/packages.lock.json",
+      "sha256": "016e1b0776dd5dd827218c57a9a2383d645e611a91974794999e53e31ac84b4c"
+    }
+  ],
+  "sourceFingerprint": "d3a9ebf9e1079543c9983034a7bab626da748fac6d002806d80e49762f910095",
+  "originalAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
+  "criterionMatrix": [
+    {
+      "criterion": "four same-name physical installations retain independent source/revision/owner/exposure evidence",
+      "evidence": [
+        "SkillIdentityTests.FourSameNameCopiesRetainIndependentSourceRevisionOwnersAndAddress",
+        "prove-installation-identities.py"
+      ]
+    },
+    {
+      "criterion": "every update/delete selects physical addresses and preserves all known structured consumers through failure/cancellation",
+      "evidence": [
+        "SkillIdentityTests.UpdatePinnedAndRefusedOutcomesKeepEveryStructuredExposure",
+        "SkillIdentityTests.CanceledRemoveReturnsFrozenSubjectWithoutOpeningReplacement",
+        "SkillIdentityTests.PartialCancellationPreservesNativeTotalsAndStructuredSubject",
+        "SkillIdentityTests.CleanupCancellationReturnsCompletedInterruptedAndNotStartedSubjects",
+        "SkillIdentityTests.SharedLinkImpactIncludesEveryContextOfOneEntryAndRetainsOtherLinks"
+      ]
+    },
+    {
+      "criterion": "logical distributor and delivery identity separate labels, source, version and context",
+      "evidence": [
+        "SkillIdentityTests.SamePluginLabelFromDifferentRepositoriesDoesNotJoinPackageRemoval",
+        "SkillIdentityTests.VersionsShareLogicalDistributorButNotDeliveryAndDifferentMarketsStayDistinct",
+        "SkillIdentityTests.SameDistributorVersionRetainsIndependentUnregisteredContexts"
+      ]
+    },
+    {
+      "criterion": "historical journal hashes survive output-only projection changes",
+      "evidence": [
+        "actual old-native schema1/schema2 apply killed at original-retained, new-native inspect/recover/undo"
+      ]
+    }
+  ],
+  "verification": {
+    "historicalFailures": [
+      {
+        "head": "22d2dea8adeb5bc6e0b3c476983aaa631c338198",
+        "kind": "Windows seeded arrow integration timeout; new product-code head passed unchanged test",
+        "logSha256": "4aa2ae8268bb774f3ea78827271d85ef9ba401aa4071c63a06738017c1aaf80c"
+      },
+      {
+        "head": "0cffb7306b317223b5fda167b476eef866d3b5bf",
+        "kind": "native proof incorrectly asked standalone quarantine to accept tracked local fork; fixed fixture only in final head",
+        "jobs": [
+          116638879088,
+          116638879095
+        ]
+      },
+      {
+        "head": "7b18827454d3f4ebd56a6c8ad3065fba4d5a1e1c",
+        "kind": "direct already-current update-plan output omitted retained payload; real-gh native red regression",
+        "logSha256": "02843a628b4dd2e6af2b5b21482f81893b9cd8cf42e81e8760c0f68463d9c182"
+      },
+      {
+        "head": "46eea4b5821261bc96f7b10261b6b2491a6e7f13",
+        "kind": "All native lanes and current gh contract fixture setup hit GitHub installation API quota; all three platform suites passed1502",
+        "ciRun": 38802860943,
+        "contractsRun": 38802878626
+      },
+      {
+        "head": "46eea4b5821261bc96f7b10261b6b2491a6e7f13",
+        "kind": "Red retention8 regressions plus actual undo requested-operation regression reproduced; corrected in52829e8"
+      },
+      {
+        "head": "52829e8fec35f67e359cc7481722bf1743b7150c",
+        "kind": "Local full suite1512/1512 and Copilot no findings; final acceptance review then reproduced three CLI unexpected-fault result regressions",
+        "redLogSha256": "27fb8f58e6e03448cacea5e250bb66f0224d4c42e235de939af44836eae1e74f"
+      },
+      {
+        "head": "52829e8fec35f67e359cc7481722bf1743b7150c",
+        "kind": "CI native GitHub installation rate-limit errors; contract authentication check also refused the installation token",
+        "ciRun": 38805659919,
+        "contractRun": 38805681611
+      }
+    ],
+    "schema1Driver": {
+      "sha256": "94d33ede292a35ecc09774680d38e5f6e4edb6f85b9c00cb57304d187ee50f11",
+      "source": "\"\"\"Supplementary actual pre-change-binary saved-plan restart proof, disposable only.\"\"\"\nimport argparse, hashlib, json, os, pathlib, shutil, stat, subprocess, tempfile, time\np=argparse.ArgumentParser();p.add_argument('--legacy',type=pathlib.Path,required=True);p.add_argument('--app',type=pathlib.Path,required=True);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--managed-discovery-fixtures',action='store_true');a=p.parse_args()\nlegacy=a.legacy.resolve();app=a.app.resolve();gh=pathlib.Path(shutil.which('gh')).resolve()\nauth=os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN') or subprocess.check_output([str(gh),'auth','token'],text=True).strip()\ndef sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()\ndef snapshot(root):\n rows=[]\n for path in [root,*sorted(root.rglob('*'))]:\n  s=path.lstat();kind='link' if path.is_symlink() else 'directory' if path.is_dir() else 'file'\n  data=os.readlink(path).encode() if kind=='link' else path.read_bytes() if kind=='file' else b''\n  rows.append(dict(path=str(path.relative_to(root)),kind=kind,device=s.st_dev,inode=s.st_ino,mode=stat.S_IMODE(s.st_mode),sha256=hashlib.sha256(data).hexdigest()))\n return rows\nwith tempfile.TemporaryDirectory(prefix='skillview-legacy-owner-proof-') as temporary:\n root=pathlib.Path(temporary).resolve();home=root/'home';home.mkdir()\n env={k:v for k,v in os.environ.items() if k not in ('CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR', 'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR') if not k.startswith(('GIT_','SKILLVIEW_'))}\n env.update(HOME=str(home),USERPROFILE=str(home),GH_TOKEN=auth,GH_EXTENSION='1',GH_PATH=str(gh),GH_CONFIG_DIR=str(root/'gh-config'),SKILLVIEW_STATE_HOME=str(root/'state'),XDG_CONFIG_HOME=str(root/'config'),XDG_STATE_HOME=str(root/'xdg-state'),XDG_DATA_HOME=str(root/'data'),XDG_CACHE_HOME=str(root/'cache'),APPDATA=str(root/'appdata'),LOCALAPPDATA=str(root/'localappdata'),CLAUDE_CONFIG_DIR=str(home/'.claude'),PI_CODING_AGENT_DIR=str(home/'.pi/agent'),GIT_CONFIG_COUNT='0',GH_TELEMETRY='false',GH_NO_UPDATE_NOTIFIER='1',GH_NO_EXTENSION_UPDATE_NOTIFIER='1')\n install=subprocess.run([str(gh),'skill','install','--agent','universal','--scope','user','--','cli/cli','skills/gh-skill'],cwd=root,env=env,capture_output=True,text=True,timeout=180);assert install.returncode==0,install.stderr\n payload=home/'.agents/skills/gh-skill';registry=home/'.agents/.skill-lock.json'\n registry_object=json.loads(registry.read_bytes());selector='gh-skill';registry_object['skills'][selector]['updatedAt']='2020-01-01T00:00:00Z';registry.write_text(json.dumps(registry_object,indent=2)+'\\n')\n (payload/'schema1-local-extra.txt').write_bytes(b'local extra retained across old schema1 recovery\\n')\n original=snapshot(payload);owner=registry.read_bytes()\n def args(host,command,*arguments):return [str(host),command,*map(str,arguments),'--allow-hidden-dirs','--json']\n def run(host,command,*arguments):\n  r=subprocess.run(args(host,command,*arguments),cwd=root,env=env,capture_output=True,text=True,timeout=180)\n  assert r.returncode==0,(r.returncode,r.stdout,r.stderr)\n  return json.loads(r.stdout)\n plan=run(legacy,'restore-plan','--path',payload)['operation'];assert plan.get('revision') is None,plan\n plan_sha=sha(pathlib.Path(plan['planPath']))\n if a.managed_discovery_fixtures:\n  builtin=home/'.codex/skills/.system/builtin-fixture';builtin.mkdir(parents=True);(builtin/'SKILL.md').write_bytes(b'---\\nname: builtin-fixture\\ndescription: Compatibility fixture\\n---\\nBody\\n')\n  plugin=home/'.codex/plugins/cache/fixture-market/fixture-plugin/1.0.0';meta=plugin/'.codex-plugin';meta.mkdir(parents=True);(meta/'plugin.json').write_text('{\"name\":\"fixture-plugin\"}')\n  packaged=plugin/'skills/packaged-fixture';packaged.mkdir(parents=True);(packaged/'SKILL.md').write_bytes(b'---\\nname: packaged-fixture\\ndescription: Compatibility fixture\\n---\\nBody\\n')\n  observed=run(app,'list');managed=[item for item in observed['skills'] if item['name'] in ('builtin-fixture','packaged-fixture')]\n  assert len(managed)==2 and all(any(owner['readOnly'] for owner in item['ownerRecords']) for item in managed),observed\n inspected=run(app,'restore-inspect','--id',plan['id'])['operation'];assert inspected['status']=='ready',inspected\n worker=subprocess.Popen(args(legacy,'restore-apply','--id',plan['id'],'--yes','--disposition','retain-original','--expect',plan['planFingerprint']),cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)\n try:\n  end=time.monotonic()+90;killed=False\n  while time.monotonic()<end and worker.poll() is None:\n   if pathlib.Path(plan['retainedPath']).exists():worker.kill();killed=True;break\n   time.sleep(.002)\n  out,err=worker.communicate(timeout=60);assert killed and worker.returncode!=0,(out,err)\n finally:\n  if worker.poll() is None:worker.kill();worker.communicate(timeout=60)\n interrupted=run(app,'restore-inspect','--id',plan['id'])['operation'];assert interrupted['status'] in ('original-retained','installed'),interrupted\n recovered=run(app,'restore-recover','--id',plan['id'],'--yes','--expect',interrupted['reviewFingerprint'])['operation'];assert recovered['succeeded'] and recovered['status']=='installed',recovered\n reviewed=run(app,'restore-inspect','--id',plan['id'])['operation'];undone=run(app,'restore-undo','--id',plan['id'],'--yes','--expect',reviewed['reviewFingerprint'])['operation'];assert undone['succeeded'] and undone['status']=='restored',undone\n assert snapshot(payload)==original and registry.read_bytes()==owner\n result=dict(newManagedRootsObservedAfterSavingPlan=a.managed_discovery_fixtures,legacyHostSha256=sha(legacy),nativeHostSha256=sha(app),gh=subprocess.check_output([str(gh),'--version'],text=True).splitlines()[0],savedPlanSha256=plan_sha,schemaVersion=1,recordedRestoration=True,persistedLegacyPlanInspected=True,actualLegacyApplyKilled=True,interruptedStatus=interrupted['status'],forwardRecoveryVerified=True,undoPreservedOriginalNativeObjectsBytesModes=True,exactOriginalRegistryBytesRestored=True)\n a.output.write_text(json.dumps(result,indent=2)+'\\n');print(json.dumps(result,indent=2))\n"
+    },
+    "localFullSuite": {
+      "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+      "passed": 1515,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "5m18s",
+      "logSha256": "3452b7d71884be069bff7091b3cbca96f934dd30750bd30d3df164876e703e37"
+    },
+    "localNativeProofs": [
+      {
+        "host": "app",
+        "kind": "identities",
+        "path": "identities-retention-native-app-identities-proof.json",
+        "sha256": "e07d1f1b584d25ec4bb2e510f953b76aebedf0be75d173f3e83b2003caf96572",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "gh version 2.97.0 (2026-07-31)",
+            "sameNameCopiesAndContextsPreserved": true,
+            "packageVersionsShareLogicalIdentity": true,
+            "addressStableAcrossNativeReplacement": true,
+            "frozenDeletedSubjectRetained": true,
+            "nativeObjectGenerationIndependentlyVerified": true,
+            "managedRefusalRetainsSubject": true,
+            "exactSelectorsRequired": true,
+            "quarantinePreviewRetainsOriginal": true,
+            "brokenUnlinkDoesNotInventRetainedPayload": true,
+            "brokenBackupAndUpdatesDoNotInventRetainedPayload": true,
+            "resolvedCommitAndPayloadHashNotInvented": true,
+            "networkProxiesBlocked": true,
+            "fixtures": [
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 2
+              },
+              {
+                "command": "quarantine",
+                "exitCode": 0
+              },
+              {
+                "command": "backup",
+                "exitCode": 10
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "cleanup",
+                "exitCode": 0
+              },
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              }
+            ]
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "gh version 2.102.0 (2026-09-30)",
+            "sameNameCopiesAndContextsPreserved": true,
+            "packageVersionsShareLogicalIdentity": true,
+            "addressStableAcrossNativeReplacement": true,
+            "frozenDeletedSubjectRetained": true,
+            "nativeObjectGenerationIndependentlyVerified": true,
+            "managedRefusalRetainsSubject": true,
+            "exactSelectorsRequired": true,
+            "quarantinePreviewRetainsOriginal": true,
+            "brokenUnlinkDoesNotInventRetainedPayload": true,
+            "brokenBackupAndUpdatesDoNotInventRetainedPayload": true,
+            "resolvedCommitAndPayloadHashNotInvented": true,
+            "networkProxiesBlocked": true,
+            "fixtures": [
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 2
+              },
+              {
+                "command": "quarantine",
+                "exitCode": 0
+              },
+              {
+                "command": "backup",
+                "exitCode": 10
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "cleanup",
+                "exitCode": 0
+              },
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "host": "app",
+        "kind": "quarantine",
+        "path": "identities-retention-native-app-quarantine-proof.json",
+        "sha256": "7953f3f09c6dee4295c0ed29772bd085a8ccf225d7b53bd50d031e1bcf49203e",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+            "previewReadOnly": true,
+            "staleReviewRefusedBeforeState": true,
+            "originalDirectoryIdentityRetained": true,
+            "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+            "undoPreviewReadOnly": true,
+            "undoRestoredOriginalDirectory": true,
+            "repeatedUndoVerifiedNoOp": true,
+            "occupiedRestorePathPreserved": true,
+            "undoFailurePreservesRequestedOperation": true,
+            "completeJournalHistory": true,
+            "securityIsolationClaimed": false,
+            "archiveExtractionUsed": false,
+            "subtreeQuarantineConsumerRefused": true,
+            "danglingUndoDestinationRefused": true,
+            "subtreeUndoConsumerRefused": true,
+            "outwardNestedRootRefused": true,
+            "emptyNestedRootRefused": true,
+            "outwardTrailingRootRefused": true
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "/opt/homebrew/bin/gh",
+            "previewReadOnly": true,
+            "staleReviewRefusedBeforeState": true,
+            "originalDirectoryIdentityRetained": true,
+            "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+            "undoPreviewReadOnly": true,
+            "undoRestoredOriginalDirectory": true,
+            "repeatedUndoVerifiedNoOp": true,
+            "occupiedRestorePathPreserved": true,
+            "undoFailurePreservesRequestedOperation": true,
+            "completeJournalHistory": true,
+            "securityIsolationClaimed": false,
+            "archiveExtractionUsed": false,
+            "subtreeQuarantineConsumerRefused": true,
+            "danglingUndoDestinationRefused": true,
+            "subtreeUndoConsumerRefused": true,
+            "outwardNestedRootRefused": true,
+            "emptyNestedRootRefused": true,
+            "outwardTrailingRootRefused": true
+          }
+        ]
+      },
+      {
+        "host": "app",
+        "kind": "update-outcomes",
+        "path": "identities-retention-native-app-update-outcomes-proof.json",
+        "sha256": "23e46a615ea57001821dbffa1a502ca1ecc9d4ae7f0c28f8b24ab027957ec131",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "gh version 2.97.0 (2026-07-31)",
+            "fixtures": [
+              {
+                "kind": "pinned",
+                "exactPayloadAndRegistryPreserved": true
+              },
+              {
+                "kind": "untracked",
+                "exactPayloadPreserved": true
+              },
+              {
+                "kind": "updated",
+                "changedPaths": [
+                  "SKILL.md"
+                ],
+                "retainedOriginalVerified": true
+              },
+              {
+                "kind": "no-op",
+                "repeatedChecks": 3,
+                "rawGhAlreadyCurrentVerified": true,
+                "nativeObjectsAndRegistryBytesPreserved": true,
+                "noPlanQuotaConsumed": true,
+                "directPlanRetainsOriginalPayload": true
+              },
+              {
+                "kind": "force-repair-same-tree",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "changedPaths": [
+                  "SKILL.md",
+                  "user-extra"
+                ],
+                "editedOriginalRetained": true,
+                "ownerBytesPreserved": true
+              },
+              {
+                "kind": "later-remote-failure",
+                "stdout": "HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning\r\nContent-Security-Policy: default-src 'none'\r\nContent-Type: application/json; charset=utf-8\r\nDate: Thu, 15 Oct 2026 21:08:50 GMT\r\nReferrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\r\nServer: github.com\r\nStrict-Transport-Security: max-age=31536000; includeSubdomains; preload\r\nVary: Accept-Encoding, Accept, X-Requested-With\r\nX-Accepted-Oauth-Scopes: repo\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: deny\r\nX-Github-Api-Version-Selected: 2022-11-28\r\nX-Github-Edge-Region: iad\r\nX-Github-Media-Type: github.v3; format=json\r\nX-Github-Request-Id: 9632:1B81A2:24A95A7:771B6F1:6AD140E2\r\nX-Oauth-Client-Id: 178c6fc778ccc68e1d6a\r\nX-Oauth-Scopes: admin:public_key, gist, read:org, repo, workflow\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4827\r\nX-Ratelimit-Reset: 1792101275\r\nX-Ratelimit-Resource: core\r\nX-Ratelimit-Used: 173\r\nX-Xss-Protection: 0\r\n\r\n{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/repos#get-a-repository\",\"status\":\"404\"}",
+                "stderr": "gh: Not Found (HTTP 404)\n",
+                "earlierMutationAndPlansPreserved": true,
+                "failedTargetObjectsPreserved": true
+              }
+            ]
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-app/skillview",
+            "nativeSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+            "gh": "gh version 2.102.0 (2026-09-30)",
+            "fixtures": [
+              {
+                "kind": "pinned",
+                "exactPayloadAndRegistryPreserved": true
+              },
+              {
+                "kind": "untracked",
+                "exactPayloadPreserved": true
+              },
+              {
+                "kind": "updated",
+                "changedPaths": [
+                  "SKILL.md"
+                ],
+                "retainedOriginalVerified": true
+              },
+              {
+                "kind": "no-op",
+                "repeatedChecks": 3,
+                "rawGhAlreadyCurrentVerified": true,
+                "nativeObjectsAndRegistryBytesPreserved": true,
+                "noPlanQuotaConsumed": true,
+                "directPlanRetainsOriginalPayload": true
+              },
+              {
+                "kind": "force-repair-same-tree",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "changedPaths": [
+                  "SKILL.md",
+                  "user-extra"
+                ],
+                "editedOriginalRetained": true,
+                "ownerBytesPreserved": true
+              },
+              {
+                "kind": "later-remote-failure",
+                "stdout": "HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning\r\nContent-Security-Policy: default-src 'none'\r\nContent-Type: application/json; charset=utf-8\r\nDate: Thu, 15 Oct 2026 21:09:56 GMT\r\nReferrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\r\nServer: github.com\r\nStrict-Transport-Security: max-age=31536000; includeSubdomains; preload\r\nVary: Accept-Encoding, Accept, X-Requested-With\r\nX-Accepted-Oauth-Scopes: repo\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: deny\r\nX-Github-Api-Version-Selected: 2022-11-28\r\nX-Github-Edge-Region: iad\r\nX-Github-Media-Type: github.v3; format=json\r\nX-Github-Request-Id: CFB0:181E45:26DCC0F:7E23BD1:6AD14123\r\nX-Oauth-Client-Id: 178c6fc778ccc68e1d6a\r\nX-Oauth-Scopes: admin:public_key, gist, read:org, repo, workflow\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4736\r\nX-Ratelimit-Reset: 1792101275\r\nX-Ratelimit-Resource: core\r\nX-Ratelimit-Used: 264\r\nX-Xss-Protection: 0\r\n\r\n{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/repos#get-a-repository\",\"status\":\"404\"}",
+                "stderr": "gh: Not Found (HTTP 404)\n",
+                "earlierMutationAndPlansPreserved": true,
+                "failedTargetObjectsPreserved": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "host": "app",
+        "kind": "legacy-schema1",
+        "path": "identities-retention-native-app-legacy-schema1-proof.json",
+        "sha256": "2f177d10a64aef4121a7a6b775dd66499926914e0a165a2d2797a782afbb4083",
+        "results": {
+          "newManagedRootsObservedAfterSavingPlan": true,
+          "legacyHostSha256": "6d7b1b9b368f55875712b3d08a40d33aedbf9a7ca7cccf0a9c4d02773555822e",
+          "nativeHostSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "savedPlanSha256": "f1e1fc1f2787f33a4b4c6658de6c01d59b4b1fa1ebcf430586246006ba2ece8f",
+          "schemaVersion": 1,
+          "recordedRestoration": true,
+          "persistedLegacyPlanInspected": true,
+          "actualLegacyApplyKilled": true,
+          "interruptedStatus": "original-retained",
+          "forwardRecoveryVerified": true,
+          "undoPreservedOriginalNativeObjectsBytesModes": true,
+          "exactOriginalRegistryBytesRestored": true
+        }
+      },
+      {
+        "host": "app",
+        "kind": "legacy-schema2",
+        "path": "identities-retention-native-app-legacy-schema2-proof.json",
+        "sha256": "0d7e7dc16a514312aec91ad6b97b74c2ad5e9b2ce14d3e9ab4d3728f3e32cee2",
+        "results": {
+          "newManagedRootsObservedAfterSavingPlan": true,
+          "legacyHostSha256": "6d7b1b9b368f55875712b3d08a40d33aedbf9a7ca7cccf0a9c4d02773555822e",
+          "nativeHostSha256": "cc005bd375e1b750875b17ff293368b365ed964a7dbf0144598e51dd00a83249",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "savedPlanSha256": "f40d98086148ca46996325fc9430aae74c533dce6dce7ba9fc0a80a22c19e4ef",
+          "sameTreeOwnerTransition": true,
+          "persistedLegacyPlanInspected": true,
+          "actualLegacyApplyKilled": true,
+          "interruptedStatus": "original-retained",
+          "forwardRecoveryVerified": true,
+          "undoPreservedOriginalNativeObjectsBytesModes": true,
+          "exactOriginalRegistryBytesRestored": true
+        }
+      },
+      {
+        "host": "extension",
+        "kind": "identities",
+        "path": "identities-retention-native-extension-identities-proof.json",
+        "sha256": "b21955f4e24713f7bd0f8b56f0bccb37512f337b782fdb2c6246f20f7e7cd3de",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "gh version 2.97.0 (2026-07-31)",
+            "sameNameCopiesAndContextsPreserved": true,
+            "packageVersionsShareLogicalIdentity": true,
+            "addressStableAcrossNativeReplacement": true,
+            "frozenDeletedSubjectRetained": true,
+            "nativeObjectGenerationIndependentlyVerified": true,
+            "managedRefusalRetainsSubject": true,
+            "exactSelectorsRequired": true,
+            "quarantinePreviewRetainsOriginal": true,
+            "brokenUnlinkDoesNotInventRetainedPayload": true,
+            "brokenBackupAndUpdatesDoNotInventRetainedPayload": true,
+            "resolvedCommitAndPayloadHashNotInvented": true,
+            "networkProxiesBlocked": true,
+            "fixtures": [
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 2
+              },
+              {
+                "command": "quarantine",
+                "exitCode": 0
+              },
+              {
+                "command": "backup",
+                "exitCode": 10
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "cleanup",
+                "exitCode": 0
+              },
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              }
+            ]
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "gh version 2.102.0 (2026-09-30)",
+            "sameNameCopiesAndContextsPreserved": true,
+            "packageVersionsShareLogicalIdentity": true,
+            "addressStableAcrossNativeReplacement": true,
+            "frozenDeletedSubjectRetained": true,
+            "nativeObjectGenerationIndependentlyVerified": true,
+            "managedRefusalRetainsSubject": true,
+            "exactSelectorsRequired": true,
+            "quarantinePreviewRetainsOriginal": true,
+            "brokenUnlinkDoesNotInventRetainedPayload": true,
+            "brokenBackupAndUpdatesDoNotInventRetainedPayload": true,
+            "resolvedCommitAndPayloadHashNotInvented": true,
+            "networkProxiesBlocked": true,
+            "fixtures": [
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 1
+              },
+              {
+                "command": "remove",
+                "exitCode": 2
+              },
+              {
+                "command": "quarantine",
+                "exitCode": 0
+              },
+              {
+                "command": "backup",
+                "exitCode": 10
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "update",
+                "exitCode": 0
+              },
+              {
+                "command": "cleanup",
+                "exitCode": 0
+              },
+              {
+                "command": "list",
+                "exitCode": 0
+              },
+              {
+                "command": "remove",
+                "exitCode": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "host": "extension",
+        "kind": "quarantine",
+        "path": "identities-retention-native-extension-quarantine-proof.json",
+        "sha256": "49769a9e565585fb411ef1f0d635b0a3c99ea072d7c3837783b247f7fa66f9c7",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+            "previewReadOnly": true,
+            "staleReviewRefusedBeforeState": true,
+            "originalDirectoryIdentityRetained": true,
+            "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+            "undoPreviewReadOnly": true,
+            "undoRestoredOriginalDirectory": true,
+            "repeatedUndoVerifiedNoOp": true,
+            "occupiedRestorePathPreserved": true,
+            "undoFailurePreservesRequestedOperation": true,
+            "completeJournalHistory": true,
+            "securityIsolationClaimed": false,
+            "archiveExtractionUsed": false,
+            "subtreeQuarantineConsumerRefused": true,
+            "danglingUndoDestinationRefused": true,
+            "subtreeUndoConsumerRefused": true,
+            "outwardNestedRootRefused": true,
+            "emptyNestedRootRefused": true,
+            "outwardTrailingRootRefused": true
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "/opt/homebrew/bin/gh",
+            "previewReadOnly": true,
+            "staleReviewRefusedBeforeState": true,
+            "originalDirectoryIdentityRetained": true,
+            "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+            "undoPreviewReadOnly": true,
+            "undoRestoredOriginalDirectory": true,
+            "repeatedUndoVerifiedNoOp": true,
+            "occupiedRestorePathPreserved": true,
+            "undoFailurePreservesRequestedOperation": true,
+            "completeJournalHistory": true,
+            "securityIsolationClaimed": false,
+            "archiveExtractionUsed": false,
+            "subtreeQuarantineConsumerRefused": true,
+            "danglingUndoDestinationRefused": true,
+            "subtreeUndoConsumerRefused": true,
+            "outwardNestedRootRefused": true,
+            "emptyNestedRootRefused": true,
+            "outwardTrailingRootRefused": true
+          }
+        ]
+      },
+      {
+        "host": "extension",
+        "kind": "update-outcomes",
+        "path": "identities-retention-native-extension-update-outcomes-proof.json",
+        "sha256": "14c19ee5fcf8f541c53e7fd4bbbbafaf331bd6781f3d941bb015e40b768165c2",
+        "results": [
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "gh version 2.97.0 (2026-07-31)",
+            "fixtures": [
+              {
+                "kind": "pinned",
+                "exactPayloadAndRegistryPreserved": true
+              },
+              {
+                "kind": "untracked",
+                "exactPayloadPreserved": true
+              },
+              {
+                "kind": "updated",
+                "changedPaths": [
+                  "SKILL.md"
+                ],
+                "retainedOriginalVerified": true
+              },
+              {
+                "kind": "no-op",
+                "repeatedChecks": 3,
+                "rawGhAlreadyCurrentVerified": true,
+                "nativeObjectsAndRegistryBytesPreserved": true,
+                "noPlanQuotaConsumed": true,
+                "directPlanRetainsOriginalPayload": true
+              },
+              {
+                "kind": "force-repair-same-tree",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "changedPaths": [
+                  "SKILL.md",
+                  "user-extra"
+                ],
+                "editedOriginalRetained": true,
+                "ownerBytesPreserved": true
+              },
+              {
+                "kind": "later-remote-failure",
+                "stdout": "HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning\r\nContent-Security-Policy: default-src 'none'\r\nContent-Type: application/json; charset=utf-8\r\nDate: Thu, 15 Oct 2026 21:12:27 GMT\r\nReferrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\r\nServer: github.com\r\nStrict-Transport-Security: max-age=31536000; includeSubdomains; preload\r\nVary: Accept-Encoding, Accept, X-Requested-With\r\nX-Accepted-Oauth-Scopes: repo\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: deny\r\nX-Github-Api-Version-Selected: 2022-11-28\r\nX-Github-Edge-Region: iad\r\nX-Github-Media-Type: github.v3; format=json\r\nX-Github-Request-Id: DF44:2C1A95:2D132A5:91B04AA:6AD141BA\r\nX-Oauth-Client-Id: 178c6fc778ccc68e1d6a\r\nX-Oauth-Scopes: admin:public_key, gist, read:org, repo, workflow\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4618\r\nX-Ratelimit-Reset: 1792101275\r\nX-Ratelimit-Resource: core\r\nX-Ratelimit-Used: 382\r\nX-Xss-Protection: 0\r\n\r\n{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/repos#get-a-repository\",\"status\":\"404\"}",
+                "stderr": "gh: Not Found (HTTP 404)\n",
+                "earlierMutationAndPlansPreserved": true,
+                "failedTargetObjectsPreserved": true
+              }
+            ]
+          },
+          {
+            "nativeHost": "/private/tmp/skillview-maintenance/update-plan/identities-retention-aot-ext/gh-skillview",
+            "nativeSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+            "gh": "gh version 2.102.0 (2026-09-30)",
+            "fixtures": [
+              {
+                "kind": "pinned",
+                "exactPayloadAndRegistryPreserved": true
+              },
+              {
+                "kind": "untracked",
+                "exactPayloadPreserved": true
+              },
+              {
+                "kind": "updated",
+                "changedPaths": [
+                  "SKILL.md"
+                ],
+                "retainedOriginalVerified": true
+              },
+              {
+                "kind": "no-op",
+                "repeatedChecks": 3,
+                "rawGhAlreadyCurrentVerified": true,
+                "nativeObjectsAndRegistryBytesPreserved": true,
+                "noPlanQuotaConsumed": true,
+                "directPlanRetainsOriginalPayload": true
+              },
+              {
+                "kind": "force-repair-same-tree",
+                "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+                "changedPaths": [
+                  "SKILL.md",
+                  "user-extra"
+                ],
+                "editedOriginalRetained": true,
+                "ownerBytesPreserved": true
+              },
+              {
+                "kind": "later-remote-failure",
+                "stdout": "HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning\r\nContent-Security-Policy: default-src 'none'\r\nContent-Type: application/json; charset=utf-8\r\nDate: Thu, 15 Oct 2026 21:13:31 GMT\r\nReferrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\r\nServer: github.com\r\nStrict-Transport-Security: max-age=31536000; includeSubdomains; preload\r\nVary: Accept-Encoding, Accept, X-Requested-With\r\nX-Accepted-Oauth-Scopes: repo\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: deny\r\nX-Github-Api-Version-Selected: 2022-11-28\r\nX-Github-Edge-Region: iad\r\nX-Github-Media-Type: github.v3; format=json\r\nX-Github-Request-Id: F108:DAEB4:2BC43D9:8DD0268:6AD141FA\r\nX-Oauth-Client-Id: 178c6fc778ccc68e1d6a\r\nX-Oauth-Scopes: admin:public_key, gist, read:org, repo, workflow\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4530\r\nX-Ratelimit-Reset: 1792101275\r\nX-Ratelimit-Resource: core\r\nX-Ratelimit-Used: 470\r\nX-Xss-Protection: 0\r\n\r\n{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/repos#get-a-repository\",\"status\":\"404\"}",
+                "stderr": "gh: Not Found (HTTP 404)\n",
+                "earlierMutationAndPlansPreserved": true,
+                "failedTargetObjectsPreserved": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "host": "extension",
+        "kind": "legacy-schema1",
+        "path": "identities-retention-native-extension-legacy-schema1-proof.json",
+        "sha256": "c6ac0544c9a297056880854482645f51c169e2001b64b2f2433de3cfabc86159",
+        "results": {
+          "newManagedRootsObservedAfterSavingPlan": true,
+          "legacyHostSha256": "6d7b1b9b368f55875712b3d08a40d33aedbf9a7ca7cccf0a9c4d02773555822e",
+          "nativeHostSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "savedPlanSha256": "4f86e13dbdf1e86eb30fd0c6ab3bad9b083959dc7b8a3b5f3acb6b5e8cc26112",
+          "schemaVersion": 1,
+          "recordedRestoration": true,
+          "persistedLegacyPlanInspected": true,
+          "actualLegacyApplyKilled": true,
+          "interruptedStatus": "original-retained",
+          "forwardRecoveryVerified": true,
+          "undoPreservedOriginalNativeObjectsBytesModes": true,
+          "exactOriginalRegistryBytesRestored": true
+        }
+      },
+      {
+        "host": "extension",
+        "kind": "legacy-schema2",
+        "path": "identities-retention-native-extension-legacy-schema2-proof.json",
+        "sha256": "c6b9a946d1015a64adf4fb9446e2ee70c6e4a341a38b838ba5a62e8482093aad",
+        "results": {
+          "newManagedRootsObservedAfterSavingPlan": true,
+          "legacyHostSha256": "6d7b1b9b368f55875712b3d08a40d33aedbf9a7ca7cccf0a9c4d02773555822e",
+          "nativeHostSha256": "0464a30b535dc5454bae8da074dd593c43b386a5f12fc57c15cf806e9517886a",
+          "gh": "gh version 2.102.0 (2026-09-30)",
+          "savedPlanSha256": "118fdd44596e43fb0472656885e3316696f83f2e0235bc907ff5032c42c01951",
+          "sameTreeOwnerTransition": true,
+          "persistedLegacyPlanInspected": true,
+          "actualLegacyApplyKilled": true,
+          "interruptedStatus": "original-retained",
+          "forwardRecoveryVerified": true,
+          "undoPreservedOriginalNativeObjectsBytesModes": true,
+          "exactOriginalRegistryBytesRestored": true
+        }
+      }
+    ],
+    "acceptedFinalReview": {
+      "id": "PRR_kwDOSKLicM8AAAABSjTRpQ",
+      "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+      "bodySha256": "127a7771b25543689dd92bc8acc639f2de41264f762a659f4b2deb8014a37cc4",
+      "fullBodyManuallyReviewed": true,
+      "noUnthreadedFindings": true
+    },
+    "artifactArchiveBindings": [
+      {
+        "artifactId": 12007616050,
+        "name": "native-maintenance-evidence-linux-x64",
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "archiveSha256": "96813ac3dedd7d0ccdca07824c2ef54a36eccd42a0edf6f3e17cceedcfef99a4",
+        "githubDigestVerified": true,
+        "downloadedProofBytesMatchArchive": true,
+        "proofFiles": 26
+      },
+      {
+        "artifactId": 12006978806,
+        "name": "native-maintenance-evidence-win-arm64",
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "archiveSha256": "414cb37fad7ce3f4b1085837ffa9266f738c391d1feefc4947b2ade599c1b303",
+        "githubDigestVerified": true,
+        "downloadedProofBytesMatchArchive": true,
+        "proofFiles": 24
+      },
+      {
+        "artifactId": 12006809225,
+        "name": "native-maintenance-evidence-win-x64",
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "archiveSha256": "50f9423746dca90381c3ae82374b56b4fd795739ce79beac4dc5335b1ad5c24c",
+        "githubDigestVerified": true,
+        "downloadedProofBytesMatchArchive": true,
+        "proofFiles": 24
+      },
+      {
+        "artifactId": 12006374835,
+        "name": "native-maintenance-evidence-osx-arm64",
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "archiveSha256": "9982dc5947a795c316983f753beee4821e020471060322a4d2e7d624699aa8f9",
+        "githubDigestVerified": true,
+        "downloadedProofBytesMatchArchive": true,
+        "proofFiles": 26
+      }
+    ],
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "fullFormatVerified": true,
+    "standaloneAotWarningsAsErrors": [
+      "IL2026",
+      "IL3050",
+      "IL3053"
+    ],
+    "remote": {
+      "prChecks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:04:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806580814/job/116668877566",
+          "name": "Analyze (csharp)",
+          "startedAt": "2026-10-15T21:01:06Z",
+          "status": "COMPLETED",
+          "workflowName": "CodeQL"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:01:44Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678257447",
+          "name": "workflow-lint",
+          "startedAt": "2026-10-15T21:01:07Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:01:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806580814/job/116668878311",
+          "name": "Analyze (actions)",
+          "startedAt": "2026-10-15T21:01:06Z",
+          "status": "COMPLETED",
+          "workflowName": "CodeQL"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:22:18Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678217407",
+          "name": "dependency-review",
+          "startedAt": "2026-10-15T21:22:11Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:01:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678220627",
+          "name": "site-check",
+          "startedAt": "2026-10-15T21:01:06Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:02:41Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678267559",
+          "name": "test (ubuntu-latest)",
+          "startedAt": "2026-10-15T21:01:06Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:04:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678220000",
+          "name": "test (macos-15)",
+          "startedAt": "2026-10-15T21:01:11Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:04:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678221105",
+          "name": "test (windows-latest)",
+          "startedAt": "2026-10-15T21:01:07Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:09:50Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678291861",
+          "name": "AOT publish smoke (linux-x64)",
+          "startedAt": "2026-10-15T21:01:06Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:12:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678219332",
+          "name": "AOT publish smoke (osx-arm64)",
+          "startedAt": "2026-10-15T21:01:11Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:20:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678291910",
+          "name": "AOT publish smoke (win-x64)",
+          "startedAt": "2026-10-15T21:01:07Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:21:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/actions/runs/38806581035/job/116678273165",
+          "name": "AOT publish smoke (win-arm64)",
+          "startedAt": "2026-10-15T21:01:07Z",
+          "status": "COMPLETED",
+          "workflowName": "ci"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-15T21:01:52Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/harder/gh-skillview/runs/116669228361",
+          "name": "CodeQL",
+          "startedAt": "2026-10-15T21:01:49Z",
+          "status": "COMPLETED",
+          "workflowName": ""
+        }
+      ],
+      "ciRun": 38806581035,
+      "codeqlRun": 38806580814,
+      "platformTests": {
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "jobs": [
+          {
+            "lane": "linux",
+            "job": 116668880588,
+            "conclusion": "success",
+            "passed": 1515,
+            "failed": 0,
+            "skipped": 0,
+            "logSha256": "7280390fab025c52f1d9e763c678992215c035856a2dcad38c99632b73faecb7"
+          },
+          {
+            "lane": "macos",
+            "job": 116668879895,
+            "conclusion": "success",
+            "passed": 1515,
+            "failed": 0,
+            "skipped": 0,
+            "logSha256": "f95a6f510bb8086157a6bb7a5a9c6cb67279278afcaf198783272e7005e062ba"
+          },
+          {
+            "lane": "windows",
+            "job": 116668880102,
+            "conclusion": "success",
+            "passed": 1515,
+            "failed": 0,
+            "skipped": 0,
+            "logSha256": "22d79bd086282e5076bc0e5d2a721151a99670d377d2746f3818a21e43425ed0"
+          }
+        ],
+        "complete": true
+      },
+      "actualGhContracts": {
+        "run": 38807277096,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "jobs": [
+          {
+            "lane": "current",
+            "job": 116671267843,
+            "conclusion": "success",
+            "passed": 17,
+            "failed": 0,
+            "skipped": 0,
+            "logSha256": "78a0503a602785f45b80882048f34422bda10ba1ec759d8b6dc0fa89f3792580"
+          },
+          {
+            "lane": "minimum",
+            "job": 116671267312,
+            "conclusion": "success",
+            "passed": 17,
+            "failed": 0,
+            "skipped": 0,
+            "logSha256": "cb5639162ecbc4ce206889d6e3a4943e83ffd4544ba32954fae1c50ab865af8b"
+          }
+        ],
+        "complete": true
+      },
+      "native": {
+        "run": 38806581035,
+        "head": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad",
+        "artifacts": [
+          {
+            "artifact": "native-maintenance-evidence-linux-x64",
+            "proofs": [
+              {
+                "name": "tracking-app-proof.json",
+                "sha256": "7f7d6af10bf5c3c575958ef10a7c18a73576a65b925fef95cc1a7039af8d4378",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "backup-app-proof.json",
+                "sha256": "25f66250db46d965c207914655d0d1bed57b62cf2728814014115e29f7cba10d",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "gitfile-app-proof.json",
+                "sha256": "f77c4390560f093b01a0d91031dae9860c95be5dd9864091a551eb6ef03e2ce9",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "object-app-proof.json",
+                "sha256": "e95ed7b06d7c9385fc48b3981393343fb24e47dd1084f266469c3448a563d231",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "quarantine-app-proof.json",
+                "sha256": "500e24620e801787495f1bb5bc9f383068fa8269de87be8375f4e444833fcedb",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "replacement-app-proof.json",
+                "sha256": "cc7f2bf2fff942e644fafade61cac289df9e93ce97abd78c3781e5b1933c6a5b",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-app-proof.json",
+                "sha256": "6df7044f86cbf0eeee480b2c0a3b1017cc3b7661da11bdf5c21a9fd422a62961",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-app-proof.json",
+                "sha256": "0c874cda3943c184944593bad8c6cd5ca7166d11c47b9b49c5a1e1bf9ab4c528",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-app-proof.json",
+                "sha256": "ea888dbf09a0e338fe6131a6154889afdf8f799c0850e3f0b2bba33d5ba9216e",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "inventory-denied-app-proof.json",
+                "sha256": "33ac54618b6a9f0d5a4d8521a3b31ec0e531e9bb631937d16dfa3ee28e6b37df",
+                "fixtures": 1,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "update-outcomes-app-proof.json",
+                "sha256": "f0d18dfa98bc69a2a881eae29a0e5ee66a406b0a9eac237c9c8575f731c20d80",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "managed-discovery-app-proof.json",
+                "sha256": "5d1d66345c7f43d78befdc623487004fcda3fa5fba145490fad9776467895dbd",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "identities-app-proof.json",
+                "sha256": "5fa6d25c1f527dcbf02dc5a43bf044b24cf3e0407cbe92a755b60855dbceeb44",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "f79b7884177c78d250ad7efa05bb19961355bbb4957db9328c692c9d47640818"
+              },
+              {
+                "name": "tracking-extension-proof.json",
+                "sha256": "6bc02fa96d2d17c2d3d69a6f79a604dbc38ec54e2979ab57aed6865503c902f1",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "backup-extension-proof.json",
+                "sha256": "b9ef47e8b81695448c35c9caf05a55f67a05af226220aae6fb5e99f9602f0566",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "gitfile-extension-proof.json",
+                "sha256": "2b99af08e81f74dfd2aa33b51c770851b3ca00fe19eea2c62c02f09c303e5e87",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "object-extension-proof.json",
+                "sha256": "35e39bf95030815f9b0e34702791b8a8333824dbc3a23de4c6d39a6d04b58dbc",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "quarantine-extension-proof.json",
+                "sha256": "5f615ddca04c7bc6b97182e2a280a909e889b87b1359c7e35bb9a392040fd66f",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "replacement-extension-proof.json",
+                "sha256": "f1b09c1a85c083ba8002812f3e76548f37040cc9c291e0475e23900322ba4b98",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-extension-proof.json",
+                "sha256": "3efa8972639eda620b6f3d7077a98acd3a2c31e83bccc97c070ba214068a6672",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-extension-proof.json",
+                "sha256": "e17c154619e5d12e89199c4daaeb2e28746b9330c3d0c0f250b3253465c0c02b",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-extension-proof.json",
+                "sha256": "ce22c1a13d063d67f363330e319d467485d774e23a1db563877b13b83032ba5a",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "inventory-denied-extension-proof.json",
+                "sha256": "bee7533e04cfd338ec164fd2b6d5704fc14ca0d38fe71de88d7d17de31435ca3",
+                "fixtures": 1,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "update-outcomes-extension-proof.json",
+                "sha256": "719ad6fe308db8f126c0cad7df0e0ba05dc5576e2b1d75873ada11042e47c481",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "managed-discovery-extension-proof.json",
+                "sha256": "90a97ebaae5187a4c342e2bc1028d1cedc42708736804476bed8fd3ce13f769f",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              },
+              {
+                "name": "identities-extension-proof.json",
+                "sha256": "d5317de03744b57581e8c1efc1e1eb7675f36b8d0c31aa666ce68cc60d9a453b",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "e204c31000b8fb1d3040bf3ef3787731661391106f9003d73e3485253f9b7750"
+              }
+            ]
+          },
+          {
+            "artifact": "native-maintenance-evidence-osx-arm64",
+            "proofs": [
+              {
+                "name": "tracking-app-proof.json",
+                "sha256": "db2b63f5fb08b587a79db7cdceafdc48e4ff6c1833b77959e33f12e922f2f441",
+                "fixtures": 4,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "backup-app-proof.json",
+                "sha256": "d3a45ff188a6b381a203b034cf4ced5e524dbc92cb52643ae9ccf7963af3e28e",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "gitfile-app-proof.json",
+                "sha256": "c84a2684fdf2f33ebc71208e6d6073b38329dbf2626215a73f81234f18572f1c",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "object-app-proof.json",
+                "sha256": "077e4252a8d0cfd788f8958d389414472107cadc409ed94da365a8c92d01638e",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "quarantine-app-proof.json",
+                "sha256": "5c4935be16bc085facc69d8fa7920cb6aeab1c79b40b2ae644c19d20d4ec2039",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "replacement-app-proof.json",
+                "sha256": "ab2521fc8f5ad1540f91815a1205cf12260c3291d76ef03af407137ad1902629",
+                "fixtures": 3,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-app-proof.json",
+                "sha256": "95bf4689cd36ebe773436c4ed6bad47e9e726fa5a134a0e24914fc6111149b8c",
+                "fixtures": 2,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-app-proof.json",
+                "sha256": "016e7e9ffb8ad6098d5d17c541f3419ebee73a8da567df4ab0babc66b71da156",
+                "fixtures": 6,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-app-proof.json",
+                "sha256": "38db55c955c13df6d932c6cf769a9f70aa0530166977936f9d781200e02ce517",
+                "fixtures": 11,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "inventory-denied-app-proof.json",
+                "sha256": "15d30dcf0ca3d9857e3154718ba36f40d5908cc9ac85b5487d167c5c211c94e9",
+                "fixtures": 1,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "update-outcomes-app-proof.json",
+                "sha256": "44eaab54b3829c05d1961ddf65088c30347e581d5f7f07d68e8532a4ca200d3e",
+                "fixtures": 6,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "managed-discovery-app-proof.json",
+                "sha256": "076e8528e88de93f14d30018d9e3cc2e2a15f328745dc78eb0b23c4c119adedd",
+                "fixtures": 9,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "identities-app-proof.json",
+                "sha256": "b7e780d24203cc46bbc108810d0ed62b89fdcb438d71d4f136e579b915b97c2c",
+                "fixtures": 13,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "91ec96a48612ba9ce3ce1dc6d7fa2ca7d352a0d914976dd8f5250e0fd7a59e6b"
+              },
+              {
+                "name": "tracking-extension-proof.json",
+                "sha256": "79231b46664a09b2260b82760184cf80221c752d7cc83ecc69aaa258f21db2af",
+                "fixtures": 4,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "backup-extension-proof.json",
+                "sha256": "ef07a217828c18b0076bd5164868c52d19cd5f314ca0e2bc51e69d5bfcb64b77",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "gitfile-extension-proof.json",
+                "sha256": "36e30970535a9927cd71692eab4974b950c6094617bc9b0192ef3a9b87824287",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "object-extension-proof.json",
+                "sha256": "6877a97775f323d89149ff887f09a3d4c2d3955a6c6ad94972830373bad280b3",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "quarantine-extension-proof.json",
+                "sha256": "df45f51f2327c20e60eca1a94582c31274f557a88b274757d29f66c141dd8f04",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "replacement-extension-proof.json",
+                "sha256": "6f5af7cc547beb89e01e5c41f4ee3d689d8452977e371d79a8f955246eae6cfe",
+                "fixtures": 3,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-extension-proof.json",
+                "sha256": "96fac649d1abaab3f151abaf338b38f221ad991372f92a9510249016586766df",
+                "fixtures": 2,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-extension-proof.json",
+                "sha256": "f688e04b66f2b75bba6e04aaf0445855e722323b89cd0217e724ce4e14131c48",
+                "fixtures": 6,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-extension-proof.json",
+                "sha256": "4d112aae864cbe6e89a0e994a955a8e9887eec498c934ed92044dbfe941a475a",
+                "fixtures": 11,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "inventory-denied-extension-proof.json",
+                "sha256": "6e9a11cbb2286e96e0272fb7e85f3da8d907d0922171678a1f14a32ab835d266",
+                "fixtures": 1,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "update-outcomes-extension-proof.json",
+                "sha256": "e06f06fba35af43f24acec362d3bfd2e90381937fa9f0ef8cdc8435cdbd537de",
+                "fixtures": 6,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "managed-discovery-extension-proof.json",
+                "sha256": "bfec90841fba61208111f79c21eb6af338e847282dd33ee774e9daf2b142af80",
+                "fixtures": 9,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              },
+              {
+                "name": "identities-extension-proof.json",
+                "sha256": "1a6b58b2d94b09148c31edb2b8b004cec069cbc2defc1bebbf39fb6b348a0f0e",
+                "fixtures": 13,
+                "gh": "gh version 2.100.0 (2026-09-03)",
+                "binarySha256": "9b94be82f94c206bf607dee53fc5a61b08eba98b796adc10830abea0df20bb75"
+              }
+            ]
+          },
+          {
+            "artifact": "native-maintenance-evidence-win-arm64",
+            "proofs": [
+              {
+                "name": "tracking-app-proof.json",
+                "sha256": "e921cafaefc05ceba095b56d62dcd9ba57a49acb0df0eea235ca77953d64d6e9",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "backup-app-proof.json",
+                "sha256": "66c29b71f1edefae79983cb76341cc9651dd92bb132cef6f40f45dc5a264461c",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "gitfile-app-proof.json",
+                "sha256": "14d15484d1d104ac215ab308ddc918bb962cc5536ad5799b13f4c6930022c92a",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "object-app-proof.json",
+                "sha256": "f2351a5e1aafc270e3639f30a656a8ad6b1fe2990cc88cdc01fbf63a23ed4f9f",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "quarantine-app-proof.json",
+                "sha256": "d9cd3fa90b42639d15f3a3199f0d166902bb662997285bfaaf03ff99fe34e9b8",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "replacement-app-proof.json",
+                "sha256": "c070a0b75b83b558ab311974c81602255b9c4de510e60fa5e03127b48066d1a1",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-app-proof.json",
+                "sha256": "27eac7b8b7bcaa242959beab31359668037ad68f5bc7eca76631d9f0ca6c3e83",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-app-proof.json",
+                "sha256": "ffd64640d48074f711a45c20497eb230639b4f1cb68897ee2df37cfbe191a075",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-app-proof.json",
+                "sha256": "fb2449fa048cf748c5cf46351c84901abcb06eab3fd94c3082a848bd095ce31b",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "update-outcomes-app-proof.json",
+                "sha256": "53a00136a863ccd2c1f46a3af40b0f9ae1ae54f3d08e2a6b35c2bdab47f973f4",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "managed-discovery-app-proof.json",
+                "sha256": "5e329f38369928716731cbdc065e81bc9f8e16c9996b71e7369d2366deda809a",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "identities-app-proof.json",
+                "sha256": "675908aa51527971f32f5e327c4cf453da37bd28191bfe22cea86a809f5c0f07",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "5e3ac4ec80664d1935f4c019a38d40187b382b8891eedb9a5bd46378323bc9b7"
+              },
+              {
+                "name": "tracking-extension-proof.json",
+                "sha256": "0ffaa435a32642c71e1fb3f4ba6dcaeee426684a84b67e470d36a86de749afa7",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "backup-extension-proof.json",
+                "sha256": "7316a4f9345c0180170aec73fda28be1cebf5a7864109e01d8227e83e7e85689",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "gitfile-extension-proof.json",
+                "sha256": "1958c321dabd29c40f4d5dbd9b8ca51ca792fb1b18433608b1236f712b81a7e8",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "object-extension-proof.json",
+                "sha256": "21f0ee1b2546719b97405288ef8f092c7035054106c8797544a1c9f605b6a8a9",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "quarantine-extension-proof.json",
+                "sha256": "62141a050f701573490a6e13241ecc500b96cab404226f4a9ac453d2a81573d6",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "replacement-extension-proof.json",
+                "sha256": "e10b50d8054d6bc199b198cd4a99e06ac2821e023bcd28076624f1a8bc5aafb3",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-extension-proof.json",
+                "sha256": "edc19aaa12e2dca532b187a37143522d106f882e0a331db66eeb546117760f9d",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-extension-proof.json",
+                "sha256": "75537b5184ba4f76983a3c6e3a0836e5dcc4a29a460256216b540735fe52048a",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-extension-proof.json",
+                "sha256": "9a5276883e78ea84882c68579ce1b94d52d2a59e58fc39fb9000eb63216d9eca",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "update-outcomes-extension-proof.json",
+                "sha256": "057fe9c225a66aa6150a0d16156d1f9511975079f1757e5dd3d425ce61c57345",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "managed-discovery-extension-proof.json",
+                "sha256": "d7b14bd8925e964d7479db1b2b5e7de2e2c7c351f2abcf0f85498f86d02ff0af",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              },
+              {
+                "name": "identities-extension-proof.json",
+                "sha256": "de603ad9995a5c250982a53915198f6ae8a37bf9cc279ec68be9a64ce2b6e35a",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "6ade749fd38840c13a7137cd2d1987fbfd17fd9a651d53306046022184f2366e"
+              }
+            ]
+          },
+          {
+            "artifact": "native-maintenance-evidence-win-x64",
+            "proofs": [
+              {
+                "name": "tracking-app-proof.json",
+                "sha256": "d591c12396b6e8f329cecf50546d3df1286bdd8c774d8f44df87caad6d24dfd5",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "backup-app-proof.json",
+                "sha256": "9dd20e3f5e4c97576c5702be53db7904bac9c053f88a7cf0803f11a50e2fba12",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "gitfile-app-proof.json",
+                "sha256": "be94bccdf9ca9194b380074259e484183372445f2a6fa3efdd532d3ac5e31698",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "object-app-proof.json",
+                "sha256": "3873b855369e8a197de059686100a9f91e35ee6e396e8aabef6ad6e76ede3ba6",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "quarantine-app-proof.json",
+                "sha256": "8ee65325776e7473ca940255f594118ffc42d7b0b255a9ef9d0e94c6d165b06d",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "replacement-app-proof.json",
+                "sha256": "2052a290b99fba3c3288c0bd34d97942112efc9501db9bde75f459b5c49914c6",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-app-proof.json",
+                "sha256": "89369db129e9d37b7a55a38658b070decc8a8a982d969d58e8e90aeaa55ff1c4",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-app-proof.json",
+                "sha256": "e8ca48c36f91177df6e78dcdbc2e50d32ba865c0074024acf694bdab2e725e49",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-app-proof.json",
+                "sha256": "f50bf9525beaef458390a616d9366320a6f475af0f13a192e29a4de84dd69fd5",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "update-outcomes-app-proof.json",
+                "sha256": "f1727d898e6bcbd191118af7ac3354fbdeae103a21083995194965a729ba9a8d",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "managed-discovery-app-proof.json",
+                "sha256": "4ca0edfaca2fd27a09ec94317810bbb98d1da70f246c94914238d152796b4321",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "identities-app-proof.json",
+                "sha256": "8f2ad2d062c06e3c12e1148aee59406da5011a3d7fd7660d9deff954637ff975",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "79c3b7a978e09d95ca98ffa9ce83061181c1d67c99c46a4267bd1704058b03af"
+              },
+              {
+                "name": "tracking-extension-proof.json",
+                "sha256": "fd970bc6747814db9675e13e0545dda6175f9c71e6aca0a0e02ab4fe61ae3c2a",
+                "fixtures": 4,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "backup-extension-proof.json",
+                "sha256": "ff754542aa7464016cbf173a7b6d9c926248d2e751b1d5d944502f90a10fa340",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "gitfile-extension-proof.json",
+                "sha256": "0b0b6b388a2f6784877fb17d0408271fd3206166f5c3bb113fb754d4fc4d7c17",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "object-extension-proof.json",
+                "sha256": "6d59625039ce082c444f155f0c83f2e2e1ac33574641de21a5470a62d4a6f96f",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "quarantine-extension-proof.json",
+                "sha256": "02cd6b3594a7fcaa373029bdb65e0fc26ac04d6d3948c814efb7c0cf439348d0",
+                "fixtures": 1,
+                "gh": "runner default",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "replacement-extension-proof.json",
+                "sha256": "4405d61348c9a0efe2579a18ad9e714901d1be17045ee3b83f131088591f3a6c",
+                "fixtures": 3,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "revision-extension-proof.json",
+                "sha256": "000ee717fa4b8d0ce2cc630a7bc20a748d7315a91774655c5f28e321df6ac525",
+                "fixtures": 2,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "shared-owner-extension-proof.json",
+                "sha256": "251b0ecd80ad380e7d28787e821a7b484db696a75e0147b2fa28ba5a3f431982",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": null
+              },
+              {
+                "name": "inventory-filter-extension-proof.json",
+                "sha256": "64b63567288a0016b5f0e16f84aecd5a907affdb097d7da477edef9d8c16f5e0",
+                "fixtures": 11,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "update-outcomes-extension-proof.json",
+                "sha256": "ea1de2188d307a6e3c526de74647f894d7e9ebcf7695371975d36f851afb7bfd",
+                "fixtures": 6,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "managed-discovery-extension-proof.json",
+                "sha256": "366c4ba2766d1d40c6c201ed2f00745bb44f4f145ba299ee03dee1ef9513520e",
+                "fixtures": 9,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              },
+              {
+                "name": "identities-extension-proof.json",
+                "sha256": "6599142cc725ff77d885b8653b97347a115243bf97eebaf40a00aed26ec95b18",
+                "fixtures": 13,
+                "gh": "gh version 2.102.0 (2026-09-30)",
+                "binarySha256": "148006c67bbfa59011760f6801f3bb0ce8ed4b8866df4491c782dfe9a02785a1"
+              }
+            ]
+          }
+        ]
+      },
+      "artifactMetadata": [
+        {
+          "id": 12007616050,
+          "name": "native-maintenance-evidence-linux-x64",
+          "size_in_bytes": 24306,
+          "digest": "sha256:96813ac3dedd7d0ccdca07824c2ef54a36eccd42a0edf6f3e17cceedcfef99a4",
+          "workflow_run": {
+            "id": 38806581035,
+            "repository_id": 1218634352,
+            "head_repository_id": 1218634352,
+            "head_branch": "codex/maintenance-identities",
+            "head_sha": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad"
+          }
+        },
+        {
+          "id": 12006978806,
+          "name": "native-maintenance-evidence-win-arm64",
+          "size_in_bytes": 20080,
+          "digest": "sha256:414cb37fad7ce3f4b1085837ffa9266f738c391d1feefc4947b2ade599c1b303",
+          "workflow_run": {
+            "id": 38806581035,
+            "repository_id": 1218634352,
+            "head_repository_id": 1218634352,
+            "head_branch": "codex/maintenance-identities",
+            "head_sha": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad"
+          }
+        },
+        {
+          "id": 12006809225,
+          "name": "native-maintenance-evidence-win-x64",
+          "size_in_bytes": 20109,
+          "digest": "sha256:50f9423746dca90381c3ae82374b56b4fd795739ce79beac4dc5335b1ad5c24c",
+          "workflow_run": {
+            "id": 38806581035,
+            "repository_id": 1218634352,
+            "head_repository_id": 1218634352,
+            "head_branch": "codex/maintenance-identities",
+            "head_sha": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad"
+          }
+        },
+        {
+          "id": 12006374835,
+          "name": "native-maintenance-evidence-osx-arm64",
+          "size_in_bytes": 24527,
+          "digest": "sha256:9982dc5947a795c316983f753beee4821e020471060322a4d2e7d624699aa8f9",
+          "workflow_run": {
+            "id": 38806581035,
+            "repository_id": 1218634352,
+            "head_repository_id": 1218634352,
+            "head_branch": "codex/maintenance-identities",
+            "head_sha": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad"
+          }
+        }
+      ],
+      "reviews": {
+        "reviewThreads": {
+          "nodes": [
+            {
+              "id": "PRRT_kwDOSKLicM6s8G1B",
+              "isResolved": true
+            },
+            {
+              "id": "PRRT_kwDOSKLicM6s8G1q",
+              "isResolved": true
+            },
+            {
+              "id": "PRRT_kwDOSKLicM6s8G2K",
+              "isResolved": true
+            },
+            {
+              "id": "PRRT_kwDOSKLicM6s8G2y",
+              "isResolved": true
+            },
+            {
+              "id": "PRRT_kwDOSKLicM6s8hVQ",
+              "isResolved": true
+            }
+          ]
+        },
+        "reviews": {
+          "nodes": [
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSiW4dA",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "22d2dea8adeb5bc6e0b3c476983aaa631c338198"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udfe1 Changes recommended\n\nDistributor identity collisions can group unrelated removal targets, and native observation and retention reporting still have correctness issues.\n\n<details open>\n<summary><strong>4 open findings</strong></summary>\n\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.png\" alt=\"High severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Include source repositories in logical distributor identity](https://github.com/harder/gh-skillview/pull/61#discussion_r4287530955) \u00b7 New\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Report original-path retention for quarantine previews](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531019) \u00b7 New\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Avoid retained-payload claims for deleted broken links](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531061) \u00b7 New\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Use read-only access when capturing Windows identity](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531120) \u00b7 New\n</details>\n\n<details>\n<summary><strong>What changed in this PR</strong></summary>\n\nAdds frozen physical-installation and maintenance-impact evidence across SkillView\u2019s inventory, CLI and TUI while preserving saved serialization contracts.\n\n**Changes:**\n- Separates address, native-object, distributor and delivery identities.\n- Preserves structured consumer evidence through maintenance outcomes.\n- Adds exact removal selectors, expanded confirmation views and regression proofs.\n\n| File | Description |\r\n| ---- | ----------- |\r\n| tests/\u200bSkillView.Tests/\u200bUi/\u200bCleanupScreenTests.cs | Tests complete batch review and canceled impacts. |\r\n| tests/\u200bSkillView.Tests/\u200bMaintenance/\u200bReplacementPlanStoreTests.cs | Tests serialization compatibility and retained evidence. |\r\n| tests/\u200bSkillView.Tests/\u200bMaintenance/\u200bQuarantineStoreTests.cs | Tests live versus historical quarantine evidence. |\r\n| tests/\u200bSkillView.Tests/\u200bInventory/\u200bSkillIdentityTests.cs | Adds identity and operation-impact regressions. |\r\n| tests/\u200bSkillView.Tests/\u200bInventory/\u200bManagedDiscoveryInventoryTests.cs | Checks preservation of managed contexts. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bUpdateScreen.cs | Renders structured update impacts. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bRemoveWizardContent.cs | Includes impacts in removal review. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bRemoveScreen.cs | Retains impacts after cancellation or failure. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bRemoveConfirmModal.cs | Displays consumers and preserves result impacts. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bOperationImpactFormatter.cs | Adds shared frozen-evidence rendering. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bInstalledScreen.cs | Displays captured installation evidence. |\r\n| src/\u200bSkillView.Core/\u200bUi/\u200bCleanupScreen.cs | Adds scrollable review and retained impacts. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bSkillUpdateCoordinator.cs | Attaches impacts to update outcomes. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bSavedUpdateCoordinator.cs | Preserves impacts in saved-update outcomes. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bReplacementPlanStore.cs | Projects recorded subjects and retention locations. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bReplacementPlan.cs | Adds a nonserialized result impact. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bQuarantineStore.Undo.cs | Publishes recorded evidence before recovery admission. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bQuarantineStore.cs | Preserves live and recorded quarantine impacts. |\r\n| src/\u200bSkillView.Core/\u200bMaintenance/\u200bQuarantineRecord.cs | Adds a nonserialized result impact. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bSkillIdentityObserver.cs | Captures native and exposure evidence. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bSecureRemovalBackend.cs | Adds observation-only identity routing. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bRemoveValidator.cs | Attaches subjects and execution evidence. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bRemoveTargetResolver.cs | Adds link impacts and distributor-based grouping. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bRemoveService.cs | Preserves impacts and canceled outcomes. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bModels/\u200bSkillPackage.cs | Retains transient managed-region evidence. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bModels/\u200bSkillIdentity.cs | Preserves conflicting owner sources. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bModels/\u200bOperationSubject.cs | Defines frozen identity and impact models. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bModels/\u200bManagedSkillRegion.cs | Carries regions into owner claims. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bModels/\u200bInstalledSkill.cs | Adds observed subjects and agreed revision values. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bManagedSkillDiscovery.cs | Retains distinct managed claims. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bLocalInventoryService.cs | Captures subjects off the UI thread. |\r\n| src/\u200bSkillView.Core/\u200bInventory/\u200bCleanupClassifier.cs | Attaches payload or link cleanup impacts. |\r\n| src/\u200bSkillView.Core/\u200bGh/\u200bModels/\u200bUpdateResult.cs | Adds structured outcome impacts. |\r\n| src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.Restore.cs | Emits restoration impacts through failures. |\r\n| src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.Identity.cs | Adds identity and impact output helpers. |\r\n| src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.cs | Integrates impacts, selectors and cancellation reporting. |\r\n| docs/\u200busage.md | Documents identities, selectors and evidence limits. |\r\n| AGENTS.md | Documents frozen-subject compatibility requirements. |\r\n| agent_docs/\u200bmaintenance-managed-discovery.md | Records prior managed-discovery acceptance. |\r\n| agent_docs/\u200bmaintenance-implementation.md | Updates acceptance and implementation checkpoints. |\r\n| agent_docs/\u200bmaintenance-identities.md | Documents identity design and verification requirements. |\r\n| agent_docs/\u200bmaintenance-acceptance.json | Records prior M10 completion. |\r\n| agent_docs/\u200bevidence/\u200bprove-installation-identities.py | Adds disposable native-host identity proofs. |\r\n| .github/\u200bworkflows/\u200bci.yml | Runs identity proofs for both native hosts. |\n</details>\n\n\ud83e\udde0 **Review effort:** Balanced\n\n---\n\n\ud83d\udca1 <a href=\"/harder/gh-skillview/new/main?filename=.github/skills/code-review/SKILL.md\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href=\"https://docs.github.com/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review?tool=webui#mcp-servers-and-agent-skills\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more in the docs.</a>",
+              "submittedAt": "2026-10-15T19:43:36Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSijKeQ",
+              "author": {
+                "login": "harder"
+              },
+              "commit": {
+                "oid": "0cffb7306b317223b5fda167b476eef866d3b5bf"
+              },
+              "state": "COMMENTED",
+              "body": "",
+              "submittedAt": "2026-10-15T20:01:40Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSijMNg",
+              "author": {
+                "login": "harder"
+              },
+              "commit": {
+                "oid": "0cffb7306b317223b5fda167b476eef866d3b5bf"
+              },
+              "state": "COMMENTED",
+              "body": "",
+              "submittedAt": "2026-10-15T20:01:43Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSijNtw",
+              "author": {
+                "login": "harder"
+              },
+              "commit": {
+                "oid": "0cffb7306b317223b5fda167b476eef866d3b5bf"
+              },
+              "state": "COMMENTED",
+              "body": "",
+              "submittedAt": "2026-10-15T20:01:45Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSijPMQ",
+              "author": {
+                "login": "harder"
+              },
+              "commit": {
+                "oid": "0cffb7306b317223b5fda167b476eef866d3b5bf"
+              },
+              "state": "COMMENTED",
+              "body": "",
+              "submittedAt": "2026-10-15T20:01:47Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSijw0Q",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "0cffb7306b317223b5fda167b476eef866d3b5bf"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nCross-platform native identity and saved-plan compatibility still require final verification and human review.\n\n<details open>\n<summary><strong>1 open finding</strong></summary>\n\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.png\" alt=\"High severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Preview fixture violates quarantine admission guard](https://github.com/harder/gh-skillview/pull/61#discussion_r4287705340) \u00b7 New\n</details>\n\n<details>\n<summary><strong>4 resolved since last review</strong></summary>\n\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.png\" alt=\"High severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Include source repositories in logical distributor identity](https://github.com/harder/gh-skillview/pull/61#discussion_r4287530955)\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Use read-only access when capturing Windows identity](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531120)\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Avoid retained-payload claims for deleted broken links](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531061)\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Report original-path retention for quarantine previews](https://github.com/harder/gh-skillview/pull/61#discussion_r4287531019)\n</details>\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T20:02:36Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSikW9w",
+              "author": {
+                "login": "harder"
+              },
+              "commit": {
+                "oid": "7b18827454d3f4ebd56a6c8ad3065fba4d5a1e1c"
+              },
+              "state": "COMMENTED",
+              "body": "",
+              "submittedAt": "2026-10-15T20:03:22Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSiupcQ",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "7b18827454d3f4ebd56a6c8ad3065fba4d5a1e1c"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nMaintenance output still needs correction, and final cross-platform, Native AOT, and saved-plan compatibility verification remains required.\n\n**0 open findings**\n\n<details>\n<summary><strong>1 resolved since last review</strong></summary>\n\n- <picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/high-v2-light.png\" alt=\"High severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> [Preview fixture violates quarantine admission guard](https://github.com/harder/gh-skillview/pull/61#discussion_r4287705340)\n</details>\n\n<details>\n<summary><strong>Previously missed (1)</strong></summary>\n\nIn code that hasn't changed since last review\n\n<details>\n<summary><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> Report retained payload path when update-plan is already current</summary>\n\n`src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.Restore.cs:79`\n\nWhen `update-plan --path ... --json` finds an already-current installation, this branch writes the generic payload impact, reporting `payloadRetained: false` and a null retained path even though the original remains installed. Text output also omits the retained location. Set retention-aware evidence before either renderer, using `current.Path`, and add a regression asserting the no-op impact.\n</details>\n</details>\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T20:18:18Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSi3rcw",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "54f9d0dfc5a5f80dfd0e9c86682a7464aaf2b7eb"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nCross-platform native identity and saved-plan compatibility still require final verification and human review.\n\n**0 open findings**\n\n<details>\n<summary><strong>Previously missed (3)</strong></summary>\n\nIn code that hasn't changed since last review\n\n<details>\n<summary><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> Backup impact falsely claims payload retention for dangling links</summary>\n\n`src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.cs:698`\n\n`backup --path` can select a scanner-produced dangling-link row. Capture then fails because there is no payload directory, but the catch emits this impact with `payloadRetained: true`, contradicting its `broken-link` subject. Only claim retention when the frozen subject observed a directory, and include that observed location rather than leaving successful backups' retained location unknown. Cover the dangling-link failure in a regression test.\n</details>\n\n<details>\n<summary><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> Incorrect retention reported for dangling-link update selections</summary>\n\n`src/\u200bSkillView.Core/\u200bMaintenance/\u200bSavedUpdateCoordinator.cs:192`\n\nA dangling-link inventory row is selectable with `update --path` or `update --all`. Its `untracked` outcome, or an incomplete-inventory refusal, reaches this initializer and reports a retained payload at the broken link's address even though the frozen subject says `broken-link`. Derive retention from the frozen subject's materialization and leave the retained path null when no directory payload was observed. Add a regression for these outcomes.\n</details>\n\n<details>\n<summary><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> Removal reports lose duplicate-path skip count on cancellation or failure</summary>\n\n`src/\u200bSkillView.Core/\u200bUi/\u200bCleanupScreen.cs:386`\n\nIf removal is canceled after duplicate paths were filtered out, this rebuilds `LastReport` with `TargetsSkipped = 0`, losing the count already published through `RemovalAttemptState`. The failure branch has the same problem. Keep an attempt state even when the caller omits it, and copy its pre-validation skip count into both synthetic reports. Extend `RemoveSelectedAsync_CancellationPublishesDuplicateSkipCount` to assert that `LastReport.TargetsSkipped` retains its one known skip.\n</details>\n</details>\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T20:31:09Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSi-H0A",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "46eea4b5821261bc96f7b10261b6b2491a6e7f13"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nCross-platform native identity and saved-state compatibility still require final verification and human review, alongside correction of the retained reporting defect.\n\n**0 open findings**\n\n<details>\n<summary><strong>Previously missed (1)</strong></summary>\n\nIn code that hasn't changed since last review\n\n<details>\n<summary><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.svg\"><img src=\"https://github.githubassets.com/static/images/icons/copilot-code-review/medium-v2-light.png\" alt=\"Medium severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture> Undo failures retain quarantine operation instead of undo</summary>\n\n`src/\u200bSkillView.Core/\u200bCli/\u200bCliDispatcher.cs:560`\n\nIf `undo` throws after reading `prepared.json`, this callback has saved an impact labeled `quarantine`. The exception skips the command rewrite at lines 586\u2013587, and the catch block writes that unchanged impact, so refusal or cancellation JSON identifies the wrong operation. Stamp the requested command in this callback so failure output reports `impact.operation: \"undo\"` while preserving the recorded subject.\n</details>\n</details>\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T20:39:20Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSjO0Qw",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "52829e8fec35f67e359cc7481722bf1743b7150c"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nCross-platform native evidence and saved-plan compatibility require completed final verification and human review.\n\n**0 open findings**\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T21:00:28Z"
+            },
+            {
+              "id": "PRR_kwDOSKLicM8AAAABSjTRpQ",
+              "author": {
+                "login": "copilot-pull-request-reviewer"
+              },
+              "commit": {
+                "oid": "4fb69deb3fb1fae1a62bf6b68b0c37fc24d4b0ad"
+              },
+              "state": "COMMENTED",
+              "body": "<!-- ccr-overview-v2 -->\n\n### \ud83d\udd35 Needs a closer look\n\nCross-platform maintenance changes require human confirmation of final platform, Native AOT, and historical-plan restart evidence.\n\n**0 open findings**\n\n\ud83e\udde0 **Review effort:** Balanced",
+              "submittedAt": "2026-10-15T21:07:20Z"
+            }
+          ]
+        }
+      },
+      "linuxUnavailableOpenat2": {
+        "errno": [
+          1,
+          38
+        ],
+        "managedBuiltinReadOnly": true,
+        "removalRefused": true,
+        "logSha256": "2780969492fd3ee84f3c22fb58e74c5625b6fa0ed70369276a8ca3f96af6e34e"
+      }
+    },
+    "localLogs": [
+      {
+        "name": "skillview-identities-cli-fault-terminal-build.log",
+        "sha256": "4ef1036826479975bb8d2500d05279d8dbac117cffb887244c0fb2164f8c9f74"
+      },
+      {
+        "name": "skillview-identities-cli-fault-final-full-tests.log",
+        "sha256": "3452b7d71884be069bff7091b3cbca96f934dd30750bd30d3df164876e703e37"
+      },
+      {
+        "name": "skillview-identities-cli-fault-terminal-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "skillview-identities-retention-aot-app.log",
+        "sha256": "1f1258f6aef570c50ac28f081ae705218c82fd697fa19d2b93a1be28e24a28a8"
+      },
+      {
+        "name": "skillview-identities-retention-aot-ext.log",
+        "sha256": "1a25fa49c03cb7e56e49bad1abf016df475dc40df4cd767a426058ffb038b002"
+      },
+      {
+        "name": "skillview-identities-retention-red-identities.log",
+        "sha256": "dd8d1c7b1d6c973f4e0b2bcf1f9178b122a8e6849472af8396636e2237c56b99"
+      },
+      {
+        "name": "skillview-identities-retention-red-cli.log",
+        "sha256": "ed2209c0f1e09e2939a3dd86f493255563d0a0a7db5365042572b9d177b09f7a"
+      },
+      {
+        "name": "skillview-identities-retention-red-cleanup.log",
+        "sha256": "4f47501dceda1af0b359a1fc9487fdfc801122a4a372b50bda594e2e01c017dd"
+      },
+      {
+        "name": "skillview-identities-undo-red-test.log",
+        "sha256": "0d50d20eba36faac280c01a50517e50b969c8c71907d1c1d686f1c40792ebc0b"
+      },
+      {
+        "name": "skillview-identities-cli-fault-red-tests.log",
+        "sha256": "27fb8f58e6e03448cacea5e250bb66f0224d4c42e235de939af44836eae1e74f"
+      }
+    ]
+  },
+  "reviews": [
+    "consumer_final_review: clear after Copilot fixes",
+    "object_evidence_review: clear after Copilot fixes",
+    "consumer_final_review: corrected standalone native proof fixture re-reviewed clear",
+    "consumer_final_review: direct no-op retention correction reviewed clear",
+    "consumer_final_review: retention, partial cleanup, requested operation and uncertain update admission re-reviewed clear on final source",
+    "object_evidence_review: same final source and serialization boundary re-reviewed clear",
+    "replacement_design_review: CLI fault report and terminal progress corrected and re-reviewed clear",
+    "consumer_final_review: CLI unexpected faults and unrelated cancellation re-reviewed clear"
+  ],
+  "remaining": "M11 complete; M01/M02/M04/M05/M06/M07/M10 previously complete.13 original findings remain; whole21-item goal remains active.",
+  "mergeCommit": "351224b3e058166073370caafcba225bce12d7e9",
+  "mergedAt": "2026-10-15T21:23:34Z",
+  "mergeTreeMatchesReviewedHead": true
+}
