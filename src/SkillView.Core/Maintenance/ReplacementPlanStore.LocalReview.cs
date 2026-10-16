@@ -19,9 +19,10 @@ internal sealed partial class ReplacementPlanStore
     {
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
+        RequirePurpose(plan, null);
         if (expectedPlan != plan.ReviewFingerprint || session.StepCount != 0 || session.IncompleteJournal || session.RecoveryJournal is not null)
             throw new IOException("Preserve requires the exact never-started plan; inspect started operations before recovery.");
-        using var owner = OpenOwner(plan.Revision?.Owner, token, requireBefore: true);
+        using var owner = OpenOwner(EffectiveOwner(plan), token, requireBefore: true);
         var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
             || observation.Root != plan.RootIdentity || observation.Parent != plan.ParentIdentity)
@@ -106,7 +107,7 @@ internal sealed partial class ReplacementPlanStore
             ReviewFingerprint = ""
         };
         plan = plan with { ReviewFingerprint = PlanHash(plan) };
-        using var owner = OpenOwner(plan.Revision.Owner, token, requireBefore: true);
+        using var owner = OpenOwner(EffectiveOwner(plan)!, token, requireBefore: true);
         var current = Observe(plan, session.Operation, inventory, token, owner);
         if (current.Topology != "ready" || current.Original?.Objects != plan.Original.Objects
             || current.Candidate?.Objects != plan.Candidate.Objects || current.Root != plan.RootIdentity || current.Parent != plan.ParentIdentity)
@@ -122,7 +123,7 @@ internal sealed partial class ReplacementPlanStore
         if (plan.SchemaVersion != 2 || plan.Revision is null || expectedPlan != plan.ReviewFingerprint
             || session.StepCount != 0 || session.IncompleteJournal || session.RecoveryJournal is not null)
             throw new IOException("Local review requires the exact never-started revision plan.");
-        using var owner = OpenOwner(plan.Revision.Owner, token, requireBefore: true);
+        using var owner = OpenOwner(EffectiveOwner(plan)!, token, requireBefore: true);
         var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
             || observation.Candidate?.Objects != plan.Candidate.Objects || observation.Root != plan.RootIdentity || observation.Parent != plan.ParentIdentity)

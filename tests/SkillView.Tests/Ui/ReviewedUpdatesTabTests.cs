@@ -78,11 +78,12 @@ public sealed partial class ReviewedUpdatesTabTests
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> prepare,
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>> apply,
         Action? changed = null, Func<Action, Task>? dispatch = null,
-        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? local = null) => new(
+        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? local = null,
+        Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpin = null) => new(
             dispatch ?? (action => { action(); return Task.CompletedTask; }),
             (operation, _) => operation().GetAwaiter().GetResult(),
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() }),
-            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local);
+            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin);
 
     [Theory]
     [InlineData(false)]

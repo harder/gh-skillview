@@ -204,6 +204,35 @@ edits and extras stay in the retained original and are not automatically merged.
 The TUI queues a separate review and approval for each target. See
 [saved updates](saved-updates.md) for commands, recovery and undo.
 
+To remove a verified pin without fetching or updating the source, select the
+physical installation and save a separate pin-only review:
+
+```sh
+skillview --scan-root /path/to/skills unpin-plan --path /path/to/skills/demo --json
+skillview unpin-inspect --id <saved-id> --json
+skillview unpin-apply --id <saved-id> --yes --disposition unpin-only --expect <plan-fingerprint>
+```
+
+Use `--install-id` instead of `--path` when preferred. Keep the same workspace,
+home, scan roots and hidden-directory options for subsequent commands. The plan
+removes supported `metadata.github-pinned` tracking and, for a verified shared gh
+owner, its selected `pinnedRef`. It preserves the recorded source/ref/tree and
+installed instruction bytes, extras and supported native metadata. Unsupported
+pin syntax, ambiguous ownership and incomplete coverage are refused. A verified
+already-unpinned installation produces no plan and consumes no retained-plan
+quota.
+
+In Updates, select a row and choose **Plan unpin only** (`p`). Review the exact
+saved fingerprint and every affected consumer, check retention approval, then
+choose **Apply unpin only**. The existing **unpin** checkbox belongs to updating
+to the latest source and is separate from this operation. Every exposure of the
+selected physical installation shares the pin change; this action does not
+detach one consumer. Publication swaps in a verified directory, so active object
+IDs and timestamps change. The exact original native directory remains retained
+for undo. After `unpin-inspect`, use `unpin-recover`, `unpin-undo` or
+`unpin-repair-owner` with `--yes --expect <current-review-fingerprint>` as needed.
+Running agent session state remains unknown.
+
 Update JSON schema 2 retains gh output streams and per-installation outcomes and
 adds `savedPlan` plus exact `applyArguments` when a candidate is prepared.
 An already-current installation reports `unchanged`, no saved plan and zero

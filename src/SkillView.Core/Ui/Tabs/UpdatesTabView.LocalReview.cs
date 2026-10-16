@@ -73,7 +73,7 @@ internal sealed partial class UpdatesTabView
     private void RefreshLocalReviewControls(bool idle)
     {
         if (_localPanel is null) return;
-        var available = idle && _review is not null && _localReviewRunner is not null;
+        var available = idle && _review is not null && _review.PinPolicy is null && _localReviewRunner is not null;
         _preserveButton.Enabled = available;
         _localReviewButton.Enabled = available && _review!.LocalDisposition is null;
         _buildMergeButton.Enabled = available && !_localReviewUncertain && _localReview?.CanMaterialize == true
@@ -117,7 +117,7 @@ internal sealed partial class UpdatesTabView
     private async Task RunLocalActionAsync(LocalUpdateAction action, ImmutableArray<LocalPathChoice> choices = default,
         ImmutableArray<LocalResolutionInput> resolutions = default)
     {
-        if (_review is not { } plan || _localReviewRunner is null || _loadCancellations.HasActive
+        if (_review is not { } plan || plan.PinPolicy is not null || _localReviewRunner is null || _loadCancellations.HasActive
             || action is LocalUpdateAction.Choose or LocalUpdateAction.Build && (_localReview is null || _localReviewUncertain)
             || action == LocalUpdateAction.Build && _localReview?.CanMaterialize != true
             || action != LocalUpdateAction.Preserve && plan.LocalDisposition is not null) return;

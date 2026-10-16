@@ -130,6 +130,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
 
+- Standalone unpin uses schema4 `unpin-only`: bind actual installed capture and
+  pin policy without fabricated revision/B/C evidence. Remove only verified raw
+  pin members; retain recorded source/ref/tree and all physical exposures. Use
+  the checked effective-owner accessor throughout saved lifecycle/journals.
+  Schema1–3 omit `PinPolicy` to preserve existing hashes. Verify already-unpinned
+  before private state writers or quota enumeration. Review the native swap's
+  new active object identities/timestamps; retain original native objects for
+  exact undo. See `agent_docs/maintenance-standalone-unpin.md`.
+
 - Saved revision updates use schema 2 replacement plans, retaining the recorded
   base and explicit local-change/pin review. Keep schema 1 recorded-restore
   fingerprints compatible by omitting absent revision fields. Registry writes

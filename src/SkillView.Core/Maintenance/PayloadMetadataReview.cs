@@ -92,6 +92,29 @@ internal sealed class PayloadMetadataReview : IDisposable
             throw new IOException("Merged content and Windows alternate streams exceed the raw payload budget.");
     }
 
+    private PayloadMetadataReview(CapturedPayloadArchive installed, PayloadMetadataAuthority authority)
+    {
+        Authority = authority;
+        var root = Require(installed.RootMetadata, "/");
+        recipes.Add("", new("", "", root, "directory", installed.Snapshot.RootUnixMode, true));
+        foreach (var item in installed.Entries)
+        {
+            var entry = item.Entry;
+            var captured = Require(item.Metadata, entry.Path);
+            recipes.Add(entry.Path, new(entry.Path, entry.Path, captured, entry.Kind, entry.UnixMode, true,
+                SelectedDirectoryLink: captured.DirectoryLink));
+        }
+    }
+
+    internal static PayloadMetadataReview PreserveInstalled(CapturedPayloadArchive installed,
+        CapturedPayloadArchive.Reader reader, CancellationToken token)
+    {
+        installed.Validate();
+        var authority = reader.OpenMetadataAuthority(token);
+        try { return new(installed, authority); }
+        catch { authority.Dispose(); throw; }
+    }
+
     internal static PayloadMetadataReview Create(ThreeWayPayloadReview review, CapturedPayloadArchive.Reader installed, CancellationToken token,
         IPayloadEvidenceReader? source = null, IPayloadEvidenceReader? resolved = null)
     {

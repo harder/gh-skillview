@@ -8,10 +8,10 @@ namespace SkillView.Ui;
 /// this type so the UpdateScreenTests assertions don't need updating.
 public static class UpdateScreen
 {
-    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills)
+    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false)
     {
         var sb = new System.Text.StringBuilder();
-        var heading = dryRun ? "Dry-run results" : "Update results";
+        var heading = dryRun ? "Dry-run results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
         if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
@@ -80,7 +80,7 @@ public static class UpdateScreen
     {
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
-        sb.AppendLine("### Saved update review");
+        sb.AppendLine(plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);
         Field("Installation ID", plan.Subject.InstallationId);
@@ -89,7 +89,22 @@ public static class UpdateScreen
         Field("Manifest", plan.PlanPath);
         Field("Retained original", plan.RetainedPath);
         Field("Candidate", plan.CandidatePath);
-        Field("Disposition", plan.LocalDisposition?.Kind ?? "replace; retain original");
+        Field("Disposition", plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
+        if (plan.PinPolicy is { } pinPolicy)
+        {
+            Field("Pin", $"{plan.Subject.Metadata.PinnedRef ?? "verified owner pin"} -> explicitly unpinned");
+            Field("Recorded source ref", plan.Subject.Metadata.GithubRef);
+            Field("Recorded source tree", plan.Subject.Metadata.GithubTreeSha);
+            Field("Native metadata policy", pinPolicy.MetadataPolicy);
+            if (pinPolicy.Owner is { } owner)
+            {
+                Field("Registry", owner.RegistryPath);
+                Field("Selected owner entry", owner.Selector);
+                Field("Owner fingerprints", owner.BeforeFingerprint + " -> " + owner.DesiredFingerprint);
+            }
+            sb.AppendLine("Only verified pin tracking changes. Installed instructions, extras and source revision remain as captured; every consumer of this physical installation is affected.");
+            sb.AppendLine("Apply swaps in a verified directory with new active object IDs and timestamps. Supported native attributes are preserved; the exact original native directory is retained for undo. This does not detach an individual consumer.");
+        }
         if (plan.LocalDisposition is { } local)
         {
             Field("Source baseline candidate", local.SourceCandidate.Identity.CanonicalPath);

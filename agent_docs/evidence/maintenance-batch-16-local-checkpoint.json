@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "batch": 16,
+  "scope": "Local pre-candidate checkpoint; no candidate commit exists for these working-tree snapshots.",
+  "baseline": {
+    "mainCommit": "0dba59be59776e6e654123aa1ce1e5496074763e",
+    "priorClosureCommit": "2fc9782",
+    "originalAcceptance": {
+      "complete": 9,
+      "total": 21,
+      "M08": "incomplete"
+    },
+    "otherOriginalObligations": "Remain unchanged and open; this checkpoint does not update acceptance."
+  },
+  "independentFinalReview": {
+    "status": "clear",
+    "manifestPath": "/tmp/skillview-unpin-review/final-cleared-hashes.json",
+    "manifestSha256": "5205cefaa44bb17c58e446967ae99fc8c7f13054fe0664d3bd92c7e97d54a144",
+    "files": {
+      ".github/workflows/ci.yml": "9c5cd05bec7ea94998ab8467b89827280a17bd91b1da29afb5acd7f0ea2e21d7",
+      "AGENTS.md": "a8d52a80bf834595e6a3601cad9ef953741b776d9ab3819f99450c2d77b865fd",
+      "agent_docs/evidence/prepare-gh-proof-tool.py": "cbdc6b5755fa01f7d41c1104ccbc73b0888dac205f214d6a60488fa75b6ab254",
+      "agent_docs/evidence/prove-old-native-plans.py": "338c4c759c06e60510bda0486a7caf4429ded928d6695696a7aeb8ca2eacab6e",
+      "agent_docs/evidence/prove-shared-revision-update.py": "9517e5829b0ad4565559da88b572ad7e1d9444d80cba07b90d6a0bb34e461e6e",
+      "agent_docs/evidence/run-local-merge-disk-full-docker.py": "e5591db0b3f94f185d9a69e86a09cdb34139564a09a2c13559215e6ead3bbe3b",
+      "agent_docs/maintenance-standalone-unpin.md": "e4026d5ed119a182ef9b9ecb922884fd1d4f4a02146e042011b72eafed3f7bc4",
+      "docs/usage.md": "fddd129cdee9c2665ce91f629f2cf0d1762a925fb503a74aa3572b0f45558037",
+      "src/SkillView.Core/Cli/CliDispatcher.Restore.cs": "e085acb71d54f9a919f666cff813f255fa5788c70f56b5e0c31110c15ba156d2",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "9dd4ff5e080fd729244ecb2fe5ac65c40709597facd4ff399231afa3cf4091f9",
+      "src/SkillView.Core/Maintenance/GhRegistryEditor.cs": "27fbad444b5bf59b2c2ba733936fe6eb003f682853e6868c48e36f7b97012922",
+      "src/SkillView.Core/Maintenance/InstalledPayloadMaterializer.cs": "24780ae52b1779dd86744611c87523a1b13d1281aca062507de56ac779259469",
+      "src/SkillView.Core/Maintenance/PayloadMetadataReview.cs": "84819f92794a65511068fe2e3e171f5af5e3cf80ff0f32d9f67714821d08fa72",
+      "src/SkillView.Core/Maintenance/PinTrackingWriter.cs": "1e9b8a9db5bebe9ebc94097fe98cf905f2ca40d8f87925691f716d2b07662c10",
+      "src/SkillView.Core/Maintenance/ReplacementPinPolicy.cs": "43c994902befc05554fc9b3a0bc2a38861906840ef7708cabe072a938fb17fc7",
+      "src/SkillView.Core/Maintenance/ReplacementPlan.cs": "67ee1a64fe024df1d3a80a0f7e7e02d958c16fbbae59b3259bad60c8044f77be",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReview.cs": "d4368ac429e4b715338c6696aebd4e6b42577a22872140e084aa1d1fceb2fc78",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.Owner.cs": "b8969e8bd4441b114331fba67b2864241b8057c4994222ef9d4d97805230cbf6",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerJournal.cs": "122f7e2ecece096ebab52de4b1d0e2ceba223b88d25eee1ea211155b8373f08d",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.OwnerRepair.cs": "be074167665f5c532bb963b10d5d8b3396810b1139c11222d3c8f6d9fe202991",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unpin.cs": "bc548e2f090432f7716015b275597d35dd2197808dd1095074d7fa8880cebe2b",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs": "54908654d4d3cd936e7b6248c4b8b9e2d262d5883823d0126f20261565f8d9f4",
+      "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs": "215d8c46d1e666e8a59cf6b3d52a15620dd6d0b5690ca14a89979fad020a3f7b",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "cfcbcca43b3fe812594937765aa35bfad4971e6be317b7c4cda92e79a25d71bb",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "ed40c62ec887dbb38da5c8f92072571974501b0cfb2e4ab688c0db5a899d35d8",
+      "src/SkillView.Core/Ui/Tabs/UpdatesTabView.LocalReview.cs": "8a00716e24fbd454a4616d9191ba6f74b628b95dce5af1ec5c6a53d13d47d583",
+      "src/SkillView.Core/Ui/Tabs/UpdatesTabView.Review.cs": "770fb94d917832bc37ade2a875300dbbee35a0b6b3f464e832878514c2136813",
+      "src/SkillView.Core/Ui/Tabs/UpdatesTabView.cs": "9157ff68b6290d4df65a1388d7d87d0dcee2c46016d0fd15c958e648887d6716",
+      "src/SkillView.Core/Ui/UpdateScreen.cs": "1c125bab5e0ba6696074be8664f86c2eaa7ac3eef89ae251507ab36cdd263f69",
+      "tests/SkillView.MaintenanceProof/Program.cs": "60badf9fe420c00024ca61b48fc57775b71f7574dad2c99ebef5b93222d071be",
+      "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs": "04532835a1e02c10b500ce0d1a8fd1738a73814c05e407cac8ca150dc106d93d",
+      "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs": "00d5db9ad1522b1e72271f37af012196dfd5089561e6d0833604b8f69b9f13ce",
+      "tests/SkillView.Tests/Maintenance/GhRegistryUnpinTests.cs": "90ba928af8fc2d5f3c1b7e20bf5d9df7f0d5320f9a0ee513eebbcb7b59d7f488",
+      "tests/SkillView.Tests/Maintenance/PinTrackingWriterTests.cs": "6bffa875b352760fab132570655b7f3bc60e9535d99458eb4468e6758ace3723",
+      "tests/SkillView.Tests/Maintenance/SharedReplacementRevisionTests.Unpin.cs": "3b81f83c3c48bce3248e5bb3d3fd7c815082a2b4e5210cfa5af2c9a88dbd05ea",
+      "tests/SkillView.Tests/Maintenance/StandaloneUnpinTests.cs": "348f32d6d74ce0352484aa2f9574c85f946b5eb7c5c09454ca9fdf19c5a6ecb2",
+      "tests/SkillView.Tests/Maintenance/WindowsPayloadMetadataTests.cs": "9414caec91df12342b3b952b0b456c4a9845ba2e1e826ec59b3be7cf4fbe76f5",
+      "tests/SkillView.Tests/Ui/ReviewedUpdatesTabTests.Unpin.cs": "3b411663929a09a5827d92d7b7aba0c482cb1f21d9243675618274cd4aa05c22",
+      "tests/SkillView.Tests/Ui/ReviewedUpdatesTabTests.cs": "a834940f9fa09969a14f1361309cab3e461a9f7b035489d4fb9c74d0c553e3f4",
+      "tests/SkillView.Tests/Ui/SkillViewAppTests.cs": "f91be261e98bad44d39cc6f25179f242acd41e240f66a33d7a7068d35914bafe",
+      "tests/SkillView.Tests/Ui/UnpinKeyboardTests.cs": "e374bdf165b21469dcbdcc762391d8109f9688bf394b45731fcf893f380e06b7"
+    }
+  },
+  "localVerification": {
+    "fullSuitePreFinalDeltas": {
+      "sourceAttribution": "This 1,959-test run predates the final reviewed source changes. It is not full-suite verification of the final source snapshot.",
+      "sourceManifestPath": "/tmp/skillview-unpin-evidence/local/source-hashes-full-suite.sha256",
+      "sourceManifestSha256": "ba176d1c08af202e19c6304d35f8b530ea0d4777072b89f1a89cb270288c2cc7",
+      "total": 1959,
+      "passed": 1959,
+      "failed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/skillview-unpin-evidence/local/full-suite-unpin.log",
+        "sha256": "b14c9b9d236eb7b226e268713df6f7dbf3bf98339618b402bbcd00ae03b35109",
+        "result": "pass",
+        "totals": {
+          "total": 1959,
+          "passed": 1959,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "stagedBeforeFinalDeltas": {
+      "sourceManifestPath": "/tmp/skillview-unpin-evidence/local/source-hashes-attempt4.sha256",
+      "sourceManifestSha256": "3e27f05c6d678bd58a90cde572a94d1495fa2984e0fad611d52eaae1259b8599",
+      "focused": {
+        "total": 251,
+        "passed": 251,
+        "failed": 0,
+        "skipped": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/focused-unpin-attempt4.log",
+          "sha256": "3aca3799725098bb0033934f4b1d05e3bb45bc4dc50b0ba68d1ba91997428029",
+          "result": "pass",
+          "totals": {
+            "total": 251,
+            "passed": 251,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "sharedReplacementRegression": {
+        "total": 69,
+        "passed": 69,
+        "failed": 0,
+        "skipped": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/legacy-replacement-regressions-attempt4b.log",
+          "sha256": "d0a82e07ac3342179dda8be5f147b0bd0848e4defcbc87fcb6688d3103119239",
+          "result": "pass",
+          "totals": {
+            "total": 69,
+            "passed": 69,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    "finalTargetedSnapshot": {
+      "sourceManifestPath": "/tmp/skillview-unpin-evidence/local/source-hashes-attempt5.sha256",
+      "sourceManifestSha256": "62d289b0016de647d8e891cdbb83e9676065fe7ac6309626259681b71bddd4ea",
+      "build": {
+        "command": "dotnet build tests/SkillView.Tests/SkillView.Tests.csproj --no-restore",
+        "warnings": 0,
+        "errors": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/tests-build-attempt5.log",
+          "sha256": "91d99384c5cc00afd9093ece0d60134b6d627214c03e36c7a3acf82f460eeff7",
+          "result": "pass"
+        }
+      },
+      "standaloneUnpin": {
+        "filterClass": "SkillView.Tests.Maintenance.StandaloneUnpinTests",
+        "total": 18,
+        "passed": 18,
+        "failed": 0,
+        "skipped": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/standalone-unpin-attempt5.log",
+          "sha256": "c487fb9fa7dc5c85df90c9bb7d8026a3e4f129d50010bcc252b5850aa73578de",
+          "result": "pass",
+          "totals": {
+            "total": 18,
+            "passed": 18,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "format": {
+        "core": {
+          "command": "dotnet format src/SkillView.Core/SkillView.Core.csproj --no-restore --verify-no-changes",
+          "exitCode": 0,
+          "log": {
+            "path": "/tmp/skillview-unpin-evidence/local/format-core-verify-attempt5.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "result": "pass"
+          }
+        },
+        "tests": {
+          "command": "dotnet format tests/SkillView.Tests/SkillView.Tests.csproj --no-restore --verify-no-changes",
+          "exitCode": 0,
+          "log": {
+            "path": "/tmp/skillview-unpin-evidence/local/format-tests-verify-attempt5.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "result": "pass"
+          }
+        }
+      }
+    },
+    "maintenanceProofHost": {
+      "sourceHashesPath": "/tmp/skillview-unpin-evidence/local/maintenance-proof-source-hashes.sha256",
+      "sourceHashesSha256": "4ab5a671c7c2cdafeb432f6784b91ea1493cece3c9d7d01c80c761a08dd04327",
+      "files": {
+        "tests/SkillView.MaintenanceProof/Program.cs": "60badf9fe420c00024ca61b48fc57775b71f7574dad2c99ebef5b93222d071be",
+        "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj": "64698a5b85b31ad017831247acea0767817cb2ea2c3dec5d5303f30c1536bd66",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "5560a17cb83d845674863a6e2117bbc303af69501137ca6e48e58e77e07a8dca"
+      },
+      "restore": {
+        "command": "dotnet restore tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj --locked-mode",
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/maintenance-proof-restore.log",
+          "sha256": "40d104602671164ab3958225da3e1c8cabd55f0251d6df6bc911d9d5a24f44ce",
+          "result": "pass; all projects up-to-date"
+        }
+      },
+      "build": {
+        "command": "dotnet build tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj --no-restore",
+        "warnings": 0,
+        "errors": 0,
+        "log": {
+          "path": "/tmp/skillview-unpin-evidence/local/maintenance-proof-build.log",
+          "sha256": "a22e5eaa1d89de55963ba8cad70bd9b4ec4a279726beb3a07de1db96cfbb793c",
+          "result": "pass"
+        }
+      }
+    }
+  },
+  "pending": {
+    "newNativeAot": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "status": "Pending CI; no new Native AOT or minimum/latest gh compatibility result is claimed by this local checkpoint.",
+    "localEnvironment": "WSL ARM64 Docker integration was unavailable and clang was absent; no local Docker or Native AOT proof was run.",
+    "historicalMacDownArrowCrash": "Never reproduced.",
+    "nativeGhContracts": {
+      "minimum": "2.97.0",
+      "recordedCurrentStable": "2.102.0"
+    },
+    "oldNativeSavedPlans": {
+      "baselineCommit": "0dba59be59776e6e654123aa1ce1e5496074763e",
+      "schemas": [
+        1,
+        2,
+        3
+      ],
+      "boundaryByCurrentHost": {
+        "App": "retain-moved",
+        "GhExtension": "install-moved"
+      },
+      "fixtureGhVersion": "2.102.0"
+    }
+  }
+}

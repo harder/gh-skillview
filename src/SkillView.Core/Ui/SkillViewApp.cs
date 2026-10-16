@@ -496,6 +496,7 @@ public sealed class SkillViewApp
             onUpdateApplied: () => _services.ListAdapter.Invalidate(),
             applyRunner: (review, hidden, token) => _workflows.ApplyReviewedUpdateAsync(review, hidden, token),
             localReviewRunner: (request, hidden, token) => _workflows.ReviewLocalUpdateAsync(request, hidden, token),
+            unpinRunner: (target, hidden, token) => _workflows.PrepareUnpinAsync(target, hidden, token),
             lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,

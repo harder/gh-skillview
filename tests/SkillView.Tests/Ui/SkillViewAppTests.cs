@@ -901,7 +901,7 @@ public sealed class SkillViewAppTests
         updates.LocalPanelForTests.Enabled = true;
         updates.ResolutionFileForTests.SetFocus();
         Assert.True(updates.LocalFileInputHasFocus);
-        foreach (var character in "/aduUqlrEeDoOiIcC123?filename.txt")
+        foreach (var character in "/adpuUqlrEeDoOiIcC123?filename.txt")
         {
             var key = new Key(character);
             window.NewKeyDownEvent(key);

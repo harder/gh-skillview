@@ -7,7 +7,7 @@ internal sealed partial class ReplacementPlanStore
 {
     private OwnerJournal? OpenOwnerJournal(Session session, InventorySnapshot inventory, CancellationToken token, bool create)
     {
-        if (session.Plan.Revision?.Owner is null) return null;
+        if (EffectiveOwner(session.Plan) is null) return null;
         var path = Path.Combine(session.Operation.CanonicalPath, "owner-journal");
         try { _ = File.GetAttributes(path); }
         catch (FileNotFoundException) { if (!create) return null; }
@@ -64,14 +64,14 @@ internal sealed partial class ReplacementPlanStore
                     {
                         var record = Read(directory, entry.Name, RegistryWriteJsonContext.Default.RegistryWriteIntent, token);
                         binding = record.Binding;
-                        if (record.SchemaVersion != 1 || record.RegistryPath != plan.Revision!.Owner!.RegistryPath
-                            || record.Selector != plan.Revision.Owner.Selector || record.Before is null || record.DesiredBytes is null
+                        if (record.SchemaVersion != 1 || record.RegistryPath != EffectiveOwner(plan)!.RegistryPath
+                            || record.Selector != EffectiveOwner(plan)!.Selector || record.Before is null || record.DesiredBytes is null
                             || record.Before.Bytes is null || record.Before.Bytes.Length > SkillLockFileReader.MaxFileBytes
                             || record.DesiredBytes.Length > SkillLockFileReader.MaxFileBytes
                             || record.Before.ContentHash != NativeRegistryFileLease.Hash(record.Before.Bytes)
                             || record.DesiredHash != NativeRegistryFileLease.Hash(record.DesiredBytes)
                             || record.Before.Identity.CanonicalPath != record.RegistryPath
-                            || !NativeDirectoryMoveLease.SameObject(record.Before.Identity, plan.Revision.Owner.Identity))
+                            || !NativeDirectoryMoveLease.SameObject(record.Before.Identity, EffectiveOwner(plan)!.Identity))
                             throw new IOException("Owner write evidence is inconsistent.");
                         (suffix == "-intent.json" ? intents : restores).Add(id, record);
                     }
@@ -82,8 +82,8 @@ internal sealed partial class ReplacementPlanStore
                         if (record.SchemaVersion != 1 || record.Current is null || record.Current.Bytes is null
                             || record.Current.Bytes.Length > SkillLockFileReader.MaxFileBytes
                             || record.Current.ContentHash != NativeRegistryFileLease.Hash(record.Current.Bytes)
-                            || !NativeDirectoryMoveLease.SameObject(record.Current.Identity, plan.Revision!.Owner!.Identity)
-                            || record.Current.Identity.CanonicalPath != plan.Revision.Owner.RegistryPath)
+                            || !NativeDirectoryMoveLease.SameObject(record.Current.Identity, EffectiveOwner(plan)!.Identity)
+                            || record.Current.Identity.CanonicalPath != EffectiveOwner(plan)!.RegistryPath)
                             throw new IOException("Owner completion evidence is inconsistent.");
                         (suffix == "-complete.json" ? completions : restoredCompletions).Add(id, record);
                     }
@@ -144,8 +144,8 @@ internal sealed partial class ReplacementPlanStore
                     || Terminal(id) || !intents.ContainsKey(previous.WriteId) || Terminal(previous.WriteId)) return null;
                 var retained = RepairImage(previous.WriteId, new HashSet<string>(StringComparer.Ordinal), token);
                 var parentAttempt = restores.TryGetValue(previous.WriteId, out var restoration) ? restoration : intents[previous.WriteId];
-                var retainedEntry = GhRegistryEditor.CaptureEntry(retained, plan.Revision!.Owner!.Selector, token);
-                var retainedState = retainedEntry.Fingerprint == plan.Revision.Owner.BeforeFingerprint ? "before" : "desired";
+                var retainedEntry = GhRegistryEditor.CaptureEntry(retained, EffectiveOwner(plan)!.Selector, token);
+                var retainedState = retainedEntry.Fingerprint == EffectiveOwner(plan)!.BeforeFingerprint ? "before" : "desired";
                 if (!Prefix(current.Bytes, parentAttempt.DesiredBytes)
                     || previous.Direction != directions[previous.WriteId] || previous.ImageHash != NativeRegistryFileLease.Hash(retained)
                     || previous.Bytes != retained.Length || previous.EntryState != retainedState) return null;
@@ -161,8 +161,8 @@ internal sealed partial class ReplacementPlanStore
             else if (names.Contains($"registry-{id}-complete.json")) return null;
             if (!NativeDirectoryMoveLease.SameObject(attempt.Before.Identity, current.Identity) || !Prefix(current.Bytes, attempt.DesiredBytes)) return null;
             var image = RepairImage(id, new HashSet<string>(StringComparer.Ordinal), token);
-            var entry = GhRegistryEditor.CaptureEntry(image, plan.Revision!.Owner!.Selector, token);
-            var state = entry.Fingerprint == plan.Revision.Owner.BeforeFingerprint ? "before" : "desired";
+            var entry = GhRegistryEditor.CaptureEntry(image, EffectiveOwner(plan)!.Selector, token);
+            var state = entry.Fingerprint == EffectiveOwner(plan)!.BeforeFingerprint ? "before" : "desired";
             return (new(id, directions[id], NativeRegistryFileLease.Hash(image), image.Length, state), image);
         }
 
@@ -171,7 +171,7 @@ internal sealed partial class ReplacementPlanStore
             token.ThrowIfCancellationRequested();
             if (!chain.Add(id) || chain.Count > MaxAttempts || !intents.TryGetValue(id, out var intent))
                 throw new IOException("Repair evidence ancestry is missing or cyclic.");
-            var transition = plan.Revision!.Owner!;
+            var transition = EffectiveOwner(plan)!;
             if (intent.Binding!.Direction == "repair")
             {
                 if (!GhRegistryWriteSession.MalformedJson(intent.Before.Bytes)

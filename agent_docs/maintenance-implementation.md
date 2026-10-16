@@ -1118,7 +1118,106 @@ unchanged. PR65 Copilot review found stale Windows publication status in the use
 guide; the correction describes supported metadata, effective-user ownership and
 the existing security-privilege requirement while retaining explicit refusals.
 
-Final PR checks and merge remain pending. Original acceptance remains 9/21; M08 fork/source/local-import/standalone
-unpin, other-owner transitions, remaining preference recovery and the original
-criterion audit remain open. The original Installed Down-arrow crash was never
-reproduced.
+### Batch 15 final merged verification
+
+PR65 merged at `0dba59be59776e6e654123aa1ce1e5496074763e` on 2026-10-16.
+The merge tree `9335a2e961cf488069a4a79b392599bda33f09a0` matches the exact
+reviewed head `81e403db602ccc4c9f82c629810f8b6d01dde3ac`; the merge parents are
+the prior main commit and that reviewed head. Final evidence is in
+`evidence/maintenance-batch-15-final.json`, including the selected artifact
+digests and member hashes, attempt attribution, observed PR checks, tests,
+metadata results and the quota-limited first attempt. All 15 observed PR check
+entries are successful after attempt 2; CodeQL passed in its separate run. The
+successful Linux/macOS jobs, platform tests and Windows metadata jobs are retained
+from attempt 1; the Windows AOT results are fresh attempt-2 replacements. The three
+platform test jobs each passed
+1,912 tests; both Windows metadata jobs passed 98 tests. The final artifact set
+contains 156 verified members across four native RIDs, with 30 new proof
+contracts checked. Attempt 1's Windows failures were GitHub Actions installation
+API quota responses; only the failed Windows jobs were rerun after reset on the
+unchanged reviewed head.
+
+Batch 15 adds preserve-installed and reviewed schema 3 merges. Approved source C
+remains the future comparison baseline, while customized result M has separate
+result evidence. Supported native metadata publication is verified across Linux
+x64, macOS ARM64, Windows x64 and Windows ARM64. Original acceptance remains
+9/21; M08 fork/source/local-import/standalone unpin, required detach, other-owner
+transitions, remaining preference recovery and the original criterion audit
+remain open. The original Installed Down-arrow crash was never reproduced.
+
+## Batch 16: standalone unpin (local checkpoint)
+
+The pre-candidate working tree adds schema 4 `unpin-only`, which binds captured
+installed content and pin policy without fabricated revision/base evidence. It
+removes verified raw pin members while retaining source/ref/tree and physical
+exposures, and uses checked effective-owner state across save, recovery and undo.
+Local final-targeted verification passes the scoped build, 18 standalone-unpin
+tests, and Core/test formatting. The earlier 1,959-test full-suite result belongs
+to the source snapshot before the final reviewed source changes; it is recorded as
+pre-final evidence, not a final-source full-suite claim. Native AOT on four RIDs
+and compatibility with gh 2.97.0/2.102.0 remain pending CI. M08 and original
+acceptance remain incomplete at 9/21; other original obligations are unchanged.
+The original Mac Down-arrow crash was never reproduced. See
+`maintenance-standalone-unpin.md` and
+`evidence/maintenance-batch-16-local-checkpoint.json` for the design and bounded
+local evidence.
+
+### Batch 16: failed CI and local cross-platform fixes
+
+PR66 attempt 1 at `b8ab8fa475960308c71e556ee5ac94a3983b65c4` was canceled after
+macOS and Windows unpin tests/metadata each exposed 16 failures: strict schema4
+archive validation compared the wrong platform projection. The macOS AOT lane also
+selected tar.gz for the official gh 2.97.0 arm64 asset, which is a ZIP; Copilot
+reported the same helper defect in one unresolved review thread. The schema4-only
+native comparison and macOS ZIP fixes were independently reviewed. On the fixed
+local source snapshot, the scoped build, StandaloneUnpinTests 29/29, shared-owner
+regressions 69/69, Core/test format checks, and three downloader-helper tests pass.
+Official macOS gh 2.97.0 and 2.102.0 ZIPs were checksum verified but not executed.
+The earlier 1,959-test full-suite result remains attributed to its pre-final source
+snapshot. Fresh cross-platform CI and four native AOT lanes remain pending.
+Frozen schema 1–3 compatibility uses records from baseline `0dba59be` with gh
+2.102.0 on both proof hosts; the separate unpin compatibility matrix uses gh
+2.97.0 and 2.102.0. Attempt1 produced no selected native proof artifacts.
+Acceptance remains 9/21 and M08 incomplete. Details, raw log hashes,
+artifact digests and exact local source manifest are in
+`evidence/maintenance-batch-16-ci-fixes.json`.
+
+### Batch 16: frozen legacy fixture follow-up
+
+At exact head `5ad2c4eb65b552fa5aaf9c44e66036c59589ec13`, all three full platform
+suites pass 1,987/1,987 and both Windows metadata lanes pass 207/207; CodeQL and
+both gh contract lanes also pass. The Linux native lane reached four standalone-
+unpin `CAP_SYS_ADMIN` refusal rows (App/extension × gh 2.97.0/2.102.0), then
+failed its schema1 restore-plan fixture because the fixture injected noncanonical
+lockfile fields before the historical guard. The workflow was canceled for that
+fixture issue; the four native artifacts are partial and do not establish a full
+RID matrix, privileged Linux success, or schema 1–3 compatibility. The helper fix
+keeps schema1 canonical and moves extension injection to later schemas; three
+focused helper tests, AST parsing and help checks pass locally, but fresh native CI
+remains pending. The earlier 1,959-test full-suite count remains pre-final-source evidence.
+Original acceptance remains 9/21 and M08 incomplete. See
+`evidence/maintenance-batch-16-legacy-fixture-fix.json` for run IDs, artifact
+SHA256 digests, partial proof scope and the local helper receipt.
+
+### Batch 16: native proof harness path follow-up
+
+At `4130a3f4`, CI attempt1 exhausted the installation API quota in existing
+proofs; the observed response reached 5,000 used, zero remaining, with reset at
+19:21:28 UTC. The failed-job rerun after reset completed the full Linux native
+lane, including private privileged unpin and frozen old-schema proofs; artifact
+assertion review is clear: 60 artifact members, 36 privileged unpin recovery rows
+and six actual old-schema fixtures were verified. macOS failed an existing shared-owner
+update preparation on a refused outbound connection. Both Windows lanes failed
+when the shared-owner App proof tried to hash an extensionless `gh` pathname;
+Windows had launched `gh.exe`, but the receipt read required its actual filename.
+These failures precede the new unpin/legacy steps on those three platforms.
+
+The helper now binds every explicit executable before authentication or fixtures,
+preserving downloaded versions and refusing missing paths without PATH fallback.
+Four focused helper tests, AST/help and diff checks pass; independent review is
+clear. Product source/tests are unchanged from the recorded 3×1,987 platform and
+2×207 metadata passes; corresponding `4130` gates, CodeQL and both gh contracts
+pass. New-head CI and a complete four-RID native proof selection remain pending.
+Acceptance remains 9/21 and M08 incomplete. See
+`evidence/maintenance-batch-16-harness-path-fix.json` for exact attribution and
+compact raw-evidence hashes.

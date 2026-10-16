@@ -12,22 +12,47 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import stat
 import subprocess
 import tempfile
 import threading
 import time
 
+
+def resolve_gh_executable(path, *, windows=None, lookup=None):
+    """Bind an explicit tool path, including Windows' omitted PATHEXT suffix."""
+    candidate = path.resolve()
+    if candidate.is_file():
+        return candidate
+    is_windows = os.name == 'nt' if windows is None else windows
+    if is_windows:
+        # An absolute path keeps which from substituting another PATH gh.
+        resolved = (lookup or shutil.which)(str(candidate))
+        if resolved is not None and Path(resolved).is_file():
+            return Path(resolved).resolve(strict=True)
+    raise FileNotFoundError(f'Explicit gh executable does not name a file: {path}')
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--proof-host', required=True, type=Path)
 parser.add_argument('--gh', required=True, action='append', type=Path)
 parser.add_argument('--output', required=True, type=Path)
-parser.add_argument('--merged', action='store_true', help='Review and preserve local bytes in a schema3 shared-owner merge, then run the same recovery matrix.')
+mode = parser.add_mutually_exclusive_group()
+mode.add_argument('--unpin-only', action='store_true', help='Clear only pin metadata/owner policy, retaining observed installed content and source/ref/tree without source resolution.')
+parser.add_argument('--expect-metadata-refusal', help='Standalone unpin must refuse this exact native metadata reason without changing installed objects or owner bytes.')
+mode.add_argument('--merged', action='store_true', help='Review and preserve local bytes in a schema3 shared-owner merge, then run the same recovery matrix.')
 args = parser.parse_args()
 app, host = args.app.resolve(), args.proof_host.resolve()
-apply_disposition = 'merge-reviewed' if args.merged else 'retain-original'
-apply_action = 'apply-merged' if args.merged else 'apply'
+if args.expect_metadata_refusal and not args.unpin_only:
+    parser.error('--expect-metadata-refusal requires --unpin-only')
+try:
+    args.gh = [resolve_gh_executable(path) for path in args.gh]
+except OSError as error:
+    parser.error(str(error))
+apply_disposition = 'unpin-only' if args.unpin_only else 'merge-reviewed' if args.merged else 'retain-original'
+apply_action = 'apply-unpin' if args.unpin_only else 'apply-merged' if args.merged else 'apply'
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
 if not auth:
     auth = subprocess.run([str(args.gh[-1]), 'auth', 'token', '--hostname', 'github.com'],
@@ -139,6 +164,18 @@ for gh_path in args.gh:
                                         '--', 'cli/cli', 'skills/gh-skill'], env=env, cwd=root,
                                        capture_output=True, text=True, timeout=120)
             assert installed.returncode == 0, installed.stderr
+        # Fixture installation may use the network. Standalone-unpin commands
+        # run with all HTTP(S) proxy paths bound to a private non-listening
+        # loopback socket, so the production gh resolver/stager cannot contact
+        # GitHub even if accidentally called. Keep the reservation alive.
+        source_blocker = None
+        if args.unpin_only:
+            source_blocker = socket.socket()
+            source_blocker.bind(('127.0.0.1', 0))
+            proxy = 'http://127.0.0.1:' + str(source_blocker.getsockname()[1])
+            for key in ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy'):
+                env[key] = proxy
+            env.update(NO_PROXY='', no_proxy='')
         payload = home / '.agents' / 'skills' / 'gh-skill'
         exposure = home / '.claude' / 'skills' / 'gh-skill'
         exposure.parent.mkdir(parents=True)
@@ -151,11 +188,13 @@ for gh_path in args.gh:
         registry_path.write_bytes((json.dumps(original, indent=2) + '\n').encode('utf-8'))
         payload.joinpath('SKILL.md').write_bytes(payload.joinpath('SKILL.md').read_bytes() + b'\nUser modifications\n')
         payload.joinpath('user-extra').write_bytes(b'\x00\xffKeep extra')
-        windows_owner_prepared = prepare_windows_fixture_owner(payload) if args.merged else False
+        windows_owner_prepared = prepare_windows_fixture_owner(payload) if args.merged or args.unpin_only else False
         original_payload, unrelated_payload = manifest(payload), manifest(custom / 'gh-skill')
         original_exposure = exposure.lstat().st_ino
 
         def run(command, *arguments, ok=True):
+            if args.unpin_only and command in ('update-apply', 'update-inspect', 'update-recover', 'update-undo', 'update-repair-owner'):
+                command = command.replace('update-', 'unpin-', 1)
             process = subprocess.run([str(app), '--scan-root', str(custom), command, *map(str, arguments),
                                       '--allow-hidden-dirs', '--json'], env=env, cwd=root,
                                      capture_output=True, text=True, timeout=180)
@@ -163,6 +202,31 @@ for gh_path in args.gh:
             return json.loads(process.stdout)
 
         def plan():
+            if args.unpin_only:
+                registry_before = registry_path.read_bytes()
+                result = run('unpin-plan', '--path', payload)['operation']
+                assert manifest(payload) == original_payload and registry_path.read_bytes() == registry_before
+                assert manifest(custom / 'gh-skill') == unrelated_payload
+                assert 'revision' not in result and 'localDisposition' not in result
+                policy = result['pinPolicy']
+                assert policy['owner']['selector'] == 'gh-skill' and len(result['subject']['agents']) >= 2
+                source = result['subject']['metadata']
+                desired = policy['desiredMetadata']
+                for key in ('upstream', 'githubRef', 'githubTreeSha', 'githubPath'):
+                    assert desired.get(key) == source.get(key), (key, source, desired)
+                assert not desired['pinned'] and desired.get('pinnedRef') is None
+                saved = json.loads(Path(result['planPath']).read_bytes())
+                assert saved['schemaVersion'] == 4 and saved['purpose'] == 'unpin-only'
+                assert 'revision' not in saved and 'localDisposition' not in saved
+                owner_before = base64.b64decode(policy['owner']['beforeEntry'], validate=True)
+                desired_owner = base64.b64decode(policy['owner']['desiredEntry'], validate=True)
+                before_json, desired_json = json.loads(owner_before), json.loads(desired_owner)
+                assert before_json.pop('pinnedRef') and before_json == desired_json
+                result['_desiredOwnerEntry'] = desired_owner
+                result['_approvedCandidate'] = manifest(Path(result['candidatePath']))
+                assert b'\nUser modifications\n' in Path(result['candidatePath']).joinpath('SKILL.md').read_bytes()
+                assert Path(result['candidatePath']).joinpath('user-extra').read_bytes() == b'\x00\xffKeep extra'
+                return result
             preparation = run('update', '--path', payload, '--unpin', '--force')
             assert not preparation['mutationAttempted']
             assert preparation['outcomes'][0]['status'] == 'review-required'
@@ -224,8 +288,10 @@ for gh_path in args.gh:
             return run(command, '--id', saved['id'], '--yes', '--expect', reviewed['reviewFingerprint'])['operation']
 
         def kill_at(saved, action, checkpoint, expected):
-            if args.merged and action == 'apply':
+            if action == 'apply':
                 action = apply_action
+            elif args.unpin_only:
+                action += '-unpin'
             process = subprocess.Popen([str(host), str(root), str(gh), saved['id'], expected, action, checkpoint],
                                        env=env, cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                        stderr=subprocess.STDOUT, text=True)
@@ -275,6 +341,12 @@ for gh_path in args.gh:
                 assert manifest(saved['_sourceCandidatePath']) == saved['_sourceCandidate']
 
         def assert_merged_publication(saved):
+            if args.unpin_only:
+                assert b'\nUser modifications\n' in payload.joinpath('SKILL.md').read_bytes()
+                assert payload.joinpath('user-extra').read_bytes() == b'\x00\xffKeep extra'
+                assert registry_path.read_bytes().count(saved['_desiredOwnerEntry']) == 1
+                assert json.loads(registry_path.read_bytes())['skills']['gh-skill']['skillFolderHash'] == saved['subject']['metadata']['githubTreeSha']
+                assert exposure.is_symlink() and exposure.lstat().st_ino == original_exposure
             if args.merged:
                 assert b'\nUser modifications\n' in payload.joinpath('SKILL.md').read_bytes()
                 assert payload.joinpath('user-extra').read_bytes() == b'\x00\xffKeep extra'
@@ -284,7 +356,32 @@ for gh_path in args.gh:
                 assert json.loads(registry_path.read_bytes())['skills']['gh-skill']['skillFolderHash'] == saved['revision']['source']['tree']
                 assert_merged_source(saved)
 
+        if args.expect_metadata_refusal:
+            registry_before = registry_path.read_bytes()
+            refusal = run('unpin-plan', '--path', payload, ok=False)
+            assert args.expect_metadata_refusal in refusal.get('error', ''), refusal
+            assert registry_path.read_bytes() == registry_before
+            assert_original()
+            assert not list((root / 'state').rglob('plan.json'))
+            results.append(dict(host=str(app), proofKind='standalone-unpin-native-refusal',
+                                gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
+                                exactRefusal=args.expect_metadata_refusal, originalNativeObjectsAndOwnerUnchanged=True,
+                                publicationSucceeded=False))
+            source_blocker.close()
+            continue
+
         saved = plan()
+        if args.unpin_only:
+            raw_before_reformat = registry_path.read_bytes()
+            selected_key = b'"selectedExtension": {'
+            assert raw_before_reformat.count(selected_key) == 1
+            reformatted = raw_before_reformat.replace(selected_key, b'"selectedExtension"  : {')
+            registry_path.write_bytes(reformatted)
+            refused = run('update-apply', '--id', saved['id'], '--yes', '--disposition', apply_disposition,
+                          '--expect', saved['planFingerprint'], ok=False)
+            assert not refused['succeeded'] and 'owner record changed' in refused['error'], refused
+            assert registry_path.read_bytes() == reformatted and manifest(payload) == original_payload
+            registry_path.write_bytes(raw_before_reformat)
         # Change one unrelated field after planning, without touching the
         # selected entry; initial apply must preserve this fresh manager work.
         current = json.loads(registry_path.read_bytes())
@@ -299,10 +396,18 @@ for gh_path in args.gh:
         updated = json.loads(registry_path.read_bytes())
         selected = updated['skills']['gh-skill']
         assert 'pinnedRef' not in selected and selected['selectedExtension'] == {'keep': True}
-        assert selected['skillFolderHash'] == saved['revision']['source']['tree']
+        assert selected['skillFolderHash'] == (saved['subject']['metadata']['githubTreeSha'] if args.unpin_only else saved['revision']['source']['tree'])
         assert selected['installedAt'] == original['skills']['gh-skill']['installedAt']
         assert updated['skills']['unrelated']['extension'] == [1, 2, 3]
         assert manifest(custom / 'gh-skill') == unrelated_payload
+        if args.unpin_only:
+            assert selected['updatedAt'] == original['skills']['gh-skill']['updatedAt']
+            native_before_noop, registry_before_noop = manifest(payload), registry_path.read_bytes()
+            plans_before_noop = sorted(str(path) for path in (root / 'state').rglob('*'))
+            noop = run('unpin-plan', '--path', payload)
+            assert noop['operation'] is None and noop['unchanged']
+            assert manifest(payload) == native_before_noop and registry_path.read_bytes() == registry_before_noop
+            assert sorted(str(path) for path in (root / 'state').rglob('*')) == plans_before_noop
         if args.merged:
             live_registry = registry_path.read_bytes()
             next_plan = run('update-plan', '--path', payload)['operation']
@@ -326,6 +431,7 @@ for gh_path in args.gh:
         rows = []
         for action, checkpoint, tear, undo in [
                 ('apply', 'retain-moved', False, False),
+                *([('apply', 'install-moved', False, False), ('undo', 'displace-moved', False, True), ('undo', 'restore-moved', False, True)] if args.unpin_only else []),
                 ('apply', 'registry-truncated', True, False),
                 ('apply', 'compensation-truncated', True, False),
                 ('undo', 'registry-truncated', True, True),
@@ -364,16 +470,26 @@ for gh_path in args.gh:
             rows.append(dict(action=action, checkpoint=checkpoint, actualProcessKilled=True,
                              tornImageExplicitlyRepaired=tear, registryBytesRestored=True,
                              originalNativePayloadAndExposureRestored=True, unrelatedSameNameUnchanged=True,
+                             **(dict(schema4StandaloneUnpinRecoveryVerified=True, recordedSourceRefTreePreserved=True) if args.unpin_only else {}),
                              **(dict(schema3MergedRecoveryVerified=True, localBytesPreserved=True, sourceCandidateUnchanged=True) if args.merged else {})))
         results.append(dict(host=str(app), proofHost=str(host),
+                            hostSha256=hashlib.sha256(app.read_bytes()).hexdigest(),
+                            proofHostSha256=hashlib.sha256(host.read_bytes()).hexdigest(),
+                            ghSha256=hashlib.sha256(gh.read_bytes()).hexdigest(),
                             gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
                             canonicalDisposableHomeAndStateGuardsVerified=True,
                             freshUnrelatedRegistryChangesPreserved=True, selectedExtensionsAndInstalledAtPreserved=True,
                             explicitUnpinAndExactImmutableCandidate=True, fixtures=rows,
+                            **(dict(proofKind='standalone-unpin', schema4Verified=True, noSourceResolution=True,
+                                    localInstructionsAndExtraPreserved=True, exactOwnerAndOriginalNativeUndo=True,
+                                    sourceNetworkBlockedAfterFixtureInstall=True, selectedEquivalentRawReformatRefused=True,
+                                    windowsSupportedFixtureOwnerPrepared=windows_owner_prepared) if args.unpin_only else {}),
                             **(dict(proofKind='shared-local-merge', schema3ReviewedPlanVerified=True,
                                     immutableSourceAndExactOwnerTransitionRetained=True, localInstructionsAndExtraPreserved=True,
                                     nextUpdateUsesRealSourceBaseline=True,
                                     windowsSupportedFixtureOwnerPrepared=windows_owner_prepared) if args.merged else {})))
+        if source_blocker is not None:
+            source_blocker.close()
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
 print(json.dumps(results, indent=2))

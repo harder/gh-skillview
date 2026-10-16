@@ -6,11 +6,12 @@ namespace SkillView.Maintenance;
 
 internal sealed partial class ReplacementPlanStore
 {
-    internal ReplacementResult RepairOwner(string id, string expectedObservation, InventorySnapshot inventory, CancellationToken token)
+    internal ReplacementResult RepairOwner(string id, string expectedObservation, InventorySnapshot inventory, CancellationToken token, string? expectedPurpose = null)
     {
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
-        using var owner = OpenOwner(plan.Revision?.Owner, token, recoverySession: session, inventory: inventory)
+        RequirePurpose(plan, expectedPurpose);
+        using var owner = OpenOwner(EffectiveOwner(plan), token, recoverySession: session, inventory: inventory, exactEntryBytes: plan.PinPolicy is not null)
             ?? throw new IOException("This plan has no shared registry owner.");
         var current = Observe(plan, session.Operation, inventory, token, owner);
         if (expectedObservation != ObservationHash(plan, current))

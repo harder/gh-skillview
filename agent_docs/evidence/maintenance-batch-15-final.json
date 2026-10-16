@@ -1,0 +1,1005 @@
+{
+  "schemaVersion": 1,
+  "batch": 15,
+  "candidateCommit": "e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0",
+  "sourceFinalSummary": {
+    "path": "/tmp/skillview-batch15-evidence/final-pr65/final-summary.json",
+    "sha256": "d1d6873e00a306a2cea5fad40ef31417419e3c05e31886de425559b60df1fc68",
+    "runAttempt": 2
+  },
+  "merge": {
+    "pullRequest": 65,
+    "mergedAt": "2026-10-16T17:58:24Z",
+    "mergeCommit": "0dba59be59776e6e654123aa1ce1e5496074763e",
+    "mergeTree": "9335a2e961cf488069a4a79b392599bda33f09a0",
+    "reviewedHead": "81e403db602ccc4c9f82c629810f8b6d01dde3ac",
+    "baseCommit": "80921f49a5aefc07b01a1fc609a61132ddc4cd7c",
+    "parents": [
+      "80921f49a5aefc07b01a1fc609a61132ddc4cd7c",
+      "81e403db602ccc4c9f82c629810f8b6d01dde3ac"
+    ],
+    "reviewedHeadEqualsMergedTree": true
+  },
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "incomplete",
+    "goal": "All 21 original findings in reviewable, verified, merged batches; acceptance remains criterion-based."
+  },
+  "M08": {
+    "status": "incomplete",
+    "implemented": "Preserve-installed and schema 3 reviewed merge preserve approved source C as the future baseline while tracking customized M as separate result evidence; native metadata publication is supported within verified platform contracts.",
+    "remaining": "Durable fork/source switch/local import; standalone unpin with required detach; other native manager owner transitions; remaining suppression kinds; damaged/stale preference recovery; complete original acceptance audit",
+    "originalInstalledDownArrowCrash": "never reproduced"
+  },
+  "priorConsolidatedVerification": {
+    "path": "agent_docs/evidence/maintenance-batch-15-verification.json",
+    "sha256": "89f69bdd39817712b0dba0134d4c42dfb689e20b8fc0cdadbaf8561f9d7142b5"
+  },
+  "finalGates": {
+    "ciRunId": 38932078129,
+    "attempt": 2,
+    "headSha": "81e403db602ccc4c9f82c629810f8b6d01dde3ac",
+    "conclusion": "success",
+    "codeqlRunId": 38932078249,
+    "codeqlConclusion": "success",
+    "observedCheckCount": 15,
+    "observedChecksAllSucceeded": true,
+    "checksAreObservedStatuses": "This lists observed PR check conclusions; it does not assert which checks GitHub branch protection marked as required.",
+    "checks": {
+      "Analyze (csharp)": "success",
+      "workflow-lint": "success",
+      "Analyze (actions)": "success",
+      "dependency-review": "success",
+      "site-check": "success",
+      "test (ubuntu-latest)": "success",
+      "test (macos-15)": "success",
+      "test (windows-latest)": "success",
+      "Windows metadata (windows-latest)": "success",
+      "Windows metadata (windows-11-arm)": "success",
+      "AOT publish smoke (linux-x64)": "success",
+      "AOT publish smoke (osx-arm64)": "success",
+      "AOT publish smoke (win-x64)": "success",
+      "AOT publish smoke (win-arm64)": "success",
+      "CodeQL": "success"
+    }
+  },
+  "tests": {
+    "linux-x64": {
+      "total": 1912,
+      "passed": 1912,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "e99b6c85581ed871373e99c65c663ba2b17a3363ddf570a8bd57a1c647b87d5f"
+    },
+    "macos-15": {
+      "total": 1912,
+      "passed": 1912,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "adf7ef00da1bea37888f1bbe7d1e771a1dd0ed33481654ab30671815969cee94"
+    },
+    "windows-latest": {
+      "total": 1912,
+      "passed": 1912,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "b9df6ff8ffe9aa6235cd2d1a71a4d0860aeae5910566a84d942481a549a42fad"
+    }
+  },
+  "windowsMetadata": {
+    "windows-latest": {
+      "total": 98,
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "dccc6c9e299cf954e1920e5e171c43acb42c1d41f5197944b2c28eb16a005c7c"
+    },
+    "windows-11-arm": {
+      "total": 98,
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "a1ba50829fb426aa134fc8f3b66c34e23a11a4547be86f4a7d575b64b56a453e"
+    }
+  },
+  "attempt1": {
+    "ciRunId": 38932078129,
+    "attempt": 1,
+    "conclusion": "failure",
+    "failedRids": [
+      "win-x64",
+      "win-arm64"
+    ],
+    "failedStep": "Prove reviewed shared-owner merges and restart repair",
+    "cause": "GitHub Actions installation REST API quota returned HTTP 403. The extension preparation failure did not attempt a live installation mutation; earlier isolated test-fixture mutations were intentional and verified.",
+    "resetUtc": "2026-10-16T17:17:20Z",
+    "failedArtifactMembersTotal": 58,
+    "failedArtifacts": {
+      "win-x64": {
+        "artifactId": 12060852126,
+        "name": "native-maintenance-evidence-win-x64",
+        "sizeBytes": 90978,
+        "githubDigest": "sha256:69c0f93d5872766086c4c83ab86707200fbb6a8d4f28ff8d820f083cb26b8237",
+        "downloadedZipSha256": "69c0f93d5872766086c4c83ab86707200fbb6a8d4f28ff8d820f083cb26b8237",
+        "digestMatches": true,
+        "memberCount": 29,
+        "actualGhVersion": "gh version 2.102.0 (2026-09-30)",
+        "memberManifestSha256": "5c0a66bca4f2a2ed15a5193b0104e5cba95dea091c6fbdc9967f0541ad60189b"
+      },
+      "win-arm64": {
+        "artifactId": 12060727673,
+        "name": "native-maintenance-evidence-win-arm64",
+        "sizeBytes": 90909,
+        "githubDigest": "sha256:fb122d1e5a07bf7fb410a957f869a94c4f1780cde5d3c10b30141c8fdf8170fd",
+        "downloadedZipSha256": "fb122d1e5a07bf7fb410a957f869a94c4f1780cde5d3c10b30141c8fdf8170fd",
+        "digestMatches": true,
+        "memberCount": 29,
+        "actualGhVersion": "gh version 2.102.0 (2026-09-30)",
+        "memberManifestSha256": "1c058563e40aa5d18329c536bc29b62865fb6dac5d82132fdad7a24c229df299"
+      }
+    },
+    "rawLogs": [
+      "/tmp/skillview-batch15-evidence/final-pr65/aot-win-x64.log",
+      "/tmp/skillview-batch15-evidence/final-pr65/aot-win-arm64.log"
+    ]
+  },
+  "nativeArtifactsSelected": {
+    "selection": "Successful Linux/macOS attempt-1 artifacts and successful Windows attempt-2 replacements. Attempt-1 failed Windows artifacts are retained above and were not selected as final platform proof.",
+    "totalVerifiedMembers": 156,
+    "artifacts": {
+      "linux-x64": {
+        "artifactId": 12060013378,
+        "createdAt": "2026-10-16T16:40:04Z",
+        "updatedAt": "2026-10-16T16:40:04Z",
+        "runAttempt": 1,
+        "name": "native-maintenance-evidence-linux-x64",
+        "sizeBytes": 109445,
+        "githubDigest": "sha256:d4d6c63e4c356053786c278a2153a7d9d02c4b3879954e6e64efe5a044c27912",
+        "downloadedZipSha256": "d4d6c63e4c356053786c278a2153a7d9d02c4b3879954e6e64efe5a044c27912",
+        "digestMatches": true,
+        "memberCount": 46,
+        "actualGhVersion": "gh version 2.102.0 (2026-09-30)",
+        "files": [
+          {
+            "path": "backup-app-proof.json",
+            "bytes": 892,
+            "sha256": "ea127166bb87a2cbcc12d0172fa49516ffe88886b3f13ae4162706a1dd5f7913"
+          },
+          {
+            "path": "backup-extension-proof.json",
+            "bytes": 895,
+            "sha256": "3530e9ba98b72678f19b03cade22392e54e361563d94ce311f9c728004b35c15"
+          },
+          {
+            "path": "disk-full-proof/container-tools.log",
+            "bytes": 5394,
+            "sha256": "e1eaebe98feee48446bde0872f1aef9fca87e0c80d55699f560680cf0c3d96fe"
+          },
+          {
+            "path": "disk-full-proof/disk-full-displace-moved.json",
+            "bytes": 13403,
+            "sha256": "3a738d6fda3695650e0075ba013590bae5944b96dee656f6260b224a4ca8863c"
+          },
+          {
+            "path": "disk-full-proof/disk-full-displace-moved.log",
+            "bytes": 87,
+            "sha256": "9cea263da17e20f625afdcdbff4f1294f2d8440bd93a9f12921619c90bfb2574"
+          },
+          {
+            "path": "disk-full-proof/disk-full-install-moved.json",
+            "bytes": 13404,
+            "sha256": "61fe5382d2e3215e5af5089264eabd1ced7389765fada9d4d2c1f6c7b8a10947"
+          },
+          {
+            "path": "disk-full-proof/disk-full-install-moved.log",
+            "bytes": 86,
+            "sha256": "838f0667641f9fc0b591ccbbddba70f64d551b100d37362bf4fee1da4cf355d9"
+          },
+          {
+            "path": "disk-full-proof/disk-full-restore-moved.json",
+            "bytes": 13402,
+            "sha256": "2398c9476a19d2eaab31bbb04d4787bddcbc6eb122dbdaf5e91e7eb4c6876605"
+          },
+          {
+            "path": "disk-full-proof/disk-full-restore-moved.log",
+            "bytes": 86,
+            "sha256": "5e1c52f8cac3d46d51a1d630600e13e1622cb8019deb87970d721a0387a6bb19"
+          },
+          {
+            "path": "disk-full-proof/disk-full-retain-moved.json",
+            "bytes": 13398,
+            "sha256": "708192d9ed6e5e39ec302a5c676a6f3955964cc3c9572dd117fb9230aa92292c"
+          },
+          {
+            "path": "disk-full-proof/disk-full-retain-moved.log",
+            "bytes": 85,
+            "sha256": "b6c771164c38a4f833eac28eb20156b3adacc6e64418413a26189441832eef6b"
+          },
+          {
+            "path": "disk-full-proof/docker.log",
+            "bytes": 1902,
+            "sha256": "c7ecd282fdd96554729678df018edfd56c68712ee2e54b14724e35cf36a7b107"
+          },
+          {
+            "path": "disk-full-proof/guard-ordinary.log",
+            "bytes": 152,
+            "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4"
+          },
+          {
+            "path": "disk-full-proof/guard-oversized.log",
+            "bytes": 152,
+            "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4"
+          },
+          {
+            "path": "disk-full-proof/guard-shared-small.log",
+            "bytes": 185,
+            "sha256": "9e5a6ea9f8807f71e2512327647f7a842c709c26a704cdef2b41aa15b99fc2d3"
+          },
+          {
+            "path": "disk-full-proof/inputs.json",
+            "bytes": 7031,
+            "sha256": "673dab3700afddbbc9c2c1ade1ea6e54c97efd7403c013272ddb6a44463e637a"
+          },
+          {
+            "path": "effective-loading-app-proof.json",
+            "bytes": 462594,
+            "sha256": "39c43c60ca117678d4c4b6cdc2748571fcd64ca453f22c54dbeb1980454cfc20"
+          },
+          {
+            "path": "effective-loading-extension-proof.json",
+            "bytes": 462615,
+            "sha256": "f68a3752aa6d7ae20f08fb2c914e5837ab1934765319c9e17cc3093478fea398"
+          },
+          {
+            "path": "gitfile-app-proof.json",
+            "bytes": 443,
+            "sha256": "c65eb549b7e1d672bdec76d1a93dc2f5877b7c03a6b79e5bba4f383f346abc2f"
+          },
+          {
+            "path": "gitfile-extension-proof.json",
+            "bytes": 446,
+            "sha256": "908271b547848897dde30673d476f99e7c8a6eab1829e21547044e5a9cb8a713"
+          },
+          {
+            "path": "identities-app-proof.json",
+            "bytes": 1712,
+            "sha256": "892cc1774defc0dccf893830c540d25e9fd43a7fc447a8ff7a1727b126acaee8"
+          },
+          {
+            "path": "identities-extension-proof.json",
+            "bytes": 1715,
+            "sha256": "055130e90fa4fb77b16c3fa4bdfee8a22e7fe7427abe941dad13fc5fdd566278"
+          },
+          {
+            "path": "inventory-denied-app-proof.json",
+            "bytes": 16463,
+            "sha256": "09045a24dee357061fa9ed43f2fb7b366c9f6b6620e2cd7f256c59422f278d84"
+          },
+          {
+            "path": "inventory-denied-extension-proof.json",
+            "bytes": 16460,
+            "sha256": "238d5ce1e12501d2c20684ddeb1c09bdeb29b9ac40c74c2490da40c646ae63c6"
+          },
+          {
+            "path": "inventory-filter-app-proof.json",
+            "bytes": 3046,
+            "sha256": "59b43b07ca180c5545d0253772a1d4f5ed5c6a0abdb155ebfda85281f854c46b"
+          },
+          {
+            "path": "inventory-filter-extension-proof.json",
+            "bytes": 3049,
+            "sha256": "d52da8218b6383a3e2b1206fe5f3724c4486bafb20acf4e7cacef0063a9d52da"
+          },
+          {
+            "path": "local-merge-app-proof.json",
+            "bytes": 1601,
+            "sha256": "64cfe7a90b8949f654d6a5b6bcfdae41c25daadee324033adf37174732dc9628"
+          },
+          {
+            "path": "local-merge-extension-proof.json",
+            "bytes": 1604,
+            "sha256": "e7c2e2b7a74becf5b2d3b01255550a53c66b781d95263b17c7457c7e3441adcf"
+          },
+          {
+            "path": "managed-discovery-app-proof.json",
+            "bytes": 1173,
+            "sha256": "8bc9c6d204649f181cf095ae6438f7023692ec7cd3d4760be93b1dd19d6bd758"
+          },
+          {
+            "path": "managed-discovery-extension-proof.json",
+            "bytes": 1176,
+            "sha256": "8a294a8863b7b8e61119272b1461dc3a64dd6563af04e988be95f66812d1ff8b"
+          },
+          {
+            "path": "object-app-proof.json",
+            "bytes": 497,
+            "sha256": "7bfd07dba6e96e956c8e8be22a038abe97399307d039023eb5da7c685bf2fd53"
+          },
+          {
+            "path": "object-extension-proof.json",
+            "bytes": 500,
+            "sha256": "16a41b347c85d4440cc84e365256d4fdb2223f8bfb2519a779625f8af950f3bc"
+          },
+          {
+            "path": "quarantine-app-proof.json",
+            "bytes": 956,
+            "sha256": "fc2959aabb6c27381cba8e7720d1e1a25aafcd1e337e74fc8762b3e6384cecfa"
+          },
+          {
+            "path": "quarantine-extension-proof.json",
+            "bytes": 959,
+            "sha256": "bb9428ee84f99b4792de41d133afc78a11f8eae85c1734ff81af9c6fd43d1086"
+          },
+          {
+            "path": "replacement-app-proof.json",
+            "bytes": 1622,
+            "sha256": "cc7f2bf2fff942e644fafade61cac289df9e93ce97abd78c3781e5b1933c6a5b"
+          },
+          {
+            "path": "replacement-extension-proof.json",
+            "bytes": 1625,
+            "sha256": "f1b09c1a85c083ba8002812f3e76548f37040cc9c291e0475e23900322ba4b98"
+          },
+          {
+            "path": "revision-app-proof.json",
+            "bytes": 1624,
+            "sha256": "6df7044f86cbf0eeee480b2c0a3b1017cc3b7661da11bdf5c21a9fd422a62961"
+          },
+          {
+            "path": "revision-extension-proof.json",
+            "bytes": 1627,
+            "sha256": "3efa8972639eda620b6f3d7077a98acd3a2c31e83bccc97c070ba214068a6672"
+          },
+          {
+            "path": "shared-owner-app-proof.json",
+            "bytes": 2381,
+            "sha256": "0c874cda3943c184944593bad8c6cd5ca7166d11c47b9b49c5a1e1bf9ab4c528"
+          },
+          {
+            "path": "shared-owner-extension-proof.json",
+            "bytes": 2384,
+            "sha256": "e17c154619e5d12e89199c4daaeb2e28746b9330c3d0c0f250b3253465c0c02b"
+          },
+          {
+            "path": "suppression-app-proof.json",
+            "bytes": 12103,
+            "sha256": "5efa10bce6379fc659ec3cad9e1c061801471f6439732e3a8221d52f00b66bdf"
+          },
+          {
+            "path": "suppression-extension-proof.json",
+            "bytes": 12187,
+            "sha256": "f8415095b81dcdbc70f66cf76dc1eaf502c873cd880ba485b017728b5871b0df"
+          },
+          {
+            "path": "tracking-app-proof.json",
+            "bytes": 28860,
+            "sha256": "1d64503e1c4f9f589e316921e2d8403617bb005040a3bf63efeffb60999dcc53"
+          },
+          {
+            "path": "tracking-extension-proof.json",
+            "bytes": 28854,
+            "sha256": "ee14d9958d811fee0abc842d0549f35bb2445489c70e0fa51a93f8f0bf29b301"
+          },
+          {
+            "path": "update-outcomes-app-proof.json",
+            "bytes": 2668,
+            "sha256": "1fe4944b11c6addc6a1b623aaa4781075dd209bae501d0b24c6e9aaf5c219e42"
+          },
+          {
+            "path": "update-outcomes-extension-proof.json",
+            "bytes": 2671,
+            "sha256": "bcf42893079b3f927f588926e63f47fab1da3419b402f0263e6018032e5d55d2"
+          }
+        ]
+      },
+      "osx-arm64": {
+        "artifactId": 12060737025,
+        "createdAt": "2026-10-16T16:51:58Z",
+        "updatedAt": "2026-10-16T16:51:58Z",
+        "runAttempt": 1,
+        "name": "native-maintenance-evidence-osx-arm64",
+        "sizeBytes": 99950,
+        "githubDigest": "sha256:e88c48a0b61cdcc0728080983f3ca7460f3fb1557e28eb9749a517a1796be453",
+        "downloadedZipSha256": "e88c48a0b61cdcc0728080983f3ca7460f3fb1557e28eb9749a517a1796be453",
+        "digestMatches": true,
+        "memberCount": 38,
+        "actualGhVersion": "gh version 2.100.0 (2026-09-03)",
+        "files": [
+          {
+            "path": "backup-app-proof.json",
+            "bytes": 893,
+            "sha256": "94b2e1c823abcfaff50cb7089f164c1297246ec2505047b5418602afbae3ad3a"
+          },
+          {
+            "path": "backup-extension-proof.json",
+            "bytes": 896,
+            "sha256": "18ed48c6fe40792c05c9790b5d8ea2ebe4217bc7a87898255430445f711142d6"
+          },
+          {
+            "path": "effective-loading-app-proof.json",
+            "bytes": 521509,
+            "sha256": "5fb2d330e0eee6275bd80e942916bf0a19ab79b17b0703c4c2182f170c93665b"
+          },
+          {
+            "path": "effective-loading-extension-proof.json",
+            "bytes": 521536,
+            "sha256": "f75291b369f8f0670cda8ad71f75667b68f6c4d31fbde502dd223491e066f894"
+          },
+          {
+            "path": "gitfile-app-proof.json",
+            "bytes": 444,
+            "sha256": "5488b52dd3e7c4b2e9e7652e69a653241bd05fb91abb449f1de5f805f1ea9121"
+          },
+          {
+            "path": "gitfile-extension-proof.json",
+            "bytes": 447,
+            "sha256": "a6e783ba38e8e69c562198e2c3e4227f87e91e86918fe6dd094bc62114b01851"
+          },
+          {
+            "path": "identities-app-proof.json",
+            "bytes": 1713,
+            "sha256": "4b554bdfe96448d3a15346f01de6659f802006f4fc18e9fb070ef9c383f469c3"
+          },
+          {
+            "path": "identities-extension-proof.json",
+            "bytes": 1716,
+            "sha256": "e01f4da568076d0fd1aa3f26003f920584e83657658b3e050a6a5815a8a97afa"
+          },
+          {
+            "path": "inventory-denied-app-proof.json",
+            "bytes": 20681,
+            "sha256": "b38aaf868baa996fe7de6c337c273b9837f09a9ab8e12014faab8fc71d35076e"
+          },
+          {
+            "path": "inventory-denied-extension-proof.json",
+            "bytes": 20682,
+            "sha256": "cd85bcca40c0369e7f93c88cf61f7ff9214347f0911b7f857647cc2d1ca3bd3d"
+          },
+          {
+            "path": "inventory-filter-app-proof.json",
+            "bytes": 3047,
+            "sha256": "b81f9a6896828b7802748e9285db2a6068c18729d9ff01601a211f22fd6f4903"
+          },
+          {
+            "path": "inventory-filter-extension-proof.json",
+            "bytes": 3050,
+            "sha256": "5fe441b89da2ddc2e9a903912ac76bfc7bbac686fb02935743e21a4c18e96f82"
+          },
+          {
+            "path": "local-merge-app-proof.json",
+            "bytes": 1934,
+            "sha256": "c7372f3dc67f064b7822ce97e6ff98e9591cc53f40ddc064fcda124c1cdad2cc"
+          },
+          {
+            "path": "local-merge-extension-proof.json",
+            "bytes": 1937,
+            "sha256": "9ece5117f069d21b41af5fd614bb3c7f87869808de660249bc31e9ee82b49a87"
+          },
+          {
+            "path": "local-merge-killed-displace-moved-proof.json",
+            "bytes": 2088,
+            "sha256": "083ee026c60180af05e53ef7d9e9df9eb63fdff1d2591b4176d1f4e88f9bac39"
+          },
+          {
+            "path": "local-merge-killed-install-moved-proof.json",
+            "bytes": 2089,
+            "sha256": "698c52d877b650ad3a492d563e89f686c20a409f98e61a8f314cfeb4721a09bf"
+          },
+          {
+            "path": "local-merge-killed-restore-moved-proof.json",
+            "bytes": 2087,
+            "sha256": "0701e995e28b69320fb9c2c59df0f994feb10797a9fdcc8d765e1b5360122f49"
+          },
+          {
+            "path": "local-merge-killed-retain-moved-proof.json",
+            "bytes": 2088,
+            "sha256": "19d982ae578a0b0af1ba5e3ec711d3b805c58322fb125054d3f4a80b678880de"
+          },
+          {
+            "path": "managed-discovery-app-proof.json",
+            "bytes": 1174,
+            "sha256": "f2c930dbf3bb845107479e87b1990184f8c965132b061822c2752d55c4970c51"
+          },
+          {
+            "path": "managed-discovery-extension-proof.json",
+            "bytes": 1177,
+            "sha256": "b405e59b36527b631898739c5b5d2525d91606d04def446c9ed5b1d4868f97d6"
+          },
+          {
+            "path": "object-app-proof.json",
+            "bytes": 498,
+            "sha256": "2ca39156316b6e9ea5ee702376c28639b230f30b79edcc16db64f0269758a880"
+          },
+          {
+            "path": "object-extension-proof.json",
+            "bytes": 501,
+            "sha256": "54c69730de852c519ad74948f3a223698f3f55f19194dccd2849a3920c85c797"
+          },
+          {
+            "path": "quarantine-app-proof.json",
+            "bytes": 957,
+            "sha256": "f42213d8bc58e01c8b432a8b677a328ce25c3f438f355d27866b9bf398cd2e58"
+          },
+          {
+            "path": "quarantine-extension-proof.json",
+            "bytes": 960,
+            "sha256": "3eb49c5ccb5311d2179e439cd0c2bed5a70fc4cb1db81e65f044e50d11a62d92"
+          },
+          {
+            "path": "replacement-app-proof.json",
+            "bytes": 1623,
+            "sha256": "ab2521fc8f5ad1540f91815a1205cf12260c3291d76ef03af407137ad1902629"
+          },
+          {
+            "path": "replacement-extension-proof.json",
+            "bytes": 1626,
+            "sha256": "6f5af7cc547beb89e01e5c41f4ee3d689d8452977e371d79a8f955246eae6cfe"
+          },
+          {
+            "path": "revision-app-proof.json",
+            "bytes": 1625,
+            "sha256": "95bf4689cd36ebe773436c4ed6bad47e9e726fa5a134a0e24914fc6111149b8c"
+          },
+          {
+            "path": "revision-extension-proof.json",
+            "bytes": 1628,
+            "sha256": "96fac649d1abaab3f151abaf338b38f221ad991372f92a9510249016586766df"
+          },
+          {
+            "path": "shared-local-merge-app-proof.json",
+            "bytes": 3424,
+            "sha256": "e0c7e34ab85fb200917dae0b2041f747cddf3c19be3cd3fa5364a1fc97b3e0cb"
+          },
+          {
+            "path": "shared-local-merge-extension-proof.json",
+            "bytes": 3427,
+            "sha256": "e1474b3f8e37a9ffad4e82bcb3b247832f58da02c9d7bc8385805eb6092d4948"
+          },
+          {
+            "path": "shared-owner-app-proof.json",
+            "bytes": 2383,
+            "sha256": "016e7e9ffb8ad6098d5d17c541f3419ebee73a8da567df4ab0babc66b71da156"
+          },
+          {
+            "path": "shared-owner-extension-proof.json",
+            "bytes": 2386,
+            "sha256": "f688e04b66f2b75bba6e04aaf0445855e722323b89cd0217e724ce4e14131c48"
+          },
+          {
+            "path": "suppression-app-proof.json",
+            "bytes": 14500,
+            "sha256": "15262bafbcefcc0e7055b57d34918c3db8de776307631ac16b00fe9830d3b98a"
+          },
+          {
+            "path": "suppression-extension-proof.json",
+            "bytes": 14584,
+            "sha256": "d0200c720793c4b8ab5e07bffafcd6a6970584b76f6b31f9ab3baae5c32a126e"
+          },
+          {
+            "path": "tracking-app-proof.json",
+            "bytes": 32284,
+            "sha256": "936a6d913ee827d73982a18df04d33d04495f6fe66e94442d5461872588a19a8"
+          },
+          {
+            "path": "tracking-extension-proof.json",
+            "bytes": 32293,
+            "sha256": "3ee97d4b820a5d2c0d3f24b82e7a183189ccb0f0888b1f982cd50c571df36f43"
+          },
+          {
+            "path": "update-outcomes-app-proof.json",
+            "bytes": 2671,
+            "sha256": "02368d5cc182f11b7632e9873d80d44963584bc38c0dab4a3eb2ecc134e2ff3a"
+          },
+          {
+            "path": "update-outcomes-extension-proof.json",
+            "bytes": 2674,
+            "sha256": "100b024145e936aaf1aa29af9bb6b17881ec6473ab0727cc21d86d2ef726f600"
+          }
+        ]
+      },
+      "win-x64": {
+        "artifactId": 12063512225,
+        "createdAt": "2026-10-16T17:42:35Z",
+        "updatedAt": "2026-10-16T17:42:35Z",
+        "runAttempt": 2,
+        "name": "native-maintenance-evidence-win-x64",
+        "sizeBytes": 96496,
+        "githubDigest": "sha256:ae1f7321a54aab94553e4d5b8439f5300816ddc8992a2e00044ae62d0f2121b4",
+        "downloadedZipSha256": "ae1f7321a54aab94553e4d5b8439f5300816ddc8992a2e00044ae62d0f2121b4",
+        "digestMatches": true,
+        "memberCount": 36,
+        "actualGhVersion": "gh version 2.102.0 (2026-09-30)",
+        "files": [
+          {
+            "path": "backup-app-proof.json",
+            "bytes": 912,
+            "sha256": "ac7cb7a41a3da13b81804a1f087e01285a6984a7f4cca8c2a084a0cb7833a4c6"
+          },
+          {
+            "path": "backup-extension-proof.json",
+            "bytes": 915,
+            "sha256": "b9eb1a27f42e115d526286e76106005ca1ab39a86f764dd0abb39f4914082fcb"
+          },
+          {
+            "path": "effective-loading-app-proof.json",
+            "bytes": 523713,
+            "sha256": "8b93c62ac6c65425fb563e160c481681f5d5d41f6c8e3eb2c8df22ac5c09345b"
+          },
+          {
+            "path": "effective-loading-extension-proof.json",
+            "bytes": 523743,
+            "sha256": "b4b9f2b4cfcd54cd6c72033fe3e6aa4815d342dcafe46ef7f718b5789069333e"
+          },
+          {
+            "path": "gitfile-app-proof.json",
+            "bytes": 451,
+            "sha256": "e169f94acda57e26e021144d2069a78156de8f95b16a318017c299e90c576d77"
+          },
+          {
+            "path": "gitfile-extension-proof.json",
+            "bytes": 454,
+            "sha256": "0d084072e498046e7eb43afcbf018d922d913dafa16785988a6b0cc3df6e9f1b"
+          },
+          {
+            "path": "identities-app-proof.json",
+            "bytes": 1782,
+            "sha256": "2e5d23ab31fe612e61d535ee1896d5e8f82291f9f5c3bb3027482bae48cb84f7"
+          },
+          {
+            "path": "identities-extension-proof.json",
+            "bytes": 1785,
+            "sha256": "f4a5828347105984ee39c1b0ce536b88c62097cb4adfa74ad9cdbfa8e1c7f49b"
+          },
+          {
+            "path": "inventory-filter-app-proof.json",
+            "bytes": 3146,
+            "sha256": "cb7702ff7fcad28625f7acdf63fa15c860216085a3a96dfe53d20bf9baf96c6a"
+          },
+          {
+            "path": "inventory-filter-extension-proof.json",
+            "bytes": 3149,
+            "sha256": "c9de3aaa719f9c33cbf858d70a8f6ee51e13f235f63bbf5c16a05622148cca0d"
+          },
+          {
+            "path": "local-merge-app-proof.json",
+            "bytes": 2007,
+            "sha256": "e6a82e42ecf68940095e0a1d61931cf02bacfd30d2ee0c014b26eaf43f19f0a7"
+          },
+          {
+            "path": "local-merge-extension-proof.json",
+            "bytes": 2010,
+            "sha256": "dfde96dc47f4869f70a98bc95727c4273deb93b92d563127c6692f7f7dec1329"
+          },
+          {
+            "path": "local-merge-killed-displace-moved-proof.json",
+            "bytes": 2167,
+            "sha256": "f2c95e87fa4e18c8f098ae9ee83c2bc8cc548a9f7e0a3918e7e5be1ebd271e5e"
+          },
+          {
+            "path": "local-merge-killed-install-moved-proof.json",
+            "bytes": 2168,
+            "sha256": "bc68abed16c2caacaae8473f7665ab4a213a0f7915afb9c94362824c47b6cfe8"
+          },
+          {
+            "path": "local-merge-killed-restore-moved-proof.json",
+            "bytes": 2166,
+            "sha256": "817c6d162f0b15591012ed78270c1947a6e321969c4928c4f6c4d1d6f8fecfce"
+          },
+          {
+            "path": "local-merge-killed-retain-moved-proof.json",
+            "bytes": 2167,
+            "sha256": "bef67fefc8b41381e61a079c21ae985df8f92ecd0c289aa54f9ec4962e079a3a"
+          },
+          {
+            "path": "managed-discovery-app-proof.json",
+            "bytes": 1222,
+            "sha256": "4c7ec121c684939a9b373ba5dbd02e30b2a72519a95e1cef3667d76abe7d389b"
+          },
+          {
+            "path": "managed-discovery-extension-proof.json",
+            "bytes": 1225,
+            "sha256": "d443ae0466266f5160e9d387803e734506fe886ea225a7f28bce3fa024bd0af4"
+          },
+          {
+            "path": "object-app-proof.json",
+            "bytes": 508,
+            "sha256": "d3409d24f168d7b4cd8ea678524525addd59db3fa152817de579fd015f311828"
+          },
+          {
+            "path": "object-extension-proof.json",
+            "bytes": 511,
+            "sha256": "580cfae3fd79713ee75f2060e11afc8b140a87df8f36013171d7514295030565"
+          },
+          {
+            "path": "quarantine-app-proof.json",
+            "bytes": 977,
+            "sha256": "976c376ab51a36d7931c200fdfddf9829ccc6d5a4eb97316f0c14cd65515347d"
+          },
+          {
+            "path": "quarantine-extension-proof.json",
+            "bytes": 980,
+            "sha256": "a245b3ea563e347369ec4de50b21f401c73729a21edd6e099eec05390629f9a6"
+          },
+          {
+            "path": "replacement-app-proof.json",
+            "bytes": 1662,
+            "sha256": "2052a290b99fba3c3288c0bd34d97942112efc9501db9bde75f459b5c49914c6"
+          },
+          {
+            "path": "replacement-extension-proof.json",
+            "bytes": 1665,
+            "sha256": "4405d61348c9a0efe2579a18ad9e714901d1be17045ee3b83f131088591f3a6c"
+          },
+          {
+            "path": "revision-app-proof.json",
+            "bytes": 1664,
+            "sha256": "89369db129e9d37b7a55a38658b070decc8a8a982d969d58e8e90aeaa55ff1c4"
+          },
+          {
+            "path": "revision-extension-proof.json",
+            "bytes": 1667,
+            "sha256": "000ee717fa4b8d0ce2cc630a7bc20a748d7315a91774655c5f28e321df6ac525"
+          },
+          {
+            "path": "shared-local-merge-app-proof.json",
+            "bytes": 3508,
+            "sha256": "1479ba946d8e3960fe0bc835359f9f54a91cbf6d72f4bba72980c9ad199aac93"
+          },
+          {
+            "path": "shared-local-merge-extension-proof.json",
+            "bytes": 3511,
+            "sha256": "248feb8f42eb15615b41bfc6d592a28aea19bc92b3ae71c5b358e27e008b30e2"
+          },
+          {
+            "path": "shared-owner-app-proof.json",
+            "bytes": 2444,
+            "sha256": "e8ca48c36f91177df6e78dcdbc2e50d32ba865c0074024acf694bdab2e725e49"
+          },
+          {
+            "path": "shared-owner-extension-proof.json",
+            "bytes": 2447,
+            "sha256": "251b0ecd80ad380e7d28787e821a7b484db696a75e0147b2fa28ba5a3f431982"
+          },
+          {
+            "path": "suppression-app-proof.json",
+            "bytes": 14425,
+            "sha256": "278246f019ea953c12a9d36e978ab9d954597b4b97ecfbf10284388db5915f7e"
+          },
+          {
+            "path": "suppression-extension-proof.json",
+            "bytes": 14509,
+            "sha256": "5245229aeab0b7d49b13637b5480603554d43fd7a8671f2baaf25c4633ea6459"
+          },
+          {
+            "path": "tracking-app-proof.json",
+            "bytes": 32450,
+            "sha256": "79c5cf7246c234273e5f3a23edd2e4fb13865a241a89635bfcc1e95a4f75f5bb"
+          },
+          {
+            "path": "tracking-extension-proof.json",
+            "bytes": 32453,
+            "sha256": "05801907f74b8b236e68153b806d6cd0378c6d31ada86efe09be83de7237ed61"
+          },
+          {
+            "path": "update-outcomes-app-proof.json",
+            "bytes": 2714,
+            "sha256": "d528d29a928714d702098dd727331da13653f87b1450507c179f233ab47e601b"
+          },
+          {
+            "path": "update-outcomes-extension-proof.json",
+            "bytes": 2717,
+            "sha256": "49ab48f5a0c656fa96d182c764556fd63049dd0ffca0a2f715ec60af9e78987b"
+          }
+        ]
+      },
+      "win-arm64": {
+        "artifactId": 12064206933,
+        "createdAt": "2026-10-16T17:55:32Z",
+        "updatedAt": "2026-10-16T17:55:32Z",
+        "runAttempt": 2,
+        "name": "native-maintenance-evidence-win-arm64",
+        "sizeBytes": 96472,
+        "githubDigest": "sha256:1b87e32eb4a783fd43a415c97390bdf964ee3398c36b6444e1913a5af346e6f2",
+        "downloadedZipSha256": "1b87e32eb4a783fd43a415c97390bdf964ee3398c36b6444e1913a5af346e6f2",
+        "digestMatches": true,
+        "memberCount": 36,
+        "actualGhVersion": "gh version 2.102.0 (2026-09-30)",
+        "files": [
+          {
+            "path": "backup-app-proof.json",
+            "bytes": 912,
+            "sha256": "ff28d8abd28ecf0ba594ffc9d073c2ddedbf71a14ae49401920e79e6b1d217cf"
+          },
+          {
+            "path": "backup-extension-proof.json",
+            "bytes": 915,
+            "sha256": "0be3e21917b71205aaae3b63bb79fe478384f6587c6d6fd33c1e1b53ede6abf3"
+          },
+          {
+            "path": "effective-loading-app-proof.json",
+            "bytes": 523742,
+            "sha256": "aaafe679d26bed4d09bb020198ea68111d8dac5dde425db3bfd935bbcd28ddf6"
+          },
+          {
+            "path": "effective-loading-extension-proof.json",
+            "bytes": 523742,
+            "sha256": "019fefe2b3fea951629bbd1d2f943b9178288de59d0213cc5159a3a59c0b2cca"
+          },
+          {
+            "path": "gitfile-app-proof.json",
+            "bytes": 451,
+            "sha256": "e77d1a8477f00e1142213852b0f8eb947aa7dc1bfae1766357e43dfc5c99a75d"
+          },
+          {
+            "path": "gitfile-extension-proof.json",
+            "bytes": 454,
+            "sha256": "f1daf97ba0b737f33d0d7956416b17eb8676fd12425e92387f4ea95cf592535c"
+          },
+          {
+            "path": "identities-app-proof.json",
+            "bytes": 1782,
+            "sha256": "9eaa0134e20094492b18a1cab895d7935240189aaa20609ef0eb84bea2c54af6"
+          },
+          {
+            "path": "identities-extension-proof.json",
+            "bytes": 1785,
+            "sha256": "d119ba7d5550bb35fe1f0c9bfb38503298030dc19b10d24efdc3df8cab775490"
+          },
+          {
+            "path": "inventory-filter-app-proof.json",
+            "bytes": 3146,
+            "sha256": "1448cc6b1372c585e3562f995922701a48847dcbc4b9024918dba20efe0aabcf"
+          },
+          {
+            "path": "inventory-filter-extension-proof.json",
+            "bytes": 3149,
+            "sha256": "da8c20d082aa892d59950d08054b92774f52cea7acf217eba774b264e591022b"
+          },
+          {
+            "path": "local-merge-app-proof.json",
+            "bytes": 2007,
+            "sha256": "c259e2e984965cec8c48d8497ba8bd480fd6f646b629aee4c69dadb4e2e08980"
+          },
+          {
+            "path": "local-merge-extension-proof.json",
+            "bytes": 2010,
+            "sha256": "5345e9d1f48a9f0f2f4fc234aa80e44e5b912ca89618ba81bb0bede9fec38132"
+          },
+          {
+            "path": "local-merge-killed-displace-moved-proof.json",
+            "bytes": 2167,
+            "sha256": "a1c7381b7547a939b048e9aa75438f62ce4d222b403e0868be6ce4a5391e4fcd"
+          },
+          {
+            "path": "local-merge-killed-install-moved-proof.json",
+            "bytes": 2168,
+            "sha256": "2184dba69748be8f70222b1225e921b2b94dcbcf745d33459db045c5da063cb6"
+          },
+          {
+            "path": "local-merge-killed-restore-moved-proof.json",
+            "bytes": 2166,
+            "sha256": "13187709fab93a603ad03c64919aa6a7f54bb6569c8d656acbd47531df1421cf"
+          },
+          {
+            "path": "local-merge-killed-retain-moved-proof.json",
+            "bytes": 2167,
+            "sha256": "b5806bd372b2fdb3668f93a018f3ce33837dd2ff91db5d3c499c942012d1dd39"
+          },
+          {
+            "path": "managed-discovery-app-proof.json",
+            "bytes": 1222,
+            "sha256": "98502155c45d36998a3ed7d16eae1b42b29415194d7d91e81ad436a098f08744"
+          },
+          {
+            "path": "managed-discovery-extension-proof.json",
+            "bytes": 1225,
+            "sha256": "a7fb6e07f0e3fc33b9a6c4a77d14d2b9809fd61f38948a1d83ecebd5f9a27d64"
+          },
+          {
+            "path": "object-app-proof.json",
+            "bytes": 508,
+            "sha256": "3f33034ece084b9cbd93af5e572ea96d551eff2b5a6d38a8ad05ba2db5a45a4d"
+          },
+          {
+            "path": "object-extension-proof.json",
+            "bytes": 511,
+            "sha256": "8d8394d372bf3f7e875cdb8aae23539f8869df0e86a3f1436b4fa46dbd7b26f1"
+          },
+          {
+            "path": "quarantine-app-proof.json",
+            "bytes": 977,
+            "sha256": "70f3126d4fcbad29f74df45ea26e238f0791ae2e3779b6df9b9d91b896350e00"
+          },
+          {
+            "path": "quarantine-extension-proof.json",
+            "bytes": 980,
+            "sha256": "8ea4f2a78c65fe1c347adafbd993b479bb438af9227023ada0ebdde1f03c3ca9"
+          },
+          {
+            "path": "replacement-app-proof.json",
+            "bytes": 1662,
+            "sha256": "c070a0b75b83b558ab311974c81602255b9c4de510e60fa5e03127b48066d1a1"
+          },
+          {
+            "path": "replacement-extension-proof.json",
+            "bytes": 1665,
+            "sha256": "e10b50d8054d6bc199b198cd4a99e06ac2821e023bcd28076624f1a8bc5aafb3"
+          },
+          {
+            "path": "revision-app-proof.json",
+            "bytes": 1664,
+            "sha256": "27eac7b8b7bcaa242959beab31359668037ad68f5bc7eca76631d9f0ca6c3e83"
+          },
+          {
+            "path": "revision-extension-proof.json",
+            "bytes": 1667,
+            "sha256": "edc19aaa12e2dca532b187a37143522d106f882e0a331db66eeb546117760f9d"
+          },
+          {
+            "path": "shared-local-merge-app-proof.json",
+            "bytes": 3508,
+            "sha256": "4013759b5ee206aa9ca49fedc432a89c66a1ef044f8a5e70f81562adb92e81c8"
+          },
+          {
+            "path": "shared-local-merge-extension-proof.json",
+            "bytes": 3511,
+            "sha256": "c765ffbf3f3260fad54700b681942bac20f3d1c39d4b6f8e1014efaf4e122ba7"
+          },
+          {
+            "path": "shared-owner-app-proof.json",
+            "bytes": 2444,
+            "sha256": "ffd64640d48074f711a45c20497eb230639b4f1cb68897ee2df37cfbe191a075"
+          },
+          {
+            "path": "shared-owner-extension-proof.json",
+            "bytes": 2447,
+            "sha256": "75537b5184ba4f76983a3c6e3a0836e5dcc4a29a460256216b540735fe52048a"
+          },
+          {
+            "path": "suppression-app-proof.json",
+            "bytes": 14425,
+            "sha256": "726ad1d6e6e387faa9ac9a8bf0f9dcc1856da4a8044f934b13b14d30d095dca5"
+          },
+          {
+            "path": "suppression-extension-proof.json",
+            "bytes": 14509,
+            "sha256": "ec027afc523723c81da5e49545ae07815c6db296e2619999d61583df4aea7a4a"
+          },
+          {
+            "path": "tracking-app-proof.json",
+            "bytes": 32450,
+            "sha256": "5546e32e9701e66c9590853ada088a96074070ab35498e38af75691b71e6154e"
+          },
+          {
+            "path": "tracking-extension-proof.json",
+            "bytes": 32453,
+            "sha256": "3a6b705a19e87783d427a1ae36d5b201452a4add0f314fbd879fe52608c002ec"
+          },
+          {
+            "path": "update-outcomes-app-proof.json",
+            "bytes": 2713,
+            "sha256": "d03f38451d8232edc1b3581341f661ccdc1fcf23a6976caa666236d7b59be6d7"
+          },
+          {
+            "path": "update-outcomes-extension-proof.json",
+            "bytes": 2715,
+            "sha256": "1203c476f7c5aa51f2a72cf088cce503c541d119f27f29b3539ad168d7903c3e"
+          }
+        ]
+      }
+    }
+  },
+  "independentFinalEvidenceReview": {
+    "reviewer": "GPT-6.1-Sol high",
+    "result": "clear",
+    "verifiedSelectedArtifactMembers": 156,
+    "verifiedFailedAttemptArtifactMembers": 58,
+    "newProofContractsChecked": 30,
+    "testRunsChecked": 3,
+    "testsPerRun": 1912,
+    "windowsMetadataRunsChecked": 2,
+    "metadataTestsPerRun": 98
+  },
+  "handoffQualification": "Historical Mac receipts retain their original scope; temporary raw outputs lost before the WSL session are not represented as recreated logs. Later exact-head CI evidence is identified by run, attempt and artifact IDs."
+}
