@@ -4,9 +4,8 @@ using SkillView.Logging;
 
 namespace SkillView.Inventory;
 
-/// Write or remove the `.skillview-ignore` marker file. The marker is
-/// the only on-disk state SkillView writes outside explicit user actions on
-/// skill directories themselves.
+/// Compatibility helpers for legacy `.skillview-ignore` markers. Ordinary
+/// cleanup suppression uses external preferences and leaves these markers alone.
 public static class IgnoreMarker
 {
     public static string MarkerPathFor(string skillDir) =>

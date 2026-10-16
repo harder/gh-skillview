@@ -54,6 +54,7 @@ public static partial class CliDispatcher
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "cleanup" => await CleanupAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "ignore" => await IgnoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "--help" or "-h" or "help" => PrintHelp(options),
                 "--version" or "-V" => PrintVersion(options),
                 _ => UnknownSubcommand(options.SubcommandName ?? "<null>", services.Logger),
@@ -74,7 +75,7 @@ public static partial class CliDispatcher
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "rescan" or "search" or "compare" or "history" => TimeSpan.FromMinutes(2),
+        "list" or "effective" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
@@ -303,6 +304,8 @@ public static partial class CliDispatcher
 
     private static void WriteListText(Inventory.Models.InventorySnapshot snapshot)
     {
+        foreach (var diagnostic in snapshot.PreferenceDiagnostics)
+            Console.Out.WriteLine(TerminalEscapeSanitizer.Sanitize(diagnostic));
         if (snapshot.Skills.Length == 0)
         {
             Console.Out.WriteLine("no skills found");
@@ -315,6 +318,8 @@ public static partial class CliDispatcher
             var flags = FormatFlags(skill);
             Console.Out.WriteLine(
                 $"{skill.Name.PadRight(nameWidth)}  {skill.Scope,-8}  {skill.Provenance,-5}  {flags,-5}  {skill.ResolvedPath}");
+            if (skill.CleanupSuppression is { State: not "none" } suppression)
+                Console.Out.WriteLine(TerminalEscapeSanitizer.Sanitize($"  cleanup suppression: {suppression.State}; legacy={suppression.LegacyMarker}, external={suppression.External}. {suppression.Diagnostic}"));
         }
     }
 
@@ -342,6 +347,9 @@ public static partial class CliDispatcher
         w.WriteBoolean("usedGhSkillList", snapshot.UsedGhSkillList);
         w.WriteNumber("schemaVersion", 3);
         w.WriteBoolean("partial", snapshot.IsPartial);
+        w.WriteStartArray("preferenceDiagnostics");
+        foreach (var message in snapshot.PreferenceDiagnostics) w.WriteStringValue(message);
+        w.WriteEndArray();
         w.WriteStartArray("inaccessiblePaths");
         foreach (var path in snapshot.Diagnostics.InaccessiblePaths) w.WriteStringValue(path);
         w.WriteEndArray();
@@ -419,6 +427,7 @@ public static partial class CliDispatcher
             w.WriteBoolean("pinned", skill.Pinned);
             w.WriteBoolean("isSymlinked", skill.IsSymlinked);
             w.WriteBoolean("ignored", skill.Ignored);
+            WriteSuppression(w, skill.CleanupSuppression);
             w.WriteString("githubTreeSha", skill.TreeSha);
             w.WriteString("version", skill.FrontMatter.Version);
             w.WriteString("description", skill.FrontMatter.Description);
@@ -2300,6 +2309,7 @@ public static partial class CliDispatcher
             | `history` | Verify retained backup journals and every payload blob; reports interrupted, orphaned and corrupt evidence without extracting it. | `--id`, `--json` |
             | `remove [SKILL]` | Safely remove one exact installation. Defaults to dry-run until you pass confirmation. | `--path` or `--install-id`, `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |
+            | `ignore` | Set external cleanup suppression for one physical install; never changes skill files or agent loading. | `--path` or `--install-id`, `--clear`, `--json` |
 
             ## Common examples
 

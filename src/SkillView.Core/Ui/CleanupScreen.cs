@@ -4,6 +4,7 @@ using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Threading;
+using SkillView.Preferences;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -42,11 +43,13 @@ public sealed class CleanupScreen
     private readonly IReadOnlyList<InstalledSkill> _allSkills;
     private readonly Func<string, int> _confirmBatchRemoval;
     private readonly SkillView.Subprocess.ProcessRunner? _ownershipRunner;
+    private readonly Func<CancellationToken, Task<InventorySnapshot>>? _captureInventory;
 
     public int RemovedCount { get; private set; }
     public int RemovedFileCount { get; private set; }
     public int RemovedDirectoryCount { get; private set; }
     public int IgnoredCount { get; private set; }
+    public bool PreferenceMutationObserved { get; private set; }
     public RemoveService.BatchRemoveReport? LastReport { get; private set; }
 
     public CleanupScreen(
@@ -57,7 +60,8 @@ public sealed class CleanupScreen
         IReadOnlyList<ScanRoot> scanRoots,
         IReadOnlyList<InstalledSkill> allSkills,
         Func<string, int>? confirmBatchRemoval = null,
-        SkillView.Subprocess.ProcessRunner? ownershipRunner = null)
+        SkillView.Subprocess.ProcessRunner? ownershipRunner = null,
+        Func<CancellationToken, Task<InventorySnapshot>>? captureInventory = null)
     {
         _app = app;
         _remove = remove;
@@ -67,15 +71,14 @@ public sealed class CleanupScreen
         _allSkills = allSkills;
         _confirmBatchRemoval = confirmBatchRemoval ?? ConfirmBatchRemoval;
         _ownershipRunner = ownershipRunner;
+        _captureInventory = captureInventory;
     }
 
-    public void Show()
+    public void Show() => Show(null);
+
+    internal void Show(Action<Window>? ready)
     {
-        using var lifetime = new CancellationSource(
-            CancellationCallbackReporter.For(_logger, "cleanup dialog", "cleanup.ui"));
-        Task? activeOperation = null;
         RemoveService.RemoveProgress? lastProgress = null;
-        var windowActive = 1;
         var closeAfterCancellation = 0;
 
         using var window = new Window
@@ -86,6 +89,9 @@ public sealed class CleanupScreen
             Width = Dim.Fill(),
             Height = Dim.Fill(),
         };
+        using var operation = new ModalOperationTracker(_app, _logger, "cleanup.ignore");
+        var readyToClose = false;
+        bool Busy() => operation.CurrentOwnership != ModalOperationTracker.Ownership.None;
 
         var header = new Label
         {
@@ -198,32 +204,6 @@ public sealed class CleanupScreen
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
             window, header, table, detail, spinner, status, statusBar);
 
-        void InvokeIfActive(Action action)
-        {
-            if (Volatile.Read(ref windowActive) == 0)
-            {
-                return;
-            }
-
-            try
-            {
-                _app.Invoke(() =>
-                {
-                    if (Volatile.Read(ref windowActive) == 0)
-                    {
-                        return;
-                    }
-
-                    try { action(); }
-                    catch (Exception ex) { _logger.Error("cleanup.ui", ex.Message); }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("cleanup.ui", ex.Message);
-            }
-        }
-
         async Task RunRemovalAsync(HashSet<int> selectedRows, CancellationToken cancellationToken)
         {
             var selectedCount = selectedRows.Count(index => index >= 0 && index < _candidates.Length);
@@ -231,7 +211,7 @@ public sealed class CleanupScreen
             var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
             {
                 lastProgress = value;
-                InvokeIfActive(() => status.Text = FormatProgress(value));
+                operation.InvokeIfActive(() => status.Text = FormatProgress(value));
             });
 
             try
@@ -240,16 +220,18 @@ public sealed class CleanupScreen
                         selectedRows,
                         cancellationToken,
                         progress,
-                        attemptState)
+                        attemptState,
+                        confirmationGranted: true)
                     .ConfigureAwait(false);
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    activeOperation = null;
+                    operation.Release();
                     status.Text = summary.Confirmed
                         ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}"
                         : " cleanup removal canceled";
+                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
                 });
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -261,30 +243,31 @@ public sealed class CleanupScreen
                     removed,
                     skipped);
                 _logger.Debug("cleanup.remove", "cleanup removal canceled");
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     status.Text = $" removal canceled after {removed}; skipped {skipped}, failed {failed}";
                     if (Volatile.Read(ref closeAfterCancellation) != 0)
                     {
-                        _app.RequestStop();
+                        readyToClose = true; operation.Release(); _app.RequestStop();
                     }
                     else
                     {
-                        activeOperation = null;
+                        operation.Release();
                     }
                 });
             }
             catch (Exception ex)
             {
                 _logger.Error("cleanup.remove", ex.Message);
-                InvokeIfActive(() =>
+                operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    activeOperation = null;
+                    operation.Release();
                     status.Text = " cleanup removal failed — see logs";
+                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
                 });
             }
         }
@@ -295,7 +278,7 @@ public sealed class CleanupScreen
             if (r == 'r' || r == 'R')
             {
                 key.Handled = true;
-                if (activeOperation is not null)
+                if (Busy())
                 {
                     return;
                 }
@@ -308,19 +291,46 @@ public sealed class CleanupScreen
                     status.Text = " no cleanup candidates selected";
                     return;
                 }
+                if (_confirmBatchRemoval(BuildRemoveConfirmationText(selectedRows.Select(index => _candidates[index]).ToImmutableArray())) != 1)
+                { status.Text = " cleanup removal canceled"; return; }
                 spinner.Visible = true;
                 spinner.AutoSpin = true;
                 lastProgress = null;
                 status.Text = " removing…  Esc cancels";
-                var cancellationToken = lifetime.Token;
-                activeOperation = RunRemovalAsync(selectedRows, cancellationToken);
+                operation.TryStart(token => Task.Run(() => RunRemovalAsync(selectedRows, token)));
             }
-            else if ((r == 'i' || r == 'I') && activeOperation is null)
+            else if ((r == 'i' || r == 'I') && !Busy())
             {
-                DoIgnore(wrapper.CheckedRows, status);
                 key.Handled = true;
+                var selected = wrapper.CheckedRows.Where(index => index >= 0 && index < _candidates.Length)
+                    .Select(index => _candidates[index]).ToArray();
+                if (selected.Length == 0) { status.Text = " no cleanup candidates selected"; return; }
+                if (_captureInventory is null || _ownershipRunner is null)
+                { status.Text = " fresh inventory unavailable; no preferences changed"; return; }
+                spinner.Visible = true; spinner.AutoSpin = true;
+                status.Text = " suppressing cleanup suggestions for selected physical installs across consumer contexts… Esc cancels";
+                operation.TryStart(token => Task.Run(async () =>
+                {
+                    string text;
+                    try
+                    {
+                        var result = await CleanupSuppressionWorkflow.SetAsync(selected,
+                            CleanupSuppressionStore.For(_ownershipRunner), _captureInventory,
+                            () => PreferenceMutationObserved = true, () => IgnoredCount++, token).ConfigureAwait(false);
+                        foreach (var error in result.Errors) _logger.Error("cleanup.ignore", error);
+                        text = $" ignored {result.Changed}, skipped {result.Skipped}, failed {result.Failed}" + (result.Canceled ? "; canceled" : "")
+                            + (result.Errors.Length > 0 ? " — see logs" : "");
+                    }
+                    catch (Exception ex) { _logger.Error("cleanup.ignore", ex.Message); text = " preference update failed — see logs"; }
+                    operation.InvokeTerminalIfActive(() =>
+                    {
+                        spinner.AutoSpin = false; spinner.Visible = false; status.Text = text;
+                        operation.Release();
+                        if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
+                    });
+                }));
             }
-            else if ((r == 'x' || r == 'X') && activeOperation is null)
+            else if ((r == 'x' || r == 'X') && !Busy())
             {
                 DoExport(status);
                 key.Handled = true;
@@ -328,30 +338,35 @@ public sealed class CleanupScreen
             else if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (activeOperation is { IsCompleted: false })
+                if (Busy())
                 {
                     Interlocked.Exchange(ref closeAfterCancellation, 1);
-                    lifetime.TryCancel();
-                    status.Text = " canceling removal…";
+                    operation.Cancel();
+                    status.Text = " canceling cleanup operation…";
                     return;
                 }
 
-                lifetime.TryCancel();
+                readyToClose = true;
                 _app.RequestStop();
             }
+        };
+        window.IsRunningChanging += (_, args) =>
+        {
+            if (args.NewValue || readyToClose || !Busy()) return;
+            args.Cancel = true; Interlocked.Exchange(ref closeAfterCancellation, 1);
+            operation.Cancel(); status.Text = " canceling cleanup operation…";
         };
 
         window.Add(header, table, detail, spinner, status, statusBar);
         table.SetFocus();
+        ready?.Invoke(window);
         try
         {
             _app.Run(window);
         }
         finally
         {
-            Interlocked.Exchange(ref windowActive, 0);
-            lifetime.TryCancel();
-            activeOperation?.GetAwaiter().GetResult();
+            operation.Cancel();
         }
     }
 
@@ -359,7 +374,8 @@ public sealed class CleanupScreen
         HashSet<int> checkedRows,
         CancellationToken cancellationToken = default,
         IProgress<RemoveService.RemoveProgress>? progress = null,
-        RemovalAttemptState? attemptState = null)
+        RemovalAttemptState? attemptState = null,
+        bool confirmationGranted = false)
     {
         attemptState ??= new RemovalAttemptState();
         attemptState.SetPreValidationSkipped(0);
@@ -371,7 +387,7 @@ public sealed class CleanupScreen
         var capture = new CallbackProgress<RemoveService.RemoveProgress>(value => { last = value; progress?.Report(value); });
         try
         {
-            var summary = await RemoveSelectedCoreAsync(checkedRows, cancellationToken, capture, attemptState).ConfigureAwait(false);
+            var summary = await RemoveSelectedCoreAsync(checkedRows, cancellationToken, capture, attemptState, confirmationGranted).ConfigureAwait(false);
             if (LastReport is { } report) LastReport = report with { Impacts = impacts };
             return summary with { Impacts = impacts };
         }
@@ -398,7 +414,7 @@ public sealed class CleanupScreen
 
     private async Task<RemovalSummary> RemoveSelectedCoreAsync(
         HashSet<int> checkedRows, CancellationToken cancellationToken,
-        IProgress<RemoveService.RemoveProgress>? progress, RemovalAttemptState? attemptState)
+        IProgress<RemoveService.RemoveProgress>? progress, RemovalAttemptState? attemptState, bool confirmationGranted)
     {
         var selected = checkedRows
             .Where(i => i >= 0 && i < _candidates.Length)
@@ -409,7 +425,7 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
-        var response = _confirmBatchRemoval(BuildRemoveConfirmationText(selected));
+        var response = confirmationGranted ? 1 : _confirmBatchRemoval(BuildRemoveConfirmationText(selected));
         if (response != 1)
         {
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
@@ -525,28 +541,6 @@ public sealed class CleanupScreen
             if (candidate.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString().TrimEnd()) ?? "";
-    }
-
-    private void DoIgnore(HashSet<int> checkedRows, Label status)
-    {
-        var marked = 0;
-        for (var i = 0; i < _candidates.Length; i++)
-        {
-            if (!checkedRows.Contains(i)) continue;
-            var c = _candidates[i];
-            var dir = c.Skill?.ResolvedPath ?? c.Path;
-            if (!System.IO.Directory.Exists(dir)) continue;
-            try
-            {
-                if (IgnoreMarker.Write(dir, _logger)) marked++;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("cleanup.ignore", $"{dir}: {ex.Message}");
-            }
-        }
-        IgnoredCount += marked;
-        status.Text = $" marked {marked} directory(ies) as ignored";
     }
 
     private void DoExport(Label status)

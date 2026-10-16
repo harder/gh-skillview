@@ -2,8 +2,8 @@
 
 PR #61 merged at `351224b3e058166073370caafcba225bce12d7e9`. This
 reviewed design starts the next implementation batch. Close the complete original
-M12 change and acceptance, retaining M08/M09/M13-M21 obligations. Implementation
-is in review; final acceptance remains pending.
+M12 change and acceptance, retaining M08/M09/M13-M21 obligations. Implementation and final acceptance are complete; historical checkpoints below
+retain their original pending status.
 
 Use M10 contextual inventory + M11 frozen subjects. Add an analysis result for
 one selected agent, profile, working project and client version, retaining every
@@ -177,3 +177,13 @@ are selected under their local tier rules. Invalid Codex absolute paths become
 unknown policy without dropping other candidates. Shared payload/frontmatter
 models and persisted journal formats remain unchanged. The native product proof
 includes both rejected Gemini forms alongside a valid competing user skill.
+
+
+Final M12 acceptance: PR #63 merged at `6233f6a39105c472130e726c425da7ecf5acb632` after final-head
+verification and review. The merged tree matches `bedba13fc1c1c16449122187aa2ade8f253c1c40`.
+`evidence/maintenance-batch-13-final.json` records source hashes, all platform and
+actual gh contracts, both local native hosts, four-RID artifact binding, old-native
+recovery compatibility and reviewed findings. Native AI-client inventory remains
+unavailable with explicit reasons and active sessions remain unknown. Product
+fixture version labels do not claim AI-client conformance. Whole-goal acceptance
+is nine of 21, with the full remaining original audit retained.

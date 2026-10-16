@@ -673,6 +673,16 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
+- Ordinary Cleanup Ignore and CLI `ignore` write only the private sibling
+  `SkillView/preferences` store; never write or silently remove legacy
+  `.skillview-ignore` payload markers. Keep suppression observations transient
+  (`JsonIgnore`) so old maintenance journal/hash inputs remain unchanged. Unknown
+  source writes must compare reviewed, freshly inventoried, and execution-time
+  native object/generation evidence, then bind the complete bounded payload.
+  Charge failed captures against the aggregate inventory byte budget. Preference
+  diagnostics are independent from physical-provider inventory coverage. Keep
+  cleanup confirmation dialogs on the event-loop thread before worker admission.
+
 - Product updates use `TuiServices.SavedUpdates`, carrying physical targets
   rather than names alone. Keep `--dir` rooted at the verified containing skills
   directory and gh noninteractive confirmation separate from target selection.

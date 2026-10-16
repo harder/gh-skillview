@@ -115,6 +115,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview update [...]` | Check availability or prepare a saved update review |
 | `skillview remove <skill>` | Remove an installed skill with safety checks |
 | `skillview cleanup` | Report or apply cleanup actions |
+| `skillview ignore --path PATH` | Suppress cleanup suggestions for one physical installation |
 
 Examples:
 
@@ -344,6 +345,28 @@ metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
 removal of an unowned chosen install remains available through the Installed workflow.
 An incomplete scan is marked in the Installed footer and Changes summary.
+
+Cleanup's **Ignore** action stores a preference outside the skill directory. It
+suppresses suggestions for that physical installation across its consumer
+contexts; agent loading and update policy stay unchanged. The CLI accepts an
+exact `--path` (including an agent symlink) or `--install-id`, plus `--json`.
+Put global flags before the command, for example:
+
+```bash
+skillview --scan-root /path/to/skills ignore --path /path/to/skills/demo --json
+skillview --scan-root /path/to/skills ignore --path /path/to/skills/demo --clear --json
+```
+
+`--clear` clears external preferences for the selected installation. Legacy
+`.skillview-ignore` markers remain unchanged and are reported separately. Known
+source preferences survive revision changes but expire after source or owner
+context changes. Unknown-source preferences require matching native object and
+whole-payload evidence; content changes or unavailable evidence leave suggestions
+visible. `list --json` reports each row's `cleanupSuppression` and independent
+`preferenceDiagnostics`. Corrupt or inaccessible preference state leaves external
+suppression inactive. Cleanup reports unsupported non-installation entries as
+skipped. Clearing stale records for a deleted installation, repairing damaged
+preference storage, and migrating legacy markers are not yet offered.
 
 Inventory also observes Codex bundled/admin skills and versioned Codex/Claude
 plugin caches. Managed rows show their distributor and package version separately

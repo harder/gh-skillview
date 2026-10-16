@@ -131,6 +131,13 @@ jobs:
           proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
           python agent_docs/evidence/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
           python agent_docs/evidence/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
+      - name: Prove external cleanup suppression without payload mutations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/suppression-app-proof.json
+          python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/suppression-extension-proof.json
       - name: Prove native backup evidence and unchanged installed copies
         shell: bash
         run: |

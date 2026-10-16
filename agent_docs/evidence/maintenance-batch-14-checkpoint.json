@@ -1,0 +1,1577 @@
+{
+  "schemaVersion": 1,
+  "batch": 14,
+  "scope": "M08 external cleanup suppression slice; original acceptance incomplete",
+  "originalComplete": 9,
+  "originalTotal": 21,
+  "priorMergedCommit": "6233f6a39105c472130e726c425da7ecf5acb632",
+  "local": {
+    "build": {
+      "passed": true,
+      "warnings": 0,
+      "errors": 0
+    },
+    "fullTests": {
+      "total": 1749,
+      "passed": 1749,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focused": {
+      "preferences": 17,
+      "eventLoop": 2,
+      "cli": 8
+    },
+    "formatVerify": true,
+    "aotAppStrictWarnings": true,
+    "aotExtension": true
+  },
+  "reviews": [
+    {
+      "reviewer": "independent store/workflow model",
+      "agreedFindings": [
+        "legacy aggregate flag confused with marker origin",
+        "reviewed owner namespace freshness",
+        "failed payload capture aggregate budget",
+        "unknown native continuity at review and execution boundaries"
+      ],
+      "resolution": "fixed; independently re-reviewed clear"
+    },
+    {
+      "reviewer": "independent UI/CLI/proof model",
+      "agreedFindings": [
+        "worker-thread nested removal confirmation",
+        "symlink selector canonicalization",
+        "actual gh local-source fixture must exercise set/clear/restart"
+      ],
+      "resolution": "fixed; independently re-reviewed clear"
+    }
+  ],
+  "localNativeProofs": {
+    "app": {
+      "reportSha256": "61c779184da6079a3b2164989a1ff0f3d4698811ef26c3ad05bc06dbba06ed1d",
+      "report": {
+        "schemaVersion": 1,
+        "results": [
+          {
+            "ghVersion": "gh version 2.97.0 (2026-07-31)",
+            "app": "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+            "checks": [
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/gh-skill",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/demo",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                "bindingMode": "object",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              }
+            ],
+            "aliasResolved": true,
+            "unknownInPlaceEditExpires": true,
+            "legacyPreserved": true,
+            "alternateStateIsolated": true,
+            "corruptClearDoesNotReviveSuppression": true,
+            "commands": [
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "skill",
+                  "install",
+                  "--from-local",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "--",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/source",
+                  "demo"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "skill",
+                  "install",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "--",
+                  "cli/cli",
+                  "skills/gh-skill"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/agent-demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "19a4c275010f4f7ada0acebd23b1509320a212e24dd1f249698601ac6c045a96",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "67beec384265a36b42b738dd1ae0f9c4e0478be48f0c09ac0757fa20c505afda",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "7c8d1d37d039532264f6c5e268a6299116d53bd421ad284755ddc6479e48bc51",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills/gh-skill",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-cumqkc46/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "--version"
+                ],
+                "exitCode": 0
+              }
+            ]
+          },
+          {
+            "ghVersion": "gh version 2.102.0 (2026-09-30)",
+            "app": "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+            "checks": [
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/gh-skill",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/demo",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                "bindingMode": "object",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              }
+            ],
+            "aliasResolved": true,
+            "unknownInPlaceEditExpires": true,
+            "legacyPreserved": true,
+            "alternateStateIsolated": true,
+            "corruptClearDoesNotReviveSuppression": true,
+            "commands": [
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "skill",
+                  "install",
+                  "--from-local",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "--",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/source",
+                  "demo"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "skill",
+                  "install",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "--",
+                  "cli/cli",
+                  "skills/gh-skill"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/agent-demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "f37867e540202b1afa431e18ab9323de845067def02c1c6fd2f4dc17328268ae",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "056a1011c946b68f3a20050fda1c1b3653ff0c6660921d2bd237894b36477325",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "d358bb657b67795863f7be002bc564a8d386a390e36fcb65793f194cd2cce568",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills/gh-skill",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_20oxfzp/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "--version"
+                ],
+                "exitCode": 0
+              }
+            ]
+          }
+        ],
+        "status": "passed",
+        "app": {
+          "path": "/tmp/skillview-maintenance/effective-loading/preferences-aot-app/skillview",
+          "sha256": "3b32a01e926cc79bbd527e2a3427ed227d46ed7e1a89f355b94b757473d75949"
+        }
+      }
+    },
+    "extension": {
+      "reportSha256": "8999312fa9dbed1749b654f73472bac9b5021590a4c7e1bbe3b14f41022b7b3e",
+      "report": {
+        "schemaVersion": 1,
+        "results": [
+          {
+            "ghVersion": "gh version 2.97.0 (2026-07-31)",
+            "app": "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+            "checks": [
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/gh-skill",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/demo",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                "bindingMode": "object",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              }
+            ],
+            "aliasResolved": true,
+            "unknownInPlaceEditExpires": true,
+            "legacyPreserved": true,
+            "alternateStateIsolated": true,
+            "corruptClearDoesNotReviveSuppression": true,
+            "commands": [
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "skill",
+                  "install",
+                  "--from-local",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "--",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/source",
+                  "demo"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "skill",
+                  "install",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "--",
+                  "cli/cli",
+                  "skills/gh-skill"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/agent-demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "f5dd0879b091b93ba1926779e892057c7f37ea74717f73f14e4c345887671877",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "f1333bf79111000e5789f822d2ab636bc87ba7b0a1564f89768bab42424c9881",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "f50b735eb3498d331b363f685361e8b97e1de660f9f126a3a96fd80277b8c153",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills/gh-skill",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-dl2ehtyz/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/gh-minimum/gh_2.97.0_macOS_arm64/bin/gh",
+                  "--version"
+                ],
+                "exitCode": 0
+              }
+            ]
+          },
+          {
+            "ghVersion": "gh version 2.102.0 (2026-09-30)",
+            "app": "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+            "checks": [
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/gh-skill",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/demo",
+                "bindingMode": "source",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              },
+              {
+                "path": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                "bindingMode": "object",
+                "restartObserved": true,
+                "payloadAndRegistryUnchanged": true
+              }
+            ],
+            "aliasResolved": true,
+            "unknownInPlaceEditExpires": true,
+            "legacyPreserved": true,
+            "alternateStateIsolated": true,
+            "corruptClearDoesNotReviveSuppression": true,
+            "commands": [
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "skill",
+                  "install",
+                  "--from-local",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "--",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/source",
+                  "demo"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "skill",
+                  "install",
+                  "--dir",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "--",
+                  "cli/cli",
+                  "skills/gh-skill"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/agent-demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "4f2d3205af5ab956fb11d99005a0dd80347e264ac09bcb7f09ae283547401a3f",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/demo",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "9fbeafdd6c538e6bbd72a0faf8c4c17ef0a8bf0b50ee9d072c51d2215fdf75ca",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--install-id",
+                  "9c4df850786314bcc59d20d97215841380e3474905a410a3daf847b807cec000",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/unknown",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/gh-skill",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "ignore",
+                  "--path",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills/gh-skill",
+                  "--clear",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/private/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+                  "--scan-root",
+                  "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-suppression-proof-_wz981dq/home/.agents/skills",
+                  "list",
+                  "--allow-hidden-dirs",
+                  "--json"
+                ],
+                "exitCode": 0
+              },
+              {
+                "argv": [
+                  "/opt/homebrew/Cellar/gh/2.102.0/bin/gh",
+                  "--version"
+                ],
+                "exitCode": 0
+              }
+            ]
+          }
+        ],
+        "status": "passed",
+        "app": {
+          "path": "/tmp/skillview-maintenance/effective-loading/preferences-aot-extension/gh-skillview",
+          "sha256": "ff3ab53212d2a10cf75cc1db9a7685e8373f47bf7213c6ff337c606cdafa75d7"
+        }
+      }
+    }
+  },
+  "requiredBeforeMerge": [
+    "all PR checks",
+    "all four RID native artifacts and exact head/digest attribution",
+    "review all new actionable findings"
+  ],
+  "limitations": [
+    "non-installation and broken-link suppression reported as skipped",
+    "deleted-path clear, damaged-state repair and legacy migration not offered",
+    "M08 preserve/merge/fork/source/owner transitions remain incomplete",
+    "original Installed Down-arrow crash never reproduced"
+  ]
+}

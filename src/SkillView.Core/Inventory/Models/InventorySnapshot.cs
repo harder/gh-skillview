@@ -30,6 +30,7 @@ public sealed record InventorySnapshot
     internal ImmutableArray<LockReadDiagnostic> OwnershipReadDiagnostics { get; init; } = [];
 
     public ScanDiagnostics Diagnostics { get; init; } = ScanDiagnostics.Empty;
+    public ImmutableArray<string> PreferenceDiagnostics { get; init; } = [];
 
     public static InventorySnapshot Empty { get; } = new()
     {
