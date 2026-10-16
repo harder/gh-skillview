@@ -64,6 +64,10 @@ jobs:
         os: [ubuntu-latest, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      # macOS/Windows must exercise native link retain/restore successfully;
+      # Linux proves the explicit unsupported-metadata refusal without mutation.
+      SKILLVIEW_EXPOSURE_LINK_PROOF: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -93,6 +97,7 @@ jobs:
       # These native tests must publish and recapture metadata successfully;
       # an environmental refusal is not a passing Windows proof.
       SKILLVIEW_WINDOWS_METADATA_PROOF: '1'
+      SKILLVIEW_EXPOSURE_LINK_PROOF: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -117,6 +122,7 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
+            --filter-class SkillView.Tests.Inventory.NativeExposureLinkTests \
             --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
             | tee dist/windows-metadata-tests.log
       - name: Retain Windows metadata evidence

@@ -1476,3 +1476,27 @@ archive tests pass; build and scoped format verification pass. Production and
 was rerun in full. Fresh final-head native gates remain required. See
 [evidence](evidence/maintenance-local-reimport-tracking-proof-corrections-local.json).
 Original acceptance remains **9/21**; the original Mac crash remains unreproduced.
+
+## Target-backed link retention: native primitive local checkpoint
+
+An internal primitive binds an ordinary exposure symlink to a separately held
+target, retains the original native link in a typed private slot and restores
+that same object to its vacant original address. Full native identity/generation,
+raw targets, supported metadata and bounded namespace transitions are checked.
+Generic state and directory-move policies are unchanged. Shared-parent transitions,
+saved detach/restart, consumer admission and gh mixed-layout contracts remain pending.
+
+Independent review closed two Windows exception-resource leaks. Final-source
+Tests/Proof builds have no warnings/errors, 23 focused tests pass without skips
+and Core formatting passes. The earlier full 1,993 Tests and 9 Integration passes,
+locked restores/builds and four format passes retain their pre-cleanup snapshot;
+only Windows cleanup and the continuity guide changed afterward.
+
+Local Linux cases prove unsupported-metadata refusal before mutation; they do
+not prove Linux retain/restore. CI requires actual positive supported-metadata
+moves on macOS/Windows, including Windows ARM64. Those native results remain
+pending and are distinct from product AOT or a user-facing detach workflow.
+Original acceptance remains 9/21; M08/M13/M15 remain incomplete. See
+`maintenance-target-backed-links.md` and
+`evidence/maintenance-target-backed-links-local.json`.
+

@@ -721,6 +721,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   exposures when reconciling inventory. Frontmatter uses bounded YAML events;
   do not replace it with reflection-based deserialization or alias expansion.
 
+- Exposure-link retention uses its dedicated target-backed typed-slot primitive;
+  never relax directory/state-file admission or replace retained links by recreation.
+  Linux symlink inode-flags metadata remains an explicit mutation refusal.
 - Standalone quarantine/undo uses a same-volume native exclusive directory rename,
   prepared/completion journals, and held root/parent/object evidence. Keep it limited
   to explicitly reviewed standalone custom-directory copies; never add archive
