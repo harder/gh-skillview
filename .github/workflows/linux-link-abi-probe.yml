@@ -1,0 +1,43 @@
+name: linux-link-abi-probe
+
+on:
+  push:
+    branches: [codex/linux-link-abi-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  native-x64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Compile and verify native Linux x64 descriptor ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/input
+          cp agent_docs/evidence/probe-linux-link-preservation-abi.c dist/input/
+          cp agent_docs/evidence/verify-linux-link-preservation-abi.py dist/input/
+          cp .github/workflows/linux-link-abi-probe.yml dist/input/
+          sha256sum dist/input/* > dist/input-sha256.txt
+          uname -a > dist/host.txt
+          cc --version > dist/compiler.txt
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Wconversion -Wsign-conversion \
+            agent_docs/evidence/probe-linux-link-preservation-abi.c -o dist/probe-linux-link-abi
+          sha256sum dist/probe-linux-link-abi > dist/binary-sha256.txt
+          probe_dir=$(mktemp -d "$RUNNER_TEMP/skillview-link-abi.XXXXXX")
+          trap 'rmdir "$probe_dir"' EXIT
+          dist/probe-linux-link-abi "$probe_dir" > dist/abi.json
+          python3 agent_docs/evidence/verify-linux-link-preservation-abi.py \
+            --input dist/abi.json --source agent_docs/evidence/probe-linux-link-preservation-abi.c \
+            --architecture x64 --output dist/verified.json
+      - name: Retain native ABI evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-link-preservation-abi-x64
+          path: dist/**
+          if-no-files-found: error
+          retention-days: 14
