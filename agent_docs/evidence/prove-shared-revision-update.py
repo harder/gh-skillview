@@ -19,6 +19,21 @@ import tempfile
 import threading
 import time
 
+
+def resolve_gh_executable(path, *, windows=None, lookup=None):
+    """Bind an explicit tool path, including Windows' omitted PATHEXT suffix."""
+    candidate = path.resolve()
+    if candidate.is_file():
+        return candidate
+    is_windows = os.name == 'nt' if windows is None else windows
+    if is_windows:
+        # An absolute path keeps which from substituting another PATH gh.
+        resolved = (lookup or shutil.which)(str(candidate))
+        if resolved is not None and Path(resolved).is_file():
+            return Path(resolved).resolve(strict=True)
+    raise FileNotFoundError(f'Explicit gh executable does not name a file: {path}')
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--proof-host', required=True, type=Path)
@@ -32,6 +47,10 @@ args = parser.parse_args()
 app, host = args.app.resolve(), args.proof_host.resolve()
 if args.expect_metadata_refusal and not args.unpin_only:
     parser.error('--expect-metadata-refusal requires --unpin-only')
+try:
+    args.gh = [resolve_gh_executable(path) for path in args.gh]
+except OSError as error:
+    parser.error(str(error))
 apply_disposition = 'unpin-only' if args.unpin_only else 'merge-reviewed' if args.merged else 'retain-original'
 apply_action = 'apply-unpin' if args.unpin_only else 'apply-merged' if args.merged else 'apply'
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')

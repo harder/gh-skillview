@@ -1198,3 +1198,26 @@ remains pending. The earlier 1,959-test full-suite count remains pre-final-sourc
 Original acceptance remains 9/21 and M08 incomplete. See
 `evidence/maintenance-batch-16-legacy-fixture-fix.json` for run IDs, artifact
 SHA256 digests, partial proof scope and the local helper receipt.
+
+### Batch 16: native proof harness path follow-up
+
+At `4130a3f4`, CI attempt1 exhausted the installation API quota in existing
+proofs; the observed response reached 5,000 used, zero remaining, with reset at
+19:21:28 UTC. The failed-job rerun after reset completed the full Linux native
+lane, including private privileged unpin and frozen old-schema proofs; artifact
+assertion review is clear: 60 artifact members, 36 privileged unpin recovery rows
+and six actual old-schema fixtures were verified. macOS failed an existing shared-owner
+update preparation on a refused outbound connection. Both Windows lanes failed
+when the shared-owner App proof tried to hash an extensionless `gh` pathname;
+Windows had launched `gh.exe`, but the receipt read required its actual filename.
+These failures precede the new unpin/legacy steps on those three platforms.
+
+The helper now binds every explicit executable before authentication or fixtures,
+preserving downloaded versions and refusing missing paths without PATH fallback.
+Four focused helper tests, AST/help and diff checks pass; independent review is
+clear. Product source/tests are unchanged from the recorded 3×1,987 platform and
+2×207 metadata passes; corresponding `4130` gates, CodeQL and both gh contracts
+pass. New-head CI and a complete four-RID native proof selection remain pending.
+Acceptance remains 9/21 and M08 incomplete. See
+`evidence/maintenance-batch-16-harness-path-fix.json` for exact attribution and
+compact raw-evidence hashes.
