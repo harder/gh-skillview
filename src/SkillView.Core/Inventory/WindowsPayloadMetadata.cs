@@ -142,16 +142,26 @@ internal sealed partial class WindowsSecureRemovalBackend
         // BACKUP_SECURITY_INFORMATION must never be accepted from a handle
         // lacking SACL rights, even if an API/provider returns partial data.
         RequireMetadataAccess(handle, 0x01020000);
-        var result = MetadataNative.GetSecurityInfo(handle, 1, BackupSecurityInformation, out _, out _, out _, out _, out var descriptor);
         try
         {
-            if (result != 0) throw new IOException("Complete Windows OWNER/GROUP/DACL/SACL visibility is unavailable: "
-                + new Win32Exception((int)result).Message + "; " + DescribeMetadataSecurityQueryFailure(handle));
-            var length = MetadataNative.GetSecurityDescriptorLength(descriptor);
-            if (length is < 20 or > PayloadNativeMetadata.MaxEntryMetadataBytes) throw new IOException("Windows security descriptor exceeds its bounded budget.");
-            var bytes = new byte[length]; Marshal.Copy(descriptor, bytes, 0, bytes.Length); return bytes;
+            // Native x64/ARM64 probes showed GetSecurityInfo's wrapper refusing
+            // BACKUP while the same held object's NtQuerySecurityObject succeeds.
+            // Keep the full flag; component queries cannot substitute coverage.
+            var bytes = WindowsSecurityDescriptorQuery.Read((buffer, length) =>
+            {
+                var status = MetadataNative.NtQuerySecurityObject(handle, BackupSecurityInformation, buffer, length, out var needed);
+                return (status, needed);
+            });
+            var descriptor = new RawSecurityDescriptor(bytes, 0);
+            if ((descriptor.ControlFlags & ControlFlags.SelfRelative) == 0 || descriptor.BinaryLength != bytes.Length)
+                throw new IOException("Complete Windows native security descriptor is not an exact self-relative representation.");
+            return bytes;
         }
-        finally { if (descriptor != IntPtr.Zero) MetadataNative.LocalFree(descriptor); }
+        catch (Exception error) when (error is IOException or ArgumentException)
+        {
+            throw new IOException("Complete Windows OWNER/GROUP/DACL/SACL visibility is unavailable: "
+                + error.Message + "; " + DescribeMetadataSecurityQueryFailure(handle), error);
+        }
     }
 
     private static void RequireMetadataAccess(SafeFileHandle handle, uint required)
@@ -295,9 +305,7 @@ internal sealed partial class WindowsSecureRemovalBackend
     {
         [DllImport("ntdll.dll")] internal static extern int NtQueryObject(SafeFileHandle handle, int type, [Out] byte[] information, uint size, out uint returned);
         [DllImport("advapi32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool AccessCheck(byte[] descriptor, SafeAccessTokenHandle token, uint desired, ref MetadataGenericMapping mapping, [Out] byte[] privileges, ref uint length, out uint granted, [MarshalAs(UnmanagedType.Bool)] out bool allowed);
-        [DllImport("advapi32.dll")] internal static extern uint GetSecurityInfo(SafeFileHandle handle, int type, uint information, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
-        [DllImport("advapi32.dll")] internal static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
-        [DllImport("kernel32.dll")] internal static extern IntPtr LocalFree(IntPtr value);
+        [DllImport("ntdll.dll")] internal static extern int NtQuerySecurityObject(SafeFileHandle handle, uint information, [Out] byte[]? descriptor, uint length, out uint needed);
         [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetFileInformationByHandleEx(SafeFileHandle file, int type, out MetadataStandardInfo information, int size);
         [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetFileInformationByHandle(SafeFileHandle file, int type, ref FileBasicInfoData information, int size);
         [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool BackupRead(SafeFileHandle file, [Out] byte[] buffer, uint size, out uint read, [MarshalAs(UnmanagedType.Bool)] bool abort, [MarshalAs(UnmanagedType.Bool)] bool security, ref IntPtr context);

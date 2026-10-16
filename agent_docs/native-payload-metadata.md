@@ -27,6 +27,11 @@ stream names, types and budgets before retaining stream bodies. Consume pending
 lookahead before `BackupSeek`, and release the native context even after failure.
 Security descriptors come from explicit complete security queries; backup-stream
 enumeration alone is not evidence of SACL visibility.
+Use held-handle `NtQuerySecurityObject(BACKUP_SECURITY_INFORMATION)` with bounded
+sizing, an exact second read and self-relative descriptor validation. Native x64
+and ARM64 probes demonstrated that `GetSecurityInfo` rejected that full-query flag
+despite sufficient rights while the same object's native full query succeeded.
+Individual component queries are diagnostic evidence, never a partial fallback.
 
 Windows native tests run with `SKILLVIEW_WINDOWS_METADATA_PROOF=1` on x64 and ARM64.
 That setting makes environmental refusal fail the supported fixture. The fixture
@@ -49,4 +54,5 @@ Linux metadata visibility. Unprivileged refusal and privileged publication are
 separate required proofs.
 
 API contracts: [AccessCheck](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-accesscheck),
-[BackupRead](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread).
+[BackupRead](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread),
+[NtQuerySecurityObject](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntquerysecurityobject).
