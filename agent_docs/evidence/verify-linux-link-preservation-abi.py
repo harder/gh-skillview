@@ -14,6 +14,21 @@ def verify(report, architecture):
                 "longBytes": 8, "devTBytes": 8, "devTAlignment": 8}
     if any(report.get(key) != value for key, value in expected.items()):
         raise ValueError("Unverified process architecture or native scalar layout")
+    # Separate native stat evidence, not inferred from statfs or mode bits.
+    # The 512-byte managed StatBuffer must cover each expected native allocation.
+    common_stat = {"alignment": 8, "devOffset": 0, "devBytes": 8,
+                   "inoOffset": 8, "inoBytes": 8, "modeBytes": 4,
+                   "uidBytes": 4, "gidBytes": 4,
+                   "ctimeSecondsOffset": 104, "ctimeSecondsBytes": 8,
+                   "ctimeNanosecondsOffset": 112, "ctimeNanosecondsBytes": 8}
+    architecture_stat = {
+        "x64": {"size": 144, "modeOffset": 24, "nlinkOffset": 16, "nlinkBytes": 8,
+                "uidOffset": 28, "gidOffset": 32},
+        "arm64": {"size": 128, "modeOffset": 16, "nlinkOffset": 20, "nlinkBytes": 4,
+                  "uidOffset": 24, "gidOffset": 28},
+    }
+    if architecture not in architecture_stat or report.get("stat") != common_stat | architecture_stat[architecture]:
+        raise ValueError("Unverified stat layout")
     if report.get("statfs") != {"size": 120, "alignment": 8, "typeOffset": 0, "typeBytes": 8,
                                 "fsidOffset": 56, "fsidBytes": 8, "flagsOffset": 80, "flagsBytes": 8}:
         raise ValueError("Unverified statfs layout")

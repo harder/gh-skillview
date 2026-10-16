@@ -109,6 +109,12 @@ int main(int argc, char **argv)
     printf("{\"schema\":1,\"ok\":%s,\"architecture\":\"%s\","
            "\"endianness\":\"%s\",\"pointerBytes\":%zu,\"longBytes\":%zu,"
            "\"devTBytes\":%zu,\"devTAlignment\":%zu,"
+           "\"stat\":{\"size\":%zu,\"alignment\":%zu,"
+           "\"devOffset\":%zu,\"devBytes\":%zu,\"inoOffset\":%zu,\"inoBytes\":%zu,"
+           "\"modeOffset\":%zu,\"modeBytes\":%zu,\"nlinkOffset\":%zu,\"nlinkBytes\":%zu,"
+           "\"uidOffset\":%zu,\"uidBytes\":%zu,\"gidOffset\":%zu,\"gidBytes\":%zu,"
+           "\"ctimeSecondsOffset\":%zu,\"ctimeSecondsBytes\":%zu,"
+           "\"ctimeNanosecondsOffset\":%zu,\"ctimeNanosecondsBytes\":%zu},"
            "\"statfs\":{\"size\":%zu,\"alignment\":%zu,"
            "\"typeOffset\":%zu,\"typeBytes\":%zu,"
            "\"fsidOffset\":%zu,\"fsidBytes\":%zu,"
@@ -123,6 +129,15 @@ int main(int argc, char **argv)
            "\"beforeIntact\":true,\"afterIntact\":true},\"deviceCases\":[",
            devices_ok ? "true" : "false", architecture(), endianness(),
            sizeof(void *), sizeof(long), sizeof(dev_t), _Alignof(dev_t),
+           sizeof(struct stat), _Alignof(struct stat),
+           offsetof(struct stat, st_dev), sizeof(identity.st_dev),
+           offsetof(struct stat, st_ino), sizeof(identity.st_ino),
+           offsetof(struct stat, st_mode), sizeof(identity.st_mode),
+           offsetof(struct stat, st_nlink), sizeof(identity.st_nlink),
+           offsetof(struct stat, st_uid), sizeof(identity.st_uid),
+           offsetof(struct stat, st_gid), sizeof(identity.st_gid),
+           offsetof(struct stat, st_ctim.tv_sec), sizeof(identity.st_ctim.tv_sec),
+           offsetof(struct stat, st_ctim.tv_nsec), sizeof(identity.st_ctim.tv_nsec),
            sizeof(struct statfs), _Alignof(struct statfs),
            offsetof(struct statfs, f_type), sizeof(guarded.value.f_type),
            offsetof(struct statfs, f_fsid), sizeof(guarded.value.f_fsid),
