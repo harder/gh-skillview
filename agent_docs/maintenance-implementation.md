@@ -1366,3 +1366,18 @@ scoped formatting checks pass. The earlier isolated counts retain their original
 source scopes. New-feature App/extension runtime and four-RID native proof remain
 pending. Acceptance stays 9/21; M08/M18/M19 remain incomplete. See
 `evidence/maintenance-local-reimport-integration-local.json`.
+
+## Actions-token diagnostic interpretation correction
+
+The later post-reset diagnostic at 22:33:05 UTC succeeded for both the required
+repository tag read and `gh auth status`, while `/user` still returned permission
+HTTP403. This withdraws the earlier inference that the user-endpoint denial
+explained auth-status failure. Actual response artifacts from the two PR67
+22:26 contract requests prove exhausted core quota: limit/used 5,000, remaining
+zero, reset 22:32:38 UTC. The earlier `2da52ab` auth-status HTTP cause remains
+uncaptured. These are separate observations.
+
+Keep the precise authenticated repository preflight and response evidence. The
+post-reset diagnostic supports a bounded retry, not a passing product gate. See
+`evidence/maintenance-actions-token-diagnostic-correction.json`. Product/test
+source is unchanged; original acceptance remains 9/21.
