@@ -38,6 +38,10 @@
   separate from SkillView's path identity and mutation authority.
   Gemini's discovery includes the root `SKILL.md` and immediate-child skills;
   enable root admission separately from OpenCode's recursive observation mode.
+  Retain framing separately from parsed YAML: Gemini rejects a leading BOM and
+  requires a closing `---`. A bounded observation ending at YAML `...` cannot
+  prove no later Gemini delimiter exists unless EOF was captured. Include this
+  distinction in the contextual fingerprint; do not change saved payload hashes.
 
 ## Repo
 

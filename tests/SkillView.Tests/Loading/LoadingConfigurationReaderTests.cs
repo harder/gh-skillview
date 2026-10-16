@@ -68,6 +68,20 @@ public sealed class LoadingConfigurationReaderTests : IDisposable
     }
 
     [Theory]
+    [InlineData("\uFEFF", "---", false)]
+    [InlineData("", "...", false)]
+    [InlineData("", "---", true)]
+    public void ParsedYamlRetainsOriginalFramingForProviderAcceptance(string prefix, string delimiter, bool accepted)
+    {
+        var path = Path.Combine(_temporary.FullName, "SKILL.md");
+        File.WriteAllText(path, prefix + "---\nname: demo\ndescription: Framing\n" + delimiter + "\n");
+        var document = new LoadingConfigurationReader().Read(path, "skill", Token, frontMatter: true);
+        Assert.Equal("observed", document.Evidence.State); Assert.NotNull(document.Root);
+        Assert.Equal(accepted, document.HeaderFraming!.GeminiAcceptance);
+        Assert.Equal(delimiter, document.HeaderFraming.ClosingDelimiter);
+    }
+
+    [Theory]
     [InlineData("config.json", "{\"enabled\": true, \"enabled\": false}")]
     [InlineData("config.toml", "enabled = true\nenabled = false\n")]
     [InlineData("config.yaml", "enabled: true\nenabled: false\n")]

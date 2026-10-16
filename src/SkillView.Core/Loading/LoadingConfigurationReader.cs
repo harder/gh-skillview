@@ -30,7 +30,15 @@ internal sealed record LoadingValue(string Kind, string? Text = null, bool? Bool
     }
 }
 
-internal sealed record LoadingConfigurationDocument(LoadingFileEvidence Evidence, LoadingValue? Root);
+internal sealed record LoadingHeaderFraming(bool HasBom, string ClosingDelimiter, bool ReachedEndOfFile, bool HasLaterDashDelimiter)
+{
+    internal bool? GeminiAcceptance => HasBom ? false : ClosingDelimiter == "---" ? true
+        : ReachedEndOfFile && !HasLaterDashDelimiter ? false : null;
+}
+internal sealed record LoadingConfigurationDocument(LoadingFileEvidence Evidence, LoadingValue? Root)
+{
+    internal LoadingHeaderFraming? HeaderFraming { get; init; }
+}
 internal enum LoadingJsonSyntax { Strict, Comments, Jsonc }
 internal enum LoadingContentFormat { FromExtension, Json, Toml, Yaml }
 
@@ -63,9 +71,11 @@ internal sealed class LoadingConfigurationReader
         LoadingContentFormat format = LoadingContentFormat.FromExtension)
     {
         token.ThrowIfCancellationRequested();
+        LoadingHeaderFraming? framing = null;
         if (++_files > _maxFiles || _bytes >= _maxTotalBytes)
             return Result("bounded", null, "Configuration capture budget exceeded.");
         byte[] bytes;
+        var reachedEndOfFile = false;
         try
         {
             // Resolve a configuration symlink without opening its contents, then
@@ -92,6 +102,7 @@ internal sealed class LoadingConfigurationReader
                 if (_bytes > _maxTotalBytes)
                     return Result("bounded", null, "Configuration grew beyond the capture byte limit.");
                 capture.Write(buffer, 0, read);
+                if (frontMatter) reachedEndOfFile = stream.Position == stream.Length;
                 if (frontMatter && HeaderRange(capture.GetBuffer().AsSpan(0, (int)capture.Length), out _, out var headerEnd) && headerEnd <= maxBytes) break;
                 if (capture.Length > maxBytes)
                     return Result("bounded", null, "Configuration grew beyond the capture byte limit.");
@@ -110,7 +121,9 @@ internal sealed class LoadingConfigurationReader
                 if (!HeaderRange(bytes, out var start, out var end, complete: true)) throw new FormatException();
                 // Hash only the bounded observed header, never a partial body
                 // whose encoding/content is unrelated to loading policy.
-                digest = Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan(0, end)));
+                framing = new(bytes.AsSpan().StartsWith("\uFEFF"u8), Encoding.ASCII.GetString(bytes.AsSpan(end, 3)), reachedEndOfFile,
+                    bytes.AsSpan(end + 3).IndexOf("\n---"u8) >= 0);
+                digest = Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan(0, end + 3)));
                 bytes = bytes[start..end];
             }
             var text = new UTF8Encoding(false, true).GetString(bytes).TrimStart('\uFEFF');
@@ -145,13 +158,13 @@ internal sealed class LoadingConfigurationReader
                     break;
             }
             if (value.Kind != "table") throw new FormatException();
-            return new(new(path, "observed", digest, purpose, null), value);
+            return new(new(path, "observed", digest, purpose, null), value) { HeaderFraming = framing };
         }
         catch (Exception ex) when (ex is JsonException or TomlException or YamlException or FormatException or DecoderFallbackException)
         { return Result("invalid", digest, "Configuration syntax or complexity is unsupported; review this file without assuming defaults."); }
 
         LoadingConfigurationDocument Result(string state, string? hash, string? diagnostic) =>
-            new(new(path, state, hash, purpose, diagnostic), null);
+            new(new(path, state, hash, purpose, diagnostic), null) { HeaderFraming = framing };
     }
 
     private static bool HeaderRange(ReadOnlySpan<byte> bytes, out int start, out int end, bool complete = false)

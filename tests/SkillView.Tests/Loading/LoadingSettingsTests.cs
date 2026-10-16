@@ -190,6 +190,14 @@ public sealed class LoadingSettingsTests : IDisposable
     }
 
     [Fact]
+    public void InvalidAbsoluteCodexOverrideBecomesUnknownPolicyInsteadOfThrowing()
+    {
+        var path = Path.Combine(_temporary.FullName, "invalid") + "\0suffix";
+        var json = global::System.Text.Json.JsonSerializer.Serialize(new { skills = new { config = new[] { new { path, enabled = false } } } });
+        Assert.Null(Evaluate("codex", new([Layer(json)], [])).Enabled);
+    }
+
+    [Fact]
     public void TrustGatedPolicyRemainsConditionalWhileExplicitlyExcludedSourcesDoNotApply()
     {
         const string disabled = """{"skills":{"enabled":false}}""";

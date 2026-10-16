@@ -167,3 +167,13 @@ Malformed mode headers remain unknown. Tests cover inherited/authored subagent
 modes, both Windows permission-pattern levels, and gh-unavailable Gemini capture.
 The eight-command native proof exercises Gemini root files, both legacy mode
 boundaries and an OS-specific permission result without starting an AI client.
+
+Third review follow-up (acceptance remains pending): the loading-only reader
+retains BOM/closing-delimiter/EOF framing separately from its YAML projection.
+Gemini-proven framing rejection cannot shadow a valid user copy; a bounded YAML
+end with unobserved later bytes stays unknown. Framing acceptance participates
+in the context fingerprint. Complete known singleton Claude/Gemini candidates
+are selected under their local tier rules. Invalid Codex absolute paths become
+unknown policy without dropping other candidates. Shared payload/frontmatter
+models and persisted journal formats remain unchanged. The native product proof
+includes both rejected Gemini forms alongside a valid competing user skill.

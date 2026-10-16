@@ -284,10 +284,15 @@ internal static class LoadingPolicyEvaluator
                     return Invalid("Codex path enablement has an unsupported entry.");
                 // Official docs disagree between a folder and SKILL.md. Keep
                 // an explicit ambiguity instead of treating either as proven.
-                if (!Path.IsPathFullyQualified(configured.Text!))
-                    return Invalid("Relative Codex skill paths require native resolution evidence.");
-                if (PathIdentity.Equals(configured.Text!, path) || PathIdentity.Equals(configured.Text!, Path.Combine(path, "SKILL.md")))
-                    enabled = null;
+                try
+                {
+                    if (!Path.IsPathFullyQualified(configured.Text!))
+                        return Invalid("Relative Codex skill paths require native resolution evidence.");
+                    if (PathIdentity.Equals(configured.Text!, path) || PathIdentity.Equals(configured.Text!, Path.Combine(path, "SKILL.md")))
+                        enabled = null;
+                }
+                catch (Exception error) when (error is ArgumentException or NotSupportedException or IOException or UnauthorizedAccessException)
+                { return Invalid("A Codex skills.config path cannot be resolved; path policy remains unknown."); }
             }
         }
         var implicitFlag = openAi?.Get("policy", "allow_implicit_invocation");

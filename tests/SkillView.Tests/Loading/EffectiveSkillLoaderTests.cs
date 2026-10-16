@@ -156,6 +156,53 @@ public sealed class EffectiveSkillLoaderTests : IDisposable
         Assert.NotEqual("shadowed", analysis.Candidates.Single(row => row.EntryPath == user.ResolvedPath).Expected.Selection);
     }
 
+    [Theory]
+    [InlineData("\uFEFF---\nname: demo\ndescription: Rejected BOM\n---\n")]
+    [InlineData("---\nname: demo\ndescription: Missing dash closure\n...\n")]
+    [InlineData("---\r\nname: demo\r\ndescription: Missing dash closure\r\n...\r\n")]
+    public void RejectedGeminiFramingCannotShadowAValidUserCopy(string content)
+    {
+        var workspace = Skill(Path.Combine(Project, ".agents", "skills", "demo"));
+        Write(Path.Combine(workspace.ResolvedPath, "SKILL.md"), content);
+        var user = Skill(Path.Combine(Home, ".agents", "skills", "demo"));
+        var analysis = Analyze("gemini", workspace, user);
+        var rejected = analysis.Candidates.Single(row => row.EntryPath == workspace.ResolvedPath);
+        Assert.Equal("incompatible", rejected.Expected.State); Assert.Equal("no", rejected.Expected.Discoverability);
+        Assert.Equal("no", rejected.Expected.ManualInvocation);
+        var selected = analysis.Candidates.Single(row => row.EntryPath == user.ResolvedPath);
+        Assert.Equal("selected", selected.Expected.Selection); Assert.Equal("yes", selected.Expected.ManualInvocation);
+        Assert.Equal(2, analysis.Candidates.Length);
+    }
+
+    [Fact]
+    public void BoundedYamlEndDoesNotProveGeminiRejectedAnUnobservedLaterDashClosure()
+    {
+        var workspace = Skill(Path.Combine(Project, ".agents", "skills", "demo"));
+        Write(Path.Combine(workspace.ResolvedPath, "SKILL.md"), "---\nname: demo\ndescription: Conditional framing\n...\n" + new string('x', 9000) + "\n---\n");
+        var user = Skill(Path.Combine(Home, ".agents", "skills", "demo"));
+        var analysis = Analyze("gemini", workspace, user);
+        Assert.Equal("unknown", analysis.Candidates.Single(row => row.EntryPath == workspace.ResolvedPath).Expected.State);
+        Assert.NotEqual("shadowed", analysis.Candidates.Single(row => row.EntryPath == user.ResolvedPath).Expected.Selection);
+        Write(Path.Combine(workspace.ResolvedPath, "SKILL.md"), "---\nname: demo\ndescription: Conditional framing\n...\n");
+        var complete = Analyze("gemini", workspace, user);
+        Assert.NotEqual(analysis.Context.ContextId, complete.Context.ContextId);
+        Assert.Equal("incompatible", complete.Candidates.Single(row => row.EntryPath == workspace.ResolvedPath).Expected.State);
+    }
+
+    [Fact]
+    public void MalformedAbsoluteCodexOverrideRetainsEveryCandidateWithoutFailingTheAnalysis()
+    {
+        var first = Skill(Path.Combine(Home, ".agents", "skills", "demo"));
+        var second = Skill(Path.Combine(Project, ".agents", "skills", "other"), "name: other\ndescription: Other\n");
+        var path = Path.Combine(first.ResolvedPath, "invalid") + "\0suffix";
+        Write(Path.Combine(Home, ".codex", "config.toml"), "[[skills.config]]\npath = " + global::System.Text.Json.JsonSerializer.Serialize(path) + "\nenabled = false\n");
+        var configuration = Configuration("codex");
+        Assert.Equal("observed", configuration.Settings.Layers.Single(layer => layer.Scope == "user").Document.Evidence.State);
+        var result = EffectiveSkillLoader.Capture(Inventory(first, second), configuration, Token);
+        Assert.Equal(2, result.Candidates.Length);
+        Assert.All(result.Candidates, row => Assert.Equal("unknown", row.Expected.State));
+    }
+
     [Fact]
     public void GeminiNamesAreSanitizedAndDeepNamespaceContainersRemainOutsideNativeDiscovery()
     {

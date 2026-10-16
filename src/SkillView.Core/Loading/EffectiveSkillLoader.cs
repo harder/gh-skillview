@@ -89,6 +89,8 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
                 region.RegistrationPath, region.RegistrationScope?.ToString())).Order(StringComparer.Ordinal).ToArray();
         var fingerprint = SkillDistributorIdentity.Digest(["effective-loading-v1", original.ConfigurationFingerprint,
             registrationFacts.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), .. registrationFacts,
+            .. observations.OrderBy(pair => pair.Key, StringComparer.Ordinal).SelectMany(pair => new[]
+                { pair.Key, pair.Value.Header.HeaderFraming?.GeminiAcceptance?.ToString() }),
             evidence.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
             .. evidence.OrderBy(file => file.Path, StringComparer.Ordinal).SelectMany(file => new[] { file.Path, file.State, file.Sha256 })]);
         var context = SkillLoadingContext.Capture(original.AgentId, original.Profile, original.ProjectDirectory,
@@ -166,7 +168,7 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
         {
             token.ThrowIfCancellationRequested();
             var discoverable = group.Where(value => value.row.Rank > 0 && value.row.Candidate.Expected.Discoverability is "expected" or "unknown").ToArray();
-            if (discoverable.Length < 2) continue;
+            if (discoverable.Length == 0 || discoverable.Length == 1 && context.AgentId is not ("claude-code" or "gemini-cli")) continue;
             if (context.AgentId == "codex")
             {
                 foreach (var value in discoverable) Replace(value.index, "coexists", false, "Codex does not select one same-name skill by scope; retain each installation.");
@@ -326,6 +328,12 @@ internal sealed class EffectiveSkillLoader(ProcessRunner runner)
     {
         if (skill.Validity == ValidityState.BrokenSymlink || header.Evidence.State == "missing")
             return new("broken", "no", "no", "no", "not-applicable", "not-discoverable", "missing-payload-or-metadata", "repair-required", ["No readable skill payload/header was observed at this candidate."]) { SlashInvocation = "no" };
+        if (context.AgentId == "gemini-cli" && header.HeaderFraming is { GeminiAcceptance: false })
+            return new("incompatible", "no", "no", "no", "not-applicable", "native-framing-rejected", "documented-framing-rejection", "repair-header-and-reload",
+                ["The cited Gemini 0.46.0 loader rejects a leading BOM or a header without its closing --- delimiter; parsed YAML alone does not establish discovery."])
+            { SlashInvocation = "no" };
+        if (context.AgentId == "gemini-cli" && header.HeaderFraming is { GeminiAcceptance: null })
+            return ExpectedSkillLoading.Unknown("Gemini's required closing --- framing was not established by the bounded header observation.");
         if (header.Root is null || openAi is { Evidence.State: not ("observed" or "missing") })
             return ExpectedSkillLoading.Unknown("Skill invocation metadata is unreadable, unsupported or beyond capture bounds.");
         if (context.AgentId == "claude-code" && placement.Kind != "managed-plugin"

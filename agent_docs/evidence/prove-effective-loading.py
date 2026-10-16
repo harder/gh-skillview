@@ -85,6 +85,10 @@ def main():
         write(home / ".config/opencode/modes/build.md", "---\nmode: subagent\npermission:\n  skill: ask\n---\nNever execute this mode prompt.\n")
         gemini_root = home / ".gemini/skills"
         skill(gemini_root, name="root-gemini")
+        rejected_bom = project_b / ".agents/skills/rejected-bom"
+        rejected_end = project_b / ".gemini/skills/rejected-end"
+        write(rejected_bom / "SKILL.md", "\ufeff---\nname: demo\ndescription: Native BOM framing rejection\n---\n")
+        write(rejected_end / "SKILL.md", "---\nname: demo\ndescription: No Gemini dash closure\n...\n")
         extension_payload = root / "extension-payload"
         extension_install = home / ".gemini/extensions/local"
         skill(extension_payload / "skills/demo")
@@ -113,7 +117,7 @@ def main():
             # SkillView's own logs/state are deliberately outside these trees.
             # Both filenames and bytes are compared; added files are changes.
             for directory in (home / ".agents", home / ".claude", home / ".codex", home / ".config/opencode",
-                              project_a / ".claude", project_a / ".gemini", project_b / ".gemini", alternate_home, home / ".gemini", extension_payload,
+                              project_a / ".claude", project_a / ".gemini", project_b / ".gemini", project_b / ".agents", alternate_home, home / ".gemini", extension_payload,
                               alternate_claude, opencode_config, opencode_json_config, bundle, home / ".opencode"):
                 for path in sorted(directory.rglob("*")):
                     observed[str(path.relative_to(root))] = "directory" if path.is_dir() else sha(path)
@@ -157,6 +161,10 @@ def main():
         first_user, second_user = rows(first, universal)[0], rows(second, universal)[0]
         assert first_user["expected"]["state"] == "disabled"
         assert second_user["expected"]["state"] == "eligible"
+        for path in (rejected_bom, rejected_end):
+            rejected = rows(second, path)[0]
+            assert rejected["expected"]["state"] == "incompatible"
+            assert rejected["expected"]["discoverability"] == "no"
         assert first_user["subject"]["installationId"] == second_user["subject"]["installationId"]
         assert first_user["loadingKey"] != second_user["loadingKey"]
         extension = rows(second, extension_payload / "skills/demo")[0]
