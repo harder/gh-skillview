@@ -11,9 +11,10 @@ ID/generation/address and bounded metadata observation are separate evidence.
 The link object is pinned without following it for the lease lifetime, preventing
 inode/file-ID reuse while retention is attempted. Caller-owned target and state
 leases must outlive this primitive.
-The caller must hold its owning operation's writer lock and complete the owning
-writer/device publication barrier after this primitive flushes link-slot
-namespaces. Namespace flushing cannot substitute for that operation barrier.
+For the default low-level API, the caller must hold its owning operation's
+writer lock and complete the owning writer/device publication barrier after the
+primitive flushes link-slot namespaces. The Linux facade owns that writer and
+barrier internally. Namespace flushing cannot substitute for the operation barrier.
 
 `NativeRetainedLinkSlot.Create(operation, name, token)` creates a private typed
 child with one fixed possible leaf, `entry`. Initialize every private namespace
@@ -47,21 +48,87 @@ to another link is refused even if both currently resolve to the held payload.
 
 Only the link is renamed; the target payload is never written. Original and
 post-rename identities remain distinct: creation identity/native ID must remain
-the same, while change-time/generation can advance. The raw target and metadata
-fingerprint remain equal. No unlink/recreate, overwrite, copy/delete, archive
+the same, while change-time/generation can advance. The raw target and applicable observed metadata fingerprint remain equal. No unlink/recreate, overwrite, copy/delete, archive
 restoration or cross-volume fallback exists.
 
-Full link metadata is a mutation gate. macOS/Windows reuse existing bounded
-capture and verification, including supported attributes or full Windows
-security/backup streams; unavailable privileges or unsupported observations
-refuse. Linux capture remains useful read-only evidence, but mutation always
-refuses under the current adapter: `CapturePayloadMetadata` reports both any
-missing trusted-xattr visibility and unobservable symlink inode flags. Even
-CAP_SYS_ADMIN does not remove the inode-flags refusal. This slice neither guesses
-an ioctl/statx interpretation nor treats preservation of an opaque inode as
-proof of complete metadata observation. A future Linux investigation needs a
-verified way to observe the missing flags, or a separately reviewed narrower
-preservation-only contract; it must not erase current refusals.
+The default `FullMetadataVerified` mode keeps full supported metadata as its
+mutation gate. macOS/Windows reuse existing bounded capture, including supported
+attributes or full Windows security/backup streams; unavailable privileges or
+unsupported observations refuse. Linux still reports unobservable symlink inode
+flags and any missing trusted-xattr visibility. Even CAP_SYS_ADMIN does not
+remove those full-metadata refusals.
+
+Linux has a separate explicit `LinuxSameOriginalObjectPreservation` mode, admitted
+only through `LinuxExposureOwnerContext`. The ordinary borrowed-target overload
+refuses that mode before creating native authorities.
+It retains and restores the continuously held original native link on a verified
+ext4 mount. It does not clone metadata or set `Metadata.Supported` to true.
+`Preservation` separately records mode, effective-user ownership, group, exactly
+one native link, all caller-visible attribute names/values and their fingerprint,
+and the held filesystem/mount/task/namespace evidence. A visible attribute whose
+value cannot be read, unstable names/values, incomplete/bounded proc evidence,
+unknown filesystem, or any authority mismatch refuses. Hidden namespaces and
+inode flags remain unknown; keeping the inode is not exhaustive metadata evidence.
+The opaque original can preserve hidden state without proving equality against
+concurrent changes. Rename changes ctime/parent generations; old timestamps and
+path-based security decisions are not preserved or attested.
+
+The Linux mode requires verified little-endian x64/ARM64 statfs/device layouts.
+It matches held `fstatfs` device/fsid/type and current-task fdinfo mount IDs with
+exact ext4 records in bounded, fresh mountinfo streams; shared ext-family magic
+alone is insufficient. Source/root/parent, target/root/parent and typed private
+slot must share this mount. Existing root-relative no-cross-mount checks remain.
+A held verified procfs/task/fd/fdinfo/ns capability and pinned active mount
+namespace are checked around observations and the native transition. The live
+operation is synchronous and bound to its actual OS thread; observation/mutation
+on another thread refuses. A private keyed, thread-bound authority admits the
+low-level Linux lease only inside its dedicated owner. No borrowed target,
+state writer, slot or proc authority enters that context.
+Native canonical-address and strict xattr paths use `/proc/thread-self/fd`,
+without fallback to the process leader's descriptor table. This does not support
+arbitrary descriptor closing/reuse races or migration of leases between tables.
+
+The owned facade is `LinuxExposureOwnerContext`. It
+accepts immutable reviewed IDs/generations, raw bytes, namespace and target
+fingerprints plus private state policy paths. A dedicated OS thread creates all
+state/writer/slot, target, source, proc and original-link resources, compares the
+reopened authorities, and releases them in its `finally`. The managed proxy has
+Ready/Inspect, typed `RetainAsync`/`RestoreAsync`, Completion and Stop/Dispose.
+It accepts no borrowed
+native objects or caller action delegates. One command can run while at most one
+waits, and four owner contexts are the process limit.
+
+Proxy disposal closes managed admission and waits outside native ownership
+locks. Proxy finalization only publishes a nonblocking managed stop signal.
+Idle and absolute expiry independently close abandoned sessions; owned native
+resources remain rooted by the owner until cleanup. Native work drains
+cooperatively: a blocked kernel call has no hard wall-clock abort guarantee.
+Bounded full exception diagnostics, including flattened callback failures and
+explicit truncation/omission counts, return as managed records for caller-side
+logging. No caller logger or file stream executes on the native owner.
+
+Per-command outcomes separate `MutationAttempted`, `MutationCompleted`,
+`Uncertain`, the observed position and its last-known position. Observations
+include detached snapshots of actual original/current link evidence, unchanged
+target fingerprints and whether the held typed slot is empty. Legacy metadata
+DTOs contain mutable byte arrays: every returned metadata/visible-attribute value,
+security descriptor and alternate-stream byte image is copied independently, so
+caller edits cannot change owner authority or another observation. This is
+detached snapshot ownership, not structural immutability of those legacy arrays. A successful move reply follows both
+native namespace reconciliation and the owning state writer/device publication
+barrier. Caller, owner-stop and absolute-deadline cancellation use owned sources
+with managed callback diagnostics, outside ownership locks. Once rename has
+completed, independent bounded reconciliation/publication runs even after caller
+cancellation. Such a result remains canceled with `MutationCompleted=true` and
+actual retained/restored evidence; it cannot become a no-change report.
+Uncertain moves close admission and are never retried.
+
+Cleanup reports `LiveContinuity=false` and the retained/uncertain last position.
+Expiry or disposal after retention leaves the native object in its private slot;
+it never restores automatically. A closed proxy refuses further moves. This is
+a primitive boundary: callers still supply placement/owner policy and a durable
+intent before starting either move. No approval, saved journal or process-death
+reopen protocol is enforced by this facade.
 
 The primitive marks an attempted rename uncertain before entering the native
 call, observes both namespaces and link metadata afterward, then flushes Unix
@@ -92,9 +159,23 @@ roundtrip from explicit metadata refusal, verify unchanged target bytes/native
 objects, wrong-target binding, identical-target link replacement, ancestor
 replacement, cancellation and foreign slots. Actual macOS/Windows positive
 checks set `SKILLVIEW_EXPOSURE_LINK_PROOF=1` to require supported metadata and
-actual retain/restore, including a post-retain restore collision; Linux still
-requires explicit refusal before mutation. This environment value affects test
-assertions only and is not a product switch. JIT test-host native interop evidence
+actual retain/restore, including a post-retain restore collision. Linux's
+strict mode still requires explicit refusal. The separate Linux tests use
+`SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF=1` to require actual ext4 original-object
+round trips and refusals for changed links/targets, collisions and nlink2.
+A dedicated-thread descriptor-table divergence fixture runs only when safe
+unprivileged `unshare(CLONE_FILES)` succeeds; EPERM is explicitly qualified as
+unavailable and supplies no positive divergence evidence. Required subprocess
+proof cases instead hard-fail missing support or a missing prebuilt proof host.
+They exercise foreign disposal before and after actual retention, initialization
+and command failure, finite expiry and abandonment. One creator-private-table
+case witnesses actual finalizer-task descriptor addresses against owned leader
+sentinels; only that disposable child disables CLR diagnostics to make every
+observed owner FD number controllably allocatable. No unrelated runtime descriptor
+is replaced. A separate internal friend-proof factory selects one fixed typed
+completed-move cancellation checkpoint, then runs real publication; ordinary
+`Start` hardcodes no checkpoint. No CLI, environment value or serialized request
+selects it. These proof controls are not product switches. JIT test-host native interop evidence
 is separate from product AOT/runtime proof. Actual macOS/Windows positive
 runtime evidence and four-RID native hosts remain pending. Minimum/current gh
 mixed-layout owner/loading/update contracts and the saved detach workflow remain

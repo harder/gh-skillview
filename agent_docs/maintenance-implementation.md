@@ -1500,3 +1500,23 @@ Original acceptance remains 9/21; M08/M13/M15 remain incomplete. See
 `maintenance-target-backed-links.md` and
 `evidence/maintenance-target-backed-links-local.json`.
 
+## Linux same-original link preservation: owned primitive local checkpoint
+
+The explicit Linux mode retains a live original symlink on a verified same ext4
+mount without promoting unknown hidden attributes or inode flags to full metadata
+support. A dedicated OS thread owns every native authority and writer; the
+ordinary borrowed-target preservation factory refuses. Typed operations report
+completed/canceled moves and uncertain positions, publish through the held writer,
+and return detached evidence. Proxy disposal and finalization signal that owner;
+expiry ends live continuity without automatic restoration. Saved detach and
+restart recovery are outside this primitive.
+
+Final local verification on Linux ARM64 passed 2,055 unit tests and 9 integration
+tests, zero skips/failures, after independently reviewed source and 39 focused
+cases including ten disposable lifecycle processes. The actual owned roundtrip
+restored the same native link/raw target and archived equal whole-target manifests.
+C ABI witnesses ran on ARM64 and x64; product/x64 C# and privileged hidden-attribute
+proofs remain pending. Separate reconciliation and publication deadlines are
+cooperative phases, not a single hard wall-clock bound. See
+`evidence/maintenance-linux-link-preservation-local.json`. Original acceptance
+remains 9/21 and M08 is incomplete.

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Inventory;
+using SkillView.Maintenance;
 using Xunit;
 
 namespace SkillView.Tests.Inventory;
@@ -239,6 +240,256 @@ public sealed class NativeExposureLinkTests : IDisposable
         Assert.Throws<IOException>(() => NativeExposureDirectory.VerifyTransition(before, after, "entry", true,
             NativeExposureDirectory.EntryHash(observedA)));
         Assert.False(lease.MutationAttempted); lease.Revalidate(Token);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LinuxExplicitOriginalObjectModeRoundTripsWithoutInventingFullMetadata(bool relative, bool alias)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(relative);
+        var root = fixture.ExposureRoot;
+        if (alias) { root += "-alias"; Directory.CreateSymbolicLink(root, fixture.ExposureRoot); }
+        using var owned = await OpenOwned(fixture, root);
+        if (owned is null) return;
+        var ready = owned.Ready.Observation!;
+        Assert.False(ready.Original.Metadata.Supported); Assert.NotEmpty(ready.Original.Metadata.Refusals);
+        Assert.Equal("live-original-link-pin", ready.Original.Preservation!.Continuity);
+        Assert.True(ready.RetainedSlotEmpty);
+        var retained = await owned.Context.RetainAsync(Token);
+        Assert.True(retained.Succeeded, retained.Error); Assert.False(retained.Canceled);
+        Assert.True(retained.MoveState!.MutationAttempted); Assert.True(retained.MoveState.MutationCompleted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, retained.MoveState.Position);
+        Assert.True(retained.MoveState.LiveContinuity); Assert.False(retained.MoveState.Uncertain);
+        Assert.False(retained.Observation!.RetainedSlotEmpty); Assert.False(retained.Observation.Current.Metadata.Supported);
+        Assert.True(NativeDirectoryMoveLease.SameObject(ready.Original.Identity, retained.Observation.Current.Identity));
+        Assert.False(PathResolver.IsSymlink(fixture.Link));
+        var restored = await owned.Context.RestoreAsync(Token);
+        Assert.True(restored.Succeeded, restored.Error); Assert.True(restored.MoveState!.MutationCompleted);
+        Assert.Equal(LinuxExposureLinkPosition.Restored, restored.MoveState.Position);
+        Assert.True(restored.Observation!.RetainedSlotEmpty);
+        Assert.True(NativeDirectoryMoveLease.SameObject(ready.Original.Identity, restored.Observation.Current.Identity));
+        Assert.True(ready.Original.RawTarget.AsSpan().SequenceEqual(restored.Observation.Current.RawTarget.AsSpan()));
+        Assert.Equal(ready.Original.Preservation.VisibleAttributesFingerprint, restored.Observation.Current.Preservation!.VisibleAttributesFingerprint);
+        Assert.Equal(ready.TargetFingerprint, restored.Observation.TargetFingerprint);
+        Assert.Equal(ready.TargetObjectFingerprint, restored.Observation.TargetObjectFingerprint);
+        owned.Context.Dispose();
+        var cleanup = await owned.Context.Completion;
+        Assert.False(cleanup.MoveState!.LiveContinuity); Assert.Equal(LinuxExposureLinkPosition.Restored, cleanup.MoveState.Position);
+    }
+
+    [Theory]
+    [InlineData("link")]
+    [InlineData("target")]
+    [InlineData("collision")]
+    public async Task LinuxOriginalObjectModeRefusesChangedAuthorityOrCollision(string change)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        if (change == "link") { Directory.Delete(fixture.Link); Directory.CreateSymbolicLink(fixture.Link, fixture.Payload); }
+        else if (change == "target") { Directory.Move(fixture.Payload, fixture.Payload + "-original"); WriteSkill(fixture.Payload); }
+        else File.WriteAllText(Path.Combine(owned.SlotPath, "entry"), "foreign");
+        var refusal = await owned.Context.RetainAsync(Token);
+        Assert.False(refusal.Succeeded); Assert.False(refusal.MoveState!.MutationAttempted);
+        if (change == "collision") Assert.Equal("foreign", File.ReadAllText(Path.Combine(owned.SlotPath, "entry")));
+        Assert.False((await owned.Context.Completion).MoveState!.LiveContinuity);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedModeRefusesRestoreCollisionAndKeepsRetainedPosition()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        var retained = await owned.Context.RetainAsync(Token); Assert.True(retained.Succeeded, retained.Error);
+        File.WriteAllText(fixture.Link, "foreign");
+        var refusal = await owned.Context.RestoreAsync(Token);
+        Assert.False(refusal.Succeeded); Assert.False(refusal.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, refusal.MoveState.LastKnownPosition);
+        Assert.Equal("foreign", File.ReadAllText(fixture.Link));
+        Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        Assert.False((await owned.Context.Completion).MoveState!.LiveContinuity);
+    }
+
+    [Fact]
+    public void LinuxBorrowedTargetFactoryCannotAdmitOriginalObjectMode()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var failure = Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target,
+            ExposureLinkRetentionMode.LinuxSameOriginalObjectPreservation, Token));
+        Assert.Contains("dedicated native owner context", failure.Message);
+        Assert.Throws<IOException>(() => new LinuxExposureOwnerContext.NativeAuthority(new object()));
+        Assert.True(PathResolver.IsSymlink(fixture.Link)); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedModeRefusesHardLinkedSymlinkBeforeMutation()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        Assert.Equal(0, LinkNative.link(fixture.Link, fixture.Link + "-hardlink"));
+        using var context = LinuxExposureOwnerContext.Start(ReviewedRequest(fixture, fixture.ExposureRoot));
+        var failure = await context.Ready;
+        Assert.False(failure.Succeeded); Assert.Contains("exactly one native link", failure.Error);
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.False((await context.Completion).MoveState!.MutationAttempted);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedPreCanceledRetainLeavesLiveOriginalAvailableForReview()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        var canceled = await owned.Context.RetainAsync(cancellation.Token);
+        Assert.True(canceled.Canceled); Assert.False(canceled.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Original, canceled.MoveState.Position);
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.True((await owned.Context.InspectAsync(Token)).Succeeded);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedRetainedExpiryLosesContinuityWithoutAutomaticRestoreOrRetry()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot, TimeSpan.FromSeconds(1));
+        if (owned is null) return;
+        var retained = await owned.Context.RetainAsync(Token); Assert.True(retained.Succeeded, retained.Error);
+        var cleanup = await owned.Context.Completion.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.Equal("idle-expired", cleanup.Reason); Assert.False(cleanup.MoveState!.LiveContinuity);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, cleanup.MoveState.Position);
+        Assert.False(PathResolver.IsSymlink(fixture.Link)); Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        var refused = await owned.Context.RestoreAsync(Token);
+        Assert.False(refused.Succeeded); Assert.False(refused.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, refused.MoveState.LastKnownPosition);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedCompletedMoveCancellationStillPublishesActualRetainedObjectThenClosesAdmission()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot, checkpoint: LinuxExposureOwnerProofCheckpoint.CancelCompletedMoveBeforePublication);
+        if (owned is null) return;
+        var result = await owned.Context.RetainAsync(Token);
+        Assert.False(result.Succeeded); Assert.True(result.Canceled);
+        Assert.True(result.MoveState!.MutationAttempted); Assert.True(result.MoveState.MutationCompleted);
+        Assert.False(result.MoveState.Uncertain); Assert.Equal(LinuxExposureLinkPosition.Retained, result.MoveState.Position);
+        Assert.NotNull(result.Observation); Assert.False(result.Observation.RetainedSlotEmpty);
+        Assert.True(NativeDirectoryMoveLease.SameObject(owned.Ready.Observation!.Original.Identity, result.Observation.Current.Identity));
+        var cleanup = await owned.Context.Completion;
+        Assert.False(cleanup.MoveState!.LiveContinuity); Assert.Equal(LinuxExposureLinkPosition.Retained, cleanup.MoveState.LastKnownPosition);
+        Assert.Equal(cleanup.ResourcesOpened, cleanup.ResourcesReleased);
+        Assert.False(PathResolver.IsSymlink(fixture.Link)); Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        var retry = await owned.Context.RestoreAsync(Token);
+        Assert.False(retry.Succeeded); Assert.False(retry.MoveState!.MutationAttempted);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedBusyReplyDoesNotPresentPriorPositionAsCurrentDuringRealMove()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        for (var index = 0; index < 512; index++)
+            File.WriteAllText(Path.Combine(fixture.Payload, "bounded-" + index), new string('x', 2048));
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        var retain = owned.Context.RetainAsync(Token);
+        Task<LinuxExposureOwnerOutcome>? waiting = null;
+        LinuxExposureOwnerOutcome? rejected = null;
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (!retain.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            var probe = owned.Context.InspectAsync(Token);
+            if (probe.IsCompletedSuccessfully && await probe is { Succeeded: false, MoveState.Uncertain: true } busy)
+            { rejected = busy; break; }
+            if (!probe.IsCompleted) waiting = probe;
+            await Task.Delay(1, Token);
+        }
+        var retained = await retain;
+        Assert.True(retained.Succeeded, retained.Error);
+        if (waiting is not null) Assert.True((await waiting).Succeeded);
+        Assert.NotNull(rejected); Assert.Contains("queue bound", rejected.Error);
+        Assert.False(rejected.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Uncertain, rejected.MoveState.Position);
+        Assert.Equal(LinuxExposureLinkPosition.Original, rejected.MoveState.LastKnownPosition);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, retained.MoveState!.Position);
+        Assert.True((await owned.Context.RestoreAsync(Token)).Succeeded);
+    }
+
+    [Fact]
+    public void ReturnedEvidenceGraphOwnsEveryMutableByteImageIndependently()
+    {
+        // Transport ownership only, not native metadata admission. One buffer is
+        // deliberately shared across every legacy mutable path before publication.
+        var authorityBytes = Enumerable.Range(0, 20).Select(index => (byte)index).ToArray();
+        var identity = new SecureFileIdentity(1, 2, 0, "/proof/link", false, true, 1, 1);
+        var attributes = ImmutableArray.Create(new PayloadExtendedAttribute("user.transport", authorityBytes));
+        var metadata = new PayloadNativeMetadata("linux", identity, "link", 511, 1, 1, 1, true,
+            attributes, "caller-visible-xattr-names", ["Unknown hidden metadata"],
+            new(1, authorityBytes, 0, [new(":transport:$DATA", authorityBytes)]));
+        var preservation = new LinkPreservationObservation(511, 1, 1, 1, attributes, "visible-fingerprint",
+            new(new(1, 0xef53, 2), 0, 1, 1, identity, "1/task/1"));
+        var authority = new ExposureLinkEvidence(identity, [1, 2], metadata, "metadata-fingerprint", preservation);
+        var first = LinuxExposureOwnerContext.SnapshotForCaller(authority);
+        var next = LinuxExposureOwnerContext.SnapshotForCaller(authority);
+        var returnedImages = new[] { first.Metadata.Attributes[0].Value, first.Preservation!.VisibleAttributes[0].Value,
+            first.Metadata.Windows!.SecurityDescriptor, first.Metadata.Windows.Streams[0].Bytes };
+        for (var index = 0; index < returnedImages.Length; index++)
+        {
+            Assert.NotSame(authorityBytes, returnedImages[index]);
+            for (var other = index + 1; other < returnedImages.Length; other++) Assert.NotSame(returnedImages[index], returnedImages[other]);
+            returnedImages[index][0] = (byte)(200 + index);
+        }
+        Assert.Equal((byte)0, authorityBytes[0]);
+        Assert.All(new[] { next.Metadata.Attributes[0].Value, next.Preservation!.VisibleAttributes[0].Value,
+            next.Metadata.Windows!.SecurityDescriptor, next.Metadata.Windows.Streams[0].Bytes }, bytes => Assert.Equal(authorityBytes, bytes));
+        Assert.Equal(authority.MetadataFingerprint, next.MetadataFingerprint);
+        Assert.Equal(authority.Preservation!.VisibleAttributesFingerprint, next.Preservation.VisibleAttributesFingerprint);
+    }
+
+    private LinuxExposureOwnerRequest ReviewedRequest(Fixture fixture, string root, TimeSpan? idle = null)
+    {
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var reviewed = NativeExposureLinkLease.Open(root, Path.Combine(root, "demo"), target, Token);
+        var payload = target.Capture(Token);
+        return new(root, Path.Combine(root, "demo"), fixture.TargetRoot, fixture.Payload,
+            reviewed.OriginalDirectory, reviewed.Original.Identity, reviewed.Original.RawTarget, reviewed.Original.MetadataFingerprint,
+            target.RootIdentity, target.ParentIdentity, target.TargetIdentity, payload.Fingerprint, payload.ObjectStateFingerprint!,
+            Path.Combine(fixture.State.CanonicalPath, "owned-" + Guid.NewGuid().ToString("N")), "retained-link",
+            idle ?? TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30));
+    }
+    private async Task<OwnedFixture?> OpenOwned(Fixture fixture, string root, TimeSpan? idle = null,
+        LinuxExposureOwnerProofCheckpoint checkpoint = LinuxExposureOwnerProofCheckpoint.None)
+    {
+        var request = ReviewedRequest(fixture, root, idle);
+        var context = checkpoint == LinuxExposureOwnerProofCheckpoint.None ? LinuxExposureOwnerContext.Start(request)
+            : LinuxExposureOwnerContext.StartForProof(request, checkpoint);
+        var ready = await context.Ready.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        if (!ready.Succeeded)
+        {
+            context.Dispose();
+            if (System.Environment.GetEnvironmentVariable("SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF") != "1") return null;
+            Assert.True(ready.Succeeded, ready.Error);
+        }
+        return new(context, ready, Path.Combine(request.StatePath, request.SlotName));
+    }
+    private sealed record OwnedFixture(LinuxExposureOwnerContext Context, LinuxExposureOwnerOutcome Ready, string SlotPath) : IDisposable
+    { public void Dispose() => Context.Dispose(); }
+    private static class LinkNative
+    {
+        [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+        internal static extern int link(string oldpath, string newpath);
     }
 
     private Fixture Create(bool relative)

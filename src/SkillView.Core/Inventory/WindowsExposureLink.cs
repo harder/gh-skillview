@@ -113,14 +113,14 @@ internal sealed partial class WindowsSecureRemovalBackend
                 throw new IOException("Exposure link/parent changed during metadata capture.");
             return new(identity, raw.ToImmutableArray(), metadata, MetadataHash(metadata));
         }
-        internal override IDisposable PinLink(string name, ExposureLinkEvidence expected, CancellationToken token)
+        internal override NativeExposureLinkPin PinLink(string name, ExposureLinkEvidence expected, CancellationToken token)
         {
             NativeStateDirectory.CheckName(name); CheckAddress(token);
             var handle = OpenEntryAt(parent, name, true, false, requestDeleteAccess: true);
             try
             {
                 if (!Matches(expected.Identity, ReadIdentity(handle))) throw new IOException("Link changed before its native object was pinned.");
-                return handle;
+                return NativeExposureLinkPin.Wrap(handle);
             }
             catch { handle.Dispose(); throw; }
         }
@@ -146,12 +146,12 @@ internal sealed partial class WindowsSecureRemovalBackend
             CheckAddress(token); return result;
         }
         internal override void MoveExclusive(string name, ExposureLinkEvidence expected, ExposureDirectoryEvidence sourceBefore,
-            NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, CancellationToken token)
+            NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, Action<CancellationToken>? beforeNativeMove, CancellationToken token)
         {
             if (destination is not WindowsExposureDirectory other) throw new IOException("Link relocation platform mismatch.");
             NativeStateDirectory.CheckName(name); NativeStateDirectory.CheckName(destinationName);
             CheckAddress(token); other.CheckAddress(token);
-            NativeExposureLinkLease.SameLink(expected, ReadLink(name, token), true);
+            NativeExposureLinkLease.SameLink(expected with { Preservation = null }, ReadLink(name, token), true);
             using var link = OpenEntryAt(parent, name, true, false, requestDeleteAccess: true);
             if (!Matches(expected.Identity, ReadIdentity(link))) throw new IOException("Link changed before rename handle acquisition.");
             if (ReadIdentity(parent).Volume != ReadIdentity(other.ParentHandle).Volume) throw new IOException("Cross-volume link relocation refused.");
@@ -164,6 +164,7 @@ internal sealed partial class WindowsSecureRemovalBackend
                 Marshal.Copy(new byte[size], 0, information, size);
                 Marshal.WriteIntPtr(information, 8, other.ParentHandle.DangerousGetHandle());
                 Marshal.WriteInt32(information, 16, filename.Length); Marshal.Copy(filename, 0, information + 20, filename.Length);
+                beforeNativeMove?.Invoke(token);
                 Validate(sourceBefore, token); other.Validate(destinationBefore, token);
                 if (!Matches(expected.Identity, ReadIdentity(link))) throw new IOException("Pinned link generation changed immediately before rename.");
                 token.ThrowIfCancellationRequested();

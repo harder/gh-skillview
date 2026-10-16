@@ -42,7 +42,7 @@ internal sealed partial class UnixSecureRemovalBackend
         }
     }
 
-    private sealed class UnixExposureDirectory(SafeUnixHandle root, SafeUnixHandle parent, string rootPath, string parentPath,
+    private sealed partial class UnixExposureDirectory(SafeUnixHandle root, SafeUnixHandle parent, string rootPath, string parentPath,
         bool ownsHandles, Action<CancellationToken>? guard = null) : NativeExposureDirectory
     {
         private SafeUnixHandle ParentHandle => parent;
@@ -95,7 +95,7 @@ internal sealed partial class UnixSecureRemovalBackend
             return new(identity, raw.ToImmutableArray(), metadata, MetadataHash(metadata));
         }
 
-        internal override IDisposable PinLink(string name, ExposureLinkEvidence expected, CancellationToken token)
+        internal override NativeExposureLinkPin PinLink(string name, ExposureLinkEvidence expected, CancellationToken token)
         {
             NativeStateDirectory.CheckName(name); CheckAddress(token);
             var flags = OperatingSystem.IsMacOS() ? 0x00200000 | 0x01000000 : LinuxOpenFlags.Path | LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec;
@@ -104,7 +104,7 @@ internal sealed partial class UnixSecureRemovalBackend
             {
                 using var stat = new StatBuffer();
                 if (!Matches(expected.Identity, ReadStat(handle, stat.Pointer))) throw new IOException("Link changed before its native object was pinned.");
-                return handle;
+                return new UnixExposurePin(handle);
             }
             catch { handle.Dispose(); throw; }
         }
@@ -132,14 +132,15 @@ internal sealed partial class UnixSecureRemovalBackend
         }
 
         internal override void MoveExclusive(string name, ExposureLinkEvidence expected, ExposureDirectoryEvidence sourceBefore,
-            NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, CancellationToken token)
+            NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, Action<CancellationToken>? beforeNativeMove, CancellationToken token)
         {
             if (destination is not UnixExposureDirectory other) throw new IOException("Link relocation platform mismatch.");
             NativeStateDirectory.CheckName(name); NativeStateDirectory.CheckName(destinationName);
             CheckAddress(token); other.CheckAddress(token);
-            NativeExposureLinkLease.SameLink(expected, ReadLink(name, token), true);
+            NativeExposureLinkLease.SameLink(expected with { Preservation = null }, ReadLink(name, token), true);
             using var stat = new StatBuffer();
             if (ReadStat(parent, stat.Pointer).Device != ReadStat(other.ParentHandle, stat.Pointer).Device) throw new IOException("Cross-filesystem link relocation refused.");
+            beforeNativeMove?.Invoke(token);
             Validate(sourceBefore, token); other.Validate(destinationBefore, token);
             token.ThrowIfCancellationRequested();
             // The final checked-name interval is not atomic against same-UID

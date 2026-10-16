@@ -403,10 +403,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   canonical addresses before verifying the root generation. Never canonicalize
   target and root through separate opens. Canonical addresses must
   come from the opened object (`GetFinalPathNameByHandleW` on Windows,
-  `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/self/fd` on Linux),
+  `fgetattrlist(ATTR_CMN_FULLPATH)` on macOS, and `/proc/thread-self/fd` on Linux),
   never only from lexical normalization; canonicalize scan roots through the
   same handle-based path before comparing them. Linux does not escape its
-  ` (deleted)` `/proc/self/fd` annotation, so a live name can legitimately end
+  ` (deleted)` `/proc/thread-self/fd` annotation, so a live name can legitimately end
   with that text; disambiguate it by comparing the named path's full native
   identity and generation with the still-open descriptor, never by suffix
   rejection alone. Non-destructive Unix scan-root canonicalization must open
@@ -723,7 +723,16 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 - Exposure-link retention uses its dedicated target-backed typed-slot primitive;
   never relax directory/state-file admission or replace retained links by recreation.
-  Linux symlink inode-flags metadata remains an explicit mutation refusal.
+  Full-metadata Linux symlink inode-flags refusal remains unchanged. Its separate
+  explicit same-original-object mode requires a live original pin, one verified
+  ext4 mount and current-thread proc/namespace evidence; hidden metadata stays
+  unknown. Linux admission is only through the dedicated owner context, never
+  the borrowed-target overload. It creates/uses/releases every native authority;
+  a foreign Dispose/finalizer only signals managed stop, never closes/unlocks FDs.
+  Publish completed moves through the owning writer barrier before replying,
+  including canceled moves. Report actual position/uncertainty and loss of live
+  continuity after cleanup; retained expiry never automatically restores.
+  Never use that narrower evidence to admit clone/archive/materialization.
 - Standalone quarantine/undo uses a same-volume native exclusive directory rename,
   prepared/completion journals, and held root/parent/object evidence. Keep it limited
   to explicitly reviewed standalone custom-directory copies; never add archive

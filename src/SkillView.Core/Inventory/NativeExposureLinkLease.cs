@@ -3,11 +3,13 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SkillView.Maintenance;
+using SkillView.Logging;
+using SkillView.Threading;
 
 namespace SkillView.Inventory;
 
 internal sealed record ExposureLinkEvidence(SecureFileIdentity Identity, ImmutableArray<byte> RawTarget,
-    PayloadNativeMetadata Metadata, string MetadataFingerprint);
+    PayloadNativeMetadata Metadata, string MetadataFingerprint, LinkPreservationObservation? Preservation = null);
 
 internal sealed record ExposureDirectoryEvidence(SecureFileIdentity Root, SecureFileIdentity Parent,
     ImmutableSortedDictionary<string, string> Entries);
@@ -19,7 +21,10 @@ internal sealed class NativeExposureLinkLease : IDisposable
     private readonly NativeExposureDirectory source;
     private readonly NativeDirectoryMoveLease target;
     private readonly string name;
-    private readonly IDisposable linkPin;
+    private readonly NativeExposureLinkPin linkPin;
+    private readonly LinuxLinkProcAuthority? linuxAuthority;
+    private readonly Logger logger;
+    private readonly Action<AggregateException>? ownerCallbackReporter;
     private ExposureDirectoryEvidence sourceEvidence;
     private ExposureLinkEvidence current;
     private NativeRetainedLinkSlot? retained;
@@ -32,38 +37,69 @@ internal sealed class NativeExposureLinkLease : IDisposable
     internal SecureFileIdentity TargetIdentity { get; }
     internal bool MutationAttempted { get; private set; }
     internal bool MutationCompleted { get; private set; }
+    internal int MutationSequence { get; private set; }
+    internal bool IsUncertain => uncertain;
+    internal LinuxExposureLinkPosition Position => restored ? LinuxExposureLinkPosition.Restored
+        : retained is not null ? LinuxExposureLinkPosition.Retained : LinuxExposureLinkPosition.Original;
 
     private NativeExposureLinkLease(NativeExposureDirectory source, string name, NativeDirectoryMoveLease target,
-        ExposureDirectoryEvidence directory, ExposureLinkEvidence link, IDisposable linkPin)
+        ExposureDirectoryEvidence directory, ExposureLinkEvidence link, NativeExposureLinkPin linkPin, LinuxLinkProcAuthority? linuxAuthority, Logger? logger,
+        Action<AggregateException>? ownerCallbackReporter)
     {
         this.source = source; this.name = name; this.target = target;
-        this.linkPin = linkPin;
+        this.linkPin = linkPin; this.linuxAuthority = linuxAuthority; this.logger = logger ?? new Logger();
+        this.ownerCallbackReporter = ownerCallbackReporter;
         sourceEvidence = OriginalDirectory = directory; Original = current = link;
         TargetIdentity = target.TargetIdentity;
     }
 
     internal static NativeExposureLinkLease Open(string root, string entry, NativeDirectoryMoveLease target, CancellationToken token)
+        => Open(root, entry, target, ExposureLinkRetentionMode.FullMetadataVerified, token);
+
+    internal static NativeExposureLinkLease Open(string root, string entry, NativeDirectoryMoveLease target,
+        ExposureLinkRetentionMode mode, CancellationToken token, Logger? logger = null)
     {
-        token.ThrowIfCancellationRequested(); target.Revalidate(token);
-        var authority = NativeExposureDirectory.Open(root, entry, token);
-        IDisposable? pin = null;
+        if (mode == ExposureLinkRetentionMode.LinuxSameOriginalObjectPreservation)
+            throw new IOException("Linux original-object preservation requires the dedicated native owner context; borrowed target admission is refused.");
+        return OpenCore(root, entry, target, mode, token, logger, null);
+    }
+
+    internal static NativeExposureLinkLease OpenOwnedLinux(LinuxExposureOwnerContext.NativeAuthority owner,
+        string root, string entry, NativeDirectoryMoveLease target, CancellationToken token, Action<AggregateException> callbackReporter)
+    {
+        owner.Verify();
+        return OpenCore(root, entry, target, ExposureLinkRetentionMode.LinuxSameOriginalObjectPreservation, token, null, callbackReporter);
+    }
+
+    private static NativeExposureLinkLease OpenCore(string root, string entry, NativeDirectoryMoveLease target,
+        ExposureLinkRetentionMode mode, CancellationToken token, Logger? logger, Action<AggregateException>? ownerCallbackReporter)
+    {
+        if (!Enum.IsDefined(mode)) throw new IOException("Unknown link retention mode.");
+        LinuxLinkProcAuthority? linux = mode == ExposureLinkRetentionMode.LinuxSameOriginalObjectPreservation
+            ? LinuxLinkProcAuthority.Open(token) : null;
+        NativeExposureDirectory? authority = null;
+        NativeExposureLinkPin? pin = null;
         try
         {
+            linux?.Check(token); target.Revalidate(token);
+            authority = NativeExposureDirectory.Open(root, entry, token);
             var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(entry));
             var directory = authority.Capture(token);
             var link = authority.ReadLink(name, token);
             pin = authority.PinLink(name, link, token);
+            link = authority.ReadLink(name, pin, linux, token);
             RequireTarget(authority.ResolveLink(name, token), target.TargetIdentity);
             RequireTarget(authority.ResolveRawTarget(link.RawTarget.AsSpan(), token), target.TargetIdentity);
             target.Revalidate(token); SameDirectory(directory, authority.Capture(token));
-            SameLink(link, authority.ReadLink(name, token), sameGeneration: true);
+            SameLink(link, authority.ReadLink(name, pin, linux, token), sameGeneration: true);
             NativeExposureDirectory.RequireEntry(directory, name, NativeExposureDirectory.EntryHash(link));
             if (PathIdentity.IsInside(link.Identity.CanonicalPath, target.CurrentPath))
                 throw new IOException("An exposure inside its target payload cannot be retained.");
-            var result = new NativeExposureLinkLease(authority, name, target, directory, link, pin);
-            pin = null; return result;
+            var result = new NativeExposureLinkLease(authority, name, target, directory, link, pin, linux, logger, ownerCallbackReporter);
+            result.ValidateLinuxAuthorities(null, token);
+            pin = null; linux = null; return result;
         }
-        catch { pin?.Dispose(); authority.Dispose(); throw; }
+        catch { pin?.Dispose(); authority?.Dispose(); linux?.Dispose(); throw; }
     }
 
     internal ExposureLinkEvidence Retain(NativeRetainedLinkSlot slot, CancellationToken token)
@@ -72,8 +108,9 @@ internal sealed class NativeExposureLinkLease : IDisposable
         if (retained is not null || restored) throw new IOException("This live link was already retained.");
         RequireMetadata(current);
         source.Validate(sourceEvidence, token); target.Revalidate(token);
-        SameLink(current, source.ReadLink(name, token), true);
+        SameLink(current, ReadLink(source, name, token), true);
         RequireTarget(source.ResolveLink(name, token), TargetIdentity);
+        ValidateLinuxAuthorities(slot.Directory, token);
         var destination = slot.Directory.Capture(token);
         if (!destination.Entries.IsEmpty) throw new IOException("The retained-link slot is not empty.");
         if (PathIdentity.IsInside(slot.CanonicalPath, sourceEvidence.Root.CanonicalPath)
@@ -90,16 +127,16 @@ internal sealed class NativeExposureLinkLease : IDisposable
 
     internal void Revalidate(CancellationToken token)
     {
-        RequireAvailable(token); target.Revalidate(token); source.Validate(sourceEvidence, token);
+        RequireAvailable(token); ValidateLinuxAuthorities(retained?.Directory, token); target.Revalidate(token); source.Validate(sourceEvidence, token);
         if (retained is null || restored)
         {
-            SameLink(current, source.ReadLink(name, token), true);
+            SameLink(current, ReadLink(source, name, token), true);
             RequireTarget(source.ResolveLink(name, token), TargetIdentity);
         }
         else
         {
             retained.Directory.Validate(retainedEvidence!, token);
-            SameLink(current, retained.Directory.ReadLink(NativeRetainedLinkSlot.EntryName, token), true);
+            SameLink(current, ReadLink(retained.Directory, NativeRetainedLinkSlot.EntryName, token), true);
             RequireTarget(source.ResolveRawTarget(current.RawTarget.AsSpan(), token), TargetIdentity);
         }
     }
@@ -108,10 +145,11 @@ internal sealed class NativeExposureLinkLease : IDisposable
     {
         RequireAvailable(token);
         if (retained is null || retainedEvidence is null || restored) throw new IOException("There is no retained link to restore.");
+        ValidateLinuxAuthorities(retained.Directory, token);
         RequireMetadata(current); target.Revalidate(token);
         retained.Directory.Validate(retainedEvidence, token); source.Validate(sourceEvidence, token);
         if (sourceEvidence.Entries.ContainsKey(name)) throw new IOException("The original exposure slot is occupied.");
-        SameLink(current, retained.Directory.ReadLink(NativeRetainedLinkSlot.EntryName, token), true);
+        SameLink(current, ReadLink(retained.Directory, NativeRetainedLinkSlot.EntryName, token), true);
         // Relative targets are interpreted at the ORIGINAL held parent.
         RequireTarget(source.ResolveRawTarget(current.RawTarget.AsSpan(), token), TargetIdentity);
         return Move(retained.Directory, NativeRetainedLinkSlot.EntryName, retainedEvidence,
@@ -121,27 +159,38 @@ internal sealed class NativeExposureLinkLease : IDisposable
     private ExposureLinkEvidence Move(NativeExposureDirectory from, string fromName, ExposureDirectoryEvidence fromBefore,
         NativeExposureDirectory to, string toName, ExposureDirectoryEvidence toBefore, NativeRetainedLinkSlot slot, bool undo, CancellationToken token)
     {
+        using var fromReferences = linuxAuthority is null ? null : from.HoldLinuxLinkAuthorities();
+        using var toReferences = linuxAuthority is null ? null : to.HoldLinuxLinkAuthorities();
         from.Validate(fromBefore, token); to.Validate(toBefore, token); target.Revalidate(token);
         NativeExposureDirectory.RequireEntry(fromBefore, fromName, NativeExposureDirectory.EntryHash(current));
         if (toBefore.Entries.ContainsKey(toName)) throw new IOException("The destination entry is occupied.");
         token.ThrowIfCancellationRequested();
-        uncertain = true; MutationAttempted = true; MutationCompleted = false;
-        from.MoveExclusive(fromName, current, fromBefore, to, toName, toBefore, token);
+        uncertain = true; MutationAttempted = true; MutationCompleted = false; MutationSequence++;
+        from.MoveExclusive(fromName, current, fromBefore, to, toName, toBefore,
+            linuxAuthority is null ? null : ct =>
+            {
+                ValidateLinuxAuthorities(to, ct); ValidateLinuxAuthorities(from, ct);
+                SameLink(current, ReadLink(from, fromName, ct), true);
+                RequireTarget(source.ResolveRawTarget(current.RawTarget.AsSpan(), ct), TargetIdentity);
+            }, token);
+        using var deadline = linuxAuthority is null ? null : new CancellationSource(TimeSpan.FromSeconds(30),
+            ownerCallbackReporter ?? CancellationCallbackReporter.For(logger, "Linux link post-rename reconciliation"));
+        var reconcile = deadline?.Token ?? CancellationToken.None;
         // Cancellation after a native move must not hide its observation. The
         // caller's durable journal owns reconciliation if any check fails.
-        var afterLink = to.ReadLink(toName, CancellationToken.None);
+        var afterLink = ReadLink(to, toName, reconcile);
         SameLink(current, afterLink, false); RequireMetadata(afterLink);
-        var fromAfter = from.Capture(CancellationToken.None);
-        var toAfter = to.Capture(CancellationToken.None);
+        var fromAfter = from.Capture(reconcile);
+        var toAfter = to.Capture(reconcile);
         NativeExposureDirectory.VerifyTransition(fromBefore, fromAfter, fromName, added: false, NativeExposureDirectory.EntryHash(current));
         NativeExposureDirectory.VerifyTransition(toBefore, toAfter, toName, added: true, NativeExposureDirectory.EntryHash(afterLink));
-        target.Revalidate(CancellationToken.None);
-        RequireTarget(source.ResolveRawTarget(afterLink.RawTarget.AsSpan(), CancellationToken.None), TargetIdentity);
-        if (undo) RequireTarget(source.ResolveLink(name, CancellationToken.None), TargetIdentity);
-        from.Flush(CancellationToken.None); to.Flush(CancellationToken.None);
-        from.Validate(fromAfter, CancellationToken.None); to.Validate(toAfter, CancellationToken.None);
-        SameLink(afterLink, to.ReadLink(toName, CancellationToken.None), true);
-        to.Validate(toAfter, CancellationToken.None);
+        target.Revalidate(reconcile); ValidateLinuxAuthorities(to, reconcile); ValidateLinuxAuthorities(from, reconcile);
+        RequireTarget(source.ResolveRawTarget(afterLink.RawTarget.AsSpan(), reconcile), TargetIdentity);
+        if (undo) RequireTarget(source.ResolveLink(name, reconcile), TargetIdentity);
+        from.Flush(reconcile); to.Flush(reconcile);
+        from.Validate(fromAfter, reconcile); to.Validate(toAfter, reconcile);
+        SameLink(afterLink, ReadLink(to, toName, reconcile), true);
+        to.Validate(toAfter, reconcile);
         if (undo) { sourceEvidence = toAfter; retainedEvidence = fromAfter; restored = true; }
         else { sourceEvidence = fromAfter; retainedEvidence = toAfter; retained = slot; }
         current = afterLink; uncertain = false; MutationCompleted = true;
@@ -150,9 +199,9 @@ internal sealed class NativeExposureLinkLease : IDisposable
     }
 
     private void RequireAvailable(CancellationToken token)
-    { token.ThrowIfCancellationRequested(); if (uncertain) throw new IOException("A prior native link move needs external journal reconciliation; no retry is admitted."); }
-    private static void RequireMetadata(ExposureLinkEvidence evidence)
-    { if (!evidence.Metadata.Supported) throw new IOException("Link metadata cannot be fully verified: " + string.Join(" ", evidence.Metadata.Refusals)); }
+    { token.ThrowIfCancellationRequested(); linuxAuthority?.Check(token); if (uncertain) throw new IOException("A prior native link move needs external journal reconciliation; no retry is admitted."); }
+    private void RequireMetadata(ExposureLinkEvidence evidence)
+    { if (linuxAuthority is not null) { if (evidence.Preservation is null) throw new IOException("Missing typed Linux preservation evidence."); return; } if (!evidence.Metadata.Supported) throw new IOException("Link metadata cannot be fully verified: " + string.Join(" ", evidence.Metadata.Refusals)); }
     private static void RequireTarget(SecureFileIdentity actual, SecureFileIdentity expected)
     { if (actual != expected) throw new IOException("The exposure does not resolve to the exact held target identity/generation/address."); }
     private static void SameDirectory(ExposureDirectoryEvidence expected, ExposureDirectoryEvidence actual)
@@ -160,10 +209,29 @@ internal sealed class NativeExposureLinkLease : IDisposable
     internal static void SameLink(ExposureLinkEvidence expected, ExposureLinkEvidence actual, bool sameGeneration)
     {
         if (!(sameGeneration ? expected.Identity == actual.Identity : NativeDirectoryMoveLease.SameObject(expected.Identity, actual.Identity))
-            || !expected.RawTarget.AsSpan().SequenceEqual(actual.RawTarget.AsSpan()) || expected.MetadataFingerprint != actual.MetadataFingerprint)
+            || !expected.RawTarget.AsSpan().SequenceEqual(actual.RawTarget.AsSpan())
+            || (expected.Preservation is null && actual.Preservation is null ? expected.MetadataFingerprint != actual.MetadataFingerprint
+                : !SamePreservation(expected.Preservation, actual.Preservation)))
             throw new IOException("Link object, raw target or supported metadata changed.");
     }
-    public void Dispose() { linkPin.Dispose(); source.Dispose(); }
+    private static bool SamePreservation(LinkPreservationObservation? a, LinkPreservationObservation? b) =>
+        a is not null && b is not null && a.UnixMode == b.UnixMode && a.UserId == b.UserId && a.GroupId == b.GroupId
+        && a.LinkCount == b.LinkCount && a.VisibleAttributesFingerprint == b.VisibleAttributesFingerprint && a.Mount == b.Mount;
+    private ExposureLinkEvidence ReadLink(NativeExposureDirectory directory, string entry, CancellationToken token) =>
+        directory.ReadLink(entry, linkPin, linuxAuthority, token);
+    private void ValidateLinuxAuthorities(NativeExposureDirectory? other, CancellationToken token)
+    {
+        if (linuxAuthority is null) return;
+        linuxAuthority.Check(token); target.Revalidate(token);
+        var expected = Original.Preservation!.Mount;
+        foreach (var observation in source.CaptureLinuxLinkAuthorities(linuxAuthority, token)
+            .Concat(target.CaptureLinuxLinkAuthorities(linuxAuthority, token))
+            .Concat(other?.CaptureLinuxLinkAuthorities(linuxAuthority, token) ?? []))
+            LinuxLinkProcAuthority.RequireSameMount(expected, observation);
+        LinuxLinkProcAuthority.RequireSameMount(expected, linkPin.ObserveLinux(linuxAuthority, token).Mount);
+        linuxAuthority.Check(token);
+    }
+    public void Dispose() { linkPin.Dispose(); source.Dispose(); linuxAuthority?.Dispose(); }
 }
 
 /// Fixed leaf storage beneath an owned private state child. Generic state
@@ -189,11 +257,27 @@ internal abstract class NativeExposureDirectory : IDisposable
 {
     internal abstract ExposureDirectoryEvidence Capture(CancellationToken token);
     internal abstract ExposureLinkEvidence ReadLink(string name, CancellationToken token);
-    internal abstract IDisposable PinLink(string name, ExposureLinkEvidence expected, CancellationToken token);
+    internal abstract NativeExposureLinkPin PinLink(string name, ExposureLinkEvidence expected, CancellationToken token);
     internal abstract SecureFileIdentity ResolveLink(string name, CancellationToken token);
     internal abstract SecureFileIdentity ResolveRawTarget(ReadOnlySpan<byte> raw, CancellationToken token);
     internal abstract void MoveExclusive(string name, ExposureLinkEvidence expected, ExposureDirectoryEvidence sourceBefore,
-        NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, CancellationToken token);
+        NativeExposureDirectory destination, string destinationName, ExposureDirectoryEvidence destinationBefore, Action<CancellationToken>? beforeNativeMove, CancellationToken token);
+    internal virtual IDisposable HoldLinuxLinkAuthorities() => throw new IOException("Linux held link authorities unavailable.");
+    internal virtual ImmutableArray<LinuxLinkMountObservation> CaptureLinuxLinkAuthorities(LinuxLinkProcAuthority authority, CancellationToken token) =>
+        throw new IOException("Linux preservation authorities unavailable.");
+    internal virtual (LinuxLinkPinObservation Pin, LinkPreservationObservation Observation) CaptureLinuxPreservation(
+        string name, NativeExposureLinkPin pin, LinuxLinkProcAuthority authority, CancellationToken token) => throw new IOException("Linux preservation unavailable.");
+    internal ExposureLinkEvidence ReadLink(string name, NativeExposureLinkPin pin, LinuxLinkProcAuthority? authority, CancellationToken token)
+    {
+        using var references = authority is null ? null : HoldLinuxLinkAuthorities();
+        authority?.Check(token);
+        var link = ReadLink(name, token);
+        if (authority is null) return link;
+        var observed = CaptureLinuxPreservation(name, pin, authority, token);
+        if (observed.Pin.Identity with { CanonicalPath = link.Identity.CanonicalPath } != link.Identity
+            || !observed.Pin.RawTarget.AsSpan().SequenceEqual(link.RawTarget.AsSpan())) throw new IOException("Named link contradicts original pin.");
+        return link with { Preservation = observed.Observation };
+    }
     internal abstract void Flush(CancellationToken token);
     public abstract void Dispose();
     internal void Validate(ExposureDirectoryEvidence expected, CancellationToken token)

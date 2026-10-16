@@ -1217,7 +1217,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
             return Path.GetFullPath(path);
         }
 
-        var descriptorPath = $"/proc/self/fd/{handle.FileDescriptor}";
+        var descriptorPath = $"/proc/thread-self/fd/{handle.FileDescriptor}";
         var capacity = InitialLinuxFinalPathCapacity;
         while (capacity <= MaxLinuxFinalPathCapacity)
         {

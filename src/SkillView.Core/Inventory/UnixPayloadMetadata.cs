@@ -215,7 +215,7 @@ internal sealed partial class UnixSecureRemovalBackend
     private static void ReadAttributes(SafeUnixHandle handle, SafeUnixHandle? parent, string? name, bool link,
         ImmutableArray<PayloadExtendedAttribute>.Builder attributes, ImmutableArray<string>.Builder refusals, CancellationToken token)
     {
-        var path = !OperatingSystem.IsMacOS() && link ? $"/proc/self/fd/{parent!.FileDescriptor}/{name}" : null;
+        var path = !OperatingSystem.IsMacOS() && link ? $"/proc/thread-self/fd/{parent!.FileDescriptor}/{name}" : null;
         long List(byte[] buffer)
         {
             long count = -1;
