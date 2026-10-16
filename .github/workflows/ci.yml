@@ -110,6 +110,7 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.WindowsPayloadMetadataTests \
             --filter-class SkillView.Tests.Maintenance.WindowsBackupReadStreamTests \
             --filter-class SkillView.Tests.Maintenance.WindowsSecurityDescriptorQueryTests \
+            --filter-class SkillView.Tests.Maintenance.RecordedTrackingWriterTests \
             --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
