@@ -192,22 +192,19 @@ internal sealed class CleanupSuppressionStore(string root, int maxRecords = 256,
         var owners = OwnerNamespace(skill);
         if (skill.SourceIdentity.Key is { } source)
         {
-            if (skill.FrontMatter.Upstream is not null || skill.FrontMatter.LocalPath is not null)
+            using var metadata = RegularFileInspection.Open(Path.Combine(skill.ResolvedPath, "SKILL.md"));
+            var prefix = new byte[LocalSkillScanner.MaxFrontMatterPrefixBytes];
+            var length = 0;
+            while (length < prefix.Length)
             {
-                using var metadata = RegularFileInspection.Open(Path.Combine(skill.ResolvedPath, "SKILL.md"));
-                var prefix = new byte[LocalSkillScanner.MaxFrontMatterPrefixBytes];
-                var length = 0;
-                while (length < prefix.Length)
-                {
-                    token.ThrowIfCancellationRequested();
-                    var count = metadata.Read(prefix, length, prefix.Length - length);
-                    if (count == 0) break;
-                    length += count;
-                }
-                var (_, live, _) = FrontMatterParser.Parse(System.Text.Encoding.UTF8.GetString(prefix, 0, length));
-                if ((skill with { FrontMatter = live }).SourceIdentity.Key != source)
-                    throw new IOException("Selected source metadata changed; refresh before setting suppression.");
+                token.ThrowIfCancellationRequested();
+                var count = metadata.Read(prefix, length, prefix.Length - length);
+                if (count == 0) break;
+                length += count;
             }
+            var (_, live, _) = FrontMatterParser.Parse(System.Text.Encoding.UTF8.GetString(prefix, 0, length));
+            if ((skill with { FrontMatter = live }).SourceIdentity.Key != source)
+                throw new IOException("Selected source metadata changed; refresh before setting suppression.");
             return new(native.CanonicalPath, "source", source, owners, null, null);
         }
         if (!SameObject(skill.ObservedSubject?.NativeObject,

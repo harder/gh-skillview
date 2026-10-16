@@ -223,4 +223,23 @@ public sealed class CleanupSuppressionStoreTests : IDisposable
         Assert.False(Directory.Exists(store.Root));
     }
 
+    [Fact]
+    public void OwnerOnlySourceMustMatchLiveMetadataAtReadAndWrite()
+    {
+        var target = Skill() with
+        {
+            Package = new("fixture/source", "github", null, null, null)
+            { Provider = "fixture", SkillPath = "skills/demo" }
+        };
+        Assert.NotNull(target.SourceIdentity.Key);
+        var store = Store(); store.Set(target, Inventory(target), false, Token);
+        Assert.True(Observe(store, target).External);
+        File.WriteAllText(Path.Combine(target.ResolvedPath, "SKILL.md"),
+            "---\nname: demo\ndescription: Changed source\nmetadata:\n  github-repo: https://github.com/other/source\n  github-path: skills/demo\n---\nNew instructions.\n");
+        Assert.False(Observe(store, target).External);
+        var freshStore = new CleanupSuppressionStore(Path.Combine(_temp.FullName, "fresh-state"));
+        Assert.Throws<IOException>(() => freshStore.Set(target, Inventory(target), false, Token));
+        Assert.False(Directory.Exists(freshStore.Root));
+    }
+
 }
