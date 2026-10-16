@@ -167,6 +167,43 @@ public sealed class ModalOperationTrackerTests
             TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    public async Task InlineSynchronizationContextCannotCompleteBeforeOwnershipPublication()
+    {
+        using var tracker = NewTracker();
+        var observed = new TaskCompletionSource<ModalOperationTracker.Ownership>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var original = SynchronizationContext.Current;
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+            Assert.True(tracker.TryStart(_ =>
+            {
+                tracker.InvokeTerminalIfActive(() =>
+                {
+                    observed.TrySetResult(tracker.CurrentOwnership);
+                    tracker.Release();
+                });
+                return Task.CompletedTask;
+            }));
+        }
+        finally { SynchronizationContext.SetSynchronizationContext(original); }
+
+        Assert.Equal(ModalOperationTracker.Ownership.Running,
+            await observed.Task.WaitAsync(TestContext.Current.CancellationToken));
+        await WaitUntilAsync(() => tracker.CurrentOwnership == ModalOperationTracker.Ownership.None,
+            TestContext.Current.CancellationToken);
+        var reused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.True(tracker.TryStart(_ => { tracker.Release(); reused.SetResult(); return Task.CompletedTask; }));
+        await reused.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => tracker.CurrentOwnership == ModalOperationTracker.Ownership.None,
+            TestContext.Current.CancellationToken);
+    }
+
+    private sealed class InlineSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback callback, object? state) => callback(state);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
         while (!condition())

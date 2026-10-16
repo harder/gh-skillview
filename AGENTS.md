@@ -4,6 +4,9 @@
   native ABI check is independent of destructive traversal support. Linux hosts
   without `openat2` may inspect regular metadata while removal stays disabled.
   CI's Linux AOT job proves this with both EPERM and ENOSYS seccomp denials.
+- Text retained from a second read of a held payload stream must match the
+  captured entry's raw content hash before it supports a report or fingerprint.
+  Discard partial path and text observations when final native capture fails.
 - Hidden directory/link exclusions make inventory coverage partial independently
   of the bounded location table. Skipped regular metadata files do not omit
   skill discovery. Startup TUI capture must use the workflow coordinator so
@@ -301,6 +304,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   use `Application.Create().Init()` to create the app instance and
   `IApplication.Dispose()` / `using` for teardown. Do not add new uses of the
   legacy static `Application.Init()` / `Application.Shutdown()` path.
+- Modal operation ownership must be published before work can run. Use an
+  explicit pending publication barrier; `Task.Yield` is insufficient when a
+  synchronization context posts inline. Set progress UI before starting work
+  so immediate completion cannot be overwritten by a late busy assignment.
 - Tie async TUI work to the lifetime of the owning app/dialog with a
   `CancellationToken`, and only update UI through `app.Invoke()` while that
   lifetime is still active. Do not fall back to direct UI mutation after

@@ -246,6 +246,11 @@ jobs:
         run: |
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
+      - name: Prove explicit static package checks preserve payloads without running scripts
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
+          python agent_docs/evidence/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
       - name: Prove managed and built-in discovery preserves read-only resources
         shell: bash
         run: |

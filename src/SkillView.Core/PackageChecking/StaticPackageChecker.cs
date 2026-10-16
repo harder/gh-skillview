@@ -1,0 +1,262 @@
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
+using SkillView.Inventory;
+using SkillView.Inventory.Models;
+using SkillView.Maintenance;
+
+namespace SkillView.PackageChecking;
+
+internal sealed class StaticPackageChecker
+{
+    internal sealed record Limits(int MarkdownFiles = 128, int DocumentBytes = 1024 * 1024,
+        int SkillBytes = PayloadSnapshot.MaxSkillBytes, int TextBytes = 8 * 1024 * 1024,
+        int References = 4096, int Findings = 256);
+
+    private readonly Limits limits;
+    private readonly Func<string, Action<NativePayloadItem, PayloadEntry>, CancellationToken, PayloadSnapshot> capture;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    internal StaticPackageChecker(Limits? limits = null,
+        Func<string, Action<NativePayloadItem, PayloadEntry>, CancellationToken, PayloadSnapshot>? captureForTests = null)
+    {
+        this.limits = limits ?? new();
+        if (this.limits.MarkdownFiles is < 1 or > 128 || this.limits.DocumentBytes is < 1 or > 1024 * 1024
+            || this.limits.SkillBytes is < 1 or > PayloadSnapshot.MaxSkillBytes || this.limits.TextBytes < this.limits.SkillBytes
+            || this.limits.TextBytes > 8 * 1024 * 1024 || this.limits.References is < 1 or > 4096 || this.limits.Findings is < 1 or > 256)
+            throw new ArgumentOutOfRangeException(nameof(limits));
+        capture = captureForTests ?? PayloadSnapshot.CaptureWithEntrySink;
+    }
+
+    internal Task<PackageCheckReport> CheckAsync(InstalledSkill target, CancellationToken token) =>
+        Task.Run(() => Check(target, token), token);
+
+    private PackageCheckReport Check(InstalledSkill target, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var texts = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var reasons = new HashSet<string>(StringComparer.Ordinal);
+        var findings = ImmutableArray.CreateBuilder<PackageCheckFinding>();
+        var findingCount = 0; var hasErrors = false; var referenceErrors = false; var format = "unknown";
+        var textBytes = 0; var documents = 0; var references = 0; var analyzedMarkdown = 0;
+        PayloadSnapshot snapshot;
+        try
+        {
+            snapshot = capture(target.ResolvedPath, (item, entry) =>
+            {
+                token.ThrowIfCancellationRequested();
+                if (entry.Kind != "file" || !entry.Path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) return;
+                var skill = entry.Path == "SKILL.md";
+                var cap = skill ? limits.SkillBytes : limits.DocumentBytes;
+                // Reserve a root SKILL.md slot and byte budget regardless of native enumeration order.
+                var used = texts.Where(pair => pair.Key != "SKILL.md").Sum(pair => pair.Value.Length);
+                if (entry.Bytes > cap || entry.Bytes > limits.TextBytes - textBytes
+                    || !skill && (documents >= limits.MarkdownFiles - 1 || entry.Bytes > limits.TextBytes - limits.SkillBytes - used))
+                { reasons.Add("Markdown file/count/text-byte limit omitted one or more documents."); return; }
+                var input = item.Content ?? throw new IOException("Held Markdown stream is unavailable.");
+                var bytes = Read(input, checked((int)entry.Bytes), cap, token);
+                if (Convert.ToHexString(SHA256.HashData(bytes)) != entry.ContentHash)
+                    throw new IOException("Held Markdown bytes differ from the captured content fingerprint.");
+                texts.Add(entry.Path, bytes);
+                textBytes += bytes.Length;
+                if (!skill) documents++;
+            }, token);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            // A failed final native verification invalidates earlier traversal callbacks.
+            // Independently capture regular root metadata; never reuse a partial path index.
+            texts.Clear(); reasons.Clear();
+            reasons.Add("Whole-payload observation unavailable: " + exception.Message);
+            try
+            {
+                RegularFileInspection.Capture(Path.Combine(target.ResolvedPath, "SKILL.md"), item =>
+                {
+                    var stream = item.Content ?? throw new IOException("Regular root metadata stream unavailable.");
+                    var bytes = Read(stream, checked((int)Math.Min(stream.Length, int.MaxValue)), limits.SkillBytes, token);
+                    CheckMetadata(bytes);
+                    return new(Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length);
+                }, token);
+            }
+            catch (Exception metadataException) when (metadataException is IOException or UnauthorizedAccessException or NotSupportedException or OverflowException)
+            { format = "unknown"; findings.Clear(); findingCount = 0; hasErrors = false; reasons.Add("Root metadata observation unavailable: " + metadataException.Message); }
+            return Result("unavailable", "unavailable", "unknown", null, 0, 0, 0);
+        }
+
+        var index = new Dictionary<string, PayloadEntry>(StringComparer.Ordinal);
+        var caseIndex = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in snapshot.Entries)
+        {
+            token.ThrowIfCancellationRequested();
+            index.Add(entry.Path, entry);
+            if (!caseIndex.TryGetValue(entry.Path, out var paths)) caseIndex.Add(entry.Path, paths = []);
+            paths.Add(entry.Path);
+        }
+        if (!index.TryGetValue("SKILL.md", out var skillEntry))
+        {
+            format = "missing";
+            Add("metadata", "skill-file-missing", "SKILL.md", null, null,
+                "The package has no exact root SKILL.md entry.", "Add the required root SKILL.md with name and description metadata.");
+        }
+        else if (skillEntry.Kind != "file")
+        { reasons.Add("Root SKILL.md is not a regular file; links are not followed."); }
+        else if (texts.TryGetValue("SKILL.md", out var skillBytes)) CheckMetadata(skillBytes);
+        else reasons.Add("Root SKILL.md exceeded its metadata byte budget.");
+
+        foreach (var (path, bytes) in texts.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            token.ThrowIfCancellationRequested();
+            if (references >= limits.References) { reasons.Add("Reference count limit reached; later documents were not inspected."); break; }
+            string text;
+            try { text = StrictUtf8.GetString(bytes); }
+            catch (DecoderFallbackException) { reasons.Add("One or more Markdown documents are not valid UTF-8."); continue; }
+            var offset = 0;
+            if (path == "SKILL.md")
+            {
+                var body = MarkdownBody(text);
+                if (!body.Known)
+                { reasons.Add("Root frontmatter has no bounded closing delimiter; its Markdown body was not inspected."); continue; }
+                (text, offset) = (body.Text, body.Offset);
+            }
+            var parsed = MarkdownPackageReferences.Scan(text, limits.References - references, token, offset);
+            analyzedMarkdown++;
+            foreach (var reason in parsed.Reasons) reasons.Add(reason);
+            foreach (var reference in parsed.References)
+            {
+                token.ThrowIfCancellationRequested(); references++;
+                if (reference.UndefinedLabel)
+                { reasons.Add("Undefined explicit reference labels were not resolved."); continue; }
+                InspectReference(path, reference);
+            }
+        }
+        var unknownReferences = reasons.Count != 0;
+        return Result("complete", unknownReferences ? "partial" : "limited",
+            referenceErrors ? "findings" : unknownReferences ? "unknown" : "none-observed",
+            snapshot.Fingerprint, snapshot.Entries.Length, snapshot.Entries.Sum(entry => entry.Bytes), analyzedMarkdown);
+
+        void CheckMetadata(byte[] bytes)
+        {
+            string text;
+            try { text = StrictUtf8.GetString(bytes); }
+            catch (DecoderFallbackException)
+            {
+                format = "invalid";
+                Add("metadata", "metadata-encoding", "SKILL.md", null, null, "Root SKILL.md is not valid UTF-8.", "Review and save the metadata as valid UTF-8.");
+                return;
+            }
+            var (_, metadata, parsed) = FrontMatterParser.Parse(text);
+            if (!parsed)
+            {
+                format = "invalid";
+                Add("metadata", "metadata-framing-or-yaml", "SKILL.md", null, null,
+                    "Required bounded frontmatter could not be parsed: " + string.Join("; ", metadata.Diagnostics),
+                    "Review the opening/closing YAML delimiters and metadata syntax; no bytes were edited.");
+                return;
+            }
+            format = metadata.Diagnostics.IsEmpty ? "valid" : "invalid";
+            foreach (var diagnostic in metadata.Diagnostics)
+            {
+                token.ThrowIfCancellationRequested();
+                var required = diagnostic.StartsWith("Required name", StringComparison.Ordinal) ? "name"
+                    : diagnostic.StartsWith("Required description", StringComparison.Ordinal) ? "description" : null;
+                Add("metadata", required is null ? "metadata-invalid" : "metadata-required-" + required, "SKILL.md", null, null,
+                    diagnostic, required is null ? "Review the reported metadata format; no payload repair was attempted." : "Add a nonempty " + required + " field in root SKILL.md frontmatter.");
+            }
+        }
+
+        void InspectReference(string document, PackageMarkdownReference reference)
+        {
+            var targetText = reference.Target;
+            if (reference.DecodeUrl)
+            {
+                var fragment = targetText.IndexOfAny(['#', '?']);
+                if (fragment >= 0) targetText = targetText[..fragment];
+                for (var index = 0; index < targetText.Length; index++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (targetText[index] != '%') continue;
+                    if (index + 2 >= targetText.Length || !char.IsAsciiHexDigit(targetText[index + 1]) || !char.IsAsciiHexDigit(targetText[index + 2]))
+                    { reasons.Add("Malformed URL escape was not inspected."); return; }
+                    index += 2;
+                }
+                try { targetText = Uri.UnescapeDataString(targetText); }
+                catch (UriFormatException) { reasons.Add("Malformed URL escape was not inspected."); return; }
+            }
+            if (targetText.Length == 0) return;
+            if (targetText.StartsWith("//", StringComparison.Ordinal) || targetText.Contains(':')) return;
+            if (targetText[0] == '/' || targetText.Contains('\\') || targetText.Any(char.IsControl)
+                || targetText.IndexOfAny(['$', '*', '{', '}']) >= 0)
+            { reasons.Add("Absolute, dynamic or unsupported reference paths were not inspected."); return; }
+            var segments = document.Split('/').SkipLast(1).ToList();
+            foreach (var segment in targetText.Split('/'))
+            {
+                token.ThrowIfCancellationRequested();
+                if (segment is "" or ".") continue;
+                if (segment == "..")
+                {
+                    if (segments.Count == 0) { reasons.Add("A reference escapes the captured package and was not inspected."); return; }
+                    segments.RemoveAt(segments.Count - 1);
+                }
+                else segments.Add(segment);
+            }
+            var relative = string.Join('/', segments);
+            for (var count = 1; count <= segments.Count; count++)
+            {
+                token.ThrowIfCancellationRequested();
+                var prefix = string.Join('/', segments.Take(count));
+                if (index.TryGetValue(prefix, out var ancestor) && ancestor.Kind == "link"
+                    || caseIndex.TryGetValue(prefix, out var candidates) && candidates.Any(candidate => index[candidate].Kind == "link"))
+                { reasons.Add("References through captured links were not followed."); return; }
+            }
+            if (relative.Length == 0 || index.ContainsKey(relative)) return;
+            if (caseIndex.TryGetValue(relative, out var alternatives))
+                Add("reference", "reference-case-mismatch", document, reference.Line, reference.Target,
+                    "The target differs in case from captured path(s): " + string.Join(", ", alternatives.Take(4)),
+                    "Use the exact captured path spelling; review case portability before sharing the package.");
+            else
+                Add("reference", "reference-missing", document, reference.Line, reference.Target,
+                    "The internal target is absent from the complete captured package: " + relative,
+                    "Restore the referenced file/asset/script or review and correct this explicit reference.");
+        }
+
+        void Add(string category, string code, string path, int? line, string? targetPath, string message, string repair)
+        {
+            findingCount++; hasErrors = true;
+            referenceErrors |= category == "reference";
+            if (findings.Count < limits.Findings) findings.Add(new(category, code, path, line, targetPath, message, repair));
+        }
+        PackageCheckReport Result(string payload, string referenceCoverage, string referenceStatus, string? fingerprint, int entries, long bytes, int analyzed) =>
+            new(target.InstallationId, target.ResolvedPath, format, referenceStatus,
+                new(payload, referenceCoverage, entries, bytes, analyzed, references, reasons.Order(StringComparer.Ordinal).ToImmutableArray()),
+                fingerprint, findings.ToImmutable(), findingCount, findingCount - findings.Count, hasErrors);
+    }
+
+    private static byte[] Read(Stream input, int expected, int limit, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (expected < 0 || expected > limit || input.Length != expected) throw new IOException("Markdown metadata/text byte budget exceeded.");
+        var bytes = new byte[expected]; var read = 0;
+        while (read < bytes.Length)
+        {
+            token.ThrowIfCancellationRequested();
+            var count = input.Read(bytes, read, Math.Min(64 * 1024, bytes.Length - read));
+            if (count == 0) throw new IOException("Captured Markdown stream ended before its observed length.");
+            read += count;
+        }
+        if (input.Length != expected) throw new IOException("Captured Markdown length changed.");
+        return bytes;
+    }
+
+    private static (string Text, int Offset, bool Known) MarkdownBody(string text)
+    {
+        using var reader = new StringReader(text.TrimStart('\uFEFF'));
+        if (reader.ReadLine() != "---") return (text, 0, true);
+        var lines = 1; var read = 4;
+        while (reader.ReadLine() is { } line && read <= FrontMatterParser.MaxYamlChars)
+        {
+            lines++; read += line.Length + 1;
+            if (line is "---" or "...") return (reader.ReadToEnd(), lines, true);
+        }
+        return ("", 0, false);
+    }
+}

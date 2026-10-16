@@ -317,6 +317,21 @@ internal sealed class SkillViewWorkflowCoordinator
                 _options.WorkspaceDirectories, _options.Profiles, token));
     }
 
+    internal void ShowPackageCheck(InstalledSkill selected, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is not { } app) return;
+        PackageCheckScreen.Show(app, _services.Logger, selected, async token =>
+        {
+            var inventory = await _services.InventoryService.CaptureAsync(null,
+                new(_options.ScanRoots, true, WorkspaceDirectories: _options.WorkspaceDirectories,
+                    Profiles: _options.Profiles), token).ConfigureAwait(false);
+            var matches = inventory.Skills.Where(skill => skill.InstallationId == selected.InstallationId
+                && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath)).Take(2).ToArray();
+            if (matches.Length != 1) throw new IOException("The selected installation changed; refresh Installed before checking it.");
+            return await new SkillView.PackageChecking.StaticPackageChecker().CheckAsync(matches[0], token).ConfigureAwait(false);
+        }, lifetimeToken);
+    }
+
     /// Scope-filtered capture used by the Installed tab's scope cycle. When
     /// `scopeFilter` is "user"/"project", `gh skill list --scope` does the
     /// filtering server-side; null captures everything (the tab narrows

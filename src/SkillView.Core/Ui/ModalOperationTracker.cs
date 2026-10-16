@@ -69,6 +69,7 @@ internal sealed class ModalOperationTracker : IDisposable
     {
         ArgumentNullException.ThrowIfNull(operation);
 
+        TaskCompletionSource publication;
         lock (_gate)
         {
             if (_disposed || _operation is not null)
@@ -76,12 +77,15 @@ internal sealed class ModalOperationTracker : IDisposable
                 return false;
             }
 
-            // Yield before invoking user work so ownership is published before
-            // even a synchronously-completing operation can queue its UI commit.
+            // SynchronizationContext.Post may run inline. A pending barrier
+            // makes publication ordering independent of Task.Yield/Post and
+            // keeps user work outside this ownership lock.
             _releaseRequested = false;
-            _operation = StartAfterOwnershipPublishedAsync(operation, Token);
-            return true;
+            publication = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _operation = StartAfterOwnershipPublishedAsync(operation, Token, publication.Task);
         }
+        publication.SetResult();
+        return true;
     }
 
     internal void Release()
@@ -180,11 +184,11 @@ internal sealed class ModalOperationTracker : IDisposable
 
     private async Task StartAfterOwnershipPublishedAsync(
         Func<CancellationToken, Task> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Task publication)
     {
         try
         {
-            await Task.Yield();
+            await publication.ConfigureAwait(false);
             await operation(cancellationToken).ConfigureAwait(false);
         }
         finally

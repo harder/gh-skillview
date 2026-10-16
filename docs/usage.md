@@ -72,6 +72,7 @@ Installed tab:
 | `f` | Focus the filter field |
 | `s` | Cycle sort (name / package / location) |
 | `P` | Cycle pin filter (all / pinned only / unpinned only) |
+| `K` | Check selected local package metadata and supported references |
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
 
@@ -259,6 +260,25 @@ implicit rewrites. Existing shared selectors require update or coordinated
 maintenance before reinstalling, including with `--force`. Project/custom updates
 preserve the user's shared registry. Owner-aware removal and record repairs remain
 refusals until a coordinated maintenance plan is available.
+
+### Static package checks
+
+Use `skillview --scan-root /path/to/skills check --path /path/to/skills/demo --json`
+to check one observed installation. `--install-id ID` also selects a physical
+installation; an observed agent exposure path may be used with `--path`.
+In Installed, select a row and press **K** to open the same read-only check.
+
+Reports separate metadata validity, supported local references and observation
+coverage. Findings include source paths, line numbers, target paths and repair
+guidance. Read `referenceScope` for the limited Markdown/code-path syntax that was
+checked. A clean result does not establish source authenticity, agent compatibility
+or behavioral safety. Skill code is never executed, and the check performs no
+remote source lookup or automated repair.
+
+Exit 0 means the requested limited checks completed without errors; findings or
+unknown/partial coverage return 1. Invalid selectors return 2; no unique inventory
+match returns 20. Pass global scan roots before `check` and use
+`--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 ### Global flags
 

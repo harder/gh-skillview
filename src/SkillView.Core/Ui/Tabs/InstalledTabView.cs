@@ -41,6 +41,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
     private readonly Action<InstalledSkill>? _onEffectiveLoading;
+    private readonly Action<InstalledSkill>? _onPackageCheck;
     private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
@@ -80,7 +81,8 @@ internal sealed class InstalledTabView : FrameView
         Func<string?, CancellationToken, Task<InventorySnapshot>>? scopedSnapshotLoader = null,
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
-        Action<InstalledSkill>? onEffectiveLoading = null)
+        Action<InstalledSkill>? onEffectiveLoading = null,
+        Action<InstalledSkill>? onPackageCheck = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -91,6 +93,7 @@ internal sealed class InstalledTabView : FrameView
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
         _onEffectiveLoading = onEffectiveLoading;
+        _onPackageCheck = onPackageCheck;
         _lifetimeToken = lifetimeToken;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
@@ -493,7 +496,7 @@ internal sealed class InstalledTabView : FrameView
     internal static string BuildSearchScopeText() => "name · path · agent · package";
 
     internal static string BuildLegendText() =>
-        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading";
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -592,6 +595,13 @@ internal sealed class InstalledTabView : FrameView
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        if (!_filterField.HasFocus && key.AsRune.Value == 'K' && _onPackageCheck is not null
+            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
+        {
+            key.Handled = true;
+            if (GetSelectedSkill() is { } selected) _onPackageCheck(selected);
+            return;
+        }
         if (!_filterField.HasFocus && key.AsRune.Value == 'E' && _onEffectiveLoading is not null
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {

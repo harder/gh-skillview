@@ -1221,3 +1221,35 @@ pass. New-head CI and a complete four-RID native proof selection remain pending.
 Acceptance remains 9/21 and M08 incomplete. See
 `evidence/maintenance-batch-16-harness-path-fix.json` for exact attribution and
 compact raw-evidence hashes.
+
+## Static package checking: partial M19 local checkpoint
+
+The isolated `codex/static-package-check` worktree adds bounded local package
+metadata/reference checking, CLI `check` selectors and an Installed-tab `K`
+read-only dialog. Reports separate metadata, reference findings and coverage;
+agent compatibility and source review remain unassessed, with no skill execution
+or remote source lookup. Unsupported syntax and incomplete observations remain
+explicit, and cannot produce a successful CLI verification.
+
+The final local snapshot also fixes shared modal ownership publication: an
+immediately completed worker could run its terminal callback before ownership
+was assigned, leaving the dialog stuck. An explicit publication barrier and an
+inline-context regression cover the independently reviewed fix. This is separate
+from the original Mac Down-arrow crash, which remains unreproduced.
+
+Queued package-check completions also preserve status/output and close when
+the parent lifetime ends, across success/failure/cancellation; an already
+canceled parent opens no dialog or capture. Those regressions pass.
+
+The final scoped build has no warnings/errors; all 2,025 Tests and 9 Integration
+tests pass with zero skips, and Core/Tests/Integration formatting is clean. The
+earlier 166 focused and 2,022 full checks retain their exact prior snapshots;
+the current full suite covers them after ownership and lifetime fixes. Independent checker, CLI/UI/proof and
+shared-modal reviews are clear. An earlier mixed-filter invocation selected zero
+tests and is not counted as verification.
+App/gh-extension runtime proof and four-RID Native AOT gates remain pending CI;
+no prior unpin full-suite or native result is reused for this feature. Original
+acceptance remains 9/21, with M19 incomplete and all other original obligations
+retained. See `maintenance-static-package-check.md` and
+`evidence/maintenance-static-package-check-local.json` for scope, source hashes,
+review records and exact verification receipts.
