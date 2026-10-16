@@ -29,7 +29,7 @@ internal sealed class PayloadMetadataReview : IDisposable
     internal PayloadMetadataRecipe this[string path] => recipes[path];
 
     private PayloadMetadataReview(ThreeWayPayloadReview review, CapturedPayloadArchive.Reader installed, PayloadMetadataAuthority authority,
-        CapturedPayloadArchive.Reader? source)
+        IPayloadEvidenceReader? source, IPayloadEvidenceReader? resolved)
     {
         Authority = authority;
         var root = Require(installed.RootMetadata, "/");
@@ -52,11 +52,12 @@ internal sealed class PayloadMetadataReview : IDisposable
                 // directory. Ownership inherits from this reviewed parent;
                 // ordinary xattrs on a parent do not inherit to a new child.
                 PayloadNativeMetadata? attributes = null;
-                if (row.Selection == "source")
+                if (row.Selection is "source" or "resolved")
                 {
-                    if (source is null || !source.TryEntry(row.Path, out var incoming) || incoming!.Entry != entry)
-                        throw new IOException("New source-node metadata needs its exact immutable source capture: " + row.Path);
-                    attributes = Require(incoming.Metadata, row.Path);
+                    var selected = row.Selection == "source" ? source : resolved;
+                    if (selected is null || selected.Entry(row.Path) != entry)
+                        throw new IOException("New node metadata needs its exact immutable selected capture: " + row.Path);
+                    attributes = Require(selected.Metadata(row.Path), row.Path);
                 }
                 recipes.Add(row.Path, new(row.Path, basisPath, basis, entry.Kind, entry.UnixMode, false, attributes));
             }
@@ -66,10 +67,10 @@ internal sealed class PayloadMetadataReview : IDisposable
     }
 
     internal static PayloadMetadataReview Create(ThreeWayPayloadReview review, CapturedPayloadArchive.Reader installed, CancellationToken token,
-        CapturedPayloadArchive.Reader? source = null)
+        IPayloadEvidenceReader? source = null, IPayloadEvidenceReader? resolved = null)
     {
         var authority = installed.OpenMetadataAuthority(token);
-        try { return new(review, installed, authority, source); }
+        try { return new(review, installed, authority, source, resolved); }
         catch { authority.Dispose(); throw; }
     }
 

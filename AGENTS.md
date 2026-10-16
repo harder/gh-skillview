@@ -155,6 +155,12 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `fremovexattr`. Verify exact attributes after every staged metadata change;
   preserve compatible I attributes and copy captured C attributes on new
   source nodes, separately from reviewed I-parent owner/group inheritance.
+  Captured custom resolutions use `IPayloadEvidenceReader`, not synthetic root
+  snapshots. Read inputs through `RegularFileInspection.Capture` on a retained
+  native handle; parse by target `SKILL.md`, never the input filename. Schema2
+  choices bind exact completed resolution manifests; schema1 omits that field.
+  Keep original source evidence when reusing captures. Charge incomplete and
+  unreferenced attempts to per-plan quotas and bound the draft scan first.
   Unix registry owners must explicitly `LOCK_UN` before closing, including
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions

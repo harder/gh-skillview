@@ -86,6 +86,23 @@ from base, keep installed when source is unchanged, and keep installed presentat
 when both agree. Conflicting bytes, deletion/type changes and inconsistent directory
 topology need explicit choices. No textual merge or conflict markers are inserted.
 
+For a custom regular-file resolution, use
+`update-merge-choose --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --resolve SKILL.md /path/to/reviewed-file`.
+The command freezes exact bytes, mode and the native source observation before
+publishing the choice. Repeat `--resolve TARGET FILE` for other captured paths.
+Only target `SKILL.md` requires valid UTF-8/frontmatter and the two-megabyte limit;
+other targets can contain binary bytes. Final-component symlinks, directories and
+special-file inputs are refused. Renaming the authored skill needs a separate
+migration plan.
+
+Later complete choice sets can reuse those bytes with `--choose-resolved TARGET`.
+Editing or deleting the original input no longer changes the saved resolution.
+Revised inputs create separate immutable captures; prior captures and incomplete
+attempts remain retained and count toward the plan's cumulative 256 MiB byte and
+64 MiB manifest limits. Selected frozen blobs are verified again on apply and
+recovery. Compatible node kinds keep installed attributes; new resolved nodes carry
+captured resolution attributes with reviewed installed-parent ownership.
+
 Review reports path hashes, choices, conflicts, metadata refusals and archive
 locations. Merged planning preserves supported native metadata and root privacy,
 then verifies the result before saving a separate approval fingerprint. Compatible
@@ -97,7 +114,7 @@ evidence. The next update compares local changes against that source baseline.
 Current metadata publication supports the verified macOS owner/group/mode/xattr
 policy. Extended ACLs, special flags, external hard links and unavailable metadata
 are refused. Linux requires proven complete attribute visibility; Windows native
-metadata publication and captured custom resolution files remain pending. These
+metadata publication remain pending. These
 limitations are explicit refusals and cannot authorize a lossy merge.
 
 Choices and finalization attempts are bounded and append-only. A partial merged

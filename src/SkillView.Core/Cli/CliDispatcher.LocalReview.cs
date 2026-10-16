@@ -14,18 +14,24 @@ public static partial class CliDispatcher
         string? id = null, expected = null;
         var json = false; var hidden = false;
         var choices = new List<LocalPathChoice>();
+        var resolutions = new List<LocalResolutionInput>();
         var args = options.SubcommandArgs;
         for (var i = 0; i < args.Count; i++)
         {
             if (args[i] == "--json" && !json) { json = true; continue; }
             if (args[i] == "--allow-hidden-dirs" && !hidden) { hidden = true; continue; }
+            if (command == "update-merge-choose" && args[i] == "--resolve" && i + 2 < args.Count)
+            {
+                var target = args[++i]; var file = args[++i];
+                choices.Add(new(target, "resolved")); resolutions.Add(new(target, file)); continue;
+            }
             if (i + 1 < args.Count)
             {
                 if (args[i] == "--id" && id is null) { id = args[++i]; continue; }
                 if (args[i] == "--expect" && expected is null) { expected = args[++i]; continue; }
-                if (command == "update-merge-choose" && args[i] is "--choose-installed" or "--choose-source")
+                if (command == "update-merge-choose" && args[i] is "--choose-installed" or "--choose-source" or "--choose-resolved")
                 {
-                    var side = args[i] == "--choose-installed" ? "installed" : "source";
+                    var side = args[i] == "--choose-installed" ? "installed" : args[i] == "--choose-source" ? "source" : "resolved";
                     choices.Add(new(args[++i], side)); continue;
                 }
             }
@@ -39,6 +45,7 @@ public static partial class CliDispatcher
         }
         try
         {
+            resolutions = resolutions.Select(input => input with { SourceFile = Path.GetFullPath(input.SourceFile, services.Runner.EffectiveWorkingDirectory) }).ToList();
             var gh = services.GhLocator.FindOnPath();
             var inventory = await services.InventoryService.CaptureAsync(gh,
                 new LocalInventoryService.Options(options.ScanRoots, hidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
@@ -56,7 +63,7 @@ public static partial class CliDispatcher
             {
                 var review = await Task.Run(() => command == "update-merge-review"
                     ? store.ReviewLocalChanges(id!, expected!, inventory, token)
-                    : store.ChooseLocalChanges(id!, expected!, choices, inventory, token), token).ConfigureAwait(false);
+                    : store.ChooseLocalChanges(id!, expected!, choices, inventory, token, resolutions), token).ConfigureAwait(false);
                 if (json) WriteJson(w => JsonSerializer.Serialize(w, review, LocalReviewJsonContext.Default.LocalUpdateReview));
                 else
                 {

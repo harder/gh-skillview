@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--gh', action='append', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
+parser.add_argument('--resolved', action='store_true', help='Use a captured custom SKILL.md resolution and delete its input before apply.')
 args = parser.parse_args()
 app = args.app.resolve()
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
@@ -89,7 +90,21 @@ for gh_path in args.gh:
         assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], (commands[-1], refused.get('error'))
         assert 'earlier replacement approval is closed' in refused['error'].lower(), refused
         assert manifest(payload) == before and registry.read_bytes() == original_registry
-        chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md')
+        if args.resolved:
+            resolution_file = root / 'reviewed-resolution.txt'
+            resolution_file.write_bytes(payload.joinpath('SKILL.md').read_bytes() + b'\nExplicitly reviewed resolution\n')
+            if os.name != 'nt':
+                resolution_file.chmod(0o600)
+            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--resolve', 'SKILL.md', resolution_file)
+            resolved_row = next(row for row in chosen['review']['paths'] if row['path'] == 'SKILL.md')
+            assert resolved_row['selection'] == 'resolved' and resolved_row['resolution']['kind'] == 'file'
+            resolution_file.write_text('Changed after capture\n')
+            resolution_file.unlink()
+            reused = run('update-merge-choose', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], '--choose-resolved', 'SKILL.md')
+            assert next(row for row in reused['review']['paths'] if row['path'] == 'SKILL.md')['resolution'] == resolved_row['resolution']
+            chosen = reused
+        else:
+            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md')
         assert chosen['canMaterialize'], chosen
         repeat = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'])
         assert repeat['reviewFingerprint'] == chosen['reviewFingerprint']
@@ -108,6 +123,9 @@ for gh_path in args.gh:
         assert applied['succeeded'] and applied['status'] == 'installed', applied
         assert manifest(payload) == merged_bytes and payload.stat().st_ino == merged_id
         assert b'Reviewed local instructions' in payload.joinpath('SKILL.md').read_bytes()
+        if args.resolved:
+            assert b'Explicitly reviewed resolution' in payload.joinpath('SKILL.md').read_bytes()
+            assert not resolution_file.exists()
         assert payload.joinpath('keep-local-extra').read_bytes() == b'\x00\xffKeep exact local bytes'
         assert payload.joinpath('keep-empty').is_dir()
         assert source_path.stat().st_ino == source_id and manifest(source_path) == source_bytes
@@ -127,7 +145,8 @@ for gh_path in args.gh:
                             immutableReviewRestartVerified=True, priorApprovalRefused=True, wrongMergedDispositionRefused=True, mergedNativeStagePromoted=True,
                             localBytesAndEmptyDirectoryPreserved=True, sourceBaselineUnchanged=True,
                             nextUpdateUsesRealSourceBaseline=True,
-                            exactOriginalNativeObjectRestored=True, registryBytesUnchanged=True))
+                            exactOriginalNativeObjectRestored=True, registryBytesUnchanged=True,
+                            **(dict(capturedResolutionSurvivesInputDeletion=True) if args.resolved else {})))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
 print(json.dumps(dict(hosts=len(results), commands=sum(len(item['commands']) for item in results), output=str(args.output))))

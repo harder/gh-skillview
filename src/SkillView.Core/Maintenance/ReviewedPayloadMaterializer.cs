@@ -11,17 +11,26 @@ internal static class ReviewedPayloadMaterializer
 {
     internal static VerifiedMergedPayload StagePreservingMetadata(NativeStateDirectory operation, string name,
         ThreeWayPayloadReview review, IReadOnlyDictionary<string, CapturedPayloadArchive.Reader> readers,
+        SkillFrontMatter approvedTracking, CancellationToken token) => StagePreservingMetadata(operation, name, review, Adapt(readers), approvedTracking, token);
+
+    internal static VerifiedMergedPayload StagePreservingMetadata(NativeStateDirectory operation, string name,
+        ThreeWayPayloadReview review, IReadOnlyDictionary<string, IPayloadEvidenceReader> readers,
         SkillFrontMatter approvedTracking, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (!readers.TryGetValue("installed", out var installed)) throw new IOException("An immutable installed capture is required.");
-        using var metadata = PayloadMetadataReview.Create(review, installed, token, readers.GetValueOrDefault("source"));
+        if (readers.GetValueOrDefault("installed") is not CapturedPayloadArchive.Reader installed) throw new IOException("An immutable installed root capture is required.");
+        using var metadata = PayloadMetadataReview.Create(review, installed, token, readers.GetValueOrDefault("source"), readers.GetValueOrDefault("resolved"));
         var snapshot = Stage(operation, name, review, readers, approvedTracking, token, metadata: metadata);
         return new(snapshot, PayloadMetadataReview.Policy, metadata.Recipes);
     }
 
     internal static PayloadSnapshot Stage(NativeStateDirectory operation, string name,
         ThreeWayPayloadReview review, IReadOnlyDictionary<string, CapturedPayloadArchive.Reader> readers,
+        SkillFrontMatter approvedTracking, CancellationToken token, Action<string>? beforeCaptureForTests = null,
+        PayloadMetadataReview? metadata = null) => Stage(operation, name, review, Adapt(readers), approvedTracking, token, beforeCaptureForTests, metadata);
+
+    internal static PayloadSnapshot Stage(NativeStateDirectory operation, string name,
+        ThreeWayPayloadReview review, IReadOnlyDictionary<string, IPayloadEvidenceReader> readers,
         SkillFrontMatter approvedTracking, CancellationToken token, Action<string>? beforeCaptureForTests = null,
         PayloadMetadataReview? metadata = null)
     {
@@ -44,7 +53,7 @@ internal static class ReviewedPayloadMaterializer
         beforeCaptureForTests?.Invoke(root.CanonicalPath);
         var result = root.FlushAndCapture(token, metadata is null ? null : item => metadata.Verify(item, token));
         if (result.FrontMatter is not { } tracking || !tracking.Diagnostics.IsEmpty
-            || tracking.Upstream != approvedTracking.Upstream || tracking.GithubTreeSha != approvedTracking.GithubTreeSha
+            || tracking.Name != approvedTracking.Name || tracking.Upstream != approvedTracking.Upstream || tracking.GithubTreeSha != approvedTracking.GithubTreeSha
             || tracking.GithubRef != approvedTracking.GithubRef || tracking.GithubPath != approvedTracking.GithubPath
             || tracking.LocalPath != approvedTracking.LocalPath || tracking.Pinned != approvedTracking.Pinned
             || tracking.PinnedRef != approvedTracking.PinnedRef)
@@ -122,6 +131,9 @@ internal static class ReviewedPayloadMaterializer
             }
         }
     }
+
+    private static IReadOnlyDictionary<string, IPayloadEvidenceReader> Adapt(IReadOnlyDictionary<string, CapturedPayloadArchive.Reader> readers) =>
+        readers.ToDictionary(item => item.Key, item => (IPayloadEvidenceReader)item.Value, StringComparer.Ordinal);
 
     private static string Parent(string path)
     {

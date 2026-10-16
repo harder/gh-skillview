@@ -43,7 +43,7 @@ internal sealed partial class ReplacementPlanStore
     }
 
     internal LocalUpdateReview ChooseLocalChanges(string id, string expectedReview, IReadOnlyList<LocalPathChoice> choices,
-        InventorySnapshot inventory, CancellationToken token)
+        InventorySnapshot inventory, CancellationToken token, IReadOnlyList<LocalResolutionInput>? resolutions = null)
     {
         token.ThrowIfCancellationRequested();
         using var session = Open(id, inventory, token);
@@ -52,11 +52,13 @@ internal sealed partial class ReplacementPlanStore
         var evidence = LoadLocalReview(session.Plan, draft, token);
         if (expectedReview != evidence.SelectionFingerprint)
             throw new IOException("Local review changed; inspect its current fingerprint before choosing paths.");
-        var selection = new LocalReviewSelection(1, evidence.HeaderFingerprint, choices.ToImmutableArray());
-        // Validate all choices and topology before publishing even a private review.
-        _ = AnalyzeLocal(evidence, selection.Choices);
         var next = evidence.SelectionCount;
         if (next >= MaxLocalSelections) throw new IOException("Local review choice history is full; retained evidence was left unchanged.");
+        var selection = CaptureResolutionSelection(session, draft, evidence, choices, resolutions ?? [], inventory, token);
+        var selectedFiles = LoadResolutions(draft, selection, new(StringComparer.Ordinal), token);
+        // Validate all choices before publishing even a private review.
+        _ = AnalyzeLocal(evidence, selection.Choices, selectedFiles.Values.Select(item => item.Entry.Entry).ToArray());
+        RequireLocalReviewReady(session, session.Plan.ReviewFingerprint, inventory, token);
         WriteLocal(draft, $"choices-{next:D2}.json", selection, LocalReviewJsonContext.Default.LocalReviewSelection, token, session.Operation);
         return LocalReviewResult(session.Plan, draft, LoadLocalReview(session.Plan, draft, token), token);
     }
@@ -73,14 +75,16 @@ internal sealed partial class ReplacementPlanStore
         if (!review.CanMaterialize) throw new IOException("Resolve all path and topology conflicts before building the merged plan.");
         using var installedArchive = OpenArchive(draft, "installed", token);
         using var sourceArchive = OpenArchive(draft, "source", token);
-        var readers = new Dictionary<string, CapturedPayloadArchive.Reader>(StringComparer.Ordinal)
+        using var resolved = OpenResolutionReaders(draft, evidence.Resolutions, token);
+        var readers = new Dictionary<string, IPayloadEvidenceReader>(StringComparer.Ordinal)
         {
             ["installed"] = evidence.Installed.OpenReader(installedArchive),
-            ["source"] = evidence.Source.OpenReader(sourceArchive)
+            ["source"] = evidence.Source.OpenReader(sourceArchive),
+            ["resolved"] = resolved
         };
         // Metadata admission precedes creation. Unsupported evidence remains a
         // reviewable refusal and can never authorize a lossy publication.
-        using (var metadata = PayloadMetadataReview.Create(review, readers["installed"], token, readers["source"])) { }
+        using (var metadata = PayloadMetadataReview.Create(review, (CapturedPayloadArchive.Reader)readers["installed"], token, readers["source"], resolved)) { }
         var attemptNames = session.Operation.EnumerateEntries(token).Select(item => item.Name).ToHashSet(StringComparer.Ordinal);
         var attempt = 0;
         while (attemptNames.Contains($"merged-{attempt:D2}") && attempt < MaxMergeAttempts) attempt++;
@@ -160,7 +164,8 @@ internal sealed partial class ReplacementPlanStore
 
     private sealed record LocalReviewEvidence(LocalReviewHeader Header, string HeaderFingerprint,
         CapturedPayloadArchive Recorded, CapturedPayloadArchive Installed, CapturedPayloadArchive Source,
-        LocalReviewSelection Selection, string SelectionFingerprint, int SelectionCount);
+        LocalReviewSelection Selection, string SelectionFingerprint, int SelectionCount,
+        ImmutableDictionary<string, ResolvedFile> Resolutions);
 
     private static LocalReviewEvidence LoadLocalReview(ReplacementPlan plan, NativeStateDirectory draft, CancellationToken token)
     {
@@ -180,24 +185,29 @@ internal sealed partial class ReplacementPlanStore
         VerifyPayload(plan.Original, LegacyProjection(installed.Snapshot, token));
         VerifyPayload(plan.Revision!.RecordedBase!, LegacyProjection(recorded.Snapshot, token));
         VerifyPayload(plan.LocalDisposition?.SourceCandidate ?? plan.Candidate, LegacyProjection(source.Snapshot, token));
-        var entries = draft.EnumerateEntries(token).Take(MaxLocalSelections + 6).ToArray();
-        if (entries.Length > MaxLocalSelections + 4 || entries.Any(item => item.Error is not null && item.Name is not ("installed" or "recorded" or "source")))
+        _ = ResolutionBudget(draft, token);
+        var entries = draft.EnumerateEntries(token).Take(MaxLocalSelections + MaxResolutionArchives + 6).ToArray();
+        if (entries.Length > MaxLocalSelections + MaxResolutionArchives + 4 || entries.Any(item => item.Error is not null
+            && !IsResolutionArchive(item.Name) && item.Name is not ("installed" or "recorded" or "source")))
             throw new IOException("Local review has unsafe or excessive entries.");
         var names = entries.Select(item => item.Name).ToHashSet(StringComparer.Ordinal);
         var count = 0; LocalReviewSelection? selection = null; string fingerprint = "";
+        var archives = new Dictionary<string, ResolutionCapture>(StringComparer.Ordinal);
+        var resolved = ImmutableDictionary<string, ResolvedFile>.Empty;
         while (names.Contains($"choices-{count:D2}.json") && count < MaxLocalSelections)
         {
             (selection, fingerprint) = ReadLocal(draft, $"choices-{count:D2}.json", LocalReviewJsonContext.Default.LocalReviewSelection, token);
-            if (selection.SchemaVersion != 1 || selection.HeaderFingerprint != headerHash || selection.Choices.IsDefault)
+            if (selection.HeaderFingerprint != headerHash || selection.Choices.IsDefault)
                 throw new IOException("Local choice history has an invalid identity.");
+            resolved = LoadResolutions(draft, selection, archives, token);
             // An incomplete or invalid newest record never revives older choices.
             _ = ThreeWayPayloadReview.Analyze(recorded.Snapshot, installed.Snapshot, source.Snapshot, selection.Choices,
-                path => PathIdentity.NormalizeKey(Path.Combine(plan.OriginalPath, path)));
+                path => PathIdentity.NormalizeKey(Path.Combine(plan.OriginalPath, path)), resolved.Values.Select(item => item.Entry.Entry).ToArray());
             count++;
         }
-        if (selection is null || names.Count != count + 4)
+        if (selection is null || names.Count != count + 4 + names.Count(IsResolutionArchive))
             throw new IOException("Local review has incomplete capture, unknown entries or a choice history gap; private evidence retained.");
-        return new(header, headerHash, recorded, installed, source, selection, fingerprint, count);
+        return new(header, headerHash, recorded, installed, source, selection, fingerprint, count, resolved);
     }
 
     private static PayloadSnapshot LegacyProjection(PayloadSnapshot snapshot, CancellationToken token)
@@ -216,9 +226,11 @@ internal sealed partial class ReplacementPlanStore
         };
     }
 
-    private static ThreeWayPayloadReview AnalyzeLocal(LocalReviewEvidence evidence, IReadOnlyList<LocalPathChoice> choices) =>
+    private static ThreeWayPayloadReview AnalyzeLocal(LocalReviewEvidence evidence, IReadOnlyList<LocalPathChoice> choices,
+        IReadOnlyList<PayloadEntry>? resolutions = null) =>
         ThreeWayPayloadReview.Analyze(evidence.Recorded.Snapshot, evidence.Installed.Snapshot, evidence.Source.Snapshot,
-            choices, path => PathIdentity.NormalizeKey(Path.Combine(evidence.Installed.Snapshot.Path, path)));
+            choices, path => PathIdentity.NormalizeKey(Path.Combine(evidence.Installed.Snapshot.Path, path)),
+            resolutions ?? evidence.Resolutions.Values.Select(item => item.Entry.Entry).ToArray());
 
     private static LocalUpdateReview LocalReviewResult(ReplacementPlan plan, NativeStateDirectory draft, LocalReviewEvidence evidence, CancellationToken token)
     {
@@ -226,7 +238,8 @@ internal sealed partial class ReplacementPlanStore
         var refusals = ImmutableArray.CreateBuilder<string>();
         using var installed = OpenArchive(draft, "installed", token);
         using var source = OpenArchive(draft, "source", token);
-        try { using var metadata = PayloadMetadataReview.Create(review, evidence.Installed.OpenReader(installed), token, evidence.Source.OpenReader(source)); }
+        using var resolved = OpenResolutionReaders(draft, evidence.Resolutions, token);
+        try { using var metadata = PayloadMetadataReview.Create(review, evidence.Installed.OpenReader(installed), token, evidence.Source.OpenReader(source), resolved); }
         catch (IOException ex) { refusals.Add(ex.Message); }
         return new(plan.Id, plan.ReviewFingerprint, evidence.HeaderFingerprint, evidence.SelectionFingerprint,
             draft.CanonicalPath, review, refusals.ToImmutable(), review.CanMaterialize && refusals.Count == 0,
@@ -267,8 +280,10 @@ internal sealed partial class ReplacementPlanStore
         VerifyNative(evidence.Source, "source", new(Path.Combine(operation.CanonicalPath, "candidate"), "", "", null, default));
         using var installedArchive = OpenArchive(draft, "installed", token);
         using var sourceArchive = OpenArchive(draft, "source", token);
+        using var resolved = OpenResolutionReaders(draft, evidence.Resolutions, token);
+        foreach (var path in evidence.Resolutions.Keys) resolved.CopyEntry(path, Stream.Null, token);
         using var metadata = PayloadMetadataReview.Create(AnalyzeLocal(evidence, evidence.Selection.Choices), evidence.Installed.OpenReader(installedArchive), token,
-            evidence.Source.OpenReader(sourceArchive));
+            evidence.Source.OpenReader(sourceArchive), resolved);
         var merged = topology is "ready" or "original-retained" ? candidate! : topology == "installed" ? original! : displaced!;
         using var mergedLease = NativeDirectoryMoveLease.Open(PathIdentity.IsInside(merged.Path, operation.CanonicalPath)
             ? operation.CanonicalPath : plan.RootPath, merged.Path, token);

@@ -79,13 +79,16 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
     }
 
     internal sealed class Reader(NativeStateDirectory archive, IReadOnlyDictionary<string, ArchivedPayloadEntry> entries,
-        PayloadNativeMetadata? rootMetadata)
+        PayloadNativeMetadata? rootMetadata) : IPayloadEvidenceReader
     {
         internal PayloadNativeMetadata? RootMetadata => rootMetadata;
         internal PayloadEntry Entry(string path) => Get(path).Entry;
         internal PayloadNativeMetadata? Metadata(string path) => Get(path).Metadata;
         internal bool TryEntry(string path, out ArchivedPayloadEntry? entry) => entries.TryGetValue(path, out entry);
         internal PayloadMetadataAuthority OpenMetadataAuthority(CancellationToken token) => PayloadMetadataAuthority.Open(archive, create: false, token);
+        PayloadEntry IPayloadEvidenceReader.Entry(string path) => Entry(path);
+        PayloadNativeMetadata? IPayloadEvidenceReader.Metadata(string path) => Metadata(path);
+        void IPayloadEvidenceReader.CopyEntry(string path, Stream destination, CancellationToken token) => CopyEntry(path, destination, token);
         private ArchivedPayloadEntry Get(string path) => entries.TryGetValue(path, out var entry) ? entry
             : throw new IOException("The path has no captured archive entry.");
         internal void CopyEntry(string path, Stream destination, CancellationToken token)
@@ -143,7 +146,7 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
     private static bool ValidBlob(string name) => name.Length == 11
         && name.StartsWith("entry-", StringComparison.Ordinal) && name.AsSpan(6).IndexOfAnyExceptInRange('0', '9') < 0;
 
-    private static long CopyVerified(Stream source, Stream destination, string expectedHash, long length,
+    internal static long CopyVerified(Stream source, Stream destination, string expectedHash, long length,
         bool exactLength, CancellationToken token)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

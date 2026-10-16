@@ -3,7 +3,7 @@
 External suppression merged in PR64. Batch15 is implementing reviewed local
 dispositions on `codex/reviewed-local-dispositions`; it has no PR yet. The private
 workflow has schema3 merge planning and CLI entrypoints under verification.
-Complete native platform metadata coverage, captured resolutions, TUI review and
+Complete native platform metadata coverage, TUI review and
 the complete recovery/proof matrix before publishing a coherent batch. Original
 M08 acceptance remains open.
 
@@ -38,6 +38,12 @@ Current CLI path (private-stage writes until explicit Apply):
    explicit choice set with repeated `--choose-installed PATH` or
    `--choose-source PATH`; `/` selects the root mode. Unselected paths use the
    three-way rules. Unknown/duplicate choices and invalid topology are refused.
+   `--resolve TARGET FILE` captures exact regular-file bytes/mode/source metadata;
+   `--choose-resolved TARGET` reuses previously completed referenced evidence.
+   The source pathname stops being an apply dependency after capture. A byte
+   reader interface supports resolutions without fabricating a native root.
+   Resolution manifests keep real source observations separate from private
+   blob metadata. Only target `SKILL.md` receives strict YAML/UTF-8 parsing.
 4. `update-merge-plan --id ID --expect LOCAL_REVIEW_HASH` builds M through held
    native handles and saves schema3. It binds the source plan, all manifests,
    exact choices, source C, result M and metadata policy. New C nodes use captured
@@ -54,8 +60,12 @@ choices. Finalization attempts use bounded independent `merged-NN` slots and
 `merge-plan-NN.json` records; partial evidence survives retries. Attempt presence
 is independent of the current payload location after promotion. An incomplete
 initial B/I/C capture remains retained and requires a new revision plan; it never
-restores approval of the earlier source replacement. Full TUI/resolution-file
-and cross-platform acceptance is still pending.
+restores approval of the earlier source replacement. Full TUI and cross-platform
+acceptance is still pending. Resolution storage includes failed/unreferenced
+attempts: at most 16 archives, 256 MiB of raw bytes and 64 MiB of encoded manifests
+per plan. Bound the outer draft enumeration before computing that quota. Flush
+each archive, then the reopened draft namespace and operation writer/device
+barrier before publishing any reference in a choice record.
 
 Original acceptance stays unchanged. Existing replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native
