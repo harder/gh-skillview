@@ -161,6 +161,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   choices bind exact completed resolution manifests; schema1 omits that field.
   Keep original source evidence when reusing captures. Charge incomplete and
   unreferenced attempts to per-plan quotas and bound the draft scan first.
+  Updates-tab local review runs through the workflow coordinator off the UI
+  thread. Starting capture closes the earlier replacement approval even after
+  failure; uncertain private writes require a fresh review. Hold operation
+  ownership through queued UI completion, and require fresh retention approval
+  after building M. Keep printable update shortcuts out of the local editor's
+  file input, and bound rendered refusal summaries while retaining full evidence.
+  Use `SingleRowButton` for actions assigned individual footer rows. In pinned
+  Terminal.Gui 2.5, `ShadowStyles.None` can retain margin space from a default
+  shadow; suppress construction via `InitializingShadowStyle` with null instead.
   Unix registry owners must explicitly `LOCK_UN` before closing, including
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions

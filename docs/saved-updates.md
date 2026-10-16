@@ -15,8 +15,19 @@ the current review. Applying a sibling changes captured directory generations.
 
 From a list, `u` opens the Updates workspace. There, `u` reviews the current physical installation, `U` queues
 marked installations, and Update uses marks or the explicit all selection.
-Each candidate has its own review, retention checkbox and **Apply reviewed plan**
+Each candidate has its own review, retention checkbox and **Replace reviewed**
 action. **Next / skip** retains an unapplied plan and advances to the next target.
+**Preserve installed** verifies the current payload and owner without applying or
+recording a maintenance preference. **Review local** freezes recorded, installed
+and source evidence and closes the earlier replacement approval. Select a path,
+then **Use installed**, **Use source**, or **Automatic**; select `/` to review root
+permissions. Enter a regular-file path beside **File:** and select **Capture file
+for path** for custom content. Each successful choice clears that file input.
+
+**Build merge** creates a separate verified candidate. Review its result and
+source baseline, check retention again, then select **Apply reviewed merge**.
+A failed private write requires **Review local** to refresh before another build.
+**Next / skip** keeps private evidence and continues the queue.
 The next candidate is prepared only after the previous operation completes.
 Earlier outcomes, output and notices remain visible when a later target fails.
 Select **Include hidden directories** (CLI `--allow-hidden-dirs`) when hidden

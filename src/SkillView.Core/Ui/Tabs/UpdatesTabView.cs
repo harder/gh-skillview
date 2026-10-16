@@ -65,13 +65,15 @@ internal sealed partial class UpdatesTabView : FrameView
         Action onLeaveTab,
         Action onUpdateApplied,
         CancellationToken lifetimeToken = default,
-        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null)
+        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null,
+        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? localReviewRunner = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _updateRunner = updateRunner;
         _applyRunner = applyRunner;
+        _localReviewRunner = localReviewRunner;
         _ghPathProvider = ghPathProvider;
         _logger = logger;
         _onLeaveTab = onLeaveTab;
@@ -96,7 +98,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Percent(45),
-            Height = Dim.Fill(7),
+            Height = Dim.Fill(8),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
@@ -108,7 +110,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = Pos.Right(_table) + 1,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(7),
+            Height = Dim.Fill(8),
             Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
@@ -150,13 +152,13 @@ internal sealed partial class UpdatesTabView : FrameView
             Style = new SpinnerStyle.Dots(),
         };
 
-        _dryRunButton = new Button
+        _dryRunButton = new SingleRowButton
         {
             Text = "_Dry-run",
             X = 0,
             Y = Pos.AnchorEnd(3),
         };
-        _updateButton = new Button
+        _updateButton = new SingleRowButton
         {
             Text = "_Update",
             X = Pos.Right(_dryRunButton) + 2,
@@ -165,6 +167,7 @@ internal sealed partial class UpdatesTabView : FrameView
         };
 
         InitializeReviewControls();
+        InitializeLocalReviewControls();
 
         _dryRunButton.Accepting += (_, ev) =>
         {
@@ -197,6 +200,7 @@ internal sealed partial class UpdatesTabView : FrameView
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _statusBar, _retainBox, _applyButton, _nextButton);
+        Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
         Disposing += (_, _) => CancelPendingWork();
     }
 
@@ -311,6 +315,10 @@ internal sealed partial class UpdatesTabView : FrameView
             _onLeaveTab();
             return;
         }
+
+        // Local-review file paths and table navigation belong to their controls.
+        // Whole-screen printable shortcuts must not consume typed filenames.
+        if (_localPanel.Visible) return;
 
         var rune = key.AsRune.Value;
         if (rune == 'a')
@@ -446,6 +454,7 @@ internal sealed partial class UpdatesTabView : FrameView
         CancelPendingLoad();
         _operationCancellations.Cancel();
         _review = null;
+        ResetLocalReview();
         _queue.Clear();
         _queueOptions = null;
         _retainBox.Value = CheckState.UnChecked;

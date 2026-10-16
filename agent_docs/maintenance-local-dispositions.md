@@ -2,8 +2,8 @@
 
 External suppression merged in PR64. Batch15 is implementing reviewed local
 dispositions on `codex/reviewed-local-dispositions`; it has no PR yet. The private
-workflow has schema3 merge planning and CLI entrypoints under verification.
-Complete native platform metadata coverage, TUI review and
+workflow has schema3 merge planning, CLI entrypoints and owned inline TUI controls
+under verification. Complete native platform metadata coverage, TUI proof and
 the complete recovery/proof matrix before publishing a coherent batch. Original
 M08 acceptance remains open.
 
@@ -60,8 +60,8 @@ choices. Finalization attempts use bounded independent `merged-NN` slots and
 `merge-plan-NN.json` records; partial evidence survives retries. Attempt presence
 is independent of the current payload location after promotion. An incomplete
 initial B/I/C capture remains retained and requires a new revision plan; it never
-restores approval of the earlier source replacement. Full TUI and cross-platform
-acceptance is still pending. Resolution storage includes failed/unreferenced
+restores approval of the earlier source replacement. Cross-platform acceptance
+and the full TUI/recovery proof matrix are still pending. Resolution storage includes failed/unreferenced
 attempts: at most 16 archives, 256 MiB of raw bytes and 64 MiB of encoded manifests
 per plan. Bound the outer draft enumeration before computing that quota. Flush
 each archive, then the reopened draft namespace and operation writer/device
