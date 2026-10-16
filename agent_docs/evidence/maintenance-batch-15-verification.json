@@ -1,0 +1,3492 @@
+{
+  "schemaVersion": 1,
+  "batch": 15,
+  "candidate": "e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0",
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "incomplete"
+  },
+  "qualification": "Historical receipts retain their exact original scope. Retrieved CI artifacts are checked separately. Final PR gates and merge remain pending.",
+  "handoffReceipts": "../handoff-evidence-2026-10-16/verification-receipt.json",
+  "artifactIntegrity": {
+    "archives": [
+      {
+        "artifactId": 12035554794,
+        "artifact": "native-maintenance-evidence-linux-x64",
+        "zip": "/tmp/skillview-batch15-evidence/archives/native-linux-x64.zip",
+        "apiSha256": "575dd9452dce42c4505baf8e1f2e2b66cfb2396e6e3bc24bc764fdd7579d406c",
+        "zipSha256": "575dd9452dce42c4505baf8e1f2e2b66cfb2396e6e3bc24bc764fdd7579d406c",
+        "archiveDigestMatches": true,
+        "members": 46,
+        "memberHashesMatch": true,
+        "mismatches": []
+      },
+      {
+        "artifactId": 12037881981,
+        "artifact": "native-maintenance-evidence-win-x64",
+        "zip": "/tmp/skillview-batch15-evidence/archives/native-win-x64.zip",
+        "apiSha256": "6ba245e467ca93ee956a91c4bc3172a8980b873fab305800b3cdc17d811c3d59",
+        "zipSha256": "6ba245e467ca93ee956a91c4bc3172a8980b873fab305800b3cdc17d811c3d59",
+        "archiveDigestMatches": true,
+        "members": 36,
+        "memberHashesMatch": true,
+        "mismatches": []
+      },
+      {
+        "artifactId": 12037254024,
+        "artifact": "native-maintenance-evidence-win-arm64",
+        "zip": "/tmp/skillview-batch15-evidence/archives/native-win-arm64.zip",
+        "apiSha256": "7dc73da852c2b70b5244454f6fb6833f793ad09a7e18d00e1cbdebdc0ba7c077",
+        "zipSha256": "7dc73da852c2b70b5244454f6fb6833f793ad09a7e18d00e1cbdebdc0ba7c077",
+        "archiveDigestMatches": true,
+        "members": 36,
+        "memberHashesMatch": true,
+        "mismatches": []
+      },
+      {
+        "artifactId": 12036354487,
+        "artifact": "native-maintenance-evidence-osx-arm64",
+        "zip": "/tmp/skillview-batch15-evidence/archives/native-osx-arm64.zip",
+        "apiSha256": "a322a284f4f5ecd0d806d90e63f2a4c46b59c9d30ab882aef9ca2a105c7438a9",
+        "zipSha256": "a322a284f4f5ecd0d806d90e63f2a4c46b59c9d30ab882aef9ca2a105c7438a9",
+        "archiveDigestMatches": true,
+        "members": 38,
+        "memberHashesMatch": true,
+        "mismatches": []
+      }
+    ],
+    "windowsMetadata": [
+      {
+        "runner": "windows-latest",
+        "path": "/tmp/skillview-batch15-evidence/windows-metadata-windows-latest/windows-metadata-tests.log",
+        "sizeBytes": 398,
+        "sha256": "a6fff2fcb84091d909bb30c3c3fe66024ccd1a7d93ffef7bf8a92007c38f579b"
+      },
+      {
+        "runner": "windows-11-arm",
+        "path": "/tmp/skillview-batch15-evidence/windows-metadata-windows-11-arm/windows-metadata-tests.log",
+        "sizeBytes": 402,
+        "sha256": "05d5910ea6d7adeb6335e5f13cd6b5f390fdc4832ba08d4211aea279802e7587"
+      }
+    ]
+  },
+  "independentIntegrationReview": {
+    "candidate": "e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0",
+    "model": "GPT-6.1-Sol high",
+    "result": "no actionable findings",
+    "scope": "CLI/TUI approval, schema3 binding, retry/latest attempts, apply/recover/undo, C/M baseline, schema1/2 compatibility and CI proof wiring; prior native implementation reviews and tests not repeated"
+  },
+  "runs": [
+    {
+      "databaseId": 38877432074,
+      "headSha": "e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "workflow_dispatch",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/38877432074",
+      "jobs": [
+        {
+          "name": "workflow-lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "AOT publish smoke (win-x64)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test (macos-15)",
+          "conclusion": "success"
+        },
+        {
+          "name": "AOT publish smoke (osx-arm64)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test (ubuntu-latest)",
+          "conclusion": "success"
+        },
+        {
+          "name": "site-check",
+          "conclusion": "success"
+        },
+        {
+          "name": "Windows metadata (windows-11-arm)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Windows metadata (windows-latest)",
+          "conclusion": "success"
+        },
+        {
+          "name": "AOT publish smoke (linux-x64)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test (windows-latest)",
+          "conclusion": "success"
+        },
+        {
+          "name": "AOT publish smoke (win-arm64)",
+          "conclusion": "success"
+        },
+        {
+          "name": "inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review'",
+          "conclusion": "skipped"
+        }
+      ]
+    },
+    {
+      "databaseId": 38875871924,
+      "headSha": "27432533cb09f57d682e699bcfd48764c98dc3a1",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "workflow_dispatch",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/38875871924",
+      "jobs": [
+        {
+          "name": "gh latest contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "gh 2.97.0 contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "notify-failure",
+          "conclusion": "skipped"
+        }
+      ]
+    }
+  ],
+  "nativeArtifacts": [
+    {
+      "rid": "linux-x64",
+      "artifact": {
+        "id": 12035554794,
+        "name": "native-maintenance-evidence-linux-x64",
+        "size_in_bytes": 109501,
+        "digest": "sha256:575dd9452dce42c4505baf8e1f2e2b66cfb2396e6e3bc24bc764fdd7579d406c",
+        "expires_at": "2026-10-30T09:12:10Z"
+      },
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "95bd9a9af4baf26dc8b0264a0e139d087b78e80b2fcea0c66f7429522e14c8fd",
+          "bytes": 892
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "a8a2dcaf3b2baecf09d2e0e6d0509c89587810654c9cf34690d9ed2d1e8269d2",
+          "bytes": 895
+        },
+        {
+          "path": "disk-full-proof/container-tools.log",
+          "sha256": "e1eaebe98feee48446bde0872f1aef9fca87e0c80d55699f560680cf0c3d96fe",
+          "bytes": 5394
+        },
+        {
+          "path": "disk-full-proof/disk-full-displace-moved.json",
+          "sha256": "dbcd4813cefe864ba6da01d4a83f5a07c77c0e095edb75def46effc2b25b9be7",
+          "bytes": 13403
+        },
+        {
+          "path": "disk-full-proof/disk-full-displace-moved.log",
+          "sha256": "9cea263da17e20f625afdcdbff4f1294f2d8440bd93a9f12921619c90bfb2574",
+          "bytes": 87
+        },
+        {
+          "path": "disk-full-proof/disk-full-install-moved.json",
+          "sha256": "53b4ae8d263bfc75d81c347261c1a942e88635bb1ab7db5d977dda9b83a19d40",
+          "bytes": 13404
+        },
+        {
+          "path": "disk-full-proof/disk-full-install-moved.log",
+          "sha256": "838f0667641f9fc0b591ccbbddba70f64d551b100d37362bf4fee1da4cf355d9",
+          "bytes": 86
+        },
+        {
+          "path": "disk-full-proof/disk-full-restore-moved.json",
+          "sha256": "44aabb3fb3a92b89c1770fa2f344db5b99811342eaf6cda9d538d61fa894dac6",
+          "bytes": 13402
+        },
+        {
+          "path": "disk-full-proof/disk-full-restore-moved.log",
+          "sha256": "5e1c52f8cac3d46d51a1d630600e13e1622cb8019deb87970d721a0387a6bb19",
+          "bytes": 86
+        },
+        {
+          "path": "disk-full-proof/disk-full-retain-moved.json",
+          "sha256": "e18247533f78367739ee54b5694577d308a8c252691368427234beea2fdea4da",
+          "bytes": 13398
+        },
+        {
+          "path": "disk-full-proof/disk-full-retain-moved.log",
+          "sha256": "b6c771164c38a4f833eac28eb20156b3adacc6e64418413a26189441832eef6b",
+          "bytes": 85
+        },
+        {
+          "path": "disk-full-proof/docker.log",
+          "sha256": "be4de188372daa3208b8082c4e0d86b5861a7021c9ef8539a3e078aded22c239",
+          "bytes": 1924
+        },
+        {
+          "path": "disk-full-proof/guard-ordinary.log",
+          "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4",
+          "bytes": 152
+        },
+        {
+          "path": "disk-full-proof/guard-oversized.log",
+          "sha256": "36927b1394a2711cc1f68ac6d278e40386908c59b0cc9363eda4f220fb7cddb4",
+          "bytes": 152
+        },
+        {
+          "path": "disk-full-proof/guard-shared-small.log",
+          "sha256": "9e5a6ea9f8807f71e2512327647f7a842c709c26a704cdef2b41aa15b99fc2d3",
+          "bytes": 185
+        },
+        {
+          "path": "disk-full-proof/inputs.json",
+          "sha256": "c3d954d8fed14b5542a033b2f4943aadf279634ce0085c79724118f5a337974a",
+          "bytes": 7031
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "f15eb92f876940f264fc1e10587ad5d546fae6ad04f6feca761a65a005b31135",
+          "bytes": 462618
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "b226276c85726a7ca8b6c44b6bbeb0a2d9f3bc3a4ee36b5e0b2b7b854a374d9d",
+          "bytes": 462601
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "54e6395017f43b4e4374016baf580a9284ec0702e2ef2380c2ad1444617f1539",
+          "bytes": 443
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "b992c7f7c8a8ab224b82141ac9bcfcde317d7a08c50af8606e48587c97debfd6",
+          "bytes": 446
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "c64d6239ed8e6b24f338bf374cce036bdb4d360ca3360114e273701a4f85b61c",
+          "bytes": 1712
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "95cf1939481a61a4b7cd48aad75d39c0f05d739bf879ba0d28dc5332d94e47f5",
+          "bytes": 1715
+        },
+        {
+          "path": "inventory-denied-app-proof.json",
+          "sha256": "b30976eea3d3353100c97f3250ae0ec28a2224576761323d4c52131f505a24fd",
+          "bytes": 16463
+        },
+        {
+          "path": "inventory-denied-extension-proof.json",
+          "sha256": "0297cbf17b941f6967a1886de8f3b12455cc78a3621957d25913da1ca8ce1e73",
+          "bytes": 16466
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "95fc9500d6acbe22d2008d27d1a5d12106295367761b3c2f91f12e2d5e36da9c",
+          "bytes": 3046
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "f4fff4711396d52001bf5c9e9449c606a54dbbd1d9c443413f13845ab7d8db2f",
+          "bytes": 3049
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "64cfe7a90b8949f654d6a5b6bcfdae41c25daadee324033adf37174732dc9628",
+          "bytes": 1601
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "e7c2e2b7a74becf5b2d3b01255550a53c66b781d95263b17c7457c7e3441adcf",
+          "bytes": 1604
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "8f224bdf1cd0703896ef5fdbc19bbc3ba2ac4f4e1ac9860549d2034e61c7e386",
+          "bytes": 1173
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "04504e1e8d7006f005de5dc105c1b4bda255026e7f1c2122c035f95523c4c327",
+          "bytes": 1176
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "2846f3cc30fd71795890b4f21b258c1e5907799a99a14df82fca99e8aa82aa61",
+          "bytes": 497
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "4e6dddee1b32cf8ff6bef0cf48359cdd773d001be324a7d1591b5e1800124deb",
+          "bytes": 500
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "135b8e4d49132e3c47a49a6e70377a6d8d591033cb6d32e5e0aaae24c74089c5",
+          "bytes": 956
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "e940edd7fff8703ef9601452625c0aa3df7a9613df64f1c69b9a85b12ef2ee19",
+          "bytes": 959
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "cc7f2bf2fff942e644fafade61cac289df9e93ce97abd78c3781e5b1933c6a5b",
+          "bytes": 1622
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "f1b09c1a85c083ba8002812f3e76548f37040cc9c291e0475e23900322ba4b98",
+          "bytes": 1625
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "6df7044f86cbf0eeee480b2c0a3b1017cc3b7661da11bdf5c21a9fd422a62961",
+          "bytes": 1624
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "3efa8972639eda620b6f3d7077a98acd3a2c31e83bccc97c070ba214068a6672",
+          "bytes": 1627
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "0c874cda3943c184944593bad8c6cd5ca7166d11c47b9b49c5a1e1bf9ab4c528",
+          "bytes": 2381
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "e17c154619e5d12e89199c4daaeb2e28746b9330c3d0c0f250b3253465c0c02b",
+          "bytes": 2384
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "14eef93e67050879c20fd2c52757e91480a5cf6412994c94c271419e562e6345",
+          "bytes": 12103
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "fc89552295351345222156a0967a9d7aeb716a7e08898e2b0cdb4cc43b777be0",
+          "bytes": 12187
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "b25862e548a57ea945d2f763f88d755fe6b1686da2e4378eed7450fff77c02c9",
+          "bytes": 28869
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "8637f36ba8e904d4a8ae6a1343cb9fa9e40f914e846706590b48457e4677f77c",
+          "bytes": 28870
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "f741a9af7cea16a93c7e81d2603ab1af4cdb2079eb4623d12536dd553019a672",
+          "bytes": 2665
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "f66cc28f8df75651e1eeff0b215b1aa237750aed69f5dbec44516f487b36ddb8",
+          "bytes": 2670
+        }
+      ],
+      "reviewedLocalMergeProofs": [
+        {
+          "path": "disk-full-proof/disk-full-displace-moved.json",
+          "results": [
+            {
+              "host": "/proof-tools/app/skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "restartRecoveryVerified": true,
+              "frozenReviewArchiveUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ],
+              "diskFull": [
+                {
+                  "boundary": "displace-moved",
+                  "nativeWitness": {
+                    "Name": "disk-full-proof-filler",
+                    "FilesystemBytes": 67108864,
+                    "FillerBytes": 66904064,
+                    "AvailableBytes": 0,
+                    "Errno": 28,
+                    "Device": 63,
+                    "Inode": 377
+                  },
+                  "status": "needs-recovery",
+                  "mutationObserved": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "disk-full-proof/disk-full-install-moved.json",
+          "results": [
+            {
+              "host": "/proof-tools/app/skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "restartRecoveryVerified": true,
+              "frozenReviewArchiveUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ],
+              "diskFull": [
+                {
+                  "boundary": "install-moved",
+                  "nativeWitness": {
+                    "Name": "disk-full-proof-filler",
+                    "FilesystemBytes": 67108864,
+                    "FillerBytes": 66940928,
+                    "AvailableBytes": 0,
+                    "Errno": 28,
+                    "Device": 63,
+                    "Inode": 219
+                  },
+                  "status": "needs-recovery",
+                  "mutationObserved": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "disk-full-proof/disk-full-restore-moved.json",
+          "results": [
+            {
+              "host": "/proof-tools/app/skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "restartRecoveryVerified": true,
+              "frozenReviewArchiveUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ],
+              "diskFull": [
+                {
+                  "boundary": "restore-moved",
+                  "nativeWitness": {
+                    "Name": "disk-full-proof-filler",
+                    "FilesystemBytes": 67108864,
+                    "FillerBytes": 66895872,
+                    "AvailableBytes": 0,
+                    "Errno": 28,
+                    "Device": 63,
+                    "Inode": 520
+                  },
+                  "status": "needs-recovery",
+                  "mutationObserved": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "disk-full-proof/disk-full-retain-moved.json",
+          "results": [
+            {
+              "host": "/proof-tools/app/skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "restartRecoveryVerified": true,
+              "frozenReviewArchiveUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ],
+              "diskFull": [
+                {
+                  "boundary": "retain-moved",
+                  "nativeWitness": {
+                    "Name": "disk-full-proof-filler",
+                    "FilesystemBytes": 67108864,
+                    "FillerBytes": 66949120,
+                    "AvailableBytes": 0,
+                    "Errno": 28,
+                    "Device": 63,
+                    "Inode": 76
+                  },
+                  "status": "needs-recovery",
+                  "mutationObserved": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "/home/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "proofKind": "explicit-unsupported-metadata",
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "preserveVerified": true,
+              "priorApprovalRefused": true,
+              "nativePublicationRefused": true,
+              "originalNativePayloadUnchanged": true,
+              "registryBytesUnchanged": true,
+              "sourceCandidateUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 1
+                }
+              ],
+              "metadataRefusals": [
+                "Native metadata cannot be preserved for /: Privileged extended-attribute names may be hidden; complete namespace coverage is unavailable without CAP_SYS_ADMIN. Caller-visible attributes remain captured for review."
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "/home/runner/work/gh-skillview/gh-skillview/dist/ext/gh-skillview",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "proofKind": "explicit-unsupported-metadata",
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "preserveVerified": true,
+              "priorApprovalRefused": true,
+              "nativePublicationRefused": true,
+              "originalNativePayloadUnchanged": true,
+              "registryBytesUnchanged": true,
+              "sourceCandidateUnchanged": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 1
+                }
+              ],
+              "metadataRefusals": [
+                "Native metadata cannot be preserved for /: Privileged extended-attribute names may be hidden; complete namespace coverage is unavailable without CAP_SYS_ADMIN. Caller-visible attributes remain captured for review."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rid": "osx-arm64",
+      "artifact": {
+        "id": 12036354487,
+        "name": "native-maintenance-evidence-osx-arm64",
+        "size_in_bytes": 99868,
+        "digest": "sha256:a322a284f4f5ecd0d806d90e63f2a4c46b59c9d30ab882aef9ca2a105c7438a9",
+        "expires_at": "2026-10-30T09:21:55Z"
+      },
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "8b3bda50e355ff3148a84f5d644fdc1fa99d173d5302371723b196d09dffe799",
+          "bytes": 893
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "ef42e92792d7a4cca9b5e063aaa3db169acf204b510a3fbe961120b5d6edabc4",
+          "bytes": 896
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "5fafdb58faacdebb02c7fc7d30c8c76870e2ec8bb4d8376ecf620b4cf89cd054",
+          "bytes": 521534
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "a2dab40c76b5d61074f0dcf24e885083daa68ba2af40efa7b52d4a229bc2e206",
+          "bytes": 521529
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "bc5c6c1c477314959a23fa94aed491bdb673c280e31fd6907c31b7ed1daaa6a8",
+          "bytes": 444
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "f54da6cab21a08f78c45e1fa9cc8f63023dd88a3b12b46ac03b4bac9f4abe170",
+          "bytes": 447
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "07e44ad0aa2ab16ed01dc9aadba6f895cc8193265950711f5c2b9ba02801f103",
+          "bytes": 1713
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "f9e72fbef6919b096f175b4a38d974299eb26991ea7814a0c926b4f154c6deae",
+          "bytes": 1716
+        },
+        {
+          "path": "inventory-denied-app-proof.json",
+          "sha256": "946bae9bc2dacbffa5032401360f47ccc32c55b2ac9aa36e3cac5b1470ed3a74",
+          "bytes": 20679
+        },
+        {
+          "path": "inventory-denied-extension-proof.json",
+          "sha256": "decc3fc143cfa65c7648f8a116035a4ec8c03a96fdd7d9557df290bbe2c9541f",
+          "bytes": 20684
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "d67d6eb4e4ca0aed07e82450f7c8f0be8e3ce6f16b69c81c353963ee23e740f6",
+          "bytes": 3047
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "dd022afae77d5bce10a5395dccef21f31e5d727a4d276587caff8b0a6a2eb66b",
+          "bytes": 3050
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "c7372f3dc67f064b7822ce97e6ff98e9591cc53f40ddc064fcda124c1cdad2cc",
+          "bytes": 1934
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "9ece5117f069d21b41af5fd614bb3c7f87869808de660249bc31e9ee82b49a87",
+          "bytes": 1937
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "083ee026c60180af05e53ef7d9e9df9eb63fdff1d2591b4176d1f4e88f9bac39",
+          "bytes": 2088
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "698c52d877b650ad3a492d563e89f686c20a409f98e61a8f314cfeb4721a09bf",
+          "bytes": 2089
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "0701e995e28b69320fb9c2c59df0f994feb10797a9fdcc8d765e1b5360122f49",
+          "bytes": 2087
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "19d982ae578a0b0af1ba5e3ec711d3b805c58322fb125054d3f4a80b678880de",
+          "bytes": 2088
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "1075f5c5e7f5558cc94c9ba71579baab17112dcb5deb85919d5a0d90229de931",
+          "bytes": 1174
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "d8f77d510f59d3c5a668d5a7a3016c60088b44df8bbdb0b273686f00b320a549",
+          "bytes": 1177
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "ce20ea21811aace4c5628e132d4843ec37ccf694e9584de6a5ffb0051e6ad5af",
+          "bytes": 498
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "bf67a1859b3062a82840a41b7c1ac284963da18f4673b350a92f13a02539da4a",
+          "bytes": 501
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "76d751db2e12262b8faabb2a6d52ada0b4f2946fd06731af1fd6b545c3d04e34",
+          "bytes": 957
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "7931750b07f25913c3cec2cace53875c333d574fecf5b0bb4527382ac02b8418",
+          "bytes": 960
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "ab2521fc8f5ad1540f91815a1205cf12260c3291d76ef03af407137ad1902629",
+          "bytes": 1623
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "6f5af7cc547beb89e01e5c41f4ee3d689d8452977e371d79a8f955246eae6cfe",
+          "bytes": 1626
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "95bf4689cd36ebe773436c4ed6bad47e9e726fa5a134a0e24914fc6111149b8c",
+          "bytes": 1625
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "96fac649d1abaab3f151abaf338b38f221ad991372f92a9510249016586766df",
+          "bytes": 1628
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "e0c7e34ab85fb200917dae0b2041f747cddf3c19be3cd3fa5364a1fc97b3e0cb",
+          "bytes": 3424
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "e1474b3f8e37a9ffad4e82bcb3b247832f58da02c9d7bc8385805eb6092d4948",
+          "bytes": 3427
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "016e7e9ffb8ad6098d5d17c541f3419ebee73a8da567df4ab0babc66b71da156",
+          "bytes": 2383
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "f688e04b66f2b75bba6e04aaf0445855e722323b89cd0217e724ce4e14131c48",
+          "bytes": 2386
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "084b3e019b84a040a922516cb3a028f5e3a0073f24752155942eec41a8ae7030",
+          "bytes": 14500
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "9e31b6dcf54c9a3f1812c401aad2aa62f1172e4d1faf4a31cf141dce8f211605",
+          "bytes": 14584
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "a9c018eb0020223fe55246b5242e0a7bb86b54c1db4f36bd984ed275798f19c6",
+          "bytes": 32281
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "016c603d42bf8771d7f4aa4291fd29b8cbb2b79a241df0e9a0d40971c1be5f10",
+          "bytes": 32293
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "4562ac2278c336a9f6099e315c86c4fdd62fea9a04fa3606f4990b2fcdf6f78e",
+          "bytes": 2670
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "c5ef347638f5e2ae0cb6bb296c711ea25daded64119186fda994e79c92d4aa7a",
+          "bytes": 2673
+        }
+      ],
+      "reviewedLocalMergeProofs": [
+        {
+          "path": "local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/ext/gh-skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "processKilledAt": "displace-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "processKilledAt": "install-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "processKilledAt": "restore-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "processKilledAt": "retain-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/app/skillview",
+              "proofHost": "/Users/runner/work/gh-skillview/gh-skillview/tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "/Users/runner/work/gh-skillview/gh-skillview/dist/ext/gh-skillview",
+              "proofHost": "/Users/runner/work/gh-skillview/gh-skillview/tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof",
+              "gh": "gh version 2.100.0 (2026-09-03)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": false,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rid": "win-x64",
+      "artifact": {
+        "id": 12037881981,
+        "name": "native-maintenance-evidence-win-x64",
+        "size_in_bytes": 96723,
+        "digest": "sha256:6ba245e467ca93ee956a91c4bc3172a8980b873fab305800b3cdc17d811c3d59",
+        "expires_at": "2026-10-30T09:38:33Z"
+      },
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "6707e258f5d4f003e36396a1b0b628b7604a41b1ce81307f9e216ea430d9d68a",
+          "bytes": 912
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "24bb9a6f2854927269bf439fb709b2762903066978ef12ba569d59e94ca420ef",
+          "bytes": 915
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "836218fe7ad1d2892269807d8c5f4b7ce0d8f8dc8a2b7797a43662f627d242bf",
+          "bytes": 523732
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "61d3976fe241c43265e80633be959aca9a0c961aa55e9467894c893d51411db3",
+          "bytes": 523736
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "962fb97a3445413d21fe4c2227563803a5ceb15b5f4f53a129c8a7bc49dea289",
+          "bytes": 451
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "59e1e0dff5525188cfe8df9241c3be481d9f7e0371cca942301f2f53ed16b2a0",
+          "bytes": 454
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "c188522ae6c8004b98e292cafb298ff637ba47690280efdf3a3dac6cb8d6e16a",
+          "bytes": 1782
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "87583b11bca3b8bb9d7c992520c4d98fceb61b3aaecea34f0fe4a8a43755cda1",
+          "bytes": 1785
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "e08dcf04362109d8d4b1732903c3b177cdfd9f8a996c714de2f0dc2cb433c7eb",
+          "bytes": 3146
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "16b11017e7898c37c7c110b10eda5aa4773b5fc85882e58ed999e735f9f77006",
+          "bytes": 3149
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "e6a82e42ecf68940095e0a1d61931cf02bacfd30d2ee0c014b26eaf43f19f0a7",
+          "bytes": 2007
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "dfde96dc47f4869f70a98bc95727c4273deb93b92d563127c6692f7f7dec1329",
+          "bytes": 2010
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "f2c95e87fa4e18c8f098ae9ee83c2bc8cc548a9f7e0a3918e7e5be1ebd271e5e",
+          "bytes": 2167
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "bc68abed16c2caacaae8473f7665ab4a213a0f7915afb9c94362824c47b6cfe8",
+          "bytes": 2168
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "817c6d162f0b15591012ed78270c1947a6e321969c4928c4f6c4d1d6f8fecfce",
+          "bytes": 2166
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "bef67fefc8b41381e61a079c21ae985df8f92ecd0c289aa54f9ec4962e079a3a",
+          "bytes": 2167
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "6ca92f60643c04ec9fc8a1ada21d483ac0a4faa325024212c14448b049f7f06e",
+          "bytes": 1222
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "cc6a8a50833bcdf75881d879570012a0082eaf3c30b56af85395990bbe347a78",
+          "bytes": 1225
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "fd4d40ca86860a6b8205713bd8cf3fdfedccb8fee32723d57f0716c2db028b71",
+          "bytes": 508
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "3d5ce756db32fff57d9079ed0a746b28f09209b7d7fb89c836cfb3aaa31ceeb1",
+          "bytes": 511
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "764a8bc5c6df1e9e6414ff900d69ca0316f5eca87787ffca0f56f6071f9c69bd",
+          "bytes": 977
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "12cf6eb1a8d405171e6e3b2d5654822d052504dd70f4efff9cf15d53d21d813e",
+          "bytes": 980
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "2052a290b99fba3c3288c0bd34d97942112efc9501db9bde75f459b5c49914c6",
+          "bytes": 1662
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "4405d61348c9a0efe2579a18ad9e714901d1be17045ee3b83f131088591f3a6c",
+          "bytes": 1665
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "89369db129e9d37b7a55a38658b070decc8a8a982d969d58e8e90aeaa55ff1c4",
+          "bytes": 1664
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "000ee717fa4b8d0ce2cc630a7bc20a748d7315a91774655c5f28e321df6ac525",
+          "bytes": 1667
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "1479ba946d8e3960fe0bc835359f9f54a91cbf6d72f4bba72980c9ad199aac93",
+          "bytes": 3508
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "248feb8f42eb15615b41bfc6d592a28aea19bc92b3ae71c5b358e27e008b30e2",
+          "bytes": 3511
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "e8ca48c36f91177df6e78dcdbc2e50d32ba865c0074024acf694bdab2e725e49",
+          "bytes": 2444
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "251b0ecd80ad380e7d28787e821a7b484db696a75e0147b2fa28ba5a3f431982",
+          "bytes": 2447
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "49c50bf676d897b7ffa643affadcc2300b1dc3a2d76b41609437ab9c3f0687cb",
+          "bytes": 14425
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "a1598ee412f554dcb1754d149c4fc525fbaae8ee47053fcb9dd98cc6b5511c29",
+          "bytes": 14509
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "065b802b72adb9b51cdf5470ca8927bb935803f63fc742671224f3277a859f12",
+          "bytes": 32450
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "3b11997dbb7e5797e5ba9920d33e8034d1e9fa0e44412137da36a9f0032b942c",
+          "bytes": 32453
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "bf591e037ecf95f04b0b8d30ae65ed34a546dfbd33fb30cb5a20c6b1d098e50c",
+          "bytes": 2714
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "08ec2221b7c1d0e9f76eca1ad912577b519d6c6dfa48fe3fa7769f6a8c580050",
+          "bytes": 2716
+        }
+      ],
+      "reviewedLocalMergeProofs": [
+        {
+          "path": "local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\ext\\gh-skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "displace-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "install-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "restore-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "retain-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "proofHost": "D:\\a\\gh-skillview\\gh-skillview\\tests\\SkillView.MaintenanceProof\\bin\\Release\\net10.0\\SkillView.MaintenanceProof.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "D:\\a\\gh-skillview\\gh-skillview\\dist\\ext\\gh-skillview.exe",
+              "proofHost": "D:\\a\\gh-skillview\\gh-skillview\\tests\\SkillView.MaintenanceProof\\bin\\Release\\net10.0\\SkillView.MaintenanceProof.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rid": "win-arm64",
+      "artifact": {
+        "id": 12037254024,
+        "name": "native-maintenance-evidence-win-arm64",
+        "size_in_bytes": 96206,
+        "digest": "sha256:7dc73da852c2b70b5244454f6fb6833f793ad09a7e18d00e1cbdebdc0ba7c077",
+        "expires_at": "2026-10-30T09:39:10Z"
+      },
+      "files": [
+        {
+          "path": "backup-app-proof.json",
+          "sha256": "f5f46924ab9d98b2b487fef72ce95099c4a23a66e59901ce80087a32a034bebe",
+          "bytes": 912
+        },
+        {
+          "path": "backup-extension-proof.json",
+          "sha256": "76d2fe55bba5c503a915ffd5c1019da3c89a88bcf3a2492a3301b5b7e3224acd",
+          "bytes": 915
+        },
+        {
+          "path": "effective-loading-app-proof.json",
+          "sha256": "1315b6127022adca27c4e6fa830248fd29529608c9c63c621430fcba7aac19e2",
+          "bytes": 523721
+        },
+        {
+          "path": "effective-loading-extension-proof.json",
+          "sha256": "0e81a50fe18a144b1b2911912de67e94f5d743bc05850adfdf9d6022de87753a",
+          "bytes": 523744
+        },
+        {
+          "path": "gitfile-app-proof.json",
+          "sha256": "fad61fc481e62b47b8c81b3a6781ecb54738998b2a2f4adf5d1d3363932232da",
+          "bytes": 451
+        },
+        {
+          "path": "gitfile-extension-proof.json",
+          "sha256": "02fa3d786d0a8f0253a8bd5bfe55dd6401d9f0587efc2f17e99a70fb63c2b3b1",
+          "bytes": 454
+        },
+        {
+          "path": "identities-app-proof.json",
+          "sha256": "30360efbec15802ed74bf459ed544ee363acbeaef6f883e7288494965197a9d5",
+          "bytes": 1782
+        },
+        {
+          "path": "identities-extension-proof.json",
+          "sha256": "5c742e9468c98db99f504c34e3c00db975d46364a0aea9d7b25f3ae986f06b17",
+          "bytes": 1785
+        },
+        {
+          "path": "inventory-filter-app-proof.json",
+          "sha256": "ca377085b58783ae19abc9ee86deda727074a9c3e685279fd4a8e019fd491adb",
+          "bytes": 3146
+        },
+        {
+          "path": "inventory-filter-extension-proof.json",
+          "sha256": "b69de2c87d36eb82d8fef6b566d79d5fdfbb85cf034757be8ae49e14077313cf",
+          "bytes": 3149
+        },
+        {
+          "path": "local-merge-app-proof.json",
+          "sha256": "c259e2e984965cec8c48d8497ba8bd480fd6f646b629aee4c69dadb4e2e08980",
+          "bytes": 2007
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "sha256": "5345e9d1f48a9f0f2f4fc234aa80e44e5b912ca89618ba81bb0bede9fec38132",
+          "bytes": 2010
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "sha256": "a1c7381b7547a939b048e9aa75438f62ce4d222b403e0868be6ce4a5391e4fcd",
+          "bytes": 2167
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "sha256": "2184dba69748be8f70222b1225e921b2b94dcbcf745d33459db045c5da063cb6",
+          "bytes": 2168
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "sha256": "13187709fab93a603ad03c64919aa6a7f54bb6569c8d656acbd47531df1421cf",
+          "bytes": 2166
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "sha256": "b5806bd372b2fdb3668f93a018f3ce33837dd2ff91db5d3c499c942012d1dd39",
+          "bytes": 2167
+        },
+        {
+          "path": "managed-discovery-app-proof.json",
+          "sha256": "b47ca2e35e6780753c845935f982bcde146057f2c38ed0f0c6eabf96cf409473",
+          "bytes": 1222
+        },
+        {
+          "path": "managed-discovery-extension-proof.json",
+          "sha256": "1a476fe9b6fff9e977d8f410d3e61b5e1f53b925a032b1c2e53e1f3b423274fa",
+          "bytes": 1225
+        },
+        {
+          "path": "object-app-proof.json",
+          "sha256": "de17c47ecadc37d6d49d1df368bab7003b28da17946d3161ccb68637f444d204",
+          "bytes": 508
+        },
+        {
+          "path": "object-extension-proof.json",
+          "sha256": "2c8248dcbb0dcd2427ad101477100eb56c48fde9883d38ad351584ef458b9f5d",
+          "bytes": 511
+        },
+        {
+          "path": "quarantine-app-proof.json",
+          "sha256": "6170a83555bdfc6e30a51b1aaf5952278b000ea0af2e85f9f2ba3fcee39b1266",
+          "bytes": 977
+        },
+        {
+          "path": "quarantine-extension-proof.json",
+          "sha256": "5da306bbd8b9a93f3629064190984c186d1bfde2a1835baf85c913234ff71a26",
+          "bytes": 980
+        },
+        {
+          "path": "replacement-app-proof.json",
+          "sha256": "c070a0b75b83b558ab311974c81602255b9c4de510e60fa5e03127b48066d1a1",
+          "bytes": 1662
+        },
+        {
+          "path": "replacement-extension-proof.json",
+          "sha256": "e10b50d8054d6bc199b198cd4a99e06ac2821e023bcd28076624f1a8bc5aafb3",
+          "bytes": 1665
+        },
+        {
+          "path": "revision-app-proof.json",
+          "sha256": "27eac7b8b7bcaa242959beab31359668037ad68f5bc7eca76631d9f0ca6c3e83",
+          "bytes": 1664
+        },
+        {
+          "path": "revision-extension-proof.json",
+          "sha256": "edc19aaa12e2dca532b187a37143522d106f882e0a331db66eeb546117760f9d",
+          "bytes": 1667
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "sha256": "4013759b5ee206aa9ca49fedc432a89c66a1ef044f8a5e70f81562adb92e81c8",
+          "bytes": 3508
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "sha256": "c765ffbf3f3260fad54700b681942bac20f3d1c39d4b6f8e1014efaf4e122ba7",
+          "bytes": 3511
+        },
+        {
+          "path": "shared-owner-app-proof.json",
+          "sha256": "ffd64640d48074f711a45c20497eb230639b4f1cb68897ee2df37cfbe191a075",
+          "bytes": 2444
+        },
+        {
+          "path": "shared-owner-extension-proof.json",
+          "sha256": "75537b5184ba4f76983a3c6e3a0836e5dcc4a29a460256216b540735fe52048a",
+          "bytes": 2447
+        },
+        {
+          "path": "suppression-app-proof.json",
+          "sha256": "a7b2e3c128cfd9a24981b10658b9a7ddc8b94ac8cbfba6bbd5b65b3ddec91200",
+          "bytes": 14425
+        },
+        {
+          "path": "suppression-extension-proof.json",
+          "sha256": "93564d97eb9a224a24ea52b54d5fe83ab4829897d97cf2a751476845bfcd6d3f",
+          "bytes": 14509
+        },
+        {
+          "path": "tracking-app-proof.json",
+          "sha256": "c3608103991566de8b036a975ef845b9a828c9ab6b5ae295541e8afe9ffd9c83",
+          "bytes": 32438
+        },
+        {
+          "path": "tracking-extension-proof.json",
+          "sha256": "52f7700eb3f80a945372f9997613a5dddac59ceed6e5d49dd3569e3006826529",
+          "bytes": 32453
+        },
+        {
+          "path": "update-outcomes-app-proof.json",
+          "sha256": "0148f5d0b75ddde91280e8030bb1a740b1596c2959c8490ae94271fe1c15b899",
+          "bytes": 2713
+        },
+        {
+          "path": "update-outcomes-extension-proof.json",
+          "sha256": "a3b85f5c487ed0d94e2a41182144ca32300b0676ce4540f37a1975c454912513",
+          "bytes": 2717
+        }
+      ],
+      "reviewedLocalMergeProofs": [
+        {
+          "path": "local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\ext\\gh-skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-displace-moved-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "displace-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-install-moved-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "install-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-restore-moved-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "restore-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "local-merge-killed-retain-moved-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "preserveVerified": true,
+              "immutableReviewRestartVerified": true,
+              "priorApprovalRefused": true,
+              "wrongMergedDispositionRefused": true,
+              "mergedNativeStagePromoted": true,
+              "localBytesAndEmptyDirectoryPreserved": true,
+              "sourceBaselineUnchanged": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "exactOriginalNativeObjectRestored": true,
+              "registryBytesUnchanged": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "processKilledAt": "retain-moved",
+              "restartRecoveryVerified": true,
+              "capturedResolutionSurvivesInputDeletion": true,
+              "commands": [
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-preserve",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-choose",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-review",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-merge-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-apply",
+                  "exitCode": 1
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-recover",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-plan",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-inspect",
+                  "exitCode": 0
+                },
+                {
+                  "command": "update-undo",
+                  "exitCode": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-app-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\app\\skillview.exe",
+              "proofHost": "C:\\a\\gh-skillview\\gh-skillview\\tests\\SkillView.MaintenanceProof\\bin\\Release\\net10.0\\SkillView.MaintenanceProof.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "shared-local-merge-extension-proof.json",
+          "results": [
+            {
+              "host": "C:\\a\\gh-skillview\\gh-skillview\\dist\\ext\\gh-skillview.exe",
+              "proofHost": "C:\\a\\gh-skillview\\gh-skillview\\tests\\SkillView.MaintenanceProof\\bin\\Release\\net10.0\\SkillView.MaintenanceProof.exe",
+              "gh": "gh version 2.102.0 (2026-09-30)",
+              "canonicalDisposableHomeAndStateGuardsVerified": true,
+              "freshUnrelatedRegistryChangesPreserved": true,
+              "selectedExtensionsAndInstalledAtPreserved": true,
+              "explicitUnpinAndExactImmutableCandidate": true,
+              "proofKind": "shared-local-merge",
+              "schema3ReviewedPlanVerified": true,
+              "immutableSourceAndExactOwnerTransitionRetained": true,
+              "localInstructionsAndExtraPreserved": true,
+              "nextUpdateUsesRealSourceBaseline": true,
+              "windowsSupportedFixtureOwnerPrepared": true,
+              "fixtures": [
+                {
+                  "action": "apply",
+                  "checkpoint": "retain-moved",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": false,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "apply",
+                  "checkpoint": "compensation-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "undo",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "registry-truncated",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                },
+                {
+                  "action": "repair",
+                  "checkpoint": "owner-repair-intent",
+                  "actualProcessKilled": true,
+                  "tornImageExplicitlyRepaired": true,
+                  "registryBytesRestored": true,
+                  "originalNativePayloadAndExposureRestored": true,
+                  "unrelatedSameNameUnchanged": true,
+                  "schema3MergedRecoveryVerified": true,
+                  "localBytesPreserved": true,
+                  "sourceCandidateUnchanged": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "windowsMetadataTests": [
+    {
+      "runner": "windows-latest",
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "a6fff2fcb84091d909bb30c3c3fe66024ccd1a7d93ffef7bf8a92007c38f579b"
+    },
+    {
+      "runner": "windows-11-arm",
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "05d5910ea6d7adeb6335e5f13cd6b5f390fdc4832ba08d4211aea279802e7587"
+    }
+  ]
+}

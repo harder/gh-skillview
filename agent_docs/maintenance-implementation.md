@@ -1065,3 +1065,50 @@ preference recovery, preserve/merge/fork/source/owner transitions and the origin
 acceptance audit remain required. Nine of 21 original findings are complete.
 The original Installed Down-arrow crash was never reproduced. Next: reviewed
 whole-payload local dispositions, retaining all other original obligations.
+
+## Batch 15: reviewed local dispositions and native metadata
+
+Candidate `e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0` implements preserve-installed,
+immutable B/I/C review, explicit installed/source/captured-file choices, and schema3
+merge plans. Approved source C remains the future baseline; customized result M
+has separate result evidence. Apply/recovery/undo retain original native objects
+and coordinate the existing supported gh owner transaction. Supported Unix and
+Windows metadata is preserved through held objects; incomplete or unsupported
+metadata remains an explicit publication refusal.
+
+The October 16 Mac handoff reports 1,912 full tests passing at production source
+`27432533cb09f57d682e699bcfd48764c98dc3a1`, native macOS App/extension shared-merge
+and old-schema recovery proofs, three actual PTY flows, and Linux ARM64 real ENOSPC
+recovery at all four move boundaries. The latter used a dedicated private 64 MiB
+tmpfs and runtime apphosts, not NativeAOT. Those original temporary raw outputs
+were lost after reboot. Preserved completion receipts and their hash manifest
+are in `handoff-evidence-2026-10-16/`; they are historical receipts, not raw logs.
+Earlier batch15 checkpoints retain their original interim scope and pending
+statuses. This entry supersedes their pending verification status only where
+the handoff receipts or independently retrieved GitHub evidence establish it.
+
+On WSL, the published candidate and base `80921f49a5aefc07b01a1fc609a61132ddc4cd7c`
+were verified, and full CI run
+[38877432074](https://github.com/harder/gh-skillview/actions/runs/38877432074)
+was independently confirmed successful at the exact candidate. Dependency review
+was skipped on that branch dispatch; PR-only checks remain required. Production
+source and ordinary test trees are identical between `2743253` and `e3d8e47`.
+The transferred supporting documents match the candidate's tracked copies.
+
+The focused independent Sol integration review is clear. All four retrieved
+native artifact ZIPs match their GitHub SHA256 digests, and every extracted member
+matches its ZIP member. The 156 retained files include 30 new local-merge proof
+files whose required assertions were checked: App/extension publication and six
+shared recovery scenarios per host on macOS/Windows; four move-boundary restart
+proofs on each of those platforms; Linux unprivileged metadata refusals and four
+real-ENOSPC recovery proofs. Each ENOSPC witness reports errno28 and zero available
+bytes in its 64 MiB tmpfs. Both Windows native metadata logs prove 98/98 tests.
+The CI native fixtures use each runner's gh (including 2.100.0 on macOS), separate
+from the minimum/current contract lanes and historical Mac proofs. Exact artifact
+and per-file hashes, checked assertions, command outcomes and review scope are in
+`evidence/maintenance-batch-15-verification.json`.
+
+Final PR checks and merge remain pending. Original acceptance remains 9/21; M08 fork/source/local-import/standalone
+unpin, other-owner transitions, remaining preference recovery and the original
+criterion audit remain open. The original Installed Down-arrow crash was never
+reproduced.

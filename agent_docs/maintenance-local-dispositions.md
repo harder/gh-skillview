@@ -1,11 +1,13 @@
 # Full M08 work retained after external suppression
 
-External suppression merged in PR64. Batch15 is implementing reviewed local
-dispositions on `codex/reviewed-local-dispositions`; it has no PR yet. The private
-workflow has schema3 merge planning, CLI entrypoints and owned inline TUI controls
-under verification. Complete native platform metadata coverage, TUI proof and
-the complete recovery/proof matrix before publishing a coherent batch. Original
-M08 acceptance remains open.
+External suppression merged in PR64. Batch15 implements reviewed local
+dispositions on `codex/reviewed-local-dispositions`. Schema3 merge planning, CLI
+entrypoints and owned inline TUI controls have completed the verification recorded
+in `evidence/maintenance-batch-15-verification.json` and the preserved October 16
+handoff receipts. Focused final integration review is clear; final PR checks and
+merge remain pending. Original M08 acceptance remains open. The development notes
+below retain their earlier scope; use the consolidated evidence for completed
+platform, recovery and TUI results.
 
 Current private draft boundaries:
 - `ThreeWayPayloadReview` analyzes complete path sets, explicit captured-file
@@ -67,12 +69,12 @@ per plan. Bound the outer draft enumeration before computing that quota. Flush
 each archive, then the reopened draft namespace and operation writer/device
 barrier before publishing any reference in a choice record.
 
-Original acceptance stays unchanged. Existing replacement supports exact recorded
+Original acceptance stays unchanged. Replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native
 objects. It admits no owner or one verified shared gh v3 owner. It already stages
-recorded base and candidate and lists local differences, but only offers reviewed
-retain-original replacement. Preserve/merge/fork and source/other-owner transitions
-remain required.
+recorded base and candidate and lists local differences. Batch15 adds verified
+preserve and reviewed merge alongside retain-original replacement. Durable fork,
+source/other-owner transitions and the remaining proof matrix below remain required.
 
 ## Three-way review
 

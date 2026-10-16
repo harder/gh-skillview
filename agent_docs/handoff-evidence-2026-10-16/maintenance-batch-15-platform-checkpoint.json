@@ -1,0 +1,100 @@
+{
+  "kind": "interim-platform-checkpoint",
+  "recordedAt": "2026-10-16T08:59:13.274842+00:00",
+  "acceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "open",
+    "batch15PR": null,
+    "readyToMerge": false
+  },
+  "windows": {
+    "source": "27432533cb09f57d682e699bcfd48764c98dc3a1",
+    "runId": 38873006075,
+    "url": "https://github.com/harder/gh-skillview/actions/runs/38873006075",
+    "scope": "focused native metadata plus related regressions; diagnostic-only run, not full CI",
+    "testsPassedPerArchitecture": 98,
+    "jobs": [
+      {
+        "name": "Windows metadata (windows-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "Windows metadata (windows-11-arm)",
+        "conclusion": "success"
+      }
+    ],
+    "record": {
+      "path": "/tmp/skillview-maintenance/effective-loading/batch15-windows-diagnostic-2743253.json",
+      "sha256": "99ea4e5aae4086d15df122a5ab01987e87e885aedb9d54b6254cdbd2b8dbec42"
+    }
+  },
+  "macOS": {
+    "source": "176b9053857150167be4af650e423977df511144",
+    "tree": "94af7096d9282ee9eb2ef81fee96a382fd6cf997",
+    "sourceStatus": "",
+    "scope": "sequential native AOT App and extension; actual older native binary creates schemas1/2, apply killed, current hosts recover and undo",
+    "allFourLegacyProofsPassed": true,
+    "record": {
+      "path": "/tmp/skillview-maintenance/effective-loading/batch15-native-legacy-proofs-176b905-final.json",
+      "sha256": "356561ce32b23c44cfc0eb249ae2f2853a0a80cc88061c764e0b8cedef9ea755"
+    }
+  },
+  "linuxARM64": {
+    "source": "b5c27927a5f52930bd8d2807b59e144f401718f8",
+    "scope": "runtime apphost proof, not NativeAOT publish; isolated normal restore adds host RID only, existing library versions and content hashes unchanged",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "abiTestsPassed": 7,
+    "unprivilegedRefusalCommands": 7,
+    "privilegedMoveKillProofs": 4,
+    "commandsPerKillProof": 14,
+    "record": {
+      "path": "/tmp/skillview-maintenance/batch15-linux-b5c2792/final-summary.json",
+      "sha256": "5ba6a27dd2c69824439b9f01a598c319ddce70aafb7dad0da91ab22739aabffb"
+    }
+  },
+  "outstanding": [
+    "Actual shared-owner merged workflow/recovery matrix",
+    "Real bounded-volume disk-full recovery proof",
+    "Final full CI and current native hosts",
+    "Final independent review and re-review, coherent batch15 PR/merge",
+    "Unchanged original M08 fork/source/local-import/unpin-only/other-owner acceptance and remaining audit findings"
+  ],
+  "ghContracts": {
+    "source": "27432533cb09f57d682e699bcfd48764c98dc3a1",
+    "runId": 38875871924,
+    "url": "https://github.com/harder/gh-skillview/actions/runs/38875871924",
+    "minimumAndLatestJobs": "passed",
+    "record": {
+      "path": "/tmp/skillview-maintenance/effective-loading/batch15-contract-2743253.json",
+      "sha256": "82f7eaec5be0c8d652d9309264534c63cbe093041f9bc18dfbe29a7925810ce4"
+    }
+  },
+  "macOSFullTests": {
+    "source": "27432533cb09f57d682e699bcfd48764c98dc3a1",
+    "passed": 1912,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "production source2743253; subsequent dirty changes proof-only/docs/CI",
+    "record": {
+      "path": "/tmp/skillview-maintenance/effective-loading/batch15-full-2743253.log",
+      "sha256": "984ded6d7b4eaa0cd94d4b68c0c3003cc3f3e21a86d2480e5115099cf643a726"
+    }
+  },
+  "macOSSharedMergedApp": {
+    "nativeAppSource": "176b9053857150167be4af650e423977df511144",
+    "frozenProofHostSource": "27432533cb09f57d682e699bcfd48764c98dc3a1",
+    "scope": "actual native App; both gh2.97.0/2.102.0, six shared recovery scenarios each; extension pending",
+    "allTopLevelBooleanAssertionsPassed": false,
+    "record": {
+      "path": "/tmp/skillview-maintenance/effective-loading/shared-local-merge-app-first-proof.json",
+      "sha256": "16967913c15afb0d160a93de8277625abe8f19302ec98d1bd9a6b11e86d91cb4"
+    }
+  },
+  "proofHarnessReview": {
+    "sharedMergedScript": "independent review clear; native App matrix passed, extension running",
+    "diskFull": "dedicated mount, exact ENOSPC and output admission findings fixed; independent re-review clear; isolated runtime proof pending",
+    "checks": "solution and proof-host builds clean; Python/shell/actionlint/diff checks pass"
+  }
+}
