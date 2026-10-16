@@ -1,15 +1,16 @@
-# Full M08 work retained after external suppression
+# Batch 15 merged; remaining M08 work retained
 
-External suppression merged in PR64. Batch15 implements reviewed local
-dispositions on `codex/reviewed-local-dispositions`. Schema3 merge planning, CLI
-entrypoints and owned inline TUI controls have completed the verification recorded
-in `evidence/maintenance-batch-15-verification.json` and the preserved October 16
-handoff receipts. Focused final integration review is clear; final PR checks and
-merge remain pending. Original M08 acceptance remains open. The development notes
-below retain their earlier scope; use the consolidated evidence for completed
-platform, recovery and TUI results.
+External suppression merged in PR64. Batch 15 merged as PR65 and adds reviewed
+local dispositions, schema 3 merge plans, CLI entrypoints and owned inline TUI
+controls. Final CI and native evidence is recorded in
+`evidence/maintenance-batch-15-final.json`; the earlier consolidated record and
+October 16 handoff receipts retain their original scopes. Original M08 acceptance
+remains open. The development notes below retain detailed implementation
+boundaries and unfinished M08/M09 obligations; use the final record for completed
+cross-platform, recovery and TUI verification.
 
-Current private draft boundaries:
+Implemented workflow boundaries:
+
 - `ThreeWayPayloadReview` analyzes complete path sets, explicit captured-file
   resolutions, root mode, topology and aggregate budgets. It is not authority.
 - `CapturedPayloadArchive` retains immutable indexed regular-file blobs for
@@ -31,7 +32,8 @@ Current private draft boundaries:
 - Finalization must stay on the originally created payload handle. Reopening
   a canonical pathname can accept a replacement with identical bytes/modes.
 
-Current CLI path (private-stage writes until explicit Apply):
+CLI flow (private-stage writes until explicit Apply):
+
 1. `update-plan` produces a schema2 immutable B/C plan without changing I.
 2. `update-merge-review --id ID --expect SOURCE_PLAN_HASH` independently retains
    B/I/C blobs plus native metadata and closes the earlier replacement approval.
@@ -63,11 +65,13 @@ choices. Finalization attempts use bounded independent `merged-NN` slots and
 is independent of the current payload location after promotion. An incomplete
 initial B/I/C capture remains retained and requires a new revision plan; it never
 restores approval of the earlier source replacement. Cross-platform acceptance
-and the full TUI/recovery proof matrix are still pending. Resolution storage includes failed/unreferenced
-attempts: at most 16 archives, 256 MiB of raw bytes and 64 MiB of encoded manifests
-per plan. Bound the outer draft enumeration before computing that quota. Flush
-each archive, then the reopened draft namespace and operation writer/device
-barrier before publishing any reference in a choice record.
+for the implemented preserve/merge workflows and their TUI/recovery proofs is
+complete; see `evidence/maintenance-batch-15-final.json`. Resolution storage
+includes failed/unreferenced attempts: at most 16 archives, 256 MiB of raw bytes
+and 64 MiB of encoded manifests per plan. Bound the outer draft enumeration
+before computing that quota. Flush each archive, then the reopened draft namespace
+and operation writer/device barrier before publishing any reference in a choice
+record.
 
 Original acceptance stays unchanged. Replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native

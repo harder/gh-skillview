@@ -155,3 +155,15 @@ Requiring 101 separate timer/redraw cycles made this correctness test sensitive
 to loaded Windows runners; batching preserves the key/boundary checks without
 turning redraw throughput into the acceptance criterion. A watchdog timeout alone
 does not establish a product navigation failure or reproduce the original crash.
+
+### Native proof failures from GitHub API quota
+
+When a native proof host fails during an actual `gh` source request, inspect the
+runner's HTTP status and `X-RateLimit-Reset` evidence before classifying it as a
+product failure. The GitHub Actions installation token quota is separate from
+the local `gh auth` quota, so a healthy local `gh api rate_limit` does not clear a
+runner-side 403. Preserve the failed attempt's logs and partial artifacts. After
+the recorded reset, confirm the reviewed PR head has not changed and rerun only
+the failed jobs. Identify replacement artifacts by artifact ID, `created_at`,
+run attempt and digest; artifact names may be reused across attempts. Do not log
+tokens or authorization headers.

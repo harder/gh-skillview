@@ -1118,7 +1118,29 @@ unchanged. PR65 Copilot review found stale Windows publication status in the use
 guide; the correction describes supported metadata, effective-user ownership and
 the existing security-privilege requirement while retaining explicit refusals.
 
-Final PR checks and merge remain pending. Original acceptance remains 9/21; M08 fork/source/local-import/standalone
-unpin, other-owner transitions, remaining preference recovery and the original
-criterion audit remain open. The original Installed Down-arrow crash was never
-reproduced.
+### Batch 15 final merged verification
+
+PR65 merged at `0dba59be59776e6e654123aa1ce1e5496074763e` on 2026-10-16.
+The merge tree `9335a2e961cf488069a4a79b392599bda33f09a0` matches the exact
+reviewed head `81e403db602ccc4c9f82c629810f8b6d01dde3ac`; the merge parents are
+the prior main commit and that reviewed head. Final evidence is in
+`evidence/maintenance-batch-15-final.json`, including the selected artifact
+digests and member hashes, attempt attribution, observed PR checks, tests,
+metadata results and the quota-limited first attempt. All 15 observed PR check
+entries are successful after attempt 2; CodeQL passed in its separate run. The
+successful Linux/macOS jobs, platform tests and Windows metadata jobs are retained
+from attempt 1; the Windows AOT results are fresh attempt-2 replacements. The three
+platform test jobs each passed
+1,912 tests; both Windows metadata jobs passed 98 tests. The final artifact set
+contains 156 verified members across four native RIDs, with 30 new proof
+contracts checked. Attempt 1's Windows failures were GitHub Actions installation
+API quota responses; only the failed Windows jobs were rerun after reset on the
+unchanged reviewed head.
+
+Batch 15 adds preserve-installed and reviewed schema 3 merges. Approved source C
+remains the future comparison baseline, while customized result M has separate
+result evidence. Supported native metadata publication is verified across Linux
+x64, macOS ARM64, Windows x64 and Windows ARM64. Original acceptance remains
+9/21; M08 fork/source/local-import/standalone unpin, required detach, other-owner
+transitions, remaining preference recovery and the original criterion audit
+remain open. The original Installed Down-arrow crash was never reproduced.
