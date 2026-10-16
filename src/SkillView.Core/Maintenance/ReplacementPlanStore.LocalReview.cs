@@ -271,7 +271,7 @@ internal sealed partial class ReplacementPlanStore
         using var draft = OpenLocalReview(operation, inventory, token);
         var evidence = LoadLocalReview(plan, draft, token);
         if (disposition.Kind != "merge-reviewed" || disposition.HeaderFingerprint != evidence.HeaderFingerprint
-            || disposition.SelectionFingerprint != evidence.SelectionFingerprint || disposition.MetadataPolicy != PayloadMetadataReview.Policy)
+            || disposition.SelectionFingerprint != evidence.SelectionFingerprint || disposition.MetadataPolicy != PayloadMetadataReview.PolicyFor(evidence.Installed.RootMetadata!))
             throw new IOException("Merged plan differs from its exact saved local review.");
         using (var source = NativeDirectoryMoveLease.Open(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "candidate"), token))
             VerifyPayload(disposition.SourceCandidate, source.Capture(token));
@@ -317,6 +317,7 @@ internal sealed partial class ReplacementPlanStore
                 if (current.Kind != expected.Kind || current.UnixMode != expected.UnixMode || current.UserId != expected.UserId
                     || current.GroupId != expected.GroupId || current.LinkCount != expected.LinkCount || current.DirectoryLink != expected.DirectoryLink
                     || current.EnumerationCoverage != expected.EnumerationCoverage || !current.Refusals.SequenceEqual(expected.Refusals)
+                    || !WindowsPayloadMetadata.Same(expected.Windows, current.Windows)
                     || current.Attributes.Length != expected.Attributes.Length
                     || expected.Attributes.Any(attr => !current.Attributes.Any(other => attr.Name == other.Name && attr.Value.AsSpan().SequenceEqual(other.Value))))
                     throw new IOException("Native metadata changed since local review: " + item.RelativePath);

@@ -11,7 +11,7 @@ internal static class RegularFileInspection
     internal static void Capture(string path, Func<NativePayloadItem, PayloadFileEvidence> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        using var file = Open(path);
+        using var file = OperatingSystem.IsWindows() ? WindowsSecureRemovalBackend.OpenRegularFileForMetadata(path) : Open(path);
         if (OperatingSystem.IsWindows()) WindowsSecureRemovalBackend.CaptureRegularFile(file, observe, token);
         else UnixSecureRemovalBackend.CaptureRegularFile(file, observe, token);
     }

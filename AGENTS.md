@@ -711,6 +711,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
+- `agent_docs/native-payload-metadata.md` — native merge metadata contracts,
+  Windows thread-token and backup-stream framing rules, and required native proofs.
+
 - Ordinary Cleanup Ignore and CLI `ignore` write only the private sibling
   `SkillView/preferences` store; never write or silently remove legacy
   `.skillview-ignore` payload markers. Keep suppression observations transient

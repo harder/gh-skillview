@@ -33,7 +33,12 @@ public sealed class PayloadNativeMetadataTests : IDisposable
             Assert.Equal(archive.Snapshot.Objects.Single(item => item.Path == entry.Entry.Path).Identity, entry.Metadata!.Identity);
         if (OperatingSystem.IsWindows())
         {
-            Assert.False(archive.RootMetadata.Supported); Assert.Equal("unavailable", archive.RootMetadata.EnumerationCoverage);
+            if (archive.RootMetadata.Supported)
+            {
+                Assert.Equal("windows-full-security-and-backup-streams-v1", archive.RootMetadata.EnumerationCoverage);
+                Assert.NotNull(archive.RootMetadata.Windows);
+            }
+            else Assert.NotEmpty(archive.RootMetadata.Refusals);
         }
         else if (OperatingSystem.IsLinux() && archive.RootMetadata.EnumerationCoverage == "caller-visible-xattr-names")
         {

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.Win32.SafeHandles;
 using SkillView.Inventory;
+using System.Text.Json.Serialization;
 
 namespace SkillView.Maintenance;
 
@@ -12,15 +13,18 @@ internal sealed record PayloadExtendedAttribute(string Name, byte[] Value);
 internal sealed record PayloadNativeMetadata(string Platform, SecureFileIdentity Identity,
     string Kind, int? UnixMode, uint? UserId, uint? GroupId, ulong? LinkCount,
     bool DirectoryLink, ImmutableArray<PayloadExtendedAttribute> Attributes,
-    string EnumerationCoverage, ImmutableArray<string> Refusals)
+    string EnumerationCoverage, ImmutableArray<string> Refusals,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] WindowsPayloadMetadata? Windows = null)
 {
     internal bool Supported => !Refusals.IsDefault && Refusals.IsEmpty
-        && EnumerationCoverage is "macos-native-owner" or "linux-standard-namespaces-with-cap-sys-admin"
-        && UserId.HasValue && GroupId.HasValue && LinkCount.HasValue && UnixMode is >= 0 and <= 511
         && Kind is "file" or "directory" or "link" && !Attributes.IsDefault
-        && (Kind == "directory" || LinkCount == 1)
-        && (Platform == "macos" ? EnumerationCoverage == "macos-native-owner"
-            : Platform == "linux" && EnumerationCoverage == "linux-standard-namespaces-with-cap-sys-admin");
+        && LinkCount.HasValue && (Kind == "directory" || LinkCount == 1)
+        && (Platform == "windows" ? Windows is { SchemaVersion: 1 } && UnixMode is null && UserId is null && GroupId is null
+                && EnumerationCoverage == "windows-full-security-and-backup-streams-v1" && Attributes.IsEmpty
+            : Windows is null && UserId.HasValue && GroupId.HasValue && UnixMode is >= 0 and <= 511
+                && (Platform == "macos" ? EnumerationCoverage == "macos-native-owner"
+                    : Platform == "linux" && EnumerationCoverage == "linux-standard-namespaces-with-cap-sys-admin"));
+    internal long AlternateStreamBytes => Windows?.StreamBytes ?? 0;
     internal const int MaxAttributeBytes = 64 * 1024;
     internal const int MaxEntryMetadataBytes = 128 * 1024;
     internal const int MaxAttributes = 64;
@@ -30,7 +34,8 @@ internal sealed record PayloadNativeMetadata(string Platform, SecureFileIdentity
     {
         if (Kind is not ("file" or "directory" or "link") || Platform is not ("macos" or "linux" or "windows")
             || Attributes.IsDefault || Attributes.Length > MaxAttributes || Refusals.IsDefault || Refusals.Length > MaxAttributes + 16
-            || EnumerationCoverage is not ("macos-native-owner" or "linux-standard-namespaces-with-cap-sys-admin" or "caller-visible-xattr-names" or "unavailable"))
+            || Windows is not null && Platform != "windows"
+            || EnumerationCoverage is not ("macos-native-owner" or "linux-standard-namespaces-with-cap-sys-admin" or "caller-visible-xattr-names" or "unavailable" or "windows-full-security-and-backup-streams-v1"))
             throw new IOException("Captured native metadata is malformed.");
         long bytes = 0; var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var attribute in Attributes)
@@ -47,16 +52,17 @@ internal sealed record PayloadNativeMetadata(string Platform, SecureFileIdentity
             bytes += System.Text.Encoding.UTF8.GetByteCount(refusal);
             if (bytes > MaxEntryMetadataBytes) throw new IOException("Captured native metadata exceeds its byte budget.");
         }
+        bytes += Windows?.Validate() ?? 0;
+        if (bytes > MaxEntryMetadataBytes) throw new IOException("Captured native metadata exceeds its byte budget.");
         return bytes;
     }
 
-    internal static PayloadNativeMetadata Capture(NativePayloadItem item, CancellationToken token, PayloadMetadataAuthority? authority = null)
+    internal static PayloadNativeMetadata Capture(NativePayloadItem item, CancellationToken token, PayloadMetadataAuthority? authority = null,
+        long maxAlternateBytes = MaxEntryMetadataBytes)
     {
         token.ThrowIfCancellationRequested();
         if (!OperatingSystem.IsWindows()) return UnixSecureRemovalBackend.CapturePayloadMetadata(item, token, authority);
-        return new("windows", item.Identity, item.Kind, null, null, null, null,
-            item.Kind == "link" && item.Identity.IsDirectory, [], "unavailable",
-            ["Windows security descriptors and alternate streams need native metadata capture before merge publication."]);
+        return WindowsSecureRemovalBackend.CapturePayloadMetadata(item, token, maxAlternateBytes);
     }
 
     internal static void Apply(SafeFileHandle target, PayloadNativeMetadata metadata, int? mode, CancellationToken token, PayloadMetadataAuthority? authority = null)
@@ -64,7 +70,7 @@ internal sealed record PayloadNativeMetadata(string Platform, SecureFileIdentity
         token.ThrowIfCancellationRequested();
         metadata.Validate();
         if (!metadata.Supported) throw new IOException("Native metadata cannot be preserved: " + string.Join(" ", metadata.Refusals));
-        if (OperatingSystem.IsWindows()) throw new IOException("Windows native metadata publication is not available yet.");
+        if (OperatingSystem.IsWindows()) { WindowsSecureRemovalBackend.ApplyPayloadMetadata(target, metadata, mode, token); return; }
         UnixSecureRemovalBackend.ApplyPayloadMetadata(target, metadata, mode, token, authority);
     }
 }

@@ -42,10 +42,13 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
                 var length = file.Length;
                 if (length > bytesBudget.Remaining || input.Path == "SKILL.md" && length > PayloadSnapshot.MaxSkillBytes)
                     throw new IOException("Resolution input exceeds its remaining byte budget.");
-                var metadata = PayloadNativeMetadata.Capture(item, token, authority);
+                var metadata = PayloadNativeMetadata.Capture(item, token, authority, bytesBudget.Remaining - length);
                 metadataBytes += metadata.Validate();
                 if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
                     throw new IOException("Resolution metadata exceeds its archive budget.");
+                bytesBudget.Consume(checked((int)metadata.AlternateStreamBytes));
+                if (length > bytesBudget.Remaining) throw new IOException("Resolution data/alternate streams exceed the remaining raw byte budget.");
+                file.Position = 0;
                 var blob = $"entry-{entries.Count:D5}";
                 using var destination = archive.OpenFile(blob, false, token);
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -126,6 +129,8 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
                 || !Path.IsPathFullyQualified(item.Metadata.Identity.CanonicalPath) || item.Metadata.Identity.IsDirectory || item.Metadata.Identity.IsReparsePoint)
                 throw new IOException("Resolution archive entry is malformed or exceeds its budget.");
             metadata += item.Metadata.Validate();
+            bytes += item.Metadata.AlternateStreamBytes;
+            if (bytes > PayloadSnapshot.MaxBytes) throw new IOException("Resolution alternate streams exceed the raw byte budget.");
             if (metadata > PayloadNativeMetadata.MaxArchiveMetadataBytes) throw new IOException("Resolution archive metadata exceeds its budget.");
         }
     }

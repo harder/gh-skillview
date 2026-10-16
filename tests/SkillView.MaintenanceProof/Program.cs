@@ -10,7 +10,7 @@ using SkillView.Ui;
 // inspects/repairs the state through the actual product CLI after restart.
 try
 {
-    if (args.Length != 6) throw new ArgumentException("root gh id fingerprint apply|undo|repair checkpoint");
+    if (args.Length != 6) throw new ArgumentException("root gh id fingerprint apply|apply-merged|undo|repair checkpoint");
     if (!SecureRemovalBackend.TryCanonicalizePath(Path.GetFullPath(args[0]), out var root, out var rootError))
         throw new IOException("Cannot establish native proof-root authority: " + rootError);
     var home = Environment.GetEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
@@ -20,7 +20,7 @@ try
         || !PrivateExistingDirectory(home) || !PrivateExistingDirectory(state)
         || File.ReadAllText(Path.Combine(root, "disposable-proof-marker")) != "SkillView disposable process proof\n")
         throw new IOException("A marked disposable HOME/CWD/state workspace is required.");
-    if (args[4] is not ("apply" or "undo" or "repair")
+    if (args[4] is not ("apply" or "apply-merged" or "undo" or "repair")
         || args[5] is not ("retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
             or "owner-repair-intent" or "owner-repaired" or "compensation-truncated"))
@@ -35,6 +35,7 @@ try
     var result = args[4] switch
     {
         "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),
+        "apply-merged" => store.Apply(args[2], args[3], inventory, lifetime.Token, "merge-reviewed"),
         "undo" => store.Recover(args[2], args[3], inventory, true, lifetime.Token),
         _ => store.RepairOwner(args[2], args[3], inventory, lifetime.Token)
     };

@@ -56,7 +56,8 @@ internal sealed partial class WindowsSecureRemovalBackend
         internal override PayloadSnapshot CaptureInto(Action<NativePayloadItem, PayloadEntry> sink,
             Action<NativePayloadItem>? observeRoot, CancellationToken token) =>
             PayloadSnapshot.CaptureBoundWithEntrySink(CurrentPath, sink,
-                (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct, observeRoot), token);
+                (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct,
+                    observeRoot is null ? null : item => observeRoot(item with { NativeParentHandle = Parent, NativeName = originalName })), token);
 
         internal override void Revalidate(CancellationToken token)
         {

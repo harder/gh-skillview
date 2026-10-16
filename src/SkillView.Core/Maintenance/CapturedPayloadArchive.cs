@@ -61,10 +61,13 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
 
         PayloadNativeMetadata CaptureMetadata(NativePayloadItem item)
         {
-            var metadata = PayloadNativeMetadata.Capture(item, token, authority);
+            var contentBytes = item.Kind == "file" ? item.Content?.Length ?? 0 : item.LinkBytes?.LongLength ?? 0;
+            var metadata = PayloadNativeMetadata.Capture(item, token, authority, PayloadSnapshot.MaxBytes - stored - contentBytes);
             metadataBytes += metadata.Validate();
             if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
                 throw new IOException("Captured native metadata exceeds its aggregate byte budget.");
+            stored = checked(stored + metadata.AlternateStreamBytes);
+            if (stored > PayloadSnapshot.MaxBytes) throw new IOException("Captured Windows streams exceed the aggregate raw byte budget.");
             return metadata;
         }
     }
@@ -114,7 +117,7 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
         long metadataBytes = RootMetadata.Validate();
         var paths = new HashSet<string>(StringComparer.Ordinal);
         var blobs = new HashSet<string>(StringComparer.Ordinal);
-        long stored = 0;
+        long stored = RootMetadata.AlternateStreamBytes;
         foreach (var item in Entries)
         {
             var entry = item.Entry;
@@ -132,6 +135,8 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
                 || metadata.Identity != native.Identity || metadata.Kind != entry.Kind || metadata.UnixMode != entry.UnixMode)
                 throw new IOException("Captured entry metadata is not bound to its native payload object.");
             metadataBytes += metadata.Validate();
+            stored = checked(stored + metadata.AlternateStreamBytes);
+            if (stored > PayloadSnapshot.MaxBytes) throw new IOException("Captured Windows streams exceed the aggregate raw byte budget.");
             if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
                 throw new IOException("Captured native metadata exceeds its aggregate byte budget.");
         }

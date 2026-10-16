@@ -1062,10 +1062,11 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
         bool openReparsePoint = true,
         bool requestDeleteAccess = true,
         bool requestReadAccess = false,
-        bool requestWriteAccess = false)
+        bool requestWriteAccess = false,
+        uint additionalAccess = 0)
     {
         ValidateRelativeEntryName(name);
-        var desiredAccess = FileReadAttributes | SynchronizeAccess;
+        var desiredAccess = FileReadAttributes | SynchronizeAccess | additionalAccess;
         if (requestDeleteAccess) desiredAccess |= DeleteAccess;
         if (requestReadAccess) desiredAccess |= 0x00000001;
         if (requestWriteAccess) desiredAccess |= 0x00000002; // FILE_WRITE_DATA

@@ -2,6 +2,29 @@ namespace SkillView.Inventory;
 
 internal sealed partial class WindowsSecureRemovalBackend
 {
+    internal static FileStream OpenRegularFileForMetadata(string path)
+    {
+        // An initial no-follow open may request complete metadata rights. When
+        // unavailable, preserve inspectable byte evidence and record the exact
+        // SACL visibility refusal during capture rather than claiming absence.
+        try
+        {
+            using var privilege = WindowsMetadataPrivilege.Enter();
+            var handle = WindowsNative.CreateFileW(ToExtendedPath(path), 0x80000000 | MetadataReadAccess,
+                ShareRead | ShareWrite | ShareDelete, IntPtr.Zero, OpenExisting, OpenReparsePoint | BackupSemantics, IntPtr.Zero);
+            try
+            {
+                if (handle.IsInvalid) throw new IOException("Open complete resolution metadata failed: " + LastErrorMessage());
+                var identity = ReadIdentity(handle);
+                if (identity.IsDirectory || identity.IsReparsePoint || WindowsNative.GetFileType(handle) != 1)
+                    throw new IOException("Resolution input is not a regular non-link disk file.");
+                return new FileStream(handle, FileAccess.Read);
+            }
+            catch { handle.Dispose(); throw; }
+        }
+        catch (IOException) { return OpenRegularFileForSnapshot(path); }
+    }
+
     internal static void CaptureRegularFile(FileStream file, Func<NativePayloadItem, PayloadFileEvidence> observe, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

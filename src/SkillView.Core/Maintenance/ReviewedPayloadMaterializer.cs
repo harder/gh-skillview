@@ -21,7 +21,7 @@ internal static class ReviewedPayloadMaterializer
         if (readers.GetValueOrDefault("installed") is not CapturedPayloadArchive.Reader installed) throw new IOException("An immutable installed root capture is required.");
         using var metadata = PayloadMetadataReview.Create(review, installed, token, readers.GetValueOrDefault("source"), readers.GetValueOrDefault("resolved"));
         var snapshot = Stage(operation, name, review, readers, approvedTracking, token, metadata: metadata);
-        return new(snapshot, PayloadMetadataReview.Policy, metadata.Recipes);
+        return new(snapshot, metadata.PolicyName, metadata.Recipes);
     }
 
     internal static PayloadSnapshot Stage(NativeStateDirectory operation, string name,
@@ -47,7 +47,7 @@ internal static class ReviewedPayloadMaterializer
             throw new IOException("The reviewed result needs a regular SKILL.md.");
         var children = selected.GroupBy(row => Parent(row.Path), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.OrderBy(row => row.Path, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
-        using var root = operation.CreatePayloadDirectory(name, token);
+        using var root = metadata is null ? operation.CreatePayloadDirectory(name, token) : operation.CreateMetadataPayloadDirectory(name, token);
         Build(root, "", review.RootMode.Selected, 0);
         operation.ValidateLocation(token);
         beforeCaptureForTests?.Invoke(root.CanonicalPath);
@@ -94,7 +94,15 @@ internal static class ReviewedPayloadMaterializer
                                 if (metadata is not null) PayloadNativeMetadata.Apply(output.SafeFileHandle, metadata[entry.Path].Desired, entry.UnixMode, token, metadata.Authority);
                                 else File.SetUnixFileMode(output.SafeFileHandle, (UnixFileMode)entry.UnixMode.Value);
                             }
-                            else if (entry.UnixMode is not null) throw new IOException("A Windows file cannot carry a Unix mode.");
+                            else
+                            {
+                                if (entry.UnixMode is not null) throw new IOException("A Windows file cannot carry a Unix mode.");
+                                if (metadata is not null)
+                                {
+                                    output.Flush(true);
+                                    PayloadNativeMetadata.Apply(output.SafeFileHandle, metadata[entry.Path].Desired, null, token, metadata.Authority);
+                                }
+                            }
                             output.Flush(true);
                         }
                         break;
@@ -105,8 +113,8 @@ internal static class ReviewedPayloadMaterializer
                             // Reparse buffers do not encode the directory flag.
                             // Windows link kind must be bound by the native
                             // metadata adapter before this draft can support it.
-                            if (OperatingSystem.IsWindows()) throw new IOException("Windows link materialization requires reviewed native link-kind metadata.");
-                            if (metadata is not null) directory.CreateLinkWithMetadata(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, false, metadata[entry.Path].Desired, token, metadata.Authority);
+                            if (OperatingSystem.IsWindows() && metadata is null) throw new IOException("Windows link materialization requires reviewed native link-kind metadata.");
+                            if (metadata is not null) directory.CreateLinkWithMetadata(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, metadata[entry.Path].Desired.DirectoryLink, metadata[entry.Path].Desired, token, metadata.Authority);
                             else directory.CreateLink(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, false, token);
                         }
                         break;

@@ -70,6 +70,47 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
 
+  windows-metadata:
+    name: Windows metadata (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # These native tests must publish and recapture metadata successfully;
+      # an environmental refusal is not a passing Windows proof.
+      SKILLVIEW_WINDOWS_METADATA_PROOF: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Prove native security descriptors and alternate streams
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
+            --configuration Release -p:RestoreLockedMode=true \
+            --filter-class SkillView.Tests.Maintenance.WindowsPayloadMetadataTests \
+            | tee dist/windows-metadata-tests.log
+          dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
+            --configuration Release --no-build \
+            --filter-class SkillView.Tests.Maintenance.WindowsBackupReadStreamTests \
+            | tee -a dist/windows-metadata-tests.log
+      - name: Retain Windows metadata evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-metadata-evidence-${{ matrix.os }}
+          path: dist/windows-metadata-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
   aot-smoke:
     name: AOT publish smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
@@ -221,6 +262,32 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
+      - name: Prove reviewed local dispositions and frozen resolutions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          metadata_args=()
+          if [ "$RUNNER_OS" = Linux ]; then
+            metadata_args=(--expect-metadata-refusal CAP_SYS_ADMIN)
+          fi
+          python agent_docs/evidence/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved "${metadata_args[@]}" --output dist/local-merge-app-proof.json
+          python agent_docs/evidence/prove-local-merge-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved "${metadata_args[@]}" --output dist/local-merge-extension-proof.json
+      - name: Prove merged payload restart recovery at every directory move
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          for boundary in retain-moved install-moved displace-moved restore-moved; do
+            python agent_docs/evidence/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
+              --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
+              --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
+          done
       - name: Retain native verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -77,6 +77,25 @@ internal sealed partial class ReplacementPlanStore
             }
             if (bytes > CapturedResolutionArchive.MaxRetainedBytes || metadata > CapturedResolutionArchive.MaxRetainedManifestBytes)
                 throw new IOException("Retained resolution attempts exceed their cumulative byte/manifest budget.");
+            if (entries.FirstOrDefault(entry => entry.Name == "manifest.json") is { Name: "manifest.json" } manifest)
+            {
+                // Complete manifests account decoded inline ADS. A failed or
+                // malformed partial manifest is conservatively charged by its
+                // encoded size; it can never bypass the raw aggregate quota.
+                long streams = manifest.Bytes;
+                try
+                {
+                    using var file = archive.OpenExistingFile("manifest.json", false, token);
+                    var (saved, _) = BoundedReviewJson.Read(file, ResolutionJsonContext.Default.ResolutionArchiveManifest,
+                        CapturedPayloadArchive.MaxManifestBytes, token);
+                    var captured = new CapturedResolutionArchive(saved.Entries); captured.Validate();
+                    streams = captured.Entries.Sum(entry => entry.Metadata!.AlternateStreamBytes);
+                }
+                catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException) { }
+                bytes = checked(bytes + streams);
+                if (bytes > CapturedResolutionArchive.MaxRetainedBytes)
+                    throw new IOException("Retained resolution alternate streams exceed their cumulative raw byte budget.");
+            }
         }
         return (bytes, metadata, attempts);
     }

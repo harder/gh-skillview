@@ -16,6 +16,15 @@ internal sealed partial class WindowsSecureRemovalBackend
             session.CreatePayloadLink(name, rawTarget, directoryLink, token);
         }
         internal override void Seal(int? unixMode, CancellationToken token) => session.SealPayload(unixMode, token);
+        internal override void SealWithMetadata(int? unixMode, SkillView.Maintenance.PayloadNativeMetadata metadata,
+            CancellationToken token, SkillView.Maintenance.PayloadMetadataAuthority? authority = null) =>
+            session.SealPayloadWithMetadata(unixMode, metadata, token);
+        internal override void CreateLinkWithMetadata(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, bool directoryLink,
+            SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token, SkillView.Maintenance.PayloadMetadataAuthority? authority = null)
+        {
+            if (unixMode is not null) throw new IOException("A Windows link cannot carry a Unix mode.");
+            session.CreatePayloadLink(name, rawTarget, directoryLink, token, metadata);
+        }
         internal override SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null) => session.CapturePayload(token, inspectMetadata);
         public override void Dispose() => session.Dispose();
     }
