@@ -228,7 +228,7 @@ internal static class LoadingPolicyEvaluator
         {
             if (policy.Kind != "string" || policy.Text is not ("on" or "off" or "name-only" or "user-invocable-only"))
                 return Invalid("Claude skillOverrides contains an unsupported visibility state.");
-            if (policy.Text == "off") return new(false, false, false, "not-applicable", "hidden", ["Claude skillOverrides turns this skill off."]);
+            if (policy.Text == "off") return new(false, false, false, "not-applicable", "hidden", ["Claude skillOverrides turns this skill off."]) { Slash = false };
             if (manual?.Boolean == false || disableModel?.Boolean == true && policy.Text != "user-invocable-only")
                 return Invalid("Explicit Claude visibility conflicts with invocation frontmatter; version-specific native precedence is unverified.");
             user = true; automatic = policy.Text != "user-invocable-only";

@@ -76,6 +76,9 @@ def main():
         project_skill = project_a / ".claude/skills/demo"
         for path in (universal, personal, project_skill):
             skill(path)
+        hidden = home / ".claude/skills/hidden-demo"
+        skill(hidden, name="hidden-demo")
+        write(home / ".claude/settings.json", '{"skillOverrides":{"hidden-demo":"off"}}\n')
         write(home / ".codex/config.toml", "# AOT source-generated TOML path\n[model_features]\nfixture_only = true\n")
         write(universal / "agents/openai.yaml", "policy:\n  allow_implicit_invocation: false\n")
         write(project_a / ".gemini/settings.json", '{"skills":{"disabled":["DEMO"]}}\n')
@@ -178,6 +181,8 @@ def main():
         alternate = run("gemini-cli", project_b, {"GEMINI_CLI_HOME": str(alternate_home)}, "0.46.0")
         assert rows(alternate, alternate_skill)[0]["placement"] == "user-agents"
         claude = run("claude-code")
+        assert rows(claude, hidden)[0]["expected"]["state"] == "disabled"
+        assert rows(claude, hidden)[0]["expected"]["slashInvocation"] == "no"
         assert rows(claude, personal)[0]["expected"]["selection"] in ("selected", "conditional-selection")
         assert rows(claude, project_skill)[0]["expected"]["selection"] == "shadowed"
         assert rows(claude, project_skill)[0]["selectionPeers"]

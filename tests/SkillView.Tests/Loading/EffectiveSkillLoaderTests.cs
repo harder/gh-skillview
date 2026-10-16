@@ -335,6 +335,7 @@ public sealed class EffectiveSkillLoaderTests : IDisposable
         Write(Path.Combine(Home, ".claude", "settings.json"), """{"skillOverrides":{"demo":"off"}}""");
         var analysis = Analyze("claude", personal, project);
         Assert.All(analysis.Candidates, candidate => Assert.Equal("disabled", candidate.Expected.State));
+        Assert.All(analysis.Candidates, candidate => Assert.Equal("no", candidate.Expected.SlashInvocation));
         Assert.Equal("shadowed", analysis.Candidates.Single(candidate => candidate.EntryPath == project.ResolvedPath).Expected.Selection);
     }
 
