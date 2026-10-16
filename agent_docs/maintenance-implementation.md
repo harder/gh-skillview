@@ -1221,3 +1221,108 @@ pass. New-head CI and a complete four-RID native proof selection remain pending.
 Acceptance remains 9/21 and M08 incomplete. See
 `evidence/maintenance-batch-16-harness-path-fix.json` for exact attribution and
 compact raw-evidence hashes.
+
+## Static package checking: partial M19 local checkpoint
+
+The isolated `codex/static-package-check` worktree adds bounded local package
+metadata/reference checking, CLI `check` selectors and an Installed-tab `K`
+read-only dialog. Reports separate metadata, reference findings and coverage;
+agent compatibility and source review remain unassessed, with no skill execution
+or remote source lookup. Unsupported syntax and incomplete observations remain
+explicit, and cannot produce a successful CLI verification.
+
+The final local snapshot also fixes shared modal ownership publication: an
+immediately completed worker could run its terminal callback before ownership
+was assigned, leaving the dialog stuck. An explicit publication barrier and an
+inline-context regression cover the independently reviewed fix. This is separate
+from the original Mac Down-arrow crash, which remains unreproduced.
+
+Queued package-check completions also preserve status/output and close when
+the parent lifetime ends, across success/failure/cancellation; an already
+canceled parent opens no dialog or capture. Those regressions pass.
+
+The final scoped build has no warnings/errors; all 2,025 Tests and 9 Integration
+tests pass with zero skips, and Core/Tests/Integration formatting is clean. The
+earlier 166 focused and 2,022 full checks retain their exact prior snapshots;
+the current full suite covers them after ownership and lifetime fixes. Independent checker, CLI/UI/proof and
+shared-modal reviews are clear. An earlier mixed-filter invocation selected zero
+tests and is not counted as verification.
+App/gh-extension runtime proof and four-RID Native AOT gates remain pending CI;
+no prior unpin full-suite or native result is reused for this feature. Original
+acceptance remains 9/21, with M19 incomplete and all other original obligations
+retained. See `maintenance-static-package-check.md` and
+`evidence/maintenance-static-package-check-local.json` for scope, source hashes,
+review records and exact verification receipts.
+
+### Batch 16: final native verification and merge
+
+PR #66 merged reviewed head `c919199` as
+`ab23a7b1f3c0719926a78d3178f78849d1aa0ea2`; the fetched merge tree exactly
+matches the reviewed tree. Final same-head CI succeeds: all 15 observed PR
+statuses, both actual CodeQL analyses and minimum/current gh contracts pass.
+The failure-only contract notification job is skipped; no configured required
+GitHub statuses were reported. Initial-attempt platform totals are 1,987 each
+(including 9 integration tests), with 207 metadata tests on each Windows host.
+Failed-only attempt2 replaces the four quota-failed AOT jobs, all successful.
+
+All four fresh final-head native artifacts are independently reviewed: 182
+members, 144 positive unpin process-kill/recovery rows and 24 actual old-native
+schema1–3 fixtures from baseline `0dba59be`. Linux positive proofs run in the
+private privileged filesystem; ordinary refusals are recorded separately and
+excluded. Prior source/fixture/path/network/quota failures remain attributed in
+the earlier records. Standalone unpin is now merged; selected-consumer detach
+and the other M08 obligations remain open. Original acceptance stays 9/21 and
+the original Mac Down-arrow crash remains unreproduced. See
+`evidence/maintenance-batch-16-final.json`.
+
+## Static package checking: PR67 parser boundary fixes
+
+Six review findings at `7657c26` exposed false reference findings or falsely
+complete coverage. Multiline code/label paragraphs and list-contained fences
+now exclude both definitions and uses, with partial coverage. Type-1 HTML stays
+excluded across blank lines; tab indentation and same-line closing tags have
+regressions. Unescaped destination ampersands remain unsupported while escaped
+ampersands stay literal. Captured link prefixes are checked before later `..`
+segments can erase them. No payload link is followed.
+
+The pre-fix regressions reproduced 23 failures. Final focused tests pass 70/70;
+the full unit suite passes 2,056/2,056, with a separate 9/9 integration pass,
+zero failures/skips, clean integration build and Core/test format verification.
+Independent review of the six source/proof files is clear. The native fixture
+script now covers eleven scenarios per product host; those expanded runtime
+proofs and fresh final-head gates remain pending.
+
+The original four package scenarios did run successfully on both product hosts
+on all four RIDs at `7657c26`, before later remote API installation quota failures.
+Earlier temporary monitoring incorrectly said the package step was not reached;
+the raw logs and eight archived summaries supersede that claim. Those 32 rows
+prove the original cases only, and the overall CI run failed. A later Actions
+token diagnostic showed a healthy quota but cannot reconstruct the failed jobs'
+budget or reset time. See
+`evidence/maintenance-static-package-check-review-fixes.json` for exact sources,
+receipts, review and limitations. Original acceptance remains 9/21; M19 is open.
+
+## PR67 repository-access preflight and proof ordering
+
+At `2da52ab`, all four AOT jobs failed in the early cleanup fixture while
+resolving the remote CLI tag with installation HTTP403. The eleven-case package
+fixture was not reached on that head. Both contract lanes stopped at `gh auth
+status`; one bounded failed-only retry reproduced the auth preflight failure.
+The old `7657c26` four-case native results remain historical.
+
+A separate Actions-token diagnostic later read the exact tag successfully with
+HTTP200 while `/user` returned HTTP403, `Resource not accessible by integration`.
+The same diagnostic's `gh auth status` reported the token invalid. This supports
+a preflight mismatch for installation tokens; it does not reconstruct the
+earlier jobs' quota or explain their remote HTTP403. A synthetic invalid token
+was separately rejected by the repository endpoint with HTTP401.
+
+The workflows now require the supplied token to read the actual CLI tag API and
+validate its successful response, exact ref and commit-ID shape. Response headers
+are retained. Token permissions, both contract lanes and all native proof stages
+remain required. Offline package checks run immediately after native smoke tests,
+before network-dependent proofs, so their evidence survives an unrelated remote
+API failure. Local YAML/Bash and actual-response validation pass; new workflow
+runtime remains pending. No C# source changed after the 2,056-unit/9-integration
+verification. See `evidence/maintenance-static-package-check-ci-preflight.json`.
+Original acceptance remains 9/21; M19 is incomplete.

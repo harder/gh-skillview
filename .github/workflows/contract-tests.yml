@@ -66,10 +66,32 @@ jobs:
           fi
           gh --version
 
-      - name: Verify gh auth
+      - name: Verify authenticated repository API access
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh auth status
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          : > dist/gh-api-access.txt
+          test -n "$GH_TOKEN"
+          gh api --include --method GET repos/cli/cli/git/ref/tags/v2.102.0 > dist/gh-api-access.txt
+          python - <<'PYREF'
+          import json, pathlib, re
+          headers, body = pathlib.Path('dist/gh-api-access.txt').read_text().split('\n\n', 1)
+          result = json.loads(body)
+          assert re.fullmatch(r'HTTP/\S+ 200(?: .*)?', headers.splitlines()[0])
+          assert result['ref'] == 'refs/tags/v2.102.0'
+          assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
+          PYREF
+
+      - name: Retain repository access evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gh-repository-access-${{ matrix.gh-version }}
+          path: dist/gh-api-access.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Restore
         run: dotnet restore --locked-mode

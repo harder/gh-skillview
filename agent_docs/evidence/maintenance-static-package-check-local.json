@@ -1,0 +1,559 @@
+{
+  "schemaVersion": 1,
+  "scope": "Partial M19 local checkpoint with reviewed shared ownership and strict parent-lifetime fixes; final scoped full Tests2025 and Integration9 pass. No commit, Native AOT or actual App/gh-extension runtime proof is claimed.",
+  "worktree": {
+    "path": "/home/kevin/code/gh-skillview-package-check",
+    "branch": "codex/static-package-check",
+    "baseCommit": "4130a3f483567a063e113f505c95abfd34cdb3dc"
+  },
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M19": "incomplete",
+    "otherOriginalObligations": "unchanged",
+    "objective": "All 21 original findings remain subject to reviewable, verified, merged criterion-based acceptance."
+  },
+  "implementation": {
+    "core": "Bounded held native payload observation, UTF-8 metadata checks and a limited local Markdown/code-path reference grammar; unavailable or unsupported coverage stays explicit. No skill scripts, AI clients, network source resolution or automated repair.",
+    "cli": "check (--path PATH | --install-id ID) [--allow-hidden-dirs] [--json]; exactly one offline inventory physical row, including captured exposure aliases.",
+    "json": {
+      "schemaVersion": 1,
+      "dimensions": [
+        "formatStatus",
+        "referenceStatus",
+        "coverage"
+      ],
+      "sourceReview": "not-assessed",
+      "agentCompatibility": "not-assessed",
+      "execution": "none"
+    },
+    "exitCodes": {
+      "completeLimitedChecksWithoutErrors": 0,
+      "findingsOrUnknownPartialCoverage": 1,
+      "invalidUsage": 2,
+      "environmentUnavailableException": 10,
+      "selectorNotExactlyOneObservedRow": 20
+    },
+    "ui": "Installed K opens workflow-coordinated offline recapture and an owned asynchronous read-only dialog. Filter typing remains local; cancellation drains workers and rejects late queued successful delivery.",
+    "sharedModalOwnership": "Publish worker ownership through an explicit pending task barrier, outside-lock asynchronous release, and an inline-synchronization-context regression. Prevent immediate completed work from leaving dialogs permanently owned. This addresses the separately reproduced dialog race, not the unreproduced original Mac Down-arrow crash.",
+    "parentLifetime": "Already canceled parents open no dialog/capture. Queued success, failure and cancellation preserve status/output and close automatically after parent cancellation; no Esc needed. Stable parent/tracker tokens outlive disposed child source."
+  },
+  "sourceSnapshot": {
+    "path": "/tmp/skillview-package-check-evidence/local/source-hashes-final-lifetime.json",
+    "sha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972",
+    "files": {
+      ".github/workflows/ci.yml": "b6d4fd1cea9f5b450d0f3f802870fc49ad0b0d98b464fcc3f4079099ea3d2d49",
+      "AGENTS.md": "4f7808bf3504496576151d1034eee5d8a97b18e3314bfbe1190e46574fe9f93f",
+      "agent_docs/evidence/prove-static-package-check.py": "b895357fe361a374330086183ab1c8ef431cdde2c394227559728872eaf1be4f",
+      "agent_docs/maintenance-static-package-check.md": "d8f08314791ad297a0a3bfe6a215de8e22876e999abd73ef101e07e2ae98f3cc",
+      "docs/usage.md": "084bb5538cc4d9835fd3b00d3e90e34637a555ce810d2fadccb6934db73ce3fe",
+      "src/SkillView.Core/Cli/CliDispatcher.Check.cs": "2ae3e927314ca9232e7a469973abb4ad34545aff5a931e760b980e8acdeb2b25",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "222d42471bb4076e26ddaab0e7d8bf2910d5f9df184e8ed1d093f1e8c5fd6e66",
+      "src/SkillView.Core/PackageChecking/MarkdownPackageReferences.cs": "14ee2961ac86074a8a74725b88fb1c61100098491d045a4df774319217093f02",
+      "src/SkillView.Core/PackageChecking/PackageCheckReport.cs": "c640397d98508673ae9fcc246ea3c7cf1030402b5de41f5c35285c0a2e322491",
+      "src/SkillView.Core/PackageChecking/StaticPackageChecker.cs": "72597ea0add8de5c26542e1cd97128b70c7d4b6d1f9d3b8cb1262dda7662031b",
+      "src/SkillView.Core/Ui/InstalledScreen.cs": "a5c5c6f2a734d95dc2e0ca918db4a6467ecbf9568b374d42320d81ea7469578a",
+      "src/SkillView.Core/Ui/ModalOperationTracker.cs": "e5df98efd5dcb6c373a43413e9cf94b0b13a1a0910dcca21e49ac8141a44db8a",
+      "src/SkillView.Core/Ui/PackageCheckScreen.cs": "09f8f77cfc329aaea87b6bb583ec24ba7c9f082b715fb9070d88e7b8fb11a8a2",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "554c8f8226fa5b539343a875c77cb364328f3e54b16a01511f492a91e010262f",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "63d2a3e0d1a1e1b02cf0faab2121b7f1365d92b79b29ee84ad33ccea0ee7616d",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "347d41ff145dd786df24855d2c22256bb669fa9d879a660c08aa48ac9f68d531",
+      "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs": "8821364eb38c717ea4fad5120631e162c927f423e38a68f659821a2c16415120",
+      "tests/SkillView.Tests/PackageChecking/MarkdownPackageReferencesTests.cs": "409ddf29774bedecfae1912b58cd8083859003ec1ff81464a847fc9c0751b92d",
+      "tests/SkillView.Tests/PackageChecking/StaticPackageCheckerTests.cs": "6ca7a267214b27e3f3f8d6081dfcb8272af803adea704a47989709c3e4c3f179",
+      "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs": "709b6e2d952652e9ad1e5487cee8c001c2b1d42f071b5a28ce999ed696d50a45",
+      "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs": "0937436fef8f31c80abdbd26a966956dc28d2c72d4a544789724fcc79af54a86"
+    },
+    "scope": "Final21 files. Relative to original18 source, only PackageCheckScreen and its tests changed for strict canceled-parent lifetime; shared modal production/test and composed AGENTS rule added. Evidence documents reviewed separately."
+  },
+  "verification": {
+    "sdk": {
+      "path": "/home/kevin/.dotnet/dotnet",
+      "version": "10.0.402"
+    },
+    "lockedRestore": {
+      "command": "dotnet restore tests/SkillView.Tests/SkillView.Tests.csproj --locked-mode",
+      "exitCode": 0,
+      "scope": "Tests project and its Core reference; observed tool output reported all projects up-to-date; no raw restore log retained."
+    },
+    "build": {
+      "name": "lifetime-build",
+      "arguments": [
+        "/home/kevin/.dotnet/dotnet",
+        "build",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-restore"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/skillview-package-check-evidence/local/lifetime-build.log",
+      "sha256": "1280a70cfd459b292de72ff1dd5ac828af0d9fbc0f40f906abdbceb48967f2ce",
+      "warnings": 0,
+      "errors": 0
+    },
+    "focusedTests": {
+      "command": "dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --no-build --filter-class SkillView.Tests.PackageChecking.StaticPackageCheckerTests --filter-class SkillView.Tests.PackageChecking.MarkdownPackageReferencesTests --filter-class SkillView.Tests.Cli.PackageCheckCliTests --filter-class SkillView.Tests.Ui.PackageCheckScreenTests --filter-class SkillView.Tests.Ui.InstalledTabViewTests --filter-class SkillView.Tests.Ui.SkillViewAppTests --filter-class SkillView.Tests.Cli.CliDispatcherHelpTests",
+      "classes": [
+        "SkillView.Tests.PackageChecking.StaticPackageCheckerTests",
+        "SkillView.Tests.PackageChecking.MarkdownPackageReferencesTests",
+        "SkillView.Tests.Cli.PackageCheckCliTests",
+        "SkillView.Tests.Ui.PackageCheckScreenTests",
+        "SkillView.Tests.Ui.InstalledTabViewTests",
+        "SkillView.Tests.Ui.SkillViewAppTests",
+        "SkillView.Tests.Cli.CliDispatcherHelpTests"
+      ],
+      "total": 166,
+      "passed": 166,
+      "failed": 0,
+      "skipped": 0,
+      "path": "/tmp/skillview-package-check-evidence/local/focused-tests.log",
+      "sha256": "473b0118f03776d54ce7747707bb9d357c5a3d5fe5cd165441cb63f512d7f7e7",
+      "exitCode": 0,
+      "scope": "Earlier166 focused run binds earlierFocusedSourceSnapshot; earlier2022 full run binds earlierModalSourceSnapshot. Current full2025 run covers the focused cases after ownership and parent-lifetime fixes."
+    },
+    "format": {
+      "core": {
+        "name": "lifetime-core-format",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "src/SkillView.Core/SkillView.Core.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/lifetime-core-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "environment": {
+          "TMPDIR": "/var/tmp/skillview-package-check-tests"
+        },
+        "sourceSnapshotSha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972"
+      },
+      "tests": {
+        "name": "lifetime-tests-format",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/lifetime-tests-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "environment": {
+          "TMPDIR": "/var/tmp/skillview-package-check-tests"
+        },
+        "sourceSnapshotSha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972"
+      },
+      "integration": {
+        "name": "integration-format-after-modal-fix",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/integration-format-after-modal-fix.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "scope": "Integration sources unchanged since this successful format check; current Core/Tests formatting verified after lifetime delta."
+      }
+    },
+    "earlierMixedFilterInvocation": {
+      "result": "Zero tests selected; not a passing verification. Replaced by the final explicit class-filter run above.",
+      "exitCode": 8
+    },
+    "earlierBuild": {
+      "command": "dotnet build tests/SkillView.Tests/SkillView.Tests.csproj --no-restore",
+      "warnings": 0,
+      "errors": 0,
+      "path": "/tmp/skillview-package-check-evidence/local/build.log",
+      "sha256": "d8719441a66594805689233cdf069e064f59f0fe09775cf42728750a605741e1",
+      "exitCode": 0
+    },
+    "fullTests": {
+      "name": "lifetime-full-tests",
+      "arguments": [
+        "/home/kevin/.dotnet/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-build"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/skillview-package-check-evidence/local/lifetime-full-tests.log",
+      "sha256": "4891a2bb9a3c755fd06cfd5572b515805f36a181a90076f7d3a3337fd91ddf62",
+      "environment": {
+        "TMPDIR": "/var/tmp/skillview-package-check-tests"
+      },
+      "sourceSnapshotSha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972",
+      "total": 2025,
+      "passed": 2025,
+      "failed": 0,
+      "skipped": 0
+    },
+    "integration": {
+      "restore": {
+        "name": "integration-restore-after-modal-fix",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--locked-mode"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/integration-restore-after-modal-fix.log",
+        "sha256": "f4d05ce6409e92644a8e92341c3e91c0cd04643853f9d02a66ddfa71039b53d0"
+      },
+      "build": {
+        "name": "lifetime-integration-build",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/lifetime-integration-build.log",
+        "sha256": "5865ef115db7320b5f6addff88281e6f69ff7ae8213f56e2e6c2f9a0cadde887",
+        "environment": {
+          "TMPDIR": "/var/tmp/skillview-package-check-tests"
+        },
+        "sourceSnapshotSha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972",
+        "warnings": 0,
+        "errors": 0
+      },
+      "tests": {
+        "name": "lifetime-integration-tests",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-build"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/lifetime-integration-tests.log",
+        "sha256": "f68c2bcd387d1f93501793bfef55726cef18000bbfa41d79eeb5913b5a114ef2",
+        "environment": {
+          "TMPDIR": "/var/tmp/skillview-package-check-tests"
+        },
+        "sourceSnapshotSha256": "cce359c3ae9891c09decb686a5c6e95889f5cb563e07d9b51489d1aabba7e972",
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "earlierFormat": {
+      "core": {
+        "command": "dotnet format src/SkillView.Core/SkillView.Core.csproj --no-restore --verify-no-changes",
+        "path": "/tmp/skillview-package-check-evidence/local/format-core.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0
+      },
+      "tests": {
+        "command": "dotnet format tests/SkillView.Tests/SkillView.Tests.csproj --no-restore --verify-no-changes",
+        "path": "/tmp/skillview-package-check-evidence/local/format-tests.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0
+      }
+    },
+    "earlierModalFixFullTests": {
+      "name": "full-tests-after-modal-fix",
+      "arguments": [
+        "/home/kevin/.dotnet/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-build"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/skillview-package-check-evidence/local/full-tests-after-modal-fix.log",
+      "sha256": "2cd2530993c1e44b342af2420efc032c9552d9b5de996579f384fa6a21e15b7f",
+      "total": 2022,
+      "passed": 2022,
+      "failed": 0,
+      "skipped": 0,
+      "sourceSnapshotSha256": "03fe6f94c36f2b258743d12445c894a86045988a579f60a9ed3096e5037142de"
+    },
+    "earlierModalFixIntegration": {
+      "restore": {
+        "name": "integration-restore-after-modal-fix",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--locked-mode"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/integration-restore-after-modal-fix.log",
+        "sha256": "f4d05ce6409e92644a8e92341c3e91c0cd04643853f9d02a66ddfa71039b53d0"
+      },
+      "build": {
+        "name": "integration-build-after-modal-fix",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/integration-build-after-modal-fix.log",
+        "sha256": "3db55f29521b234fd4581b48ec0bbd437dcc1a9fad15cc2494278c9c8591207e",
+        "warnings": 0,
+        "errors": 0
+      },
+      "tests": {
+        "name": "integration-tests-after-modal-fix",
+        "arguments": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-build"
+        ],
+        "exitCode": 0,
+        "log": "/tmp/skillview-package-check-evidence/local/integration-tests-after-modal-fix.log",
+        "sha256": "452d829b07a41a205580e69cb4d8793dface009684ad7ded1470d5c362518d62",
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "earlierModalFixBuild": {
+      "name": "build-after-modal-fix",
+      "arguments": [
+        "/home/kevin/.dotnet/dotnet",
+        "build",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-restore"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/skillview-package-check-evidence/local/build-after-modal-fix.log",
+      "sha256": "ce59b9c1d2b6d9ce14200703081323b8b1f1883173b8f5ccdd1896c5ea05fcf1",
+      "warnings": 0,
+      "errors": 0
+    },
+    "lifetimeFocusedTests": {
+      "name": "lifetime-focused-tests",
+      "arguments": [
+        "/home/kevin/.dotnet/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--no-build",
+        "--filter-class",
+        "SkillView.Tests.Ui.PackageCheckScreenTests",
+        "--filter-class",
+        "SkillView.Tests.Ui.ModalOperationTrackerTests"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/skillview-package-check-evidence/local/lifetime-focused-tests.log",
+      "sha256": "4cbb2140bf90cbe66eb386dabcbf644fa3f58e62d03617d58a449ed51c34cbee",
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "independentReviews": {
+    "checker": {
+      "result": "clear after used-definition scope and HTML/container/frontmatter framing corrections",
+      "reviewer": "CLI/UI implementer; own CLI/UI changes excluded",
+      "path": "/tmp/skillview-package-check-review/core-source-review.json",
+      "sha256": "d048fc3f2f31da11d0aec7c4b8e9a68e09cb7a8b4d52425697a097b94592b67b",
+      "files": {
+        "src/SkillView.Core/PackageChecking/MarkdownPackageReferences.cs": "14ee2961ac86074a8a74725b88fb1c61100098491d045a4df774319217093f02",
+        "src/SkillView.Core/PackageChecking/PackageCheckReport.cs": "c640397d98508673ae9fcc246ea3c7cf1030402b5de41f5c35285c0a2e322491",
+        "src/SkillView.Core/PackageChecking/StaticPackageChecker.cs": "72597ea0add8de5c26542e1cd97128b70c7d4b6d1f9d3b8cb1262dda7662031b",
+        "tests/SkillView.Tests/PackageChecking/MarkdownPackageReferencesTests.cs": "409ddf29774bedecfae1912b58cd8083859003ec1ff81464a847fc9c0751b92d",
+        "tests/SkillView.Tests/PackageChecking/StaticPackageCheckerTests.cs": "6ca7a267214b27e3f3f8d6081dfcb8272af803adea704a47989709c3e4c3f179"
+      }
+    },
+    "cliUiProofAndCi": {
+      "result": "clear",
+      "reviewer": "checker implementer; own PackageChecking changes excluded",
+      "path": "/tmp/skillview-package-check-review/peer-delta-review.json",
+      "sha256": "51b401f9cab287f44d2f3fbd717cc629ef916b8d6575cd2290998ffd840b5677",
+      "record": {
+        "result": "clear after exact root-proof assertion and credential-removal corrections",
+        "scope": "Independent CLI/UI/docs/runtime-proof/CI delta review; own PackageChecking implementation excluded",
+        "productProofExecutedByReviewer": false,
+        "files": [
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "b6d4fd1cea9f5b450d0f3f802870fc49ad0b0d98b464fcc3f4079099ea3d2d49"
+          },
+          {
+            "path": "agent_docs/evidence/prove-static-package-check.py",
+            "sha256": "b895357fe361a374330086183ab1c8ef431cdde2c394227559728872eaf1be4f"
+          },
+          {
+            "path": "agent_docs/maintenance-static-package-check.md",
+            "sha256": "d8f08314791ad297a0a3bfe6a215de8e22876e999abd73ef101e07e2ae98f3cc"
+          },
+          {
+            "path": "docs/usage.md",
+            "sha256": "084bb5538cc4d9835fd3b00d3e90e34637a555ce810d2fadccb6934db73ce3fe"
+          },
+          {
+            "path": "src/SkillView.Core/Cli/CliDispatcher.cs",
+            "sha256": "222d42471bb4076e26ddaab0e7d8bf2910d5f9df184e8ed1d093f1e8c5fd6e66"
+          },
+          {
+            "path": "src/SkillView.Core/Cli/CliDispatcher.Check.cs",
+            "sha256": "2ae3e927314ca9232e7a469973abb4ad34545aff5a931e760b980e8acdeb2b25"
+          },
+          {
+            "path": "src/SkillView.Core/Ui/InstalledScreen.cs",
+            "sha256": "a5c5c6f2a734d95dc2e0ca918db4a6467ecbf9568b374d42320d81ea7469578a"
+          },
+          {
+            "path": "src/SkillView.Core/Ui/SkillViewApp.cs",
+            "sha256": "554c8f8226fa5b539343a875c77cb364328f3e54b16a01511f492a91e010262f"
+          },
+          {
+            "path": "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs",
+            "sha256": "63d2a3e0d1a1e1b02cf0faab2121b7f1365d92b79b29ee84ad33ccea0ee7616d"
+          },
+          {
+            "path": "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs",
+            "sha256": "347d41ff145dd786df24855d2c22256bb669fa9d879a660c08aa48ac9f68d531"
+          },
+          {
+            "path": "src/SkillView.Core/Ui/PackageCheckScreen.cs",
+            "sha256": "a7170c42124ce2e2592f870d1cce976305cffbbb56587a196ed87e2f752c6b38"
+          },
+          {
+            "path": "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs",
+            "sha256": "ffbad6bf849c6a6ad07fcef4fada821b4c55450f638e45174c38558e31302220"
+          },
+          {
+            "path": "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs",
+            "sha256": "0c4e68e3c6859ca9e427a013acc6d9a6e58b47e9ee9b57d9eae9bfe048011c49"
+          }
+        ]
+      },
+      "scopeQualification": "Historical 13-file review before final test-only formatting; the finalTwoTestFormattingDelta receipt below binds both resulting test files. Other reviewed files retain their reviewed hashes."
+    },
+    "agentsDocumentation": {
+      "path": "/tmp/skillview-package-check-review/agents-delta-review.json",
+      "sha256": "aef920d2f051bb99a7f78076ec967a49ae6472655b5422c3080c63c93189108f",
+      "record": {
+        "result": "clear",
+        "scope": "Only the three added durable held-stream/hash and failed-capture observation rules",
+        "file": "AGENTS.md",
+        "fileSha256": "0e12d8fe2281b04d74cc2753c563314f5619ea54426b93595ab105e1fb2d83b0",
+        "diffSha256": "70d98fa734759d5175593d7be3ceced8f523e80ab24b46bbb9bd59750a5f86d6"
+      },
+      "scopeAfterModalFix": "Earlier static-checker rule review remains scoped to its original bytes; current AGENTS adds only the separately reviewed modal ownership rule. Current whole-file hash is in sourceSnapshot."
+    },
+    "finalTwoTestFormattingDelta": {
+      "path": "/tmp/skillview-package-check-review/final-two-tests-review.json",
+      "sha256": "32143b7e7ab5a1ecfda29b3feeaf69aee3ddeb26ee5ec9956c6a87ac4295e9c7",
+      "record": {
+        "result": "clear",
+        "scope": "Only current final CLI/UI test files after formatter and explicit System.Threading.Timeout qualification; selectors, partial-coverage exits, focus/keyboard routing, queued cancellation and worker draining assertions retained",
+        "files": [
+          {
+            "path": "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs",
+            "sha256": "8821364eb38c717ea4fad5120631e162c927f423e38a68f659821a2c16415120"
+          },
+          {
+            "path": "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs",
+            "sha256": "9d43f49047fb70028cba0726a2c0e6a785964df257d4d2de61b8e229613a0b96"
+          }
+        ],
+        "buildOrTestsRunByReviewer": false
+      }
+    },
+    "sharedModalOwnership": {
+      "path": "/tmp/skillview-local-reimport-review/modal-publication-independent-review.json",
+      "sha256": "ae91391fc9077908b84a8cf1395231bd597163093974dc2f26d51dd72ee0e1a2",
+      "scope": "Exact two copied production/test files match independently reviewed hashes. Nine production worker boundaries audited. Only reviewed four-line modal rule composed into existing static-checker AGENTS changes; no local-reimport UI/core copied.",
+      "files": {
+        "src/SkillView.Core/Ui/ModalOperationTracker.cs": "e5df98efd5dcb6c373a43413e9cf94b0b13a1a0910dcca21e49ac8141a44db8a",
+        "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs": "709b6e2d952652e9ad1e5487cee8c001c2b1d42f071b5a28ce999ed696d50a45"
+      },
+      "copyReceipt": {
+        "path": "/tmp/skillview-package-check-evidence/local/modal-publication-supplement.json",
+        "sha256": "06a280619f42237a276eac2d34e62972bf283ffe0b78d3e831f89a6b9e92d24e"
+      }
+    },
+    "parentLifetime": {
+      "path": "/tmp/skillview-package-check-review/dialog-lifetime-independent-review.json",
+      "sha256": "caef4301135c809ab3d28e42277f62b2b4f4ebdecb628289e335909bc1041c42",
+      "result": "clear",
+      "scope": "Supersedes earlier PackageCheckScreen and its test source hashes only; original checker/CLI/proof reviews otherwise retain their scope. New queued success/failure/canceled no-late-state automatic-close and already-canceled no-start regressions."
+    }
+  },
+  "pending": {
+    "actualProductHostProof": "CI only; the new runtime proof script has not been executed locally against App or gh-extension hosts.",
+    "nativeAot": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "fullSuite": "Final local scoped Tests2025 and Integration9 pass on current21-file source. Earlier2022+9 and166 runs remain attributed to historical snapshots; cross-platform CI pending.",
+    "commitAndPublication": "Deferred until Batch16 merges and this isolated change completes review.",
+    "acceptance": "M19 remains partial and incomplete; source authenticity, agent compatibility, behavioral evaluation and the original audit remain open.",
+    "runtimeProofScriptPreparation": "Root observed AST parse and --help exit 0; no retained raw log. This is not actual App/gh-extension execution."
+  },
+  "earlierFocusedSourceSnapshot": {
+    "path": "/tmp/skillview-package-check-evidence/local/source-hashes.json",
+    "sha256": "75564359f2ba44f39bb0d0be3f07fa5d80ecff89693e0cf5c2bc379fa6b0aaeb",
+    "files": {
+      ".github/workflows/ci.yml": "b6d4fd1cea9f5b450d0f3f802870fc49ad0b0d98b464fcc3f4079099ea3d2d49",
+      "agent_docs/evidence/prove-static-package-check.py": "b895357fe361a374330086183ab1c8ef431cdde2c394227559728872eaf1be4f",
+      "agent_docs/maintenance-static-package-check.md": "d8f08314791ad297a0a3bfe6a215de8e22876e999abd73ef101e07e2ae98f3cc",
+      "docs/usage.md": "084bb5538cc4d9835fd3b00d3e90e34637a555ce810d2fadccb6934db73ce3fe",
+      "src/SkillView.Core/Cli/CliDispatcher.Check.cs": "2ae3e927314ca9232e7a469973abb4ad34545aff5a931e760b980e8acdeb2b25",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "222d42471bb4076e26ddaab0e7d8bf2910d5f9df184e8ed1d093f1e8c5fd6e66",
+      "src/SkillView.Core/PackageChecking/MarkdownPackageReferences.cs": "14ee2961ac86074a8a74725b88fb1c61100098491d045a4df774319217093f02",
+      "src/SkillView.Core/PackageChecking/PackageCheckReport.cs": "c640397d98508673ae9fcc246ea3c7cf1030402b5de41f5c35285c0a2e322491",
+      "src/SkillView.Core/PackageChecking/StaticPackageChecker.cs": "72597ea0add8de5c26542e1cd97128b70c7d4b6d1f9d3b8cb1262dda7662031b",
+      "src/SkillView.Core/Ui/InstalledScreen.cs": "a5c5c6f2a734d95dc2e0ca918db4a6467ecbf9568b374d42320d81ea7469578a",
+      "src/SkillView.Core/Ui/PackageCheckScreen.cs": "a7170c42124ce2e2592f870d1cce976305cffbbb56587a196ed87e2f752c6b38",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "554c8f8226fa5b539343a875c77cb364328f3e54b16a01511f492a91e010262f",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "63d2a3e0d1a1e1b02cf0faab2121b7f1365d92b79b29ee84ad33ccea0ee7616d",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "347d41ff145dd786df24855d2c22256bb669fa9d879a660c08aa48ac9f68d531",
+      "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs": "8821364eb38c717ea4fad5120631e162c927f423e38a68f659821a2c16415120",
+      "tests/SkillView.Tests/PackageChecking/MarkdownPackageReferencesTests.cs": "409ddf29774bedecfae1912b58cd8083859003ec1ff81464a847fc9c0751b92d",
+      "tests/SkillView.Tests/PackageChecking/StaticPackageCheckerTests.cs": "6ca7a267214b27e3f3f8d6081dfcb8272af803adea704a47989709c3e4c3f179",
+      "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs": "9d43f49047fb70028cba0726a2c0e6a785964df257d4d2de61b8e229613a0b96"
+    },
+    "scope": "18 implementation, test, guide, usage, runtime-proof and CI files frozen before final logged verification; checkpoint/ledger and later AGENTS documentation are recorded separately."
+  },
+  "earlierModalSourceSnapshot": {
+    "path": "/tmp/skillview-package-check-evidence/local/source-hashes-after-modal-fix.json",
+    "sha256": "03fe6f94c36f2b258743d12445c894a86045988a579f60a9ed3096e5037142de",
+    "files": {
+      ".github/workflows/ci.yml": "b6d4fd1cea9f5b450d0f3f802870fc49ad0b0d98b464fcc3f4079099ea3d2d49",
+      "AGENTS.md": "4f7808bf3504496576151d1034eee5d8a97b18e3314bfbe1190e46574fe9f93f",
+      "agent_docs/evidence/prove-static-package-check.py": "b895357fe361a374330086183ab1c8ef431cdde2c394227559728872eaf1be4f",
+      "agent_docs/maintenance-static-package-check.md": "d8f08314791ad297a0a3bfe6a215de8e22876e999abd73ef101e07e2ae98f3cc",
+      "docs/usage.md": "084bb5538cc4d9835fd3b00d3e90e34637a555ce810d2fadccb6934db73ce3fe",
+      "src/SkillView.Core/Cli/CliDispatcher.Check.cs": "2ae3e927314ca9232e7a469973abb4ad34545aff5a931e760b980e8acdeb2b25",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "222d42471bb4076e26ddaab0e7d8bf2910d5f9df184e8ed1d093f1e8c5fd6e66",
+      "src/SkillView.Core/PackageChecking/MarkdownPackageReferences.cs": "14ee2961ac86074a8a74725b88fb1c61100098491d045a4df774319217093f02",
+      "src/SkillView.Core/PackageChecking/PackageCheckReport.cs": "c640397d98508673ae9fcc246ea3c7cf1030402b5de41f5c35285c0a2e322491",
+      "src/SkillView.Core/PackageChecking/StaticPackageChecker.cs": "72597ea0add8de5c26542e1cd97128b70c7d4b6d1f9d3b8cb1262dda7662031b",
+      "src/SkillView.Core/Ui/InstalledScreen.cs": "a5c5c6f2a734d95dc2e0ca918db4a6467ecbf9568b374d42320d81ea7469578a",
+      "src/SkillView.Core/Ui/ModalOperationTracker.cs": "e5df98efd5dcb6c373a43413e9cf94b0b13a1a0910dcca21e49ac8141a44db8a",
+      "src/SkillView.Core/Ui/PackageCheckScreen.cs": "a7170c42124ce2e2592f870d1cce976305cffbbb56587a196ed87e2f752c6b38",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "554c8f8226fa5b539343a875c77cb364328f3e54b16a01511f492a91e010262f",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "63d2a3e0d1a1e1b02cf0faab2121b7f1365d92b79b29ee84ad33ccea0ee7616d",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "347d41ff145dd786df24855d2c22256bb669fa9d879a660c08aa48ac9f68d531",
+      "tests/SkillView.Tests/Cli/PackageCheckCliTests.cs": "8821364eb38c717ea4fad5120631e162c927f423e38a68f659821a2c16415120",
+      "tests/SkillView.Tests/PackageChecking/MarkdownPackageReferencesTests.cs": "409ddf29774bedecfae1912b58cd8083859003ec1ff81464a847fc9c0751b92d",
+      "tests/SkillView.Tests/PackageChecking/StaticPackageCheckerTests.cs": "6ca7a267214b27e3f3f8d6081dfcb8272af803adea704a47989709c3e4c3f179",
+      "tests/SkillView.Tests/Ui/ModalOperationTrackerTests.cs": "709b6e2d952652e9ad1e5487cee8c001c2b1d42f071b5a28ce999ed696d50a45",
+      "tests/SkillView.Tests/Ui/PackageCheckScreenTests.cs": "9d43f49047fb70028cba0726a2c0e6a785964df257d4d2de61b8e229613a0b96"
+    },
+    "scope": "21 files: original18 implementation/test/guide/proof/workflow files unchanged, shared modal production/test fix, and combined AGENTS rules. Checkpoint and ledger are reviewed separately."
+  }
+}

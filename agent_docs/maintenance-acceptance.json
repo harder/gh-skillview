@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "0dba59be59776e6e654123aa1ce1e5496074763e",
+  "verifiedMainCommit": "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -106,8 +106,8 @@
       "title": "Protect local changes before update or force repair",
       "priority": "P0",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Local changes remain protected by routine updates; raw backups and quarantine/undo remain available. Saved recorded restore and newer-revision replacement support preserve-installed and schema 3 reviewed merges for ownerless and supported shared-gh installations. Merged payloads retain approved source C as the future baseline and record customized M as separate result evidence. Supported native metadata publication is verified across Linux x64, macOS ARM64, Windows x64 and Windows ARM64; unsupported or incomplete evidence refuses publication. External cleanup suppression remains outside installed payloads for verified physical installations.",
-      "remaining": "Durable fork/source switch/local import; standalone unpin with required detach; other native manager owner transitions; remaining suppression kinds; damaged/stale preference recovery; complete original acceptance audit",
+      "implementedEvidenceSummary": "Local changes remain protected by routine updates; raw backups and quarantine/undo remain available. Saved recorded restore and newer-revision replacement support preserve-installed and schema 3 reviewed merges for ownerless and supported shared-gh installations. Merged payloads retain approved source C as the future baseline and record customized M as separate result evidence. Supported native metadata publication is verified across Linux x64, macOS ARM64, Windows x64 and Windows ARM64; unsupported or incomplete evidence refuses publication. External cleanup suppression remains outside installed payloads for verified physical installations. Merged schema 4 standalone unpin is source-free and preserves installed bytes plus exact retained native originals for ownerless and supported shared-gh installations, with explicit review of every physical consumer.",
+      "remaining": "Durable fork/source switch/local import; required selected-consumer detach; other native manager owner transitions; remaining suppression kinds; damaged/stale preference recovery; complete original acceptance audit",
       "acceptance": "Changed tracked file, extra file, deletion, pin, shared symlink target and unchanged upstream tree SHA are all covered. No overwrite without an explicit disposition of local changes. Verified rollback restores extras and exclusions. Preserve the observed doc/runtime disagreement in compatibility tests.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -215,7 +215,7 @@
       "title": "Separate latest, pinned, approved and intentionally customized revisions",
       "priority": "P2",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Pin preservation and explicit unpin targeting",
+      "implementedEvidenceSummary": "Pin preservation and merged saved source-free physical-install unpin with exact owner-byte transitions and retained-native-object undo; all affected shared consumers are reviewed",
       "remaining": "Desired-state policies, immutable approvals and reproducible profiles",
       "acceptance": "Routine maintenance leaves pins and forks alone. Unpin is an explicit change for selected installs. Reprovisioning produces the same approved payloads and exposure topology. A branch-only file change can count even when an authored version string is unchanged.",
       "evidenceLedger": "maintenance-implementation.md",

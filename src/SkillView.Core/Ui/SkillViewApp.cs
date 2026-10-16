@@ -476,7 +476,8 @@ public sealed class SkillViewApp
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
                 CancellationCallbackReporter.For(_services.Logger, "installed tab"),
-            onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill))
+            onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill),
+            onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()))
         {
             X = 0,
             Y = 2,
