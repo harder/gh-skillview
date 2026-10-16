@@ -353,7 +353,7 @@ internal sealed partial class UnixSecureRemovalBackend
             // forbids linking. No retained name can redirect a later probe.
             var how = new OpenHow
             {
-                Flags = 0x410000 | 0x80 | 0x80000 | 2,
+                Flags = (ulong)(LinuxOpenFlags.TemporaryFile | LinuxOpenFlags.Exclusive | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.ReadWrite),
                 Mode = 0x180,
                 Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
             };
@@ -373,7 +373,7 @@ internal sealed partial class UnixSecureRemovalBackend
             ValidateLocation(token);
             if (payloadName) NativePayloadDirectory.CheckName(name); else NativeStateDirectory.CheckName(name);
             var flags = OperatingSystem.IsMacOS() ? (create ? 2 | 0x200 | (writerLock ? 0 : 0x800) : 0) | 0x100 | 0x1000000 | 4
-                : (create ? 2 | 0x40 | (writerLock ? 0 : 0x80) : 0) | 0x20000 | 0x80000 | 0x800;
+                : (create ? LinuxOpenFlags.ReadWrite | LinuxOpenFlags.Create | (writerLock ? 0 : LinuxOpenFlags.Exclusive) : 0) | LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking;
             token.ThrowIfCancellationRequested();
             int descriptor;
             if (OperatingSystem.IsLinux())

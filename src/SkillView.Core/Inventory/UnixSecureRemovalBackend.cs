@@ -50,7 +50,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         using var buffer = new StatBuffer();
         var flags = OperatingSystem.IsMacOS()
             ? 0x00000100 | 0x01000000 | 0x00000004
-            : 0x00020000 | 0x00080000 | 0x00000800;
+            : LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking;
         var descriptor = OpenWithRetry(path, flags);
         if (descriptor < 0) throw new IOException(LastError("open payload file failed"));
         using var native = new SafeUnixHandle(descriptor);
@@ -231,7 +231,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         var flags = OperatingSystem.IsMacOS()
             ? 0x00000100 | 0x01000000 | 0x00000004
-            : 0x00020000 | 0x00080000 | 0x00000800;
+            : LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking;
         int descriptor;
         if (OperatingSystem.IsLinux())
         {
@@ -1899,11 +1899,11 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         internal static int DirectoryOpenFlags => OperatingSystem.IsMacOS()
             ? 0x00100000 | 0x00000100 | 0x01000000
-            : 0x00010000 | 0x00020000 | 0x00080000;
+            : LinuxOpenFlags.Directory | LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec;
 
         internal static int DirectoryFollowOpenFlags => OperatingSystem.IsMacOS()
             ? 0x00100000 | 0x01000000
-            : 0x00010000 | 0x00080000;
+            : LinuxOpenFlags.Directory | LinuxOpenFlags.CloseOnExec;
 
         internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
         internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;

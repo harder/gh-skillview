@@ -167,6 +167,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   ownership through queued UI completion, and require fresh retention approval
   after building M. Keep printable update shortcuts out of the local editor's
   file input, and bound rendered refusal summaries while retaining full evidence.
+  Interactive child containers need `CanFocus=true`; prove actual focus and
+  main-shell shortcut routing, not only direct key delivery to a text field.
   Use `SingleRowButton` for actions assigned individual footer rows. In pinned
   Terminal.Gui 2.5, `ShadowStyles.None` can retain margin space from a default
   shadow; suppress construction via `InitializingShadowStyle` with null instead.
@@ -399,7 +401,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   the current process architecture: little-endian x64 reads `st_mode` at byte
   24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
   unverified architectures or endianness disable secure removal rather than
-  guessing. The unsuffixed macOS libc symbols expose the verified 64-bit-inode
+  guessing. Linux open flags also differ by architecture: use `LinuxOpenFlags`
+  for directory/no-follow/temporary-file opens. On ARM64, x64's directory bit
+  requests direct I/O instead. Recheck with `agent_docs/evidence/probe-linux-abi.c`
+  when adding an ABI; do not infer open flags from the `stat` layout.
+  The unsuffixed macOS libc symbols expose the verified 64-bit-inode
   ABI only to native ARM64 processes; fail closed on Intel/Rosetta rather than
   parsing the ARM64 layout. Unix captured identity includes change-time seconds/nanoseconds as
   well as device/inode for selected directories, parents, links, and observed

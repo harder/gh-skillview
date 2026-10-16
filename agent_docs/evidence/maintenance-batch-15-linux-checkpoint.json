@@ -1,0 +1,90 @@
+{
+  "kind": "interim-development-checkpoint",
+  "scope": "Immutable e4b021c snapshot plus exact listed Linux ABI/proof changes; concurrent Windows changes excluded.",
+  "readyToMerge": false,
+  "originalAcceptanceComplete": 9,
+  "originalAcceptanceTotal": 21,
+  "independentReview": "Linux open flag fix reviewed; no confirmed findings.",
+  "verification": {
+    "baseCommit": "e4b021c6b18cfe5b654e0df758356406e97e40c2",
+    "copiedFileSha256": {
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/src/SkillView.Core/Inventory/LinuxOpenFlags.cs": "3887516e8e581aef32c6f099e8726af7e81196b5e772943940b8be1728b12069",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/src/SkillView.Core/Inventory/UnixSecureRemovalBackend.cs": "c672ceaa9db9989bd2ac80bbf2475f42babcec5a09a34fdca551b8b17a731123",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/src/SkillView.Core/Inventory/UnixRegistryFile.cs": "ffac7a8878fc74706c5f0496e013a94d1fedc50bbed8dbc7fe7ccaa0c71ea473",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/src/SkillView.Core/Inventory/UnixStateDirectory.cs": "0f06c3b853bd4b90933d039ee459d60061c42b7b96ee9f577acf3dbd45917fa0",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/src/SkillView.Core/Inventory/UnixPayloadMetadata.cs": "32854f3bee62be72db0e7be325204400c404730e7772d0769b66f21e6a65fc3a",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/agent_docs/evidence/prove-local-merge-update.py": "14d05f810a4d0b01555f505bb7bd4085f3ffb2cf7a9a9e789ed396028441c0aa",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/agent_docs/evidence/probe-linux-abi.c": "06311d86515a9e408025628ab9a56e5bc944366df294e5be4386f79b47fadae5",
+      "/tmp/skillview-maintenance/batch15-linux-e4b021c/tests/SkillView.Tests/Inventory/LinuxOpenFlagsTests.cs": "79c0b1f20e6ffc9b7c0b7b2d16a8f58f3f6315430d0775a7c1f83ee7879a5fc3"
+    },
+    "sdkImage": {
+      "name": "mcr.microsoft.com/dotnet/sdk:10.0.402",
+      "digest": "sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa",
+      "platform": "linux/arm64"
+    },
+    "ghAsset": {
+      "version": "2.102.0",
+      "file": "gh_2.102.0_linux_arm64.tar.gz",
+      "sha256": "7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484",
+      "publishedChecksumVerified": true
+    },
+    "isolatedAppBuild": {
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "dotnet-build-linux-patched.log"
+    },
+    "abiProbe": {
+      "file": "native-linux-abi.txt",
+      "architecture": "aarch64",
+      "flags": {
+        "O_DIRECTORY": "0x4000",
+        "O_NOFOLLOW": "0x8000",
+        "O_DIRECT": "0x10000",
+        "O_CLOEXEC": "0x80000",
+        "O_PATH": "0x200000",
+        "O_TMPFILE": "0x404000",
+        "O_NONBLOCK": "0x800",
+        "O_CREAT": "0x40",
+        "O_EXCL": "0x80",
+        "AT_FDCWD": "0xffffffffffffff9c",
+        "AT_SYMLINK_NOFOLLOW": "0x100",
+        "AT_REMOVEDIR": "0x200"
+      },
+      "stat": {
+        "size": 128,
+        "st_mode": 16,
+        "st_ino": 8,
+        "st_ctim": 104,
+        "st_ctim_tv_sec": 104,
+        "st_ctim_tv_nsec": 112
+      }
+    },
+    "noSysAdminProof": {
+      "file": "linux-no-cap-patched-proof.json",
+      "log": "linux-no-cap-patched-proof.log",
+      "exitCode": 0,
+      "ghVersion": "2.102.0",
+      "commandCount": 14,
+      "intendedRefusal": "CAP_SYS_ADMIN metadata namespace coverage",
+      "proofKind": "explicit-unsupported-metadata"
+    },
+    "sysAdminProof": {
+      "file": "linux-cap-patched-proof.json",
+      "log": "linux-cap-patched-proof.log",
+      "exitCode": 0,
+      "ghVersion": "2.102.0",
+      "commandCount": 26,
+      "allElevenFlagsPassed": true
+    },
+    "linuxOpenFlagsTests": {
+      "file": "linux-open-flags-tests.log",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "buildWarnings": 0,
+      "buildErrors": 0
+    }
+  }
+}

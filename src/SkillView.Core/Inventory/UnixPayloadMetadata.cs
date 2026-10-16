@@ -122,7 +122,7 @@ internal sealed partial class UnixSecureRemovalBackend
             if (item.Kind == "link")
             {
                 if (parent is null || item.NativeName is null) throw new IOException("A held link parent/name is required.");
-                var flags = OperatingSystem.IsMacOS() ? 0x00200000 | 0x01000000 : 0x00200000 | 0x00020000 | 0x00080000;
+                var flags = OperatingSystem.IsMacOS() ? 0x00200000 | 0x01000000 : LinuxOpenFlags.Path | LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec;
                 ownedLink = CreateHandle(OpenAtWithRetry(parent.FileDescriptor, item.NativeName, flags), "open metadata link without following target");
                 handle = ownedLink;
             }

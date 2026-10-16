@@ -13,6 +13,7 @@ parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--gh', action='append', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
 parser.add_argument('--resolved', action='store_true', help='Use a captured custom SKILL.md resolution and delete its input before apply.')
+parser.add_argument('--expect-metadata-refusal', metavar='REASON', help='Require this exact reason in every metadata refusal, and prove publication is refused without live changes.')
 args = parser.parse_args()
 app = args.app.resolve()
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
@@ -105,6 +106,26 @@ for gh_path in args.gh:
             chosen = reused
         else:
             chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md')
+        if args.expect_metadata_refusal:
+            assert not chosen['canMaterialize'] and chosen['metadataRefusals'], chosen
+            assert all(args.expect_metadata_refusal in issue for issue in chosen['metadataRefusals']), chosen
+            assert not chosen['review']['topologyConflicts'] and all(row['selection'] for row in chosen['review']['paths']), chosen
+            refused = run('update-merge-plan', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], ok=False)
+            assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], refused
+            assert 'native metadata cannot be preserved' in refused['error'].lower(), refused
+            assert args.expect_metadata_refusal in refused['error'], refused
+            assert manifest(payload) == before and payload.stat().st_ino == original_id
+            assert registry.read_bytes() == original_registry
+            assert source_path.stat().st_ino == source_id and manifest(source_path) == source_bytes
+            assert not Path(source_plan['retainedPath']).exists() and not Path(source_plan['displacedPath']).exists()
+            assert not list(Path(source_plan['planPath']).parent.glob('merged-*'))
+            results.append(dict(host=str(app), gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
+                                sourceRevision=source_plan['revision']['source'], commands=commands,
+                                proofKind='explicit-unsupported-metadata', metadataRefusals=chosen['metadataRefusals'],
+                                preserveVerified=True, priorApprovalRefused=True, nativePublicationRefused=True,
+                                originalNativePayloadUnchanged=True, registryBytesUnchanged=True, sourceCandidateUnchanged=True,
+                                **(dict(capturedResolutionSurvivesInputDeletion=True) if args.resolved else {})))
+            continue
         assert chosen['canMaterialize'], chosen
         repeat = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'])
         assert repeat['reviewFingerprint'] == chosen['reviewFingerprint']
