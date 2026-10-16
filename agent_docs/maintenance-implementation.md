@@ -1181,3 +1181,20 @@ Frozen schema 1–3 compatibility uses records from baseline `0dba59be` with gh
 Acceptance remains 9/21 and M08 incomplete. Details, raw log hashes,
 artifact digests and exact local source manifest are in
 `evidence/maintenance-batch-16-ci-fixes.json`.
+
+### Batch 16: frozen legacy fixture follow-up
+
+At exact head `5ad2c4eb65b552fa5aaf9c44e66036c59589ec13`, all three full platform
+suites pass 1,987/1,987 and both Windows metadata lanes pass 207/207; CodeQL and
+both gh contract lanes also pass. The Linux native lane reached four standalone-
+unpin `CAP_SYS_ADMIN` refusal rows (App/extension × gh 2.97.0/2.102.0), then
+failed its schema1 restore-plan fixture because the fixture injected noncanonical
+lockfile fields before the historical guard. The workflow was canceled for that
+fixture issue; the four native artifacts are partial and do not establish a full
+RID matrix, privileged Linux success, or schema 1–3 compatibility. The helper fix
+keeps schema1 canonical and moves extension injection to later schemas; three
+focused helper tests, AST parsing and help checks pass locally, but fresh native CI
+remains pending. The earlier 1,959-test full-suite count remains pre-final-source evidence.
+Original acceptance remains 9/21 and M08 incomplete. See
+`evidence/maintenance-batch-16-legacy-fixture-fix.json` for run IDs, artifact
+SHA256 digests, partial proof scope and the local helper receipt.

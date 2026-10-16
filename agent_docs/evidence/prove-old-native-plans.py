@@ -37,6 +37,19 @@ def manifest(directory):
     return result
 
 
+def extend_registry_fixture(registry, expected_before, schema1_verified):
+    """Only preserving owner plans may use extensions; legacy schema 1 refuses them."""
+    assert schema1_verified, 'Complete schema-1 recovery/undo verification before adding owner extensions'
+    assert registry.read_bytes() == expected_before, 'Registry changed before fixture transition'
+    owner = json.loads(expected_before)
+    owner['extension'] = {'preserve': True}
+    owner['skills']['gh-skill']['selectedExtension'] = {'preserve': True}
+    owner['skills']['unrelated'] = {'source': 'other/repo', 'sourceType': 'github', 'extension': [1, 2]}
+    desired = (json.dumps(owner, indent=2) + '\n').encode()
+    registry.write_bytes(desired)
+    return desired
+
+
 def prepare_windows_fixture_owner(path):
     # Same supported disposable-owner setup as the existing native merge proof.
     if os.name != 'nt':
@@ -174,11 +187,6 @@ def main():
         exposure.parent.mkdir(parents=True)
         exposure.symlink_to(payload, target_is_directory=True)
         registry = home / '.agents' / '.skill-lock.json'
-        owner = json.loads(registry.read_bytes())
-        owner['extension'] = {'preserve': True}
-        owner['skills']['gh-skill']['selectedExtension'] = {'preserve': True}
-        owner['skills']['unrelated'] = {'source': 'other/repo', 'sourceType': 'github', 'extension': [1, 2]}
-        registry.write_bytes((json.dumps(owner, indent=2) + '\n').encode())
         payload.joinpath('SKILL.md').write_bytes(payload.joinpath('SKILL.md').read_bytes() + b'\nLocal compatibility instructions\n')
         payload.joinpath('user-extra').write_bytes(b'\x00\xffOriginal extra')
         payload.joinpath('empty-user-directory').mkdir()
@@ -201,7 +209,14 @@ def main():
             assert exposure.is_symlink() and exposure.resolve() == payload
             assert (exposure.lstat().st_dev, exposure.lstat().st_ino, os.readlink(exposure)) == exposure_before
 
+        schema1_verified = False
         for schema in (1, 2, 3):
+            if schema == 2:
+                # The frozen schema-1 owner guard intentionally rejects unknown
+                # fields. Preserve native gh bytes for that entire lifecycle,
+                # then exercise extension preservation with schemas 2 and 3.
+                unchanged()
+                registry_bytes = extend_registry_fixture(registry, registry_bytes, schema1_verified)
             for boundary in (args.kill_boundary,):
                 family = 'restore' if schema == 1 else 'update'
                 if schema == 1:
@@ -256,12 +271,15 @@ def main():
                 assert Path(saved['planPath']).read_bytes() == frozen
                 if schema == 3:
                     assert source_path.read_bytes() == frozen_source
+                if schema == 1:
+                    schema1_verified = True
                 rows.append(dict(schema=schema, proofKind='old-native-plan-restart', boundary=boundary,
                                  oldNativePlanCreated=True, currentNativePlanInspected=True, actualCurrentProcessKilled=True,
                                  forwardRecoveryVerified=True, exactOriginalNativeObjectsAndBytesRestored=True,
                                  exactOriginalRegistryBytesRestored=True, exposureNativeLinkRestored=True,
                                  unrelatedSameNameUnchanged=True, planBytesAndFingerprintUnchanged=True,
-                                 pinPolicyAbsent=True, savedPlanSha256=hashlib.sha256(frozen).hexdigest()))
+                                 pinPolicyAbsent=True, registryExtensionsIncluded=schema >= 2,
+                                 savedPlanSha256=hashlib.sha256(frozen).hexdigest()))
     successful = [(row['schema'], row['boundary']) for row in rows if row['proofKind'] == 'old-native-plan-restart']
     expected = [(schema, boundary) for schema in (1, 2, 3) if schema != 3 or not args.expect_schema3_metadata_refusal
                 for boundary in (args.kill_boundary,)]
