@@ -713,6 +713,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 - `agent_docs/native-payload-metadata.md` — native merge metadata contracts,
   Windows thread-token and backup-stream framing rules, and required native proofs.
+- `agent_docs/evidence/disk-full-proof.md` — real ENOSPC recovery proofs; filling
+  is permitted only inside the marked, natively verified bounded Linux tmpfs.
 
 - Ordinary Cleanup Ignore and CLI `ignore` write only the private sibling
   `SkillView/preferences` store; never write or silently remove legacy

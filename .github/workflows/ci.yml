@@ -277,6 +277,16 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
+      - name: Prove reviewed shared-owner merges and restart repair
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
+          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
       - name: Prove reviewed local dispositions and frozen resolutions
         shell: bash
         env:
@@ -306,11 +316,25 @@ jobs:
               --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
               --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
           done
+      - name: Prove real disk-full recovery on isolated bounded tmpfs
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          python3 agent_docs/evidence/run-local-merge-disk-full-docker.py \
+            --app dist/app/skillview \
+            --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
+            --gh "$proof_gh_path" --output dist/disk-full-proof --platform linux/amd64
       - name: Retain native verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-maintenance-evidence-${{ matrix.rid }}
-          path: dist/*-proof.json
+          path: |
+            dist/*-proof.json
+            dist/disk-full-proof/**
           if-no-files-found: warn
           retention-days: 14

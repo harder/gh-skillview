@@ -16,11 +16,17 @@ parser.add_argument('--gh', action='append', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
 parser.add_argument('--resolved', action='store_true', help='Use a captured custom SKILL.md resolution and delete its input before apply.')
 parser.add_argument('--expect-metadata-refusal', metavar='REASON', help='Require this exact reason in every metadata refusal, and prove publication is refused without live changes.')
-parser.add_argument('--proof-host', type=Path, help='Disposable process-death host; required with --kill-boundary.')
-parser.add_argument('--kill-boundary', choices=('retain-moved', 'install-moved', 'displace-moved', 'restore-moved'))
+parser.add_argument('--proof-host', type=Path, help='Disposable proof host; required with a kill or disk-full boundary.')
+fault = parser.add_mutually_exclusive_group()
+fault.add_argument('--kill-boundary', choices=('retain-moved', 'install-moved', 'displace-moved', 'restore-moved'))
+fault.add_argument('--disk-full-boundary', choices=('retain-moved', 'install-moved', 'displace-moved', 'restore-moved'),
+                   help='Real ENOSPC; requires a Linux tmpfs of at most 128 MiB under TMPDIR.')
 args = parser.parse_args()
-if bool(args.proof_host) != bool(args.kill_boundary) or args.kill_boundary and args.expect_metadata_refusal:
-    parser.error('Use --proof-host and --kill-boundary together, without --expect-metadata-refusal.')
+boundary = args.kill_boundary or args.disk_full_boundary
+if bool(args.proof_host) != bool(boundary) or boundary and args.expect_metadata_refusal:
+    parser.error('Use --proof-host and one fault boundary together, without --expect-metadata-refusal.')
+if args.disk_full_boundary and os.name != 'posix':
+    parser.error('Real disk-full proof requires Linux; the host additionally verifies bounded tmpfs authority.')
 app = args.app.resolve()
 proof_host = args.proof_host.resolve() if args.proof_host else None
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
@@ -41,6 +47,11 @@ def manifest(directory):
         rows.append((str(path.relative_to(directory)), kind, stat.S_IMODE(native.st_mode) if os.name != 'nt' else None,
                      hashlib.sha256(content).hexdigest(), attrs))
     return rows
+
+
+def native_objects(directory):
+    return [(str(path.relative_to(directory)), path.lstat().st_dev, path.lstat().st_ino)
+            for path in [directory, *sorted(directory.rglob('*'))]]
 
 
 def prepare_windows_fixture_owner(path):
@@ -102,6 +113,15 @@ for gh_path in args.gh:
                    APPDATA=str(root / 'appdata'), LOCALAPPDATA=str(root / 'localappdata'),
                    CLAUDE_CONFIG_DIR=str(home / '.claude'), PI_CODING_AGENT_DIR=str(home / '.pi' / 'agent'),
                    GH_TELEMETRY='false', GH_NO_UPDATE_NOTIFIER='1', GH_NO_EXTENSION_UPDATE_NOTIFIER='1')
+        if args.disk_full_boundary:
+            (root / 'state').mkdir()
+            (root / 'tmp').mkdir()
+            env.update(TMPDIR=str(root / 'tmp'), DOTNET_EnableDiagnostics='0')
+            # Read-only admission occurs before installing or staging anything.
+            admission = subprocess.run([str(proof_host), '--check-disk-full-root', str(root)],
+                                       env=env, cwd=root, capture_output=True, text=True, timeout=30)
+            assert admission.returncode == 0, (admission.stdout, admission.stderr)
+            assert not (root / 'disk-full-proof-filler').exists()
         skills = root / 'custom'
         installed = subprocess.run([str(gh), 'skill', 'install', '--dir', str(skills), '--pin=' + old_commit,
                                     '--', 'cli/cli', 'skills/gh-skill'], env=env, cwd=root, capture_output=True, text=True, timeout=120)
@@ -115,6 +135,7 @@ for gh_path in args.gh:
         windows_owner_prepared = prepare_windows_fixture_owner(payload)
         before = manifest(payload)
         original_id = payload.stat().st_ino
+        original_objects = native_objects(payload)
         registry = home / '.agents' / '.skill-lock.json'
         original_registry = registry.read_bytes()
         commands = []
@@ -162,6 +183,86 @@ for gh_path in args.gh:
                 assert not reader.is_alive(), 'Process-death output drain did not finish'
                 process.stdout.close()
             assert registry.read_bytes() == original_registry
+
+        def disk_full_at(saved, action, fingerprint):
+            filler = root / 'disk-full-proof-filler'
+            assert not filler.exists() and not filler.is_symlink()
+            # Save immutable resolution evidence too, including raw archive
+            # bytes and modes. The filler never enters this private subtree.
+            review_path = Path(source_plan['planPath']).parent / 'local-review'
+            frozen_review = manifest(review_path)
+            process = subprocess.Popen([str(proof_host), str(root), str(gh), saved['id'], fingerprint,
+                                        action, 'disk-full:' + args.disk_full_boundary], env=env, cwd=root,
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = bytearray()
+            truncated = threading.Event()
+
+            def consume():
+                while chunk := process.stdout.read(4096):
+                    room = 256 * 1024 - len(output)
+                    output.extend(chunk[:room])
+                    if len(chunk) > room:
+                        truncated.set()
+
+            reader = threading.Thread(target=consume, daemon=True)
+            reader.start()
+            try:
+                try:
+                    exit_code = process.wait(timeout=90)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=15)
+                    reader.join(timeout=5)
+                    assert not reader.is_alive(), 'Disk-full output drain did not finish'
+                    process.stdout.close()
+                text = output.decode('utf-8', errors='replace')
+                assert not truncated.is_set(), 'Disk-full host exceeded its bounded output budget'
+                identities = [json.loads(line.removeprefix('DISK_FULL_FILLER ')) for line in text.splitlines()
+                              if line.startswith('DISK_FULL_FILLER ')]
+                witnesses = [json.loads(line.removeprefix('DISK_FULL ')) for line in text.splitlines()
+                             if line.startswith('DISK_FULL ')]
+                assert len(identities) == len(witnesses) == 1, text
+                witness = witnesses[0]
+                assert witness['Name'] == filler.name and witness['Errno'] == 28 and witness['AvailableBytes'] == 0, witness
+                assert (witness['Device'], witness['Inode']) == (identities[0]['Device'], identities[0]['Inode']), witness
+                assert 0 < witness['FillerBytes'] <= witness['FilesystemBytes'] <= 128 * 1024 * 1024, witness
+                lines = text.splitlines()
+                witness_line = next(index for index, line in enumerate(lines) if line.startswith('DISK_FULL '))
+                failed = json.loads('\n'.join(lines[witness_line + 1:]))
+                assert exit_code == 2 and not failed['succeeded'] and not failed['canceled'], failed
+                assert failed['status'] == 'needs-recovery' and failed['mutationObserved'], failed
+                assert 'no space left on device' in failed['message'].lower(), failed
+                disk_full_evidence.append(dict(boundary=args.disk_full_boundary, nativeWitness=witness, failure=failed))
+            finally:
+                # Only remove the exact inode this host exclusively created,
+                # after its exit and output drain; never recursively clear space.
+                identities = [json.loads(line.removeprefix('DISK_FULL_FILLER '))
+                              for line in output.decode('utf-8', errors='replace').splitlines()
+                              if line.startswith('DISK_FULL_FILLER ')]
+                if len(identities) == 1:
+                    identity = identities[0]
+                    native = filler.lstat()
+                    assert identity['Name'] == filler.name and stat.S_ISREG(native.st_mode) and native.st_nlink == 1
+                    assert (native.st_dev, native.st_ino) == (identity['Device'], identity['Inode'])
+                    assert 0 <= native.st_size <= 128 * 1024 * 1024
+                    root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+                    try:
+                        held = os.stat(filler.name, dir_fd=root_fd, follow_symlinks=False)
+                        assert (held.st_dev, held.st_ino) == (native.st_dev, native.st_ino)
+                        os.unlink(filler.name, dir_fd=root_fd)
+                    finally:
+                        os.close(root_fd)
+            assert manifest(review_path) == frozen_review
+            assert registry.read_bytes() == original_registry
+            assert source_path.stat().st_ino == source_id and manifest(source_path) == source_bytes
+            original_location = payload if args.disk_full_boundary == 'restore-moved' else Path(saved['retainedPath'])
+            merged_location = (Path(saved['candidatePath']) if args.disk_full_boundary == 'retain-moved' else payload
+                               if args.disk_full_boundary == 'install-moved' else Path(saved['displacedPath']))
+            assert manifest(original_location) == before and native_objects(original_location) == original_objects
+            assert manifest(merged_location) == merged_bytes and native_objects(merged_location) == merged_objects
+
+        disk_full_evidence = []
 
         source_plan = run('update-plan', '--path', payload, '--unpin')['operation']
         source_payload_fingerprint = json.loads(Path(source_plan['planPath']).read_text())['candidate']['payload']
@@ -225,12 +326,13 @@ for gh_path in args.gh:
         assert manifest(payload) == before and registry.read_bytes() == original_registry
         merged_bytes = manifest(Path(merged['candidatePath']))
         merged_id = Path(merged['candidatePath']).stat().st_ino
+        merged_objects = native_objects(Path(merged['candidatePath']))
         refused = run('update-apply', '--id', merged['id'], '--yes', '--disposition', 'retain-original', '--expect', merged['planFingerprint'], ok=False)
         assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], (commands[-1], refused.get('error'))
         assert 'exact saved disposition: merge-reviewed' in refused['error'].lower(), refused
         assert manifest(payload) == before and registry.read_bytes() == original_registry
-        if args.kill_boundary in ('retain-moved', 'install-moved'):
-            kill_at(merged, 'apply-merged', merged['planFingerprint'])
+        if boundary in ('retain-moved', 'install-moved'):
+            (disk_full_at if args.disk_full_boundary else kill_at)(merged, 'apply-merged', merged['planFingerprint'])
             inspection = run('update-inspect', '--id', merged['id'])['operation']
             applied = run('update-recover', '--id', merged['id'], '--yes', '--expect', inspection['reviewFingerprint'])['operation']
         else:
@@ -250,12 +352,13 @@ for gh_path in args.gh:
         assert next_plan['revision']['recordedBase']['payload'] == source_payload_fingerprint
         assert 'SKILL.md' in next_plan['revision']['localChanges'] and 'keep-local-extra' in next_plan['revision']['localChanges']
         inspection = run('update-inspect', '--id', merged['id'])['operation']
-        if args.kill_boundary in ('displace-moved', 'restore-moved'):
-            kill_at(merged, 'undo', inspection['reviewFingerprint'])
+        if boundary in ('displace-moved', 'restore-moved'):
+            (disk_full_at if args.disk_full_boundary else kill_at)(merged, 'undo', inspection['reviewFingerprint'])
             inspection = run('update-inspect', '--id', merged['id'])['operation']
         undone = run('update-undo', '--id', merged['id'], '--yes', '--expect', inspection['reviewFingerprint'])['operation']
         assert undone['succeeded'] and undone['status'] == 'restored', undone
         assert manifest(payload) == before and payload.stat().st_ino == original_id
+        assert native_objects(payload) == original_objects
         assert manifest(Path(undone['displacedPath'])) == merged_bytes
         assert registry.read_bytes() == original_registry and manifest(source_path) == source_bytes
         results.append(dict(host=str(app), gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
@@ -266,6 +369,8 @@ for gh_path in args.gh:
                             exactOriginalNativeObjectRestored=True, registryBytesUnchanged=True,
                             windowsSupportedFixtureOwnerPrepared=windows_owner_prepared,
                             **(dict(processKilledAt=args.kill_boundary, restartRecoveryVerified=True) if args.kill_boundary else {}),
+                            **(dict(diskFull=disk_full_evidence, restartRecoveryVerified=True,
+                                    frozenReviewArchiveUnchanged=True) if args.disk_full_boundary else {}),
                             **(dict(capturedResolutionSurvivesInputDeletion=True) if args.resolved else {})))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(results, indent=2))
