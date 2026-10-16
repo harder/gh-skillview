@@ -242,4 +242,28 @@ public sealed class CleanupSuppressionStoreTests : IDisposable
         Assert.False(Directory.Exists(freshStore.Root));
     }
 
+    [Fact]
+    public void MissingStateHomeIsADiagnosticAndDoesNotSwallowCancellation()
+    {
+        var runner = new SkillView.Subprocess.ProcessRunner(new SkillView.Logging.Logger(),
+            environment: new Dictionary<string, string> { ["HOME"] = "", ["USERPROFILE"] = "" });
+        var read = CleanupSuppressionStore.ReadFor(runner, [], Token);
+        Assert.NotNull(read.Diagnostic); Assert.Empty(read.Records);
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => CleanupSuppressionStore.ReadFor(runner, [], cancellation.Token));
+    }
+
+    [Fact]
+    public void IncompleteOwnerEvidenceCannotSetOrActivateButCanClearSuppression()
+    {
+        var target = Skill(known: true); var store = Store(); store.Set(target, Inventory(target), false, Token);
+        var incomplete = target with { OwnershipDiagnostics = ["Owner registry unreadable"] };
+        Assert.False(Observe(store, incomplete).External);
+        var freshStore = new CleanupSuppressionStore(Path.Combine(_temp.FullName, "fresh-state"));
+        Assert.Throws<IOException>(() => freshStore.Set(incomplete, Inventory(incomplete), false, Token));
+        Assert.False(Directory.Exists(freshStore.Root));
+        Assert.True(store.Set(incomplete, Inventory(incomplete), true, Token).Changed);
+        Assert.False(Observe(store, target).External);
+    }
+
 }

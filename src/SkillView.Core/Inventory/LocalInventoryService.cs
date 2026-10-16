@@ -204,7 +204,7 @@ public sealed class LocalInventoryService
         }).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
         return await Task.Run(() =>
         {
-            var read = CleanupSuppressionStore.For(_contextRunner).Read(snapshot.ProtectedRoots.Select(root => root.Path)
+            var read = CleanupSuppressionStore.ReadFor(_contextRunner, snapshot.ProtectedRoots.Select(root => root.Path)
                 .Concat(observed.Select(skill => skill.ResolvedPath)).ToArray(), cancellationToken);
             long byteBudget = 32 * 1024 * 1024;
             var enriched = observed.Select(skill =>

@@ -20,6 +20,14 @@ internal sealed class CleanupSuppressionStore(string root, int maxRecords = 256,
     internal static CleanupSuppressionStore For(ProcessRunner runner) => new(Path.Combine(
         Path.GetDirectoryName(MaintenanceBackupStore.ResolveRoot(runner))!, "preferences"));
 
+    internal static SuppressionRead ReadFor(ProcessRunner runner, IReadOnlyList<string> exclusions, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        try { return For(runner).Read(exclusions, token); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { return new([], "Cleanup preferences unavailable: " + ex.Message); }
+    }
+
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     internal static string Key(SuppressionBinding binding) => Hash(JsonSerializer.SerializeToUtf8Bytes(binding,
         SuppressionJsonContext.Default.SuppressionBinding));
@@ -185,6 +193,8 @@ internal sealed class CleanupSuppressionStore(string root, int maxRecords = 256,
     internal static SuppressionBinding CaptureBinding(InstalledSkill skill, CancellationToken token, ref long byteBudget)
     {
         token.ThrowIfCancellationRequested();
+        if (!skill.OwnershipDiagnostics.IsEmpty)
+            throw new IOException("Ownership coverage is unavailable; refresh or reconcile owner diagnostics before setting suppression.");
         if (skill.Validity == ValidityState.BrokenSymlink)
             throw new IOException("Broken-link suppression is not supported by this binding; the selected row was skipped, and its link remains unchanged.");
         if (!SecureRemovalBackend.TryObserveIdentity(skill.ResolvedPath, out var native, out var error)
