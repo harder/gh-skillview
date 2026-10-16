@@ -1381,3 +1381,58 @@ Keep the precise authenticated repository preflight and response evidence. The
 post-reset diagnostic supports a bounded retry, not a passing product gate. See
 `evidence/maintenance-actions-token-diagnostic-correction.json`. Product/test
 source is unchanged; original acceptance remains 9/21.
+
+## PR67 final merge closure and post-merge local reimport base
+
+The static package-check change merged from the exact reviewed head
+`8677be990e9d3e82fadfaa12fc80ecb824704cda` as
+`6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44`. The merge tree
+`e168038ba39ab6bd64bcd4cd1004608ba5212d81` exactly matches the reviewed head
+tree; its parents are `ab23a7b1f3c0719926a78d3178f78849d1aa0ea2` and the
+reviewed PR head. The root merge guard receipt is
+`/tmp/skillview-package-check-evidence/final-merge-root-guard/merge-verified.json`.
+This section supersedes the earlier PR67 paragraphs above that recorded fresh
+native gates and review resolution as pending; those earlier entries remain
+historical snapshots of their respective heads and observations.
+
+On that exact head, CI attempt 2, both minimum/latest `gh` contract lanes, and
+both actual CodeQL analyses succeeded. Six review threads were resolved. The
+18 observed final check-runs comprise 17 successes and the expected skipped
+`notify-failure` job; this records observed statuses without asserting the
+repository's branch-protection required-status configuration. Each of the three
+platform test jobs reported 2,065 passed (2,056 unit plus 9 integration), with
+zero failures/skips. Both Windows metadata jobs reported 207 passed, zero
+failures/skips.
+
+All four fresh attempt-2 native artifacts were matched to GitHub's SHA-256
+digest and independently reviewed. Across the four RIDs, the artifacts contain
+88 eleven-scenario package-check rows, 144 standalone-unpin recovery rows
+(App and extension at `gh` 2.97.0 and 2.102.0), and 24 actual legacy schema
+1/2/3 rows. Linux positive publication evidence comes from the privileged
+private tmpfs fixture; ordinary Linux refusal rows are not counted as positive
+publication. The legacy fixtures record `registryExtensionsIncluded` false for
+schema 1 and true for schemas 2/3. Runtime binary hashes and CLI versions are
+recorded, but the binaries themselves were not archived. The four-RID artifact
+index and independent-review receipts are in
+`/tmp/skillview-package-check-evidence/final-merge-root-guard/four-rid-independent-index.json`.
+
+The initial same-head CI/contracts attempt stopped after exact API repository
+reads returned Actions installation-token HTTP 403 with core quota exhausted
+(limit/used 5,000; remaining zero; reset 2026-10-16T22:32:38Z). Its partial
+artifacts remain historical; the successful results above come from the one
+failed-only retry for each run. A later read-only probe observed the exact tag
+GET return HTTP 200 with 4,997 remaining, `/user` return 403, and `gh auth
+status` exit successfully. This correction withdraws any claim that the `/user`
+denial explains an auth-status failure. It does not explain the earlier
+`2da52ab` failure, whose HTTP cause remains uncaptured. Details are in
+`agent_docs/evidence/maintenance-batch-17-final.json`.
+
+The four unpublished local-reimport commits were rebased onto the actual merge
+commit without changing their tree: old and new tree are both
+`3ff8058f6b7340e4b4bb513f3475458b9bf83d76`, and the rebased head is
+`e62961fc1686813711be562983bbe2c6b505c271`. The existing identical-tree local
+verification reports 2,121 unit plus 9 integration tests, zero failures/skips;
+that receipt predates the rebase and is not a fresh native proof for local
+reimport. Native App/extension gates for that candidate remain outstanding.
+The original acceptance remains 9/21 and M19 is partial. The original Mac
+Down-arrow crash remains unreproduced.
