@@ -1038,22 +1038,30 @@ external suppression and continuing preserve/merge/fork/source/owner transitions
 M03/M09/M13-M21 obligations remain unchanged.
 
 
-Batch 14 (awaiting PR verification): external cleanup suppression for physical installations
-uses private, bounded append-only preferences outside payloads. Inventory reads do
-not initialize state; diagnostics remain independent from physical inventory
-coverage. Exact path/install-ID CLI actions and owned Cleanup Ignore preserve
-legacy markers, bind stable source/owner namespaces, and require native continuity
-plus bounded complete payload evidence for unknown sources. Clears retain reserved
-capacity; partial publications trigger rescans and cannot revive older suppression.
-Independent store and UI/CLI reviews found and corrected legacy-origin reporting,
-owner/native freshness, failed-capture byte accounting, worker-thread confirmation,
-and alias selection. Re-reviews have no outstanding agreed findings. Local focused
-tests pass 17 preference, two event-loop and eight CLI cases. Both local AOT hosts
-pass minimum/current gh proofs (116 commands total), including actual remote and
-local gh installations plus ownerless fixtures, unchanged native payload objects,
-registry bytes, restart, alias/same-name isolation, source edits, legacy origins,
-alternate state homes and corrupt-clear fail-open behavior. The full suite passes 1,749 tests with zero failures/skips; formatter and sequential
-AOT publishes pass. CI and artifact attribution remain required before merge.
-Local evidence: `evidence/maintenance-batch-14-checkpoint.json`. M08 remains incomplete;
-this slice does not close preserve/merge/fork/source/owner transitions or the
-remaining non-installation suppression and state-recovery work.
+Batch 14 merged: PR #64, merge `80921f49a5aefc07b01a1fc609a61132ddc4cd7c`, has the
+identical tree to reviewed head `81072edbbac6d0a167aff5ae85e0bddfc6104c56`.
+External cleanup suppression uses private bounded append-only state outside skill
+payloads, stable source/owner namespaces, and native continuity plus bounded whole
+payload evidence for unknown sources. Exact CLI selectors resolve agent aliases;
+owned TUI operations drain before disposal and rescan after partial publication.
+Legacy marker origins remain separate and external clear leaves markers intact.
+Incomplete ownership evidence cannot activate/set suppression; state-home setup
+failures are preference diagnostics and do not abort physical inventory.
+
+All 13 PR checks pass. Local build/format, 1,752 full tests (zero failures/skips),
+20 preference tests, both event-loop regressions and eight CLI cases pass. Both
+sequential local AOT hosts pass minimum/current gh proofs: 116 commands covering
+actual remote/local gh installs and ownerless copies with unchanged native payload
+objects/modes and registry bytes. Four native CI RIDs produced 116 digest-verified
+proof files: 232 new suppression commands plus 64 effective-loading commands and
+468 prior fixtures. Both actual gh contract lanes pass 17/17. Independent store,
+workflow, UI/CLI and proof reviews plus Copilot findings were corrected and
+re-reviewed; both Copilot threads are resolved. Failed quota-limited and superseded
+runs remain distinct from final successful-attempt evidence. Full attribution is
+in `evidence/maintenance-batch-14-final.json`.
+
+M08 remains incomplete. Non-installation/broken-link suppression, damaged/stale
+preference recovery, preserve/merge/fork/source/owner transitions and the original
+acceptance audit remain required. Nine of 21 original findings are complete.
+The original Installed Down-arrow crash was never reproduced. Next: reviewed
+whole-payload local dispositions, retaining all other original obligations.

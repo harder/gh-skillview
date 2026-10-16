@@ -682,6 +682,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Charge failed captures against the aggregate inventory byte budget. Preference
   diagnostics are independent from physical-provider inventory coverage. Keep
   cleanup confirmation dialogs on the event-loop thread before worker admission.
+  Include preference-store construction in its diagnostic boundary so missing
+  HOME/USERPROFILE cannot abort inventory. Incomplete ownership diagnostics block
+  suppression capture/activation; external clear still bypasses binding capture.
 
 - Product updates use `TuiServices.SavedUpdates`, carrying physical targets
   rather than names alone. Keep `--dir` rooted at the verified containing skills
