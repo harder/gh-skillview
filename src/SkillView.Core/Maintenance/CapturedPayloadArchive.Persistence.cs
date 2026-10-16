@@ -30,8 +30,14 @@ internal sealed partial record CapturedPayloadArchive
     internal static (CapturedPayloadArchive Archive, string Fingerprint) Load(NativeStateDirectory archive,
         string? expectedFingerprint, CancellationToken token)
     {
-        using var file = archive.OpenExistingFile("manifest.json", false, token);
-        var (manifest, fingerprint) = BoundedReviewJson.Read(file, PayloadArchiveJsonContext.Default.PayloadArchiveManifest, MaxManifestBytes, token);
+        PayloadArchiveManifest manifest;
+        string fingerprint;
+        // Windows state reads are exclusive. Finish the bounded, fingerprinted
+        // manifest read before enumeration independently opens every entry.
+        using (var file = archive.OpenExistingFile("manifest.json", false, token))
+        {
+            (manifest, fingerprint) = BoundedReviewJson.Read(file, PayloadArchiveJsonContext.Default.PayloadArchiveManifest, MaxManifestBytes, token);
+        }
         if (expectedFingerprint is not null && fingerprint != expectedFingerprint)
             throw new IOException("Captured archive manifest differs from its reviewed fingerprint.");
         if (manifest.SchemaVersion != 1 || manifest.RootMetadata is null || manifest.Entries.IsDefault
@@ -57,10 +63,25 @@ internal sealed partial record CapturedPayloadArchive
         names.Add("manifest.json");
         var actual = archive.EnumerateEntries(token).Take(PayloadSnapshot.MaxEntries + 4).ToArray();
         var sizes = actual.ToDictionary(item => item.Name, item => item.Bytes, StringComparer.Ordinal);
-        if (actual.Length > PayloadSnapshot.MaxEntries + 2 || actual.Any(item => item.Error is not null || !names.Contains(item.Name))
+        if (actual.Length != names.Count || actual.Length > PayloadSnapshot.MaxEntries + 2 || actual.Any(item => item.Error is not null || !names.Contains(item.Name))
             || result.Entries.Any(item => item.Blob is not null && (!sizes.TryGetValue(item.Blob, out var size) || size != item.StoredBytes)))
-            throw new IOException("Captured archive contains unexpected, missing or resized entries.");
+            throw new IOException("Captured archive contains unexpected, missing or resized entries. "
+                + DescribeEntryFailure(actual, result.Entries.Where(item => item.Blob is not null)
+                    .ToDictionary(item => item.Blob!, item => item.StoredBytes, StringComparer.Ordinal)));
         return (result, fingerprint);
+    }
+
+    internal static string DescribeEntryFailure(IReadOnlyList<(string Name, long Bytes, string? Error)> actual,
+        IReadOnlyDictionary<string, long> expected)
+    {
+        var names = actual.Select(item => item.Name).ToHashSet(StringComparer.Ordinal);
+        var failures = actual.Where(item => item.Error is not null || item.Name != "manifest.json"
+                && (!expected.TryGetValue(item.Name, out var size) || size != item.Bytes))
+            .Take(8).Select(item => $"name={Bound(item.Name)} expected={(expected.TryGetValue(item.Name, out var size) ? size.ToString(System.Globalization.CultureInfo.InvariantCulture) : item.Name == "manifest.json" ? "manifest" : "absent")} actual={item.Bytes} error={Bound(item.Error)}");
+        var missing = expected.Keys.Append("manifest.json").Where(name => !names.Contains(name)).Take(8).Select(Bound);
+        return $"Observed {actual.Count} entries; expected {expected.Count + 1}. Failures: {string.Join(" | ", failures)}. Missing: {string.Join(", ", missing)}.";
+
+        static string Bound(string? value) => new((value ?? "none").Take(160).Select(c => char.IsControl(c) ? '?' : c).ToArray());
     }
 }
 

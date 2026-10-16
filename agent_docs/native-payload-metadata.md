@@ -37,6 +37,10 @@ capturing any plan. They record that preparation explicitly; they do not prove
 support for Administrators-owned installations or arbitrary Windows metadata.
 Portable framing tests run on every platform. Native AOT CLI and process-death
 proofs complement these tests; compilation alone is not native execution evidence.
+For a focused native regression run, dispatch `ci.yml` with
+`verification=windows-metadata`. Skipped full jobs use distinct diagnostic check
+names, so this run cannot stand in for the normal full CI gate. Full dispatches,
+pushes and pull requests retain all checks and their ordinary names.
 
 Linux open flags are architecture-specific. Use `LinuxOpenFlags` for x64/ARM64
 directory/no-follow flags and for deriving `O_TMPFILE`. An anonymous held witness

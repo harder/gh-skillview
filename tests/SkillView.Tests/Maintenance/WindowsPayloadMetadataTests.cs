@@ -119,7 +119,9 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
             Assert.Throws<IOException>(() => Build());
             Assert.False(Directory.Exists(Path.Combine(state.CanonicalPath, "merged")));
             Assert.Equal(before.ObjectStateFingerprint, source.Capture(Token).ObjectStateFingerprint);
-            Assert.NotEqual("1", System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF"));
+            Assert.False(System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF") == "1",
+                "Supported Windows merge fixture refused: " + string.Join(" | ", captured.RootMetadata.Refusals
+                    .Concat(captured.Entries.SelectMany(entry => entry.Metadata!.Refusals.Select(reason => entry.Entry.Path + ": " + reason)))));
             return;
         }
         var resource = captured.Entries.Single(entry => entry.Entry.Path == "resource").Metadata!.Windows!;
@@ -162,7 +164,8 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
         if (!saved.Metadata!.Supported)
         {
             Assert.NotEmpty(saved.Metadata.Refusals);
-            Assert.NotEqual("1", System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF")); return;
+            Assert.False(System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF") == "1",
+                "Supported Windows resolution fixture refused: " + string.Join(" | ", saved.Metadata.Refusals)); return;
         }
         Assert.Equal(new byte[] { 9, 0, 8 }, saved.Metadata.Windows!.Streams.Single().Bytes);
         File.WriteAllBytes(input + ":Zone.Identifier", [1]); File.Delete(input);

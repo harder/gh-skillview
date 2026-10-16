@@ -108,7 +108,8 @@ public sealed partial class ReplacementLocalReviewTests
         var legacy = new LocalReviewSelection(1, new('a', 64), []);
         var encoded = JsonSerializer.Serialize(legacy, LocalReviewJsonContext.Default.LocalReviewSelection);
         Assert.DoesNotContain("resolutions", encoded);
-        Assert.Equal("{\n  \"schemaVersion\": 1,\n  \"headerFingerprint\": \"" + new string('a', 64) + "\",\n  \"choices\": []\n}", encoded);
+        var expectedLegacy = "{\n  \"schemaVersion\": 1,\n  \"headerFingerprint\": \"" + new string('a', 64) + "\",\n  \"choices\": []\n}";
+        Assert.Equal(expectedLegacy.ReplaceLineEndings(System.Environment.NewLine), encoded);
         var plan = await Plan(); var first = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
         var path = Path.Combine(first.ReviewPath, "choices-00.json");
         File.WriteAllText(path, File.ReadAllText(path).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2"));

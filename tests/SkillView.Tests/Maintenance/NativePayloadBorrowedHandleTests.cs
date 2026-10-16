@@ -24,7 +24,19 @@ public sealed class NativePayloadBorrowedHandleTests : IDisposable
         WriteSkill(target, "Original instructions.\n");
         using var lease = NativeDirectoryMoveLease.Open(parent, target, Token);
         var original = lease.Capture(Token); var seen = new List<string>(); PayloadSnapshot? captured = null;
-        Directory.Move(parent, parent + "-retained"); WriteSkill(target, "Replacement instructions.\n");
+        try { Directory.Move(parent, parent + "-retained"); }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && (ex is IOException or UnauthorizedAccessException)
+            && (ex.HResult & 0xFFFF) is 5 or 32)
+        {
+            // Windows can prevent the ancestor rename while the selected
+            // directory is held. Verify that stronger boundary before accepting
+            // this outcome; it is not a redirected-capture execution claim.
+            Assert.True(Directory.Exists(parent));
+            Assert.False(Directory.Exists(parent + "-retained"));
+            Assert.Equal(original.ObjectStateFingerprint, lease.Capture(Token).ObjectStateFingerprint);
+            return;
+        }
+        WriteSkill(target, "Replacement instructions.\n");
         try
         {
             captured = lease.CaptureInto((item, _) =>

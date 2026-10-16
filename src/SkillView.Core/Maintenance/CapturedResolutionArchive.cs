@@ -95,9 +95,14 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
 
     internal static CapturedResolutionArchive Load(NativeStateDirectory archive, string expectedHash, CancellationToken token)
     {
-        using var file = archive.OpenExistingFile("manifest.json", false, token);
-        var (manifest, hash) = BoundedReviewJson.Read(file, ResolutionJsonContext.Default.ResolutionArchiveManifest,
-            CapturedPayloadArchive.MaxManifestBytes, token);
+        ResolutionArchiveManifest manifest;
+        string hash;
+        // Enumeration must reopen each entry after this exclusive Windows read.
+        using (var file = archive.OpenExistingFile("manifest.json", false, token))
+        {
+            (manifest, hash) = BoundedReviewJson.Read(file, ResolutionJsonContext.Default.ResolutionArchiveManifest,
+                CapturedPayloadArchive.MaxManifestBytes, token);
+        }
         if (!QuarantineStore.ValidHash(expectedHash) || hash != expectedHash || manifest.SchemaVersion != 1)
             throw new IOException("Resolution archive manifest differs from its exact reviewed evidence.");
         var result = new CapturedResolutionArchive(manifest.Entries); result.Validate();
@@ -105,7 +110,8 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
         var actual = archive.EnumerateEntries(token).Take(PayloadSnapshot.MaxEntries + 2).ToArray();
         if (actual.Length != result.Entries.Length + 1 || actual.Any(item => item.Error is not null
             || item.Name != "manifest.json" && (!expected.TryGetValue(item.Name, out var size) || size != item.Bytes)))
-            throw new IOException("Resolution archive has unknown, missing or resized entries.");
+            throw new IOException("Resolution archive has unknown, missing or resized entries. "
+                + CapturedPayloadArchive.DescribeEntryFailure(actual, expected));
         return result;
     }
 

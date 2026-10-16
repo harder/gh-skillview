@@ -6,12 +6,18 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      verification:
+        description: 'Run all checks or only Windows native metadata regressions'
+        type: choice
+        options: [all, windows-metadata]
+        default: all
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ inputs.verification == 'windows-metadata' && '-windows-metadata' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +34,7 @@ jobs:
         run: python3 -m unittest discover -s .github/scripts -p test_homebrew_formula.py
 
   dependency-review:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,6 +44,8 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
   site-check:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped site checks' || 'site-check' }}
+    if: inputs.verification != 'windows-metadata'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -47,6 +56,8 @@ jobs:
         run: node --check site/app.js
 
   test:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped tests' || 'test' }} (${{ matrix.os }})
+    if: inputs.verification != 'windows-metadata'
     strategy:
       fail-fast: false
       matrix:
@@ -97,11 +108,12 @@ jobs:
           dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
             --configuration Release -p:RestoreLockedMode=true \
             --filter-class SkillView.Tests.Maintenance.WindowsPayloadMetadataTests \
-            | tee dist/windows-metadata-tests.log
-          dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
-            --configuration Release --no-build \
             --filter-class SkillView.Tests.Maintenance.WindowsBackupReadStreamTests \
-            | tee -a dist/windows-metadata-tests.log
+            --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
+            --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
+            --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
+            --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
+            | tee dist/windows-metadata-tests.log
       - name: Retain Windows metadata evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -112,7 +124,8 @@ jobs:
           retention-days: 14
 
   aot-smoke:
-    name: AOT publish smoke (${{ matrix.rid }})
+    if: inputs.verification != 'windows-metadata'
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

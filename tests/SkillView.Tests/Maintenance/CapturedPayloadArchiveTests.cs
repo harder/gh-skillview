@@ -106,6 +106,35 @@ public sealed class CapturedPayloadArchiveTests : IDisposable
     }
 
     [Fact]
+    public void ManifestReadClosesBeforeEnumerationAndDisappearanceStillRefusesLoad()
+    {
+        using var original = CreateOriginal();
+        using var state = NativeStateDirectory.OpenOrCreate(State, [Target], Token);
+        CapturedPayloadArchive.Capture(state, "installed-evidence", original, Token);
+        var path = Path.Combine(State, "installed-evidence");
+        using var archive = NativeStateDirectory.OpenOrCreate(path, [Target], Token, allowCreate: false);
+        using var intercepted = new BeforeEnumerationState(archive, () => File.Delete(Path.Combine(path, "manifest.json")));
+        var error = Assert.Throws<IOException>(() => CapturedPayloadArchive.Load(intercepted, null, Token));
+        Assert.Contains("Missing: manifest.json", error.Message);
+    }
+
+    [Fact]
+    public void ArchiveEntryFailureDetailsRetainExactSizesAndBoundUntrustedMessages()
+    {
+        var expected = Enumerable.Range(0, PayloadSnapshot.MaxEntries)
+            .ToDictionary(index => $"entry-{index:D5}", index => (long)index, StringComparer.Ordinal);
+        var error = "native\n\u001b" + new string('x', 20000);
+        var actual = expected.Select(item => (item.Key, item.Value + 1, (string?)error)).ToArray();
+        var message = CapturedPayloadArchive.DescribeEntryFailure(actual, expected);
+        Assert.Contains($"Observed {PayloadSnapshot.MaxEntries} entries; expected {PayloadSnapshot.MaxEntries + 1}.", message);
+        Assert.Contains("name=entry-00000 expected=0 actual=1 error=native??", message);
+        Assert.Contains("Missing: manifest.json", message);
+        Assert.InRange(message.Length, 1, 6000);
+        Assert.DoesNotContain('\n', message);
+        Assert.DoesNotContain('\u001b', message);
+    }
+
+    [Fact]
     public void CanceledOrFailedCaptureReturnsNoArchiveAndLeavesOriginalUntouched()
     {
         using var original = CreateOriginal();
@@ -119,5 +148,32 @@ public sealed class CapturedPayloadArchiveTests : IDisposable
         Assert.Equal(before.Fingerprint, original.Capture(Token).Fingerprint);
         Assert.Equal(before.ObjectStateFingerprint, original.Capture(Token).ObjectStateFingerprint);
         Assert.True(Directory.Exists(Path.Combine(State, "failed-evidence")));
+    }
+
+    private sealed class BeforeEnumerationState(NativeStateDirectory inner, Action beforeEnumeration) : NativeStateDirectory
+    {
+        private Microsoft.Win32.SafeHandles.SafeFileHandle? manifest;
+        internal override string CanonicalPath => inner.CanonicalPath;
+        internal override FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token)
+        {
+            var file = inner.OpenExistingFile(name, writerLock, token);
+            if (name == "manifest.json") manifest = file.SafeFileHandle;
+            return file;
+        }
+        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
+        {
+            Assert.NotNull(manifest);
+            Assert.True(manifest.IsClosed, "Manifest read must release its exclusive handle before native enumeration.");
+            beforeEnumeration();
+            return inner.EnumerateEntries(token);
+        }
+        internal override OwnedDirectoryLease CaptureOwnership(CancellationToken token) => throw new NotSupportedException();
+        internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token) => throw new NotSupportedException();
+        internal override void FlushPublication(CancellationToken token) => throw new NotSupportedException();
+        internal override void ValidateLocation(CancellationToken token) => throw new NotSupportedException();
+        internal override NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token) => throw new NotSupportedException();
+        internal override void SealStagingDirectory(int unixMode, CancellationToken token) => throw new NotSupportedException();
+        internal override void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token) => throw new NotSupportedException();
+        public override void Dispose() { }
     }
 }
