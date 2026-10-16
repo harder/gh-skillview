@@ -10,7 +10,14 @@ internal abstract class NativePayloadDirectory : IDisposable
     internal abstract FileStream CreateFile(string name, CancellationToken token);
     internal abstract void CreateLink(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, bool directoryLink, CancellationToken token);
     internal abstract void Seal(int? unixMode, CancellationToken token);
-    internal abstract SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token);
+    internal virtual void SealWithMetadata(int? unixMode, SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token,
+        SkillView.Maintenance.PayloadMetadataAuthority? authority = null) =>
+        throw new IOException("Native payload metadata publication is unavailable.");
+    internal virtual void CreateLinkWithMetadata(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, bool directoryLink,
+        SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token,
+        SkillView.Maintenance.PayloadMetadataAuthority? authority = null) =>
+        throw new IOException("Native payload link metadata publication is unavailable.");
+    internal abstract SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null);
     public abstract void Dispose();
 
     internal static void CheckName(string name)

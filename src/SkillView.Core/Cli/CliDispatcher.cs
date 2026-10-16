@@ -49,6 +49,7 @@ public static partial class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => await LocalReviewAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -77,7 +78,8 @@ public static partial class CliDispatcher
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "effective" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
-            or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner" => TimeSpan.FromMinutes(10),
+            or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
+            or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 
@@ -2298,7 +2300,11 @@ public static partial class CliDispatcher
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
             | `update-plan` | Resolve and stage an immutable newer revision, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--unpin`, `--allow-hidden-dirs`, `--json` |
-            | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update using the same fingerprint and disposition contract as restore commands. | `--id`, `--expect`, `--yes`, `--disposition retain-original`, `--json` |
+            | `update-merge-review` | Capture immutable recorded/installed/source evidence for a never-started update. Closes the earlier replacement approval. | `--id`, `--expect <source plan fingerprint>`, `--json` |
+            | `update-merge-choose` | Save the complete set of explicit path choices; other paths use the three-way rules. Use `/` for root mode. | `--id`, `--expect <local review fingerprint>`, repeated `--choose-installed <path>` / `--choose-source <path>`, `--json` |
+            | `update-merge-plan` | Build and save a separately approved merged candidate with preserved supported native metadata. No live installation change. | `--id`, `--expect <local review fingerprint>`, `--json` |
+            | `update-preserve` | Verify and keep the current installation without moving payloads, writing its owner or changing preferences. | `--id`, `--expect <plan fingerprint>`, `--json` |
+            | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update. Apply must match its saved replacement or merged disposition. | `--id`, `--expect`, `--yes`, `--disposition retain-original` / `merge-reviewed`, `--json` |
             | `update-repair-owner` | Repair only a recognized torn registry from its explicitly reviewed retained image. Inspect again before resuming payload recovery. | `--id`, `--yes --expect`, `--json` |
             | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |
             | `restore-apply` | Apply a saved plan, retaining the original directory. | `--id`, `--yes --disposition retain-original --expect`, `--json` |

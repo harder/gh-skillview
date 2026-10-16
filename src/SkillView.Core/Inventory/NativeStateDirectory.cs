@@ -18,6 +18,9 @@ internal abstract class NativeStateDirectory : IDisposable
         }
     }
     internal abstract void FlushPublication(CancellationToken token);
+    internal virtual void FlushNamespace(CancellationToken token) => FlushPublication(token);
+    internal virtual FileStream CreateAnonymousMetadataWitness(CancellationToken token) =>
+        throw new IOException("Anonymous native metadata witnesses are unavailable.");
     internal abstract void ValidateLocation(CancellationToken token);
     internal abstract NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token);
     internal virtual NativePayloadDirectory CreatePayloadDirectory(string name, CancellationToken token) =>

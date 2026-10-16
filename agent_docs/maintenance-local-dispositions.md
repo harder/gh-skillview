@@ -2,16 +2,20 @@
 
 External suppression merged in PR64. Batch15 is implementing reviewed local
 dispositions on `codex/reviewed-local-dispositions`; it has no PR yet. The private
-draft capture/materialization code does not admit publication. Complete metadata
-admission, immutable plan binding, CLI/TUI review and recovery proofs before
-publishing a coherent batch. Original M08 acceptance remains open.
+workflow has schema3 merge planning and CLI entrypoints under verification.
+Complete native platform metadata coverage, captured resolutions, TUI review and
+the complete recovery/proof matrix before publishing a coherent batch. Original
+M08 acceptance remains open.
 
 Current private draft boundaries:
 - `ThreeWayPayloadReview` analyzes complete path sets, explicit captured-file
   resolutions, root mode, topology and aggregate budgets. It is not authority.
 - `CapturedPayloadArchive` retains immutable indexed regular-file blobs for
-  file/link bytes, under a held private state directory. It does not attest
-  ACLs, xattrs, alternate streams or hard-link topology.
+  file/link bytes, under a held private state directory. Its bounded manifest
+  explicitly retains full native identities/generations and observed metadata;
+  unsupported ACLs, flags, streams, hard links or unknown namespace coverage
+  remain concrete refusals. The legacy `PayloadSnapshot` remains a byte/object
+  comparison contract, not a complete metadata attestation.
 - `ReviewedPayloadMaterializer` builds selected authored content through
   `NativePayloadDirectory`, rebinds approved source tracking, and finalizes via
   the held root. A successful draft is still not an applyable saved plan.
@@ -24,6 +28,34 @@ Current private draft boundaries:
   native metadata admission before the draft workflow can use links.
 - Finalization must stay on the originally created payload handle. Reopening
   a canonical pathname can accept a replacement with identical bytes/modes.
+
+Current CLI path (private-stage writes until explicit Apply):
+1. `update-plan` produces a schema2 immutable B/C plan without changing I.
+2. `update-merge-review --id ID --expect SOURCE_PLAN_HASH` independently retains
+   B/I/C blobs plus native metadata and closes the earlier replacement approval.
+   Repeat with the same source-plan hash to inspect saved choices after restart.
+3. `update-merge-choose --id ID --expect LOCAL_REVIEW_HASH` writes the complete
+   explicit choice set with repeated `--choose-installed PATH` or
+   `--choose-source PATH`; `/` selects the root mode. Unselected paths use the
+   three-way rules. Unknown/duplicate choices and invalid topology are refused.
+4. `update-merge-plan --id ID --expect LOCAL_REVIEW_HASH` builds M through held
+   native handles and saves schema3. It binds the source plan, all manifests,
+   exact choices, source C, result M and metadata policy. New C nodes use captured
+   C attributes and reviewed I-parent ownership; compatible I kinds keep I
+   attributes. Existing root privacy is the default. Unknown metadata refuses.
+5. `update-apply --id ID --yes --disposition merge-reviewed --expect MERGE_HASH`
+   uses the existing retain/promote/owner journal, with B/I/C/metadata/result
+   revalidation. Recovery/undo still require a fresh inspection fingerprint.
+6. `update-preserve --id ID --expect PLAN_HASH` verifies and keeps I without any
+   payload move, owner write or preference change. The private plan remains.
+
+Choice records are append-only, and invalid newest records cannot revive prior
+choices. Finalization attempts use bounded independent `merged-NN` slots and
+`merge-plan-NN.json` records; partial evidence survives retries. Attempt presence
+is independent of the current payload location after promotion. An incomplete
+initial B/I/C capture remains retained and requires a new revision plan; it never
+restores approval of the earlier source replacement. Full TUI/resolution-file
+and cross-platform acceptance is still pending.
 
 Original acceptance stays unchanged. Existing replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native

@@ -89,6 +89,14 @@ public static class UpdateScreen
         Field("Manifest", plan.PlanPath);
         Field("Retained original", plan.RetainedPath);
         Field("Candidate", plan.CandidatePath);
+        Field("Disposition", plan.LocalDisposition?.Kind ?? "replace; retain original");
+        if (plan.LocalDisposition is { } local)
+        {
+            Field("Source baseline candidate", local.SourceCandidate.Identity.CanonicalPath);
+            Field("Source baseline payload", local.SourceCandidate.Payload);
+            Field("Local choice fingerprint", local.SelectionFingerprint);
+            Field("Native metadata policy", local.MetadataPolicy);
+        }
         Field("Root mode", $"{plan.OriginalRootMode} -> {plan.CandidateRootMode}");
         if (plan.Revision is { } revision)
         {
@@ -96,7 +104,9 @@ public static class UpdateScreen
             Field("Resolved ref", revision.Source.Ref);
             Field("Commit", revision.Source.Commit);
             Field("Git tree", revision.Source.Tree);
-            Field("Authored version", $"{plan.Subject.Metadata.Version ?? "unspecified"} -> {revision.DesiredMetadata.Version ?? "unspecified"}");
+            var resultVersion = plan.LocalDisposition is { } disposition ? disposition.ResultAuthoredVersion : revision.DesiredMetadata.Version;
+            Field("Authored version", $"{plan.Subject.Metadata.Version ?? "unspecified"} -> {resultVersion ?? "unspecified"}");
+            if (plan.LocalDisposition is not null) Field("Source authored version", revision.DesiredMetadata.Version ?? "unspecified");
             Field("Pin", plan.Subject.Metadata.Pinned || plan.Subject.Metadata.PinnedRef is not null
                 ? $"{plan.Subject.Metadata.PinnedRef ?? plan.Subject.Metadata.GithubRef} -> explicitly unpinned" : "unpinned -> unpinned");
             Field("Local changes", revision.LocalChanges.Length.ToString());

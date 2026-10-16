@@ -16,7 +16,7 @@ internal sealed partial class WindowsSecureRemovalBackend
             session.CreatePayloadLink(name, rawTarget, directoryLink, token);
         }
         internal override void Seal(int? unixMode, CancellationToken token) => session.SealPayload(unixMode, token);
-        internal override SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token) => session.CapturePayload(token);
+        internal override SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null) => session.CapturePayload(token, inspectMetadata);
         public override void Dispose() => session.Dispose();
     }
 }

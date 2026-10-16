@@ -300,14 +300,14 @@ internal sealed partial class WindowsSecureRemovalBackend
             ValidateLocation(token);
             sealedStage = true;
         }
-        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token)
+        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null)
         {
             token.ThrowIfCancellationRequested();
             if (!sealedStage || stagingGuard is null) throw new IOException("Only a sealed held payload can be finalized.");
             stagingGuard(token);
             if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("Draft payload moved before finalization.");
-            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (_, _) => { },
-                (depth, observe, ct) => WalkOpenedPayload(root, depth, observe, ct), token);
+            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (item, _) => inspectMetadata?.Invoke(item),
+                (depth, observe, ct) => WalkOpenedPayload(root, depth, observe, ct, inspectMetadata), token);
             stagingGuard(token);
             if (!PathIdentity.Equals(snapshot.Path, canonical) || !PathIdentity.Equals(ReadFinalPath(root), canonical))
                 throw new IOException("Draft payload moved during finalization.");

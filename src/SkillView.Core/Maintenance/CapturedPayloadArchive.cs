@@ -4,13 +4,14 @@ using SkillView.Inventory;
 
 namespace SkillView.Maintenance;
 
-internal sealed record ArchivedPayloadEntry(PayloadEntry Entry, string? Blob, long StoredBytes);
+internal sealed record ArchivedPayloadEntry(PayloadEntry Entry, string? Blob, long StoredBytes,
+    PayloadNativeMetadata? Metadata = null);
 
 /// Immutable byte evidence for a draft, not a materialized installation. Numbered
 /// private regular files retain raw link bytes without creating links in state.
-/// Native ACLs, xattrs, streams and hard-link topology are deliberately not attested.
-internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
-    ImmutableArray<ArchivedPayloadEntry> Entries)
+/// Bounded native metadata includes explicit refusals for unsupported observations.
+internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
+    ImmutableArray<ArchivedPayloadEntry> Entries, PayloadNativeMetadata? RootMetadata = null)
 {
     internal static CapturedPayloadArchive Capture(NativeStateDirectory parent, string name,
         NativeDirectoryMoveLease source, CancellationToken token,
@@ -18,15 +19,17 @@ internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
     {
         token.ThrowIfCancellationRequested();
         using var archive = parent.CreateStagingDirectory(name, token);
+        using var authority = PayloadMetadataAuthority.Open(archive, create: true, token);
         var entries = ImmutableArray.CreateBuilder<ArchivedPayloadEntry>();
-        long stored = 0;
+        long stored = 0; long metadataBytes = 0; PayloadNativeMetadata? rootMetadata = null;
         var snapshot = source.CaptureInto((item, entry) =>
         {
             token.ThrowIfCancellationRequested();
             inspectMetadata?.Invoke(item);
+            var metadata = CaptureMetadata(item);
             if (entry.Kind == "directory")
             {
-                entries.Add(new(entry, null, 0));
+                entries.Add(new(entry, null, 0, metadata));
                 return;
             }
             if (entry.Kind == "file" && entry.Bytes > PayloadSnapshot.MaxBytes - stored)
@@ -42,13 +45,28 @@ internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
             stored = checked(stored + bytes);
             if (stored > PayloadSnapshot.MaxBytes) throw new IOException("Captured archive exceeds its aggregate byte budget.");
             destination.Flush(true);
-            entries.Add(new(entry, blob, bytes));
-        }, inspectMetadata, token);
+            entries.Add(new(entry, blob, bytes, metadata));
+        }, root =>
+        {
+            inspectMetadata?.Invoke(root);
+            rootMetadata = CaptureMetadata(root);
+        }, token);
         // Sealing is admitted only after the native walker has checked every
         // observed identity, content stream and namespace again.
+        var result = new CapturedPayloadArchive(snapshot, entries.OrderBy(item => item.Entry.Path, StringComparer.Ordinal).ToImmutableArray(), rootMetadata);
+        result.Save(archive, token);
         archive.FlushPublication(token);
         archive.SealStagingDirectory(448, token);
-        return new(snapshot, entries.OrderBy(item => item.Entry.Path, StringComparer.Ordinal).ToImmutableArray());
+        return result;
+
+        PayloadNativeMetadata CaptureMetadata(NativePayloadItem item)
+        {
+            var metadata = PayloadNativeMetadata.Capture(item, token, authority);
+            metadataBytes += metadata.Validate();
+            if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
+                throw new IOException("Captured native metadata exceeds its aggregate byte budget.");
+            return metadata;
+        }
     }
 
     internal void CopyEntry(NativeStateDirectory archive, string path, Stream destination, CancellationToken token)
@@ -57,12 +75,17 @@ internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
     internal Reader OpenReader(NativeStateDirectory archive)
     {
         Validate();
-        return new(archive, Entries.ToDictionary(item => item.Entry.Path, StringComparer.Ordinal));
+        return new(archive, Entries.ToDictionary(item => item.Entry.Path, StringComparer.Ordinal), RootMetadata);
     }
 
-    internal sealed class Reader(NativeStateDirectory archive, IReadOnlyDictionary<string, ArchivedPayloadEntry> entries)
+    internal sealed class Reader(NativeStateDirectory archive, IReadOnlyDictionary<string, ArchivedPayloadEntry> entries,
+        PayloadNativeMetadata? rootMetadata)
     {
+        internal PayloadNativeMetadata? RootMetadata => rootMetadata;
         internal PayloadEntry Entry(string path) => Get(path).Entry;
+        internal PayloadNativeMetadata? Metadata(string path) => Get(path).Metadata;
+        internal bool TryEntry(string path, out ArchivedPayloadEntry? entry) => entries.TryGetValue(path, out entry);
+        internal PayloadMetadataAuthority OpenMetadataAuthority(CancellationToken token) => PayloadMetadataAuthority.Open(archive, create: false, token);
         private ArchivedPayloadEntry Get(string path) => entries.TryGetValue(path, out var entry) ? entry
             : throw new IOException("The path has no captured archive entry.");
         internal void CopyEntry(string path, Stream destination, CancellationToken token)
@@ -81,6 +104,11 @@ internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
             || Snapshot.Entries.IsDefault || Snapshot.Entries.Length != Entries.Length)
             throw new IOException("Captured archive entries are missing or exceed their budget.");
         var expected = Snapshot.Entries.ToDictionary(entry => entry.Path, StringComparer.Ordinal);
+        var objects = Snapshot.Objects.ToDictionary(item => item.Path, StringComparer.Ordinal);
+        if (RootMetadata is null || Snapshot.RootIdentity is null || RootMetadata.Identity != Snapshot.RootIdentity.Value
+            || RootMetadata.Kind != "directory" || RootMetadata.UnixMode != Snapshot.RootUnixMode)
+            throw new IOException("Captured root metadata is not bound to its native payload object.");
+        long metadataBytes = RootMetadata.Validate();
         var paths = new HashSet<string>(StringComparer.Ordinal);
         var blobs = new HashSet<string>(StringComparer.Ordinal);
         long stored = 0;
@@ -97,9 +125,16 @@ internal sealed record CapturedPayloadArchive(PayloadSnapshot Snapshot,
                 throw new IOException("Captured archive manifest is inconsistent.");
             stored = checked(stored + item.StoredBytes);
             if (stored > PayloadSnapshot.MaxBytes) throw new IOException("Captured archive exceeds its aggregate byte budget.");
+            if (item.Metadata is not { } metadata || !objects.TryGetValue(entry.Path, out var native)
+                || metadata.Identity != native.Identity || metadata.Kind != entry.Kind || metadata.UnixMode != entry.UnixMode)
+                throw new IOException("Captured entry metadata is not bound to its native payload object.");
+            metadataBytes += metadata.Validate();
+            if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
+                throw new IOException("Captured native metadata exceeds its aggregate byte budget.");
         }
         if (PayloadSnapshot.Digest(Snapshot.Entries, false) != Snapshot.Fingerprint
-            || PayloadSnapshot.Digest(Snapshot.Entries, true) != Snapshot.ComparisonFingerprint)
+            || PayloadSnapshot.Digest(Snapshot.Entries, true) != Snapshot.ComparisonFingerprint
+            || PayloadSnapshot.DigestObjects(new(Snapshot.RootIdentity.Value, Snapshot.RootUnixMode), Snapshot.Objects, CancellationToken.None) != Snapshot.ObjectStateFingerprint)
             throw new IOException("Captured archive payload fingerprint is inconsistent.");
         if (!ThreeWayPayloadReview.Analyze(Snapshot, Snapshot, Snapshot).CanMaterialize)
             throw new IOException("Captured archive topology is inconsistent.");

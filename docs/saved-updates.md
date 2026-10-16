@@ -62,6 +62,50 @@ The reviewed candidate is promoted directly. Apply does not resolve the source
 again. Local edits and extra files remain in the retained original; they are
 not merged into the candidate. This is an explicit replacement disposition.
 
+To keep the installed payload instead, verify the never-started plan with
+`update-preserve --id PLAN_ID --expect PLAN_FINGERPRINT`. This leaves payloads,
+owner records and preferences unchanged; the unused plan stays available.
+
+The local merge workflow captures the recorded base, installed files and approved
+source in private immutable archives. Starting it closes the earlier replacement
+approval. Use the same global scan and context options for every command:
+
+```sh
+skillview --scan-root /path/to/skills update-merge-review --id PLAN_ID --expect PLAN_FINGERPRINT --json
+skillview --scan-root /path/to/skills update-merge-choose --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --choose-installed SKILL.md --json
+skillview --scan-root /path/to/skills update-merge-plan --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --json
+skillview --scan-root /path/to/skills update-apply --id PLAN_ID --yes --disposition merge-reviewed --expect MERGE_PLAN_FINGERPRINT
+```
+
+Each choose command replaces the complete explicit choice set. Repeat
+`--choose-installed PATH` or `--choose-source PATH`; use `/` for root permissions.
+Use the review fingerprint returned by each command for the following choose or
+merge-plan command.
+Unselected paths use the three-way rules: take source when installed is unchanged
+from base, keep installed when source is unchanged, and keep installed presentation
+when both agree. Conflicting bytes, deletion/type changes and inconsistent directory
+topology need explicit choices. No textual merge or conflict markers are inserted.
+
+Review reports path hashes, choices, conflicts, metadata refusals and archive
+locations. Merged planning preserves supported native metadata and root privacy,
+then verifies the result before saving a separate approval fingerprint. Compatible
+installed node kinds keep installed attributes; new source nodes carry captured
+source attributes and reviewed installed-parent ownership. Approved source tracking
+continues to identify the real source baseline; customized result bytes have separate
+evidence. The next update compares local changes against that source baseline.
+
+Current metadata publication supports the verified macOS owner/group/mode/xattr
+policy. Extended ACLs, special flags, external hard links and unavailable metadata
+are refused. Linux requires proven complete attribute visibility; Windows native
+metadata publication and captured custom resolution files remain pending. These
+limitations are explicit refusals and cannot authorize a lossy merge.
+
+Choices and finalization attempts are bounded and append-only. A partial merged
+attempt remains retained and a retry builds a separate candidate. Incomplete newest
+records never revive older approvals. An interrupted initial archive capture needs
+a new revision plan; installed files remain unchanged. Apply, inspection, recovery
+and undo revalidate the original, source baseline, choices and materialized result.
+
 Inspect before recovery or undo, then use that inspection's review fingerprint:
 
 ```sh

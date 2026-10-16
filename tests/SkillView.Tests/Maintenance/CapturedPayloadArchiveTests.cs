@@ -69,6 +69,43 @@ public sealed class CapturedPayloadArchiveTests : IDisposable
     }
 
     [Fact]
+    public void PersistedManifestRestoresNativeEvidenceAndIndependentBytesAfterRestart()
+    {
+        using var original = CreateOriginal();
+        using var state = NativeStateDirectory.OpenOrCreate(State, [Target], Token);
+        var capture = CapturedPayloadArchive.Capture(state, "installed-evidence", original, Token);
+        using var archive = NativeStateDirectory.OpenOrCreate(Path.Combine(State, "installed-evidence"), [Target], Token, allowCreate: false);
+        var loaded = CapturedPayloadArchive.Load(archive, null, Token);
+        Assert.Equal(capture.Snapshot.RootIdentity, loaded.Archive.Snapshot.RootIdentity);
+        Assert.Equal(capture.Snapshot.Objects, loaded.Archive.Snapshot.Objects);
+        Assert.Equal(capture.Snapshot.ObjectStateFingerprint, loaded.Archive.Snapshot.ObjectStateFingerprint);
+        Assert.Equal(capture.Snapshot.ComparisonFingerprint, loaded.Archive.Snapshot.ComparisonFingerprint);
+        File.WriteAllBytes(Path.Combine(Target, "binary"), [1]);
+        using var saved = new MemoryStream();
+        CapturedPayloadArchive.Load(archive, loaded.Fingerprint, Token).Archive.CopyEntry(archive, "binary", saved, Token);
+        Assert.Equal(new byte[] { 0, 255, 0, 13, 10 }, saved.ToArray());
+        Assert.Throws<IOException>(() => CapturedPayloadArchive.Load(archive, new('0', 64), Token));
+    }
+
+    [Fact]
+    public void PersistedManifestRejectsDuplicatePropertiesUnexpectedFilesAndNativeEvidenceChanges()
+    {
+        using var original = CreateOriginal();
+        using var state = NativeStateDirectory.OpenOrCreate(State, [Target], Token);
+        CapturedPayloadArchive.Capture(state, "installed-evidence", original, Token);
+        var path = Path.Combine(State, "installed-evidence");
+        using var archive = NativeStateDirectory.OpenOrCreate(path, [Target], Token, allowCreate: false);
+        var manifest = Path.Combine(path, "manifest.json"); var bytes = File.ReadAllText(manifest);
+        File.WriteAllText(manifest, bytes.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 1, \"schemaVersion\": 1"));
+        Assert.Throws<IOException>(() => CapturedPayloadArchive.Load(archive, null, Token));
+        File.WriteAllText(manifest, bytes.Replace("\"objects\": \"", "\"objects\": \"0"));
+        Assert.Throws<IOException>(() => CapturedPayloadArchive.Load(archive, null, Token));
+        File.WriteAllText(manifest, bytes);
+        File.WriteAllText(Path.Combine(path, "unreviewed"), "extra");
+        Assert.Throws<IOException>(() => CapturedPayloadArchive.Load(archive, null, Token));
+    }
+
+    [Fact]
     public void CanceledOrFailedCaptureReturnsNoArchiveAndLeavesOriginalUntouched()
     {
         using var original = CreateOriginal();

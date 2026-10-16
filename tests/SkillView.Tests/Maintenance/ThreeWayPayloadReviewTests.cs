@@ -121,6 +121,8 @@ public sealed class ThreeWayPayloadReviewTests
         Assert.Throws<IOException>(() => ThreeWayPayloadReview.Analyze(snapshot, snapshot, snapshot, [new("one", "installed"), new("one", "source")]));
         Assert.Throws<IOException>(() => ThreeWayPayloadReview.Analyze(snapshot, snapshot, snapshot, [new("unknown", "source")]));
         Assert.Throws<IOException>(() => ThreeWayPayloadReview.Analyze(snapshot, snapshot, snapshot, [new("one", "resolved")]));
+        Assert.Throws<IOException>(() => ThreeWayPayloadReview.Analyze(snapshot, snapshot, snapshot, [null!]));
+        Assert.Throws<IOException>(() => ThreeWayPayloadReview.Analyze(snapshot, snapshot, snapshot, [new(null!, "installed")]));
     }
     [Fact]
     public void ResolutionRequiresCapturedFileEvidenceAndSelectsItsExactResult()

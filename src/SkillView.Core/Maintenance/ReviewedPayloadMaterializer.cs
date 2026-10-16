@@ -9,9 +9,21 @@ namespace SkillView.Maintenance;
 /// plan. This method grants no authority to replace an installation.
 internal static class ReviewedPayloadMaterializer
 {
+    internal static VerifiedMergedPayload StagePreservingMetadata(NativeStateDirectory operation, string name,
+        ThreeWayPayloadReview review, IReadOnlyDictionary<string, CapturedPayloadArchive.Reader> readers,
+        SkillFrontMatter approvedTracking, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!readers.TryGetValue("installed", out var installed)) throw new IOException("An immutable installed capture is required.");
+        using var metadata = PayloadMetadataReview.Create(review, installed, token, readers.GetValueOrDefault("source"));
+        var snapshot = Stage(operation, name, review, readers, approvedTracking, token, metadata: metadata);
+        return new(snapshot, PayloadMetadataReview.Policy, metadata.Recipes);
+    }
+
     internal static PayloadSnapshot Stage(NativeStateDirectory operation, string name,
         ThreeWayPayloadReview review, IReadOnlyDictionary<string, CapturedPayloadArchive.Reader> readers,
-        SkillFrontMatter approvedTracking, CancellationToken token, Action<string>? beforeCaptureForTests = null)
+        SkillFrontMatter approvedTracking, CancellationToken token, Action<string>? beforeCaptureForTests = null,
+        PayloadMetadataReview? metadata = null)
     {
         token.ThrowIfCancellationRequested();
         if (!review.CanMaterialize) throw new IOException("Resolve every path and topology conflict before building a draft.");
@@ -30,12 +42,12 @@ internal static class ReviewedPayloadMaterializer
         Build(root, "", review.RootMode.Selected, 0);
         operation.ValidateLocation(token);
         beforeCaptureForTests?.Invoke(root.CanonicalPath);
-        var result = root.FlushAndCapture(token);
-        if (result.FrontMatter is not { } metadata || !metadata.Diagnostics.IsEmpty
-            || metadata.Upstream != approvedTracking.Upstream || metadata.GithubTreeSha != approvedTracking.GithubTreeSha
-            || metadata.GithubRef != approvedTracking.GithubRef || metadata.GithubPath != approvedTracking.GithubPath
-            || metadata.LocalPath != approvedTracking.LocalPath || metadata.Pinned != approvedTracking.Pinned
-            || metadata.PinnedRef != approvedTracking.PinnedRef)
+        var result = root.FlushAndCapture(token, metadata is null ? null : item => metadata.Verify(item, token));
+        if (result.FrontMatter is not { } tracking || !tracking.Diagnostics.IsEmpty
+            || tracking.Upstream != approvedTracking.Upstream || tracking.GithubTreeSha != approvedTracking.GithubTreeSha
+            || tracking.GithubRef != approvedTracking.GithubRef || tracking.GithubPath != approvedTracking.GithubPath
+            || tracking.LocalPath != approvedTracking.LocalPath || tracking.Pinned != approvedTracking.Pinned
+            || tracking.PinnedRef != approvedTracking.PinnedRef)
             throw new IOException("The draft result does not match its approved source tracking.");
         VerifyResult(result);
         return result;
@@ -70,7 +82,8 @@ internal static class ReviewedPayloadMaterializer
                             if (!OperatingSystem.IsWindows())
                             {
                                 if (entry.UnixMode is null or < 0 or > 511) throw new IOException("Unsupported draft file permission bits.");
-                                File.SetUnixFileMode(output.SafeFileHandle, (UnixFileMode)entry.UnixMode.Value);
+                                if (metadata is not null) PayloadNativeMetadata.Apply(output.SafeFileHandle, metadata[entry.Path].Desired, entry.UnixMode, token, metadata.Authority);
+                                else File.SetUnixFileMode(output.SafeFileHandle, (UnixFileMode)entry.UnixMode.Value);
                             }
                             else if (entry.UnixMode is not null) throw new IOException("A Windows file cannot carry a Unix mode.");
                             output.Flush(true);
@@ -84,13 +97,15 @@ internal static class ReviewedPayloadMaterializer
                             // Windows link kind must be bound by the native
                             // metadata adapter before this draft can support it.
                             if (OperatingSystem.IsWindows()) throw new IOException("Windows link materialization requires reviewed native link-kind metadata.");
-                            directory.CreateLink(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, false, token);
+                            if (metadata is not null) directory.CreateLinkWithMetadata(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, false, metadata[entry.Path].Desired, token, metadata.Authority);
+                            else directory.CreateLink(leaf, input.GetBuffer().AsSpan(0, (int)input.Length), entry.UnixMode, false, token);
                         }
                         break;
                     default: throw new IOException("Unsupported selected draft entry kind.");
                 }
             }
-            directory.Seal(mode, token);
+            if (metadata is not null) directory.SealWithMetadata(mode, metadata[parent].Desired, token, metadata.Authority);
+            else directory.Seal(mode, token);
         }
 
         void VerifyResult(PayloadSnapshot result)

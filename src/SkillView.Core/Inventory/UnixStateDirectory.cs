@@ -221,7 +221,9 @@ internal sealed partial class UnixSecureRemovalBackend
             NativePayloadDirectory.CheckName(name);
             return OpenStateFile(name, false, token, create: true, payloadName: true);
         }
-        internal void CreatePayloadLink(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, CancellationToken token)
+        internal void CreatePayloadLink(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, CancellationToken token,
+            SkillView.Maintenance.PayloadNativeMetadata? metadata = null,
+            SkillView.Maintenance.PayloadMetadataAuthority? authority = null)
         {
             ValidateLocation(token); NativePayloadDirectory.CheckName(name);
             if (rawTarget.IsEmpty || rawTarget.Length > 64 * 1024 || rawTarget.Contains((byte)0)
@@ -241,8 +243,10 @@ internal sealed partial class UnixSecureRemovalBackend
                     || unchecked((ushort)Marshal.ReadInt16(stat.Pointer, 6)) != 1)
                     throw new IOException("New staged link identity or hard-link topology is unsupported.");
                 using var borrowed = new SafeFileHandle(new IntPtr(link.FileDescriptor), ownsHandle: false);
-                File.SetUnixFileMode(borrowed, (UnixFileMode)unixMode.Value);
+                if (metadata is not null) SkillView.Maintenance.PayloadNativeMetadata.Apply(borrowed, metadata, unixMode, token, authority);
+                else File.SetUnixFileMode(borrowed, (UnixFileMode)unixMode.Value);
             }
+            else if (metadata is not null) throw new IOException("Linux link metadata publication requires complete native flag coverage.");
             FlushStateDirectory(root, token);
             ValidateLocation(token);
         }
@@ -257,15 +261,25 @@ internal sealed partial class UnixSecureRemovalBackend
             FlushStateDirectory(root, token);
             sealedStage = true;
         }
-        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token)
+        internal void SealPayloadWithMetadata(int? unixMode, SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token,
+            SkillView.Maintenance.PayloadMetadataAuthority? authority = null)
+        {
+            if (stagingGuard is null) throw new IOException("Only a new staged payload can receive native metadata.");
+            ValidateLocation(token);
+            using var borrowed = new SafeFileHandle(new IntPtr(root.FileDescriptor), ownsHandle: false);
+            SkillView.Maintenance.PayloadNativeMetadata.Apply(borrowed, metadata, unixMode, token, authority);
+            FlushStateDirectory(root, token);
+            sealedStage = true;
+        }
+        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null)
         {
             token.ThrowIfCancellationRequested();
             if (!sealedStage || stagingGuard is null || payloadParent is null || payloadName is null)
                 throw new IOException("Only a sealed held payload can be finalized.");
             stagingGuard(token);
             if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("Draft payload moved before finalization.");
-            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (_, _) => { },
-                (depth, observe, ct) => WalkOpenedPayload(root, payloadParent, payloadName, depth, observe, ct, flushToDisk: true), token);
+            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (item, _) => inspectMetadata?.Invoke(item),
+                (depth, observe, ct) => WalkOpenedPayload(root, payloadParent, payloadName, depth, observe, ct, flushToDisk: true, observeRoot: inspectMetadata), token);
             stagingGuard(token);
             if (!PathIdentity.Equals(snapshot.Path, canonical) || !PathIdentity.Equals(ReadFinalPath(root), canonical))
                 throw new IOException("Draft payload moved during finalization.");
@@ -331,6 +345,29 @@ internal sealed partial class UnixSecureRemovalBackend
         }
         internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: true);
         internal override FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: false);
+        internal override FileStream CreateAnonymousMetadataWitness(CancellationToken token)
+        {
+            ValidateLocation(token);
+            if (!OperatingSystem.IsLinux()) throw new IOException("Anonymous metadata witnesses require Linux.");
+            // O_TMPFILE|O_EXCL creates an unnamed inode which Linux permanently
+            // forbids linking. No retained name can redirect a later probe.
+            var how = new OpenHow
+            {
+                Flags = 0x410000 | 0x80 | 0x80000 | 2,
+                Mode = 0x180,
+                Resolve = UnixConstants.ResolveNoCrossDevice | UnixConstants.ResolveBeneath | UnixConstants.ResolveNoSymlinks
+            };
+            var descriptor = RetryOnInterrupted(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                return checked((int)UnixNative.syscall(UnixConstants.OpenAt2SystemCall, root.FileDescriptor, ".",
+                    ref how, (nuint)Marshal.SizeOf<OpenHow>()));
+            });
+            if (descriptor < 0) throw new IOException(LastError("create anonymous metadata witness failed"));
+            var file = new SafeFileHandle(new IntPtr(descriptor), ownsHandle: true);
+            try { return new FileStream(file, FileAccess.ReadWrite); }
+            catch { file.Dispose(); throw; }
+        }
         private FileStream OpenStateFile(string name, bool writerLock, CancellationToken token, bool create, bool payloadName = false)
         {
             ValidateLocation(token);
@@ -435,6 +472,10 @@ internal sealed partial class UnixSecureRemovalBackend
                 }
                 finally { if (retained) _barrier.DangerousRelease(); }
             }
+        }
+        internal override void FlushNamespace(CancellationToken token)
+        {
+            ValidateLocation(token); FlushStateDirectory(root, token);
         }
         public override void Dispose() { foreach (var directory in held.AsEnumerable().Reverse()) directory.Dispose(); }
     }

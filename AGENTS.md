@@ -138,6 +138,23 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   native registry lease is held, read through its handle (Windows byte locks
   reject second-handle reads). NativeStateDirectory publication requires its
   `writer.lock` handle to remain open. See `agent_docs/maintenance-update-plans.md`.
+  Reviewed local merges use separate schema 3 plans and immutable B/I/C byte+
+  metadata archives; C remains the real source baseline while M has its own
+  exact result evidence. Omit absent disposition fields from schema 1/2 JSON.
+  Creating a local review closes the original replacement approval, including
+  after partial capture. Private merge attempts are bounded and retained;
+  derive their history from immutable plan records as well as current staging
+  slots because promotion deliberately vacates the latter. A newest partial
+  attempt cannot revive an older completion. Reopened nested review writes
+  must flush their held directory namespace before the owning operation's
+  writer/device barrier. See `agent_docs/maintenance-local-dispositions.md`.
+  Linux metadata enumeration cannot infer complete trusted-xattr visibility
+  from namespace capability bits. Its permission witness is a fresh held
+  `O_TMPFILE|O_EXCL` inode, never a retained filename; unknown coverage refuses
+  publication. macOS can retain `com.apple.provenance` after a successful
+  `fremovexattr`. Verify exact attributes after every staged metadata change;
+  preserve compatible I attributes and copy captured C attributes on new
+  source nodes, separately from reviewed I-parent owner/group inheritance.
   Unix registry owners must explicitly `LOCK_UN` before closing, including
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions

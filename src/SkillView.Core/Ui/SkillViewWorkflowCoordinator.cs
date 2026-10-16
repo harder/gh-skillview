@@ -563,7 +563,7 @@ internal sealed class SkillViewWorkflowCoordinator
     {
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
-        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, "retain-original", inventory,
+        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, review.LocalDisposition is null ? "retain-original" : "merge-reviewed", inventory,
             reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
     }
 

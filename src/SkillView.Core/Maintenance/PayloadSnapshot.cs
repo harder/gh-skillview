@@ -159,7 +159,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         }
     }
 
-    private static string DigestObjects(NativePayloadRoot root, ImmutableArray<PayloadObjectEvidence> objects, CancellationToken token)
+    internal static string DigestObjects(NativePayloadRoot root, ImmutableArray<PayloadObjectEvidence> objects, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

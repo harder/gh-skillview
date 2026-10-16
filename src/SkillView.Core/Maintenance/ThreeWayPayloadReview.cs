@@ -43,7 +43,7 @@ internal sealed record ThreeWayPayloadReview(ImmutableArray<LocalPathReview> Pat
         var selected = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var choice in choices ?? [])
         {
-            if (choice.Side is not ("installed" or "source" or "resolved")
+            if (choice is null || string.IsNullOrEmpty(choice.Path) || choice.Side is not ("installed" or "source" or "resolved")
                 || choice.Side == "resolved" && (choice.Path == "/" || !resolutions.ContainsKey(choice.Path))
                 || !selected.TryAdd(choice.Path, choice.Side))
                 throw new IOException("Every path needs at most one installed/source/captured-resolution choice.");

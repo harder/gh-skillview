@@ -12,7 +12,12 @@ internal sealed partial class UnixSecureRemovalBackend
         internal override void CreateLink(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, bool directoryLink, CancellationToken token) =>
             session.CreatePayloadLink(name, rawTarget, unixMode, token);
         internal override void Seal(int? unixMode, CancellationToken token) => session.SealPayload(unixMode, token);
-        internal override SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token) => session.CapturePayload(token);
+        internal override void SealWithMetadata(int? unixMode, SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token,
+            SkillView.Maintenance.PayloadMetadataAuthority? authority = null) => session.SealPayloadWithMetadata(unixMode, metadata, token, authority);
+        internal override void CreateLinkWithMetadata(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, bool directoryLink,
+            SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token,
+            SkillView.Maintenance.PayloadMetadataAuthority? authority = null) => session.CreatePayloadLink(name, rawTarget, unixMode, token, metadata, authority);
+        internal override SkillView.Maintenance.PayloadSnapshot FlushAndCapture(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null) => session.CapturePayload(token, inspectMetadata);
         public override void Dispose() => session.Dispose();
     }
 
