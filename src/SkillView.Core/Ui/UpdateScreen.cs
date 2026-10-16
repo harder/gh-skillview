@@ -8,10 +8,10 @@ namespace SkillView.Ui;
 /// this type so the UpdateScreenTests assertions don't need updating.
 public static class UpdateScreen
 {
-    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false)
+    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false, bool localReimport = false)
     {
         var sb = new System.Text.StringBuilder();
-        var heading = dryRun ? "Dry-run results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
+        var heading = dryRun ? "Dry-run results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
         if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
@@ -80,7 +80,7 @@ public static class UpdateScreen
     {
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
-        sb.AppendLine(plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
+        sb.AppendLine(plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);
         Field("Installation ID", plan.Subject.InstallationId);
@@ -89,7 +89,39 @@ public static class UpdateScreen
         Field("Manifest", plan.PlanPath);
         Field("Retained original", plan.RetainedPath);
         Field("Candidate", plan.CandidatePath);
-        Field("Disposition", plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
+        Field("Disposition", plan.LocalImport is not null ? plan.LocalImport.Disposition : plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
+        Field("Review fingerprint", plan.ReviewFingerprint);
+        if (plan.LocalImport is { } import)
+        {
+            Field("Recorded local source", import.SourcePath);
+            Field("Captured canonical source", import.CanonicalSourcePath);
+            Field("Installed archive I", import.InstalledArchiveFingerprint);
+            Field("Source archive C", import.SourceArchiveFingerprint);
+            Field("Native metadata policy", import.MetadataPolicy);
+            Field("gh witness version", import.Gh.Version);
+            Field("gh witness binary SHA256", import.Gh.BinarySha256);
+            Field("Authored version", $"{plan.Subject.Metadata.Version ?? "unspecified"} -> {import.DesiredMetadata.Version ?? "unspecified"}");
+            Field("Metadata recipes", import.Metadata.Length.ToString());
+            foreach (var recipe in import.Metadata.Take(128))
+            {
+                var desired = recipe.Desired;
+                Field("Desired native metadata", $"{(recipe.Path.Length == 0 ? "/" : recipe.Path)}: {desired.Platform} {desired.Kind}; mode={desired.UnixMode}; uid={desired.UserId}; gid={desired.GroupId}; coverage={desired.EnumerationCoverage}; basis={recipe.BasisPath}");
+                foreach (var attribute in desired.Attributes)
+                    Field("Attribute", $"{attribute.Name}: {attribute.Value.Length} bytes; SHA256 {Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(attribute.Value)).ToLowerInvariant()}");
+                if (desired.Windows is { } windows)
+                {
+                    Field("Windows security", Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(windows.SecurityDescriptor)).ToLowerInvariant());
+                    Field("Windows file attributes", windows.FileAttributes.ToString("x8", System.Globalization.CultureInfo.InvariantCulture));
+                    foreach (var stream in windows.Streams)
+                        Field("Windows stream", $"{stream.Name}: {stream.Bytes.Length} bytes; SHA256 {Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream.Bytes)).ToLowerInvariant()}");
+                }
+            }
+            if (import.Metadata.Length > 128) Field("Additional metadata recipes", $"{import.Metadata.Length - 128} omitted from display; complete evidence remains in {plan.PlanPath}");
+            if (plan.LocalSource is { } source) Field("Local source status", source.Status + ": " + source.Message);
+            sb.AppendLine("Baseline-less replacement: source C replaces installed I, including source deletions and extras. No recorded base or automatic merge is available. Review every changed path and affected consumer.");
+            sb.AppendLine("The gh staging output is a compatibility witness. SkillView materializes captured C with only the root local-path tracking splice; it preserves I root privacy and supported C descendant metadata. Active object IDs and timestamps change. The exact original native objects are retained for undo.");
+            sb.AppendLine("Source identity, bytes, metadata and lexical/canonical address must remain fresh before the first retain move. After that move, recovery and undo use frozen evidence even if the source changes or disappears; a stale source observation does not veto them.");
+        }
         if (plan.PinPolicy is { } pinPolicy)
         {
             Field("Pin", $"{plan.Subject.Metadata.PinnedRef ?? "verified owner pin"} -> explicitly unpinned");

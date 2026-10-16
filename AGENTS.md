@@ -142,6 +142,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
 
+- Local reimport uses schema5 `local-reimport` with `LocalImport`, omitting
+  Revision/LocalDisposition/PinPolicy and preserving schema1–4 hashes. The same
+  recorded ownerless local source must be fresh before the first actual retain;
+  subsequent recovery/undo uses frozen archives even when that source disappears.
+  Promote previews by held immutable copies into a fresh operation, never by
+  renaming active native state. See `agent_docs/maintenance-local-reimport.md`.
+
 - Standalone unpin uses schema4 `unpin-only`: bind actual installed capture and
   pin policy without fabricated revision/B/C evidence. Remove only verified raw
   pin members; retain recorded source/ref/tree and all physical exposures. Use

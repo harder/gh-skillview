@@ -13,10 +13,11 @@ public static partial class CliDispatcher
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
         var requestedCommand = options.SubcommandName!;
+        var localReimport = requestedCommand.StartsWith("reimport-", StringComparison.Ordinal);
         var unpinOnly = requestedCommand.StartsWith("unpin-", StringComparison.Ordinal);
         var command = requestedCommand.StartsWith("update-", StringComparison.Ordinal)
-            ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : requestedCommand;
-        var expectedPurpose = unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
+            ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : localReimport ? "restore-" + requestedCommand[9..] : requestedCommand;
+        var expectedPurpose = localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
         string? path = null, installId = null, id = null, expected = null, disposition = null;
@@ -43,10 +44,10 @@ public static partial class CliDispatcher
         }
         if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
-            || command == "restore-apply" && (!execute || !(unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-apply" && (!execute || !(localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         OperationImpact? frozenImpact = null;
@@ -63,14 +64,21 @@ public static partial class CliDispatcher
             if (command == "restore-plan")
             {
                 if (gh is null && !unpinOnly) throw new IOException("Saved replacement staging requires GitHub CLI.");
-                var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
-                    : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
-                if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
-                var target = selected[0];
-                frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
-                if (latest || unpinOnly)
+                InstalledSkill target;
+                if (localReimport) target = SelectLocalReimportTarget(inventory, path, installId);
+                else
                 {
-                    var preparation = unpinOnly
+                    var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
+                        : PathIdentity.Equals(skill.ResolvedPath, path!)).ToArray();
+                    if (selected.Length != 1) throw new IOException("Select one exact captured installation; put --scan-root before the command.");
+                    target = selected[0];
+                }
+                frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
+                if (latest || unpinOnly || localReimport)
+                {
+                    var preparation = localReimport
+                        ? await Task.Run(() => store.PlanLocalReimportAsync(gh!, target, inventory, token), token).ConfigureAwait(false)
+                        : unpinOnly
                         ? await Task.Run(() => store.PlanUnpin(target, inventory, token), token).ConfigureAwait(false)
                         : await Task.Run(() => store.PlanLatestAsync(gh!, target, inventory, unpin, token), token).ConfigureAwait(false);
                     if (preparation.Unchanged is { } current)
@@ -79,7 +87,7 @@ public static partial class CliDispatcher
                         {
                             PayloadRetained = true,
                             RetainedPayloadPath = current.Path,
-                            RetentionEvidence = unpinOnly ? "verified-unpin-plan-no-op; original payload remains installed" : "verified-update-plan-no-op; original payload remains installed"
+                            RetentionEvidence = localReimport ? "verified-local-reimport-no-op; original payload and effective metadata remain installed" : unpinOnly ? "verified-unpin-plan-no-op; original payload remains installed" : "verified-update-plan-no-op; original payload remains installed"
                         };
                         if (json) WriteJson(w =>
                         {
@@ -89,7 +97,8 @@ public static partial class CliDispatcher
                             WriteImpact(w, frozenImpact);
                             w.WriteEndObject();
                         });
-                        else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"));
+                        else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"
+                            + (current.LocalSource is { } source ? $"\nLocal source: {source.Status}: {source.Message}" : "")));
                         if (!json) WriteImpactText(frozenImpact);
                         return current.CleanupWarning is null ? ExitCodes.Success : ExitCodes.UserError;
                     }
@@ -116,10 +125,10 @@ public static partial class CliDispatcher
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
-                if (unpinOnly && command == "restore-plan")
+                if ((unpinOnly || localReimport) && command == "restore-plan")
                 {
                     w.WriteStartArray("applyArguments");
-                    foreach (var argument in new[] { "unpin-apply", "--id", result.Id, "--yes", "--disposition", "unpin-only", "--expect", result.PlanFingerprint }) w.WriteStringValue(argument);
+                    foreach (var argument in new[] { localReimport ? "reimport-apply" : "unpin-apply", "--id", result.Id, "--yes", "--disposition", localReimport ? "replace-local-retain-original" : "unpin-only", "--expect", result.PlanFingerprint }) w.WriteStringValue(argument);
                     if (allowHidden) w.WriteStringValue("--allow-hidden-dirs");
                     w.WriteEndArray();
                 }
@@ -129,9 +138,10 @@ public static partial class CliDispatcher
             else Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
                 + string.Join("\n", result.ChangedPaths.Select(change => "Changed: " + change)) + "\n" + result.Message));
+            if (!json && result.LocalImport is not null) Console.WriteLine(LocalReimportScreen.RenderText(result));
             if (!json) WriteImpactText(result.Impact ?? frozenImpact);
-            if (!json && unpinOnly && command == "restore-plan")
-                Console.WriteLine($"Apply: skillview unpin-apply --id {result.Id} --yes --disposition unpin-only --expect {result.PlanFingerprint}{(allowHidden ? " --allow-hidden-dirs" : "")}");
+            if (!json && (unpinOnly || localReimport) && command == "restore-plan")
+                Console.WriteLine($"Apply: skillview {(localReimport ? "reimport-apply" : "unpin-apply")} --id {result.Id} --yes --disposition {(localReimport ? "replace-local-retain-original" : "unpin-only")} --expect {result.PlanFingerprint}{(allowHidden ? " --allow-hidden-dirs" : "")}");
             return result.Canceled ? ExitCodes.Cancelled : result.Succeeded ? ExitCodes.Success : ExitCodes.UserError;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException
@@ -159,4 +169,13 @@ public static partial class CliDispatcher
             return ex is OperationCanceledException ? ExitCodes.Cancelled : ex is ArgumentException ? ExitCodes.InvalidUsage : ExitCodes.UserError;
         }
     }
+    internal static InstalledSkill SelectLocalReimportTarget(InventorySnapshot inventory, string? path, string? installId)
+    {
+        if ((path is null) == (installId is null)) throw new ArgumentException("Choose exactly one path or installation ID.");
+        var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
+            : PathIdentity.Equals(skill.ResolvedPath, path!) || skill.Agents.Any(agent => PathIdentity.Equals(agent.Path, path!))).ToArray();
+        return selected.Length == 1 ? selected[0]
+            : throw new IOException("Select one exact captured installation; put --scan-root before the command.");
+    }
+
 }

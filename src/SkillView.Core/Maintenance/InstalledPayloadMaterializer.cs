@@ -7,12 +7,13 @@ namespace SkillView.Maintenance;
 internal static class InstalledPayloadMaterializer
 {
     internal static PayloadSnapshot Stage(NativeStateDirectory operation, CapturedPayloadArchive installed,
-        CapturedPayloadArchive.Reader reader, PayloadMetadataReview metadata, byte[] desiredSkill, CancellationToken token)
+        CapturedPayloadArchive.Reader reader, PayloadMetadataReview metadata, byte[] desiredSkill, CancellationToken token,
+        string name = "candidate")
     {
         var children = installed.Entries.GroupBy(item => Parent(item.Entry.Path), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Entry.Path, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
-        using var root = operation.CreateMetadataPayloadDirectory("candidate", token);
-        Build(root, "", installed.Snapshot.RootUnixMode, 0);
+        using var root = operation.CreateMetadataPayloadDirectory(name, token);
+        Build(root, "", metadata[""].Desired.UnixMode, 0);
         return root.FlushAndCapture(token, item => metadata.Verify(item, token));
 
         void Build(NativePayloadDirectory directory, string parent, int? mode, int depth)

@@ -28,6 +28,8 @@ public class CliDispatcherHelpTests
         Assert.Contains("| `quarantine` |", stdout);
         Assert.Contains("| `restore-plan` |", stdout);
         Assert.Contains("| `unpin-plan` |", stdout);
+        Assert.Contains("| `reimport-plan` |", stdout);
+        Assert.Contains("--disposition replace-local-retain-original", stdout);
         Assert.Contains("--disposition unpin-only", stdout);
         Assert.Contains("| `restore-inspect` |", stdout);
         Assert.Contains("| `restore-apply` |", stdout);
@@ -59,6 +61,11 @@ public class CliDispatcherHelpTests
     [InlineData("update-recover", 600)]
     [InlineData("update-undo", 600)]
     [InlineData("update-repair-owner", 600)]
+    [InlineData("reimport-plan", 600)]
+    [InlineData("reimport-inspect", 600)]
+    [InlineData("reimport-apply", 600)]
+    [InlineData("reimport-recover", 600)]
+    [InlineData("reimport-undo", 600)]
     [InlineData("unpin-plan", 600)]
     [InlineData("unpin-inspect", 600)]
     [InlineData("unpin-apply", 600)]

@@ -16,6 +16,42 @@ internal sealed partial record CapturedPayloadArchive
 {
     internal const int MaxManifestBytes = 64 * 1024 * 1024;
 
+    internal static void CopyInto(NativeStateDirectory source, NativeStateDirectory parent, string name,
+        string expectedFingerprint, CancellationToken token)
+    {
+        var loaded = Load(source, expectedFingerprint, token);
+        var reader = loaded.Archive.OpenReader(source);
+        var destinationPath = Path.Combine(parent.CanonicalPath, name);
+        using (var destination = parent.CreateStagingDirectory(name, token))
+        {
+            foreach (var entry in loaded.Archive.Entries.Where(entry => entry.Blob is not null))
+            {
+                token.ThrowIfCancellationRequested();
+                using var output = destination.OpenFile(entry.Blob!, false, token);
+                reader.CopyEntry(entry.Entry.Path, output, token);
+                output.Flush(true);
+            }
+            using (var input = source.OpenExistingFile("manifest.json", false, token))
+            using (var output = destination.OpenFile("manifest.json", false, token))
+            {
+                if (input.Length is <= 0 or > MaxManifestBytes) throw new IOException("Archive manifest copy exceeds its limit.");
+                CopyVerified(input, output, expectedFingerprint.ToUpperInvariant(), input.Length, true, token);
+                output.Flush(true);
+            }
+            destination.FlushPublication(token);
+            destination.SealStagingDirectory(448, token);
+        }
+        // Sealing closes writer admission. Reopen a separate held read session
+        // instead of weakening the sealed writer's native namespace checks.
+        using var readback = NativeStateDirectory.OpenOrCreate(destinationPath, [], token, allowCreate: false);
+        var copied = Load(readback, expectedFingerprint, token);
+        var copiedReader = copied.Archive.OpenReader(readback);
+        foreach (var entry in copied.Archive.Entries.Where(entry => entry.Blob is not null))
+            copiedReader.CopyEntry(entry.Entry.Path, Stream.Null, token);
+        source.ValidateLocation(token);
+        parent.FlushPublication(token);
+    }
+
     private void Save(NativeStateDirectory archive, CancellationToken token)
     {
         Validate();

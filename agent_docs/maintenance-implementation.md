@@ -1326,3 +1326,27 @@ API failure. Local YAML/Bash and actual-response validation pass; new workflow
 runtime remains pending. No C# source changed after the 2,056-unit/9-integration
 verification. See `evidence/maintenance-static-package-check-ci-preflight.json`.
 Original acceptance remains 9/21; M19 is incomplete.
+
+## Local reimport: partial M08/M18 local checkpoint
+
+This isolated branch adds saved baseline-less I/C replacement from an ownerless
+installation's same recorded absolute source. Review covers all consumers and
+exact bytes/supported metadata; apply needs the saved fingerprint and explicit
+original retention. Fresh source evidence gates first retain; later recovery
+uses frozen archives. No-op precedes retained quota. Nested skills/unsupported
+metadata are explicit adapter limits; native owners/fork/adoption/detach remain
+pending.
+
+Final managed checks pass 2,044 Tests and 9 Integration tests without skips.
+Tests/Integration/MaintenanceProof builds have no warnings/errors; four scoped
+formatting checks pass. The initial one /tmp cross-mount refusal is preserved;
+unchanged-source private child TMPDIR execution passes. Actual minimum/current
+gh local import succeeds in the exact private child environment. These results
+do not claim actual App/extension/native proof.
+
+Independent source/proof reviews are clear. Four-platform native hosts, process
+death, metadata and actual old-native schema1–4 proof remain CI pending. The
+shared dialog ownership race is reproduced/fixed; the original Mac Down-arrow
+crash remains unreproduced. Acceptance stays 9/21; M08/M18 remain incomplete.
+See evidence/maintenance-local-reimport-local.json for hashes, exact local
+receipts, proof scope and remaining gates.

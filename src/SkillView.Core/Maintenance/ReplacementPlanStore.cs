@@ -167,7 +167,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         return Result(plan, observation.Topology, true, false, false, ObservationHash(plan, observation),
             (session.IncompleteJournal ? "Incomplete journal entries remain unchanged; recovery uses the reviewed current locations. " : "") + "Current locations verified against the saved original and candidate. This fingerprint is required for recovery or undo; agent session state is unknown."
             + (observation.Owner is null ? "" : " Registry owner state: " + observation.Owner.State + ".")
-            + (observation.Owner?.Repair is not { } repair ? "" : $" Explicit owner repair would restore the entire retained registry image {repair.ImageHash} ({repair.Bytes} bytes, selected entry {repair.EntryState}, {repair.Direction} write {repair.WriteId}). Review its retained intent before authorizing repair. A matching prefix is evidence, not proof of which process changed the file."), observation.Owner);
+            + (observation.Owner?.Repair is not { } repair ? "" : $" Explicit owner repair would restore the entire retained registry image {repair.ImageHash} ({repair.Bytes} bytes, selected entry {repair.EntryState}, {repair.Direction} write {repair.WriteId}). Review its retained intent before authorizing repair. A matching prefix is evidence, not proof of which process changed the file."), observation.Owner)
+            with
+        { LocalSource = InspectLocalSource(plan, session.Operation, observation.Topology, token) };
     }
 
     internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token,
@@ -283,6 +285,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 _ => admitted.Retained
             };
             if (sourceSlot?.Objects != before.ObjectStateFingerprint) throw new IOException("Move source changed after intent publication.");
+            if (action == "retain")
+            {
+                if (plan.LocalImport is not null) checkpoint?.Invoke("local-retain-intent");
+                RequireFreshLocalSource(plan, session.Operation, token);
+            }
             try
             {
                 if (toOriginal) lease.MoveToSlot(plan.RootPath, plan.OriginalPath, admitted.Root, admitted.Parent, token);
@@ -373,6 +380,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             throw new IOException("Original root/parent authority changed: " + rootError);
         VerifyLocalDisposition(plan, operation, inventory, topology, original, retained, candidate, displaced, token);
         VerifyPinPolicy(plan, operation, topology, original, retained, candidate, displaced, token);
+        VerifyLocalImport(plan, operation, topology, original, retained, candidate, displaced, token);
         return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity, owner?.Observe(token));
 
         ReplacementSlot? Slot(string scanRoot, string path)
@@ -419,16 +427,21 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     };
 
     private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token,
-        ReplacementPlan? activePlan = null, OwnerContext? owner = null)
+        ReplacementPlan? activePlan = null, OwnerContext? owner = null, bool localReimport = false)
     {
         token.ThrowIfCancellationRequested();
         inventory = owner?.RecoveryInventory(inventory, token) ?? inventory;
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete || inventory.ConfiguredRoots.Length > 512
             || target.Validity != ValidityState.Valid || !target.MetadataConflicts.IsEmpty
-            || !target.OwnershipDiagnostics.IsEmpty || !target.FrontMatter.Diagnostics.IsEmpty
-            || target.FrontMatter.LocalPath is not null || string.IsNullOrWhiteSpace(target.FrontMatter.Upstream)
-            || target.TreeSha is not { Length: 40 } tree || !tree.All(char.IsAsciiHexDigit)
-            || string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
+            || !target.OwnershipDiagnostics.IsEmpty || !target.FrontMatter.Diagnostics.IsEmpty)
+            throw new IOException("Saved replacement requires complete inventory and unambiguous metadata.");
+        if (localReimport || activePlan?.LocalImport is not null)
+        {
+            RequireLocalSourceMetadata(target.FrontMatter, true);
+            if (target.AllOwnershipClaims.Any()) throw new IOException("Local reimport requires an ownerless installation.");
+        }
+        else if (target.FrontMatter.LocalPath is not null || string.IsNullOrWhiteSpace(target.FrontMatter.Upstream)
+            || target.TreeSha is not { Length: 40 } tree || !tree.All(char.IsAsciiHexDigit) || string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
             throw new IOException("Recorded restore requires complete inventory and an unambiguous gh remote revision. Use --allow-hidden-dirs when hidden agent containers make coverage partial.");
         if (!inventory.ScannedRoots.Any(scan => OwnershipPath.Same(scan.Path, target.ScanRoot)))
             throw new IOException("The original scan root must be included in the current inventory.");
@@ -620,7 +633,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, CandidateName(plan)), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, PlanName(plan)),
-            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy)
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport)
         {
             Impact = PlanImpact(plan, status)
         };
@@ -710,10 +723,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 }
             }
             var plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (!(plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
+            if (!((plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 3 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is not null && plan.PinPolicy is null && hasMergePlan
-                    || plan.SchemaVersion == 4 && plan.Purpose == "unpin-only" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is not null && !hasMergePlan)
+                    || plan.SchemaVersion == 4 && plan.Purpose == "unpin-only" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is not null && !hasMergePlan))
+                    || plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is not null && !hasMergePlan)
                 || plan.Id != id
                 || plan.LocalDisposition is { } disposition && (!IsMergeSlot(disposition.MergedSlot) || PlanName(plan) != latestPlanName)
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
@@ -750,13 +764,14 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             subjectObserved?.Invoke(PlanImpact(plan));
             ValidateRevision(plan, operation.CanonicalPath, token);
             ValidatePinPolicy(plan, operation, token);
+            ValidateLocalImport(plan, operation, token);
             var stepCount = 0;
             ReplacementStep? latestOwnerStep = null;
             var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
             var incompleteJournal = false;
             var entries = operation.EnumerateEntries(token).Take(MaxSteps + 13 + 2 * MaxMergeAttempts).ToArray();
             if (entries.Length > MaxSteps + 11 + 2 * MaxMergeAttempts) throw new IOException("Replacement operation entry budget exceeded.");
-            if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture")))
+            if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             while (names.Contains($"step-{stepCount:D4}.json"))
@@ -787,12 +802,14 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 }
                 stepCount++;
             }
-            if (names.Contains("installed-capture") != (plan.PinPolicy is not null)) throw new IOException("Installed capture presence disagrees with the saved pin plan.");
+            if (names.Contains("installed-capture") != (plan.PinPolicy is not null || plan.LocalImport is not null)) throw new IOException("Installed capture presence disagrees with the saved plan.");
+            if (new[] { "local-source-capture", "gh-input-capture", "gh-output-capture" }.Any(name => names.Contains(name) != (plan.LocalImport is not null)))
+                throw new IOException("Local source witness presence disagrees with the saved plan.");
             if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
             if (names.Contains("owner-journal") && EffectiveOwner(plan) is null) throw new IOException("Unexpected owner journal for this plan.");
             if (plan.LocalDisposition is not null && !names.Contains("local-review")) throw new IOException("Merged plan lacks its immutable local review.");
             if ((names.Any(IsMergeSlot) || names.Any(IsMergePlan)) && !names.Contains("local-review")) throw new IOException("Unexpected merged stage without local review.");
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture")
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")
                 && !IsMergeSlot(name) && !IsMergePlan(name)
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");

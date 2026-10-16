@@ -332,6 +332,74 @@ internal sealed class SkillViewWorkflowCoordinator
         }, lifetimeToken);
     }
 
+    internal void ShowLocalReimport(InstalledSkill selected, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is not { } app) return;
+        LocalReimportScreen.Show(app, _services.Logger, selected,
+            (request, token) => RunLocalReimportAsync(selected, request, token), lifetimeToken);
+        if (!lifetimeToken.IsCancellationRequested) _refreshActiveTab();
+    }
+
+    internal async Task<LocalReimportResponse> RunLocalReimportAsync(InstalledSkill selected,
+        LocalReimportRequest request, CancellationToken token)
+    {
+        var ghPath = _getGhPath();
+        var inventory = await CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, token).ConfigureAwait(false);
+        if (request.Action == LocalReimportAction.Prepare)
+        {
+            if (ghPath is null) throw new IOException("Local reimport preparation requires GitHub CLI.");
+            var target = inventory.Skills.SingleOrDefault(skill => skill.InstallationId == selected.InstallationId
+                && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath))
+                ?? throw new IOException("The selected physical installation changed; refresh before preparing local reimport.");
+            return new(Preparation: await Task.Run(() => _services.SavedUpdates.PrepareLocalReimportAsync(
+                ghPath, target, inventory, token), token).ConfigureAwait(false));
+        }
+        if (request.Action == LocalReimportAction.Inspect)
+        {
+            var inspected = await Task.Run(() => _services.SavedUpdatePlans.Inspect(request.Id!, inventory, token, "local-reimport"), token).ConfigureAwait(false);
+            RequireSelectedLocalReimport(selected, inspected);
+            return new(Plan: inspected);
+        }
+        var review = request.Review ?? throw new ArgumentException("Inspect the saved local reimport before continuing.");
+        RequireSelectedLocalReimport(selected, review);
+        if (request.Id != review.Id) throw new ArgumentException("The saved ID differs from the reviewed local reimport.");
+        if (request.Action == LocalReimportAction.Apply)
+            return new(Preparation: await Task.Run(() => _services.SavedUpdates.ApplyAsync(review,
+                "replace-local-retain-original", inventory,
+                reconciliation => CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, reconciliation), token), token).ConfigureAwait(false));
+        if (request.Action is not (LocalReimportAction.Recover or LocalReimportAction.Undo))
+            throw new ArgumentException("Unsupported local reimport action.");
+        // Reconciliation survives canceled UI delivery and uses its own deadline.
+        SkillView.Maintenance.ReplacementResult result;
+        string? reconciliationWarning = null;
+        try
+        {
+            result = await Task.Run(() => _services.SavedUpdatePlans.Recover(review.Id,
+                review.ReviewFingerprint, inventory, request.Action == LocalReimportAction.Undo, token, "local-reimport"), token).ConfigureAwait(false);
+        }
+        finally
+        {
+            _services.ListAdapter.Invalidate();
+            using var deadline = new SkillView.Threading.CancellationSource(TimeSpan.FromSeconds(10),
+                SkillView.Threading.CancellationCallbackReporter.For(_services.Logger, "local reimport reconciliation"));
+            try
+            {
+                var reconciled = await CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, deadline.Token).ConfigureAwait(false);
+                if (reconciled.IsPartial || !reconciled.ConfiguredRootsComplete)
+                    throw new IOException("Post-attempt inventory is partial; saved evidence remains authoritative.");
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or OperationCanceledException)
+            { reconciliationWarning = exception.Message; _services.Logger.Warn("reimport.reconcile", exception.ToString()); }
+        }
+        return new(Plan: result, ReconciliationWarning: reconciliationWarning);
+    }
+
+    private static void RequireSelectedLocalReimport(InstalledSkill selected, SkillView.Maintenance.ReplacementResult review)
+    {
+        if (!LocalReimportScreen.IsLocalReimport(review) || !PathIdentity.Equals(selected.ResolvedPath, review.OriginalPath))
+            throw new IOException("This saved local reimport belongs to another purpose or physical installation address.");
+    }
+
     /// Scope-filtered capture used by the Installed tab's scope cycle. When
     /// `scopeFilter` is "user"/"project", `gh skill list --scope` does the
     /// filtering server-side; null captures everything (the tab narrows

@@ -6,7 +6,8 @@ using SkillView.Inventory.Models;
 namespace SkillView.Maintenance;
 
 internal sealed record ReplacementUnchanged(string InstallationId, string Path,
-    string PayloadFingerprint, string Message, string? CleanupWarning);
+    string PayloadFingerprint, string Message, string? CleanupWarning,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceObservation? LocalSource = null);
 
 internal sealed record ReplacementPreparation
 {
@@ -50,7 +51,8 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     ReplacementEvidence Candidate, ImmutableArray<string> ChangedPaths, string ReviewFingerprint,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -67,8 +69,11 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ReplacementLocalSourceObservation? LocalSource { get; init; }
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }
 }
