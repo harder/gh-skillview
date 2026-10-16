@@ -204,6 +204,29 @@ jobs:
           test -s 'dist/ext/gh-skillview${{ matrix.ext }}'
           'dist/app/skillview${{ matrix.ext }}' --version
           'dist/ext/gh-skillview${{ matrix.ext }}' --version
+      - name: Prove explicit static package checks preserve payloads without running scripts
+        shell: bash
+        run: |
+          python agent_docs/evidence/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
+          python agent_docs/evidence/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
+      - name: Verify repository API access and retain response evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          : > dist/gh-api-access.txt
+          test -n "$GH_TOKEN"
+          gh api --include --method GET repos/cli/cli/git/ref/tags/v2.102.0 > dist/gh-api-access.txt
+          python - <<'PYREF'
+          import json, pathlib, re
+          headers, body = pathlib.Path('dist/gh-api-access.txt').read_text().split('\n\n', 1)
+          result = json.loads(body)
+          assert re.fullmatch(r'HTTP/\S+ 200(?: .*)?', headers.splitlines()[0])
+          assert result['ref'] == 'refs/tags/v2.102.0'
+          assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
+          PYREF
       - name: Prove contextual agent loading without starting AI clients
         shell: bash
         run: |
@@ -246,11 +269,6 @@ jobs:
         run: |
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
-      - name: Prove explicit static package checks preserve payloads without running scripts
-        shell: bash
-        run: |
-          python agent_docs/evidence/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
-          python agent_docs/evidence/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
       - name: Prove managed and built-in discovery preserves read-only resources
         shell: bash
         run: |
@@ -413,6 +431,7 @@ jobs:
           name: native-maintenance-evidence-${{ matrix.rid }}
           path: |
             dist/*-proof.json
+            dist/gh-api-access.txt
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**
           if-no-files-found: warn

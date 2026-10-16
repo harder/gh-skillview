@@ -1301,3 +1301,28 @@ token diagnostic showed a healthy quota but cannot reconstruct the failed jobs'
 budget or reset time. See
 `evidence/maintenance-static-package-check-review-fixes.json` for exact sources,
 receipts, review and limitations. Original acceptance remains 9/21; M19 is open.
+
+## PR67 repository-access preflight and proof ordering
+
+At `2da52ab`, all four AOT jobs failed in the early cleanup fixture while
+resolving the remote CLI tag with installation HTTP403. The eleven-case package
+fixture was not reached on that head. Both contract lanes stopped at `gh auth
+status`; one bounded failed-only retry reproduced the auth preflight failure.
+The old `7657c26` four-case native results remain historical.
+
+A separate Actions-token diagnostic later read the exact tag successfully with
+HTTP200 while `/user` returned HTTP403, `Resource not accessible by integration`.
+The same diagnostic's `gh auth status` reported the token invalid. This supports
+a preflight mismatch for installation tokens; it does not reconstruct the
+earlier jobs' quota or explain their remote HTTP403. A synthetic invalid token
+was separately rejected by the repository endpoint with HTTP401.
+
+The workflows now require the supplied token to read the actual CLI tag API and
+validate its successful response, exact ref and commit-ID shape. Response headers
+are retained. Token permissions, both contract lanes and all native proof stages
+remain required. Offline package checks run immediately after native smoke tests,
+before network-dependent proofs, so their evidence survives an unrelated remote
+API failure. Local YAML/Bash and actual-response validation pass; new workflow
+runtime remains pending. No C# source changed after the 2,056-unit/9-integration
+verification. See `evidence/maintenance-static-package-check-ci-preflight.json`.
+Original acceptance remains 9/21; M19 is incomplete.
