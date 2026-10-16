@@ -1108,6 +1108,16 @@ from the minimum/current contract lanes and historical Mac proofs. Exact artifac
 and per-file hashes, checked assertions, command outcomes and review scope are in
 `evidence/maintenance-batch-15-verification.json`.
 
+The WSL ARM64 scoped test-project locked restore succeeds with SDK10.0.402.
+All 66 focused local-review, three-way-review, Linux ABI and Updates-tab tests
+pass with a private `/var/tmp` TMPDIR. The initial run's two state-placement
+refusals came from the sandbox's read-only `/tmp/.git` mount; the failed run is
+retained separately. Full solution locked restore infers an uncommitted host RID
+on this machine, so no local release-publish claim is made and release locks stay
+unchanged. PR65 Copilot review found stale Windows publication status in the user
+guide; the correction describes supported metadata, effective-user ownership and
+the existing security-privilege requirement while retaining explicit refusals.
+
 Final PR checks and merge remain pending. Original acceptance remains 9/21; M08 fork/source/local-import/standalone
 unpin, other-owner transitions, remaining preference recovery and the original
 criterion audit remain open. The original Installed Down-arrow crash was never

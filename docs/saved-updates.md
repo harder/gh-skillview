@@ -124,9 +124,16 @@ evidence. The next update compares local changes against that source baseline.
 
 Current metadata publication supports the verified macOS owner/group/mode/xattr
 policy. Extended ACLs, special flags, external hard links and unavailable metadata
-are refused. Linux requires proven complete attribute visibility; Windows native
-metadata publication remain pending. These
-limitations are explicit refusals and cannot authorize a lossy merge.
+are refused. Linux requires proven complete attribute visibility.
+
+Windows supports complete owner/group/DACL/SACL security descriptors, supported
+nonrestrictive file attributes and bounded alternate data streams. Objects must be
+owned by the effective user and have recoverable access permissions. Complete SACL
+visibility requires the caller's existing `SeSecurityPrivilege`; SkillView enables
+it on a duplicate thread token and restores the prior thread token afterward.
+Unsupported owners or ACLs, restrictive/storage attributes, junctions or unknown
+reparse types, hard links, unsupported stream layouts and incomplete metadata
+remain explicit refusals. A refusal cannot authorize a lossy merge.
 
 Choices and finalization attempts are bounded and append-only. A partial merged
 attempt remains retained and a retry builds a separate candidate. Incomplete newest

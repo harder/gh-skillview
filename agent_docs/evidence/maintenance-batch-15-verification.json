@@ -3488,5 +3488,38 @@
       "skipped": 0,
       "logSha256": "05d5910ea6d7adeb6335e5f13cd6b5f390fdc4832ba08d4211aea279802e7587"
     }
-  ]
+  ],
+  "wslFocusedVerification": {
+    "source": "67cf417b68bdb627f84a499947b519ca0e9d4a05",
+    "platform": "Linux ARM64 WSL",
+    "sdk": "10.0.402",
+    "scope": "Scoped test-project locked restore and 66 local review, three-way review, Linux ABI and Updates-tab tests; no local release publish or full solution verification",
+    "lockedTestProjectRestore": "passed",
+    "solutionLockedRestore": "NU1004: inferred host linux-arm64 outside committed release RID matrix; lock files unchanged",
+    "initialRun": {
+      "passed": 64,
+      "failed": 2,
+      "skipped": 0,
+      "reason": "Git state-placement refusal with synthetic read-only /tmp/.git mount"
+    },
+    "isolatedRerun": {
+      "passed": 66,
+      "failed": 0,
+      "skipped": 0,
+      "tmpdir": "/var/tmp/skillview-batch15-tests",
+      "logSha256": "fd06f5b1e0bbdaf2e1b493b197a203c11844be7bb9af40f6e9e14a4ff1c510a6"
+    }
+  },
+  "independentEvidenceReview": {
+    "candidate": "67cf417b68bdb627f84a499947b519ca0e9d4a05",
+    "model": "GPT-6.1-Sol high",
+    "result": "no concrete inaccuracies; all 156 file hashes and 30 proof summaries verified against retrieved raw artifacts"
+  },
+  "copilotReview": {
+    "pullRequest": 65,
+    "finding": "Stale Windows metadata publication status in user guide",
+    "url": "https://github.com/harder/gh-skillview/pull/65#discussion_r4296836576",
+    "resolution": "Corrected supported descriptors/attributes/streams, effective-user ownership and existing SeSecurityPrivilege requirement; unsupported/incomplete cases remain refused",
+    "reReview": "Independent GPT-6.1-Sol high review clear; Windows policy and WSL claims match implementation/raw logs"
+  }
 }
