@@ -31,8 +31,11 @@ public sealed record InstalledSkill
 
     public required Provenance Provenance { get; init; }
 
-    /// True if this install carries a `.skillview-ignore` marker.
+    /// True if legacy or verified external cleanup suppression is active.
     public required bool Ignored { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public SkillView.Preferences.CleanupSuppression? CleanupSuppression { get; init; }
 
     /// True if the canonical path was reached via any symlink.
     public required bool IsSymlinked { get; init; }

@@ -274,12 +274,13 @@ internal sealed class SkillViewWorkflowCoordinator
                         _services.Logger,
                         candidates,
                         snapshot.ProtectedRoots.ToArray(),
-                        snapshot.Skills, ownershipRunner: _services.Runner);
+                        snapshot.Skills, ownershipRunner: _services.Runner,
+                        captureInventory: token => CaptureInventoryAsync(report, token));
                     screen.Show();
                     if (screen.RemovedCount > 0
                         || screen.RemovedFileCount > 0
                         || screen.RemovedDirectoryCount > 0
-                        || screen.IgnoredCount > 0)
+                        || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved)
                     {
                         _services.ListAdapter.Invalidate();
                         // Cleanup can remove or ignore skills while the user is

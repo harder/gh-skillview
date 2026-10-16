@@ -102,6 +102,9 @@ public static class InstalledScreen
         if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));
         if (s.FrontMatter.LocalPath is { } localPath) AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
         AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
+        if (s.CleanupSuppression is { } suppression)
+            AppendDetailItem(sb, "Cleanup suppression", MarkdownTableFormatter.FormatTableCell(
+                $"{suppression.State}; legacy={suppression.LegacyMarker}, external={suppression.External}. {suppression.Diagnostic}"));
         if (!string.IsNullOrWhiteSpace(s.TreeSha))
         {
             AppendDetailItem(sb, "Tree SHA", MarkdownTableFormatter.FormatCodeSpan(s.TreeSha));

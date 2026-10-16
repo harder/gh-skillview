@@ -6,6 +6,7 @@ using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
+using SkillView.Preferences;
 
 namespace SkillView.Inventory;
 
@@ -201,7 +202,19 @@ public sealed class LocalInventoryService
                 !snapshot.IsPartial && snapshot.ConfiguredRootsComplete, cancellationToken, snapshot.ManagedRegions)
             };
         }).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
-        return snapshot with { Skills = observed };
+        return await Task.Run(() =>
+        {
+            var read = CleanupSuppressionStore.For(_contextRunner).Read(snapshot.ProtectedRoots.Select(root => root.Path)
+                .Concat(observed.Select(skill => skill.ResolvedPath)).ToArray(), cancellationToken);
+            long byteBudget = 32 * 1024 * 1024;
+            var enriched = observed.Select(skill =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var suppression = CleanupSuppressionStore.Match(skill, read, cancellationToken, ref byteBudget);
+                return skill with { Ignored = suppression.Active, CleanupSuppression = suppression };
+            }).ToImmutableArray();
+            return snapshot with { Skills = enriched, PreferenceDiagnostics = read.Diagnostic is { } message ? [message] : [] };
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     internal static bool MatchesFilters(InstalledSkill skill, Scope? scope, string? agent)

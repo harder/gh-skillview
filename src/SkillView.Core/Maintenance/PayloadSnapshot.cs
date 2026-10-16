@@ -38,13 +38,17 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token) =>
         CaptureCore(path, token, null, strictMetadata: false);
 
+    internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token, long byteLimit) =>
+        CaptureCore(path, token, null, strictMetadata: false, byteLimit: Math.Clamp(byteLimit, 0, MaxBytes));
+
     internal static PayloadSnapshot CaptureEvidence(string path,
         Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot> walk,
         CancellationToken token) => CaptureCore(path, token, null, strictMetadata: false, walk: walk);
 
     private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation,
         Action<NativePayloadItem, PayloadEntry>? sink = null, bool strictMetadata = true,
-        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot>? walk = null)
+        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot>? walk = null,
+        long byteLimit = MaxBytes)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var root = System.IO.Path.GetFullPath(path);
@@ -96,7 +100,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
             var stream = item.Content ?? throw new IOException("native payload file stream is missing");
             if (!stream.CanSeek) throw new IOException("payload contains a non-regular file");
             var initialLength = stream.Length;
-            if (initialLength > MaxBytes - totalBytes) throw new IOException("payload byte limit exceeded");
+            if (initialLength > byteLimit - totalBytes) throw new IOException("payload byte limit exceeded");
             using var hashBuilder = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             using var skillBytes = strictMetadata && item.RelativePath == LocalSkillScanner.SkillFileName ? new MemoryStream() : null;
             var buffer = new byte[64 * 1024];
@@ -108,7 +112,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
                 if (count == 0) break;
                 readBytes += count;
                 totalBytes += count;
-                if (totalBytes > MaxBytes || (skillBytes is not null && readBytes > MaxSkillBytes))
+                if (totalBytes > byteLimit || (skillBytes is not null && readBytes > MaxSkillBytes))
                     throw new IOException("payload byte limit exceeded");
                 hashBuilder.AppendData(buffer.AsSpan(0, count));
                 skillBytes?.Write(buffer, 0, count);

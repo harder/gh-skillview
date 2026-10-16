@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "351224b3e058166073370caafcba225bce12d7e9",
+  "verifiedMainCommit": "6233f6a39105c472130e726c425da7ecf5acb632",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -106,8 +106,8 @@
       "title": "Protect local changes before update or force repair",
       "priority": "P0",
       "status": "incomplete",
-      "implementedEvidenceSummary": "Local changes refused by routine updates; raw backups; quarantine/undo; saved recorded and ownerless/shared-gh newer-revision replacement retaining original/displaced native objects, with reviewed owner/payload recovery",
-      "remaining": "Source and other manager owner transitions; additional reviewed local-change dispositions; external suppression state; complete original acceptance audit",
+      "implementedEvidenceSummary": "Local changes refused by routine updates; raw backups; quarantine/undo; saved recorded and ownerless/shared-gh newer-revision replacement retaining original/displaced native objects, with reviewed owner/payload recovery; external cleanup suppression for verified physical installations without payload-marker writes",
+      "remaining": "Source and other manager owner transitions; additional reviewed local-change dispositions; remaining suppression kinds and damaged/stale preference recovery; complete original acceptance audit",
       "acceptance": "Changed tracked file, extra file, deletion, pin, shared symlink target and unchanged upstream tree SHA are all covered. No overwrite without an explicit disposition of local changes. Verified rollback restores extras and exclusions. Preserve the observed doc/runtime disagreement in compatibility tests.",
       "evidenceLedger": "maintenance-implementation.md",
       "finalAcceptanceProven": false
@@ -156,12 +156,15 @@
       "id": "M12",
       "title": "Explain what each agent can actually load",
       "priority": "P1",
-      "status": "incomplete",
-      "implementedEvidenceSummary": "Basic validity and placement evidence",
-      "remaining": "Versioned effective-loading analysis and observed-versus-expected agent views",
+      "status": "complete",
+      "implementedEvidenceSummary": "Versioned conditional local loading analysis for selected agent/profile/project/CWD/version, frozen physical subjects and all candidates; cited agent-specific selection/coexistence, policy and invocation dimensions, explicit unavailable native inventory and unknown sessions; shared CLI/TUI rendering with bounded owned capture",
+      "remaining": null,
       "acceptance": "Explain why a skill is unavailable and which copy is selected or which names coexist. Disabled, broken and incompatible states outrank a generic symlink badge. Do not apply the generic client guide\u2019s project-over-user advice as a universal rule for every agent.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-batch-13-final.json",
+      "verifiedCommit": "6233f6a39105c472130e726c425da7ecf5acb632",
+      "mergedPullRequest": 63
     },
     {
       "id": "M13",

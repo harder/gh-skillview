@@ -1018,3 +1018,42 @@ source/evidence acceptance reviews are clear. Evidence is in `evidence/maintenan
 batch-12-final.json`. M11 is complete; eight original findings are complete and 13
 remain. The original Installed down-arrow crash was never reproduced. Next is full
 original M12 effective agent loading, retaining all remaining M08 obligations.
+
+
+Batch 13 final acceptance: PR #63 merged at `6233f6a39105c472130e726c425da7ecf5acb632`, with a tree
+identical to reviewed head `bedba13fc1c1c16449122187aa2ade8f253c1c40`. All 13 PR checks pass. Local
+and Linux/macOS/Windows suites pass 1,722 tests with zero failures/skips; focused
+loading tests pass 204, and both minimum/current gh contract lanes pass 17. Both
+local AOT hosts pass 32 loading commands plus four actual old-schema 1/schema 2
+killed-Apply recovery/undo proofs. All four CI RIDs produced 108 verified proof
+files / 532 commands and fixture rows, bound to fresh successful-attempt GitHub
+artifact digests and native hashes. Source, proof and Copilot findings were fixed
+and independently re-reviewed, including the final body-only Claude slash-state
+finding. See `evidence/maintenance-batch-13-final.json` for exact attribution.
+These are product fixtures and conditional cited local expectations: no actual
+AI-client conformance or running-session observation is claimed. M12 is complete;
+nine original findings are complete and twelve remain. The original Installed
+Down-arrow crash was never reproduced. Next is full original M08, beginning with
+external suppression and continuing preserve/merge/fork/source/owner transitions;
+M03/M09/M13-M21 obligations remain unchanged.
+
+
+Batch 14 (awaiting PR verification): external cleanup suppression for physical installations
+uses private, bounded append-only preferences outside payloads. Inventory reads do
+not initialize state; diagnostics remain independent from physical inventory
+coverage. Exact path/install-ID CLI actions and owned Cleanup Ignore preserve
+legacy markers, bind stable source/owner namespaces, and require native continuity
+plus bounded complete payload evidence for unknown sources. Clears retain reserved
+capacity; partial publications trigger rescans and cannot revive older suppression.
+Independent store and UI/CLI reviews found and corrected legacy-origin reporting,
+owner/native freshness, failed-capture byte accounting, worker-thread confirmation,
+and alias selection. Re-reviews have no outstanding agreed findings. Local focused
+tests pass 17 preference, two event-loop and eight CLI cases. Both local AOT hosts
+pass minimum/current gh proofs (116 commands total), including actual remote and
+local gh installations plus ownerless fixtures, unchanged native payload objects,
+registry bytes, restart, alias/same-name isolation, source edits, legacy origins,
+alternate state homes and corrupt-clear fail-open behavior. The full suite passes 1,749 tests with zero failures/skips; formatter and sequential
+AOT publishes pass. CI and artifact attribution remain required before merge.
+Local evidence: `evidence/maintenance-batch-14-checkpoint.json`. M08 remains incomplete;
+this slice does not close preserve/merge/fork/source/owner transitions or the
+remaining non-installation suppression and state-recovery work.
