@@ -91,6 +91,34 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
     }
 
     [Fact]
+    public void EffectiveSecurityPrivilegeProbeObservesTheScopedThreadTokenAndRestoration()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal("SeSecurityPrivilege=unavailable", WindowsMetadataPrivilege.DescribeEffectiveSecurityPrivilege());
+            return;
+        }
+        using var original = WindowsIdentity.GetCurrent(ifImpersonating: true);
+        Assert.Null(original);
+        WindowsMetadataPrivilege privilege;
+        try { privilege = WindowsMetadataPrivilege.Enter(); }
+        catch (IOException error)
+        {
+            Assert.False(System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF") == "1", error.ToString());
+            return;
+        }
+        using (privilege)
+        {
+            using var active = WindowsIdentity.GetCurrent(ifImpersonating: true);
+            Assert.NotNull(active);
+            Assert.StartsWith("SeSecurityPrivilege(enabled=True,", WindowsMetadataPrivilege.DescribeEffectiveSecurityPrivilege());
+        }
+        using var restored = WindowsIdentity.GetCurrent(ifImpersonating: true);
+        Assert.Null(restored);
+        Assert.Contains("thread-token-error=1008", WindowsMetadataPrivilege.DescribeEffectiveSecurityPrivilege());
+    }
+
+    [Fact]
     public void WindowsNativeMergeCopiesExactDescriptorAndRootFileStreamsOrRefusesWithoutMutation()
     {
         if (!OperatingSystem.IsWindows()) return;

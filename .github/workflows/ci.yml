@@ -282,12 +282,15 @@ jobs:
         run: |
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
-          metadata_args=()
-          if [ "$RUNNER_OS" = Linux ]; then
-            metadata_args=(--expect-metadata-refusal CAP_SYS_ADMIN)
-          fi
-          python agent_docs/evidence/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved "${metadata_args[@]}" --output dist/local-merge-app-proof.json
-          python agent_docs/evidence/prove-local-merge-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved "${metadata_args[@]}" --output dist/local-merge-extension-proof.json
+          prove_local_merge() {
+            if [ "$RUNNER_OS" = Linux ]; then
+              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved "$@"
+            fi
+          }
+          prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
+          prove_local_merge --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/local-merge-extension-proof.json
       - name: Prove merged payload restart recovery at every directory move
         if: runner.os != 'Linux'
         shell: bash

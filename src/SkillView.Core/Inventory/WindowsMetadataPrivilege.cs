@@ -60,9 +60,30 @@ internal sealed class WindowsMetadataPrivilege : IDisposable
             Environment.FailFast("Cannot restore Windows metadata thread security context.");
         active.Dispose(); active = null; previous?.Dispose(); previous = null;
     }
+
+    internal static string DescribeEffectiveSecurityPrivilege()
+    {
+        if (!OperatingSystem.IsWindows()) return "SeSecurityPrivilege=unavailable";
+        // Inspect the effective thread token without changing it or enabling
+        // any privilege. PrivilegeCheck requires an impersonation token.
+        var opened = Native.OpenThreadToken(Native.GetCurrentThread(), 0x0008, true, out var token);
+        var error = Marshal.GetLastPInvokeError();
+        using (token)
+        {
+            if (!opened) return $"SeSecurityPrivilege(thread-token-error={error})";
+            if (!Native.LookupPrivilegeValueW(null, "SeSecurityPrivilege", out var luid))
+                return $"SeSecurityPrivilege(lookup-error={Marshal.GetLastPInvokeError()})";
+            var required = new PrivilegeSet { Count = 1, Control = 1, Luid = luid, Attributes = 2 };
+            if (!Native.PrivilegeCheck(token, ref required, out var enabled))
+                return $"SeSecurityPrivilege(check-error={Marshal.GetLastPInvokeError()})";
+            return $"SeSecurityPrivilege(enabled={enabled},attributes=0x{required.Attributes:X8})";
+        }
+    }
+
     private static IOException Failure(string operation) => new(operation + ": " + new Win32Exception(Marshal.GetLastPInvokeError()).Message);
     [StructLayout(LayoutKind.Sequential)] private struct Luid { internal uint Low; internal int High; }
     [StructLayout(LayoutKind.Sequential)] private struct TokenPrivileges { internal uint Count; internal Luid Luid; internal uint Attributes; }
+    [StructLayout(LayoutKind.Sequential)] private struct PrivilegeSet { internal uint Count, Control; internal Luid Luid; internal uint Attributes; }
     private static class Native
     {
         [DllImport("kernel32.dll")] internal static extern IntPtr GetCurrentThread();
@@ -73,5 +94,6 @@ internal sealed class WindowsMetadataPrivilege : IDisposable
         [DllImport("advapi32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetThreadToken(IntPtr thread, IntPtr token);
         [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool LookupPrivilegeValueW(string? system, string name, out Luid luid);
         [DllImport("advapi32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool AdjustTokenPrivileges(SafeAccessTokenHandle token, [MarshalAs(UnmanagedType.Bool)] bool disableAll, ref TokenPrivileges privileges, uint length, IntPtr previous, IntPtr returned);
+        [DllImport("advapi32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool PrivilegeCheck(SafeAccessTokenHandle token, ref PrivilegeSet privileges, [MarshalAs(UnmanagedType.Bool)] out bool enabled);
     }
 }

@@ -145,7 +145,8 @@ internal sealed partial class WindowsSecureRemovalBackend
         var result = MetadataNative.GetSecurityInfo(handle, 1, BackupSecurityInformation, out _, out _, out _, out _, out var descriptor);
         try
         {
-            if (result != 0) throw new IOException("Complete Windows OWNER/GROUP/DACL/SACL visibility is unavailable: " + new Win32Exception((int)result).Message);
+            if (result != 0) throw new IOException("Complete Windows OWNER/GROUP/DACL/SACL visibility is unavailable: "
+                + new Win32Exception((int)result).Message + "; " + DescribeMetadataSecurityQueryFailure(handle));
             var length = MetadataNative.GetSecurityDescriptorLength(descriptor);
             if (length is < 20 or > PayloadNativeMetadata.MaxEntryMetadataBytes) throw new IOException("Windows security descriptor exceeds its bounded budget.");
             var bytes = new byte[length]; Marshal.Copy(descriptor, bytes, 0, bytes.Length); return bytes;
