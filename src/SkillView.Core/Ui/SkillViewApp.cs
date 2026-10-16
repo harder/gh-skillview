@@ -495,6 +495,7 @@ public sealed class SkillViewApp
             onLeaveTab: LeaveUpdates,
             onUpdateApplied: () => _services.ListAdapter.Invalidate(),
             applyRunner: (review, hidden, token) => _workflows.ApplyReviewedUpdateAsync(review, hidden, token),
+            localReviewRunner: (request, hidden, token) => _workflows.ReviewLocalUpdateAsync(request, hidden, token),
             lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,
@@ -749,6 +750,7 @@ public sealed class SkillViewApp
     private bool TextInputHasFocus()
     {
         if (_inDoctor) return false;
+        if (_updatesTab?.Visible == true) return _updatesTab.LocalFileInputHasFocus;
         if (_activeTab == SkillViewTab.Installed)
         {
             return _installedTab?.FilterHasFocus == true;
@@ -2849,6 +2851,7 @@ public sealed class SkillViewApp
 
     internal SkillView.Ui.Tabs.ChangesTabView? ChangesTabForTests => _changesTab;
     internal bool UpdatesWorkspaceVisibleForTests => _updatesTab?.Visible == true;
+    internal SkillView.Ui.Tabs.UpdatesTabView? UpdatesTabForTests => _updatesTab;
     internal void StopBackgroundAdmissionForTests() => _backgroundTasks.StopAccepting();
 
     internal ContextBarView? ContextBarForTests => _contextBar;

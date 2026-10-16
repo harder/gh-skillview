@@ -20,6 +20,19 @@ parallel publish processes can contend on files such as
 `SkillView.Core.deps.json`. That contention is a verification artifact, not a
 product failure.
 
+On a Linux ARM64 development host, solution restore can infer `linux-arm64` for
+the self-contained product hosts, outside the committed release RID matrix. For
+focused unit/UI verification, locked-restore and test `SkillView.Tests.csproj`
+directly; it references Core without restoring the product hosts. Do not modify
+release lock files merely to run these scoped tests.
+
+Some Codex sandboxes expose an empty read-only `/tmp/.git` mount. Native state
+placement then correctly refuses fixtures beneath `/tmp` as Git-contained. Check
+the mount with `findmnt -T /tmp/.git` and run with an approved private `TMPDIR`
+outside those ancestors, for example beneath `/var/tmp`. Keep the placement guard
+and sandbox marker intact. Record the initial environment refusal separately
+from the isolated rerun.
+
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,
 `--filter-class`, `--filter-not-class`, `--filter-trait`,

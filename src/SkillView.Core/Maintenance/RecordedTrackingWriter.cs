@@ -78,8 +78,9 @@ internal static class RecordedTrackingWriter
             ("github-tree-sha", installed.GithubTreeSha), ("github-path", installed.GithubPath),
             ("github-pinned", installed.PinnedRef)
         };
-        var added = header + string.Concat(values.Where(value => value.Value is not null)
+        var entries = string.Concat(values.Where(value => value.Value is not null)
             .Select(value => indent + value.Key + ": " + JsonSerializer.Serialize(value.Value, ReplacementStringJsonContext.Default.String) + "\n"));
+        var added = entries.Length == 0 ? "" : header + entries;
         var result = normalized.Insert(insert, added);
         var (_, parsed, valid) = FrontMatterParser.Parse(result);
         if (!valid || !parsed.Diagnostics.IsEmpty || InstallerMetadataNormalizer.Normalize(result) != normalized)

@@ -138,6 +138,40 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   native registry lease is held, read through its handle (Windows byte locks
   reject second-handle reads). NativeStateDirectory publication requires its
   `writer.lock` handle to remain open. See `agent_docs/maintenance-update-plans.md`.
+  Reviewed local merges use separate schema 3 plans and immutable B/I/C byte+
+  metadata archives; C remains the real source baseline while M has its own
+  exact result evidence. Omit absent disposition fields from schema 1/2 JSON.
+  Creating a local review closes the original replacement approval, including
+  after partial capture. Private merge attempts are bounded and retained;
+  derive their history from immutable plan records as well as current staging
+  slots because promotion deliberately vacates the latter. A newest partial
+  attempt cannot revive an older completion. Reopened nested review writes
+  must flush their held directory namespace before the owning operation's
+  writer/device barrier. See `agent_docs/maintenance-local-dispositions.md`.
+  Linux metadata enumeration cannot infer complete trusted-xattr visibility
+  from namespace capability bits. Its permission witness is a fresh held
+  `O_TMPFILE|O_EXCL` inode, never a retained filename; unknown coverage refuses
+  publication. macOS can retain `com.apple.provenance` after a successful
+  `fremovexattr`. Verify exact attributes after every staged metadata change;
+  preserve compatible I attributes and copy captured C attributes on new
+  source nodes, separately from reviewed I-parent owner/group inheritance.
+  Captured custom resolutions use `IPayloadEvidenceReader`, not synthetic root
+  snapshots. Read inputs through `RegularFileInspection.Capture` on a retained
+  native handle; parse by target `SKILL.md`, never the input filename. Schema2
+  choices bind exact completed resolution manifests; schema1 omits that field.
+  Keep original source evidence when reusing captures. Charge incomplete and
+  unreferenced attempts to per-plan quotas and bound the draft scan first.
+  Updates-tab local review runs through the workflow coordinator off the UI
+  thread. Starting capture closes the earlier replacement approval even after
+  failure; uncertain private writes require a fresh review. Hold operation
+  ownership through queued UI completion, and require fresh retention approval
+  after building M. Keep printable update shortcuts out of the local editor's
+  file input, and bound rendered refusal summaries while retaining full evidence.
+  Interactive child containers need `CanFocus=true`; prove actual focus and
+  main-shell shortcut routing, not only direct key delivery to a text field.
+  Use `SingleRowButton` for actions assigned individual footer rows. In pinned
+  Terminal.Gui 2.5, `ShadowStyles.None` can retain margin space from a default
+  shadow; suppress construction via `InitializingShadowStyle` with null instead.
   Unix registry owners must explicitly `LOCK_UN` before closing, including
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions
@@ -367,7 +401,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   the current process architecture: little-endian x64 reads `st_mode` at byte
   24, little-endian ARM64 at byte 16, and both read `st_ctim` at bytes 104/112;
   unverified architectures or endianness disable secure removal rather than
-  guessing. The unsuffixed macOS libc symbols expose the verified 64-bit-inode
+  guessing. Linux open flags also differ by architecture: use `LinuxOpenFlags`
+  for directory/no-follow/temporary-file opens. On ARM64, x64's directory bit
+  requests direct I/O instead. Recheck with `agent_docs/evidence/probe-linux-abi.c`
+  when adding an ABI; do not infer open flags from the `stat` layout.
+  The unsuffixed macOS libc symbols expose the verified 64-bit-inode
   ABI only to native ARM64 processes; fail closed on Intel/Rosetta rather than
   parsing the ARM64 layout. Unix captured identity includes change-time seconds/nanoseconds as
   well as device/inode for selected directories, parents, links, and observed
@@ -673,6 +711,11 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Progressive disclosure
 
+- `agent_docs/native-payload-metadata.md` — native merge metadata contracts,
+  Windows thread-token and backup-stream framing rules, and required native proofs.
+- `agent_docs/evidence/disk-full-proof.md` — real ENOSPC recovery proofs; filling
+  is permitted only inside the marked, natively verified bounded Linux tmpfs.
+
 - Ordinary Cleanup Ignore and CLI `ignore` write only the private sibling
   `SkillView/preferences` store; never write or silently remove legacy
   `.skillview-ignore` payload markers. Keep suppression observations transient
@@ -682,6 +725,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   Charge failed captures against the aggregate inventory byte budget. Preference
   diagnostics are independent from physical-provider inventory coverage. Keep
   cleanup confirmation dialogs on the event-loop thread before worker admission.
+  Include preference-store construction in its diagnostic boundary so missing
+  HOME/USERPROFILE cannot abort inventory. Incomplete ownership diagnostics block
+  suppression capture/activation; external clear still bypasses binding capture.
 
 - Product updates use `TuiServices.SavedUpdates`, carrying physical targets
   rather than names alone. Keep `--dir` rooted at the verified containing skills

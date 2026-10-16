@@ -72,6 +72,17 @@ That makes `.agents/skills` the most predictable sandbox root for PTY tests.
 Do not rely only on visible screen text. Terminal.Gui redraws, status auto-clear,
 and truncation make pure screen scraping brittle.
 
+- Avoid whole-screen absence checks such as `"loading" not in screen`; the
+  permanent Installed shortcut legend includes `E loading`. Wait for the exact
+  inventory/status or saved-plan condition needed by the next action.
+- Button labels can repeat in instructions and status text. Prefer the actual
+  bracketed button when locating a click target.
+- Check real focus before typing. A nonfocusable ancestor can leave a text field
+  unfocused even when direct key-delivery tests insert characters. Exercise both
+  the field and main-shell printable-shortcut routing through the PTY.
+- Close the owned PTY master before the bounded process-exit wait on failure,
+  and retain the transcript even when teardown times out.
+
 Use **condition-based waiting** with these sources, in order:
 
 1. **File log conditions** for internal milestones

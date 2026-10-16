@@ -1,14 +1,80 @@
 # Full M08 work retained after external suppression
 
-This is read-only preparation while M12 final CI awaits GitHub quota. Do not
-implement a new batch before the current batch is reviewed, verified and merged.
+External suppression merged in PR64. Batch15 implements reviewed local
+dispositions on `codex/reviewed-local-dispositions`. Schema3 merge planning, CLI
+entrypoints and owned inline TUI controls have completed the verification recorded
+in `evidence/maintenance-batch-15-verification.json` and the preserved October 16
+handoff receipts. Focused final integration review is clear; final PR checks and
+merge remain pending. Original M08 acceptance remains open. The development notes
+below retain their earlier scope; use the consolidated evidence for completed
+platform, recovery and TUI results.
 
-Original acceptance stays unchanged. Existing replacement supports exact recorded
+Current private draft boundaries:
+- `ThreeWayPayloadReview` analyzes complete path sets, explicit captured-file
+  resolutions, root mode, topology and aggregate budgets. It is not authority.
+- `CapturedPayloadArchive` retains immutable indexed regular-file blobs for
+  file/link bytes, under a held private state directory. Its bounded manifest
+  explicitly retains full native identities/generations and observed metadata;
+  unsupported ACLs, flags, streams, hard links or unknown namespace coverage
+  remain concrete refusals. The legacy `PayloadSnapshot` remains a byte/object
+  comparison contract, not a complete metadata attestation.
+- `ReviewedPayloadMaterializer` builds selected authored content through
+  `NativePayloadDirectory`, rebinds approved source tracking, and finalizes via
+  the held root. A successful draft is still not an applyable saved plan.
+- `CaptureInto` opts into Unix link modes. Legacy capture, backup and saved
+  replacement hash inputs continue omitting those modes. Never compare the
+  two capture flavors as if they had identical fingerprints.
+- macOS symlink modes can reflect umask. Preserve the observed mode through
+  an `O_SYMLINK` handle; never chmod the target. Linux links require 0777.
+  Windows materialization still needs captured directory-link kind and full
+  native metadata admission before the draft workflow can use links.
+- Finalization must stay on the originally created payload handle. Reopening
+  a canonical pathname can accept a replacement with identical bytes/modes.
+
+Current CLI path (private-stage writes until explicit Apply):
+1. `update-plan` produces a schema2 immutable B/C plan without changing I.
+2. `update-merge-review --id ID --expect SOURCE_PLAN_HASH` independently retains
+   B/I/C blobs plus native metadata and closes the earlier replacement approval.
+   Repeat with the same source-plan hash to inspect saved choices after restart.
+3. `update-merge-choose --id ID --expect LOCAL_REVIEW_HASH` writes the complete
+   explicit choice set with repeated `--choose-installed PATH` or
+   `--choose-source PATH`; `/` selects the root mode. Unselected paths use the
+   three-way rules. Unknown/duplicate choices and invalid topology are refused.
+   `--resolve TARGET FILE` captures exact regular-file bytes/mode/source metadata;
+   `--choose-resolved TARGET` reuses previously completed referenced evidence.
+   The source pathname stops being an apply dependency after capture. A byte
+   reader interface supports resolutions without fabricating a native root.
+   Resolution manifests keep real source observations separate from private
+   blob metadata. Only target `SKILL.md` receives strict YAML/UTF-8 parsing.
+4. `update-merge-plan --id ID --expect LOCAL_REVIEW_HASH` builds M through held
+   native handles and saves schema3. It binds the source plan, all manifests,
+   exact choices, source C, result M and metadata policy. New C nodes use captured
+   C attributes and reviewed I-parent ownership; compatible I kinds keep I
+   attributes. Existing root privacy is the default. Unknown metadata refuses.
+5. `update-apply --id ID --yes --disposition merge-reviewed --expect MERGE_HASH`
+   uses the existing retain/promote/owner journal, with B/I/C/metadata/result
+   revalidation. Recovery/undo still require a fresh inspection fingerprint.
+6. `update-preserve --id ID --expect PLAN_HASH` verifies and keeps I without any
+   payload move, owner write or preference change. The private plan remains.
+
+Choice records are append-only, and invalid newest records cannot revive prior
+choices. Finalization attempts use bounded independent `merged-NN` slots and
+`merge-plan-NN.json` records; partial evidence survives retries. Attempt presence
+is independent of the current payload location after promotion. An incomplete
+initial B/I/C capture remains retained and requires a new revision plan; it never
+restores approval of the earlier source replacement. Cross-platform acceptance
+and the full TUI/recovery proof matrix are still pending. Resolution storage includes failed/unreferenced
+attempts: at most 16 archives, 256 MiB of raw bytes and 64 MiB of encoded manifests
+per plan. Bound the outer draft enumeration before computing that quota. Flush
+each archive, then the reopened draft namespace and operation writer/device
+barrier before publishing any reference in a choice record.
+
+Original acceptance stays unchanged. Replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native
 objects. It admits no owner or one verified shared gh v3 owner. It already stages
-recorded base and candidate and lists local differences, but only offers reviewed
-retain-original replacement. Preserve/merge/fork and source/other-owner transitions
-remain required.
+recorded base and candidate and lists local differences. Batch15 adds verified
+preserve and reviewed merge alongside retain-original replacement. Durable fork,
+source/other-owner transitions and the remaining proof matrix below remain required.
 
 ## Three-way review
 

@@ -6,12 +6,18 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      verification:
+        description: 'Run all checks or only Windows native metadata regressions'
+        type: choice
+        options: [all, windows-metadata]
+        default: all
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ inputs.verification == 'windows-metadata' && '-windows-metadata' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +34,7 @@ jobs:
         run: python3 -m unittest discover -s .github/scripts -p test_homebrew_formula.py
 
   dependency-review:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,6 +44,8 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
   site-check:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped site checks' || 'site-check' }}
+    if: inputs.verification != 'windows-metadata'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -47,6 +56,8 @@ jobs:
         run: node --check site/app.js
 
   test:
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped tests' || 'test' }} (${{ matrix.os }})
+    if: inputs.verification != 'windows-metadata'
     strategy:
       fail-fast: false
       matrix:
@@ -70,8 +81,53 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
 
+  windows-metadata:
+    name: Windows metadata (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # These native tests must publish and recapture metadata successfully;
+      # an environmental refusal is not a passing Windows proof.
+      SKILLVIEW_WINDOWS_METADATA_PROOF: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Prove native security descriptors and alternate streams
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
+            --configuration Release -p:RestoreLockedMode=true \
+            --filter-class SkillView.Tests.Maintenance.WindowsPayloadMetadataTests \
+            --filter-class SkillView.Tests.Maintenance.WindowsBackupReadStreamTests \
+            --filter-class SkillView.Tests.Maintenance.WindowsSecurityDescriptorQueryTests \
+            --filter-class SkillView.Tests.Maintenance.RecordedTrackingWriterTests \
+            --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
+            --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
+            --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
+            --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
+            | tee dist/windows-metadata-tests.log
+      - name: Retain Windows metadata evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-metadata-evidence-${{ matrix.os }}
+          path: dist/windows-metadata-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
   aot-smoke:
-    name: AOT publish smoke (${{ matrix.rid }})
+    if: inputs.verification != 'windows-metadata'
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -221,11 +277,64 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
+      - name: Prove reviewed shared-owner merges and restart repair
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
+          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
+      - name: Prove reviewed local dispositions and frozen resolutions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          prove_local_merge() {
+            if [ "$RUNNER_OS" = Linux ]; then
+              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved "$@"
+            fi
+          }
+          prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
+          prove_local_merge --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/local-merge-extension-proof.json
+      - name: Prove merged payload restart recovery at every directory move
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          for boundary in retain-moved install-moved displace-moved restore-moved; do
+            python agent_docs/evidence/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
+              --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
+              --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
+          done
+      - name: Prove real disk-full recovery on isolated bounded tmpfs
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          proof_gh_path="$(command -v gh)"
+          python3 agent_docs/evidence/run-local-merge-disk-full-docker.py \
+            --app dist/app/skillview \
+            --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
+            --gh "$proof_gh_path" --output dist/disk-full-proof --platform linux/amd64
       - name: Retain native verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-maintenance-evidence-${{ matrix.rid }}
-          path: dist/*-proof.json
+          path: |
+            dist/*-proof.json
+            dist/disk-full-proof/**
           if-no-files-found: warn
           retention-days: 14

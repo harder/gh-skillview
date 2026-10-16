@@ -57,6 +57,10 @@ public class CliDispatcherHelpTests
     [InlineData("update-recover", 600)]
     [InlineData("update-undo", 600)]
     [InlineData("update-repair-owner", 600)]
+    [InlineData("update-merge-review", 600)]
+    [InlineData("update-merge-choose", 600)]
+    [InlineData("update-merge-plan", 600)]
+    [InlineData("update-preserve", 600)]
     public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
     {
         Assert.Equal(TimeSpan.FromSeconds(seconds), CliDispatcher.TimeoutFor(subcommand));

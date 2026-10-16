@@ -13,7 +13,7 @@ using Xunit;
 
 namespace SkillView.Tests.Ui;
 
-public sealed class ReviewedUpdatesTabTests
+public sealed partial class ReviewedUpdatesTabTests
 {
     [Theory]
     [InlineData(80, 20)]
@@ -28,7 +28,13 @@ public sealed class ReviewedUpdatesTabTests
             Assert.InRange(button.Frame.Left, 0, width - 1);
             Assert.InRange(button.Frame.Right, 1, width);
             Assert.InRange(button.Frame.Bottom, 1, height);
+            Assert.Equal(1, button.Frame.Height);
+            Assert.Null(button.ShadowStyle);
+            Assert.Equal(Terminal.Gui.Drawing.Thickness.Empty, button.Margin.Thickness);
         }
+        var controls = view.SubViews.Where(child => child.Visible && child is Button or CheckBox).ToArray();
+        foreach (var control in controls)
+            Assert.DoesNotContain(controls, other => !ReferenceEquals(control, other) && control.Frame.IntersectsWith(other.Frame));
         Assert.NotEqual(view.DryRunButtonForTests.Frame.Y, view.ApplyButtonForTests.Frame.Y);
     }
 
@@ -71,11 +77,12 @@ public sealed class ReviewedUpdatesTabTests
     private static UpdatesTabView View(InstalledSkill[] targets,
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> prepare,
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>> apply,
-        Action? changed = null, Func<Action, Task>? dispatch = null) => new(
+        Action? changed = null, Func<Action, Task>? dispatch = null,
+        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? local = null) => new(
             dispatch ?? (action => { action(); return Task.CompletedTask; }),
             (operation, _) => operation().GetAwaiter().GetResult(),
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() }),
-            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply);
+            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local);
 
     [Theory]
     [InlineData(false)]

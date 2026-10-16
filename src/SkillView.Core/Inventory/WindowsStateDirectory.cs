@@ -86,9 +86,10 @@ internal sealed partial class WindowsSecureRemovalBackend
     }
 
     private static SafeFileHandle CreateStateEntryAt(SafeFileHandle parent, string name, bool directory,
-        bool openIf, byte[] descriptor, bool exclusive, CancellationToken token, bool existingOnly = false)
+        bool openIf, byte[] descriptor, bool exclusive, CancellationToken token, bool existingOnly = false, bool payloadName = false, bool metadataAccess = false)
     {
-        NativeStateDirectory.CheckName(name);
+        if (payloadName) NativePayloadDirectory.CheckName(name); else NativeStateDirectory.CheckName(name);
+        using var metadataPrivilege = metadataAccess ? WindowsMetadataPrivilege.Enter() : null;
         var text = Marshal.StringToHGlobalUni(name);
         var unicodeAddress = Marshal.AllocHGlobal(Marshal.SizeOf<UnicodeString>());
         var securityAddress = Marshal.AllocHGlobal(descriptor.Length);
@@ -115,7 +116,8 @@ internal sealed partial class WindowsSecureRemovalBackend
             var options = FileOpenForBackupIntent | FileSynchronousIoNonAlert | FileOpenReparsePoint | 2u
                 | (directory ? FileDirectoryFile : FileNonDirectoryFile);
             token.ThrowIfCancellationRequested();
-            var status = StateNative.NtCreateFile(out rawHandle, existingOnly ? 0x00120089u : 0x001201BFu, ref attributes, out _, IntPtr.Zero,
+            var access = (existingOnly ? 0x00120089u : 0x001201BFu) | (metadataAccess ? MetadataReadAccess | MetadataWriteAccess : 0);
+            var status = StateNative.NtCreateFile(out rawHandle, access, ref attributes, out _, IntPtr.Zero,
                 0x80, exclusive ? 0u : ShareRead | ShareWrite | ShareDelete,
                 existingOnly ? 1u : openIf ? 3u : 2u, options, IntPtr.Zero, 0);
             if (status < 0) throw new IOException("Create/open relative state entry failed: "
@@ -253,19 +255,92 @@ internal sealed partial class WindowsSecureRemovalBackend
     [SupportedOSPlatform("windows")]
     private sealed class WindowsStateSession(List<SafeFileHandle> held, SafeFileHandle root, string canonical,
         WindowsStateExclusions excluded, SecurityIdentifier user, byte[] descriptor,
-        Action<CancellationToken>? stagingGuard = null) : NativeStateDirectory
+        Action<CancellationToken>? stagingGuard = null, bool metadataPayload = false) : NativeStateDirectory
     {
         private bool sealedStage;
+        internal override NativePayloadDirectory CreatePayloadDirectory(string name, CancellationToken token)
+        {
+            NativeStateDirectory.CheckName(name);
+            return CreatePayloadChild(name, token);
+        }
+        internal NativePayloadDirectory CreatePayloadChild(string name, CancellationToken token) =>
+            new WindowsPayloadDirectory(CreateChild(name, token, payloadName: true, metadataAccess: metadataPayload));
+        internal override NativePayloadDirectory CreateMetadataPayloadDirectory(string name, CancellationToken token) =>
+            new WindowsPayloadDirectory(CreateChild(name, token, payloadName: true, metadataAccess: true));
+        internal FileStream CreatePayloadFile(string name, CancellationToken token)
+        {
+            ValidateLocation(token);
+            var handle = CreateStateEntryAt(root, name, false, false, descriptor, exclusive: true, token, payloadName: true, metadataAccess: metadataPayload);
+            try { CheckWindowsPrivateState(handle, user); return new FileStream(handle, FileAccess.ReadWrite); }
+            catch { handle.Dispose(); throw; }
+        }
+        internal void CreatePayloadLink(string name, ReadOnlySpan<byte> rawTarget, bool directoryLink, CancellationToken token,
+            SkillView.Maintenance.PayloadNativeMetadata? metadata = null)
+        {
+            ValidateLocation(token); NativePayloadDirectory.CheckName(name);
+            // Only the documented symbolic-link format is materializable here.
+            // Junctions and other reparse providers require separate adapters.
+            if (rawTarget.Length is < 20 or > 16 * 1024
+                || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(rawTarget) != 0xA000000C
+                || System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(rawTarget[4..]) + 8 != rawTarget.Length)
+                throw new IOException("Unsupported raw Windows symbolic-link buffer.");
+            using var child = CreateStateEntryAt(root, name, directoryLink, false, descriptor, exclusive: false, token, payloadName: true, metadataAccess: metadataPayload);
+            var bytes = rawTarget.ToArray();
+            var buffer = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, buffer, bytes.Length);
+                token.ThrowIfCancellationRequested();
+                if (!WindowsNative.DeviceIoControl(child, 0x000900A4, buffer, (uint)bytes.Length, [], 0, out _, IntPtr.Zero))
+                    throw new IOException("Create held payload symbolic link failed: " + LastErrorMessage());
+                if (!ReadIdentity(child).IsReparsePoint || !ReadReparseData(child).AsSpan().SequenceEqual(bytes))
+                    throw new IOException("Created payload symbolic link differs from its captured bytes.");
+                if (metadata is not null) ApplyPayloadMetadata(child, metadata, null, token);
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+            ValidateLocation(token);
+        }
+        internal void SealPayload(int? unixMode, CancellationToken token)
+        {
+            if (stagingGuard is null || unixMode is not null) throw new IOException("Invalid Windows payload sealing policy.");
+            ValidateLocation(token);
+            sealedStage = true;
+        }
+        internal void SealPayloadWithMetadata(int? unixMode, SkillView.Maintenance.PayloadNativeMetadata metadata, CancellationToken token)
+        {
+            if (stagingGuard is null || unixMode is not null) throw new IOException("Invalid Windows metadata sealing policy.");
+            ValidateLocation(token);
+            ApplyPayloadMetadata(root, metadata, null, token);
+            sealedStage = true;
+        }
+        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token, Action<NativePayloadItem>? inspectMetadata = null)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!sealedStage || stagingGuard is null) throw new IOException("Only a sealed held payload can be finalized.");
+            stagingGuard(token);
+            if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("Draft payload moved before finalization.");
+            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (item, _) => inspectMetadata?.Invoke(item),
+                (depth, observe, ct) => WalkOpenedPayload(root, depth, observe, ct, inspectMetadata), token);
+            stagingGuard(token);
+            if (!PathIdentity.Equals(snapshot.Path, canonical) || !PathIdentity.Equals(ReadFinalPath(root), canonical))
+                throw new IOException("Draft payload moved during finalization.");
+            return snapshot;
+        }
         internal override NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token)
         {
             ValidateLocation(token); NativeStateDirectory.CheckName(name);
-            var child = CreateStateEntryAt(root, name, directory: true, openIf: false, descriptor, exclusive: false, token);
+            return CreateChild(name, token, payloadName: false);
+        }
+        private WindowsStateSession CreateChild(string name, CancellationToken token, bool payloadName, bool metadataAccess = false)
+        {
+            ValidateLocation(token);
+            var child = CreateStateEntryAt(root, name, directory: true, openIf: false, descriptor, exclusive: false, token, payloadName: payloadName, metadataAccess: metadataAccess);
             try
             {
                 var address = Path.Combine(canonical, name);
                 if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Staging directory moved during creation.");
                 CheckWindowsPrivateState(child, user);
-                return new WindowsStateSession([child], child, address, excluded, user, descriptor, ValidateLocation);
+                return new WindowsStateSession([child], child, address, excluded, user, descriptor, ValidateLocation, metadataAccess);
             }
             catch { child.Dispose(); throw; }
         }

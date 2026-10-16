@@ -35,6 +35,11 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     internal static PayloadSnapshot CaptureWithEntrySink(string path,
         Action<NativePayloadItem, PayloadEntry> sink, CancellationToken token) => CaptureCore(path, token, null, sink, strictMetadata: false);
 
+    internal static PayloadSnapshot CaptureBoundWithEntrySink(string path,
+        Action<NativePayloadItem, PayloadEntry> sink,
+        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot> walk,
+        CancellationToken token) => CaptureCore(path, token, null, sink, strictMetadata: true, walk: walk, captureLinkModes: true);
+
     internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token) =>
         CaptureCore(path, token, null, strictMetadata: false);
 
@@ -48,7 +53,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
     private static PayloadSnapshot CaptureCore(string path, CancellationToken cancellationToken, Action<string, string>? observation,
         Action<NativePayloadItem, PayloadEntry>? sink = null, bool strictMetadata = true,
         Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot>? walk = null,
-        long byteLimit = MaxBytes)
+        long byteLimit = MaxBytes, bool captureLinkModes = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var root = System.IO.Path.GetFullPath(path);
@@ -80,6 +85,10 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         PayloadFileEvidence? Observe(NativePayloadItem item)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // Existing backup and replacement schemas intentionally hashed Unix
+            // links without modes. The new bound draft capture opts in; do not
+            // change older saved-plan/hash inputs.
+            if (item.Kind == "link" && !captureLinkModes) item = item with { UnixMode = null };
             if (entries.Count >= MaxEntries) throw new IOException("payload entry limit exceeded");
             objects.Add(new(item.RelativePath, item.Identity, item.UnixMode));
             if (item.Kind == "link")
@@ -150,7 +159,7 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         }
     }
 
-    private static string DigestObjects(NativePayloadRoot root, ImmutableArray<PayloadObjectEvidence> objects, CancellationToken token)
+    internal static string DigestObjects(NativePayloadRoot root, ImmutableArray<PayloadObjectEvidence> objects, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

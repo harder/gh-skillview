@@ -15,6 +15,8 @@ internal abstract class NativeDirectoryMoveLease : IDisposable
     internal bool MutationAttempted { get; private protected set; }
     internal bool MutationCompleted { get; private protected set; }
     internal abstract PayloadSnapshot Capture(CancellationToken token);
+    internal abstract PayloadSnapshot CaptureInto(Action<NativePayloadItem, PayloadEntry> sink,
+        Action<NativePayloadItem>? observeRoot, CancellationToken token);
     internal virtual PayloadSnapshot FlushPayload(CancellationToken token) => Capture(token);
     internal abstract void Revalidate(CancellationToken token);
     internal abstract void FlushSourceNamespace(CancellationToken token);

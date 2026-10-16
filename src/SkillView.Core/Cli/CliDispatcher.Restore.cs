@@ -41,10 +41,10 @@ public static partial class CliDispatcher
         }
         if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
-            || command == "restore-apply" && (!execute || disposition != "retain-original" || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-apply" && (!execute || !(disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (or merge-reviewed for a merged update) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         OperationImpact? frozenImpact = null;
@@ -104,7 +104,7 @@ public static partial class CliDispatcher
             else result = await Task.Run(() => command switch
             {
                 "restore-inspect" => store.Inspect(id!, inventory, token),
-                "restore-apply" => store.Apply(id!, expected!, inventory, token),
+                "restore-apply" => store.Apply(id!, expected!, inventory, token, disposition!),
                 "restore-repair-owner" => store.RepairOwner(id!, expected!, inventory, token),
                 _ => store.Recover(id!, expected!, inventory, command == "restore-undo", token)
             }, token).ConfigureAwait(false);

@@ -17,7 +17,7 @@ internal sealed partial class UnixSecureRemovalBackend
         try
         {
             var name = Path.GetFileName(path);
-            var flags = 2 | (OperatingSystem.IsMacOS() ? 0x100 | 0x1000000 | 4 : 0x20000 | 0x80000 | 0x800);
+            var flags = 2 | (OperatingSystem.IsMacOS() ? 0x100 | 0x1000000 | 4 : LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking);
             int descriptor;
             if (OperatingSystem.IsLinux())
             {

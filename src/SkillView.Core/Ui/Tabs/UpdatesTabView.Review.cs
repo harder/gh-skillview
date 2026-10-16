@@ -30,14 +30,14 @@ internal sealed partial class UpdatesTabView
             Text = "Retain original, including local edits; apply this reviewed plan",
             Enabled = false
         };
-        _applyButton = new Button
+        _applyButton = new SingleRowButton
         {
             X = 0,
             Y = Pos.AnchorEnd(2),
-            Text = "Apply reviewed plan",
+            Text = "Replace reviewed",
             Enabled = false
         };
-        _nextButton = new Button
+        _nextButton = new SingleRowButton
         {
             X = Pos.Right(_applyButton) + 2,
             Y = Pos.AnchorEnd(2),
@@ -61,9 +61,12 @@ internal sealed partial class UpdatesTabView
     private void RefreshReviewControls()
     {
         var idle = !_operationCancellations.HasActive && !_loadCancellations.HasActive;
-        _retainBox.Enabled = idle && _review is not null;
-        _applyButton.Enabled = idle && _review is not null && _applyRunner is not null && _retainBox.Value == CheckState.Checked;
+        var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
+        _retainBox.Enabled = idle && applicable;
+        _applyButton.Enabled = idle && applicable && _applyRunner is not null && _retainBox.Value == CheckState.Checked;
+        _applyButton.Text = _review?.LocalDisposition is null ? "Replace reviewed" : "Apply reviewed merge";
         _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0);
+        RefreshLocalReviewControls(idle);
     }
 
     private async Task PrepareNextAsync()
@@ -78,6 +81,7 @@ internal sealed partial class UpdatesTabView
     private async Task ApplyReviewAsync()
     {
         if (_review is not { } captured || _applyRunner is null || _retainBox.Value != CheckState.Checked
+            || _localReviewStarted && captured.LocalDisposition is null
             || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
         var hidden = _queueOptions?.AllowHiddenDirectories ?? false;
         await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), dryRun: false, applying: true).ConfigureAwait(false);
@@ -93,6 +97,7 @@ internal sealed partial class UpdatesTabView
             _review = null;
         }
         _retainBox.Value = CheckState.UnChecked;
+        ResetLocalReview();
         if (_queue.Count > 0) return PrepareNextAsync();
         _queueOptions = null;
         _status.Text = " review queue complete; saved plans remain available for inspection";
@@ -122,12 +127,13 @@ internal sealed partial class UpdatesTabView
                 {
                     SaveOutcomes(result.Outcomes);
                     _review = applying ? null : result.SavedPlan;
+                    ResetLocalReview();
                     _retainBox.Value = CheckState.UnChecked;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
                 }
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, []);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"
-                    : _review is not null ? $" review required · {_queue.Count} remaining · approve retention, then Apply reviewed plan"
+                    : _review is not null ? $" review required · {_queue.Count} remaining · choose preserve, local review, or approve Replace reviewed"
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
                     : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)} · {_queue.Count} remaining"
                     : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {_queue.Count} remaining · Next / skip continues";

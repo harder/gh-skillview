@@ -563,7 +563,7 @@ internal sealed class SkillViewWorkflowCoordinator
     {
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
-        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, "retain-original", inventory,
+        return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, review.LocalDisposition is null ? "retain-original" : "merge-reviewed", inventory,
             reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
     }
 
@@ -571,6 +571,28 @@ internal sealed class SkillViewWorkflowCoordinator
         _services.InventoryService.CaptureAsync(ghPath,
             new LocalInventoryService.Options(_options.ScanRoots, allowHidden,
                 WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles), token);
+
+    internal async Task<LocalUpdateResponse> ReviewLocalUpdateAsync(LocalUpdateRequest request, bool allowHidden, CancellationToken token)
+    {
+        var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);
+        return await Task.Run(() =>
+        {
+            var plans = _services.SavedUpdatePlans;
+            var plan = request.Plan;
+            return request.Action switch
+            {
+                LocalUpdateAction.Preserve => new LocalUpdateResponse(Plan: plans.PreserveInstalled(plan.Id, plan.PlanFingerprint, inventory, token)),
+                LocalUpdateAction.Review => new LocalUpdateResponse(Review: plans.ReviewLocalChanges(plan.Id, plan.PlanFingerprint, inventory, token)),
+                LocalUpdateAction.Choose when request.Review is { } review => new LocalUpdateResponse(Review: plans.ChooseLocalChanges(
+                    plan.Id, review.ReviewFingerprint, request.Choices, inventory, token,
+                    request.Resolutions.Select(input => input with
+                    { SourceFile = Path.GetFullPath(input.SourceFile, _services.Runner.EffectiveWorkingDirectory) }).ToArray())),
+                LocalUpdateAction.Build when request.Review is { } review => new LocalUpdateResponse(Plan: plans.FinalizeLocalChanges(
+                    plan.Id, review.ReviewFingerprint, inventory, token)),
+                _ => throw new ArgumentException("The local update action needs its exact captured review.")
+            };
+        }, token).ConfigureAwait(false);
+    }
 
     /// Drill into the Updates workspace from the Changes queue.
     /// Calls <paramref name="activateUpdates"/> with <paramref name="hideChanges"/> so the caller

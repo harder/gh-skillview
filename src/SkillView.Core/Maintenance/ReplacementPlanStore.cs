@@ -169,12 +169,17 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             + (observation.Owner?.Repair is not { } repair ? "" : $" Explicit owner repair would restore the entire retained registry image {repair.ImageHash} ({repair.Bytes} bytes, selected entry {repair.EntryState}, {repair.Direction} write {repair.WriteId}). Review its retained intent before authorizing repair. A matching prefix is evidence, not proof of which process changed the file."), observation.Owner);
     }
 
-    internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token)
+    internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token,
+        string disposition = "retain-original")
     {
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
+        if (disposition != (plan.LocalDisposition is null ? "retain-original" : "merge-reviewed"))
+            throw new IOException("Apply requires the exact saved disposition: " + (plan.LocalDisposition is null ? "retain-original" : "merge-reviewed") + ".");
         using var owner = OpenOwner(plan.Revision?.Owner, token, requireBefore: true);
         if (expectedPlan != plan.ReviewFingerprint) throw new IOException("Saved plan fingerprint does not match the reviewed plan.");
+        if (plan.LocalDisposition is null && session.Operation.EnumerateEntries(token).Any(entry => entry.Name == "local-review"))
+            throw new IOException("A local merge review has started; complete its separately reviewed merged plan or create a new revision plan. The earlier replacement approval is closed.");
         if (session.StepCount != 0) throw new IOException("This plan has started. Inspect it and use explicit recovery with the current review fingerprint.");
         var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
@@ -192,6 +197,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     {
         using var session = Open(id, inventory, token);
         using var owner = OpenOwner(session.Plan.Revision?.Owner, token, recoverySession: session, inventory: inventory);
+        if (session.Plan.LocalDisposition is null && session.StepCount == 0
+            && session.Operation.EnumerateEntries(token).Any(entry => entry.Name == "local-review"))
+            throw new IOException("A local merge review has started; it grants no recovery or replacement authority.");
         var observation = Observe(session.Plan, session.Operation, inventory, token, owner);
         if (expectedObservation != ObservationHash(session.Plan, observation))
             throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
@@ -232,7 +240,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             if (!undo && current.Topology == "ready")
                 Move("retain", plan.RootPath, plan.OriginalPath, "original", false);
             if (!undo && current.Topology == "original-retained")
-                Move("install", session.Operation.CanonicalPath, Path.Combine(session.Operation.CanonicalPath, "candidate"), null, true);
+                Move("install", session.Operation.CanonicalPath, Path.Combine(session.Operation.CanonicalPath, CandidateName(plan)), null, true);
             if (undo && current.Topology == "installed")
                 Move("displace", plan.RootPath, plan.OriginalPath, "displaced", false);
             if (undo && current.Topology is "replacement-retained" or "original-retained")
@@ -339,9 +347,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         foreach (var privateName in plan.Revision is null ? new[] { "candidate", "original", "displaced" }
             : new[] { "candidate", "original", "displaced", "recorded-base" })
             QuarantineStore.EnsureNoConsumers(Path.Combine(operation.CanonicalPath, privateName), inventory, token);
+        foreach (var attempt in operation.EnumerateEntries(token).Where(entry => IsMergeSlot(entry.Name)))
+            QuarantineStore.EnsureNoConsumers(Path.Combine(operation.CanonicalPath, attempt.Name), inventory, token);
         var original = Slot(plan.RootPath, plan.OriginalPath);
         var retained = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "original"));
-        var candidate = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "candidate"));
+        var candidate = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, CandidateName(plan)));
         var displaced = Slot(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "displaced"));
         var topology = (original?.Payload == plan.Original.Payload && Is(original, plan.Original), retained, candidate, displaced) switch
         {
@@ -358,6 +368,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             || !NativeDirectoryMoveLease.SameObject(plan.ParentIdentity, parentIdentity)
             || rootIdentity.CanonicalPath != plan.RootPath || parentIdentity.CanonicalPath != plan.ParentIdentity.CanonicalPath)
             throw new IOException("Original root/parent authority changed: " + rootError);
+        VerifyLocalDisposition(plan, operation, inventory, topology, original, retained, candidate, displaced, token);
         return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity, owner?.Observe(token));
 
         ReplacementSlot? Slot(string scanRoot, string path)
@@ -603,9 +614,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
 
     private ReplacementResult Result(ReplacementPlan plan, string status, bool succeeded, bool changed, bool canceled, string review, string message, ReplacementOwnerObservation? owner = null) =>
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
-            Path.Combine(Root, plan.Id, "candidate"), Path.Combine(Root, plan.Id, "displaced"),
-            plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, "plan.json"),
-            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner)
+            Path.Combine(Root, plan.Id, CandidateName(plan)), Path.Combine(Root, plan.Id, "displaced"),
+            plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, PlanName(plan)),
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition)
         {
             Impact = PlanImpact(plan, status)
         };
@@ -619,11 +630,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         PayloadRetained = true,
         RetainedPayloadPath = status switch
         {
-            "planned" or "ready" or "unchanged" or "restored" => plan.OriginalPath,
+            "planned" or "ready" or "unchanged" or "restored" or "preserved" => plan.OriginalPath,
             "original-retained" or "installed" or "replacement-retained" => Path.Combine(Root, plan.Id, "original"),
             _ => null
         },
-        RetentionEvidence = status is "planned" or "ready" or "unchanged" or "restored" or "original-retained" or "installed" or "replacement-retained"
+        RetentionEvidence = status is "planned" or "ready" or "unchanged" or "restored" or "preserved" or "original-retained" or "installed" or "replacement-retained"
             ? "result-observed-original-location; later changes unknown" : "saved preservation contract; current location requires inspection"
     };
 
@@ -671,32 +682,75 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             writer = state.OpenExistingFile("writer.lock", true, token); CheckWriter(writer);
             operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
             operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
-            var plan = Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (!(plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null
-                    || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null)
+            var operationNames = operation.EnumerateEntries(token).Take(MaxSteps + 12 + 2 * MaxMergeAttempts).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+            var attemptCount = 0;
+            while (attemptCount < MaxMergeAttempts && (operationNames.Contains($"merged-{attemptCount:D2}")
+                || operationNames.Contains($"merge-plan-{attemptCount:D2}.json"))) attemptCount++;
+            var attemptIds = operationNames.Where(IsMergeSlot).Select(name => name[7..])
+                .Concat(operationNames.Where(IsMergePlan).Select(name => name[11..13])).Distinct(StringComparer.Ordinal).Count();
+            if (attemptIds != attemptCount)
+                throw new IOException("Merged attempt history has an unknown entry or gap.");
+            var latestPlanName = $"merge-plan-{attemptCount - 1:D2}.json";
+            var hasMergePlan = attemptCount > 0 && operationNames.Contains(latestPlanName);
+            ReplacementPlan? mergedPlan = null;
+            if (hasMergePlan)
+            {
+                try { mergedPlan = Read(operation, latestPlanName, ReplacementJsonContext.Default.ReplacementPlan, token); }
+                catch (Exception ex) when (ex is IOException or JsonException)
+                {
+                    // Never revive an older completed attempt. The base plan is
+                    // inspectable for a private retry, but local-review keeps its
+                    // former apply/recovery approval permanently closed.
+                    logger.Warn("replacement", $"Replacement {id}: incomplete merged plan retained: {ex.Message}");
+                    hasMergePlan = false;
+                }
+            }
+            var plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
+            if (!(plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && !hasMergePlan
+                    || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is null && !hasMergePlan
+                    || plan.SchemaVersion == 3 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is not null && hasMergePlan)
                 || plan.Id != id
+                || plan.LocalDisposition is { } disposition && (!IsMergeSlot(disposition.MergedSlot) || PlanName(plan) != latestPlanName)
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
                 || PlanHash(plan) != plan.ReviewFingerprint
                 || !QuarantineStore.ValidHash(plan.ReviewFingerprint) || !QuarantineStore.ValidHash(plan.ContextFingerprint)
                 || !Path.IsPathFullyQualified(plan.OriginalPath) || !Path.IsPathFullyQualified(plan.RootPath)
                 || !PathIdentity.IsInside(plan.OriginalPath, plan.RootPath)
                 || plan.RootIdentity.CanonicalPath != plan.RootPath || plan.Original.Identity.CanonicalPath != plan.OriginalPath
-                || plan.Candidate.Identity.CanonicalPath != Path.Combine(operation.CanonicalPath, "candidate")
+                || plan.Candidate.Identity.CanonicalPath != Path.Combine(operation.CanonicalPath, CandidateName(plan))
                 || plan.Subject.Agents.IsDefault || plan.Subject.Owners.IsDefault || plan.ChangedPaths.IsDefault
                 || plan.Subject.Agents.Any(agent => agent is null || string.IsNullOrWhiteSpace(agent.AgentId)
                     || string.IsNullOrWhiteSpace(agent.Path) || !Path.IsPathFullyQualified(agent.Path))
                 || plan.Subject.Owners.Any(owner => owner is null))
                 throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
             ValidateEvidence(plan.Original); ValidateEvidence(plan.Candidate);
+            if (plan.LocalDisposition is { } local)
+            {
+                if (local.SourceCandidate is null) throw new IOException("Merged plan lacks immutable source candidate evidence.");
+                ValidateEvidence(local.SourceCandidate);
+                var sourcePlan = Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
+                if (sourcePlan.SchemaVersion != 2 || sourcePlan.LocalDisposition is not null
+                    || PlanHash(sourcePlan) != local.SourcePlanFingerprint || sourcePlan.ReviewFingerprint != local.SourcePlanFingerprint
+                    || PlanHash(plan with
+                    {
+                        SchemaVersion = 2,
+                        Candidate = local.SourceCandidate,
+                        ChangedPaths = sourcePlan.ChangedPaths,
+                        LocalDisposition = null,
+                        ReviewFingerprint = ""
+                    }) != local.SourcePlanFingerprint
+                    || !QuarantineStore.ValidHash(local.HeaderFingerprint) || !QuarantineStore.ValidHash(local.SelectionFingerprint))
+                    throw new IOException("Merged plan is not bound to its immutable original revision plan.");
+            }
             subjectObserved?.Invoke(PlanImpact(plan));
             ValidateRevision(plan, operation.CanonicalPath, token);
             var stepCount = 0;
             ReplacementStep? latestOwnerStep = null;
             var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
             var incompleteJournal = false;
-            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 10).ToArray();
-            if (entries.Length > MaxSteps + 8) throw new IOException("Replacement operation entry budget exceeded.");
-            if (entries.Any(entry => entry.Error is not null && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal")))
+            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 13 + 2 * MaxMergeAttempts).ToArray();
+            if (entries.Length > MaxSteps + 11 + 2 * MaxMergeAttempts) throw new IOException("Replacement operation entry budget exceeded.");
+            if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review")))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             while (names.Contains($"step-{stepCount:D4}.json"))
@@ -729,7 +783,10 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             }
             if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
             if (names.Contains("owner-journal") && plan.Revision?.Owner is null) throw new IOException("Unexpected owner journal for this plan.");
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal")
+            if (plan.LocalDisposition is not null && !names.Contains("local-review")) throw new IOException("Merged plan lacks its immutable local review.");
+            if ((names.Any(IsMergeSlot) || names.Any(IsMergePlan)) && !names.Contains("local-review")) throw new IOException("Unexpected merged stage without local review.");
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review")
+                && !IsMergeSlot(name) && !IsMergePlan(name)
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");
             var session = new Session(state, writer, operation, operationWriter, plan, stepCount, incompleteJournal) { LatestOwnerStep = latestOwnerStep };

@@ -377,6 +377,12 @@ public class CliDispatcherErrorTests : IDisposable
     [InlineData("update-repair-owner", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000")]
     [InlineData("update-repair-owner", "--id 00000000000000000000000000000000 --yes --expect bad")]
     [InlineData("update-repair-owner", "--id ../outside --yes --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("update-merge-review", "--id ../outside --expect bad")]
+    [InlineData("update-merge-choose", "--id 00000000000000000000000000000000 --expect bad")]
+    [InlineData("update-merge-choose", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000 --resolve SKILL.md")]
+    [InlineData("update-merge-review", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000 --choose-resolved SKILL.md")]
+    [InlineData("update-merge-plan", "--id 00000000000000000000000000000000 --expect bad")]
+    [InlineData("update-preserve", "--id 00000000000000000000000000000000 --expect bad")]
     public async Task QuarantineInvalidConfirmationOrSelectorIsRejectedBeforeInventory(string command, string arguments)
     {
         var argv = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);

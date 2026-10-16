@@ -50,7 +50,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
         using var buffer = new StatBuffer();
         var flags = OperatingSystem.IsMacOS()
             ? 0x00000100 | 0x01000000 | 0x00000004
-            : 0x00020000 | 0x00080000 | 0x00000800;
+            : LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking;
         var descriptor = OpenWithRetry(path, flags);
         if (descriptor < 0) throw new IOException(LastError("open payload file failed"));
         using var native = new SafeUnixHandle(descriptor);
@@ -91,23 +91,24 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     }
 
     internal static NativePayloadRoot WalkPayload(string path, int maxDepth,
-        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, Action<NativePayloadItem>? observeRoot = null)
     {
         token.ThrowIfCancellationRequested();
         var full = Path.GetFullPath(path);
         var canonicalParent = RealPath(Path.GetDirectoryName(full) ?? throw new IOException("payload directory has no parent"));
         using var root = OpenAbsoluteDirectory(Path.Combine(canonicalParent, Path.GetFileName(full)), out var parent, out var rootName);
         using var rootParent = parent;
-        return WalkOpenedPayload(root, parent, rootName, maxDepth, observe, token);
+        return WalkOpenedPayload(root, parent, rootName, maxDepth, observe, token, observeRoot: observeRoot);
     }
 
     private static NativePayloadRoot WalkOpenedPayload(SafeUnixHandle root, SafeUnixHandle parent, string rootName,
-        int maxDepth, Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, bool flushToDisk = false)
+        int maxDepth, Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, bool flushToDisk = false, Action<NativePayloadItem>? observeRoot = null)
     {
         token.ThrowIfCancellationRequested();
         using var buffer = new StatBuffer();
         var rootBefore = ReadStat(root, buffer.Pointer);
         var canonical = ReadFinalPath(root);
+        observeRoot?.Invoke(new("", "directory", null, (int)(rootBefore.Mode & 0xFFF), null, null, ToSecureIdentity(rootBefore, canonical), root));
         var observations = new List<(string Path, NativeStat Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
         var frames = new Stack<(DirectoryFrame Frame, NativeStat Before, string Relative)>();
         frames.Push((new DirectoryFrame(root, parent, rootName, canonical, 0, ownsParent: false, ownsDirectory: false), rootBefore, ""));
@@ -143,8 +144,9 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     var length = ReadLinkAtWithRetry(current.Frame.Directory.FileDescriptor, entry.Value.Name, bytes);
                     if (length < 0 || length >= bytes.Length) throw new IOException("payload link inspection failed or exceeded limit");
                     observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.AsSpan(0, (int)length))), null);
-                    observe(new(relative, "link", null, null, bytes.AsSpan(0, (int)length).ToArray(),
-                        Encoding.UTF8.GetString(bytes, 0, (int)length), ToSecureIdentity(before, "")));
+                    observe(new(relative, "link", null, (int)(before.Mode & 0xFFF), bytes.AsSpan(0, (int)length).ToArray(),
+                        Encoding.UTF8.GetString(bytes, 0, (int)length), ToSecureIdentity(before, ""),
+                        NativeParentHandle: current.Frame.Directory, NativeName: entry.Value.Name));
                     token.ThrowIfCancellationRequested();
                     if (!TryReadStatAt(current.Frame.Directory, entry.Value.Name, buffer.Pointer, out var after, out _)
                         || !Matches(before, after)) throw new IOException("payload link changed during comparison");
@@ -157,7 +159,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     {
                         var opened = ReadStat(child, buffer.Pointer);
                         if (!Matches(before, opened)) throw new IOException("payload directory changed before open");
-                        observe(new(relative, "directory", null, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, "")));
+                        observe(new(relative, "directory", null, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, ""), child, current.Frame.Directory, entry.Value.Name));
                         frames.Push((new DirectoryFrame(child, current.Frame.Directory, entry.Value.Name, relative,
                             current.Frame.Depth + 1, ownsParent: false), opened, relative + "/"));
                         child = null;
@@ -173,7 +175,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
                     var duplicate = DupWithRetry(child.FileDescriptor);
                     if (duplicate < 0) throw new IOException("duplicate payload handle failed");
                     using var stream = new FileStream(new SafeFileHandle(new IntPtr(duplicate), ownsHandle: true), FileAccess.Read);
-                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, "")))
+                    var evidence = observe(new(relative, "file", stream, (int)(opened.Mode & 0xFFF), null, null, ToSecureIdentity(opened, ""), child, current.Frame.Directory, entry.Value.Name))
                         ?? throw new IOException("payload file evidence is missing");
                     observations[^1] = (relative, before, null, evidence);
                     if (flushToDisk && RetryOnInterrupted(() => StateNative.fsync(child.FileDescriptor)) != 0)
@@ -229,7 +231,7 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         var flags = OperatingSystem.IsMacOS()
             ? 0x00000100 | 0x01000000 | 0x00000004
-            : 0x00020000 | 0x00080000 | 0x00000800;
+            : LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec | LinuxOpenFlags.NonBlocking;
         int descriptor;
         if (OperatingSystem.IsLinux())
         {
@@ -1897,11 +1899,11 @@ internal sealed partial class UnixSecureRemovalBackend : ISecureRemovalBackend
     {
         internal static int DirectoryOpenFlags => OperatingSystem.IsMacOS()
             ? 0x00100000 | 0x00000100 | 0x01000000
-            : 0x00010000 | 0x00020000 | 0x00080000;
+            : LinuxOpenFlags.Directory | LinuxOpenFlags.NoFollow | LinuxOpenFlags.CloseOnExec;
 
         internal static int DirectoryFollowOpenFlags => OperatingSystem.IsMacOS()
             ? 0x00100000 | 0x01000000
-            : 0x00010000 | 0x00080000;
+            : LinuxOpenFlags.Directory | LinuxOpenFlags.CloseOnExec;
 
         internal static int NoFollowFlag => OperatingSystem.IsMacOS() ? 0x0020 : 0x0100;
         internal static int RemoveDirectoryFlag => OperatingSystem.IsMacOS() ? 0x0080 : 0x0200;

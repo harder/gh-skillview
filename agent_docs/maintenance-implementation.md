@@ -1038,22 +1038,87 @@ external suppression and continuing preserve/merge/fork/source/owner transitions
 M03/M09/M13-M21 obligations remain unchanged.
 
 
-Batch 14 (awaiting PR verification): external cleanup suppression for physical installations
-uses private, bounded append-only preferences outside payloads. Inventory reads do
-not initialize state; diagnostics remain independent from physical inventory
-coverage. Exact path/install-ID CLI actions and owned Cleanup Ignore preserve
-legacy markers, bind stable source/owner namespaces, and require native continuity
-plus bounded complete payload evidence for unknown sources. Clears retain reserved
-capacity; partial publications trigger rescans and cannot revive older suppression.
-Independent store and UI/CLI reviews found and corrected legacy-origin reporting,
-owner/native freshness, failed-capture byte accounting, worker-thread confirmation,
-and alias selection. Re-reviews have no outstanding agreed findings. Local focused
-tests pass 17 preference, two event-loop and eight CLI cases. Both local AOT hosts
-pass minimum/current gh proofs (116 commands total), including actual remote and
-local gh installations plus ownerless fixtures, unchanged native payload objects,
-registry bytes, restart, alias/same-name isolation, source edits, legacy origins,
-alternate state homes and corrupt-clear fail-open behavior. The full suite passes 1,749 tests with zero failures/skips; formatter and sequential
-AOT publishes pass. CI and artifact attribution remain required before merge.
-Local evidence: `evidence/maintenance-batch-14-checkpoint.json`. M08 remains incomplete;
-this slice does not close preserve/merge/fork/source/owner transitions or the
-remaining non-installation suppression and state-recovery work.
+Batch 14 merged: PR #64, merge `80921f49a5aefc07b01a1fc609a61132ddc4cd7c`, has the
+identical tree to reviewed head `81072edbbac6d0a167aff5ae85e0bddfc6104c56`.
+External cleanup suppression uses private bounded append-only state outside skill
+payloads, stable source/owner namespaces, and native continuity plus bounded whole
+payload evidence for unknown sources. Exact CLI selectors resolve agent aliases;
+owned TUI operations drain before disposal and rescan after partial publication.
+Legacy marker origins remain separate and external clear leaves markers intact.
+Incomplete ownership evidence cannot activate/set suppression; state-home setup
+failures are preference diagnostics and do not abort physical inventory.
+
+All 13 PR checks pass. Local build/format, 1,752 full tests (zero failures/skips),
+20 preference tests, both event-loop regressions and eight CLI cases pass. Both
+sequential local AOT hosts pass minimum/current gh proofs: 116 commands covering
+actual remote/local gh installs and ownerless copies with unchanged native payload
+objects/modes and registry bytes. Four native CI RIDs produced 116 digest-verified
+proof files: 232 new suppression commands plus 64 effective-loading commands and
+468 prior fixtures. Both actual gh contract lanes pass 17/17. Independent store,
+workflow, UI/CLI and proof reviews plus Copilot findings were corrected and
+re-reviewed; both Copilot threads are resolved. Failed quota-limited and superseded
+runs remain distinct from final successful-attempt evidence. Full attribution is
+in `evidence/maintenance-batch-14-final.json`.
+
+M08 remains incomplete. Non-installation/broken-link suppression, damaged/stale
+preference recovery, preserve/merge/fork/source/owner transitions and the original
+acceptance audit remain required. Nine of 21 original findings are complete.
+The original Installed Down-arrow crash was never reproduced. Next: reviewed
+whole-payload local dispositions, retaining all other original obligations.
+
+## Batch 15: reviewed local dispositions and native metadata
+
+Candidate `e3d8e47c08d66b9a5ba63b1a260ae9c206e967f0` implements preserve-installed,
+immutable B/I/C review, explicit installed/source/captured-file choices, and schema3
+merge plans. Approved source C remains the future baseline; customized result M
+has separate result evidence. Apply/recovery/undo retain original native objects
+and coordinate the existing supported gh owner transaction. Supported Unix and
+Windows metadata is preserved through held objects; incomplete or unsupported
+metadata remains an explicit publication refusal.
+
+The October 16 Mac handoff reports 1,912 full tests passing at production source
+`27432533cb09f57d682e699bcfd48764c98dc3a1`, native macOS App/extension shared-merge
+and old-schema recovery proofs, three actual PTY flows, and Linux ARM64 real ENOSPC
+recovery at all four move boundaries. The latter used a dedicated private 64 MiB
+tmpfs and runtime apphosts, not NativeAOT. Those original temporary raw outputs
+were lost after reboot. Preserved completion receipts and their hash manifest
+are in `handoff-evidence-2026-10-16/`; they are historical receipts, not raw logs.
+Earlier batch15 checkpoints retain their original interim scope and pending
+statuses. This entry supersedes their pending verification status only where
+the handoff receipts or independently retrieved GitHub evidence establish it.
+
+On WSL, the published candidate and base `80921f49a5aefc07b01a1fc609a61132ddc4cd7c`
+were verified, and full CI run
+[38877432074](https://github.com/harder/gh-skillview/actions/runs/38877432074)
+was independently confirmed successful at the exact candidate. Dependency review
+was skipped on that branch dispatch; PR-only checks remain required. Production
+source and ordinary test trees are identical between `2743253` and `e3d8e47`.
+The transferred supporting documents match the candidate's tracked copies.
+
+The focused independent Sol integration review is clear. All four retrieved
+native artifact ZIPs match their GitHub SHA256 digests, and every extracted member
+matches its ZIP member. The 156 retained files include 30 new local-merge proof
+files whose required assertions were checked: App/extension publication and six
+shared recovery scenarios per host on macOS/Windows; four move-boundary restart
+proofs on each of those platforms; Linux unprivileged metadata refusals and four
+real-ENOSPC recovery proofs. Each ENOSPC witness reports errno28 and zero available
+bytes in its 64 MiB tmpfs. Both Windows native metadata logs prove 98/98 tests.
+The CI native fixtures use each runner's gh (including 2.100.0 on macOS), separate
+from the minimum/current contract lanes and historical Mac proofs. Exact artifact
+and per-file hashes, checked assertions, command outcomes and review scope are in
+`evidence/maintenance-batch-15-verification.json`.
+
+The WSL ARM64 scoped test-project locked restore succeeds with SDK10.0.402.
+All 66 focused local-review, three-way-review, Linux ABI and Updates-tab tests
+pass with a private `/var/tmp` TMPDIR. The initial run's two state-placement
+refusals came from the sandbox's read-only `/tmp/.git` mount; the failed run is
+retained separately. Full solution locked restore infers an uncommitted host RID
+on this machine, so no local release-publish claim is made and release locks stay
+unchanged. PR65 Copilot review found stale Windows publication status in the user
+guide; the correction describes supported metadata, effective-user ownership and
+the existing security-privilege requirement while retaining explicit refusals.
+
+Final PR checks and merge remain pending. Original acceptance remains 9/21; M08 fork/source/local-import/standalone
+unpin, other-owner transitions, remaining preference recovery and the original
+criterion audit remain open. The original Installed Down-arrow crash was never
+reproduced.

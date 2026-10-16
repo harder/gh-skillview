@@ -95,16 +95,16 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
-        if (disposition != "retain-original")
-            return UpdateResult.Failure(false, 2, "Explicit retain-original approval is required.", []) with
-            { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "Explicit retain-original approval is required.")] };
+        if (disposition != (review.LocalDisposition is null ? "retain-original" : "merge-reviewed"))
+            return UpdateResult.Failure(false, 2, "Explicit " + (review.LocalDisposition is null ? "retain-original" : "merge-reviewed") + " approval is required.", []) with
+            { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "The saved local-change disposition needs explicit approval.")] };
         var result = Empty(false) with { SavedPlan = review };
         var attempted = false;
         try
         {
             token.ThrowIfCancellationRequested();
             attempted = true;
-            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token);
+            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
