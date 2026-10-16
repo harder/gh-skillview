@@ -201,13 +201,84 @@ internal sealed partial class UnixSecureRemovalBackend
     }
 
     private sealed class UnixStateSession(List<SafeUnixHandle> held, SafeUnixHandle root, string canonical,
-        UnixStateExclusions excluded, Action<CancellationToken>? stagingGuard = null) : NativeStateDirectory
+        UnixStateExclusions excluded, Action<CancellationToken>? stagingGuard = null,
+        SafeUnixHandle? payloadParent = null, string? payloadName = null) : NativeStateDirectory
     {
         private SafeFileHandle? _barrier;
         private bool sealedStage;
+        internal override NativePayloadDirectory CreatePayloadDirectory(string name, CancellationToken token)
+        {
+            NativeStateDirectory.CheckName(name);
+            return CreatePayloadChild(name, token);
+        }
+        internal NativePayloadDirectory CreatePayloadChild(string name, CancellationToken token)
+        {
+            NativePayloadDirectory.CheckName(name);
+            return new UnixPayloadDirectory(CreateChild(name, token));
+        }
+        internal FileStream CreatePayloadFile(string name, CancellationToken token)
+        {
+            NativePayloadDirectory.CheckName(name);
+            return OpenStateFile(name, false, token, create: true, payloadName: true);
+        }
+        internal void CreatePayloadLink(string name, ReadOnlySpan<byte> rawTarget, int? unixMode, CancellationToken token)
+        {
+            ValidateLocation(token); NativePayloadDirectory.CheckName(name);
+            if (rawTarget.IsEmpty || rawTarget.Length > 64 * 1024 || rawTarget.Contains((byte)0)
+                || unixMode is null or < 0 or > 511 || !OperatingSystem.IsMacOS() && unixMode != 511)
+                throw new IOException("Unsupported raw payload link target or mode.");
+            var target = new byte[rawTarget.Length + 1]; rawTarget.CopyTo(target);
+            if (RetryOnInterrupted(() => { token.ThrowIfCancellationRequested(); return PayloadNative.symlinkat(target, root.FileDescriptor, name); }) != 0)
+                throw new IOException(LastError("create exclusive payload link failed"));
+            if (OperatingSystem.IsMacOS())
+            {
+                // O_SYMLINK opens the link itself. Never chmod a reconstructed
+                // path or follow the target, including dangling/external links.
+                using var link = CreateHandle(OpenAtWithRetry(root.FileDescriptor, name, 0x00200000 | 0x01000000), "open newly staged link");
+                using var stat = new StatBuffer();
+                var observed = ReadStat(link, stat.Pointer);
+                if (!observed.IsSymlink || !TryReadStatAt(root, name, stat.Pointer, out var named, out _) || !Matches(observed, named)
+                    || unchecked((ushort)Marshal.ReadInt16(stat.Pointer, 6)) != 1)
+                    throw new IOException("New staged link identity or hard-link topology is unsupported.");
+                using var borrowed = new SafeFileHandle(new IntPtr(link.FileDescriptor), ownsHandle: false);
+                File.SetUnixFileMode(borrowed, (UnixFileMode)unixMode.Value);
+            }
+            FlushStateDirectory(root, token);
+            ValidateLocation(token);
+        }
+        internal void SealPayload(int? unixMode, CancellationToken token)
+        {
+            if (OperatingSystem.IsWindows()) throw new IOException("Unix payload staging is unavailable on Windows.");
+            if (stagingGuard is null || unixMode is null or < 0 or > 511)
+                throw new IOException("Only new payload directories with ordinary Unix permission bits may be sealed.");
+            ValidateLocation(token);
+            using var borrowed = new SafeFileHandle(new IntPtr(root.FileDescriptor), ownsHandle: false);
+            File.SetUnixFileMode(borrowed, (UnixFileMode)unixMode.Value);
+            FlushStateDirectory(root, token);
+            sealedStage = true;
+        }
+        internal SkillView.Maintenance.PayloadSnapshot CapturePayload(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!sealedStage || stagingGuard is null || payloadParent is null || payloadName is null)
+                throw new IOException("Only a sealed held payload can be finalized.");
+            stagingGuard(token);
+            if (!PathIdentity.Equals(ReadFinalPath(root), canonical)) throw new IOException("Draft payload moved before finalization.");
+            var snapshot = SkillView.Maintenance.PayloadSnapshot.CaptureBoundWithEntrySink(canonical, (_, _) => { },
+                (depth, observe, ct) => WalkOpenedPayload(root, payloadParent, payloadName, depth, observe, ct, flushToDisk: true), token);
+            stagingGuard(token);
+            if (!PathIdentity.Equals(snapshot.Path, canonical) || !PathIdentity.Equals(ReadFinalPath(root), canonical))
+                throw new IOException("Draft payload moved during finalization.");
+            return snapshot;
+        }
         internal override NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token)
         {
             ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            return CreateChild(name, token);
+        }
+        private UnixStateSession CreateChild(string name, CancellationToken token)
+        {
+            ValidateLocation(token);
             if (RetryOnInterrupted(() => { token.ThrowIfCancellationRequested(); return StateNative.mkdirat(root.FileDescriptor, name, 0x1C0); }) != 0)
                 throw new IOException(LastError("create exclusive staging directory failed"));
             var child = OpenDirectoryAt(root, name, refuseNestedMount: true);
@@ -216,7 +287,7 @@ internal sealed partial class UnixSecureRemovalBackend
                 var address = Path.Combine(canonical, name);
                 if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Staging directory moved during creation.");
                 FlushStateDirectory(root, token);
-                return new UnixStateSession([child], child, address, excluded, ValidateLocation);
+                return new UnixStateSession([child], child, address, excluded, ValidateLocation, root, name);
             }
             catch { child.Dispose(); throw; }
         }
@@ -260,9 +331,10 @@ internal sealed partial class UnixSecureRemovalBackend
         }
         internal override FileStream OpenFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: true);
         internal override FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token) => OpenStateFile(name, writerLock, token, create: false);
-        private FileStream OpenStateFile(string name, bool writerLock, CancellationToken token, bool create)
+        private FileStream OpenStateFile(string name, bool writerLock, CancellationToken token, bool create, bool payloadName = false)
         {
-            ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            ValidateLocation(token);
+            if (payloadName) NativePayloadDirectory.CheckName(name); else NativeStateDirectory.CheckName(name);
             var flags = OperatingSystem.IsMacOS() ? (create ? 2 | 0x200 | (writerLock ? 0 : 0x800) : 0) | 0x100 | 0x1000000 | 4
                 : (create ? 2 | 0x40 | (writerLock ? 0 : 0x80) : 0) | 0x20000 | 0x80000 | 0x800;
             token.ThrowIfCancellationRequested();

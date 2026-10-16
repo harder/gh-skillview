@@ -1,7 +1,29 @@
 # Full M08 work retained after external suppression
 
-This is read-only preparation while M12 final CI awaits GitHub quota. Do not
-implement a new batch before the current batch is reviewed, verified and merged.
+External suppression merged in PR64. Batch15 is implementing reviewed local
+dispositions on `codex/reviewed-local-dispositions`; it has no PR yet. The private
+draft capture/materialization code does not admit publication. Complete metadata
+admission, immutable plan binding, CLI/TUI review and recovery proofs before
+publishing a coherent batch. Original M08 acceptance remains open.
+
+Current private draft boundaries:
+- `ThreeWayPayloadReview` analyzes complete path sets, explicit captured-file
+  resolutions, root mode, topology and aggregate budgets. It is not authority.
+- `CapturedPayloadArchive` retains immutable indexed regular-file blobs for
+  file/link bytes, under a held private state directory. It does not attest
+  ACLs, xattrs, alternate streams or hard-link topology.
+- `ReviewedPayloadMaterializer` builds selected authored content through
+  `NativePayloadDirectory`, rebinds approved source tracking, and finalizes via
+  the held root. A successful draft is still not an applyable saved plan.
+- `CaptureInto` opts into Unix link modes. Legacy capture, backup and saved
+  replacement hash inputs continue omitting those modes. Never compare the
+  two capture flavors as if they had identical fingerprints.
+- macOS symlink modes can reflect umask. Preserve the observed mode through
+  an `O_SYMLINK` handle; never chmod the target. Linux links require 0777.
+  Windows materialization still needs captured directory-link kind and full
+  native metadata admission before the draft workflow can use links.
+- Finalization must stay on the originally created payload handle. Reopening
+  a canonical pathname can accept a replacement with identical bytes/modes.
 
 Original acceptance stays unchanged. Existing replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native

@@ -1,7 +1,11 @@
 namespace SkillView.Inventory;
 
+/// NativeHandle is borrowed for the synchronous callback only. Duplicate it
+/// explicitly if a consumer needs a separate lifetime; never close it here.
+/// Unix links expose their held parent and final name instead of a target handle.
 internal readonly record struct NativePayloadItem(string RelativePath, string Kind,
-    Stream? Content, int? UnixMode, byte[]? LinkBytes, string? LinkTarget, SecureFileIdentity Identity);
+    Stream? Content, int? UnixMode, byte[]? LinkBytes, string? LinkTarget, SecureFileIdentity Identity, System.Runtime.InteropServices.SafeHandle? NativeHandle = null,
+    System.Runtime.InteropServices.SafeHandle? NativeParentHandle = null, string? NativeName = null);
 
 internal readonly record struct NativePayloadRoot(SecureFileIdentity Identity, int? UnixMode);
 
@@ -10,14 +14,15 @@ internal readonly record struct PayloadFileEvidence(string Hash, long Bytes);
 internal static class SecurePayloadWalker
 {
     internal static NativePayloadRoot Walk(string path, int maxDepth,
-        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken cancellationToken)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken cancellationToken,
+        Action<NativePayloadItem>? observeRoot = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!SecureRemovalBackend.IsSupported)
             throw new IOException($"Native payload inspection unavailable: {SecureRemovalBackend.UnsupportedReason}");
         return OperatingSystem.IsWindows()
-            ? WindowsSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken)
-            : UnixSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken);
+            ? WindowsSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken, observeRoot)
+            : UnixSecureRemovalBackend.WalkPayload(path, maxDepth, observe, cancellationToken, observeRoot);
     }
 
     internal static void VerifyContent(Stream stream, PayloadFileEvidence expected, CancellationToken token)

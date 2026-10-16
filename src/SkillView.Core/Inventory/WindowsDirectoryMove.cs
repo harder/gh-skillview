@@ -53,6 +53,11 @@ internal sealed partial class WindowsSecureRemovalBackend
         internal override PayloadSnapshot Capture(CancellationToken token) =>
             PayloadSnapshot.CaptureEvidence(CurrentPath, (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct), token);
 
+        internal override PayloadSnapshot CaptureInto(Action<NativePayloadItem, PayloadEntry> sink,
+            Action<NativePayloadItem>? observeRoot, CancellationToken token) =>
+            PayloadSnapshot.CaptureBoundWithEntrySink(CurrentPath, sink,
+                (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct, observeRoot), token);
+
         internal override void Revalidate(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();

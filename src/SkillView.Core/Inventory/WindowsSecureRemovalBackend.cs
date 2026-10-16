@@ -105,21 +105,22 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
     }
 
     internal static NativePayloadRoot WalkPayload(string path, int maxDepth,
-        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, Action<NativePayloadItem>? observeRoot = null)
     {
         token.ThrowIfCancellationRequested();
         using var root = OpenEntry(path, directory: true, enumerateDirectory: true, requestDeleteAccess: false);
-        return WalkOpenedPayload(root, maxDepth, observe, token);
+        return WalkOpenedPayload(root, maxDepth, observe, token, observeRoot);
     }
 
     private static NativePayloadRoot WalkOpenedPayload(SafeFileHandle root, int maxDepth,
-        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token)
+        Func<NativePayloadItem, PayloadFileEvidence?> observe, CancellationToken token, Action<NativePayloadItem>? observeRoot = null)
     {
         token.ThrowIfCancellationRequested();
         var rootBefore = ReadIdentity(root);
         if (!rootBefore.IsDirectory || rootBefore.IsReparsePoint)
             throw new IOException("payload root is not a non-link directory");
         var canonical = ReadFinalPath(root);
+        observeRoot?.Invoke(new("", "directory", null, null, null, null, ToSecureIdentity(rootBefore, canonical), root));
         var observations = new List<(string Path, NativeIdentity Identity, string? LinkHash, PayloadFileEvidence? FileEvidence)>();
         var inspector = new WindowsSecureRemovalBackend();
         var directoryFingerprints = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -162,14 +163,14 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                         token.ThrowIfCancellationRequested();
                         var bytes = ReadReparseData(child);
                         observations[^1] = (relative, before, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), null);
-                        observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes), ToSecureIdentity(before, "")));
+                        observe(new(relative, "link", null, null, bytes, Convert.ToBase64String(bytes), ToSecureIdentity(before, ""), child, current.Frame.Directory, entry.Value.Name));
                     }
                     else if (isDirectory)
                     {
                         if (current.Frame.Depth >= maxDepth) throw new IOException("payload depth limit exceeded");
                         var childFingerprint = inspector.CaptureDirectoryFingerprint(child, relative, token);
                         directoryFingerprints[relative] = childFingerprint;
-                        observe(new(relative, "directory", null, null, null, null, ToSecureIdentity(before, "")));
+                        observe(new(relative, "directory", null, null, null, null, ToSecureIdentity(before, ""), child, current.Frame.Directory, entry.Value.Name));
                         frames.Push((new DirectoryFrame(child, relative, before, current.Frame.Depth + 1), relative + "/", childFingerprint));
                         child = null;
                     }
@@ -177,7 +178,7 @@ internal sealed partial class WindowsSecureRemovalBackend : ISecureRemovalBacken
                     {
                         if (WindowsNative.GetFileType(child) != 1) throw new IOException("payload entry is not a disk file");
                         using var stream = new FileStream(child, FileAccess.Read);
-                        var evidence = observe(new(relative, "file", stream, null, null, null, ToSecureIdentity(before, "")))
+                        var evidence = observe(new(relative, "file", stream, null, null, null, ToSecureIdentity(before, ""), child, current.Frame.Directory, entry.Value.Name))
                             ?? throw new IOException("payload file evidence is missing");
                         observations[^1] = (relative, before, null, evidence);
                         token.ThrowIfCancellationRequested();

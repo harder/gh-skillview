@@ -20,6 +20,8 @@ internal abstract class NativeStateDirectory : IDisposable
     internal abstract void FlushPublication(CancellationToken token);
     internal abstract void ValidateLocation(CancellationToken token);
     internal abstract NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token);
+    internal virtual NativePayloadDirectory CreatePayloadDirectory(string name, CancellationToken token) =>
+        throw new IOException("Payload materialization is unavailable for this state authority.");
     internal abstract void SealStagingDirectory(int unixMode, CancellationToken token);
     internal abstract void ReceiveDirectory(NativeDirectoryMoveLease source, string name, CancellationToken token);
     public abstract void Dispose();
