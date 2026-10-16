@@ -1274,3 +1274,30 @@ the earlier records. Standalone unpin is now merged; selected-consumer detach
 and the other M08 obligations remain open. Original acceptance stays 9/21 and
 the original Mac Down-arrow crash remains unreproduced. See
 `evidence/maintenance-batch-16-final.json`.
+
+## Static package checking: PR67 parser boundary fixes
+
+Six review findings at `7657c26` exposed false reference findings or falsely
+complete coverage. Multiline code/label paragraphs and list-contained fences
+now exclude both definitions and uses, with partial coverage. Type-1 HTML stays
+excluded across blank lines; tab indentation and same-line closing tags have
+regressions. Unescaped destination ampersands remain unsupported while escaped
+ampersands stay literal. Captured link prefixes are checked before later `..`
+segments can erase them. No payload link is followed.
+
+The pre-fix regressions reproduced 23 failures. Final focused tests pass 70/70;
+the full unit suite passes 2,056/2,056, with a separate 9/9 integration pass,
+zero failures/skips, clean integration build and Core/test format verification.
+Independent review of the six source/proof files is clear. The native fixture
+script now covers eleven scenarios per product host; those expanded runtime
+proofs and fresh final-head gates remain pending.
+
+The original four package scenarios did run successfully on both product hosts
+on all four RIDs at `7657c26`, before later remote API installation quota failures.
+Earlier temporary monitoring incorrectly said the package step was not reached;
+the raw logs and eight archived summaries supersede that claim. Those 32 rows
+prove the original cases only, and the overall CI run failed. A later Actions
+token diagnostic showed a healthy quota but cannot reconstruct the failed jobs'
+budget or reset time. See
+`evidence/maintenance-static-package-check-review-fixes.json` for exact sources,
+receipts, review and limitations. Original acceptance remains 9/21; M19 is open.

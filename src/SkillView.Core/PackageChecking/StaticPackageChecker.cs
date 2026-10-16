@@ -197,15 +197,21 @@ internal sealed class StaticPackageChecker
                     if (segments.Count == 0) { reasons.Add("A reference escapes the captured package and was not inspected."); return; }
                     segments.RemoveAt(segments.Count - 1);
                 }
-                else segments.Add(segment);
+                else
+                {
+                    segments.Add(segment);
+                    // A lexical '..' later in the reference cannot erase the fact
+                    // that reaching it first traverses an uninspected native link.
+                    if (CapturedLink(string.Join('/', segments)))
+                    { reasons.Add("References through captured links were not followed."); return; }
+                }
             }
             var relative = string.Join('/', segments);
             for (var count = 1; count <= segments.Count; count++)
             {
                 token.ThrowIfCancellationRequested();
                 var prefix = string.Join('/', segments.Take(count));
-                if (index.TryGetValue(prefix, out var ancestor) && ancestor.Kind == "link"
-                    || caseIndex.TryGetValue(prefix, out var candidates) && candidates.Any(candidate => index[candidate].Kind == "link"))
+                if (CapturedLink(prefix))
                 { reasons.Add("References through captured links were not followed."); return; }
             }
             if (relative.Length == 0 || index.ContainsKey(relative)) return;
@@ -217,6 +223,19 @@ internal sealed class StaticPackageChecker
                 Add("reference", "reference-missing", document, reference.Line, reference.Target,
                     "The internal target is absent from the complete captured package: " + relative,
                     "Restore the referenced file/asset/script or review and correct this explicit reference.");
+        }
+
+        bool CapturedLink(string prefix)
+        {
+            token.ThrowIfCancellationRequested();
+            if (index.TryGetValue(prefix, out var exact) && exact.Kind == "link") return true;
+            if (caseIndex.TryGetValue(prefix, out var candidates))
+                foreach (var candidate in candidates)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (index[candidate].Kind == "link") return true;
+                }
+            return false;
         }
 
         void Add(string category, string code, string path, int? line, string? targetPath, string message, string repair)

@@ -1,5 +1,10 @@
 # AGENTS.md
 
+- Offline package checks must exclude unsupported Markdown contexts from both
+  reference-definition and reference-use passes. Unsupported reference contexts
+  cannot justify definite missing-file findings. Check each captured link prefix
+  before later `..` normalization; see `agent_docs/maintenance-static-package-check.md`.
+
 - Read-only skill and lock metadata uses `RegularFileInspection`, whose verified
   native ABI check is independent of destructive traversal support. Linux hosts
   without `openat2` may inspect regular metadata while removal stays disabled.

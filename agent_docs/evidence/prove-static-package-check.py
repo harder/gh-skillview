@@ -19,10 +19,9 @@ def manifest(root):
     observed = []
     for path in [root, *sorted(root.rglob('*'))]:
         info = path.lstat()
-        assert not stat.S_ISLNK(info.st_mode), 'Proof inputs must be regular local fixtures'
-        value = path.read_bytes() if path.is_file() else b''
+        value = os.readlink(path).encode() if stat.S_ISLNK(info.st_mode) else (path.read_bytes() if path.is_file() else b'')
         observed.append((str(path.relative_to(root)), info.st_dev, info.st_ino,
-                         stat.S_IMODE(info.st_mode), hashlib.sha256(value).hexdigest()))
+                         info.st_mode, hashlib.sha256(value).hexdigest()))
     return observed
 
 
@@ -57,7 +56,16 @@ def main():
             for key in ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy'):
                 env[key] = proxy
             env['NO_PROXY'] = env['no_proxy'] = ''
-            for scenario in ('intact', 'missing-reference', 'case-mismatch', 'invalid-metadata'):
+            edge_bodies = {
+                'multiline-code': '`\n[Example](missing.md)\n[hidden]: references/missing.md\n`\n\n[hidden]\n',
+                'multiline-label': '[Guide\ntext](references/missing.md)\n',
+                'html-blank-line': '<script>\n\n[Example](missing.md)\n</script>\n\n[Guide](references/guide.md)\n',
+                'list-fence': '- ```md\n  [Example](missing.md)\n  ```\n\n[Guide](references/guide.md)\n',
+                'character-references': '[Named](references/a&amp;b.md)\n[Numeric](references/a&#38;b.md)\n[Escaped](references/a\\&amp;b.md)\n',
+                'escaped-character-reference': '[Escaped](references/a\\&amp;b.md)\n',
+                'link-parent-segment': '`scripts/pointer/../tool.py`\n',
+            }
+            for scenario in ('intact', 'missing-reference', 'case-mismatch', 'invalid-metadata', *edge_bodies):
                 payload = skills / scenario
                 (payload / 'references').mkdir(parents=True)
                 (payload / 'scripts').mkdir()
@@ -65,12 +73,23 @@ def main():
                 (payload / 'scripts' / 'check.py').write_text(
                     'from pathlib import Path\nPath(' + repr(str(marker)) + ').write_text("executed")\n', encoding='utf-8')
                 (payload / 'references' / 'guide.md').write_text('Local resource.\n', encoding='utf-8')
+                (payload / 'references' / 'a&b.md').write_text('Local resource.\n', encoding='utf-8')
+                (payload / 'references' / 'a&amp;b.md').write_text('Local resource.\n', encoding='utf-8')
+                outside = None
+                if scenario == 'link-parent-segment':
+                    outside = root / 'outside'
+                    (outside / 'child').mkdir(parents=True)
+                    (outside / 'tool.py').write_text('outside must not be inspected or run\n', encoding='utf-8')
+                    (payload / 'scripts' / 'tool.py').write_text('inside\n', encoding='utf-8')
+                    (payload / 'scripts' / 'pointer').symlink_to(outside / 'child', target_is_directory=True)
+                    outside_before = manifest(outside)
                 target = 'references/missing.md' if scenario == 'missing-reference' else (
                     'references/GUIDE.md' if scenario == 'case-mismatch' else 'references/guide.md')
                 header = '---\nname: ' + scenario + '\ndescription: Disposable package check\n---\n'
                 if scenario == 'invalid-metadata':
                     header = '---\nname: ' + scenario + '\n---\n'
-                (payload / 'SKILL.md').write_text(header + '\n[Guide](' + target + ')\n\n`scripts/check.py`\n', encoding='utf-8')
+                body = edge_bodies.get(scenario, '[Guide](' + target + ')\n')
+                (payload / 'SKILL.md').write_text(header + '\n' + body + '\n`scripts/check.py`\n', encoding='utf-8')
                 before = manifest(payload)
                 process = subprocess.run([str(app), '--scan-root', str(skills), 'check', '--path', str(payload), '--json'],
                                          cwd=root, env=env, capture_output=True, text=True, timeout=120)
@@ -79,10 +98,18 @@ def main():
                 assert report['agentCompatibility'] == report['sourceReview'] == 'not-assessed', report
                 assert report['coverage']['payload'] == 'complete', report
                 assert report['payloadFingerprint'] and report['installationId'], report
-                if scenario == 'intact':
+                if scenario in ('intact', 'escaped-character-reference'):
                     assert process.returncode == 0 and not report['hasErrors'], (process.returncode, report, process.stderr)
                     assert report['formatStatus'] == 'valid', report
                     assert report['referenceStatus'] == 'none-observed', report
+                    assert report['coverage']['references'] == 'limited', report
+                elif scenario in edge_bodies:
+                    assert not report['hasErrors'], (process.returncode, report, process.stderr)
+                    assert report['formatStatus'] == 'valid', report
+                    assert report['coverage']['references'] == 'partial' and report['referenceStatus'] == 'unknown', report
+                    assert process.returncode == 1, (process.returncode, report)
+                    assert not any(finding['code'] in ('reference-missing', 'reference-case-mismatch')
+                                   for finding in report['findings']), report
                 else:
                     assert process.returncode == 1 and report['hasErrors'], (process.returncode, report, process.stderr)
                     if scenario == 'invalid-metadata':
@@ -96,9 +123,12 @@ def main():
                                    for finding in report['findings']), report
                         assert report['referenceStatus'] == 'findings', report
                 assert manifest(payload) == before, 'Check changed payload bytes, native objects or modes'
+                if outside is not None:
+                    assert manifest(outside) == outside_before, 'Check changed the external link target'
                 assert not any(root.glob('*-executed')), 'Check executed a referenced script'
                 rows.append(dict(scenario=scenario, exitCode=process.returncode, formatStatus=report['formatStatus'],
                                  referenceStatus=report['referenceStatus'], sourceUnchanged=True,
+                                 referenceCoverage=report['coverage']['references'],
                                  referencedScriptNotExecuted=True, payloadFingerprint=report['payloadFingerprint']))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(schemaVersion=1, appSha256=hashlib.sha256(app.read_bytes()).hexdigest(),

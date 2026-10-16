@@ -53,7 +53,7 @@ internal static class MarkdownPackageReferences
                 }
                 if (line[index] != '[') continue;
                 var endLabel = ClosingLabel(line, index, token);
-                if (endLabel < 0) continue;
+                if (endLabel < 0) { reasons.Add("Multiline or unsupported link labels are not inspected."); break; }
                 if (line.AsSpan(index + 1, endLabel - index - 1).Contains('[')) reasons.Add("Nested link-label references are not fully inspected.");
                 var next = endLabel + 1;
                 if (next < line.Length && line[next] == '(')
@@ -103,24 +103,39 @@ internal static class MarkdownPackageReferences
     private static IEnumerable<(string Line, int Number)> Lines(string text, CancellationToken token, HashSet<string> reasons)
     {
         using var reader = new StringReader(text);
-        char fence = '\0'; var width = 0; var number = 0; var comment = false; var html = false;
+        char fence = '\0'; var width = 0; var containerIndent = 0; var number = 0;
+        var comment = false; var html = false; var rawHtml = false; var unsupportedParagraph = false;
         while (reader.ReadLine() is { } line)
         {
             token.ThrowIfCancellationRequested(); number++;
-            var trimmed = line.TrimStart(' ');
-            var indent = line.Length - trimmed.Length;
+            var offset = 0; var indent = 0;
+            while (offset < line.Length && line[offset] is ' ' or '\t')
+            {
+                token.ThrowIfCancellationRequested();
+                indent += line[offset++] == '\t' ? 4 - indent % 4 : 1;
+            }
+            var trimmed = line[offset..];
+            if (fence != '\0' && containerIndent > 0 && !string.IsNullOrWhiteSpace(line) && indent < containerIndent)
+                fence = '\0'; // Dedenting ends the unsupported list container, including its fence.
             if (fence == '\0')
             {
+                if (rawHtml)
+                { if (RawHtmlEnd(line)) rawHtml = false; continue; }
+                if (html)
+                { if (string.IsNullOrWhiteSpace(line)) html = false; continue; }
                 if (comment)
                 { if (line.Contains("-->", StringComparison.Ordinal)) comment = false; continue; }
+                if (RawHtmlStart(trimmed))
+                {
+                    rawHtml = !RawHtmlEnd(line);
+                    reasons.Add("Raw HTML code blocks are excluded through their closing tag, including blank lines."); continue;
+                }
                 var commentStart = line.IndexOf("<!--", StringComparison.Ordinal);
                 if (commentStart >= 0)
                 {
                     comment = line.IndexOf("-->", commentStart + 4, StringComparison.Ordinal) < 0;
                     reasons.Add("HTML comments are not inspected."); continue;
                 }
-                if (html)
-                { if (string.IsNullOrWhiteSpace(line)) html = false; continue; }
                 if (trimmed.StartsWith('<'))
                 { html = true; reasons.Add("Raw HTML blocks are not inspected; a blank line ends this limited exclusion."); continue; }
                 if (trimmed.StartsWith('>'))
@@ -131,17 +146,89 @@ internal static class MarkdownPackageReferences
                 while (run < trimmed.Length && trimmed[run] == trimmed[0]) run++;
             if (fence != '\0')
             {
-                if (indent <= 3 && run >= width && trimmed[0] == fence && string.IsNullOrWhiteSpace(trimmed[run..])) fence = '\0';
+                if (indent <= containerIndent + 3 && run >= width && trimmed[0] == fence && string.IsNullOrWhiteSpace(trimmed[run..])) fence = '\0';
                 continue;
             }
-            if (indent <= 3 && run >= 3) { fence = trimmed[0]; width = run; continue; }
+            if (indent <= 3 && run >= 3) { fence = trimmed[0]; width = run; containerIndent = 0; continue; }
+            if (indent <= 3 && ListFence(trimmed, indent, token, out var listFence, out var listWidth, out var listIndent))
+            {
+                fence = listFence; width = listWidth; containerIndent = listIndent;
+                reasons.Add("List-contained fenced code is excluded; list block syntax is not fully inspected."); continue;
+            }
             if (indent >= 4 || line.StartsWith('\t'))
             { reasons.Add("Indented code blocks are not inspected."); continue; }
             if (line.Contains("<img", StringComparison.OrdinalIgnoreCase) || line.Contains("<a ", StringComparison.OrdinalIgnoreCase))
             { reasons.Add("HTML references are not inspected."); continue; }
+            if (string.IsNullOrWhiteSpace(line)) unsupportedParagraph = false;
+            if (unsupportedParagraph) continue;
+            if (UnsupportedInlineParagraph(line, reasons, token))
+            { unsupportedParagraph = true; continue; }
             yield return (line, number);
         }
         if (fence != '\0') reasons.Add("Unclosed fenced code block; remaining text was not inspected.");
+    }
+
+    private static bool RawHtmlStart(string line)
+    {
+        foreach (var tag in new[] { "<script", "<style", "<pre", "<textarea" })
+            if (line.StartsWith(tag, StringComparison.OrdinalIgnoreCase)
+                && (line.Length == tag.Length || line[tag.Length] is ' ' or '\t' or '>')) return true;
+        return false;
+    }
+
+    private static bool RawHtmlEnd(string line) => line.Contains("</script>", StringComparison.OrdinalIgnoreCase)
+        || line.Contains("</style>", StringComparison.OrdinalIgnoreCase) || line.Contains("</pre>", StringComparison.OrdinalIgnoreCase)
+        || line.Contains("</textarea>", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ListFence(string line, int indent, CancellationToken token, out char fence, out int width, out int contentIndent)
+    {
+        fence = '\0'; width = 0; contentIndent = indent;
+        var offset = 0; var markers = 0;
+        while (markers < 8 && offset < line.Length)
+        {
+            token.ThrowIfCancellationRequested();
+            var end = offset;
+            if (line[end] is '-' or '+' or '*') end++;
+            else
+            {
+                while (end < line.Length && end - offset < 9 && char.IsAsciiDigit(line[end])) end++;
+                if (end == offset || end >= line.Length || line[end] is not ('.' or ')')) break;
+                end++;
+            }
+            if (end >= line.Length || line[end] is not (' ' or '\t')) break;
+            contentIndent += end - offset;
+            while (end < line.Length && line[end] is ' ' or '\t')
+            {
+                token.ThrowIfCancellationRequested();
+                contentIndent += line[end++] == '\t' ? 4 - contentIndent % 4 : 1;
+            }
+            offset = end; markers++;
+        }
+        if (markers == 0 || offset >= line.Length || line[offset] is not ('`' or '~')) return false;
+        fence = line[offset];
+        while (offset + width < line.Length && line[offset + width] == fence) { token.ThrowIfCancellationRequested(); width++; }
+        return width >= 3;
+    }
+
+    private static bool UnsupportedInlineParagraph(string line, HashSet<string> reasons, CancellationToken token)
+    {
+        // Exclusion precedes BOTH passes, so code/unsupported labels cannot publish definitions.
+        // A blank line is the deliberately conservative paragraph recovery boundary.
+        for (var index = 0; index < line.Length; index++)
+        {
+            token.ThrowIfCancellationRequested();
+            if (line[index] == '\\') { index++; continue; }
+            if (line[index] == '[' && ClosingLabel(line, index, token) < 0)
+            { reasons.Add("Multiline or unsupported link-label paragraphs are not inspected."); return true; }
+            if (line[index] != '`') continue;
+            var ticks = 1;
+            while (index + ticks < line.Length && line[index + ticks] == '`') { token.ThrowIfCancellationRequested(); ticks++; }
+            var close = ticks <= 32 ? ClosingCode(line, index + ticks, ticks, token) : -1;
+            if (close < 0)
+            { reasons.Add("Multiline or unclosed inline-code paragraphs are not inspected."); return true; }
+            index = close + ticks - 1;
+        }
+        return false;
     }
 
     private static string? Label(string value)
@@ -205,6 +292,9 @@ internal static class MarkdownPackageReferences
                 if (end + 1 >= line.Length || !"!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".Contains(line[end + 1])) return false;
                 builder.Append(line[++end]); continue;
             }
+            // Character references are deliberately unsupported. An escaped '&' took
+            // the branch above and remains literal: never decode it a second time.
+            if (character == '&') return false;
             if (angle && character == '>') { end++; target = builder.ToString(); return true; }
             if (!angle && (char.IsWhiteSpace(character) || character == ')' && depth == 0))
             { target = builder.ToString(); return true; }

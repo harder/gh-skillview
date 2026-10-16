@@ -160,6 +160,60 @@ public sealed class StaticPackageCheckerTests : IDisposable
         Assert.Contains(result.Coverage.Reasons, reason => reason.Contains("links", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("scripts/pointer/../tool.py")]
+    [InlineData("SCRIPTS/POINTER/../tool.py")]
+    [InlineData("scripts/pointer/./../tool.py")]
+    [InlineData("scripts/%70ointer/../tool.py")]
+    [InlineData("scripts/pointer//../tool.py")]
+    public async Task LinkTraversalCannotBeErasedByLexicalDotSegmentNormalization(string reference)
+    {
+        var outside = Path.Combine(temporary.FullName, "outside", "child"); Directory.CreateDirectory(outside);
+        Write("scripts/tool.py", "This file does not establish where pointer/../tool.py resolves.");
+        Directory.CreateSymbolicLink(Path.Combine(Payload, "scripts", "pointer"), outside);
+        Write("SKILL.md", Metadata + $"[Unsafe normalization]({reference})\n[Known](scripts/tool.py)\n");
+        var before = PayloadSnapshot.CaptureEvidence(Payload, Token);
+        var result = await new StaticPackageChecker().CheckAsync(Target(), Token);
+        Assert.Empty(result.Findings); Assert.Equal("unknown", result.ReferenceStatus);
+        Assert.Equal("partial", result.Coverage.References); Assert.Equal(2, result.Coverage.AnalyzedReferences);
+        Assert.Contains(result.Coverage.Reasons, reason => reason.Contains("links", StringComparison.Ordinal));
+        Assert.Equal(before.Fingerprint, PayloadSnapshot.CaptureEvidence(Payload, Token).Fingerprint);
+    }
+
+    [Fact]
+    public async Task OrdinaryCapturedDirectoryDotSegmentsStillResolveWithoutUnknownCoverage()
+    {
+        Directory.CreateDirectory(Path.Combine(Payload, "scripts", "ordinary"));
+        Write("scripts/tool.py", "Not executed");
+        Write("SKILL.md", Metadata + "[Known](scripts/ordinary/../tool.py)\n");
+        var result = await new StaticPackageChecker().CheckAsync(Target(), Token);
+        Assert.Empty(result.Findings); Assert.Equal("none-observed", result.ReferenceStatus);
+        Assert.Equal("limited", result.Coverage.References);
+    }
+
+    [Theory]
+    [InlineData("assets/a&amp;b.png", "assets/a&b.png")]
+    [InlineData("assets/&#97;.png", "assets/a.png")]
+    [InlineData("assets/&#x61;.png", "assets/a.png")]
+    public async Task HtmlCharacterReferencesCannotProduceFalseLiteralMissingFindings(string reference, string actual)
+    {
+        Write(actual, "Present under the rendered destination spelling.");
+        Write("SKILL.md", Metadata + $"[Entity]({reference})\n[Known](SKILL.md)\n");
+        var result = await new StaticPackageChecker().CheckAsync(Target(), Token);
+        Assert.Empty(result.Findings); Assert.Equal("unknown", result.ReferenceStatus);
+        Assert.Equal("partial", result.Coverage.References);
+    }
+
+    [Fact]
+    public async Task BackslashEscapedAmpersandIsNotDecodedAsAnHtmlCharacterReference()
+    {
+        Write("assets/a&amp;b.png", "The ampersand is literal, not a second decoding opportunity.");
+        Write("SKILL.md", Metadata + "[Literal](assets/a\\&amp;b.png)\n");
+        var result = await new StaticPackageChecker().CheckAsync(Target(), Token);
+        Assert.Empty(result.Findings); Assert.Equal("none-observed", result.ReferenceStatus);
+        Assert.Equal("limited", result.Coverage.References);
+    }
+
     [Fact]
     public async Task SecondHeldReadMustMatchTheFirstCapturedHashBeforeTextBecomesFrozenEvidence()
     {
