@@ -19,7 +19,8 @@ if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', args.version):
 operating_system, architecture = args.rid.split('-')
 operating_system = {'osx': 'macOS', 'win': 'windows'}.get(operating_system, operating_system)
 architecture = {'x64': 'amd64'}.get(architecture, architecture)
-archive_name = 'gh_' + args.version + '_' + operating_system + '_' + architecture + ('.zip' if operating_system == 'windows' else '.tar.gz')
+zip_archive = operating_system in ('macOS', 'windows')
+archive_name = 'gh_' + args.version + '_' + operating_system + '_' + architecture + ('.zip' if zip_archive else '.tar.gz')
 base = 'https://github.com/cli/cli/releases/download/v' + args.version + '/'
 
 
@@ -37,7 +38,7 @@ assert len(matching) == 1 and re.fullmatch('[a-f0-9]{64}', matching[0]), 'Missin
 archive = download(archive_name, 128 * 1024 * 1024)
 assert hashlib.sha256(archive).hexdigest() == matching[0], 'Official archive checksum mismatch'
 leaf = 'bin/gh.exe' if operating_system == 'windows' else 'bin/gh'
-if operating_system == 'windows':
+if zip_archive:
     with zipfile.ZipFile(io.BytesIO(archive)) as opened:
         members = [item for item in opened.infolist() if item.filename == leaf or item.filename.endswith('/' + leaf)]
         assert len(members) == 1 and 0 < members[0].file_size <= 128 * 1024 * 1024

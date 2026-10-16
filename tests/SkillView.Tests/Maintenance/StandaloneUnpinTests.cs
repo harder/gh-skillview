@@ -58,6 +58,67 @@ public sealed class StandaloneUnpinTests : IDisposable
     }
 
     [Fact]
+    public void StrictInstalledArchiveBindsNativeEvidenceDespiteDistinctSkillComparisonHashFlavor()
+    {
+        if (!OperatingSystem.IsWindows()) File.CreateSymbolicLink(Path.Combine(Payload, "local-link"), "extra");
+        using var original = NativeDirectoryMoveLease.Open(Skills, Payload, Token);
+        var native = original.Capture(Token);
+        using var state = NativeStateDirectory.OpenOrCreate(State, [Payload], Token);
+        var installed = CapturedPayloadArchive.Capture(state, "installed", original, Token);
+        var beforeSkill = Assert.Single(native.Entries, entry => entry.Path == "SKILL.md");
+        var archivedSkill = Assert.Single(installed.Snapshot.Entries, entry => entry.Path == "SKILL.md");
+        Assert.Equal(beforeSkill.ContentHash, beforeSkill.ComparisonHash);
+        Assert.NotEqual(archivedSkill.ContentHash, archivedSkill.ComparisonHash);
+        Assert.Equal(beforeSkill.ContentHash, archivedSkill.ContentHash);
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Null(Assert.Single(native.Entries, entry => entry.Path == "local-link").UnixMode);
+            Assert.NotNull(Assert.Single(installed.Snapshot.Entries, entry => entry.Path == "local-link").UnixMode);
+        }
+        ReplacementPlanStore.VerifyUnpinOriginal(ReplacementEvidence.From(native), installed, Token);
+        // The strict immutable archive keeps its authored-comparison hash.
+        Assert.Equal(archivedSkill, Assert.Single(installed.Snapshot.Entries, entry => entry.Path == "SKILL.md"));
+    }
+
+    [Theory]
+    [InlineData("root-id")]
+    [InlineData("root-generation")]
+    [InlineData("root-mode")]
+    [InlineData("entry-hash")]
+    [InlineData("entry-comparison")]
+    [InlineData("entry-mode")]
+    [InlineData("entry-bytes")]
+    [InlineData("child-generation")]
+    [InlineData("payload-fingerprint")]
+    [InlineData("object-fingerprint")]
+    public void ArchiveProjectionStillRejectsChangedRawContentModesAndFullNativeEvidence(string change)
+    {
+        using var lease = NativeDirectoryMoveLease.Open(Skills, Payload, Token);
+        var native = lease.Capture(Token);
+        using var state = NativeStateDirectory.OpenOrCreate(State, [Payload], Token);
+        var installed = CapturedPayloadArchive.Capture(state, "installed", lease, Token);
+        var original = ReplacementEvidence.From(native);
+        var entry = original.Entries[0];
+        var child = original.Children[0];
+        original = change switch
+        {
+            "root-id" => original with { Identity = original.Identity with { FileIdLow = original.Identity.FileIdLow ^ 1 } },
+            "root-generation" => original with { Identity = original.Identity with { ChangeTimeNanoseconds = original.Identity.ChangeTimeNanoseconds + 1, WindowsChangeTime = original.Identity.WindowsChangeTime + 1 } },
+            "root-mode" => original with { Mode = original.Mode == 448 ? 493 : 448 },
+            "entry-hash" => original with { Entries = original.Entries.SetItem(0, entry with { ContentHash = new('f', 64) }) },
+            "entry-comparison" => original with { Entries = original.Entries.SetItem(0, entry with { ComparisonHash = new('f', 64) }) },
+            "entry-mode" => original with { Entries = original.Entries.SetItem(0, entry with { UnixMode = entry.UnixMode == 448 ? 493 : 448 }) },
+            "entry-bytes" => original with { Entries = original.Entries.SetItem(0, entry with { Bytes = entry.Bytes + 1 }) },
+            "payload-fingerprint" => original with { Payload = new('f', 64) },
+            "object-fingerprint" => original with { Objects = new('f', 64) },
+            _ => original with { Children = original.Children.SetItem(0, child with { Identity = child.Identity with { ChangeTimeNanoseconds = child.Identity.ChangeTimeNanoseconds + 1, WindowsChangeTime = child.Identity.WindowsChangeTime + 1 } }) }
+        };
+        var error = Assert.Throws<IOException>(() => ReplacementPlanStore.VerifyUnpinOriginal(original, installed, Token));
+        Assert.Contains("Unpin archive is not the actual captured original", error.Message);
+        Assert.Contains("match: False", error.Message);
+    }
+
+    [Fact]
     public void AlreadyUnpinnedPrecedesStateWriterAndFullQuotaAndNeverNeedsSource()
     {
         File.WriteAllText(Path.Combine(Payload, "SKILL.md"), Metadata.Replace("  github-pinned: v1 # pin comment stays\n", ""));

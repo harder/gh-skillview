@@ -169,10 +169,7 @@ internal sealed partial class ReplacementPlanStore
         SameTracking(plan.Subject.Metadata with { Pinned = false, PinnedRef = null }, policy.DesiredMetadata);
         using var archive = OpenArchive(operation, "installed-capture", token);
         var installed = CapturedPayloadArchive.Load(archive, policy.ArchiveFingerprint, token).Archive;
-        var legacy = LegacyProjection(installed.Snapshot, token);
-        if (legacy.RootIdentity != plan.Original.Identity || legacy.RootUnixMode != plan.Original.Mode
-            || !legacy.Entries.SequenceEqual(plan.Original.Entries) || !legacy.Objects.SequenceEqual(plan.Original.Children))
-            throw new IOException("Unpin archive is not the actual captured original.");
+        VerifyUnpinOriginal(plan.Original, installed, token);
         var reader = installed.OpenReader(archive);
         using var metadata = PayloadMetadataReview.PreserveInstalled(installed, reader, token);
         var recomputed = policy with { MetadataPolicy = metadata.PolicyName, Metadata = metadata.Recipes };
@@ -182,20 +179,40 @@ internal sealed partial class ReplacementPlanStore
         using var input = new MemoryStream(); reader.CopyEntry("SKILL.md", input, token);
         var desired = PinTrackingWriter.Unpin(input.ToArray());
         var hash = Convert.ToHexString(SHA256.HashData(desired));
-        var expected = installed.Snapshot.Entries.Select(entry => LegacyEntry(entry.Path == "SKILL.md"
-            ? entry with { ContentHash = hash, Bytes = desired.Length } : entry)).ToArray();
-        if (expected.Length != plan.Candidate.Entries.Length || plan.Original.Mode != plan.Candidate.Mode
-            || expected.Where((entry, i) => entry.Path == "SKILL.md"
-                ? entry.Path != plan.Candidate.Entries[i].Path || entry.Kind != plan.Candidate.Entries[i].Kind
-                    || entry.ContentHash != plan.Candidate.Entries[i].ContentHash || entry.Bytes != plan.Candidate.Entries[i].Bytes
-                    || entry.UnixMode != plan.Candidate.Entries[i].UnixMode
-                : entry != plan.Candidate.Entries[i]).Any())
+        var expected = installed.Snapshot.Entries.Select(entry => NativeUnpinEntry(entry.Path == "SKILL.md"
+            ? entry with { ContentHash = hash, Bytes = desired.Length } : entry));
+        if (plan.Original.Mode != plan.Candidate.Mode || !expected.SequenceEqual(plan.Candidate.Entries))
             throw new IOException("Unpin candidate changes content outside the exact pin member.");
         if (policy.Owner is { } owner) ValidateOwnerTransition(plan.Subject.Metadata, plan.Subject.Owners, null, owner, token, unpinOnly: true);
         else if (!plan.Subject.Owners.IsEmpty) throw new IOException("Unpin plan lacks its required owner transition.");
     }
 
-    private static PayloadEntry LegacyEntry(PayloadEntry entry) => entry.Kind == "link" ? entry with { UnixMode = null } : entry;
+    // Native Capture/FlushPayload use CaptureEvidence: SKILL.md comparison hashes
+    // are raw hashes and Unix link modes are absent. CapturedPayloadArchive uses
+    // strict CaptureInto instead, retaining normalized authored hashes and link
+    // modes. Project only those representation differences; retain raw content,
+    // complete native identities/generations and every other entry field.
+    private static PayloadEntry NativeUnpinEntry(PayloadEntry entry) => entry with
+    {
+        ComparisonHash = entry.ContentHash,
+        UnixMode = entry.Kind == "link" ? null : entry.UnixMode
+    };
+
+    internal static void VerifyUnpinOriginal(ReplacementEvidence original, CapturedPayloadArchive installed, CancellationToken token)
+    {
+        var legacy = LegacyProjection(installed.Snapshot, token);
+        var identityMatches = legacy.RootIdentity == original.Identity;
+        var modeMatches = legacy.RootUnixMode == original.Mode;
+        var entriesMatch = legacy.Entries.Select(NativeUnpinEntry).SequenceEqual(original.Entries);
+        var childrenMatch = legacy.Objects.SequenceEqual(original.Children);
+        var payloadMatches = legacy.Fingerprint == original.Payload;
+        var objectFingerprintMatches = legacy.ObjectStateFingerprint == original.Objects;
+        if (!identityMatches || !modeMatches || !entriesMatch || !childrenMatch || !payloadMatches || !objectFingerprintMatches)
+            throw new IOException("Unpin archive is not the actual captured original. "
+                + $"Root identity/generation match: {identityMatches}; root mode match: {modeMatches}; "
+                + $"native entry evidence match: {entriesMatch}; native child identities/generations match: {childrenMatch}; "
+                + $"raw payload fingerprint match: {payloadMatches}; native object fingerprint match: {objectFingerprintMatches}.");
+    }
 
     private static void VerifyPinPolicy(ReplacementPlan plan, NativeStateDirectory operation, string topology,
         ReplacementSlot? original, ReplacementSlot? retained, ReplacementSlot? candidate, ReplacementSlot? displaced, CancellationToken token)

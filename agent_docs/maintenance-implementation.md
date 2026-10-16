@@ -1161,3 +1161,23 @@ The original Mac Down-arrow crash was never reproduced. See
 `maintenance-standalone-unpin.md` and
 `evidence/maintenance-batch-16-local-checkpoint.json` for the design and bounded
 local evidence.
+
+### Batch 16: failed CI and local cross-platform fixes
+
+PR66 attempt 1 at `b8ab8fa475960308c71e556ee5ac94a3983b65c4` was canceled after
+macOS and Windows unpin tests/metadata each exposed 16 failures: strict schema4
+archive validation compared the wrong platform projection. The macOS AOT lane also
+selected tar.gz for the official gh 2.97.0 arm64 asset, which is a ZIP; Copilot
+reported the same helper defect in one unresolved review thread. The schema4-only
+native comparison and macOS ZIP fixes were independently reviewed. On the fixed
+local source snapshot, the scoped build, StandaloneUnpinTests 29/29, shared-owner
+regressions 69/69, Core/test format checks, and three downloader-helper tests pass.
+Official macOS gh 2.97.0 and 2.102.0 ZIPs were checksum verified but not executed.
+The earlier 1,959-test full-suite result remains attributed to its pre-final source
+snapshot. Fresh cross-platform CI and four native AOT lanes remain pending.
+Frozen schema 1–3 compatibility uses records from baseline `0dba59be` with gh
+2.102.0 on both proof hosts; the separate unpin compatibility matrix uses gh
+2.97.0 and 2.102.0. Attempt1 produced no selected native proof artifacts.
+Acceptance remains 9/21 and M08 incomplete. Details, raw log hashes,
+artifact digests and exact local source manifest are in
+`evidence/maintenance-batch-16-ci-fixes.json`.

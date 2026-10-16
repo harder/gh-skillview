@@ -30,6 +30,14 @@ after review, so it cannot overwrite fresh unrelated raw member bytes. Owner aut
 lock; repair remains a separately reviewed whole-image operation for recognized
 torn writes.
 
+Archive capture and native move evidence use different comparison representations:
+strict `CaptureInto` retains the normalized authored SKILL.md comparison hash and
+Unix link modes; `CaptureEvidence` stores raw comparison hashes and omits link modes.
+Schema4 projects those representation fields when binding the archive to native
+original/candidate evidence. It still compares complete raw entries, root mode,
+full native identities/generations and raw/object fingerprints. Immutable archive
+hashes and schema1–3 projections remain unchanged.
+
 The existing native directory swap supplies the authority and durable recovery
 boundary. Applying creates active native objects and regenerates timestamps while
 preserving exact path sets, authored file bytes, extra files, local deletions,
