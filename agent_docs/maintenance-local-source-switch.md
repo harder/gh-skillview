@@ -93,3 +93,8 @@ Local tests qualify their exact source and environment separately from native
 App/extension proofs. Four-RID minimum/current-gh lifecycle and real old-native
 schema1–5 compatibility require actual final-source CI evidence; the design and
 local refusal tests alone do not establish those gates.
+
+Frozen schema5 compatibility evidence retains the complete bounded `gh --version`
+stdout after trimming its outer whitespace, including the release URL and internal
+line endings, exactly as the native producer records it. Check the staged binary
+hash independently; a first-line banner is not the saved version witness.

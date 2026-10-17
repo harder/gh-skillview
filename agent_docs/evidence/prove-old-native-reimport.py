@@ -35,6 +35,16 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def frozen_gh_version(stdout):
+    """Match the native producer's complete bounded StdOut.Trim() witness."""
+    if len(stdout) > 4096:
+        raise ValueError('gh version witness exceeds its bound')
+    value = stdout.decode('utf-8', 'strict').strip()
+    if not value.startswith('gh version '):
+        raise ValueError('gh version witness lacks its banner')
+    return value
+
+
 def publish(status, **fields):
     if _output is not None:
         _output.parent.mkdir(parents=True, exist_ok=True)
@@ -273,7 +283,7 @@ def main():
         assert source_receipt['binarySha256'].lower() == old_tool['sha256'], 'Frozen binary differs from source build receipt'
         version_result, version_bytes, _ = child([gh, '--version'], env, root, timeout=30)
         assert version_result['exitCode'] == 0
-        gh_version = version_bytes.decode('utf-8', 'strict').splitlines()[0]
+        gh_version = frozen_gh_version(version_bytes)
         source = root / 'source-parent' / 'legacy-local'
         source.mkdir(parents=True)
         source.joinpath('SKILL.md').write_bytes(b'---\nname: legacy-local\ndescription: Old source\n---\nInitial C\n')
@@ -337,7 +347,8 @@ def main():
             policy = plan['localImport']
             assert policy['sourcePath'] == str(source) and policy['canonicalSourcePath'] == str(source)
             assert policy['disposition'] == 'replace-local-retain-original'
-            assert policy['gh']['binarySha256'].lower() == gh_tool['sha256'] and policy['gh']['version'] == gh_version
+            assert policy['gh']['binarySha256'].lower() == gh_tool['sha256'], 'Saved gh binary hash differs from the staged native tool'
+            assert policy['gh']['version'] == gh_version, 'Saved gh version differs from the complete native version witness'
             frozen_archives = {}
             for slot, fingerprint in [('installed-capture', policy['installedArchiveFingerprint']), ('local-source-capture', policy['sourceArchiveFingerprint']),
                                       ('gh-input-capture', policy['gh']['inputArchiveFingerprint']), ('gh-output-capture', policy['gh']['outputArchiveFingerprint'])]:

@@ -32,6 +32,8 @@ jobs:
         run: node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js
       - name: Test Homebrew formula renderer
         run: python3 -m unittest discover -s .github/scripts -p test_homebrew_formula.py
+      - name: Test frozen native-plan fixture contracts
+        run: python3 -m unittest discover -s agent_docs/evidence -p 'test_old_native_*.py'
 
   dependency-review:
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
@@ -169,6 +171,8 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
             --filter-class SkillView.Tests.Inventory.NativeExposureLinkTests \
+            --filter-class SkillView.Tests.Inventory.NativePlacementTests \
+            --filter-class SkillView.Tests.Maintenance.LocalSourceSwitchTests \
             --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
             | tee dist/windows-metadata-tests.log
       - name: Retain Windows metadata evidence
