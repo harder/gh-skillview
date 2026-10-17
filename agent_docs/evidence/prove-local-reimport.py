@@ -19,6 +19,8 @@ import time
 import uuid
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -248,6 +250,7 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         assert manifest(source) == source_before
         assert planned['applyArguments'] == ['reimport-apply', '--id', saved['id'], '--yes', '--disposition',
                                              'replace-local-retain-original', '--expect', saved['planFingerprint'], '--allow-hidden-dirs']
+        acknowledge_frozen_source(run, saved, 'reimport')
         if case in ('stale-source', 'local-retain-intent'):
             if case == 'local-retain-intent':
                 kill_at(saved, 'apply-reimport', saved['planFingerprint'], case)

@@ -141,6 +141,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
 
 ## Critical agent notes
 
+- Product source-changing saved plans bind optional version-1 source-review
+  evidence and an explicit immutable acknowledgement separately from retention.
+  Analyze held immutable archives, never reopened live paths; enforce persisted
+  contracts even through legacy store instances. Legacy absent fields retain old
+  hashes and stay unreviewed. Pin-only changes are distinct. See
+  `agent_docs/maintenance-update-source-review.md`.
+
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention
   approval. Only availability checks use the low-level mutable gh update adapter

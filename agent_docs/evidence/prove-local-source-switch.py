@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from source_review_proof import acknowledge_frozen_source
 
 _helpers_path = Path(__file__).with_name('prove-local-reimport.py')
 _proof_output = None
@@ -244,6 +245,14 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         source_unchanged()
         assert planned['applyArguments'] == ['source-switch-apply', '--id', saved['id'], '--yes', '--disposition',
                                              'replace-local-source-retain-original', '--expect', saved['planFingerprint'], '--allow-hidden-dirs']
+        if case == 'normal':
+            refusal = run('source-switch-apply', '--id', saved['id'], '--yes', '--disposition',
+                          'replace-local-source-retain-original', '--expect', saved['planFingerprint'], expected=1)
+            assert 'source-review acknowledgement' in refusal['error'], refusal
+            assert manifest(payload) == before and objects(payload) == before_objects
+            assert not Path(saved['retainedPath']).exists()
+            source_unchanged()
+        acknowledge_frozen_source(run, saved, 'source-switch')
         if case == 'normal':
             private_before = manifest(plan_path.parent)
             for family, disposition in [('restore', 'retain-original'), ('update', 'retain-original'),

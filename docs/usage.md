@@ -355,9 +355,9 @@ match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 This remains a partial implementation of [M19](../agent_docs/maintenance-audit.json).
-Frozen update content/declaration diffs, new destination/dependency deltas, explicit
-source-review acknowledgement, opt-in isolated prompt evaluation and authoring
-`gh skill publish --dry-run` integration remain separate future work. `publish --fix`
+Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
+Opt-in isolated prompt evaluation and authoring `gh skill publish --dry-run`
+integration remain separate future work. `publish --fix`
 is never a repair action for installed payloads; no authored bytes are rewritten.
 
 ### Global flags
@@ -570,6 +570,7 @@ source; **K** checks the package offline. The CLI flow is:
 ```sh
 skillview --scan-root /path/to/skills source-switch-plan --path /path/to/skills/demo --new-source /durable/new/demo --json
 skillview source-switch-inspect --id <saved-id> --json
+skillview source-switch-ack-source --id <saved-id> --expect <plan-fingerprint> --review <source-review-fingerprint> --yes
 skillview source-switch-apply --id <saved-id> --yes --disposition replace-local-source-retain-original --expect <plan-fingerprint>
 ```
 
@@ -590,3 +591,8 @@ unknown/inaccessible or overlapping placement refuses before private staging.
 Linux placement also refuses mount/bind transitions, including otherwise legitimate
 sources on another mounted filesystem.
 See [the detailed contract](../agent_docs/maintenance-local-source-switch.md).
+
+Saved source-changing updates also provide a [frozen source review](saved-updates.md#frozen-source-review)
+with captured diffs and a separate explicit acknowledgement. This user declaration
+supplies no authenticity, compatibility or safety assurance; local `check` remains
+unreviewed without a matching explicit review workflow.

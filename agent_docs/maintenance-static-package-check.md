@@ -85,11 +85,11 @@ behavioral safety or source review; execution is `none`. M19 and the original
 21-item acceptance audit remain incomplete. This
 feature is a partial implementation, with original acceptance still 9/21.
 
-The remaining [original M19 clauses](maintenance-audit.json) are frozen content
-diffs before updates (instructions/scripts/tool declarations), newly introduced
-destination/dependency deltas, explicit source-review acknowledgement, real opt-in
-isolated representative-prompt evaluations with an explicit runnable environment,
-and authoring `gh skill publish --dry-run` integration. Never use `publish --fix`
+The [saved-update source-review phase](maintenance-update-source-review.md) adds
+frozen content diffs, bounded declaration deltas and explicit acknowledgement to
+new product plans. The remaining [original M19 clauses](maintenance-audit.json)
+include real opt-in isolated representative-prompt evaluations with an explicit
+runnable environment and authoring `gh skill publish --dry-run` integration. Never use `publish --fix`
 to repair installed updates or silently edit authored instructions.
 
 The dialog uses `ModalOperationTracker` ownership through queued completion.

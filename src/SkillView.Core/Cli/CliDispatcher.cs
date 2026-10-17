@@ -51,10 +51,10 @@ public static partial class CliDispatcher
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => await LocalReviewAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+                "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
                     or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
                     or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -81,10 +81,10 @@ public static partial class CliDispatcher
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "effective" or "check" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
             or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner"
             or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
@@ -2318,6 +2318,7 @@ public static partial class CliDispatcher
             | `update-merge-choose` | Save complete explicit path choices; use `/` for root mode. Freeze a custom regular file or reuse previously captured bytes. | `--id`, `--expect <local review fingerprint>`, repeated `--choose-installed <path>` / `--choose-source <path>` / `--choose-resolved <path>` / `--resolve <path> <file>`, `--json` |
             | `update-merge-plan` | Build and save a separately approved merged candidate with preserved supported native metadata. No live installation change. | `--id`, `--expect <local review fingerprint>`, `--json` |
             | `update-preserve` | Verify and keep the current installation without moving payloads, writing its owner or changing preferences. | `--id`, `--expect <plan fingerprint>`, `--json` |
+            | `update-ack-source`, `reimport-ack-source`, `source-switch-ack-source`, `restore-ack-source` | Declare review of an exact frozen diff, independently of retention approval. No authenticity or safety claim. | `--id --expect <plan> --review <source-review fingerprint> --yes`, `--json` |
             | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update. Apply must match its saved replacement or merged disposition. | `--id`, `--expect`, `--yes`, `--disposition retain-original` / `merge-reviewed`, `--json` |
             | `update-repair-owner` | Repair only a recognized torn registry from its explicitly reviewed retained image. Inspect again before resuming payload recovery. | `--id`, `--yes --expect`, `--json` |
             | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |

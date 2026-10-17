@@ -22,7 +22,7 @@ public sealed class TuiServices
     private SkillView.Maintenance.SkillUpdateCoordinator UpdateAvailability =>
         new(InstallService, UpdateService, ListAdapter, Logger, Runner);
     internal SkillView.Maintenance.ReplacementPlanStore SavedUpdatePlans => new(Path.Combine(Path.GetDirectoryName(
-        SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(Runner))!, "replacements"), Logger, runner: Runner);
+        SkillView.Maintenance.MaintenanceBackupStore.ResolveRoot(Runner))!, "replacements"), Logger, runner: Runner, sourceReviewRequired: true);
     internal SkillView.Maintenance.SavedUpdateCoordinator SavedUpdates => new(
         SavedUpdatePlans,
         UpdateAvailability, ListAdapter, Logger);

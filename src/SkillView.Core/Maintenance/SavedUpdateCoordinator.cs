@@ -213,6 +213,8 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         try
         {
             token.ThrowIfCancellationRequested();
+            if (review.SourceReview is { } source && review.AcknowledgeSourceReview)
+                plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token);
             attempted = true;
             var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
                 review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);

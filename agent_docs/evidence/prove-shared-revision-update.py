@@ -20,6 +20,8 @@ import threading
 import time
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def resolve_gh_executable(path, *, windows=None, lookup=None):
     """Bind an explicit tool path, including Windows' omitted PATHEXT suffix."""
     candidate = path.resolve()
@@ -388,6 +390,7 @@ for gh_path in args.gh:
         current['skills']['unrelated']['extension'] = [1, 2, 3]
         registry_path.write_bytes((json.dumps(current, indent=2) + '\n').encode('utf-8'))
         preimage = registry_path.read_bytes()
+        acknowledge_frozen_source(run, saved)
         applied = run('update-apply', '--id', saved['id'], '--yes', '--disposition', apply_disposition,
                       '--expect', saved['planFingerprint'])['operation']
         assert applied['succeeded'] and applied['owner']['state'] == 'desired', applied

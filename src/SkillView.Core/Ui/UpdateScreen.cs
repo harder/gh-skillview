@@ -100,6 +100,11 @@ public static class UpdateScreen
             Field("Future update policy", change.FutureUpdatePolicy);
             sb.AppendLine("Old source placement is not a captured base or old-content freshness requirement. The selected source may be a copied local installation; no ancestry or independent physical fork is inferred. Git-managed sources remain unsupported.");
         }
+        sb.AppendLine("### Frozen source changes");
+        // Indented code preserves diff lines and prevents authored Markdown from
+        // becoming review controls, links or headings.
+        foreach (var line in SourceReviewScreen.RenderText(plan).Split('\n')) sb.Append("    ").AppendLine(line);
+        sb.AppendLine();
         if (plan.LocalImport is { } import)
         {
             Field("Recorded local source", import.SourcePath);
@@ -176,7 +181,8 @@ public static class UpdateScreen
         }
         if (plan.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         else foreach (var agent in plan.Subject.Agents) Field("Affected consumer", $"{agent.AgentId}: {agent.Path}");
-        foreach (var path in plan.ChangedPaths) Field("Changed path", path);
+        foreach (var path in plan.ChangedPaths.Take(128)) Field("Changed path", path);
+        if (plan.ChangedPaths.Length > 128) Field("Omitted changed paths (complete saved plan retained)", (plan.ChangedPaths.Length - 128).ToString());
         sb.AppendLine("The original directory, including local edits and extras, is retained for explicit recovery/undo. Agent session state is unknown.");
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
     }

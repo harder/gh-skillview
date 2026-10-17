@@ -102,7 +102,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Percent(45),
-            Height = Dim.Fill(8),
+            Height = Dim.Fill(9),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
@@ -114,7 +114,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = Pos.Right(_table) + 1,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(8),
+            Height = Dim.Fill(9),
             Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
@@ -216,7 +216,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar, _retainBox, _applyButton, _nextButton);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
         Disposing += (_, _) => CancelPendingWork();
     }
@@ -496,6 +496,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _queue.Clear();
         _queueOptions = null;
         _retainBox.Value = CheckState.UnChecked;
+        _sourceReviewBox.Value = CheckState.UnChecked;
         SetBusy(false);
         SetOperationControlsEnabled(true);
     }
