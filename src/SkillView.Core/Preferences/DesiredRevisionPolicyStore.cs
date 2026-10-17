@@ -203,9 +203,15 @@ internal sealed class DesiredRevisionPolicyStore(string root, ProcessRunner? run
             return Select(current, Bind(target));
         }
 
-        internal DesiredPolicyObservation Set(InstalledSkill target, DesiredRevisionPolicy? policy, string expected, CancellationToken token)
+        internal DesiredPolicyObservation Set(InstalledSkill target, DesiredRevisionPolicy? policy, string expected, CancellationToken token,
+            ApprovedPayloadStore.ReadLease? approval = null)
         {
             if (policy is not null) ValidatePolicy(policy);
+            if (policy?.ApprovalId is not null)
+            {
+                if (approval is null) throw new IOException("Immutable desired intent requires a held verified completed approval, not a mutable ID/fingerprint pair.");
+                approval.RequirePolicy(target, policy, token);
+            }
             var before = Observe(target, token);
             if (before.Fingerprint != expected) throw new IOException("Desired-state review changed; inspect again before publication.");
             if (!target.OwnershipDiagnostics.IsEmpty || !target.MetadataConflicts.IsEmpty)
@@ -216,6 +222,8 @@ internal sealed class DesiredRevisionPolicyStore(string root, ProcessRunner? run
                 || payload.FrontMatter is not { } metadata || !metadata.Diagnostics.IsEmpty
                 || Bind(target with { FrontMatter = metadata }) != Bind(target))
                 throw new IOException("Selected installation source changed before desired-state publication.");
+            if (approval is not null && policy is not null)
+                approval.RequirePolicy(target with { FrontMatter = metadata, Name = metadata.Name ?? target.Name }, policy, token);
             var binding = Bind(target);
             var record = new DesiredPolicyRecord(1, current.Records.IsEmpty ? 1 : checked(current.Records[^1].Sequence + 1),
                 policy is null ? "clear" : "set", binding, policy);

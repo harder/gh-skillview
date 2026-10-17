@@ -331,6 +331,31 @@ internal sealed partial class WindowsSecureRemovalBackend
             ValidateLocation(token); NativeStateDirectory.CheckName(name);
             return CreateChild(name, token, payloadName: false);
         }
+        internal override NativeStateDirectory OpenExistingDirectory(string name, CancellationToken token)
+        {
+            ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            var child = CreateStateEntryAt(root, name, directory: true, openIf: false, descriptor, exclusive: false, token, existingOnly: true);
+            try
+            {
+                var address = Path.Combine(canonical, name);
+                void Guard(CancellationToken ct)
+                {
+                    ValidateLocation(ct);
+                    var parentBefore = ReadIdentity(root);
+                    var before = InspectWindowsStateAncestor(child, excluded, ct);
+                    if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Held state child moved.");
+                    using var named = OpenEntryAt(root, name, true, false, requestDeleteAccess: false);
+                    if (!Matches(before, ReadIdentity(named)) || !Matches(before, ReadIdentity(child))
+                        || !Matches(parentBefore, ReadIdentity(root)))
+                        throw new IOException("Held state parent/child relationship changed.");
+                    ValidateLocation(ct);
+                }
+                var result = new WindowsStateSession([child], child, address, excluded, user, descriptor, Guard);
+                result.ValidateLocation(token);
+                return result;
+            }
+            catch { child.Dispose(); throw; }
+        }
         private WindowsStateSession CreateChild(string name, CancellationToken token, bool payloadName, bool metadataAccess = false)
         {
             ValidateLocation(token);

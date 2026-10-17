@@ -290,6 +290,34 @@ internal sealed partial class UnixSecureRemovalBackend
             ValidateLocation(token); NativeStateDirectory.CheckName(name);
             return CreateChild(name, token);
         }
+        internal override NativeStateDirectory OpenExistingDirectory(string name, CancellationToken token)
+        {
+            ValidateLocation(token); NativeStateDirectory.CheckName(name);
+            token.ThrowIfCancellationRequested();
+            var child = OpenDirectoryAt(root, name, refuseNestedMount: true);
+            try
+            {
+                var address = Path.Combine(canonical, name);
+                void Guard(CancellationToken ct)
+                {
+                    ValidateLocation(ct);
+                    using var buffer = new StatBuffer();
+                    var parentBefore = ReadStat(root, buffer.Pointer);
+                    var before = InspectStateAncestor(child, excluded, buffer.Pointer, ct);
+                    if (!PathIdentity.Equals(ReadFinalPath(child), address)) throw new IOException("Held state child moved.");
+                    ct.ThrowIfCancellationRequested();
+                    using var named = OpenDirectoryAt(root, name, refuseNestedMount: true);
+                    if (!Matches(before, ReadStat(named, buffer.Pointer)) || !Matches(before, ReadStat(child, buffer.Pointer))
+                        || !Matches(parentBefore, ReadStat(root, buffer.Pointer)))
+                        throw new IOException("Held state parent/child relationship changed.");
+                    ValidateLocation(ct);
+                }
+                var result = new UnixStateSession([child], child, address, excluded, Guard, root, name);
+                result.ValidateLocation(token);
+                return result;
+            }
+            catch { child.Dispose(); throw; }
+        }
         private UnixStateSession CreateChild(string name, CancellationToken token)
         {
             ValidateLocation(token);

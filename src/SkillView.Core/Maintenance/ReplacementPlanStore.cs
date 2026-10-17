@@ -207,7 +207,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         }
         using var desiredPolicy = AcquireDesiredPolicy(Subject(reviewed), inventory, reviewed.Purpose, token,
             explicitUnpin: reviewed.Subject.Metadata.Pinned && reviewed.Revision?.DesiredMetadata.Pinned == false,
-            selection: reviewed.Selection?.Provider.Selection.Request);
+            selection: reviewed.Selection?.Provider.Selection.Request, approval: reviewed.Approval?.Reference,
+            approvedMetadata: reviewed.Approval?.Header.Subject.Metadata);
+        using var approvedAdmission = OpenApprovedAdmission(reviewed, inventory, token);
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
         RequirePurpose(plan, expectedPurpose);
@@ -218,7 +220,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         if (plan.LocalDisposition is null && session.Operation.EnumerateEntries(token).Any(entry => entry.Name == "local-review"))
             throw new IOException("A local merge review has started; complete its separately reviewed merged plan or create a new revision plan. The earlier replacement approval is closed.");
         if (session.StepCount != 0) throw new IOException("This plan has started. Inspect it and use explicit recovery with the current review fingerprint.");
-        RequireDesiredPolicyReceipt(session, desiredPolicy, token);
+        RequireDesiredPolicyReceipt(session, desiredPolicy, token, approvedAdmission);
         var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
             || observation.Candidate?.Objects != plan.Candidate.Objects
@@ -234,6 +236,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         bool undo, CancellationToken token, string? expectedPurpose = null)
     {
         SkillView.Preferences.DesiredRevisionPolicyStore.WriterLease? desiredPolicy = null;
+        ApprovedPayloadStore.ReadLease? approvedAdmission = null;
         if (!undo)
         {
             ReplacementPlan? neverStarted = null;
@@ -251,11 +254,18 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                         neverStarted = preflight.Plan;
                 }
             }
-            if (neverStarted is not null) desiredPolicy = AcquireDesiredPolicy(Subject(neverStarted), inventory, neverStarted.Purpose, token,
-                explicitUnpin: neverStarted.Subject.Metadata.Pinned && neverStarted.Revision?.DesiredMetadata.Pinned == false,
-                selection: neverStarted.Selection?.Provider.Selection.Request);
+            if (neverStarted is not null)
+            {
+                desiredPolicy = AcquireDesiredPolicy(Subject(neverStarted), inventory, neverStarted.Purpose, token,
+                    explicitUnpin: neverStarted.Subject.Metadata.Pinned && neverStarted.Revision?.DesiredMetadata.Pinned == false,
+                    selection: neverStarted.Selection?.Provider.Selection.Request, approval: neverStarted.Approval?.Reference,
+                    approvedMetadata: neverStarted.Approval?.Header.Subject.Metadata);
+                try { approvedAdmission = OpenApprovedAdmission(neverStarted, inventory, token); }
+                catch { desiredPolicy.Dispose(); throw; }
+            }
         }
         using var policyLifetime = desiredPolicy;
+        using var approvalLifetime = approvedAdmission;
         using var session = Open(id, inventory, token);
         RequirePurpose(session.Plan, expectedPurpose);
         using var owner = OpenOwner(EffectiveOwner(session.Plan), token, recoverySession: session, inventory: inventory, exactEntryBytes: session.Plan.PinPolicy is not null);
@@ -267,7 +277,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
         if (!undo && session.StepCount == 0 && !session.IncompleteJournal && session.RecoveryJournal is null
             && observation.Topology == "ready")
-            RequireDesiredPolicyReceipt(session, desiredPolicy ?? throw new IOException("First recovery requires fresh desired-policy admission."), token);
+            RequireDesiredPolicyReceipt(session, desiredPolicy ?? throw new IOException("First recovery requires fresh desired-policy admission."), token, approvedAdmission);
         if (!undo && session.StepCount == 0 && !session.IncompleteJournal && session.RecoveryJournal is null
             && observation.Topology == "ready" && IsUnchangedRevision(session.Plan)
             && (owner is null || OwnerSatisfied(observation, owner, false)))
@@ -445,6 +455,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         VerifyPinPolicy(plan, operation, topology, original, retained, candidate, displaced, token);
         VerifyLocalImport(plan, operation, topology, original, retained, candidate, displaced, token);
         VerifySelection(plan, operation, topology, original, candidate, displaced, token);
+        VerifyApprovalPayload(plan, operation, topology, original, retained, candidate, displaced, token);
         return new(topology, original, retained, candidate, displaced, rootIdentity, parentIdentity, owner?.Observe(token));
 
         ReplacementSlot? Slot(string scanRoot, string path)
@@ -491,7 +502,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     };
 
     private InventorySnapshot Admit(InstalledSkill target, InventorySnapshot inventory, CancellationToken token,
-        ReplacementPlan? activePlan = null, OwnerContext? owner = null, bool localReimport = false)
+        ReplacementPlan? activePlan = null, OwnerContext? owner = null, bool localReimport = false, bool approvedCapture = false)
     {
         token.ThrowIfCancellationRequested();
         inventory = owner?.RecoveryInventory(inventory, token) ?? inventory;
@@ -499,7 +510,12 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             || target.Validity != ValidityState.Valid || !target.MetadataConflicts.IsEmpty
             || !target.OwnershipDiagnostics.IsEmpty || !target.FrontMatter.Diagnostics.IsEmpty)
             throw new IOException("Saved replacement requires complete inventory and unambiguous metadata.");
-        if (localReimport || activePlan?.LocalImport is not null)
+        if (approvedCapture || activePlan?.Approval is not null)
+        {
+            if (target.SourceIdentity.Conflicted || target.AllOwnershipClaims.Any() && target.FrontMatter.LocalPath is not null)
+                throw new IOException("Approved capture cannot infer a source/owner transition contract.");
+        }
+        else if (localReimport || activePlan?.LocalImport is not null)
         {
             RequireLocalSourceMetadata(target.FrontMatter, true);
             if (target.AllOwnershipClaims.Any()) throw new IOException("Local reimport requires an ownerless installation.");
@@ -673,7 +689,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         return Hash(bytes.GetBuffer().AsSpan(0, (int)bytes.Length));
     }
 
-    private static void WriteCanonical(JsonElement value, Utf8JsonWriter writer)
+    internal static void WriteCanonical(JsonElement value, Utf8JsonWriter writer)
     {
         if (value.ValueKind == JsonValueKind.Object)
         {
@@ -697,7 +713,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, CandidateName(plan)), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, PlanName(plan)),
-            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport, plan.Selection)
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport, plan.Selection, plan.Approval)
         {
             Impact = PlanImpact(plan, status)
         };
@@ -787,13 +803,16 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 }
             }
             var plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (!((plan.Selection is null && ((plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
+            var knownPurpose = plan.Approval is null && ((plan.Selection is null && ((plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 3 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is not null && plan.PinPolicy is null && hasMergePlan
                     || plan.SchemaVersion == 4 && plan.Purpose == "unpin-only" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is not null && !hasMergePlan))
                     || plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is not null && !hasMergePlan))
                     || plan.SchemaVersion == SelectedRevisionSchema && plan.Purpose == SelectedRevisionPurpose && plan.Selection is not null
                         && plan.Revision is not null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is null && !hasMergePlan)
+                || plan.SchemaVersion == ApprovedRestoreSchema && plan.Purpose == ApprovedRestorePurpose && plan.Approval is not null
+                    && plan.Revision is null && plan.Selection is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is null && !hasMergePlan;
+            if (!knownPurpose
                 || plan.Id != id
                 || plan.LocalDisposition is { } disposition && (!IsMergeSlot(disposition.MergedSlot) || PlanName(plan) != latestPlanName)
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null
@@ -832,13 +851,17 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             ValidatePinPolicy(plan, operation, token);
             ValidateLocalImport(plan, operation, token);
             ValidateSelection(plan, operation, token);
+            ValidateApproval(plan, operation, token);
             var stepCount = 0;
             ReplacementStep? latestOwnerStep = null;
             var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
             var incompleteJournal = false;
             var entries = operation.EnumerateEntries(token).Take(MaxSteps + 16 + 2 * MaxMergeAttempts).ToArray();
             if (entries.Length > MaxSteps + 14 + 2 * MaxMergeAttempts) throw new IOException("Replacement operation entry budget exceeded.");
-            if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture" or "selected-source-capture" or "selected-gh-capture")))
+            if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture" or "selected-source-capture" or "selected-gh-capture")
+                && !(plan.SchemaVersion == ApprovedRestoreSchema && plan.Approval is { } approved
+                    && (entry.Name is ("approved-payload" or "approved-original")
+                        || approved.Header.Selected is not null && entry.Name is ("approved-selected-source" or "approved-selected-provider")))))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             while (names.Contains($"step-{stepCount:D4}.json"))
@@ -874,11 +897,15 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 throw new IOException("Local source witness presence disagrees with the saved plan.");
             if (SelectedArchives.Any(name => names.Contains(name) != (plan.Selection is not null)))
                 throw new IOException("Selected revision archive presence disagrees with the saved plan.");
+            if (names.Contains("approved-payload") != (plan.Approval is not null)
+                || names.Contains("approved-original") != (plan.Approval is not null)
+                || ApprovedArchiveNames.Skip(1).Any(name => names.Contains(name) != (plan.Approval?.Header.Selected is not null)))
+                throw new IOException("Approved capture archive presence conflicts with its exact saved purpose.");
             if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
             if (names.Contains("owner-journal") && EffectiveOwner(plan) is null) throw new IOException("Unexpected owner journal for this plan.");
             if (plan.LocalDisposition is not null && !names.Contains("local-review")) throw new IOException("Merged plan lacks its immutable local review.");
             if ((names.Any(IsMergeSlot) || names.Any(IsMergePlan)) && !names.Contains("local-review")) throw new IOException("Unexpected merged stage without local review.");
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "desired-policy.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture" or "selected-source-capture" or "selected-gh-capture")
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "desired-policy.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture" or "selected-source-capture" or "selected-gh-capture" or "approved-payload" or "approved-original" or "approved-selected-source" or "approved-selected-provider")
                 && !IsMergeSlot(name) && !IsMergePlan(name)
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");

@@ -62,6 +62,29 @@ public sealed class SelectedRevisionPlanTests : IDisposable
         Assert.True(applied.Succeeded); Assert.Equal("installed", applied.Status);
         Assert.Contains("new authored bytes", File.ReadAllText(Path.Combine(fixture.Target.ResolvedPath, "SKILL.md")));
         Assert.Equal(calls, File.ReadAllText(fixture.Marker));
+        // Approval is a separately retained copy of this completed result.
+        // The executable is already absent; recorded tracking cannot replace
+        // this installed-plan/native-owner proof or cause another API request.
+        var logger = new Logger(); var diagnostics = new List<LockReadDiagnostic>();
+        var claims = new SkillLockFileReader(logger).LoadObservations(fixture.Inventory.ScannedRoots.Select(root => root.Path).ToArray(),
+            Token, new(fixture.Environment["HOME"], Path.Combine(fixture.Environment["HOME"], "state")), diagnostics);
+        var refreshed = fixture.Inventory with
+        {
+            Skills = LocalInventoryService.EnrichOwnership(new LocalSkillScanner(logger).Scan(fixture.Inventory.ScannedRoots).ToImmutableArray(), claims, Token),
+            OwnershipRecords = claims.Select(claim => claim.Package).ToImmutableArray(),
+            OwnershipReadDiagnostics = diagnostics.ToImmutableArray()
+        };
+        var installed = Assert.Single(refreshed.Skills);
+        var approvals = ApprovedPayloadStore.For(fixture.Runner, logger);
+        var approved = approvals.CaptureSelected(installed, refreshed, PayloadSnapshot.Capture(installed.ResolvedPath, Token).Fingerprint,
+            fixture.Root, plan.Id, plan.PlanFingerprint, Token);
+        using (var captured = approvals.Open(approved, fixture.Inventory.ScannedRoots.Select(root => root.Path).ToArray(), Token))
+        {
+            Assert.Equal("verified-selected-result", captured.Header.Kind);
+            Assert.Equal(plan.PlanFingerprint, captured.Header.Selected!.PlanFingerprint);
+            if (shared) Assert.NotNull(captured.Header.OwnerCapture); else Assert.Null(captured.Header.OwnerCapture);
+        }
+        Assert.Equal(calls, File.ReadAllText(fixture.Marker));
         if (shared)
         {
             using var entry = JsonDocument.Parse(GhRegistryEditor.CaptureEntry(File.ReadAllBytes(fixture.Registry!), "demo", Token).Bytes);
@@ -72,6 +95,65 @@ public sealed class SelectedRevisionPlanTests : IDisposable
         var undone = fixture.Store.Recover(plan.Id, inspected.ReviewFingerprint, fixture.Inventory, true, Token, ReplacementPlanStore.SelectedRevisionPurpose);
         Assert.True(undone.Succeeded);
         var restored = PayloadSnapshot.Capture(fixture.Target.ResolvedPath, Token);
+        Assert.Equal(before.RootIdentity, restored.RootIdentity); Assert.Equal(before.ObjectStateFingerprint, restored.ObjectStateFingerprint);
+        Assert.Equal(before.Fingerprint, restored.Fingerprint);
+        if (shared) Assert.Equal(registryBefore, File.ReadAllBytes(fixture.Registry!));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApprovedSelectedArchiveRestoresSameVersionCustomBodyAndExactNativeUndoWithoutProvider(bool shared)
+    {
+        if (OperatingSystem.IsWindows() || !File.Exists("/usr/bin/python3")) { Assert.Skip("POSIX injected Python protocol host required; Windows selected approval restore proof remains required."); return; }
+        var fixture = Create("tag", "valid", shared);
+        ReplacementPreparation prepared;
+        try { prepared = await fixture.Store.PlanSelectedAsync(fixture.Gh, fixture.Target, fixture.Inventory, new("tag", "v1", true), Token); }
+        catch (IOException ex) when (OperatingSystem.IsLinux() && ex.Message.Contains("CAP_SYS_ADMIN", StringComparison.Ordinal))
+        { Assert.Skip("Actual schema8 selected archive Open/Apply/Recover requires the existing complete metadata authority on an admitted native host."); return; }
+        var selected = Assert.IsType<ReplacementResult>(prepared.Plan);
+        Assert.True(fixture.Store.Apply(selected.Id, selected.PlanFingerprint, fixture.Inventory, Token,
+            ReplacementPlanStore.SelectedRevisionDisposition, ReplacementPlanStore.SelectedRevisionPurpose).Succeeded);
+        var logger = new Logger();
+        InventorySnapshot Refresh()
+        {
+            var diagnostics = new List<LockReadDiagnostic>();
+            var claims = new SkillLockFileReader(logger).LoadObservations(fixture.Inventory.ScannedRoots.Select(root => root.Path).ToArray(),
+                Token, new(fixture.Environment["HOME"], Path.Combine(fixture.Environment["HOME"], "state")), diagnostics);
+            return fixture.Inventory with
+            {
+                Skills = LocalInventoryService.EnrichOwnership(new LocalSkillScanner(logger).Scan(fixture.Inventory.ScannedRoots).ToImmutableArray(), claims, Token),
+                OwnershipRecords = claims.Select(claim => claim.Package).ToImmutableArray(),
+                OwnershipReadDiagnostics = diagnostics.ToImmutableArray()
+            };
+        }
+        var installedInventory = Refresh(); var installed = Assert.Single(installedInventory.Skills);
+        var approvals = ApprovedPayloadStore.For(fixture.Runner, logger);
+        var reference = approvals.CaptureSelected(installed, installedInventory, PayloadSnapshot.Capture(installed.ResolvedPath, Token).Fingerprint,
+            fixture.Root, selected.Id, selected.PlanFingerprint, Token);
+        var approved = PayloadSnapshot.Capture(installed.ResolvedPath, Token);
+        var calls = File.ReadAllText(fixture.Marker); File.Delete(fixture.Gh);
+        File.AppendAllText(Path.Combine(installed.ResolvedPath, "SKILL.md"), "\nLater intentional body, unchanged authored version.\n");
+        var inventory = Refresh(); var target = Assert.Single(inventory.Skills);
+        var before = PayloadSnapshot.Capture(target.ResolvedPath, Token);
+        var registryBefore = fixture.Registry is null ? null : File.ReadAllBytes(fixture.Registry);
+        var policy = DesiredRevisionPolicyStore.For(fixture.Runner).Observe(target, inventory.ScannedRoots.Select(root => root.Path).ToArray(), Token);
+        approvals.SetPolicy(reference, target, inventory, policy.Fingerprint!, true, Token);
+        var plan = fixture.Store.PlanApproved(reference, target, inventory, Token);
+        using (var saved = JsonDocument.Parse(File.ReadAllBytes(plan.PlanPath)))
+            Assert.Equal(8, saved.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.NotNull(plan.Approval!.Header.Selected); Assert.Null(plan.Revision);
+        Assert.Equal(target.FrontMatter.Version, plan.Approval.Header.Subject.Metadata.Version);
+        var inspected = fixture.Store.Inspect(plan.Id, inventory, Token, ReplacementPlanStore.ApprovedRestorePurpose);
+        Assert.Equal("ready", inspected.Status);
+        Assert.True(fixture.Store.Apply(plan.Id, plan.PlanFingerprint, inventory, Token,
+            ReplacementPlanStore.ApprovedRestoreDisposition, ReplacementPlanStore.ApprovedRestorePurpose).Succeeded);
+        Assert.Equal(approved.Fingerprint, PayloadSnapshot.Capture(target.ResolvedPath, Token).Fingerprint);
+        Assert.Equal(calls, File.ReadAllText(fixture.Marker));
+        Directory.Move(approvals.Root, approvals.Root + "-unavailable");
+        var current = fixture.Store.Inspect(plan.Id, Refresh(), Token, ReplacementPlanStore.ApprovedRestorePurpose);
+        Assert.True(fixture.Store.Recover(plan.Id, current.ReviewFingerprint, Refresh(), true, Token, ReplacementPlanStore.ApprovedRestorePurpose).Succeeded);
+        var restored = PayloadSnapshot.Capture(target.ResolvedPath, Token);
         Assert.Equal(before.RootIdentity, restored.RootIdentity); Assert.Equal(before.ObjectStateFingerprint, restored.ObjectStateFingerprint);
         Assert.Equal(before.Fingerprint, restored.Fingerprint);
         if (shared) Assert.Equal(registryBefore, File.ReadAllBytes(fixture.Registry!));

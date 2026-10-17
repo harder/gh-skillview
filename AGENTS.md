@@ -1,5 +1,14 @@
 # AGENTS.md
 
+- Approved payload archives are independent native retained evidence, never
+  pristine upstream B/C merely because installed/custom bytes were captured.
+  Require a held completed approval and separate expected fingerprint to set
+  desired intent; an ID/string pair is insufficient. Schema8 restore-approved
+  retains its copied evidence for started recovery/undo without source access.
+  New schema8 producers must opt into the actual-base independent source-review
+  receipt gate at integration; absent-field legacy fallback is not applicable.
+  See `agent_docs/maintenance-approved-payloads.md`.
+
 - Selected revision preparation freezes a typed tag/full commit and actual gh
   output; never invent a symbolic commit ref or revisit a tag during apply.
   Provider archive capture does not imply complete native metadata authority.
