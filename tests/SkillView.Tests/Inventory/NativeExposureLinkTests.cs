@@ -1,0 +1,766 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using SkillView.Inventory;
+using SkillView.Maintenance;
+using SkillView.Tests.Maintenance;
+using Xunit;
+
+namespace SkillView.Tests.Inventory;
+
+public sealed class NativeExposureLinkTests : IDisposable
+{
+    private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-exposure-link-");
+    private CancellationToken Token => TestContext.Current.CancellationToken;
+    public void Dispose() => temporary.Delete(true);
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(bool relative, bool ancestorAlias)
+    {
+        using var fixture = Create(relative);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        var exposureRoot = fixture.ExposureRoot;
+        if (ancestorAlias)
+        {
+            exposureRoot += "-alias";
+            Directory.CreateSymbolicLink(exposureRoot, fixture.ExposureRoot);
+        }
+        using var lease = NativeExposureLinkLease.Open(exposureRoot, Path.Combine(exposureRoot, "demo"), target, Token);
+        RequirePositiveProofMetadata(lease);
+        Assert.Equal(target.TargetIdentity, lease.TargetIdentity);
+        Assert.NotEmpty(lease.Original.RawTarget);
+        Assert.True(lease.Original.Identity.IsReparsePoint);
+        lease.Revalidate(Token);
+        if (!lease.Original.Metadata.Supported)
+        {
+            var failure = Assert.Throws<IOException>(() => lease.Retain(fixture.Slot, Token));
+            Assert.Contains("Link metadata cannot be fully verified", failure.Message);
+            Assert.NotEmpty(lease.Original.Metadata.Refusals);
+            if (OperatingSystem.IsLinux()) Assert.Contains(lease.Original.Metadata.Refusals, value => value.Contains("symlink inode flags", StringComparison.Ordinal));
+            Assert.False(lease.MutationAttempted);
+            Assert.True(PathResolver.IsSymlink(fixture.Link));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        }
+        else
+        {
+            Assert.False(OperatingSystem.IsLinux());
+            var retained = lease.Retain(fixture.Slot, Token);
+            fixture.State.FlushPublication(Token);
+            Assert.True(lease.MutationAttempted); Assert.True(lease.MutationCompleted);
+            Assert.True(NativeDirectoryMoveLease.SameObject(lease.Original.Identity, retained.Identity));
+            Assert.Equal(lease.Original.MetadataFingerprint, retained.MetadataFingerprint);
+            Assert.False(PathResolver.IsSymlink(fixture.Link));
+            Assert.True(PathResolver.IsSymlink(Path.Combine(fixture.Slot.CanonicalPath, "entry")));
+            lease.Revalidate(Token);
+            // Existing generic state policy still rejects the retained link.
+            using (var generic = NativeStateDirectory.OpenOrCreate(fixture.Slot.CanonicalPath, [fixture.TargetRoot, fixture.ExposureRoot], Token, allowCreate: false))
+                Assert.NotNull(Assert.Single(generic.EnumerateEntries(Token)).Error);
+            var restored = lease.Restore(Token);
+            fixture.State.FlushPublication(Token);
+            Assert.True(NativeDirectoryMoveLease.SameObject(lease.Original.Identity, restored.Identity));
+            Assert.True(lease.Original.RawTarget.AsSpan().SequenceEqual(restored.RawTarget.AsSpan()));
+            Assert.Equal(lease.Original.MetadataFingerprint, restored.MetadataFingerprint);
+            Assert.True(PathResolver.IsSymlink(fixture.Link));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+            lease.Revalidate(Token);
+        }
+        Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Link, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData("leading-parent")]
+    [InlineData("leading-dot")]
+    [InlineData("inner-dot")]
+    [InlineData("inner-parent")]
+    [InlineData("missing-before-parent")]
+    [InlineData("junction-before-parent")]
+    [InlineData("absolute-dot")]
+    [InlineData("absolute-parent")]
+    [InlineData("relative-junction-no-dot")]
+    [InlineData("absolute-junction-no-dot")]
+    public void WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(string spelling)
+    {
+        if (!OperatingSystem.IsWindows())
+        { Assert.Skip("Windows native raw-target/follow parity requires actual Windows execution."); return; }
+        using var fixture = Create(false);
+        Directory.Delete(fixture.Link);
+        Directory.CreateDirectory(Path.Combine(fixture.TargetRoot, "unused"));
+        var alias = Path.Combine(fixture.ExposureRoot, "alias");
+        if (spelling.Contains("junction", StringComparison.Ordinal))
+        {
+            var destination = spelling == "junction-before-parent"
+                ? Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(fixture.TargetRoot)!, "away", "deep")).FullName
+                : fixture.TargetRoot;
+            CreateWindowsJunction(alias, destination);
+        }
+        // Declared before native leases so they close before removing this
+        // known junction leaf; generic recursive fixture teardown must not walk it.
+        using var junctionCleanup = spelling.Contains("junction", StringComparison.Ordinal)
+            ? new KnownJunctionCleanup(alias) : null;
+        var rawTarget = spelling switch
+        {
+            "leading-parent" => @"..\targets\payload",
+            "leading-dot" => @".\..\targets\payload",
+            "inner-dot" => @"..\targets\.\payload",
+            "inner-parent" => @"..\targets\unused\..\payload",
+            // Windows link substitution normalizes these components before
+            // opening the final path. Do not require an erased name to exist
+            // or follow an erased junction into a different lexical parent.
+            "missing-before-parent" => @"missing\..\..\targets\payload",
+            "junction-before-parent" => @"alias\..\..\targets\payload",
+            "absolute-dot" => Path.Combine(fixture.TargetRoot, ".", "payload"),
+            "absolute-parent" => Path.Combine(fixture.TargetRoot, "unused", "..", "payload"),
+            "relative-junction-no-dot" => @"alias\payload",
+            "absolute-junction-no-dot" => Path.Combine(alias, "payload"),
+            _ => throw new InvalidOperationException()
+        };
+        CreateFixtureExposure(fixture.Link, rawTarget);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var targetBefore = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        // The actual OS-followed entry is the oracle, never a synthetic target
+        // identity or only an assertion about Path.GetFullPath output.
+        var followed = directory.ResolveLink("demo", Token);
+        Assert.Equal(target.TargetIdentity, followed);
+        Assert.Equal(followed, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        RequirePositiveProofMetadata(lease);
+        if (!lease.Original.Metadata.Supported)
+        { Assert.Skip("Windows raw parity ran, but full native link metadata is unavailable for retain/restore."); return; }
+        var retained = lease.Retain(fixture.Slot, Token); fixture.State.FlushPublication(Token);
+        Assert.False(PathResolver.IsSymlink(fixture.Link));
+        Assert.ThrowsAny<IOException>(() => directory.ResolveLink("demo", Token));
+        // E is absent now: raw bytes are resolved from its ORIGINAL parent,
+        // matching the OS-followed pre-retain identity and still-held T.
+        Assert.Equal(followed, directory.ResolveRawTarget(retained.RawTarget.AsSpan(), Token));
+        lease.Revalidate(Token);
+        var restored = lease.Restore(Token); fixture.State.FlushPublication(Token);
+        Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Identity));
+        Assert.True(original.RawTarget.AsSpan().SequenceEqual(restored.RawTarget.AsSpan()));
+        Assert.Equal(original.MetadataFingerprint, restored.MetadataFingerprint);
+        Assert.Equal(followed, directory.ResolveLink("demo", Token));
+        Assert.Equal(followed, directory.ResolveRawTarget(restored.RawTarget.AsSpan(), Token));
+        Assert.Equal(targetBefore.Fingerprint, target.Capture(Token).Fingerprint);
+        Assert.Equal(targetBefore.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public void WindowsRawCandidateCannotUseTheNameOfARenamedOriginalParent()
+    {
+        if (!OperatingSystem.IsWindows())
+        { Assert.Skip("Windows held-parent raw-target regression requires actual Windows execution."); return; }
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        Assert.Equal(target.TargetIdentity, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Directory.Move(fixture.ExposureRoot, fixture.ExposureRoot + "-moved");
+        Directory.CreateDirectory(fixture.ExposureRoot);
+        CreateFixtureExposure(fixture.Link, fixture.Payload);
+        Assert.Throws<IOException>(() => directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    private sealed class KnownJunctionCleanup(string path) : IDisposable
+    {
+        public void Dispose() => Directory.Delete(path, recursive: false);
+    }
+
+    private static void CreateFixtureExposure(string path, string target)
+    {
+        Directory.CreateSymbolicLink(path, target);
+        // Set the effective-token owner on the link itself, before freezing
+        // metadata. Elevated Windows otherwise creates an Administrators owner.
+        if (OperatingSystem.IsWindows()) WindowsPayloadMetadataTests.SetFixtureOwner(path);
+    }
+
+    private static void CreateWindowsJunction(string link, string target)
+    {
+        // Same private mklink fixture convention as RemoveServiceTests, with
+        // the system cmd and AutoRun disabled. Never interpolate shell input.
+        foreach (var path in new[] { link, target })
+            Assert.DoesNotContain(path, character => character is '&' or '|' or '<' or '>' or '%' or '!' or '"' or '\r' or '\n');
+        var start = new ProcessStartInfo(Path.Combine(System.Environment.SystemDirectory, "cmd.exe"))
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Path.GetDirectoryName(link)! };
+        foreach (var argument in new[] { "/d", "/c", "mklink", "/J", link, target }) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start);
+        Assert.NotNull(process);
+        var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(10000))
+        {
+            process.Kill(entireProcessTree: true); process.WaitForExit(10000);
+            Assert.Fail("Private junction fixture did not quiesce within its bound.");
+        }
+        Assert.Equal(0, process.ExitCode);
+        Assert.True(Task.WaitAll([stdout, stderr], 10000), "Private junction fixture streams did not drain.");
+        Assert.True(PathResolver.IsSymlink(link));
+    }
+
+    [Fact]
+    public void ALinkToAnotherDirectoryDoesNotAcquireTheHeldTargetsAuthority()
+    {
+        using var fixture = Create(true);
+        var other = Path.Combine(fixture.TargetRoot, "other"); WriteSkill(other);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, other, Token);
+        Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
+        Assert.True(PathResolver.IsSymlink(fixture.Link)); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public void LinkToLinkFinalTargetIsRefusedEvenWhenBothCurrentlyReachTheHeldPayload()
+    {
+        using var fixture = Create(false);
+        var indirect = Path.Combine(fixture.ExposureRoot, "indirect");
+        Directory.CreateSymbolicLink(indirect, fixture.Payload);
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, "indirect");
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData(false, "/")]
+    [InlineData(false, "///")]
+    [InlineData(true, "/")]
+    [InlineData(true, "///")]
+    public void UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(bool absolute, string suffix)
+    {
+        if (OperatingSystem.IsWindows())
+        { Assert.Skip("Unix no-follow target resolution requires native Unix execution."); return; }
+        using var fixture = Create(false);
+        var indirect = Path.Combine(fixture.ExposureRoot, "indirect");
+        Directory.CreateSymbolicLink(indirect, fixture.Payload);
+        var raw = (absolute ? indirect : "indirect") + suffix;
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, raw);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(raw), original.RawTarget.ToArray());
+        // OS-followed E reaches T, but raw final-target admission must refuse
+        // the second link even when trailing separators make O_NOFOLLOW follow it.
+        Assert.Equal(target.TargetIdentity, directory.ResolveLink("demo", Token));
+        Assert.Throws<IOException>(() => directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        var unchanged = directory.ReadLink("demo", Token);
+        Assert.Equal(original.Identity, unchanged.Identity);
+        Assert.Equal(original.RawTarget.ToArray(), unchanged.RawTarget.ToArray());
+        Assert.Equal(original.MetadataFingerprint, unchanged.MetadataFingerprint);
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+    }
+
+    [Theory]
+    [InlineData(false, "/")]
+    [InlineData(false, "///")]
+    [InlineData(true, "/")]
+    [InlineData(true, "///")]
+    public async Task UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(bool absolute, string suffix)
+    {
+        if (OperatingSystem.IsWindows())
+        { Assert.Skip("Unix raw-target trailing separators require native Unix execution."); return; }
+        using var fixture = Create(false);
+        var raw = (absolute ? fixture.Payload : Path.GetRelativePath(fixture.ExposureRoot, fixture.Payload)) + suffix;
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, raw);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        var rawBytes = System.Text.Encoding.UTF8.GetBytes(raw);
+        Assert.Equal(rawBytes, original.RawTarget.ToArray());
+        Assert.Equal(target.TargetIdentity, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        if (OperatingSystem.IsLinux())
+        {
+            using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+            if (owned is null) { Assert.Skip("Linux owned preservation unavailable; read-only trailing-separator parity passed."); return; }
+            var retained = await owned.Context.RetainAsync(Token);
+            Assert.True(retained.Succeeded, retained.Error);
+            Assert.Equal(rawBytes, retained.Observation!.Current.RawTarget.ToArray());
+            var restored = await owned.Context.RestoreAsync(Token);
+            Assert.True(restored.Succeeded, restored.Error);
+            Assert.Equal(rawBytes, restored.Observation!.Current.RawTarget.ToArray());
+            Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Observation.Current.Identity));
+            Assert.True(restored.Observation.RetainedSlotEmpty);
+        }
+        else
+        {
+            using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+            RequirePositiveProofMetadata(lease);
+            if (!lease.Original.Metadata.Supported)
+            { Assert.Skip("Native full link metadata unavailable; read-only trailing-separator parity passed."); return; }
+            var retained = lease.Retain(fixture.Slot, Token); fixture.State.FlushPublication(Token);
+            Assert.Equal(rawBytes, retained.RawTarget.ToArray());
+            var restored = lease.Restore(Token); fixture.State.FlushPublication(Token);
+            Assert.Equal(rawBytes, restored.RawTarget.ToArray());
+            Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Identity));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        }
+        Assert.Equal(rawBytes, directory.ReadLink("demo", Token).RawTarget.ToArray());
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+    }
+
+    [Fact]
+    public void OrdinaryDirectoryExposureDoesNotBecomeARetainableLink()
+    {
+        using var fixture = Create(false); Directory.Delete(fixture.Link); WriteSkill(fixture.Link);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
+        Assert.True(Directory.Exists(fixture.Link)); Assert.False(PathResolver.IsSymlink(fixture.Link));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public void ReplacingLinkWithIdenticalRawTargetRequiresFreshNativeReview()
+    {
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, Path.GetRelativePath(fixture.ExposureRoot, fixture.Payload));
+        Assert.Throws<IOException>(() => lease.Revalidate(Token));
+        Assert.False(lease.MutationAttempted); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    [Fact]
+    public void RenamedExposureParentCannotRedirectValidationToAReplacement()
+    {
+        using var fixture = Create(false);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        var before = target.Capture(Token);
+        var original = lease.Original;
+        var moved = fixture.ExposureRoot + "-moved";
+        try { Directory.Move(fixture.ExposureRoot, moved); }
+        catch (Exception error) when (OperatingSystem.IsWindows()
+            && (error is IOException or UnauthorizedAccessException) && (error.HResult & 0xffff) is 5 or 32)
+        {
+            // A live original-link pin can make Windows prevent the parent
+            // rename. This is prevention evidence, not a successful-rename proof.
+            lease.Revalidate(Token);
+            using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+            NativeExposureLinkLease.SameLink(original, directory.ReadLink("demo", Token), sameGeneration: true);
+            var current = directory.Capture(Token);
+            Assert.Equal(lease.OriginalDirectory.Root, current.Root);
+            Assert.Equal(lease.OriginalDirectory.Parent, current.Parent);
+            Assert.True(lease.OriginalDirectory.Entries.SequenceEqual(current.Entries));
+            Assert.DoesNotContain(Path.GetFileName(moved),
+                Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(moved)!).Select(Path.GetFileName));
+            Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
+            Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+            Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Link, "SKILL.md")));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+            Assert.False(lease.MutationAttempted);
+            TestContext.Current.TestOutputHelper!.WriteLine($"Windows prevented pinned-parent rename (native error {error.HResult & 0xffff}); unchanged authority revalidated, no actual parent-rename claim.");
+            return;
+        }
+        Directory.CreateDirectory(fixture.ExposureRoot); File.WriteAllText(fixture.Link, "foreign");
+        Assert.Throws<IOException>(() => lease.Revalidate(Token));
+        Assert.Equal("foreign", File.ReadAllText(fixture.Link)); Assert.False(lease.MutationAttempted);
+    }
+
+    [Fact]
+    public void PreCanceledRetainDoesNotMoveOrAllocateAnything()
+    {
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        var failure = Assert.Throws<OperationCanceledException>(() => lease.Retain(fixture.Slot, cancellation.Token));
+        Assert.Equal(cancellation.Token, failure.CancellationToken); Assert.False(lease.MutationAttempted);
+        lease.Revalidate(Token); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public void RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry()
+    {
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        RequirePositiveProofMetadata(lease);
+        if (!lease.Original.Metadata.Supported)
+        {
+            Assert.Throws<IOException>(() => lease.Retain(fixture.Slot, Token));
+            Assert.False(lease.MutationAttempted); return; // No post-retain proof on this host.
+        }
+        var retained = lease.Retain(fixture.Slot, Token);
+        fixture.State.FlushPublication(Token);
+        File.WriteAllText(fixture.Link, "foreign occupant");
+        Assert.Throws<IOException>(() => lease.Restore(Token));
+        Assert.Equal("foreign occupant", File.ReadAllText(fixture.Link));
+        var actual = fixture.Slot.Directory.ReadLink("entry", Token);
+        NativeExposureLinkLease.SameLink(retained, actual, true);
+        Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+    }
+
+    [Fact]
+    public void ReplacingTargetWithSameAuthoredBytesCannotPreserveTargetAuthority()
+    {
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        Directory.Move(fixture.Payload, fixture.Payload + "-original"); WriteSkill(fixture.Payload);
+        Assert.Throws<IOException>(() => lease.Revalidate(Token));
+        Assert.False(lease.MutationAttempted); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload + "-original", "SKILL.md")));
+    }
+
+    [Fact]
+    public void AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed()
+    {
+        using var fixture = Create(true);
+        File.WriteAllText(Path.Combine(fixture.Slot.CanonicalPath, "entry"), "foreign");
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        RequirePositiveProofMetadata(lease);
+        Assert.Throws<IOException>(() => lease.Retain(fixture.Slot, Token));
+        Assert.Equal("foreign", File.ReadAllText(Path.Combine(fixture.Slot.CanonicalPath, "entry")));
+        Assert.True(PathResolver.IsSymlink(fixture.Link)); Assert.False(lease.MutationAttempted);
+    }
+
+    [Fact]
+    public void SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration()
+    {
+        var common = Directory.CreateDirectory(Path.Combine(temporary.FullName, "shared-parent")).FullName;
+        var payload = Path.Combine(common, "payload"); WriteSkill(payload);
+        using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temporary.FullName, "private-shared"), [common], Token);
+        using var writer = state.OpenFile("writer.lock", true, Token);
+        using var slot = NativeRetainedLinkSlot.Create(state, "retained-link", Token);
+        var link = Path.Combine(common, "exposure"); CreateFixtureExposure(link, "payload");
+        using var target = NativeDirectoryMoveLease.Open(common, payload, Token);
+        var before = target.Capture(Token);
+        using var lease = NativeExposureLinkLease.Open(common, link, target, Token);
+        RequirePositiveProofMetadata(lease);
+        var failure = Assert.Throws<IOException>(() => lease.Retain(slot, Token));
+        Assert.Contains(lease.Original.Metadata.Supported ? "coordinated generation transition" : "Link metadata cannot be fully verified", failure.Message);
+        Assert.False(lease.MutationAttempted); lease.Revalidate(Token);
+        Assert.Empty(slot.Directory.Capture(Token).Entries);
+        Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+    }
+
+    [Fact]
+    public void NamespaceReconciliationDoesNotRefreshAnUnrelatedSiblingChange()
+    {
+        var parent = new SecureFileIdentity(1, 2, 0, "/root", true, false, 1, 1);
+        var before = new ExposureDirectoryEvidence(parent, parent, ImmutableSortedDictionary.CreateRange(StringComparer.Ordinal,
+            new Dictionary<string, string> { ["entry"] = "old-link", ["sibling"] = "before" }));
+        var after = before with { Root = parent with { ChangeTimeNanoseconds = 2 }, Parent = parent with { ChangeTimeNanoseconds = 2 }, Entries = before.Entries.Remove("entry").SetItem("sibling", "foreign") };
+        Assert.Throws<IOException>(() => NativeExposureDirectory.VerifyTransition(before, after, "entry", false, "old-link"));
+    }
+
+    [Fact]
+    public void MovedEntryObservationCannotBeCombinedWithAReplacementNamespaceEntry()
+    {
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        var observedA = lease.Original;
+        var before = fixture.Slot.Directory.Capture(Token);
+        var replacementB = observedA with { Identity = observedA.Identity with { FileIdLow = observedA.Identity.FileIdLow + 1 } };
+        var after = before with
+        {
+            Root = before.Root with { ChangeTimeNanoseconds = before.Root.ChangeTimeNanoseconds + 1 },
+            Parent = before.Parent with { ChangeTimeNanoseconds = before.Parent.ChangeTimeNanoseconds + 1 },
+            Entries = before.Entries.Add("entry", NativeExposureDirectory.EntryHash(replacementB))
+        };
+        // All untouched entries and the expected one-name addition are valid;
+        // only binding the moved name to actual A rejects this contradiction.
+        Assert.Throws<IOException>(() => NativeExposureDirectory.VerifyTransition(before, after, "entry", true,
+            NativeExposureDirectory.EntryHash(observedA)));
+        Assert.False(lease.MutationAttempted); lease.Revalidate(Token);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LinuxExplicitOriginalObjectModeRoundTripsWithoutInventingFullMetadata(bool relative, bool alias)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(relative);
+        var root = fixture.ExposureRoot;
+        if (alias) { root += "-alias"; Directory.CreateSymbolicLink(root, fixture.ExposureRoot); }
+        using var owned = await OpenOwned(fixture, root);
+        if (owned is null) return;
+        var ready = owned.Ready.Observation!;
+        Assert.False(ready.Original.Metadata.Supported); Assert.NotEmpty(ready.Original.Metadata.Refusals);
+        Assert.Equal("live-original-link-pin", ready.Original.Preservation!.Continuity);
+        Assert.True(ready.RetainedSlotEmpty);
+        var retained = await owned.Context.RetainAsync(Token);
+        Assert.True(retained.Succeeded, retained.Error); Assert.False(retained.Canceled);
+        Assert.True(retained.MoveState!.MutationAttempted); Assert.True(retained.MoveState.MutationCompleted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, retained.MoveState.Position);
+        Assert.True(retained.MoveState.LiveContinuity); Assert.False(retained.MoveState.Uncertain);
+        Assert.False(retained.Observation!.RetainedSlotEmpty); Assert.False(retained.Observation.Current.Metadata.Supported);
+        Assert.True(NativeDirectoryMoveLease.SameObject(ready.Original.Identity, retained.Observation.Current.Identity));
+        Assert.False(PathResolver.IsSymlink(fixture.Link));
+        var restored = await owned.Context.RestoreAsync(Token);
+        Assert.True(restored.Succeeded, restored.Error); Assert.True(restored.MoveState!.MutationCompleted);
+        Assert.Equal(LinuxExposureLinkPosition.Restored, restored.MoveState.Position);
+        Assert.True(restored.Observation!.RetainedSlotEmpty);
+        Assert.True(NativeDirectoryMoveLease.SameObject(ready.Original.Identity, restored.Observation.Current.Identity));
+        Assert.True(ready.Original.RawTarget.AsSpan().SequenceEqual(restored.Observation.Current.RawTarget.AsSpan()));
+        Assert.Equal(ready.Original.Preservation.VisibleAttributesFingerprint, restored.Observation.Current.Preservation!.VisibleAttributesFingerprint);
+        Assert.Equal(ready.TargetFingerprint, restored.Observation.TargetFingerprint);
+        Assert.Equal(ready.TargetObjectFingerprint, restored.Observation.TargetObjectFingerprint);
+        owned.Context.Dispose();
+        var cleanup = await owned.Context.Completion;
+        Assert.False(cleanup.MoveState!.LiveContinuity); Assert.Equal(LinuxExposureLinkPosition.Restored, cleanup.MoveState.Position);
+    }
+
+    [Theory]
+    [InlineData("link")]
+    [InlineData("target")]
+    [InlineData("collision")]
+    public async Task LinuxOriginalObjectModeRefusesChangedAuthorityOrCollision(string change)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        if (change == "link") { Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, fixture.Payload); }
+        else if (change == "target") { Directory.Move(fixture.Payload, fixture.Payload + "-original"); WriteSkill(fixture.Payload); }
+        else File.WriteAllText(Path.Combine(owned.SlotPath, "entry"), "foreign");
+        var refusal = await owned.Context.RetainAsync(Token);
+        Assert.False(refusal.Succeeded); Assert.False(refusal.MoveState!.MutationAttempted);
+        if (change == "collision") Assert.Equal("foreign", File.ReadAllText(Path.Combine(owned.SlotPath, "entry")));
+        Assert.False((await owned.Context.Completion).MoveState!.LiveContinuity);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedModeRefusesRestoreCollisionAndKeepsRetainedPosition()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        var retained = await owned.Context.RetainAsync(Token); Assert.True(retained.Succeeded, retained.Error);
+        File.WriteAllText(fixture.Link, "foreign");
+        var refusal = await owned.Context.RestoreAsync(Token);
+        Assert.False(refusal.Succeeded); Assert.False(refusal.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, refusal.MoveState.LastKnownPosition);
+        Assert.Equal("foreign", File.ReadAllText(fixture.Link));
+        Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        Assert.False((await owned.Context.Completion).MoveState!.LiveContinuity);
+    }
+
+    [Fact]
+    public void LinuxBorrowedTargetFactoryCannotAdmitOriginalObjectMode()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var failure = Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target,
+            ExposureLinkRetentionMode.LinuxSameOriginalObjectPreservation, Token));
+        Assert.Contains("dedicated native owner context", failure.Message);
+        Assert.Throws<IOException>(() => new LinuxExposureOwnerContext.NativeAuthority(new object()));
+        Assert.True(PathResolver.IsSymlink(fixture.Link)); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedModeRefusesHardLinkedSymlinkBeforeMutation()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        Assert.Equal(0, LinkNative.link(fixture.Link, fixture.Link + "-hardlink"));
+        using var context = LinuxExposureOwnerContext.Start(ReviewedRequest(fixture, fixture.ExposureRoot));
+        var failure = await context.Ready;
+        Assert.False(failure.Succeeded); Assert.Contains("exactly one native link", failure.Error);
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.False((await context.Completion).MoveState!.MutationAttempted);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedPreCanceledRetainLeavesLiveOriginalAvailableForReview()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        var canceled = await owned.Context.RetainAsync(cancellation.Token);
+        Assert.True(canceled.Canceled); Assert.False(canceled.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Original, canceled.MoveState.Position);
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.True((await owned.Context.InspectAsync(Token)).Succeeded);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedRetainedExpiryLosesContinuityWithoutAutomaticRestoreOrRetry()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot, TimeSpan.FromSeconds(1));
+        if (owned is null) return;
+        var retained = await owned.Context.RetainAsync(Token); Assert.True(retained.Succeeded, retained.Error);
+        var cleanup = await owned.Context.Completion.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        Assert.Equal("idle-expired", cleanup.Reason); Assert.False(cleanup.MoveState!.LiveContinuity);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, cleanup.MoveState.Position);
+        Assert.False(PathResolver.IsSymlink(fixture.Link)); Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        var refused = await owned.Context.RestoreAsync(Token);
+        Assert.False(refused.Succeeded); Assert.False(refused.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, refused.MoveState.LastKnownPosition);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedCompletedMoveCancellationStillPublishesActualRetainedObjectThenClosesAdmission()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot, checkpoint: LinuxExposureOwnerProofCheckpoint.CancelCompletedMoveBeforePublication);
+        if (owned is null) return;
+        var result = await owned.Context.RetainAsync(Token);
+        Assert.False(result.Succeeded); Assert.True(result.Canceled);
+        Assert.True(result.MoveState!.MutationAttempted); Assert.True(result.MoveState.MutationCompleted);
+        Assert.False(result.MoveState.Uncertain); Assert.Equal(LinuxExposureLinkPosition.Retained, result.MoveState.Position);
+        Assert.NotNull(result.Observation); Assert.False(result.Observation.RetainedSlotEmpty);
+        Assert.True(NativeDirectoryMoveLease.SameObject(owned.Ready.Observation!.Original.Identity, result.Observation.Current.Identity));
+        var cleanup = await owned.Context.Completion;
+        Assert.False(cleanup.MoveState!.LiveContinuity); Assert.Equal(LinuxExposureLinkPosition.Retained, cleanup.MoveState.LastKnownPosition);
+        Assert.Equal(cleanup.ResourcesOpened, cleanup.ResourcesReleased);
+        Assert.False(PathResolver.IsSymlink(fixture.Link)); Assert.True(PathResolver.IsSymlink(Path.Combine(owned.SlotPath, "entry")));
+        var retry = await owned.Context.RestoreAsync(Token);
+        Assert.False(retry.Succeeded); Assert.False(retry.MoveState!.MutationAttempted);
+    }
+
+    [Fact]
+    public async Task LinuxOwnedBusyReplyDoesNotPresentPriorPositionAsCurrentDuringRealMove()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = Create(true);
+        for (var index = 0; index < 512; index++)
+            File.WriteAllText(Path.Combine(fixture.Payload, "bounded-" + index), new string('x', 2048));
+        using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+        if (owned is null) return;
+        var retain = owned.Context.RetainAsync(Token);
+        Task<LinuxExposureOwnerOutcome>? waiting = null;
+        LinuxExposureOwnerOutcome? rejected = null;
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (!retain.IsCompleted && watch.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            var probe = owned.Context.InspectAsync(Token);
+            if (probe.IsCompletedSuccessfully && await probe is { Succeeded: false, MoveState.Uncertain: true } busy)
+            { rejected = busy; break; }
+            if (!probe.IsCompleted) waiting = probe;
+            await Task.Delay(1, Token);
+        }
+        var retained = await retain;
+        Assert.True(retained.Succeeded, retained.Error);
+        if (waiting is not null) Assert.True((await waiting).Succeeded);
+        Assert.NotNull(rejected); Assert.Contains("queue bound", rejected.Error);
+        Assert.False(rejected.MoveState!.MutationAttempted);
+        Assert.Equal(LinuxExposureLinkPosition.Uncertain, rejected.MoveState.Position);
+        Assert.Equal(LinuxExposureLinkPosition.Original, rejected.MoveState.LastKnownPosition);
+        Assert.Equal(LinuxExposureLinkPosition.Retained, retained.MoveState!.Position);
+        Assert.True((await owned.Context.RestoreAsync(Token)).Succeeded);
+    }
+
+    [Fact]
+    public void ReturnedEvidenceGraphOwnsEveryMutableByteImageIndependently()
+    {
+        // Transport ownership only, not native metadata admission. One buffer is
+        // deliberately shared across every legacy mutable path before publication.
+        var authorityBytes = Enumerable.Range(0, 20).Select(index => (byte)index).ToArray();
+        var identity = new SecureFileIdentity(1, 2, 0, "/proof/link", false, true, 1, 1);
+        var attributes = ImmutableArray.Create(new PayloadExtendedAttribute("user.transport", authorityBytes));
+        var metadata = new PayloadNativeMetadata("linux", identity, "link", 511, 1, 1, 1, true,
+            attributes, "caller-visible-xattr-names", ["Unknown hidden metadata"],
+            new(1, authorityBytes, 0, [new(":transport:$DATA", authorityBytes)]));
+        var preservation = new LinkPreservationObservation(511, 1, 1, 1, attributes, "visible-fingerprint",
+            new(new(1, 0xef53, 2), 0, 1, 1, identity, "1/task/1"));
+        var authority = new ExposureLinkEvidence(identity, [1, 2], metadata, "metadata-fingerprint", preservation);
+        var first = LinuxExposureOwnerContext.SnapshotForCaller(authority);
+        var next = LinuxExposureOwnerContext.SnapshotForCaller(authority);
+        var returnedImages = new[] { first.Metadata.Attributes[0].Value, first.Preservation!.VisibleAttributes[0].Value,
+            first.Metadata.Windows!.SecurityDescriptor, first.Metadata.Windows.Streams[0].Bytes };
+        for (var index = 0; index < returnedImages.Length; index++)
+        {
+            Assert.NotSame(authorityBytes, returnedImages[index]);
+            for (var other = index + 1; other < returnedImages.Length; other++) Assert.NotSame(returnedImages[index], returnedImages[other]);
+            returnedImages[index][0] = (byte)(200 + index);
+        }
+        Assert.Equal((byte)0, authorityBytes[0]);
+        Assert.All(new[] { next.Metadata.Attributes[0].Value, next.Preservation!.VisibleAttributes[0].Value,
+            next.Metadata.Windows!.SecurityDescriptor, next.Metadata.Windows.Streams[0].Bytes }, bytes => Assert.Equal(authorityBytes, bytes));
+        Assert.Equal(authority.MetadataFingerprint, next.MetadataFingerprint);
+        Assert.Equal(authority.Preservation!.VisibleAttributesFingerprint, next.Preservation.VisibleAttributesFingerprint);
+    }
+
+    private LinuxExposureOwnerRequest ReviewedRequest(Fixture fixture, string root, TimeSpan? idle = null)
+    {
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var reviewed = NativeExposureLinkLease.Open(root, Path.Combine(root, "demo"), target, Token);
+        var payload = target.Capture(Token);
+        return new(root, Path.Combine(root, "demo"), fixture.TargetRoot, fixture.Payload,
+            reviewed.OriginalDirectory, reviewed.Original.Identity, reviewed.Original.RawTarget, reviewed.Original.MetadataFingerprint,
+            target.RootIdentity, target.ParentIdentity, target.TargetIdentity, payload.Fingerprint, payload.ObjectStateFingerprint!,
+            Path.Combine(fixture.State.CanonicalPath, "owned-" + Guid.NewGuid().ToString("N")), "retained-link",
+            idle ?? TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30));
+    }
+    private async Task<OwnedFixture?> OpenOwned(Fixture fixture, string root, TimeSpan? idle = null,
+        LinuxExposureOwnerProofCheckpoint checkpoint = LinuxExposureOwnerProofCheckpoint.None)
+    {
+        var request = ReviewedRequest(fixture, root, idle);
+        var context = checkpoint == LinuxExposureOwnerProofCheckpoint.None ? LinuxExposureOwnerContext.Start(request)
+            : LinuxExposureOwnerContext.StartForProof(request, checkpoint);
+        var ready = await context.Ready.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        if (!ready.Succeeded)
+        {
+            context.Dispose();
+            if (System.Environment.GetEnvironmentVariable("SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF") != "1") return null;
+            Assert.True(ready.Succeeded, ready.Error);
+        }
+        return new(context, ready, Path.Combine(request.StatePath, request.SlotName));
+    }
+    private sealed record OwnedFixture(LinuxExposureOwnerContext Context, LinuxExposureOwnerOutcome Ready, string SlotPath) : IDisposable
+    { public void Dispose() => Context.Dispose(); }
+    private static class LinkNative
+    {
+        [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+        internal static extern int link(string oldpath, string newpath);
+    }
+
+    private Fixture Create(bool relative)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(temporary.FullName, Guid.NewGuid().ToString("N"))).FullName;
+        var targets = Directory.CreateDirectory(Path.Combine(root, "targets")).FullName;
+        var exposures = Directory.CreateDirectory(Path.Combine(root, "exposures")).FullName;
+        var payload = Path.Combine(targets, "payload"); WriteSkill(payload);
+        // All private namespaces precede the target and exposure parent freeze.
+        var state = NativeStateDirectory.OpenOrCreate(Path.Combine(root, "private"), [targets, exposures], Token);
+        FileStream? writer = null;
+        NativeRetainedLinkSlot? slot = null;
+        try
+        {
+            writer = state.OpenFile("writer.lock", true, Token);
+            slot = NativeRetainedLinkSlot.Create(state, "retained-link", Token);
+            var link = Path.Combine(exposures, "demo");
+            CreateFixtureExposure(link, relative ? Path.GetRelativePath(exposures, payload) : payload);
+            return new(state, writer, slot, targets, payload, exposures, link, File.ReadAllBytes(Path.Combine(payload, "SKILL.md")));
+        }
+        catch { slot?.Dispose(); writer?.Dispose(); state.Dispose(); throw; }
+    }
+    private static void WriteSkill(string path)
+    { Directory.CreateDirectory(path); File.WriteAllText(Path.Combine(path, "SKILL.md"), "---\nname: demo\ndescription: native link fixture\nmetadata:\n  github-pinned: frozen\n---\nunchanged\n"); }
+    private static void RequirePositiveProofMetadata(NativeExposureLinkLease lease)
+    {
+        if (!OperatingSystem.IsLinux() && System.Environment.GetEnvironmentVariable("SKILLVIEW_EXPOSURE_LINK_PROOF") == "1")
+            Assert.True(lease.Original.Metadata.Supported, "Native proof requires complete supported link metadata: " + string.Join(" ", lease.Original.Metadata.Refusals));
+    }
+    private sealed record Fixture(NativeStateDirectory State, FileStream Writer, NativeRetainedLinkSlot Slot, string TargetRoot, string Payload,
+        string ExposureRoot, string Link, byte[] SkillBytes) : IDisposable
+    { public void Dispose() { Slot.Dispose(); Writer.Dispose(); State.Dispose(); } }
+}

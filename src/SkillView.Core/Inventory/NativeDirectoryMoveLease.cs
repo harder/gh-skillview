@@ -18,6 +18,8 @@ internal abstract class NativeDirectoryMoveLease : IDisposable
     internal abstract PayloadSnapshot CaptureInto(Action<NativePayloadItem, PayloadEntry> sink,
         Action<NativePayloadItem>? observeRoot, CancellationToken token);
     internal virtual PayloadSnapshot FlushPayload(CancellationToken token) => Capture(token);
+    internal virtual System.Collections.Immutable.ImmutableArray<LinuxLinkMountObservation> CaptureLinuxLinkAuthorities(LinuxLinkProcAuthority authority, CancellationToken token) =>
+        throw new IOException("Linux target preservation authority unavailable.");
     internal abstract void Revalidate(CancellationToken token);
     internal abstract void FlushSourceNamespace(CancellationToken token);
     internal abstract void MoveToSlot(string rootPath, string path, SecureFileIdentity expectedRoot,

@@ -9,6 +9,10 @@ using SkillView.Ui;
 // have no pause/fault switches. Recovery runs through the actual CLI on restart.
 try
 {
+    if (args.Length == 2 && args[0] == "--exposure-lifetime-proof")
+        return ExposureLifetimeProof.Run(args[1]);
+    if (args.Length == 2 && args[0] == "--exposure-link-roundtrip")
+        return ExposureLinkProof.Run(args[1]);
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
     if (!checkDiskFullRoot && args.Length != 6)
         throw new ArgumentException("root gh id fingerprint apply|apply-merged|apply-unpin|apply-reimport|undo|undo-unpin|undo-reimport|repair|repair-unpin [disk-full:]checkpoint; or --check-disk-full-root root");

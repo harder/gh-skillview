@@ -1,0 +1,485 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native target-backed exposure-link retain/restore primitive local checkpoint; no saved detach workflow or acceptance promotion.",
+  "baseCommit": "c919199a6861b9aaf9301e31c4b2945e098da799",
+  "sourceCapture": {
+    "path": "/tmp/skillview-link-retention-evidence/local/source-hashes-post-handle-fix.json",
+    "sha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+  },
+  "sourceFiles": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "95f7efdfd7b4c61e360622abbc6ba4896cfa77d33856b67b67e572c996e8ab56"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "99dea2547762641e69232de978e5441bc01bd9bb21034eaa7d78f777951387f8"
+    },
+    {
+      "path": "agent_docs/maintenance-target-backed-links.md",
+      "sha256": "ec53eecf5d1bcc39af4ea02e30c921e76d36e115af6403e2af290560ebfc6a54"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/NativeExposureLinkLease.cs",
+      "sha256": "8d6025aa9cf9c05f8c9df721281209e4b7c824da1ad33cea5abbaadc19fc46e5"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixExposureLink.cs",
+      "sha256": "47d92f4019412172d14f31a542b09ef5b6580573b9d04c3385907c8929cfbc03"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/UnixStateDirectory.cs",
+      "sha256": "706e825fbc3ddd4b29e1bd206cfd3ef058c9a1ecaf07600b8dbc38fc86ed5838"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsExposureLink.cs",
+      "sha256": "39995553c5a5a4cf98f678be8aff68a4799158473a1e114307221cafe803e372"
+    },
+    {
+      "path": "src/SkillView.Core/Inventory/WindowsStateDirectory.cs",
+      "sha256": "d0082ec80cf8ebae40fd09f80dc20e30cecad2a139be724343e3e2f784b4a6fb"
+    },
+    {
+      "path": "tests/SkillView.Tests/Inventory/NativeExposureLinkTests.cs",
+      "sha256": "73e09e02f26264ce16d2b3c08635cc2482dd3dbdb164dceecbbb389307f42d96"
+    }
+  ],
+  "validationReport": {
+    "path": "/tmp/skillview-link-retention-evidence/local/final-validation-summary.json",
+    "sha256": "9598ff95b4f8b17463dbd49504cfe19ef355abf847f5628a9849fe9123fc4a41"
+  },
+  "validation": {
+    "worktree": "/home/kevin/code/gh-skillview-link-retention",
+    "scope": "Target-backed native link retain/restore primitive only; no saved detach/restart schema or CLI/TUI.",
+    "currentSource": {
+      "path": "/tmp/skillview-link-retention-evidence/local/source-hashes-post-handle-fix.json",
+      "sha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+    },
+    "currentSourceFilesVerified": 9,
+    "finalDelta": [
+      "agent_docs/maintenance-target-backed-links.md",
+      "src/SkillView.Core/Inventory/WindowsExposureLink.cs"
+    ],
+    "finalChecks": {
+      "commands": {
+        "path": "/tmp/skillview-link-retention-evidence/local/post-handle-fix-commands.json",
+        "sha256": "226ae50d2d320edf17799009984902d8762961a4c09e723a134f909f072eb768"
+      },
+      "testsBuild": {
+        "warnings": 0,
+        "errors": 0
+      },
+      "focusedTests": {
+        "total": 23,
+        "passed": 23,
+        "failed": 0,
+        "skipped": 0
+      },
+      "proofBuild": {
+        "warnings": 0,
+        "errors": 0
+      },
+      "coreFormat": "pass"
+    },
+    "priorSourceQualifiedChecks": {
+      "source": {
+        "path": "/tmp/skillview-link-retention-evidence/local/source-hashes-final.json",
+        "sha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      "focusedCommands": {
+        "path": "/tmp/skillview-link-retention-evidence/local/final-focused-commands.json",
+        "sha256": "3b340f202316cecbc50d5a60af96a636e6dcb8b4c9b05c1e4d4dcf8389c97275"
+      },
+      "fullCommands": {
+        "path": "/tmp/skillview-link-retention-evidence/local/final-full-commands.json",
+        "sha256": "42382f27de4adc5702eac65b0c48423dd464ebf44fb1a89d33b8d8588accdf33"
+      },
+      "fullTests": {
+        "total": 1993,
+        "passed": 1993,
+        "failed": 0,
+        "skipped": 0
+      },
+      "integrationTests": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      },
+      "scope": "Before Windows-only resource cleanup and guide continuity qualification. Other seven sources unchanged. Integration/Proof locked restores, builds, all four scoped formats passed."
+    },
+    "reviews": {
+      "initial": {
+        "path": "/tmp/skillview-link-retention-review/independent-review-initial.json",
+        "sha256": "ad92cf697d80a5eabbb958c4f0c90a1a2148b931e61689389c252aa3f57c5897"
+      },
+      "final": {
+        "path": "/tmp/skillview-link-retention-review/independent-review-final.json",
+        "sha256": "119f039652fec9c33f0696fb8cb76d542ae9af6cc66bc4bab78ba7de57f2d91b"
+      }
+    },
+    "limitations": [
+      "Local Linux tests exercise explicit unsupported symlink inode-flags metadata refusal; mutation attempted false, no positive Linux retain/restore claim.",
+      "Positive supported-metadata native retain/restore on macOS and Windows requires CI; all four RID native interop evidence pending.",
+      "No App/extension/AOT detach, process-kill recovery, saved reopen, or exclusive consumer-loading proof.",
+      "Live same-object rename continuity depends on held original link pin; future saved reopen needs independent continuity evidence or ambiguous-state refusal."
+    ],
+    "commitsOrPushes": false
+  },
+  "rawCommands": {
+    "final-focused-commands.json": [
+      {
+        "name": "build-final-source",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 6.451,
+        "log": "/tmp/skillview-link-retention-evidence/local/build-final-source.log",
+        "sha256": "f6620fc11bf6d6e383c36bbd33f23c63b21cf56a699711f61f800f1129d26210",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "focused-final-source",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-build",
+          "--filter-class",
+          "SkillView.Tests.Inventory.NativeExposureLinkTests",
+          "--filter-class",
+          "SkillView.Tests.Maintenance.NativeStagingTests",
+          "--filter-class",
+          "SkillView.Tests.Maintenance.NativePayloadCaptureTests"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 2.176,
+        "log": "/tmp/skillview-link-retention-evidence/local/focused-final-source.log",
+        "sha256": "ae64f3c630e79ffddf217556bc02f64eb6bd79d72b5027f8a877b5eefccb1495",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      }
+    ],
+    "final-full-commands.json": [
+      {
+        "name": "full-tests-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-build"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 35.692,
+        "log": "/tmp/skillview-link-retention-evidence/local/full-tests-final.log",
+        "sha256": "a0968bf8648ea0c4b264bf8dddac9170be158f90a3557369b1db2d618f0f71f2",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "integration-restore-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--locked-mode"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 1.044,
+        "log": "/tmp/skillview-link-retention-evidence/local/integration-restore-final.log",
+        "sha256": "7048cff4e7c1debec4ea2b414909228afeef8140f435749e854c8d00480b8534",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "proof-restore-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--locked-mode"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 0.867,
+        "log": "/tmp/skillview-link-retention-evidence/local/proof-restore-final.log",
+        "sha256": "15f3fe29fe6170c677fb1e51a819191bc8cdfffbdf87ceb389343f250c63ec32",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "integration-build-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 2.386,
+        "log": "/tmp/skillview-link-retention-evidence/local/integration-build-final.log",
+        "sha256": "1f2b8f83a5dfb1a6902c0b818232a4c54ded48b7e7de8fdcd4baab17478f953e",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "integration-tests-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-build"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 4.419,
+        "log": "/tmp/skillview-link-retention-evidence/local/integration-tests-final.log",
+        "sha256": "226d5296a68f8fe3f1304cd765c3b56047d1de18ac9f31d3a97092f50c76aa5d",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "proof-build-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--no-restore"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 1.014,
+        "log": "/tmp/skillview-link-retention-evidence/local/proof-build-final.log",
+        "sha256": "df514c9ceef41c36c05b5b4a2cfb968ef576a75dd27f1e9f08eb8d69d9a9c920",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "core-format-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "src/SkillView.Core/SkillView.Core.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 23.165,
+        "log": "/tmp/skillview-link-retention-evidence/local/core-format-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "tests-format-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 12.484,
+        "log": "/tmp/skillview-link-retention-evidence/local/tests-format-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "integration-format-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 5.669,
+        "log": "/tmp/skillview-link-retention-evidence/local/integration-format-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      },
+      {
+        "name": "proof-format-final",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 5.405,
+        "log": "/tmp/skillview-link-retention-evidence/local/proof-format-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sourceSnapshotSha256": "2f65ec3e81ddbe74422eef8fdc3adcd2b1f13bf82ba3ad2ebda390bf6036d432"
+      }
+    ],
+    "post-handle-fix-commands.json": [
+      {
+        "name": "build-post-handle-fix",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 16.371,
+        "log": "/tmp/skillview-link-retention-evidence/local/build-post-handle-fix.log",
+        "sha256": "b6a340118cc7c35bd15bc265acd809d5a2fe0d1a7f041665a6827cda7a6fdea9",
+        "sourceSnapshotSha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+      },
+      {
+        "name": "focused-post-handle-fix",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-build",
+          "--filter-class",
+          "SkillView.Tests.Inventory.NativeExposureLinkTests",
+          "--filter-class",
+          "SkillView.Tests.Maintenance.NativeStagingTests",
+          "--filter-class",
+          "SkillView.Tests.Maintenance.NativePayloadCaptureTests"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 1.666,
+        "log": "/tmp/skillview-link-retention-evidence/local/focused-post-handle-fix.log",
+        "sha256": "de030ca444b78b02e3b4d8af4f6d62756ba4396ee38cdc1034c21602d8bc5fa3",
+        "sourceSnapshotSha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+      },
+      {
+        "name": "proof-build-post-handle-fix",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--no-restore"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 0.81,
+        "log": "/tmp/skillview-link-retention-evidence/local/proof-build-post-handle-fix.log",
+        "sha256": "b42f9244114a312ba74dd04898011d21ac756a782f7cf37016c6657487af80c4",
+        "sourceSnapshotSha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+      },
+      {
+        "name": "core-format-post-handle-fix",
+        "command": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "src/SkillView.Core/SkillView.Core.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "environmentOverrides": {
+          "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+          "SKILLVIEW_EXPOSURE_LINK_PROOF": "1"
+        },
+        "exitCode": 0,
+        "durationSeconds": 23.344,
+        "log": "/tmp/skillview-link-retention-evidence/local/core-format-post-handle-fix.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sourceSnapshotSha256": "62ee4bca29bca44a527438e7e112291fd1dfa4a68a50ed2f141ea36b4f716b13"
+      }
+    ]
+  },
+  "verifiedReferencedFiles": 7,
+  "reviewFindings": {
+    "status": "closed after independent re-review",
+    "findings": [
+      "Temporary Windows parent handle must be disposed if identity inspection throws before ownership transfer.",
+      "Windows UTF16/UNICODE_STRING allocations must be inside the cleanup region to release partial initialization."
+    ],
+    "finalReview": {
+      "path": "/tmp/skillview-link-retention-review/independent-review-final.json",
+      "sha256": "119f039652fec9c33f0696fb8cb76d542ae9af6cc66bc4bab78ba7de57f2d91b"
+    }
+  },
+  "runtimeContract": {
+    "link": "Held native ordinary directory symlink; full ID/generation/raw target and supported metadata, separately held exact target directory.",
+    "storage": "Dedicated typed private fixed entry slot; generic state/directory policy unchanged.",
+    "move": "Exclusive same-volume retain and exact original-object restore; expected changed-entry hash and bounded namespaces verified before/after, before syscall and after flush.",
+    "liveContinuity": "Original held native link pin prevents ID reuse; post-rename generation is separate evidence.",
+    "linux": "Current metadata adapter always refuses symlink inode-flags visibility; local tests prove refusal before attempted mutation. No positive Linux move claimed.",
+    "macOSWindows": "Positive complete-supported-metadata moves required by new CI test environment; actual runtime evidence pending.",
+    "sameParent": "Target-root/parent overlaps require an explicit coordinated generation contract and currently refuse.",
+    "durability": "Slot namespace flush precedes caller-owned state writer/device barrier. POSIX checked-name interval remains non-atomic; Windows rename namespace durability is qualified.",
+    "restart": "No persisted reopen/recovery protocol; future postdeath native continuity cannot be inferred from bare ID/raw target while guessing a changed generation.",
+    "ownershipLoading": "No manager/consumer mutation admission, gh mixed-layout contract or exclusive loading claim."
+  },
+  "ci": {
+    "workflowSha256": "95f7efdfd7b4c61e360622abbc6ba4896cfa77d33856b67b67e572c996e8ab56",
+    "testProofEnvironment": "SKILLVIEW_EXPOSURE_LINK_PROOF=1",
+    "jobs": "Three platform full tests and two Windows metadata jobs; new primitive class included in filtered metadata tests, covering Windows ARM64.",
+    "scope": "JIT test-host native interop evidence; separate from product AOT/runtime proof. All actual new-feature CI remains pending."
+  },
+  "originalAcceptance": {
+    "complete": 9,
+    "total": 21,
+    "M08": "incomplete",
+    "M13": "incomplete",
+    "M15": "incomplete",
+    "allOriginalRequirementsRetained": true,
+    "originalMacDownArrowCrash": "never reproduced"
+  }
+}

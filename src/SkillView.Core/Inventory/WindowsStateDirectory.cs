@@ -253,7 +253,7 @@ internal sealed partial class WindowsSecureRemovalBackend
     }
 
     [SupportedOSPlatform("windows")]
-    private sealed class WindowsStateSession(List<SafeFileHandle> held, SafeFileHandle root, string canonical,
+    private sealed partial class WindowsStateSession(List<SafeFileHandle> held, SafeFileHandle root, string canonical,
         WindowsStateExclusions excluded, SecurityIdentifier user, byte[] descriptor,
         Action<CancellationToken>? stagingGuard = null, bool metadataPayload = false) : NativeStateDirectory
     {

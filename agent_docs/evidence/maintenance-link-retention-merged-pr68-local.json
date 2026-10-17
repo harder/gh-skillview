@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "createdUtc": "2026-10-17T02:07:03.101506+00:00",
+  "kind": "link-retention-merged-pr68-integrated-local-verification",
+  "scope": "First managed verification of the reviewed link primitive rebased onto actual merged PR68. Source/locks unchanged; no new product implementation, Git operation or publication by this executor.",
+  "integration": {
+    "tip": "2320fd4f2fe36b14cf2862d4888c4c21d5b20197",
+    "base": "4649d75fc3a4f9fdd7c22ca5593e629a1b559298",
+    "tree": "84d81fb3f65af48cdc5767b66f628abb08988524",
+    "identityAuthority": "Parent/Luna supplied verified Git identity; this executor performs no Git operations.",
+    "treeRelation": "Parent verified entire tree equals earlier private b5+link5e integration base751998ff2b1b5927590b915169d7c05706a193a7. This receipt does not run Git.",
+    "precedingMergeClosure": {
+      "path": "/home/kevin/code/gh-skillview-link-retention/agent_docs/evidence/maintenance-batch-18-pr68-merge-final.json",
+      "sha256": "a525ffac5bf458c8f8cf7cb6a6533b50a35a98e06a2c2037938c7d0a571488d0"
+    }
+  },
+  "source": {
+    "inputs": 419,
+    "scope": "All rg-listed src/tests sources, project/lock/resource inputs plus global.json and Directory.Build.props/targets; bin, obj and TestResults excluded. Documentation/ledger changes are outside this build-input snapshot.",
+    "before": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/source-before.json",
+      "sha256": "774537f8ccfecfdb9e6fa37879e4dbe22b20e0034683eaec97ad4eabf39cd697"
+    },
+    "after": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/source-after.json",
+      "sha256": "774537f8ccfecfdb9e6fa37879e4dbe22b20e0034683eaec97ad4eabf39cd697"
+    },
+    "allHashesEqual": true,
+    "allCurrentInputsMatch": true,
+    "sdkSelection": "global.json10.0.402, rollForward disabled; exact /home/kevin/.dotnet/dotnet host.",
+    "locks": "All captured project lock files remain byte-identical; only scoped locked restores, no force-evaluate/full-solution/RID restore."
+  },
+  "verification": {
+    "summary": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/summary.json",
+      "sha256": "e2b1f8cbb6320c8ee3b9353ced83806a5b63bbd1740a0a68a5a502bf9e9a7e86"
+    },
+    "execution": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/execution.json",
+      "sha256": "6c1aa2c9c3575eff566c41cd0a8402053e132bcf34bb162ada997296881649ba"
+    },
+    "sdk": "10.0.402",
+    "platform": "Linux ARM64",
+    "environment": {
+      "TMPDIR": "/var/tmp/skillview-link-retention-tests",
+      "inheritedGitRedirection": "all GIT_* stripped",
+      "SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF": "not requested; existing opt-in native subprocesses may be explicitly skipped"
+    },
+    "unit": {
+      "total": 2227,
+      "failed": 0,
+      "passed": 2217,
+      "skipped": 10
+    },
+    "integration": {
+      "total": 9,
+      "failed": 0,
+      "passed": 9,
+      "skipped": 0
+    },
+    "lockedRestoreProjects": [
+      "SkillView.Tests",
+      "SkillView.IntegrationTests",
+      "SkillView.MaintenanceProof"
+    ],
+    "builds": {
+      "count": 3,
+      "projects": [
+        "SkillView.Tests",
+        "SkillView.IntegrationTests",
+        "SkillView.MaintenanceProof"
+      ],
+      "warnings": 0,
+      "errors": 0
+    },
+    "formatVerifies": {
+      "count": 4,
+      "projects": [
+        "SkillView.Core",
+        "SkillView.Tests",
+        "SkillView.IntegrationTests",
+        "SkillView.MaintenanceProof"
+      ],
+      "allExitZero": true
+    },
+    "commands": [
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--locked-mode"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/00-restore.log",
+          "sha256": "40d104602671164ab3958225da3e1c8cabd55f0251d6df6bc911d9d5a24f44ce"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--locked-mode"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/01-restore.log",
+          "sha256": "40d104602671164ab3958225da3e1c8cabd55f0251d6df6bc911d9d5a24f44ce"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "restore",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--locked-mode"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/02-restore.log",
+          "sha256": "40d104602671164ab3958225da3e1c8cabd55f0251d6df6bc911d9d5a24f44ce"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/03-build.log",
+          "sha256": "902435e737381270f0d815caa421f80af003f51644dd3018d5602975c3e67fec"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-build"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/04-test.log",
+          "sha256": "f95e0ecff75950dc2e70829d3d44d9319c1ac732db103535846130add017c780"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/05-build.log",
+          "sha256": "9e432f81731b4a3873297ce5ce4987729b54be261d5cb2a6418d9c1c16cd2600"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "test",
+          "--project",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-build"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/06-test.log",
+          "sha256": "b926c2405c2484777874a38d13e130585c8544a19d7fcefa46bf6f5e65111043"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "build",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--no-restore"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/07-build.log",
+          "sha256": "5c8041a10a0d3ba1d9e90323f58b11045c9fedb140d398655da6bbf3c500fc49"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "src/SkillView.Core/SkillView.Core.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/08-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.Tests/SkillView.Tests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/09-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/10-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "/home/kevin/.dotnet/dotnet",
+          "format",
+          "tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj",
+          "--no-restore",
+          "--verify-no-changes"
+        ],
+        "exitCode": 0,
+        "log": {
+          "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/11-format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ]
+  },
+  "nativeEvidence": {
+    "currentFullManagedRun": "Ten existing opt-in LinuxExposureOwnerLifetimeTests subprocess cases explicitly skipped because SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF was not requested. No new lifetime/FD-table evidence is claimed from those skips.",
+    "historical39": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/historical-native-binding.json",
+      "sha256": "75de4ca0fb3d3d81a62392397f8c67c99aacebb9bf9ddeaf91b271139e8b4788"
+    },
+    "qualification": "The five stage2 production/test/proof C# files match their historical39 native-positive source. Prior actual ARM39/owner roundtrip records remain unchanged and historical; the entire old source/Program/assembly is not claimed identical, and that evidence is not relabeled as an integrated-binary execution.",
+    "notPerformed": "No duplicate native matrix, actual gh/client/skill script invocation, local App or extension AOT publish, Docker, opaque identity product admission or saved detach/restart implementation in this verification."
+  },
+  "ledgerPrefix": {
+    "sha256": "53f204c4ba23e0fa87624f47206b60d8d5fe4a0a9d03a021b9d744f63855be38",
+    "bytes": 100093,
+    "savedCopy": {
+      "path": "/tmp/skillview-link-retention-evidence/merged-pr68-integration/ledger-prefix.md",
+      "sha256": "53f204c4ba23e0fa87624f47206b60d8d5fe4a0a9d03a021b9d744f63855be38"
+    },
+    "preservedExactly": true,
+    "precedingPr68ClosureJsonUnchanged": true
+  },
+  "pending": [
+    "Fresh native/AOT gates and independent artifact reviews for the final published link source; local JIT Tests/Proof builds do not establish four-RID App/extension AOT compatibility.",
+    "Original link primitive restrictions remain: Linux hidden metadata unknown, full COPY guards unchanged, continuously owned native resources, no saved detach/restart claimed by this primitive batch.",
+    "Actual main/link integration into source-switch and later detach candidates remains separate. Their unpublished local work and native proof requirements are not satisfied by this receipt."
+  ],
+  "acceptance": {
+    "completed": 9,
+    "total": 21,
+    "allOriginalCriteriaRetained": true,
+    "promotedByThisReceipt": false,
+    "M08": "incomplete",
+    "M13": "incomplete",
+    "M15": "incomplete",
+    "originalMacCrash": "unreproduced"
+  },
+  "publication": "No commit, push, PR or merge performed by this executor. Parent/Luna retains Git/publication authority."
+}

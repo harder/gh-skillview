@@ -64,6 +64,10 @@ jobs:
         os: [ubuntu-latest, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      # macOS/Windows must exercise native link retain/restore successfully;
+      # Linux proves the explicit unsupported-metadata refusal without mutation.
+      SKILLVIEW_EXPOSURE_LINK_PROOF: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -80,6 +84,52 @@ jobs:
         run: dotnet format SkillView.sln --no-restore --verify-no-changes
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
+      - name: Prove Linux live native link preservation and hidden attributes on ext4
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+          SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p dist/linux-live-link/input
+          cp agent_docs/evidence/probe-linux-link-preservation-abi.c dist/linux-live-link/input/
+          cp agent_docs/evidence/verify-linux-link-preservation-abi.py dist/linux-live-link/input/
+          cp agent_docs/evidence/prove-linux-link-hidden-attributes.py dist/linux-live-link/input/
+          cp tests/SkillView.MaintenanceProof/ExposureLinkProof.cs dist/linux-live-link/input/
+          cp tests/SkillView.MaintenanceProof/ExposureLifetimeProof.cs dist/linux-live-link/input/
+          cp src/SkillView.Core/Inventory/LinuxExposureOwnerContext.cs dist/linux-live-link/input/
+          cp tests/SkillView.Tests/Inventory/LinuxExposureOwnerLifetimeTests.cs dist/linux-live-link/input/
+          sha256sum dist/linux-live-link/input/* > dist/linux-live-link/input-sha256.txt
+          cc --version > dist/linux-live-link/compiler.txt
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Wconversion -Wsign-conversion \
+            agent_docs/evidence/probe-linux-link-preservation-abi.c -o dist/linux-live-link/probe-linux-link-abi
+          probe_dir=$(mktemp -d "$RUNNER_TEMP/skillview-link-abi.XXXXXX")
+          trap 'rmdir "$probe_dir"' EXIT
+          dist/linux-live-link/probe-linux-link-abi "$probe_dir" > dist/linux-live-link/abi.json
+          python3 agent_docs/evidence/verify-linux-link-preservation-abi.py \
+            --input dist/linux-live-link/abi.json --source agent_docs/evidence/probe-linux-link-preservation-abi.c \
+            --architecture x64 --output dist/linux-live-link/abi-verified.json
+          dotnet build tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj \
+            --configuration Release -p:RestoreLockedMode=true | tee dist/linux-live-link/proof-build.log
+          dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
+            --configuration Release --no-build \
+            --filter-class SkillView.Tests.Inventory.NativeExposureLinkTests \
+            --filter-class SkillView.Tests.Inventory.LinuxLinkProcAuthorityTests \
+            --filter-class SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests \
+            | tee dist/linux-live-link/native-tests.log
+          python3 agent_docs/evidence/prove-linux-link-hidden-attributes.py \
+            --dotnet "$(command -v dotnet)" \
+            --proof tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof.dll \
+            --output dist/linux-live-link/hidden-attribute-proof.json
+      - name: Retain Linux live link evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-live-link-evidence
+          path: dist/linux-live-link/**
+          if-no-files-found: error
+          retention-days: 14
 
   windows-metadata:
     name: Windows metadata (${{ matrix.os }})
@@ -93,6 +143,7 @@ jobs:
       # These native tests must publish and recapture metadata successfully;
       # an environmental refusal is not a passing Windows proof.
       SKILLVIEW_WINDOWS_METADATA_PROOF: '1'
+      SKILLVIEW_EXPOSURE_LINK_PROOF: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -117,6 +168,7 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.CapturedPayloadArchiveTests \
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
+            --filter-class SkillView.Tests.Inventory.NativeExposureLinkTests \
             --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
             | tee dist/windows-metadata-tests.log
       - name: Retain Windows metadata evidence

@@ -200,7 +200,7 @@ internal sealed partial class UnixSecureRemovalBackend
         finally { StateNative.acl_free(acl); }
     }
 
-    private sealed class UnixStateSession(List<SafeUnixHandle> held, SafeUnixHandle root, string canonical,
+    private sealed partial class UnixStateSession(List<SafeUnixHandle> held, SafeUnixHandle root, string canonical,
         UnixStateExclusions excluded, Action<CancellationToken>? stagingGuard = null,
         SafeUnixHandle? payloadParent = null, string? payloadName = null) : NativeStateDirectory
     {

@@ -1476,3 +1476,125 @@ archive tests pass; build and scoped format verification pass. Production and
 was rerun in full. Fresh final-head native gates remain required. See
 [evidence](evidence/maintenance-local-reimport-tracking-proof-corrections-local.json).
 Original acceptance remains **9/21**; the original Mac crash remains unreproduced.
+
+## PR68 local reimport: final merged gates
+
+PR68 merged the exact reviewed head `b5fff2cc086d207690eefd4019bd9dbdf771f1fd`
+onto `6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44` as
+`4649d75fc3a4f9fdd7c22ca5593e629a1b559298`. The merge tree
+`9a58bbdb0a1786328dcb883e829ea5ea56e7cb10` matches both the reviewed head and
+CI's merge checkout tree; `origin/main` was fetched and verified at the merge
+commit. All CI, both CodeQL analyses and both minimum/latest `gh` contract lanes
+passed. Fifteen observed PR check entries were successful and no review threads
+remained unresolved. `notify-failure` was skipped after contract success. The
+repository reported no configured required status names, so this records
+observed results rather than branch-protection configuration.
+
+Each platform test job passed 2,159 tests (2,150 unit plus 9 integration), with
+zero failures or skips; both Windows metadata jobs passed 207 tests. All four
+native artifact ZIP digests match GitHub and all four independent artifact
+reviews are clear. The four archives contain 220 members total (77 Linux x64,
+49 macOS ARM64, 47 Windows x64 and 47 Windows ARM64). Their assertion rows
+include 88 static package checks, 112 local-reimport assertions (80 live
+publication and 32 guard/refusal rows), 144 schema4 unpin recovery cases, and
+24 positive old schema1–3 recovery cases. Linux's six positive old-schema rows
+ran on private ext4; six ordinary Linux rows remain distinct (four schema1/2
+positives and two schema3 CAP_SYS_ADMIN refusals). Old schema4 unpin
+compatibility is recorded separately. Runtime binary hashes and `gh` versions
+are recorded, but the binaries were not archived. The original Mac Down-arrow
+crash remains unreproduced.
+
+The merge verification and four-RID artifact/review index are in
+[evidence](evidence/maintenance-batch-18-pr68-merge-final.json). Original
+acceptance remains 9/21; M08, M18 and M19 are not complete, and the full 21-item
+objective remains open.
+
+## Target-backed link retention: native primitive local checkpoint
+
+An internal primitive binds an ordinary exposure symlink to a separately held
+target, retains the original native link in a typed private slot and restores
+that same object to its vacant original address. Full native identity/generation,
+raw targets, supported metadata and bounded namespace transitions are checked.
+Generic state and directory-move policies are unchanged. Shared-parent transitions,
+saved detach/restart, consumer admission and gh mixed-layout contracts remain pending.
+
+Independent review closed two Windows exception-resource leaks. Final-source
+Tests/Proof builds have no warnings/errors, 23 focused tests pass without skips
+and Core formatting passes. The earlier full 1,993 Tests and 9 Integration passes,
+locked restores/builds and four format passes retain their pre-cleanup snapshot;
+only Windows cleanup and the continuity guide changed afterward.
+
+Local Linux cases prove unsupported-metadata refusal before mutation; they do
+not prove Linux retain/restore. CI requires actual positive supported-metadata
+moves on macOS/Windows, including Windows ARM64. Those native results remain
+pending and are distinct from product AOT or a user-facing detach workflow.
+Original acceptance remains 9/21; M08/M13/M15 remain incomplete. See
+`maintenance-target-backed-links.md` and
+`evidence/maintenance-target-backed-links-local.json`.
+
+## Linux same-original link preservation: owned primitive local checkpoint
+
+The explicit Linux mode retains a live original symlink on a verified same ext4
+mount without promoting unknown hidden attributes or inode flags to full metadata
+support. A dedicated OS thread owns every native authority and writer; the
+ordinary borrowed-target preservation factory refuses. Typed operations report
+completed/canceled moves and uncertain positions, publish through the held writer,
+and return detached evidence. Proxy disposal and finalization signal that owner;
+expiry ends live continuity without automatic restoration. Saved detach and
+restart recovery are outside this primitive.
+
+Final local verification on Linux ARM64 passed 2,055 unit tests and 9 integration
+tests, zero skips/failures, after independently reviewed source and 39 focused
+cases including ten disposable lifecycle processes. The actual owned roundtrip
+restored the same native link/raw target and archived equal whole-target manifests.
+C ABI witnesses ran on ARM64 and x64; product/x64 C# and privileged hidden-attribute
+proofs remain pending. Separate reconciliation and publication deadlines are
+cooperative phases, not a single hard wall-clock bound. See
+`evidence/maintenance-linux-link-preservation-local.json`. Original acceptance
+remains 9/21 and M08 is incomplete.
+
+## Link retention: actual merged PR68 base verification
+
+The reviewed link primitive is locally rebased at
+`2320fd4f2fe36b14cf2862d4888c4c21d5b20197` onto actual PR68 merge
+`4649d75fc3a4f9fdd7c22ca5593e629a1b559298`. Parent-verified tree
+`84d81fb3f65af48cdc5767b66f628abb08988524` matches the earlier private
+`b5 + link5e` integration. This verification made no source or Git changes and
+preserves the complete preceding PR68 closure and historical primitive records.
+
+The first integrated managed run passed **2,217** unit tests with zero failures
+and **10 explicit opt-in native-lifetime skips** (2,227 total), plus **9/9**
+Integration tests without skips. Three scoped locked restores, three builds
+(Tests/Integration/Proof, zero warnings/errors) and four project format verifies
+pass using SDK10.0.402 and child-only `/var/tmp/skillview-link-retention-tests`
+with inherited `GIT_*` removed. All **419** source/project/lock/resource input
+hashes remained unchanged before/after. No solution/RID restore or lock
+regeneration was used.
+
+The ten skipped lifecycle subprocesses provide no new FD-table/cleanup evidence.
+The prior actual39 native receipt remains historical: its five stage2 C#
+production/test/proof hashes still match, but its entire source/Program/assembly
+is not claimed identical to this integration or reexecuted here. Existing
+primitive/owner records are retained. Fresh published-head four-RID native/AOT
+gates and independent artifact review remain pending; JIT Proof builds do not
+prove App/extension AOT or a saved detach/restart workflow. Actual source-switch
+and detach merged-base integrations remain separate. See
+[evidence](evidence/maintenance-link-retention-merged-pr68-local.json). Original
+acceptance remains **9/21**, all criteria retained; M08/M13/M15 remain incomplete
+and the original Mac crash remains unreproduced. No commit or push is claimed.
+
+## PR69 Windows raw-target fix: local checkpoint
+
+PR69 head `9824c2a1a513c8192d56f44008587ff288c3ed90` exposed a Windows-only raw relative-target failure: `NtOpenFile` rejected `..\targets\payload` with invalid-name syntax in the Windows metadata and full test jobs. The Windows x64 and ARM64 metadata jobs each had 9 failures; the x64 full test had 11 failures and 10 opt-in skips. Linux and macOS full tests, CodeQL, and both contract-test lanes passed on that old head. Root canceled its four unfinished AOT jobs after confirming the repeated failure. The old-head evidence remains intact in the linked local checkpoint; none is a passing full CI/native result.
+
+A local fix conditionally normalizes only raw Windows targets containing explicit dot/dotdot components against the held parent’s handle-derived address. It retains the existing no-dot native-open path and held-target identity, generation, address, and rename checks. On the frozen four-file snapshot, focused Linux validation passed 29 tests with 11 Windows-only cases skipped, two JIT builds and both scoped format verifies passed, and an independent static review was clear. The 11 skipped cases are not Windows runtime evidence. Fresh Windows parity, full tests, all four native AOT gates, and final-head artifacts remain required.
+
+See [the local raw-target fix checkpoint](evidence/maintenance-batch-19-windows-raw-target-fix-local.json). Original acceptance remains **9/21**; M08 is incomplete.
+
+## PR69 combined link-fix refinement: local checkpoint
+
+On published baseline `19c9a4cdfeb51caaa29e5fab7c0050b5cb42c31e`, targeted local validation passed 75 tests (37/48 native-link tests; the remaining 11 are Windows-only skips, plus 38/38 Linux proc-authority tests). Four indirect trailing-separator refusals and four ordinary-target Linux roundtrips passed. The tmpfs descriptor case passed; the required-ext4 run intentionally exited at its preflight before starting the worker. Tests build and scoped format verification were clean. The frozen Windows production helper is unchanged.
+
+The 19c9 CI run completed naturally with failures: Windows metadata had 11 failures on each architecture and the Windows test job had 17 failures; these include exact exception-type assertions, a junction metadata fixture, and an access-denied renamed-parent fixture. The four AOT jobs built and smoked binaries but then failed repository API verification with Actions installation quota HTTP 403; the minimum-gh contract lane passed and latest-gh contract failures were likewise quota-contaminated. Both CodeQL analyses passed. Copilot threads #4300874220 and #4300874253 remain unresolved and are bound to prior head `9824c2a1a513c8192d56f44008587ff288c3ed90`. No cancellation or rerun is claimed.
+
+See [the combined local checkpoint](evidence/maintenance-batch-19-combined-link-fix-local.json). Independent review of this refinement is clear; fresh Windows/macOS native and final-head gates remain pending. Acceptance remains **9/21**; M08 is incomplete.

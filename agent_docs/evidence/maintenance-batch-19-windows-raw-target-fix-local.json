@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "kind": "pr69-windows-raw-target-fix-local-checkpoint",
+  "createdAtUtc": "2026-10-17T02:26:14.089263+00:00",
+  "publishedBase": {
+    "pr": 69,
+    "publishedHead": "9824c2a1a513c8192d56f44008587ff288c3ed90",
+    "base": "4649d75fc3a4f9fdd7c22ca5593e629a1b559298",
+    "status": "The Windows fix described here is an unpublished frozen local worktree snapshot, not present on the published PR head."
+  },
+  "oldHeadCiAttempt1": {
+    "runId": 38993745781,
+    "head": "9824c2a1a513c8192d56f44008587ff288c3ed90",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "cancellationReceipt": {
+      "path": "/tmp/skillview-link-retention-evidence/pr69-initial/ci-run-cancellation-terminal.json",
+      "sha256": "d54455d27aaa15f56326df852aee17a0702d29f6b7d7bea5a5a6fa72f00fc74b"
+    },
+    "reason": "Root authorized cancellation after the same Windows relative-path failure was confirmed in three jobs; four unfinished AOT lanes were stopped to avoid spending that work on a known-failing head.",
+    "failedWindowsJobs": [
+      {
+        "name": "Windows metadata (windows-latest)",
+        "jobId": 117281546055,
+        "total": 236,
+        "passed": 227,
+        "failed": 9,
+        "skipped": 0
+      },
+      {
+        "name": "Windows metadata (windows-11-arm)",
+        "jobId": 117281546119,
+        "total": 236,
+        "passed": 227,
+        "failed": 9,
+        "skipped": 0
+      },
+      {
+        "name": "test (windows-latest)",
+        "jobId": 117281546102,
+        "total": 2236,
+        "passed": 2215,
+        "failed": 11,
+        "skipped": 10
+      }
+    ],
+    "commonFailure": "WindowsOpenException in WindowsSecureRemovalBackend.OpenExposureRawTarget: opening raw relative target `..\\targets\\payload` through NtOpenFile fails with ERROR_INVALID_NAME (\u201cThe filename, directory name, or volume label syntax is incorrect\u201d). The failures are NativeExposureLinkTests; Linux/macOS full test jobs succeeded.",
+    "rawLogs": [
+      {
+        "path": "/tmp/skillview-link-retention-evidence/pr69-initial/windows-metadata-117281546055.log",
+        "sha256": "baa40a7799ef541d9a95817f52b4cb91121d97fca20284d394f708565eaf9e4b"
+      },
+      {
+        "path": "/tmp/skillview-link-retention-evidence/pr69-initial/windows-metadata-117281546119.log",
+        "sha256": "b43675df96a5f7ce352c78587980d2518cd20b1cc275c59f9d408d4e6957a92e"
+      },
+      {
+        "path": "/tmp/skillview-link-retention-evidence/pr69-initial/windows-test-117281546102.log",
+        "sha256": "1b7c00d2ed01c88f7b0926d42a266afee4177136ace4d0e8074413e0fc8e39ca"
+      }
+    ],
+    "windowsArtifacts": [
+      {
+        "id": 12086850736,
+        "name": "windows-metadata-evidence-windows-11-arm",
+        "githubDigest": "sha256:11f59b8649079c3b817e250a2102e276a7ae7e14eab325a7550e1b3be7e4529"
+      },
+      {
+        "id": 12086057516,
+        "name": "windows-metadata-evidence-windows-latest",
+        "githubDigest": "sha256:307cb319a6993ff4add8c83df98b1929e5fea77c9298d327d3c6bb632e53b81c"
+      }
+    ],
+    "canceledAotJobs": [
+      "linux-x64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "unaffectedRuns": [
+      {
+        "workflow": "CodeQL",
+        "runId": 38993745770,
+        "head": "9824c2a1a513c8192d56f44008587ff288c3ed90",
+        "conclusion": "success",
+        "snapshotSha256": "e0258a3a4f30f420851e5dc6282543310e6e19482b023c5b6153495c269221a5"
+      },
+      {
+        "workflow": "contract-tests",
+        "runId": 38993764418,
+        "head": "9824c2a1a513c8192d56f44008587ff288c3ed90",
+        "conclusion": "success",
+        "bothGhLanesPassed": true,
+        "receipt": {
+          "path": "/tmp/skillview-link-retention-evidence/pr69-initial/contracts-terminal-evidence.json",
+          "sha256": "479de5b85845938ad9389e6ae7b1ff65d4163afe24a795199be5643cef363570"
+        }
+      }
+    ],
+    "partialLinuxArtifact": {
+      "path": "/tmp/skillview-link-retention-evidence/pr69-initial/linux-live-link-evidence-receipt.json",
+      "sha256": "b7d1583a690dd8fbabb25e36653af14c0da007b31fa454870995919e9898c436",
+      "artifactId": 12085894242,
+      "zipSha256": "a1e7e04349dd408152cab082b08495df99a46e594dc873cbaaf50269e42b355f",
+      "qualification": "Completed Linux live-link evidence step only; not a terminal AOT/CI result and not a replacement for final-head native artifacts."
+    }
+  },
+  "localWindowsFix": {
+    "scope": "Conditional normalization of raw Windows targets with explicit dot/dotdot components; legacy no-dot NtOpenFile path remains unchanged. Retained original held-parent authority, address, full identity/generation checks, bounds, and actual NT open/rename. Static independent reviewer found no blocking issue, contingent on actual Windows parity/runtime evidence.",
+    "sourceManifest": {
+      "path": "/tmp/skillview-link-retention-evidence/windows-raw-target-fix/source-final.json",
+      "sha256": "dbba024909ba564f03c158ff7c6b6ec0e277631b81b0918568bb2914dab2adba",
+      "pathCount": 4,
+      "hashes": {
+        "src/SkillView.Core/Inventory/WindowsExposureLink.cs": "5a660d3b9b98dad0492fac21344de246bacf618678242c7af17d1ff84b6ffacc",
+        "tests/SkillView.Tests/Inventory/NativeExposureLinkTests.cs": "b14c1e538a7cf76b434a68187ffb04d5fe355e1e4faadbab0adf578acd64b9e6",
+        "AGENTS.md": "9f997967fe786418ca4ccb06c6296d3d5d65edaa3805506da7256b2918723e1f",
+        "agent_docs/maintenance-target-backed-links.md": "ab8fde7c3ceae5a20661dd94ccee89aabf71b52ba30e09aa16ef15262018170b"
+      },
+      "allCurrentPathsMatch": true
+    },
+    "focusedValidation": {
+      "execution": {
+        "path": "/tmp/skillview-link-retention-evidence/windows-raw-target-fix/execution.json",
+        "sha256": "13289718ae75b694f0f2c0ee79d9f93f231169439cf606691915d46c40252b5a"
+      },
+      "testTotal": 40,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 11,
+      "skipScope": "new Windows-only parity cases skipped on Linux; do not claim Windows runtime validation",
+      "builds": 2,
+      "buildWarnings": 0,
+      "buildErrors": 0,
+      "formatReceipt": {
+        "path": "/tmp/skillview-link-retention-evidence/windows-raw-target-fix/05-06-format-verifies.json",
+        "sha256": "f2653c2d409c75143e9a8e32f151905009f919d767ec3097a65990fa467d257d",
+        "coreAndTestsVerifyPassed": true
+      }
+    },
+    "independentReview": {
+      "path": "/tmp/skillview-link-retention-review/windows-raw-target-fix-independent.json",
+      "sha256": "6b7b95c295f1d8df857956a7112eb93880ce833d475457455c0bce15fe6e8a42",
+      "result": "clear",
+      "scope": "Four-file static source snapshot; Windows runtime positive tests remain a required gate."
+    }
+  },
+  "requiredFreshGates": [
+    "Windows x64 and ARM64 targeted raw-target parity tests/full tests",
+    "all four exact-head native AOT jobs and full workflow checks",
+    "final native artifacts/digests/member manifests and independent review",
+    "fresh CodeQL and both gh contract lanes bound to the fixed published head"
+  ],
+  "acceptance": {
+    "completed": 9,
+    "total": 21,
+    "M08": "incomplete"
+  },
+  "noCommitOrPush": true
+}

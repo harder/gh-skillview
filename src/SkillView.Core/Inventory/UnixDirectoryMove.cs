@@ -41,6 +41,12 @@ internal sealed partial class UnixSecureRemovalBackend
         SecureDirectoryValidationSnapshot policy) : NativeDirectoryMoveLease
     {
         private SafeUnixHandle Parent => ownedParent ?? root;
+        internal override System.Collections.Immutable.ImmutableArray<LinuxLinkMountObservation> CaptureLinuxLinkAuthorities(LinuxLinkProcAuthority authority, CancellationToken token)
+        {
+            using var references = new LinuxLinkHandleReferences(root, Parent, target);
+            authority.Check(token); Revalidate(token);
+            return [authority.ObserveHandle(root, token), authority.ObserveHandle(Parent, token), authority.ObserveHandle(target, token)];
+        }
         internal override SecureFileIdentity RootIdentity => rootIdentity;
         internal override SecureFileIdentity ParentIdentity => parentIdentity;
         internal override SecureFileIdentity TargetIdentity => policy.Identity;
