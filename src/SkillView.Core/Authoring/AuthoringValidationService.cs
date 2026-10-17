@@ -35,8 +35,12 @@ internal sealed class AuthoringValidationService(ProcessRunner runner, Logger lo
         var path = Path.GetFullPath(repository, runner.EffectiveWorkingDirectory);
         var overrides = new Dictionary<string, string>
         {
-            ["GH_NO_UPDATE_NOTIFIER"] = "1", ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1", ["GH_TELEMETRY"] = "false",
-            ["GH_PROMPT_DISABLED"] = "1", ["NO_COLOR"] = "1", ["GIT_TERMINAL_PROMPT"] = "0"
+            ["GH_NO_UPDATE_NOTIFIER"] = "1",
+            ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1",
+            ["GH_TELEMETRY"] = "false",
+            ["GH_PROMPT_DISABLED"] = "1",
+            ["NO_COLOR"] = "1",
+            ["GIT_TERMINAL_PROMPT"] = "0"
         };
         foreach (var name in new[] { "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "GH_CONFIG_DIR", "TMPDIR", "TEMP", "TMP" })
             if (runner.GetEffectiveEnvironmentVariable(name) is { Length: > 0 } value)
