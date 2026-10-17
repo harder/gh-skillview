@@ -89,6 +89,7 @@ internal sealed partial class ReplacementPlanStore
         }
         // Initialize private ancestors before freezing the registry-parent
         // generation; creating state must never refresh an already saved plan.
+        using var desiredPolicy = AcquireDesiredPolicy(target, inventory, UnpinPurpose, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token); CheckWriter(writer);
         var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
@@ -135,6 +136,7 @@ internal sealed partial class ReplacementPlanStore
             ValidatePinPolicy(plan, operation, token);
             plan = plan with { ReviewFingerprint = PlanHash(plan) };
             Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+            WriteDesiredPolicyReceipt(operation, plan, desiredPolicy, token);
             return ReplacementPreparation.Saved(Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
                 "Saved standalone unpin. Source, recorded ref/tree and authored payload are preserved; no source was resolved. All shown exposures share this policy change. Applying swaps a metadata-preserving clone with new native object identities and regenerated timestamps; exact original native objects remain retained for undo. Review pin/owner changes and approve retention before applying."));
         }

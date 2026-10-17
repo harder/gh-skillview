@@ -25,6 +25,8 @@ internal sealed partial class ReplacementPlanStore
     {
         token.ThrowIfCancellationRequested();
         ManagedSkillDiscovery.RefuseTarget(target, token, runner);
+        DesiredRevisionPolicyGate.RequireAllowed(target, DesiredPolicies.Observe(target, Exclusions(inventory), token),
+            "update-revision", explicitUnpin: unpin);
         if (target.Pinned && !unpin) throw new IOException("Exact pin retained; updating this installation requires explicit unpin review.");
         var process = runner ?? throw new IOException("Latest update planning requires a captured process context.");
         var source = await new GhRevisionResolver(process, ghPath).ResolveLatestAsync(

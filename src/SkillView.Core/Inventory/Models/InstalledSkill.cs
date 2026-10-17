@@ -36,6 +36,8 @@ public sealed record InstalledSkill
 
     [System.Text.Json.Serialization.JsonIgnore]
     public SkillView.Preferences.CleanupSuppression? CleanupSuppression { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public SkillView.Preferences.DesiredPolicyObservation? DesiredPolicy { get; init; }
 
     /// True if the canonical path was reached via any symlink.
     public required bool IsSymlinked { get; init; }

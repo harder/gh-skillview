@@ -36,6 +36,8 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             .OrderByDescending(path => path.Length).FirstOrDefault()
             ?? throw new IOException("The physical installation needs a containing scan root; add --scan-root for its actual directory.");
         target = target with { ResolvedPath = canonicalPath, ScanRoot = containingRoot };
+        using var desiredPolicy = AcquireDesiredPolicy(target, inventory, revision is null ? "restore-recorded" : "update-revision", token,
+            explicitUnpin: target.Pinned && revision?.DesiredMetadata.Pinned == false);
         using (var initialOwner = OpenOwner(revision?.Owner, token, requireBefore: true))
             inventory = Admit(target, inventory, token, owner: initialOwner);
         CheckPlacement(inventory, token);
@@ -149,7 +151,11 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 || revision?.Source.Tree == target.TreeSha && live.GhPresentationFingerprint is { } presentation
                     && presentation == stagedMetadata.GhPresentationFingerprint;
             unchanged = allowUnchanged && IsUnchangedRevision(plan, payloadsMatch);
-            if (!unchanged) Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+            if (!unchanged)
+            {
+                Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+                WriteDesiredPolicyReceipt(operation, plan, desiredPolicy, token);
+            }
             return plan;
         }
     }
@@ -175,6 +181,17 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
     internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token,
         string disposition = "retain-original", string? expectedPurpose = null)
     {
+        ReplacementPlan reviewed;
+        using (var preflight = Open(id, inventory, token))
+        {
+            reviewed = preflight.Plan;
+            RequirePurpose(reviewed, expectedPurpose);
+            if (expectedPlan != reviewed.ReviewFingerprint || disposition != Disposition(reviewed))
+                throw new IOException("Saved plan fingerprint or explicit disposition does not match the reviewed plan.");
+            if (preflight.StepCount != 0) throw new IOException("This plan has started. Inspect and use explicit recovery.");
+        }
+        using var desiredPolicy = AcquireDesiredPolicy(Subject(reviewed), inventory, reviewed.Purpose, token,
+            explicitUnpin: reviewed.Subject.Metadata.Pinned && reviewed.Revision?.DesiredMetadata.Pinned == false);
         using var session = Open(id, inventory, token);
         var plan = session.Plan;
         RequirePurpose(plan, expectedPurpose);
@@ -185,6 +202,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         if (plan.LocalDisposition is null && session.Operation.EnumerateEntries(token).Any(entry => entry.Name == "local-review"))
             throw new IOException("A local merge review has started; complete its separately reviewed merged plan or create a new revision plan. The earlier replacement approval is closed.");
         if (session.StepCount != 0) throw new IOException("This plan has started. Inspect it and use explicit recovery with the current review fingerprint.");
+        RequireDesiredPolicyReceipt(session, desiredPolicy, token);
         var observation = Observe(plan, session.Operation, inventory, token, owner);
         if (observation.Topology != "ready" || observation.Original?.Objects != plan.Original.Objects
             || observation.Candidate?.Objects != plan.Candidate.Objects
@@ -193,12 +211,34 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         if (IsUnchangedRevision(plan))
             return Result(plan, "unchanged", true, false, false, ObservationHash(plan, observation),
                 "The verified payload, tracking policy and owner record are already current; no directory or registry write was attempted.", observation.Owner);
-        return Execute(session, inventory, observation, undo: false, token, owner);
+        return Execute(session, inventory, observation, undo: false, token, owner, desiredPolicy);
     }
 
     internal ReplacementResult Recover(string id, string expectedObservation, InventorySnapshot inventory,
         bool undo, CancellationToken token, string? expectedPurpose = null)
     {
+        SkillView.Preferences.DesiredRevisionPolicyStore.WriterLease? desiredPolicy = null;
+        if (!undo)
+        {
+            ReplacementPlan? neverStarted = null;
+            using (var preflight = Open(id, inventory, token))
+            {
+                RequirePurpose(preflight.Plan, expectedPurpose);
+                if (preflight.StepCount == 0 && !preflight.IncompleteJournal && preflight.RecoveryJournal is null)
+                {
+                    using var priorOwner = OpenOwner(EffectiveOwner(preflight.Plan), token, recoverySession: preflight,
+                        inventory: inventory, exactEntryBytes: preflight.Plan.PinPolicy is not null);
+                    // Legacy transactions may have moved the original before
+                    // the first durable journal entry. Native retained topology,
+                    // not a zero step count alone, proves whether work started.
+                    if (Observe(preflight.Plan, preflight.Operation, inventory, token, priorOwner).Topology == "ready")
+                        neverStarted = preflight.Plan;
+                }
+            }
+            if (neverStarted is not null) desiredPolicy = AcquireDesiredPolicy(Subject(neverStarted), inventory, neverStarted.Purpose, token,
+                explicitUnpin: neverStarted.Subject.Metadata.Pinned && neverStarted.Revision?.DesiredMetadata.Pinned == false);
+        }
+        using var policyLifetime = desiredPolicy;
         using var session = Open(id, inventory, token);
         RequirePurpose(session.Plan, expectedPurpose);
         using var owner = OpenOwner(EffectiveOwner(session.Plan), token, recoverySession: session, inventory: inventory, exactEntryBytes: session.Plan.PinPolicy is not null);
@@ -209,15 +249,19 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         if (expectedObservation != ObservationHash(session.Plan, observation))
             throw new IOException("Recovery locations, object evidence or context changed; inspect again before proceeding.");
         if (!undo && session.StepCount == 0 && !session.IncompleteJournal && session.RecoveryJournal is null
+            && observation.Topology == "ready")
+            RequireDesiredPolicyReceipt(session, desiredPolicy ?? throw new IOException("First recovery requires fresh desired-policy admission."), token);
+        if (!undo && session.StepCount == 0 && !session.IncompleteJournal && session.RecoveryJournal is null
             && observation.Topology == "ready" && IsUnchangedRevision(session.Plan)
             && (owner is null || OwnerSatisfied(observation, owner, false)))
             return Result(session.Plan, "unchanged", true, false, false, expectedObservation,
                 "The never-started plan is already current; no payload move, registry write or journal was attempted.", observation.Owner);
-        return Execute(session, inventory, observation, undo, token, owner);
+        return Execute(session, inventory, observation, undo, token, owner, desiredPolicy);
     }
 
     private ReplacementResult Execute(Session session, InventorySnapshot inventory, ReplacementObservation current,
-        bool undo, CancellationToken token, OwnerContext? owner = null)
+        bool undo, CancellationToken token, OwnerContext? owner = null,
+        SkillView.Preferences.DesiredRevisionPolicyStore.WriterLease? desiredPolicy = null)
     {
         var plan = session.Plan;
         var changed = false;
@@ -292,6 +336,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             }
             try
             {
+                desiredPolicy?.Revalidate(token);
                 if (toOriginal) lease.MoveToSlot(plan.RootPath, plan.OriginalPath, admitted.Root, admitted.Parent, token);
                 else lease.MoveToState(session.Operation, stateName!, token);
             }
@@ -320,6 +365,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 throw new IOException("Registry changed after transition review; inspect again.");
             var writeId = Guid.NewGuid().ToString("N");
             Append(undo ? "owner-undo-intent" : "owner-forward-intent", admitted, token, writeId);
+            desiredPolicy?.Revalidate(token);
             var result = owner.Held.WriteSelection(undo ? owner.Transition.DesiredFingerprint : owner.Transition.BeforeFingerprint,
                 undo ? owner.Transition.BeforeEntry : owner.Transition.DesiredEntry, ownerJournal!.Directory, writeId, token,
                 snapshot, new(plan.ReviewFingerprint, undo ? "undo" : "forward", writeId));
@@ -699,7 +745,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             writer = state.OpenExistingFile("writer.lock", true, token); CheckWriter(writer);
             operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
             operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
-            var operationNames = operation.EnumerateEntries(token).Take(MaxSteps + 12 + 2 * MaxMergeAttempts).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+            var operationNames = operation.EnumerateEntries(token).Take(MaxSteps + 13 + 2 * MaxMergeAttempts).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             var attemptCount = 0;
             while (attemptCount < MaxMergeAttempts && (operationNames.Contains($"merged-{attemptCount:D2}")
                 || operationNames.Contains($"merge-plan-{attemptCount:D2}.json"))) attemptCount++;
@@ -769,8 +815,8 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             ReplacementStep? latestOwnerStep = null;
             var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
             var incompleteJournal = false;
-            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 13 + 2 * MaxMergeAttempts).ToArray();
-            if (entries.Length > MaxSteps + 11 + 2 * MaxMergeAttempts) throw new IOException("Replacement operation entry budget exceeded.");
+            var entries = operation.EnumerateEntries(token).Take(MaxSteps + 14 + 2 * MaxMergeAttempts).ToArray();
+            if (entries.Length > MaxSteps + 12 + 2 * MaxMergeAttempts) throw new IOException("Replacement operation entry budget exceeded.");
             if (entries.Any(entry => entry.Error is not null && !IsMergeSlot(entry.Name) && entry.Name is not ("candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")))
                 throw new IOException("Unsafe replacement journal entry.");
             var names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
@@ -809,7 +855,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             if (names.Contains("owner-journal") && EffectiveOwner(plan) is null) throw new IOException("Unexpected owner journal for this plan.");
             if (plan.LocalDisposition is not null && !names.Contains("local-review")) throw new IOException("Merged plan lacks its immutable local review.");
             if ((names.Any(IsMergeSlot) || names.Any(IsMergePlan)) && !names.Contains("local-review")) throw new IOException("Unexpected merged stage without local review.");
-            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")
+            if (names.Any(name => name is not ("writer.lock" or "plan.json" or "desired-policy.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")
                 && !IsMergeSlot(name) && !IsMergePlan(name)
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
                 throw new IOException("Unknown replacement operation entry or journal gap.");

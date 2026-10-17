@@ -1,5 +1,13 @@
 # AGENTS.md
 
+- Desired revision intent is separate private policy. Only positive native
+  missing-child evidence authorizes default allow; corrupt/inaccessible/stale
+  policy refuses. Hold the desired-policy writer before replacement/operation/
+  registry/payload authorities and bind first apply to its immutable receipt.
+  Started native recovery and undo retain their existing authority independently
+  of later policy. Clearing intent never clears actual pins or revives old
+  approvals. See `agent_docs/maintenance-desired-revisions.md`.
+
 - `gh skill list` uses `sourceURL` for both repository URLs and local paths.
   Classify native absolute paths before URI parsing and preserve the exact
   scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.

@@ -33,6 +33,7 @@ internal sealed partial class ReplacementPlanStore
         // not retain preflight generations across our namespace initialization.
         using (NativeDirectoryMoveLease.Open(containing, canonical, token)) { }
         using (NativeDirectoryMoveLease.Open(Path.GetDirectoryName(sourceCanonical)!, sourceCanonical, token)) { }
+        using var desiredPolicy = AcquireDesiredPolicy(target, inventory, LocalReimportPurpose, token);
         // Initialize admitted namespaces before freezing payload parents: a
         // first-use ancestor or sibling creation can change their generation.
         // This admits no retained operation, replacement writer or plan quota.
@@ -129,6 +130,7 @@ internal sealed partial class ReplacementPlanStore
                     ValidateLocalImport(plan, operation, token);
                     plan = plan with { ReviewFingerprint = PlanHash(plan) };
                     Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+                    WriteDesiredPolicyReceipt(operation, plan, desiredPolicy, token);
                     state.FlushPublication(token);
                     result = ReplacementPreparation.Saved(Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
                         "Saved baseline-less local replacement from the same recorded source. Review every installed-only/different path and all consumers; no automatic merge is claimed. Candidate preserves captured source bytes and supported descendant metadata plus installed root privacy after actual gh staging. Applying creates new active object identities/timestamps; original native objects remain retained for undo.")

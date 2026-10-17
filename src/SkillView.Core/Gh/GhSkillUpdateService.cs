@@ -6,6 +6,8 @@ using SkillView.Inventory.Models;
 using System.Text.RegularExpressions;
 using SkillView.Ui;
 using SkillView.Maintenance;
+using SkillView.Inventory;
+using SkillView.Preferences;
 
 namespace SkillView.Gh;
 
@@ -58,36 +60,61 @@ public sealed class GhSkillUpdateService
     {
         options ??= new Options();
         var args = BuildArgs(options);
-        if (!options.DryRun)
+        DesiredRevisionPolicyStore.WriterLease? desiredPolicy = null;
+        try
         {
-            try
+            if (!options.DryRun)
             {
-                GhSharedLockGuard.ValidateCapturedOwners(options.Targets, cancellationToken);
-                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, ResolveHome(options.ProcessEnvironment));
-                GhSharedLockGuard.ValidateUpdateRecords(records, options.Targets);
+                try
+                {
+                    GhSharedLockGuard.ValidateCapturedOwners(options.Targets, cancellationToken);
+                    var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, ResolveHome(options.ProcessEnvironment));
+                    GhSharedLockGuard.ValidateUpdateRecords(records, options.Targets);
+                    if (options.Targets is not { Count: 1 } || options.Skills is not { Count: 1 }
+                        || options.All || options.Directory is null)
+                        throw new IOException("A real adapter update requires one exact captured installation, directory and selector; use the saved update workflow.");
+                    var target = options.Targets[0];
+                    if (!OwnershipPath.Same(options.Directory, Path.GetDirectoryName(target.ResolvedPath)!)
+                        || options.Skills[0] != Path.GetFileName(target.ResolvedPath))
+                        throw new IOException("The update selector/directory does not identify its exact captured physical installation.");
+                    // Incidental gh registry isolation can change the child's HOME;
+                    // policy remains bound to the original application context.
+                    desiredPolicy = DesiredRevisionPolicyStore.For(_runner).Acquire([target.ScanRoot, target.ResolvedPath], cancellationToken);
+                    var current = PayloadSnapshot.Capture(target.ResolvedPath, cancellationToken).FrontMatter
+                        ?? throw new IOException("Current update tracking metadata is unavailable.");
+                    var live = target with { FrontMatter = current };
+                    if (DesiredRevisionPolicyStore.Bind(live) != DesiredRevisionPolicyStore.Bind(target)
+                        || current.GithubRef != target.FrontMatter.GithubRef || current.GithubTreeSha != target.FrontMatter.GithubTreeSha
+                        || current.Pinned != target.FrontMatter.Pinned || current.PinnedRef != target.FrontMatter.PinnedRef)
+                        throw new IOException("The captured update source, revision or pin changed before launch.");
+                    DesiredRevisionPolicyGate.RequireAllowed(live, desiredPolicy.Observe(live, cancellationToken),
+                        "update-revision", explicitUnpin: options.Unpin);
+                    desiredPolicy.Revalidate(cancellationToken);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { return UpdateResult.Failure(false, 2, ex.Message, args); }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            { return UpdateResult.Failure(false, 2, ex.Message, args); }
+            var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
+                retainCancellationOutput: true, environment: options.ProcessEnvironment).ConfigureAwait(false);
+            if (!result.Succeeded)
+                _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
+            var entries = ParseEntries(result.StdOut, options.DryRun).AddRange(ParseEntries(result.StdErr, options.DryRun));
+            return new UpdateResult
+            {
+                DryRun = options.DryRun,
+                Succeeded = result.Succeeded,
+                ExitCode = result.ExitCode,
+                StdOut = result.StdOut,
+                StdErr = result.StdErr,
+                Cancelled = result.Cancelled,
+                MutationAttempted = !options.DryRun,
+                ErrorMessage = result.Succeeded ? null : result.Cancelled ? "Update canceled; partial changes may exist." : result.StdErr.Trim(),
+                CommandLine = args,
+                Entries = entries,
+                Notices = ParseNotices(result.StdOut, "stdout").AddRange(ParseNotices(result.StdErr, "stderr")),
+            };
         }
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
-            retainCancellationOutput: true, environment: options.ProcessEnvironment).ConfigureAwait(false);
-        if (!result.Succeeded)
-            _logger.Warn("gh.skill.update", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
-        var entries = ParseEntries(result.StdOut, options.DryRun).AddRange(ParseEntries(result.StdErr, options.DryRun));
-        return new UpdateResult
-        {
-            DryRun = options.DryRun,
-            Succeeded = result.Succeeded,
-            ExitCode = result.ExitCode,
-            StdOut = result.StdOut,
-            StdErr = result.StdErr,
-            Cancelled = result.Cancelled,
-            MutationAttempted = !options.DryRun,
-            ErrorMessage = result.Succeeded ? null : result.Cancelled ? "Update canceled; partial changes may exist." : result.StdErr.Trim(),
-            CommandLine = args,
-            Entries = entries,
-            Notices = ParseNotices(result.StdOut, "stdout").AddRange(ParseNotices(result.StdErr, "stderr")),
-        };
+        finally { desiredPolicy?.Dispose(); }
     }
 
     internal static IReadOnlyList<string> BuildArgs(Options options)

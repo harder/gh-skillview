@@ -46,96 +46,111 @@ public sealed class GhSkillInstallService
         options ??= new Options();
         options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? _runner.EffectiveWorkingDirectory) };
         var args = BuildArgs(repo, skillName, options);
+        SkillView.Preferences.DesiredRevisionPolicyStore.WriterLease? desiredPolicy = null;
         try
         {
-            var mutates = options.All || !string.IsNullOrEmpty(skillName);
-            var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
-            var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
-            if (options.All && context?.NeedsManagedSelectors(destinations) == true)
-                throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
-            IReadOnlyList<string>? resolvedSelectors = null;
-            string? registryHome = null;
-            System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;
-            if (options.FromLocal && mutates && (context?.Claims.IsEmpty == false || context?.NeedsManagedSelectors(destinations) == true))
+            try
             {
-                var listing = await ListRepoSkillsAsync(ghPath, repo, allowHiddenDirs: options.AllowHiddenDirs,
-                    cancellationToken: cancellationToken, processEnvironment: options.ProcessEnvironment,
-                    workingDirectory: options.WorkingDirectory, fromLocal: true).ConfigureAwait(false);
-                if (!listing.Succeeded) throw new IOException("Cannot establish local install selectors: " + listing.ErrorMessage);
-                resolvedSelectors = ResolveWriteSelectors(listing.Skills, skillName, options.All);
-                if (resolvedSelectors.Count == 0) throw new IOException("The exact local materialization names are unresolved; no write was admitted.");
-            }
-            if (!options.FromLocal && (options.All || !string.IsNullOrEmpty(skillName)))
-            {
-                var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
-                if (!string.IsNullOrEmpty(home)) home = System.IO.Path.GetFullPath(home, options.WorkingDirectory);
-                var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
-                registryHome = home;
-                capturedRegistry = records;
-                if (!records.IsEmpty || context?.Claims.IsEmpty == false || context?.NeedsManagedSelectors(destinations) == true)
+                var mutates = options.All || !string.IsNullOrEmpty(skillName);
+                var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
+                if (mutates)
                 {
-                    if (skillName is { } direct && records.ContainsKey(direct.Split('@')[0]))
-                        throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
-                    IReadOnlyList<string> selectors;
-                    if (options.Upstream)
-                        throw new IOException("Upstream import with existing shared records requires a coordinated maintenance plan.");
-                    var requested = skillName;
-                    var version = options.Version;
-                    if (requested?.LastIndexOf('@') is >= 0 and var at)
-                    { version ??= requested[(at + 1)..]; requested = requested[..at]; }
-                    var listing = await ListRepoSkillsAsync(ghPath, repo, version, options.AllowHiddenDirs, cancellationToken,
-                        options.ProcessEnvironment, options.WorkingDirectory).ConfigureAwait(false);
-                    if (!listing.Succeeded) throw new IOException("Cannot establish install selectors before writing shared records: " + listing.ErrorMessage);
-                    // Exact paths may resolve an authored name different from
-                    // their leaf. Do not guess that name from the path.
-                    selectors = ResolveWriteSelectors(listing.Skills, requested, options.All);
-                    resolvedSelectors = selectors;
-                    if (selectors.Count == 0 || selectors.Any(records.ContainsKey))
-                        throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
+                    var policyRunner = _runner.WithContext(options.WorkingDirectory!, options.ProcessEnvironment ?? new Dictionary<string, string>());
+                    desiredPolicy = SkillView.Preferences.DesiredRevisionPolicyStore.For(policyRunner).Acquire(destinations, cancellationToken);
                 }
-            }
-            if (mutates)
-            {
-                var latestDestinations = await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false);
-                if (!destinations.SequenceEqual(latestDestinations, StringComparer.Ordinal))
-                    throw new IOException("Installation destinations changed during preparation; refresh before installing.");
-                var latestContext = GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken);
-                if (options.All && latestContext.NeedsManagedSelectors(destinations))
+                var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
+                desiredPolicy?.RefuseProtectedInstallDestinations(destinations, cancellationToken);
+                if (context?.Pins.IsEmpty == false)
+                    throw new IOException("An admitted install root contains an exact pinned installation. Use a saved exact-target workflow; selector-to-native placement is not proven for protected siblings.");
+                if (options.All && context?.NeedsManagedSelectors(destinations) == true)
                     throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
-                GhInstallOwnershipGuard.ValidateUnchanged(context!, cancellationToken);
-                GhInstallOwnershipGuard.Validate(context!, destinations, resolvedSelectors, cancellationToken);
-                GhInstallOwnershipGuard.Validate(latestContext, destinations, resolvedSelectors, cancellationToken);
-                // No discovery await may separate these checks from launch.
-                if (capturedRegistry is not null)
+                IReadOnlyList<string>? resolvedSelectors = null;
+                string? registryHome = null;
+                System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;
+                if (options.FromLocal && mutates && (context?.Claims.IsEmpty == false || context?.NeedsExactSelectors(destinations) == true))
                 {
-                    var current = GhSharedLockGuard.ValidateCurrent(cancellationToken, registryHome);
-                    if (current.Keys.Except(capturedRegistry.Keys, StringComparer.Ordinal).Any())
-                        throw new IOException("Shared records changed during install preparation; refresh before installing.");
+                    var listing = await ListRepoSkillsAsync(ghPath, repo, allowHiddenDirs: options.AllowHiddenDirs,
+                        cancellationToken: cancellationToken, processEnvironment: options.ProcessEnvironment,
+                        workingDirectory: options.WorkingDirectory, fromLocal: true).ConfigureAwait(false);
+                    if (!listing.Succeeded) throw new IOException("Cannot establish local install selectors: " + listing.ErrorMessage);
+                    resolvedSelectors = ResolveWriteSelectors(listing.Skills, skillName, options.All);
+                    if (resolvedSelectors.Count == 0) throw new IOException("The exact local materialization names are unresolved; no write was admitted.");
+                }
+                if (!options.FromLocal && (options.All || !string.IsNullOrEmpty(skillName)))
+                {
+                    var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME", options.ProcessEnvironment);
+                    if (!string.IsNullOrEmpty(home)) home = System.IO.Path.GetFullPath(home, options.WorkingDirectory);
+                    var records = GhSharedLockGuard.ValidateCurrent(cancellationToken, home);
+                    registryHome = home;
+                    capturedRegistry = records;
+                    if (!records.IsEmpty || context?.Claims.IsEmpty == false || context?.NeedsExactSelectors(destinations) == true)
+                    {
+                        if (skillName is { } direct && records.ContainsKey(direct.Split('@')[0]))
+                            throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
+                        IReadOnlyList<string> selectors;
+                        if (options.Upstream)
+                            throw new IOException("Upstream import with existing shared records requires a coordinated maintenance plan.");
+                        var requested = skillName;
+                        var version = options.Version;
+                        if (requested?.LastIndexOf('@') is >= 0 and var at)
+                        { version ??= requested[(at + 1)..]; requested = requested[..at]; }
+                        var listing = await ListRepoSkillsAsync(ghPath, repo, version, options.AllowHiddenDirs, cancellationToken,
+                            options.ProcessEnvironment, options.WorkingDirectory).ConfigureAwait(false);
+                        if (!listing.Succeeded) throw new IOException("Cannot establish install selectors before writing shared records: " + listing.ErrorMessage);
+                        // Exact paths may resolve an authored name different from
+                        // their leaf. Do not guess that name from the path.
+                        selectors = ResolveWriteSelectors(listing.Skills, requested, options.All);
+                        resolvedSelectors = selectors;
+                        if (selectors.Count == 0 || selectors.Any(records.ContainsKey))
+                            throw new IOException("An existing shared selector would be replaced. Use update or a coordinated maintenance plan before reinstalling.");
+                    }
+                }
+                if (mutates)
+                {
+                    var latestDestinations = await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false);
+                    if (!destinations.SequenceEqual(latestDestinations, StringComparer.Ordinal))
+                        throw new IOException("Installation destinations changed during preparation; refresh before installing.");
+                    var latestContext = GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken);
+                    if (options.All && latestContext.NeedsManagedSelectors(destinations))
+                        throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
+                    GhInstallOwnershipGuard.ValidateUnchanged(context!, cancellationToken);
+                    GhInstallOwnershipGuard.Validate(context!, destinations, resolvedSelectors, cancellationToken);
+                    GhInstallOwnershipGuard.Validate(latestContext, destinations, resolvedSelectors, cancellationToken);
+                    desiredPolicy!.RefuseProtectedInstallDestinations(destinations, cancellationToken);
+                    // No discovery await may separate these checks from launch.
+                    if (capturedRegistry is not null)
+                    {
+                        var current = GhSharedLockGuard.ValidateCurrent(cancellationToken, registryHome);
+                        if (current.Keys.Except(capturedRegistry.Keys, StringComparer.Ordinal).Any())
+                            throw new IOException("Shared records changed during install preparation; refresh before installing.");
+                    }
+                    desiredPolicy?.Revalidate(cancellationToken);
                 }
             }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
-            environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
-        if (!result.Succeeded)
-        {
-            _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
-            return InstallResult.Failure(repo, skillName, options.Version, result.ExitCode, result.StdErr.Trim(), args);
-        }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
+            var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
+                environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
+                return InstallResult.Failure(repo, skillName, options.Version, result.ExitCode, result.StdErr.Trim(), args);
+            }
 
-        return new InstallResult
-        {
-            Repo = repo,
-            SkillName = skillName,
-            Version = options.Version,
-            Succeeded = true,
-            ExitCode = 0,
-            StdOut = result.StdOut,
-            StdErr = result.StdErr,
-            ErrorMessage = null,
-            CommandLine = args,
-        };
+            return new InstallResult
+            {
+                Repo = repo,
+                SkillName = skillName,
+                Version = options.Version,
+                Succeeded = true,
+                ExitCode = 0,
+                StdOut = result.StdOut,
+                StdErr = result.StdErr,
+                ErrorMessage = null,
+                CommandLine = args,
+            };
+        }
+        finally { desiredPolicy?.Dispose(); }
     }
 
     /// Discover the skills a repository offers without installing anything.

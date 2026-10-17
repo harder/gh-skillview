@@ -42,6 +42,7 @@ public static partial class CliDispatcher
                 "list" => await ListAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "effective" => await EffectiveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "check" => await CheckAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "policy-inspect" or "policy-set" or "policy-clear" => await DesiredPolicyAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -79,7 +80,7 @@ public static partial class CliDispatcher
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "check" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "list" or "effective" or "check" or "policy-inspect" or "policy-set" or "policy-clear" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
@@ -435,6 +436,15 @@ public static partial class CliDispatcher
             w.WriteBoolean("isSymlinked", skill.IsSymlinked);
             w.WriteBoolean("ignored", skill.Ignored);
             WriteSuppression(w, skill.CleanupSuppression);
+            w.WritePropertyName("desiredRevisionPolicy");
+            if (skill.DesiredPolicy is not { } desired) w.WriteNullValue();
+            else
+            {
+                w.WriteStartObject(); w.WriteString("status", desired.Status); w.WriteString("reason", desired.Reason);
+                w.WriteString("fingerprint", desired.Fingerprint); w.WritePropertyName("intent");
+                JsonSerializer.Serialize(w, desired.Policy, SkillView.Preferences.DesiredPolicyJsonContext.Default.DesiredRevisionPolicy);
+                w.WriteString("runtimeState", "unknown"); w.WriteEndObject();
+            }
             w.WriteString("githubTreeSha", skill.TreeSha);
             w.WriteString("version", skill.FrontMatter.Version);
             w.WriteString("description", skill.FrontMatter.Description);
@@ -2296,6 +2306,8 @@ public static partial class CliDispatcher
             | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `effective` | Explain conditional loading policy for an exact agent/profile/project. Native inventory and active-session state stay separate. | `--agent`, `--profile`, `--project`, `--cwd`, `--config-dir`, `--client-version`, `--agent-name`, `--trust`, `--json` |
+            | `policy-inspect` | Inspect desired revision intent separately from actual pin and session state. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `policy-set`, `policy-clear` | Publish selected installation intent without changing payloads or actual pin metadata. | `--path` or `--install-id`, `--mode`, `--ref`, `--expect`, `--yes`, `--json` |
             | `check` | Check bounded local package metadata and supported references without running skill code. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
