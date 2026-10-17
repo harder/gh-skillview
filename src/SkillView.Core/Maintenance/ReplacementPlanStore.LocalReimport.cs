@@ -13,7 +13,20 @@ internal sealed partial class ReplacementPlanStore
     private string LocalPreviewRoot => Root + "-local-previews";
     private static readonly string[] LocalArchiveNames = ["installed-capture", "local-source-capture", "gh-input-capture", "gh-output-capture"];
 
-    internal async Task<ReplacementPreparation> PlanLocalReimportAsync(string ghPath, InstalledSkill target,
+    internal Task<ReplacementPreparation> PlanLocalReimportAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, CancellationToken token) => PlanLocalImportAsync(ghPath, target, null, inventory, token);
+
+    internal const string LocalSourceSwitchPurpose = "switch-local-source";
+    internal const string LocalSourceSwitchDisposition = "replace-local-source-retain-original";
+
+    internal Task<ReplacementPreparation> PlanLocalSourceSwitchAsync(string ghPath, InstalledSkill target, string newSourcePath,
+        InventorySnapshot inventory, CancellationToken token)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newSourcePath);
+        return PlanLocalImportAsync(ghPath, target, newSourcePath, inventory, token);
+    }
+
+    private async Task<ReplacementPreparation> PlanLocalImportAsync(string ghPath, InstalledSkill target, string? newSourcePath,
         InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -26,9 +39,18 @@ internal sealed partial class ReplacementPlanStore
             ?? throw new IOException("Local reimport needs a containing installation scan root.");
         target = target with { ResolvedPath = canonical, ScanRoot = containing };
         inventory = Admit(target, inventory, token, localReimport: true);
-        var sourcePath = target.FrontMatter.LocalPath!;
-        var sourceCanonical = Canonical(sourcePath);
+        var switching = newSourcePath is not null;
+        if (switching && (!Path.IsPathFullyQualified(newSourcePath!) || newSourcePath!.Any(char.IsControl)))
+            throw new IOException("New source must be an absolute ordinary local directory.");
+        var sourcePath = switching ? Path.GetFullPath(newSourcePath!) : target.FrontMatter.LocalPath!;
+        if (switching && (newSourcePath == target.FrontMatter.LocalPath || sourcePath == target.FrontMatter.LocalPath))
+            throw new IOException("No source transition: use local reimport for the same recorded source; installed content has not been verified current.");
+        using var previousPlacement = switching ? NativePlacementLease.Open(target.FrontMatter.LocalPath!, token) : null;
+        using var selectedPlacement = switching ? NativePlacementLease.Open(newSourcePath!, token) : null;
+        if (selectedPlacement?.Evidence.MissingSuffix.IsEmpty == false) throw new IOException("New local source does not exist.");
+        var sourceCanonical = selectedPlacement?.Evidence.CanonicalPath ?? Canonical(sourcePath);
         CheckLocalLocations(target, inventory, sourcePath, sourceCanonical, token);
+        if (previousPlacement is not null) CheckSwitchPlacement(previousPlacement.Evidence, inventory, sourcePath, sourceCanonical, token);
         // Refuse missing/inadmissible payloads before private writes, but do
         // not retain preflight generations across our namespace initialization.
         using (NativeDirectoryMoveLease.Open(containing, canonical, token)) { }
@@ -36,9 +58,11 @@ internal sealed partial class ReplacementPlanStore
         // Initialize admitted namespaces before freezing payload parents: a
         // first-use ancestor or sibling creation can change their generation.
         // This admits no retained operation, replacement writer or plan quota.
-        using var previews = NativeStateDirectory.OpenOrCreate(LocalPreviewRoot, LocalExclusions(inventory, sourceCanonical), token);
+        RevalidatePlacements();
+        using var previews = NativeStateDirectory.OpenOrCreate(LocalPreviewRoot, LocalImportExclusions(), token);
         using var previewCoordinator = previews.OpenFile("writer.lock", true, token); CheckWriter(previewCoordinator);
-        using (var initialized = NativeStateDirectory.OpenOrCreate(Root, LocalExclusions(inventory, sourceCanonical), token))
+        RevalidatePlacements();
+        using (var initialized = NativeStateDirectory.OpenOrCreate(Root, LocalImportExclusions(), token))
             initialized.FlushNamespace(token);
         var retained = previews.EnumerateEntries(token).Take(6).ToArray();
         if (retained.Any(entry => entry.Name != "writer.lock") || retained.Any(entry => entry.Error is not null))
@@ -58,6 +82,7 @@ internal sealed partial class ReplacementPlanStore
         try
         {
             ReplacementPreparation result;
+            RevalidatePlacements();
             using (var preview = previews.CreateStagingDirectory(id, token))
             {
                 ownership = preview.CaptureOwnership(token);
@@ -73,10 +98,13 @@ internal sealed partial class ReplacementPlanStore
                 freshSource = captured.Archive;
                 VerifyUnpinOriginal(ReplacementEvidence.From(before), installed.Archive, token);
                 SameTracking(target.FrontMatter, installed.Archive.Snapshot.FrontMatter ?? throw new IOException("Installed tracking is unavailable."));
+                if (switching && !SameParsedMetadata(target.FrontMatter, installed.Archive.Snapshot.FrontMatter!))
+                    throw new IOException("Installed authored metadata changed after inventory; refresh before source switching.");
                 RequireLocalSourceMetadata(captured.Archive.Snapshot.FrontMatter ?? throw new IOException("Local source requires root SKILL.md."), false);
                 RequireSingleLocalSkill(captured.Archive);
+                if (switching) RequireOptionalCapturedLocalPath(captured.Archive.Snapshot.FrontMatter!.LocalPath);
                 if (captured.Archive.Snapshot.FrontMatter!.Name != target.FrontMatter.Name
-                    || captured.Archive.Snapshot.FrontMatter.LocalPath is { } recorded && recorded != sourcePath
+                    || !switching && captured.Archive.Snapshot.FrontMatter.LocalPath is { } recorded && recorded != sourcePath
                     || captured.Archive.Entries.Any(item => item.Entry.Kind == "link" || Path.GetFileName(item.Entry.Path) is ".skill-lock.json" or "skills-lock.json"))
                     throw new IOException("Local source needs the same authored name, unambiguous tracking and no links or owner records.");
                 CheckLocalWorkingBudget(installed.Archive, captured.Archive);
@@ -89,7 +117,7 @@ internal sealed partial class ReplacementPlanStore
                 unknownGhOutput = false;
                 var staged = BuildLocalCandidate(preview, installed.Archive, captured.Archive, sourceReader, sourcePath, token);
                 VerifyCurrent();
-                if (LocalCandidateUnchanged(installed.Archive, staged.Snapshot, staged.Metadata))
+                if (!switching && LocalCandidateUnchanged(installed.Archive, staged.Snapshot, staged.Metadata))
                 {
                     result = ReplacementPreparation.Current(new(target.InstallationId, canonical, before.Fingerprint,
                         "Verified complete local content, tracking and supported metadata policy are current. No retained plan was allocated; installed objects remain unchanged.", null,
@@ -99,7 +127,8 @@ internal sealed partial class ReplacementPlanStore
                 {
                     // Preview coordinator precedes the replacement writer. No
                     // open state directory is renamed or treated as a payload.
-                    using var state = NativeStateDirectory.OpenOrCreate(Root, LocalExclusions(inventory, sourceCanonical), token);
+                    RevalidatePlacements();
+                    using var state = NativeStateDirectory.OpenOrCreate(Root, LocalImportExclusions(), token);
                     using var writer = state.OpenFile("writer.lock", true, token); CheckWriter(writer);
                     var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
                     if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
@@ -122,16 +151,18 @@ internal sealed partial class ReplacementPlanStore
                     VerifyCurrent();
                     var subject = new ReplacementSubject(target.InstallationId, target.Name, target.Scope, target.Agents, target.FrontMatter, []);
                     var policy = new ReplacementLocalImport(sourcePath, sourceCanonical, source.RootIdentity,
-                        installed.Fingerprint, captured.Fingerprint, built.Snapshot.FrontMatter!, PayloadMetadataReview.LocalImportPolicy, built.Metadata, witness);
-                    var plan = new ReplacementPlan(5, id, LocalReimportPurpose, DateTimeOffset.UtcNow, canonical,
+                        installed.Fingerprint, captured.Fingerprint, built.Snapshot.FrontMatter!, PayloadMetadataReview.LocalImportPolicy, built.Metadata, witness, switching ? LocalSourceSwitchDisposition : LocalReimportDisposition);
+                    var plan = new ReplacementPlan(switching ? 6 : 5, id, switching ? LocalSourceSwitchPurpose : LocalReimportPurpose, DateTimeOffset.UtcNow, canonical,
                         original.RootIdentity.CanonicalPath, original.RootIdentity, original.ParentIdentity, subject, context,
-                        ReplacementEvidence.From(before), ReplacementEvidence.From(desired), LocalChangedPaths(installed.Archive, built.Snapshot, built.Metadata), "", LocalImport: policy);
+                        ReplacementEvidence.From(before), ReplacementEvidence.From(desired), LocalChangedPaths(installed.Archive, built.Snapshot, built.Metadata), "", LocalImport: policy,
+                        LocalSourceSwitch: switching ? new(target.FrontMatter.LocalPath!, previousPlacement!.Evidence,
+                            captured.Archive.Snapshot.FrontMatter!.LocalPath) : null);
                     ValidateLocalImport(plan, operation, token);
                     plan = plan with { ReviewFingerprint = PlanHash(plan) };
                     Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
                     state.FlushPublication(token);
                     result = ReplacementPreparation.Saved(Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
-                        "Saved baseline-less local replacement from the same recorded source. Review every installed-only/different path and all consumers; no automatic merge is claimed. Candidate preserves captured source bytes and supported descendant metadata plus installed root privacy after actual gh staging. Applying creates new active object identities/timestamps; original native objects remain retained for undo.")
+                        (switching ? "Saved baseline-less local source transition. Old source is placement-only; no old base or ancestry is claimed. " : "Saved baseline-less local replacement from the same recorded source. ") + "Review every installed-only/different path and all consumers; no automatic merge is claimed. Candidate preserves captured source bytes and supported descendant metadata plus installed root privacy after actual gh staging. Applying creates new active object identities/timestamps; original native objects remain retained for undo.")
                         with
                     { LocalSource = new("current", "Durable source matches its complete captured native evidence.") });
                 }
@@ -148,12 +179,12 @@ internal sealed partial class ReplacementPlanStore
         catch (OperationCanceledException ex)
         {
             var cleanup = CleanKnownFailure();
-            throw new OperationCanceledException($"Local reimport canceled. Preview {id}: {previewPath}; final operation: {finalPath ?? "not allocated"}. {cleanup} {ex.Message}", ex, ex.CancellationToken);
+            throw new OperationCanceledException($"{(switching ? "Local source switch" : "Local reimport")} canceled. Preview {id}: {previewPath}; final operation: {finalPath ?? "not allocated"}. {cleanup} {ex.Message}", ex, ex.CancellationToken);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             var cleanup = CleanKnownFailure();
-            throw StagingFailure($"Local reimport refused. Preview {id}: {previewPath}; final operation: {finalPath ?? "not allocated"}. {cleanup} {ex.Message}", ex);
+            throw StagingFailure($"{(switching ? "Local source switch" : "Local reimport")} refused. Preview {id}: {previewPath}; final operation: {finalPath ?? "not allocated"}. {cleanup} {ex.Message}", ex);
         }
         finally { ownership?.Dispose(); }
 
@@ -170,8 +201,19 @@ internal sealed partial class ReplacementPlanStore
             return "Private evidence remains retained and charged the full logical working reservation; unknown gh output is never counted as zero.";
         }
 
+        string[] LocalImportExclusions() => previousPlacement is null ? LocalExclusions(inventory, sourceCanonical)
+            : LocalExclusions(inventory, sourceCanonical).Concat(new[] { previousPlacement.Evidence.Path, previousPlacement.Evidence.CanonicalPath }).Distinct().ToArray();
+
+        void RevalidatePlacements()
+        {
+            previousPlacement?.Revalidate(token);
+            selectedPlacement?.Revalidate(token);
+            if (previousPlacement is not null) CheckSwitchPlacement(previousPlacement.Evidence, inventory, sourcePath, sourceCanonical, token);
+        }
+
         void VerifyCurrent()
         {
+            RevalidatePlacements();
             inventory = Admit(target, inventory, token, localReimport: true);
             VerifyPayload(ReplacementEvidence.From(before), original.Capture(token));
             if (context != Context(target, inventory, token) || Canonical(sourcePath) != sourceCanonical)

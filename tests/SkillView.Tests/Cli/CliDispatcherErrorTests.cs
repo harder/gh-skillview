@@ -30,6 +30,20 @@ public class CliDispatcherErrorTests : IDisposable
         try { Directory.Delete(_tempRoot, recursive: true); } catch { }
     }
 
+    [Theory]
+    [InlineData("source-switch-plan", "--path", "one")]
+    [InlineData("source-switch-plan", "--new-source", "relative", "--path", "one")]
+    [InlineData("source-switch-plan", "--path", "one", "--install-id", "two", "--new-source", "/new")]
+    [InlineData("source-switch-plan", "--path", "one", "--new-source", "/new", "--new-source", "/other")]
+    [InlineData("source-switch-apply", "--id", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--yes", "--disposition", "replace-local-retain-original", "--expect", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("source-switch-inspect", "--id", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--new-source", "/new")]
+    public async Task SourceSwitchRejectsIncompleteDuplicateOrWrongFamilyArgumentsBeforeState(params string[] args)
+    {
+        var (code, _, _) = await RunCliAsync("skillview", args);
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
     // --- remove parser edge cases ----------------------------------------
 
     [Fact]

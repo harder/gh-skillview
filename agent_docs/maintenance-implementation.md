@@ -1598,3 +1598,135 @@ On published baseline `19c9a4cdfeb51caaa29e5fab7c0050b5cb42c31e`, targeted local
 The 19c9 CI run completed naturally with failures: Windows metadata had 11 failures on each architecture and the Windows test job had 17 failures; these include exact exception-type assertions, a junction metadata fixture, and an access-denied renamed-parent fixture. The four AOT jobs built and smoked binaries but then failed repository API verification with Actions installation quota HTTP 403; the minimum-gh contract lane passed and latest-gh contract failures were likewise quota-contaminated. Both CodeQL analyses passed. Copilot threads #4300874220 and #4300874253 remain unresolved and are bound to prior head `9824c2a1a513c8192d56f44008587ff288c3ed90`. No cancellation or rerun is claimed.
 
 See [the combined local checkpoint](evidence/maintenance-batch-19-combined-link-fix-local.json). Independent review of this refinement is clear; fresh Windows/macOS native and final-head gates remain pending. Acceptance remains **9/21**; M08 is incomplete.
+
+
+### Ownerless local source-switch local checkpoint (unpublished)
+
+The isolated `codex/local-source-switch` worktree implements schema6
+`switch-local-source`, with explicit `replace-local-source-retain-original`
+approval, separate old-source placement evidence, real captured I/C and gh
+staging witness, raw local-path splicing and frozen post-retain recovery. CLI
+`source-switch-*` and Installed **T** review the selected physical installation;
+**R** and **K** retain their existing families. Old-source content is never a base
+or freshness dependency. Schema1–5 omit the new field. Git-managed source, owner
+transition, detach and automatic merge support remain pending.
+
+Independent review found and closed a Linux bind-alias placement gap. Placement
+now keeps NO_XDEV and uses bounded held readlink evidence/root-walk restarts for
+ordinary aliases; mount/cross-filesystem, broken, unknown and dot-component
+addresses refuse. Exact recorded lexical address, canonical projection and a
+proven first-missing boundary stay separate. The initial absolute-alias trial
+passed6/7, with the alias case failing, and remains retained; its flags were not weakened to obtain success.
+
+The final 29-file snapshot `cd928881243c77c96ccaac66405e3ea4b4af4aa0558f2dfb82edef113639f047`
+(27 author files plus root-owned Python/Program drafts) passed27/27 focused tests,
+zero skipped, on Linux ARM64 SDK10.0.402 with child-only
+`TMPDIR=/var/tmp/skillview-source-switch-tests`. Final Tests/Proof JIT builds had
+zero warnings/errors, and Core/Tests format verification passed. The earlier
+377 unit plus9 integration pass,3 builds,2 cached locked restores and4 format
+verifies belong to pre-mount-fix snapshot `c46c99a2…`; they are historical, not a
+whole-suite claim for final source. Final independent delta/evidence review is
+clear at receipt `28279bfce05ce271687cdc1f2611ba68c709832ae4edf0dceb614a5daaa1b589`.
+
+The [local checkpoint](evidence/maintenance-local-source-switch-local.json) binds
+exact source/command/log hashes and preserved failures. No successful schema6
+publication/native AOT, privileged Docker, macOS/Windows or old-native schema1–5
+compatibility is claimed here. Root will integrate the actual merged reimport
+and link-retention bases and run final gates before publication. Nothing is
+committed or pushed from this worktree. Acceptance remains9/21 with M08 incomplete
+and all original criteria retained.
+
+After this scoped review, upstream PR68 review identified two inherited issues: a
+file-hash case mismatch rejects changed local-import plans before publication,
+and saved-plan rendering can hide preparation errors/notices and direct
+recover/undo messages. The sixth-worktree product remains frozen while root
+coordinates independently reviewed fixes and propagation. The scoped clear and
+local test counts above remain historical; they do not establish publication
+readiness. The old-schema5 proof draft is explicitly disabled with an unset final
+merged baseline: provisional `7d90` cannot produce a changed plan. No old native
+compatibility result is claimed.
+
+
+### Source-switch upstream corrections and recovery-proof preparation
+
+The three inherited reimport defects are now corrected in this isolated source:
+native candidate digest encoding, visible failed-operation diagnostics and catalog
+local-source classification. Existing platform fixture corrections are included.
+The 38-file snapshot `baa1a949298d103f3a6c75f8687a6f6cde1b365556bf90001e3059374751f69e`
+remained unchanged across Tests/Proof builds, Core/Tests format verification and
+89 focused tests, with zero failures/skips. Independent delta and raw validation
+reviews are clear; the earlier 29-file/27-test results remain historical.
+
+A separate Docker wrapper keeps fixtures on the private container root filesystem
+for strict placement checks, preserving existing tmpfs/ENOSPC runners. Its inherited
+Git-redirection provenance defect was fixed and tested with two actual private
+repositories. The old-schema5 proof invalidates prior positive output and refuses
+its unset baseline before tools or fixtures. These are script/guard checks only.
+The corrected upstream commit `49f482cdd20a24351d6d832005ec6bb0f9d60731` is local,
+not merged and not the frozen native producer. Actual merged reimport/link bases,
+a final schema5 baseline and fresh native gates remain required. Nothing here
+promotes acceptance beyond 9/21 or claims reproduction of the original Mac crash.
+See `evidence/maintenance-local-source-switch-local.json` for exact references.
+
+
+The draft source-switch CI wiring now builds the literal frozen schema5 producer
+for the same RID and runs both new hosts/gh versions, actual old-schema recovery,
+and separate privileged Linux root-filesystem proofs. It archives raw recovery
+packets and input sources. Seven local syntax/disabled-baseline/routing checks
+passed with independent review; routing uses test doubles and is not native proof.
+The current UNSET baseline deliberately prevents the native fetch/publish step.
+Existing run scripts and tmpfs/ENOSPC proofs are unchanged. Actual merged-base
+integration and native execution remain outstanding.
+
+The unpublished source-switch worktree also carries PR68's `b5fff2c` tracking
+proof and canonical archive-fixture corrections verbatim, plus the canonical-path
+testing note. The earlier 38-file/89-test receipt is historical for its exact
+source: only the archive test class changed among those inputs. All six archive
+tests pass after rebuilding this worktree, including the actual Unix root alias;
+scoped format verification passes. Its 40-file propagation manifest is separate
+from the unchanged CI wiring. No merged-base or native schema5 compatibility
+result is claimed; the old schema5 baseline stays UNSET until corrected reimport
+is actually merged and verified. See the latest correction section of the local
+source-switch receipt. Original acceptance remains **9/21**.
+
+### Source-switch: verified merged schema5 producer bound
+
+PR68 is now merged and verified at
+`4649d75fc3a4f9fdd7c22ca5593e629a1b559298`, tree
+`9a58bbdb0a1786328dcb883e829ea5ea56e7cb10`, identical to its reviewed
+`b5fff2c` head tree. The old-schema5 producer now names that exact merge rather
+than UNSET. CI and the Docker wrapper already extract the single producer literal;
+their exact-source, clean-checkout and binary-hash guards are unchanged. No old
+plan is fabricated, reserialized or fingerprint-normalized. Existing old-plan
+bytes, archive hashes and absent schema6 fields remain asserted.
+
+Only the producer's literal/comments/documentation changed among the prior40
+inputs; all other executable AST and39 files are unchanged. Eight targeted
+Python/helper checks pass, including actual CI extraction of the exact SHA,
+malformed-baseline early refusals and prior-positive invalidation when tools
+are missing. No C# changed and no SDK, Git command, native executable, Docker,
+network, AI client or skill script was run for this delta. Earlier38/89 and40/6
+managed-test receipts retain their exact historical scopes. See the merged
+baseline section of the [local checkpoint](evidence/maintenance-local-source-switch-local.json).
+
+The actual same-RID frozen producer build and current App/extension schema5
+kill/recover/undo compatibility proofs remain pending. Actual merged
+link-retention/source6 base integration and final-source native gates remain
+required before publication. This source-only binding does not establish
+compatibility. No branch integration, commit or push occurred here. Original
+acceptance remains **9/21**, with M08 incomplete and all criteria retained.
+
+## PR69 merged; source-switch integration in progress
+
+PR69 merged as `0fe868e9c5d2519322e5ca9743627cd66404211f`, with tree
+`2b4ac66a840e5d17db71a8aad2a361ba660651e4` exactly matching reviewed head
+`ee4b4fe7ffb82135a2c5b4a01472a2bd146806e8`. Its Linux/macOS/Windows x64/Windows
+ARM64 AOT jobs and independently reviewed final artifacts passed, along with
+CodeQL and minimum/latest gh contract lanes. Both review threads were resolved.
+The preceding PR69 pending-gate statements remain historical snapshots.
+
+The private source-switch checkpoint is now being integrated onto that actual
+merge. Its UI resolution preserves PR69's bounded failure diagnostics and adds
+source-switch family routing and the corresponding lifecycle cases. Final
+integrated managed tests and native gates remain pending; earlier local results
+are not relabeled as merged-base evidence. Acceptance remains **9/21**.

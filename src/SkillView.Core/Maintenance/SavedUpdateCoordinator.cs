@@ -13,12 +13,24 @@ namespace SkillView.Maintenance;
 internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
-    internal async Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,
+    internal Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, CancellationToken token) => PrepareLocalImportAsync(ghPath, target, null, inventory, token);
+
+    internal Task<UpdateResult> PrepareLocalSourceSwitchAsync(string ghPath, InstalledSkill target, string newSourcePath,
+        InventorySnapshot inventory, CancellationToken token)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newSourcePath);
+        return PrepareLocalImportAsync(ghPath, target, newSourcePath, inventory, token);
+    }
+
+    private async Task<UpdateResult> PrepareLocalImportAsync(string ghPath, InstalledSkill target, string? newSourcePath,
         InventorySnapshot inventory, CancellationToken token)
     {
         try
         {
-            var preparation = await plans.PlanLocalReimportAsync(ghPath, target, inventory, token).ConfigureAwait(false);
+            var preparation = newSourcePath is null
+                ? await plans.PlanLocalReimportAsync(ghPath, target, inventory, token).ConfigureAwait(false)
+                : await plans.PlanLocalSourceSwitchAsync(ghPath, target, newSourcePath, inventory, token).ConfigureAwait(false);
             return Empty(false) with
             {
                 SavedPlan = preparation.Plan,
@@ -191,7 +203,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
-        var requiredDisposition = review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
+        var requiredDisposition = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchDisposition : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
             : review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
         if (disposition != requiredDisposition)
             return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
@@ -203,7 +215,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             token.ThrowIfCancellationRequested();
             attempted = true;
             var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
-                review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);
+                review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
@@ -294,6 +306,6 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
             status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
-            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.LocalImport is not null ? "reimport-inspect" : plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
+            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.LocalSourceSwitch is not null ? "source-switch-inspect" : plan.LocalImport is not null ? "reimport-inspect" : plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
         { Impact = plan.Impact };
 }

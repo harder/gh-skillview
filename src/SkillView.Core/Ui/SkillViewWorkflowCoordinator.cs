@@ -340,9 +340,25 @@ internal sealed class SkillViewWorkflowCoordinator
         if (!lifetimeToken.IsCancellationRequested) _refreshActiveTab();
     }
 
-    internal async Task<LocalReimportResponse> RunLocalReimportAsync(InstalledSkill selected,
-        LocalReimportRequest request, CancellationToken token)
+    internal void ShowLocalSourceSwitch(InstalledSkill selected, CancellationToken lifetimeToken)
     {
+        if (_getApp() is not { } app) return;
+        LocalReimportScreen.Show(app, _services.Logger, selected,
+            (request, token) => RunLocalSourceSwitchAsync(selected, request, token), lifetimeToken, sourceSwitch: true);
+        if (!lifetimeToken.IsCancellationRequested) _refreshActiveTab();
+    }
+
+    internal Task<LocalReimportResponse> RunLocalReimportAsync(InstalledSkill selected,
+        LocalReimportRequest request, CancellationToken token) => RunLocalImportAsync(selected, request, false, token);
+
+    internal Task<LocalReimportResponse> RunLocalSourceSwitchAsync(InstalledSkill selected,
+        LocalReimportRequest request, CancellationToken token) => RunLocalImportAsync(selected, request, true, token);
+
+    private async Task<LocalReimportResponse> RunLocalImportAsync(InstalledSkill selected,
+        LocalReimportRequest request, bool sourceSwitch, CancellationToken token)
+    {
+        var purpose = sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchPurpose : SkillView.Maintenance.ReplacementPlanStore.LocalReimportPurpose;
+        var disposition = sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchDisposition : SkillView.Maintenance.ReplacementPlanStore.LocalReimportDisposition;
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, token).ConfigureAwait(false);
         if (request.Action == LocalReimportAction.Prepare)
@@ -351,21 +367,22 @@ internal sealed class SkillViewWorkflowCoordinator
             var target = inventory.Skills.SingleOrDefault(skill => skill.InstallationId == selected.InstallationId
                 && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath))
                 ?? throw new IOException("The selected physical installation changed; refresh before preparing local reimport.");
-            return new(Preparation: await Task.Run(() => _services.SavedUpdates.PrepareLocalReimportAsync(
-                ghPath, target, inventory, token), token).ConfigureAwait(false));
+            return new(Preparation: await Task.Run(() => sourceSwitch
+                ? _services.SavedUpdates.PrepareLocalSourceSwitchAsync(ghPath, target, request.NewSourcePath ?? throw new ArgumentException("Choose the new source."), inventory, token)
+                : _services.SavedUpdates.PrepareLocalReimportAsync(ghPath, target, inventory, token), token).ConfigureAwait(false));
         }
         if (request.Action == LocalReimportAction.Inspect)
         {
-            var inspected = await Task.Run(() => _services.SavedUpdatePlans.Inspect(request.Id!, inventory, token, "local-reimport"), token).ConfigureAwait(false);
-            RequireSelectedLocalReimport(selected, inspected);
+            var inspected = await Task.Run(() => _services.SavedUpdatePlans.Inspect(request.Id!, inventory, token, purpose), token).ConfigureAwait(false);
+            RequireSelectedLocalReimport(selected, inspected, sourceSwitch);
             return new(Plan: inspected);
         }
         var review = request.Review ?? throw new ArgumentException("Inspect the saved local reimport before continuing.");
-        RequireSelectedLocalReimport(selected, review);
+        RequireSelectedLocalReimport(selected, review, sourceSwitch);
         if (request.Id != review.Id) throw new ArgumentException("The saved ID differs from the reviewed local reimport.");
         if (request.Action == LocalReimportAction.Apply)
             return new(Preparation: await Task.Run(() => _services.SavedUpdates.ApplyAsync(review,
-                "replace-local-retain-original", inventory,
+                disposition, inventory,
                 reconciliation => CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, reconciliation), token), token).ConfigureAwait(false));
         if (request.Action is not (LocalReimportAction.Recover or LocalReimportAction.Undo))
             throw new ArgumentException("Unsupported local reimport action.");
@@ -375,7 +392,7 @@ internal sealed class SkillViewWorkflowCoordinator
         try
         {
             result = await Task.Run(() => _services.SavedUpdatePlans.Recover(review.Id,
-                review.ReviewFingerprint, inventory, request.Action == LocalReimportAction.Undo, token, "local-reimport"), token).ConfigureAwait(false);
+                review.ReviewFingerprint, inventory, request.Action == LocalReimportAction.Undo, token, purpose), token).ConfigureAwait(false);
         }
         finally
         {
@@ -394,9 +411,9 @@ internal sealed class SkillViewWorkflowCoordinator
         return new(Plan: result, ReconciliationWarning: reconciliationWarning);
     }
 
-    private static void RequireSelectedLocalReimport(InstalledSkill selected, SkillView.Maintenance.ReplacementResult review)
+    private static void RequireSelectedLocalReimport(InstalledSkill selected, SkillView.Maintenance.ReplacementResult review, bool sourceSwitch = false)
     {
-        if (!LocalReimportScreen.IsLocalReimport(review) || !PathIdentity.Equals(selected.ResolvedPath, review.OriginalPath))
+        if (!(sourceSwitch ? LocalReimportScreen.IsLocalSourceSwitch(review) : LocalReimportScreen.IsLocalReimport(review)) || !PathIdentity.Equals(selected.ResolvedPath, review.OriginalPath))
             throw new IOException("This saved local reimport belongs to another purpose or physical installation address.");
     }
 

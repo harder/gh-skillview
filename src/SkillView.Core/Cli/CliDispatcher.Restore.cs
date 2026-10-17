@@ -13,14 +13,15 @@ public static partial class CliDispatcher
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
         var requestedCommand = options.SubcommandName!;
+        var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
         var localReimport = requestedCommand.StartsWith("reimport-", StringComparison.Ordinal);
         var unpinOnly = requestedCommand.StartsWith("unpin-", StringComparison.Ordinal);
-        var command = requestedCommand.StartsWith("update-", StringComparison.Ordinal)
+        var command = sourceSwitch ? "restore-" + requestedCommand[14..] : requestedCommand.StartsWith("update-", StringComparison.Ordinal)
             ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : localReimport ? "restore-" + requestedCommand[9..] : requestedCommand;
-        var expectedPurpose = localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
+        var expectedPurpose = sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
-        string? path = null, installId = null, id = null, expected = null, disposition = null;
+        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null;
         var execute = false;
         var json = false;
         var allowHidden = false;
@@ -33,6 +34,7 @@ public static partial class CliDispatcher
             if (args[index] == "--yes" && !execute && command is not ("restore-plan" or "restore-inspect")) { execute = true; continue; }
             if (index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
             {
+                if (args[index] == "--new-source" && sourceSwitch && command == "restore-plan" && newSource is null) { newSource = args[++index]; continue; }
                 if (args[index] == "--path" && command == "restore-plan" && path is null && installId is null) { path = args[++index]; continue; }
                 if (args[index] == "--install-id" && command == "restore-plan" && path is null && installId is null) { installId = args[++index]; continue; }
                 if (args[index] == "--id" && command != "restore-plan" && id is null) { id = args[++index]; continue; }
@@ -42,12 +44,13 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
             return ExitCodes.InvalidUsage;
         }
-        if (command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
+        if (sourceSwitch && command == "restore-plan" && (string.IsNullOrWhiteSpace(newSource) || !Path.IsPathFullyQualified(newSource) || newSource.Any(char.IsControl))
+            || command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
-            || command == "restore-apply" && (!execute || !(localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-apply" && (!execute || !(sourceSwitch ? disposition == ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. source-switch-plan also requires --new-source <absolute directory>; source-switch-apply requires replace-local-source-retain-original. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         OperationImpact? frozenImpact = null;
@@ -65,7 +68,7 @@ public static partial class CliDispatcher
             {
                 if (gh is null && !unpinOnly) throw new IOException("Saved replacement staging requires GitHub CLI.");
                 InstalledSkill target;
-                if (localReimport) target = SelectLocalReimportTarget(inventory, path, installId);
+                if (localReimport || sourceSwitch) target = SelectLocalReimportTarget(inventory, path, installId);
                 else
                 {
                     var selected = inventory.Skills.Where(skill => installId is not null ? skill.InstallationId == installId
@@ -74,9 +77,11 @@ public static partial class CliDispatcher
                     target = selected[0];
                 }
                 frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
-                if (latest || unpinOnly || localReimport)
+                if (latest || unpinOnly || localReimport || sourceSwitch)
                 {
-                    var preparation = localReimport
+                    var preparation = sourceSwitch
+                        ? await Task.Run(() => store.PlanLocalSourceSwitchAsync(gh!, target, newSource!, inventory, token), token).ConfigureAwait(false)
+                        : localReimport
                         ? await Task.Run(() => store.PlanLocalReimportAsync(gh!, target, inventory, token), token).ConfigureAwait(false)
                         : unpinOnly
                         ? await Task.Run(() => store.PlanUnpin(target, inventory, token), token).ConfigureAwait(false)
@@ -125,10 +130,10 @@ public static partial class CliDispatcher
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
-                if ((unpinOnly || localReimport) && command == "restore-plan")
+                if ((unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
                 {
                     w.WriteStartArray("applyArguments");
-                    foreach (var argument in new[] { localReimport ? "reimport-apply" : "unpin-apply", "--id", result.Id, "--yes", "--disposition", localReimport ? "replace-local-retain-original" : "unpin-only", "--expect", result.PlanFingerprint }) w.WriteStringValue(argument);
+                    foreach (var argument in new[] { sourceSwitch ? "source-switch-apply" : localReimport ? "reimport-apply" : "unpin-apply", "--id", result.Id, "--yes", "--disposition", sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? "replace-local-retain-original" : "unpin-only", "--expect", result.PlanFingerprint }) w.WriteStringValue(argument);
                     if (allowHidden) w.WriteStringValue("--allow-hidden-dirs");
                     w.WriteEndArray();
                 }
@@ -140,8 +145,8 @@ public static partial class CliDispatcher
                 + string.Join("\n", result.ChangedPaths.Select(change => "Changed: " + change)) + "\n" + result.Message));
             if (!json && result.LocalImport is not null) Console.WriteLine(LocalReimportScreen.RenderText(result));
             if (!json) WriteImpactText(result.Impact ?? frozenImpact);
-            if (!json && (unpinOnly || localReimport) && command == "restore-plan")
-                Console.WriteLine($"Apply: skillview {(localReimport ? "reimport-apply" : "unpin-apply")} --id {result.Id} --yes --disposition {(localReimport ? "replace-local-retain-original" : "unpin-only")} --expect {result.PlanFingerprint}{(allowHidden ? " --allow-hidden-dirs" : "")}");
+            if (!json && (unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
+                Console.WriteLine($"Apply: skillview {(sourceSwitch ? "source-switch-apply" : localReimport ? "reimport-apply" : "unpin-apply")} --id {result.Id} --yes --disposition {(sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? "replace-local-retain-original" : "unpin-only")} --expect {result.PlanFingerprint}{(allowHidden ? " --allow-hidden-dirs" : "")}");
             return result.Canceled ? ExitCodes.Cancelled : result.Succeeded ? ExitCodes.Success : ExitCodes.UserError;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException or EntryPointNotFoundException

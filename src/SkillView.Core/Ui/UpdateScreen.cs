@@ -8,10 +8,10 @@ namespace SkillView.Ui;
 /// this type so the UpdateScreenTests assertions don't need updating.
 public static class UpdateScreen
 {
-    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false, bool localReimport = false)
+    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false, bool localReimport = false, bool localSourceSwitch = false)
     {
         var sb = new System.Text.StringBuilder();
-        var heading = dryRun ? "Dry-run results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
+        var heading = localSourceSwitch || result.SavedPlan?.LocalSourceSwitch is not null ? "Local source switch results" : dryRun ? "Dry-run results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
         if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
@@ -80,7 +80,7 @@ public static class UpdateScreen
     {
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
-        sb.AppendLine(plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
+        sb.AppendLine(plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);
         Field("Installation ID", plan.Subject.InstallationId);
@@ -91,6 +91,15 @@ public static class UpdateScreen
         Field("Candidate", plan.CandidatePath);
         Field("Disposition", plan.LocalImport is not null ? plan.LocalImport.Disposition : plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
         Field("Review fingerprint", plan.ReviewFingerprint);
+        if (plan.LocalSourceSwitch is { } change)
+        {
+            Field("Previous recorded source", change.PreviousRecordedPath);
+            Field("Previous source placement", change.PreviousPlacement.CanonicalPath);
+            Field("Placement coverage", change.PreviousPlacement.MissingSuffix.IsEmpty ? "existing ordinary directory; placement only" : "first missing boundary proven; remaining suffix unreachable; placement only");
+            Field("Captured C recorded source", change.CapturedSourceRecordedPath ?? "absent");
+            Field("Future update policy", change.FutureUpdatePolicy);
+            sb.AppendLine("Old source placement is not a captured base or old-content freshness requirement. The selected source may be a copied local installation; no ancestry or independent physical fork is inferred. Git-managed sources remain unsupported.");
+        }
         if (plan.LocalImport is { } import)
         {
             Field("Recorded local source", import.SourcePath);

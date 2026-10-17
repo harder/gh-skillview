@@ -104,6 +104,7 @@ public static class InstalledScreen
         if (s.FrontMatter.LocalPath is { } localPath)
         {
             AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
+            AppendDetailItem(sb, "Local source switch", "Press **T** to review replacement from a different existing durable ordinary local source. Old-source history is not inferred; all consumers retain exact original rollback.");
             AppendDetailItem(sb, "Local reimport", "Press **R** to review replacement from this same recorded local source, retaining the exact installed original. All consumers are affected; recovery uses frozen evidence after the first retain.");
         }
         AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));

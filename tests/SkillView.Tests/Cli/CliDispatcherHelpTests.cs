@@ -29,6 +29,9 @@ public class CliDispatcherHelpTests
         Assert.Contains("| `restore-plan` |", stdout);
         Assert.Contains("| `unpin-plan` |", stdout);
         Assert.Contains("| `reimport-plan` |", stdout);
+        Assert.Contains("| `source-switch-plan` |", stdout);
+        Assert.Contains("--new-source <absolute directory>", stdout);
+        Assert.Contains("--disposition replace-local-source-retain-original", stdout);
         Assert.Contains("--disposition replace-local-retain-original", stdout);
         Assert.Contains("--disposition unpin-only", stdout);
         Assert.Contains("| `restore-inspect` |", stdout);
@@ -61,6 +64,11 @@ public class CliDispatcherHelpTests
     [InlineData("update-recover", 600)]
     [InlineData("update-undo", 600)]
     [InlineData("update-repair-owner", 600)]
+    [InlineData("source-switch-plan", 600)]
+    [InlineData("source-switch-inspect", 600)]
+    [InlineData("source-switch-apply", 600)]
+    [InlineData("source-switch-recover", 600)]
+    [InlineData("source-switch-undo", 600)]
     [InlineData("reimport-plan", 600)]
     [InlineData("reimport-inspect", 600)]
     [InlineData("reimport-apply", 600)]

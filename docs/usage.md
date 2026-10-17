@@ -514,3 +514,33 @@ root permissions or manager registries.
 
 For local changes on a tracked GitHub installation, see [recorded restoration](recorded-restoration.md) for saved plans, retained originals and verified undo.
 For a reviewed newer revision, see [saved updates](saved-updates.md).
+
+### Switch an ownerless local source
+
+For an ownerless local copy, Installed **T** reviews replacement from a different
+existing durable ordinary local directory. **R** still reimports the same recorded
+source; **K** checks the package offline. The CLI flow is:
+
+```sh
+skillview --scan-root /path/to/skills source-switch-plan --path /path/to/skills/demo --new-source /durable/new/demo --json
+skillview source-switch-inspect --id <saved-id> --json
+skillview source-switch-apply --id <saved-id> --yes --disposition replace-local-source-retain-original --expect <plan-fingerprint>
+```
+
+Review the changed paths and every consumer before approval. This is an explicit
+baseline-less replacement, including installed-only extras/deletions; it creates
+new active native objects and retains the exact original for undo. It does not
+infer a merge base or fork ancestry. Git-managed sources, mixed/pinned tracking,
+owner transitions, source/payload links and nested skills currently refuse.
+A copied local source may contain old absolute local-path metadata; only that
+tracking scalar is rebound to the selected durable source in the candidate.
+
+Use `source-switch-recover` or `source-switch-undo` with `--id`, `--yes` and the
+fresh inspection fingerprint in `--expect`. Before the first retain, selected
+source freshness is required. After that move, recovery/undo use frozen evidence
+even if both external sources disappear; undo restores the previous tracking.
+A missing old source is allowed only after native placement exclusion is proven;
+unknown/inaccessible or overlapping placement refuses before private staging.
+Linux placement also refuses mount/bind transitions, including otherwise legitimate
+sources on another mounted filesystem.
+See [the detailed contract](../agent_docs/maintenance-local-source-switch.md).
