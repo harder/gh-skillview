@@ -90,8 +90,10 @@ frozen content diffs, bounded declaration deltas and explicit acknowledgement to
 new product plans. The explicit repository authoring `gh skill publish --dry-run`
 workflow is documented in [authoring validation](maintenance-authoring-validation.md);
 its gh command result is separate from installed-package static evidence.
-The [original M19 clauses](maintenance-audit.json) still require explicit isolated
-representative-prompt evaluations and final combined verification. Never use `publish --fix`
+The [explicit offline evaluation workflow](maintenance-isolated-evaluation.md)
+requires a reviewed environment and prompts plus separate execution consent.
+Its real container/runtime proof and final combined verification remain pending;
+the [original M19 acceptance](maintenance-audit.json) is still incomplete. Never use `publish --fix`
 to repair installed updates or silently edit authored instructions.
 
 The dialog uses `ModalOperationTracker` ownership through queued completion.

@@ -9,6 +9,32 @@ namespace SkillView.Tests.Subprocess;
 public sealed class ProcessRunnerTests
 {
     [Fact]
+    public async Task RunAsync_IsolatedContextDoesNotInheritParentOrConfiguredCredentials()
+    {
+        Assert.SkipUnless(OperatingSystem.IsLinux(), "The fixed /usr/bin/env fixture requires Linux.");
+        using var temporary = new PrivateProcessDirectory();
+        var runner = new ProcessRunner(new Logger(), environment: new Dictionary<string, string> { ["GH_TOKEN"] = "must-not-inherit", ["GIT_DIR"] = "/must-not-inherit" });
+        var parentHome = System.Environment.GetEnvironmentVariable("HOME");
+        var isolated = runner.WithIsolatedContext(temporary.Path, new Dictionary<string, string>
+        { ["HOME"] = temporary.Path, ["XDG_STATE_HOME"] = temporary.Path, ["TMPDIR"] = "/var/tmp" });
+        Assert.Null(isolated.GetEffectiveEnvironmentVariable("GH_TOKEN"));
+        Assert.Null(isolated.WithCaptureLimit(1024).GetEffectiveEnvironmentVariable("GH_TOKEN"));
+        Assert.Null(isolated.WithContext(temporary.Path, new Dictionary<string, string>()).GetEffectiveEnvironmentVariable("GH_TOKEN"));
+        var result = await isolated.RunAsync("/usr/bin/env", [], cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(result.Succeeded, result.StdErr);
+        Assert.Equal(new[] { "HOME=" + temporary.Path, "TMPDIR=/var/tmp", "XDG_STATE_HOME=" + temporary.Path },
+            result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
+        Assert.Equal(parentHome, System.Environment.GetEnvironmentVariable("HOME"));
+    }
+
+    private sealed class PrivateProcessDirectory : IDisposable
+    {
+        private readonly DirectoryInfo directory = Directory.CreateTempSubdirectory("skillview-process-context-");
+        internal string Path => directory.FullName;
+        public void Dispose() => directory.Delete();
+    }
+
+    [Fact]
     public async Task RunAsync_EnvironmentOverridesAreChildOnly()
     {
         const string name = "SKILLVIEW_STAGE_TEST";

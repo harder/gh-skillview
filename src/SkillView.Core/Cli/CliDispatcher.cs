@@ -43,6 +43,7 @@ public static partial class CliDispatcher
                 "effective" => await EffectiveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "check" => await CheckAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "authoring-validate" => await AuthoringAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "evaluate-review" or "evaluate-run" => await EvaluateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -80,6 +81,8 @@ public static partial class CliDispatcher
 
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
+        "evaluate-review" => TimeSpan.FromMinutes(2),
+        "evaluate-run" => TimeSpan.FromMinutes(10),
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
         "list" or "effective" or "check" or "authoring-validate" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
@@ -2300,6 +2303,8 @@ public static partial class CliDispatcher
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `effective` | Explain conditional loading policy for an exact agent/profile/project. Native inventory and active-session state stay separate. | `--agent`, `--profile`, `--project`, `--cwd`, `--config-dir`, `--client-version`, `--agent-name`, `--trust`, `--json` |
             | `authoring-validate` | Explicitly run gh publish dry-run on a selected source repository; may contact GitHub and write cache state. | `--repository PATH`, `--dry-run`, `--json` |
+            | `evaluate-review` | Freeze a package, explicit offline Docker environment and representative prompts without launching Docker. | `--path`, `--config`, `--json` |
+            | `evaluate-run` | Explicitly run the reviewed offline evaluation. Requires a local Linux Docker daemon and already-local digest-pinned image. | `--path`, `--config`, `--review`, `--consent-run`, `--json` |
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |

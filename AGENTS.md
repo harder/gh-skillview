@@ -6,6 +6,12 @@
   discovery from exit zero. Preserve authored bytes and report changes, never
   invoke `--fix`. See `agent_docs/maintenance-authoring-validation.md`.
 
+- Isolated evaluation is explicit `evaluate-review` then `evaluate-run` with an
+  exact fingerprint and `--consent-run`. Routine inspection/updates never execute
+  evaluators. Require the local digest-pinned offline Docker contract; no pulls,
+  host credentials/config or weaker fallback. Fake process tests prove protocol,
+  not actual isolation or agent quality. See `agent_docs/maintenance-isolated-evaluation.md`.
+
 - `gh skill list` uses `sourceURL` for both repository URLs and local paths.
   Classify native absolute paths before URI parsing and preserve the exact
   scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.

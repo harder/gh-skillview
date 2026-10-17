@@ -57,6 +57,15 @@ public sealed class ProcessRunner
         return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
     }
 
+    /// An explicit allowlist context uses the same frozen-environment mechanism
+    /// as WithContext, but deliberately inherits no ambient/configured values.
+    internal ProcessRunner WithIsolatedContext(string workingDirectory, IReadOnlyDictionary<string, string> environment)
+    {
+        var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var pair in environment) values[pair.Key] = pair.Value;
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+    }
+
     internal ProcessRunner WithCaptureLimit(int remainingCharacters) =>
         new(_logger, Math.Min(_maxCapturedCharsPerStream, Math.Max(1, remainingCharacters)), _terminationWait, _environment, _defaultWorkingDirectory)
         { ReplaceEnvironment = ReplaceEnvironment };
