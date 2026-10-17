@@ -1,13 +1,13 @@
 # Frozen source review for saved updates (partial M19)
 
 Product saved-plan factories opt into optional `sourceReview` contract version 1
-on schema 1/2/3/5. The enclosing plan schema and all absent-field hash domains
+on schema 1/2/3/5/6. The enclosing plan schema and all absent-field hash domains
 remain unchanged. `SourceReview` is omitted when absent. The current reader
-accepts existing schema 1–5 plans with their original evidence and admission: legacy plans remain
+accepts existing schema 1–6 plans with their original evidence and admission: legacy plans remain
 unreviewed, cannot mint a source receipt without archives, and may still use their
 original explicit retention/recovery contract. Low-level legacy/native producers
-remain available for those compatibility proofs. Every current CLI/TUI product
-factory opts in; this internal producer choice is not a public guard bypass.
+remain available for those compatibility proofs. Every current source-changing
+CLI/TUI product factory opts in; this internal producer choice is not a public guard bypass.
 A persisted contract is enforced regardless of the store instance opening it.
 Older binaries reject this added field under their strict unknown-field policy;
 new contracts must not be routed through an older binary.
@@ -50,14 +50,14 @@ that captured path was absent from complete earlier supported observations.
 With partial earlier coverage, the label is `newly-observed` and introduction is
 unproven. Arbitrary commands, dynamic endpoints and unmodeled grammars stay unknown.
 
-`update-inspect`, `reimport-inspect` and `restore-inspect` expose frozen evidence.
+`update-inspect`, `reimport-inspect`, `source-switch-inspect` and `restore-inspect` expose frozen evidence.
 After reviewing it, explicitly declare review with the matching command:
 
 ```text
 skillview update-ack-source --id ID --expect PLAN_FINGERPRINT --review SOURCE_REVIEW_FINGERPRINT --yes
 ```
 
-Use `reimport-ack-source` or `restore-ack-source` for those purposes. Keep the same
+Use `reimport-ack-source`, `source-switch-ack-source` or `restore-ack-source` for those purposes. Keep the same
 HOME/state/CWD and scan/workspace/profile options. The immutable receipt binds ID,
 plan/report fingerprints, both raw archive manifests, payloads and context. The
 acknowledgement verifies all raw archive bytes before publication. Repeating a
@@ -94,15 +94,27 @@ Native proof scripts explicitly display the frozen report and call the receipt
 command before their existing applies/process-kill boundaries. These are declared
 fixture reviews that test mechanics; they are not human review or safety evidence.
 The legacy-owner proof deliberately retains its actual old producer and checks.
-No native, remote, AI client, interpreter or payload execution is part of this
-implementation phase. Authored bytes change only through the existing explicitly
+Authored bytes change only through the existing explicitly
 reviewed merge/resolution workflow; no silent fixes are added.
 
-Future integration of the unpublished Source6/detach branches must inspect their
-actual plan contracts and factories, opt source-changing product producers into
-frozen review, and retain legacy absent-field/hash compatibility. No absent branch
-types or policy are guessed here.
+The integrated source-switch factory opts schema6 into frozen review. Its native
+compatibility harness must also build an actual pre-review schema6 producer from
+the verified final PR70 merge. `SOURCE_SWITCH_BASELINE` stays empty until that
+merge is known, so this private draft cannot publish a compatibility pass. With
+that binding, `prove-old-native-reimport.py --legacy-schema 6` creates a genuine
+old plan, preserves its bytes and archives, checks omitted `sourceReview`, kills
+the current native apply after retain/install, removes both external sources,
+then verifies recovery and exact native undo without inventing an acknowledgement.
+Both product hosts run it; Linux uses the existing privileged private-root
+container for positive metadata publication. Schema5 remains a separate producer
+and proof. Synthetic plans and schema1–5 results cannot replace this boundary.
+The container wrapper requires both schema6 producer arguments, a frozen
+distinct source commit, and a schema6 result proving source-free recovery; it
+cannot report a successful aggregate run after silently omitting that producer.
+Detach integration remains separate and must preserve its actual contracts.
 
-Original acceptance remains 9/21. M19 is incomplete: real opt-in isolated
-representative-prompt evaluation and authoring `gh skill publish --dry-run` remain
-later phases, together with pending official App/native/full/final-base gates.
+Original acceptance remains 9/21. M19 is incomplete. Opt-in isolated evaluation
+and authoring `gh skill publish --dry-run` have private implementations and proof
+harnesses; their actual native execution, schema6 compatibility and final-base
+App/full verification remain pending. These maintenance fixtures never execute
+payload scripts or establish behavioral safety or model quality.
