@@ -132,9 +132,13 @@ internal sealed partial class WindowsSecureRemovalBackend
         }
         internal override SecureFileIdentity ResolveRawTarget(ReadOnlySpan<byte> raw, CancellationToken token)
         {
-            CheckAddress(token); var before = ReadIdentity(parent); var parsed = ParseExposureTarget(raw);
+            CheckAddress(token); var before = ReadIdentity(parent); var address = ReadFinalPath(parent);
+            var parsed = ParseExposureTarget(raw);
             using var target = OpenExposureRawTarget(parent, parsed.Path, parsed.Relative, token);
-            return TargetIdentity(target, before, token);
+            var result = TargetIdentity(target, before, token);
+            if (!PathIdentity.Equals(address, ReadFinalPath(parent)))
+                throw new IOException("Original exposure parent moved during raw target resolution.");
+            return result;
         }
         private SecureFileIdentity TargetIdentity(SafeFileHandle target, NativeIdentity parentBefore, CancellationToken token)
         {
@@ -208,6 +212,29 @@ internal sealed partial class WindowsSecureRemovalBackend
         // This intentionally resolves the captured raw path from the original
         // held parent. It is read-only and its resulting full identity/address
         // must match the separately held target, before any rename is admitted.
+        if (path.Split('\\', '/').Any(component => component is "." or ".."))
+        {
+            // Windows expands dot components in a symbolic link's substituted
+            // path. NtOpenFile does not perform that DOS-path normalization.
+            // This is only a READ-ONLY candidate witness, never rename/delete
+            // authority: its opened full native identity/generation/address
+            // still must equal the separately held target. Keep no-dot NT
+            // paths (including their intermediate reparse behavior) unchanged.
+            token.ThrowIfCancellationRequested();
+            var originalAddress = ReadFinalPath(originalParent);
+            if (!IsExposureLocalDrivePath(originalAddress))
+                throw new IOException("Dot-containing raw target requires a held local-drive original parent.");
+            string normalized;
+            try { normalized = Path.GetFullPath(relative ? path : path[4..], originalAddress); }
+            catch (Exception error) when (error is ArgumentException or NotSupportedException)
+            { throw new IOException("Raw exposure target normalization is unavailable.", error); }
+            if (!IsExposureLocalDrivePath(normalized))
+                throw new IOException("Normalized raw exposure target is not a supported local-drive address.");
+            path = "\\??\\" + normalized;
+            relative = false;
+        }
+        if (path.Length > (ushort.MaxValue - sizeof(char)) / sizeof(char))
+            throw new IOException("Raw exposure target exceeds the bounded native path length.");
         IntPtr text = IntPtr.Zero, unicodeAddress = IntPtr.Zero, raw = IntPtr.Zero;
         try
         {
@@ -229,4 +256,7 @@ internal sealed partial class WindowsSecureRemovalBackend
             if (text != IntPtr.Zero) Marshal.FreeHGlobal(text);
         }
     }
+    private static bool IsExposureLocalDrivePath(string path) => path.Length >= 3
+        && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\';
+
 }

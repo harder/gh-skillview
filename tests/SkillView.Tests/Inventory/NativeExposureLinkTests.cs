@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using SkillView.Inventory;
 using SkillView.Maintenance;
 using Xunit;
@@ -68,6 +69,122 @@ public sealed class NativeExposureLinkTests : IDisposable
         Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
         Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
         Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Link, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData("leading-parent")]
+    [InlineData("leading-dot")]
+    [InlineData("inner-dot")]
+    [InlineData("inner-parent")]
+    [InlineData("missing-before-parent")]
+    [InlineData("junction-before-parent")]
+    [InlineData("absolute-dot")]
+    [InlineData("absolute-parent")]
+    [InlineData("relative-junction-no-dot")]
+    [InlineData("absolute-junction-no-dot")]
+    public void WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(string spelling)
+    {
+        if (!OperatingSystem.IsWindows())
+        { Assert.Skip("Windows native raw-target/follow parity requires actual Windows execution."); return; }
+        using var fixture = Create(false);
+        Directory.Delete(fixture.Link);
+        Directory.CreateDirectory(Path.Combine(fixture.TargetRoot, "unused"));
+        var alias = Path.Combine(fixture.ExposureRoot, "alias");
+        if (spelling.Contains("junction", StringComparison.Ordinal))
+        {
+            var destination = spelling == "junction-before-parent"
+                ? Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(fixture.TargetRoot)!, "away", "deep")).FullName
+                : fixture.TargetRoot;
+            CreateWindowsJunction(alias, destination);
+        }
+        var rawTarget = spelling switch
+        {
+            "leading-parent" => @"..\targets\payload",
+            "leading-dot" => @".\..\targets\payload",
+            "inner-dot" => @"..\targets\.\payload",
+            "inner-parent" => @"..\targets\unused\..\payload",
+            // Windows link substitution normalizes these components before
+            // opening the final path. Do not require an erased name to exist
+            // or follow an erased junction into a different lexical parent.
+            "missing-before-parent" => @"missing\..\..\targets\payload",
+            "junction-before-parent" => @"alias\..\..\targets\payload",
+            "absolute-dot" => Path.Combine(fixture.TargetRoot, ".", "payload"),
+            "absolute-parent" => Path.Combine(fixture.TargetRoot, "unused", "..", "payload"),
+            "relative-junction-no-dot" => @"alias\payload",
+            "absolute-junction-no-dot" => Path.Combine(alias, "payload"),
+            _ => throw new InvalidOperationException()
+        };
+        Directory.CreateSymbolicLink(fixture.Link, rawTarget);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var targetBefore = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        // The actual OS-followed entry is the oracle, never a synthetic target
+        // identity or only an assertion about Path.GetFullPath output.
+        var followed = directory.ResolveLink("demo", Token);
+        Assert.Equal(target.TargetIdentity, followed);
+        Assert.Equal(followed, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+        RequirePositiveProofMetadata(lease);
+        if (!lease.Original.Metadata.Supported)
+        { Assert.Skip("Windows raw parity ran, but full native link metadata is unavailable for retain/restore."); return; }
+        var retained = lease.Retain(fixture.Slot, Token); fixture.State.FlushPublication(Token);
+        Assert.False(PathResolver.IsSymlink(fixture.Link));
+        Assert.Throws<IOException>(() => directory.ResolveLink("demo", Token));
+        // E is absent now: raw bytes are resolved from its ORIGINAL parent,
+        // matching the OS-followed pre-retain identity and still-held T.
+        Assert.Equal(followed, directory.ResolveRawTarget(retained.RawTarget.AsSpan(), Token));
+        lease.Revalidate(Token);
+        var restored = lease.Restore(Token); fixture.State.FlushPublication(Token);
+        Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Identity));
+        Assert.True(original.RawTarget.AsSpan().SequenceEqual(restored.RawTarget.AsSpan()));
+        Assert.Equal(original.MetadataFingerprint, restored.MetadataFingerprint);
+        Assert.Equal(followed, directory.ResolveLink("demo", Token));
+        Assert.Equal(followed, directory.ResolveRawTarget(restored.RawTarget.AsSpan(), Token));
+        Assert.Equal(targetBefore.Fingerprint, target.Capture(Token).Fingerprint);
+        Assert.Equal(targetBefore.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+    }
+
+    [Fact]
+    public void WindowsRawCandidateCannotUseTheNameOfARenamedOriginalParent()
+    {
+        if (!OperatingSystem.IsWindows())
+        { Assert.Skip("Windows held-parent raw-target regression requires actual Windows execution."); return; }
+        using var fixture = Create(true);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        Assert.Equal(target.TargetIdentity, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Directory.Move(fixture.ExposureRoot, fixture.ExposureRoot + "-moved");
+        Directory.CreateDirectory(fixture.ExposureRoot);
+        Directory.CreateSymbolicLink(fixture.Link, fixture.Payload);
+        Assert.Throws<IOException>(() => directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Assert.True(PathResolver.IsSymlink(fixture.Link));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    private static void CreateWindowsJunction(string link, string target)
+    {
+        // Same private mklink fixture convention as RemoveServiceTests, with
+        // the system cmd and AutoRun disabled. Never interpolate shell input.
+        foreach (var path in new[] { link, target })
+            Assert.DoesNotContain(path, character => character is '&' or '|' or '<' or '>' or '%' or '!' or '"' or '\r' or '\n');
+        var start = new ProcessStartInfo(Path.Combine(System.Environment.SystemDirectory, "cmd.exe"))
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Path.GetDirectoryName(link)! };
+        foreach (var argument in new[] { "/d", "/c", "mklink", "/J", link, target }) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start);
+        Assert.NotNull(process);
+        var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(10000))
+        {
+            process.Kill(entireProcessTree: true); process.WaitForExit(10000);
+            Assert.Fail("Private junction fixture did not quiesce within its bound.");
+        }
+        Assert.Equal(0, process.ExitCode);
+        Assert.True(Task.WaitAll([stdout, stderr], 10000), "Private junction fixture streams did not drain.");
+        Assert.True(PathResolver.IsSymlink(link));
     }
 
     [Fact]

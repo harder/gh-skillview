@@ -733,6 +733,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   including canceled moves. Report actual position/uncertainty and loss of live
   continuity after cleanup; retained expiry never automatically restores.
   Never use that narrower evidence to admit clone/archive/materialization.
+  Windows dot-containing raw targets use explicit-base normalization only for
+  a read-only candidate witness from the original held parent. Require the
+  opened full native target identity/generation/address and bracket that parent;
+  never substitute this path for held-relative rename/delete authority.
 - Standalone quarantine/undo uses a same-volume native exclusive directory rename,
   prepared/completion journals, and held root/parent/object evidence. Keep it limited
   to explicitly reviewed standalone custom-directory copies; never add archive

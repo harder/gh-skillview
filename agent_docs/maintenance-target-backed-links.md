@@ -40,11 +40,25 @@ Relative retained links are intentionally not followed at their private
 address. Restoration resolves captured raw bytes against the ORIGINAL held
 parent and compares the resulting directory's full native evidence with the
 still-held target. Windows accepts only the existing supported symbolic-link
-tag and bounded valid relative/local-drive substitute paths; junctions, mount
-points, UNC/device targets and unknown reparse tags refuse. Invalid Unix target
+tag and bounded valid relative/local-drive substitute paths; selected junctions,
+mount points, UNC/device targets and unknown reparse tags refuse. Invalid Unix target
 encoding, broken/non-directory targets and volume changes refuse.
 The raw target's final component must itself be an ordinary directory; a link
 to another link is refused even if both currently resolve to the held payload.
+
+Windows raw targets containing `.` or `..` use bounded
+[`Path.GetFullPath(path, basePath)` normalization](https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats#path-normalization)
+against the original held parent's fresh native address. This implements
+[Windows link-substitution dot semantics](https://learn.microsoft.com/en-us/windows/win32/fileio/creating-symbolic-links)
+for a read-only candidate open. Its actual opened canonical address and full
+native identity/generation must match the separately held target, with full
+original-parent identity/address checks before and after. The path is never
+rename/delete authority. No-dot NT opens retain their existing intermediate
+reparse behavior; final reparse, volume and metadata guards remain unchanged.
+Actual Windows tests compare native followed links and raw witnesses across
+leading/nonleading dots, erased missing components and junctions, and retention
+while the original entry is absent. Local Linux runs cannot establish this
+Windows parity.
 
 Only the link is renamed; the target payload is never written. Original and
 post-rename identities remain distinct: creation identity/native ID must remain

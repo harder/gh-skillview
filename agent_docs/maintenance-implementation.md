@@ -1582,3 +1582,11 @@ and detach merged-base integrations remain separate. See
 [evidence](evidence/maintenance-link-retention-merged-pr68-local.json). Original
 acceptance remains **9/21**, all criteria retained; M08/M13/M15 remain incomplete
 and the original Mac crash remains unreproduced. No commit or push is claimed.
+
+## PR69 Windows raw-target fix: local checkpoint
+
+PR69 head `9824c2a1a513c8192d56f44008587ff288c3ed90` exposed a Windows-only raw relative-target failure: `NtOpenFile` rejected `..\targets\payload` with invalid-name syntax in the Windows metadata and full test jobs. The Windows x64 and ARM64 metadata jobs each had 9 failures; the x64 full test had 11 failures and 10 opt-in skips. Linux and macOS full tests, CodeQL, and both contract-test lanes passed on that old head. Root canceled its four unfinished AOT jobs after confirming the repeated failure. The old-head evidence remains intact in the linked local checkpoint; none is a passing full CI/native result.
+
+A local fix conditionally normalizes only raw Windows targets containing explicit dot/dotdot components against the held parent’s handle-derived address. It retains the existing no-dot native-open path and held-target identity, generation, address, and rename checks. On the frozen four-file snapshot, focused Linux validation passed 29 tests with 11 Windows-only cases skipped, two JIT builds and both scoped format verifies passed, and an independent static review was clear. The 11 skipped cases are not Windows runtime evidence. Fresh Windows parity, full tests, all four native AOT gates, and final-head artifacts remain required.
+
+See [the local raw-target fix checkpoint](evidence/maintenance-batch-19-windows-raw-target-fix-local.json). Original acceptance remains **9/21**; M08 is incomplete.
