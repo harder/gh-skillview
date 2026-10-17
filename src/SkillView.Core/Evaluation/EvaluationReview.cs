@@ -102,7 +102,10 @@ internal sealed class EvaluationReview
         var executable = Text(root, "dockerExecutable", 4096); var endpoint = Text(root, "dockerEndpoint", 4096);
         var image = Text(root, "image", 512); var imageId = Text(root, "imageId", 71);
         var entrypoint = Text(root, "entrypoint", 4096);
-        if (!executable.StartsWith('/') || !Path.IsPathFullyQualified(executable)) throw new ArgumentException("dockerExecutable must be an explicit absolute Linux path.");
+        // This declaration describes the Linux runner even during read-only
+        // review on another host. Windows Path APIs give '/' a different meaning;
+        // Linux absolute path grammar requires that leading slash, not a drive.
+        if (!executable.StartsWith('/')) throw new ArgumentException("dockerExecutable must be an explicit absolute Linux path.");
         if (!endpoint.StartsWith("unix:///", StringComparison.Ordinal) || endpoint.IndexOfAny(['?', '#']) >= 0
             || endpoint[7..].Split('/').Any(part => part is "." or ".."))
             throw new ArgumentException("dockerEndpoint must be an explicit local absolute unix:/// socket, without query or traversal.");

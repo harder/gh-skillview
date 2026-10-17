@@ -102,7 +102,11 @@ options change. A declared review supplies no authenticity or safety assurance.
 The native proof includes a fresh ready plan recovered through the real workflow
 coordinator with its source-review declaration, followed by exact native undo.
 That proof is pending until its final native hosts execute. Compatibility with
-pre-review schema6 plans additionally needs an actual final PR70 native producer;
+pre-review schema6 plans uses actual PR70 merge
+`5822f81077a8675724012670c6acd4c4c6abc0c9` (tree
+`cfcb6cfe819ef2d7cc302cd1b6006f4cbb8e90b1`) as its frozen native producer.
+The next native run must create its plan with that producer and exercise the
+new consumer through source disappearance, restart recovery and exact undo;
 source inspection and schemas1–5 restart proofs do not substitute for it.
 
 Frozen schema5 compatibility evidence retains the complete bounded `gh --version`

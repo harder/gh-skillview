@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
@@ -42,7 +43,7 @@ public sealed class SourceUpdateReviewTests : IDisposable
         ScanRoot[] roots = [new(Skills, Scope.Custom, null)];
         return InventorySnapshot.Empty with { Skills = new LocalSkillScanner(new Logger()).Scan(roots).ToImmutableArray(), ScannedRoots = [.. roots], ConfiguredRoots = [.. roots] };
     }
-    private async Task<ReplacementResult> Plan()
+    private async Task<ReplacementResult> Plan(bool candidateHasLink = false)
     {
         var inventory = Inventory();
         return await Store(true).PlanAsync(Assert.Single(inventory.Skills), inventory, (destination, _) =>
@@ -51,9 +52,93 @@ public sealed class SourceUpdateReviewTests : IDisposable
             Directory.CreateDirectory(Path.Combine(destination.CanonicalPath, "scripts"));
             File.WriteAllText(Path.Combine(destination.CanonicalPath, "scripts", "never-run.sh"), "#!/bin/sh\nexit 99\n");
             File.WriteAllText(Path.Combine(destination.CanonicalPath, "package.json"), "{\"dependencies\":{\"fixture\":\"2\"}}");
+            if (candidateHasLink)
+            {
+                File.WriteAllBytes(Path.Combine(destination.CanonicalPath, "candidate-extra"), [5, 6, 7]);
+                File.CreateSymbolicLink(Path.Combine(destination.CanonicalPath, "user-link"), "candidate-extra");
+            }
             return Task.CompletedTask;
         }, Token);
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeLinkReviewRetainsFullArchiveModesAndHistoricalPlanEvidence(bool candidateHasLink)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix link-mode hash domain; Windows link metadata has a separate contract."); return; }
+        Assert.SkipUnless(SecureRemovalBackend.IsSupported, SecureRemovalBackend.UnsupportedReason ?? "Native directory capture is unavailable.");
+        File.WriteAllBytes(Path.Combine(Payload, "user-extra"), [0, 255, 42]);
+        File.SetUnixFileMode(Path.Combine(Payload, "user-extra"), (UnixFileMode)320);
+        File.CreateSymbolicLink(Path.Combine(Payload, "user-link"), "user-extra");
+        var original = PayloadSnapshot.CaptureEvidence(Payload, Token);
+        Assert.Null(original.Entries.Single(entry => entry.Path == "user-link").UnixMode);
+        var plan = await Plan(candidateHasLink);
+        var savedBytes = File.ReadAllBytes(plan.PlanPath);
+        var saved = JsonSerializer.Deserialize(savedBytes, ReplacementJsonContext.Default.ReplacementPlan)!;
+        Assert.Equal(original.Fingerprint, saved.Original.Payload);
+        Assert.Null(saved.Original.Entries.Single(entry => entry.Path == "user-link").UnixMode);
+        var review = Assert.IsType<SourceReviewEvidence>(plan.SourceReview);
+        var directory = Path.GetDirectoryName(plan.PlanPath)!;
+        using (var beforeState = NativeStateDirectory.OpenOrCreate(Path.Combine(directory, review.InstalledArchive), [], Token, allowCreate: false))
+        using (var afterState = NativeStateDirectory.OpenOrCreate(Path.Combine(directory, review.CandidateArchive), [], Token, allowCreate: false))
+        {
+            var before = CapturedPayloadArchive.Load(beforeState, review.InstalledManifest, Token);
+            var after = CapturedPayloadArchive.Load(afterState, review.CandidateManifest, Token);
+            var link = before.Archive.Entries.Single(item => item.Entry.Path == "user-link");
+            Assert.NotNull(link.Entry.UnixMode);
+            Assert.NotEqual(saved.Original.Payload, before.Archive.Snapshot.Fingerprint);
+            Assert.Equal(review.InstalledManifest, before.Fingerprint);
+            Assert.Equal(link.Entry, review.Report.Files.Single(file => file.Path == "user-link").Before);
+            using var raw = new MemoryStream(); before.Archive.CopyEntry(beforeState, "user-link", raw, Token);
+            Assert.Equal(Encoding.UTF8.GetBytes("user-extra"), raw.ToArray());
+            if (candidateHasLink)
+            {
+                var candidateLink = after.Archive.Entries.Single(item => item.Entry.Path == "user-link");
+                Assert.NotNull(candidateLink.Entry.UnixMode);
+                Assert.NotEqual(saved.Candidate.Payload, after.Archive.Snapshot.Fingerprint);
+                Assert.Equal("candidate-extra", candidateLink.Entry.LinkTarget);
+            }
+        }
+        using (var candidate = NativeDirectoryMoveLease.Open(directory, plan.CandidatePath, Token))
+            Assert.Equal(saved.Candidate.Payload, candidate.Capture(Token).Fingerprint);
+        var ready = Store().Inspect(plan.Id, Inventory(), Token);
+        Assert.False(ready.SourceReviewAcknowledged);
+        Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
+        Store().AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, review.Fingerprint, Inventory(), Token);
+        Assert.True(Store().Inspect(plan.Id, Inventory(), Token).SourceReviewAcknowledged);
+        var applied = Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        Assert.True(applied.Succeeded, applied.Message);
+        var installed = Store().Inspect(plan.Id, Inventory(), Token);
+        var undone = Store().Recover(plan.Id, installed.ReviewFingerprint, Inventory(), true, Token);
+        Assert.True(undone.Succeeded, undone.Message);
+        var restored = PayloadSnapshot.CaptureEvidence(Payload, Token);
+        Assert.Equal(original.Fingerprint, restored.Fingerprint);
+        Assert.True(NativeDirectoryMoveLease.SameObject(original.RootIdentity!.Value, restored.RootIdentity!.Value));
+        Assert.Equal("user-extra", new FileInfo(Path.Combine(Payload, "user-link")).LinkTarget);
+        Assert.Equal(savedBytes, File.ReadAllBytes(plan.PlanPath));
+    }
+
+    [Fact]
+    public async Task NativeLinkRawArchiveCorruptionStillCannotAcquireSourceReceipt()
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix link-mode hash domain; Windows link metadata has a separate contract."); return; }
+        Assert.SkipUnless(SecureRemovalBackend.IsSupported, SecureRemovalBackend.UnsupportedReason ?? "Native directory capture is unavailable.");
+        File.WriteAllBytes(Path.Combine(Payload, "user-extra"), [0, 255, 42]);
+        File.CreateSymbolicLink(Path.Combine(Payload, "user-link"), "user-extra");
+        var original = PayloadSnapshot.CaptureEvidence(Payload, Token);
+        var plan = await Plan(); var review = plan.SourceReview!;
+        var archive = Path.Combine(Path.GetDirectoryName(plan.PlanPath)!, review.InstalledArchive);
+        string blob;
+        using (var state = NativeStateDirectory.OpenOrCreate(archive, [], Token, allowCreate: false))
+            blob = CapturedPayloadArchive.Load(state, review.InstalledManifest, Token).Archive.Entries.Single(item => item.Entry.Path == "user-link").Blob!;
+        var raw = File.ReadAllBytes(Path.Combine(archive, blob)); raw[^1] ^= 1;
+        File.WriteAllBytes(Path.Combine(archive, blob), raw);
+        Assert.Throws<IOException>(() => Store().AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, review.Fingerprint, Inventory(), Token));
+        Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(plan.PlanPath)!, "source-review-" + plan.PlanFingerprint + ".json")));
+        Assert.False(Directory.Exists(plan.RetainedPath));
+        Assert.Equal(original.Fingerprint, PayloadSnapshot.CaptureEvidence(Payload, Token).Fingerprint);
+    }
+
     [Fact]
     public async Task PersistedContractGatesApplyAndNeverStartedRecoveryAcrossLegacyStoreInstances()
     {

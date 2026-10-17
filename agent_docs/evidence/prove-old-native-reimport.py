@@ -23,9 +23,10 @@ import time
 # Verified corrected PR68 merge (tree 9a58bbdb0a1786328dcb883e829ea5ea56e7cb10).
 # Build this exact source as the schema5 producer; never normalize old plan bytes.
 BASELINE = '4649d75fc3a4f9fdd7c22ca5593e629a1b559298'
-# Disabled until PR70's actual final merge is verified. Never substitute a
-# synthetic schema6 plan or a pre-M19 producer assembled from current sources.
-SOURCE_SWITCH_BASELINE = ''
+# Verified PR70 merge (tree cfcb6cfe819ef2d7cc302cd1b6006f4cbb8e90b1).
+# Build this actual pre-review schema6 producer; never synthesize old plan bytes
+# or assemble a historical producer from current source-review code.
+SOURCE_SWITCH_BASELINE = '5822f81077a8675724012670c6acd4c4c6abc0c9'
 _baseline = BASELINE
 _HELPERS = Path(__file__).with_name('prove-local-reimport.py')
 _output = None
