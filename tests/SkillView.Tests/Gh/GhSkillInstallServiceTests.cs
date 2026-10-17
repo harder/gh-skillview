@@ -53,20 +53,22 @@ public class GhSkillInstallServiceTests
         Assert.Contains("cursor", list);
     }
 
-    [Fact]
-    public void BuildArgs_ScopeAndPathPassthrough()
+    [Theory]
+    [InlineData("custom")]
+    [InlineData("project")]
+    [InlineData("user")]
+    public void BuildArgs_CustomDirectoryOverridesScope(string scope)
     {
         var args = GhSkillInstallService.BuildArgs(
             "o/r", null,
-            new GhSkillInstallService.Options(Scope: "custom", Path: "/tmp/skills"));
+            new GhSkillInstallService.Options(Scope: scope, Path: "/tmp/skills"));
         var list = args.ToList();
-        var scopeIdx = list.IndexOf("--scope");
         // A custom directory maps to gh's `--dir` (gh has no `--path`).
         var dirIdx = list.IndexOf("--dir");
-        Assert.True(scopeIdx >= 0);
-        Assert.Equal("custom", list[scopeIdx + 1]);
+        Assert.DoesNotContain("--scope", list);
         Assert.True(dirIdx >= 0);
         Assert.Equal("/tmp/skills", list[dirIdx + 1]);
+        Assert.True(dirIdx < list.IndexOf("--"));
         Assert.DoesNotContain("--path", list);
     }
 

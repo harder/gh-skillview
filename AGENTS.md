@@ -277,6 +277,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   even while supporting older `gh` releases.
   `--upstream` is a boolean flag (use a checkbox in the TUI); it does not
   accept a URL value, which would become an unintended positional argument.
+  A custom `--dir` overrides scope. Do not emit `--scope` when `Options.Path`
+  is set: SkillView's "custom" UI scope is not a valid gh scope value;
+  gh accepts only `project` and `user`.
   A version suffix belongs on a skill selector, never the repository name;
   use `--pin=<ref>` for an entire-repository ref, including discovery listing.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
