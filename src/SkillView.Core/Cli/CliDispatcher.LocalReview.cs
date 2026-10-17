@@ -50,7 +50,7 @@ public static partial class CliDispatcher
             var inventory = await services.InventoryService.CaptureAsync(gh,
                 new LocalInventoryService.Options(options.ScanRoots, hidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backup = MaintenanceBackupStore.ResolveRoot(services.Runner);
-            var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backup)!, "replacements"), services.Logger, runner: services.Runner);
+            var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backup)!, "replacements"), services.Logger, runner: services.Runner, sourceReviewRequired: true);
             if (command is "update-merge-plan" or "update-preserve")
             {
                 var plan = await Task.Run(() => command == "update-preserve" ? store.PreserveInstalled(id!, expected!, inventory, token)

@@ -1,6 +1,6 @@
-using System.IO;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Maintenance;
 using SkillView.Ui;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
@@ -12,11 +12,8 @@ using Terminal.Gui.Views;
 namespace SkillView.Ui.Tabs;
 
 /// Embedded tab 3 — the Changes workspace maintenance queue.
-/// Shows a prioritised list of pending work (Update · Cleanup · Diagnostics)
-/// and hands off to the appropriate specialist view when a row is activated.
-///
-/// Layout: full-width table over the whole pane; one compact status line at the
-/// bottom. No split detail pane — the row title is the summary.
+/// Shows issue + physical-installation observations with frozen detail and
+/// routes exact selected targets into the existing specialist workflows.
 internal sealed class ChangesTabView : FrameView
 {
     private const int KindColumnWidth = 11;
@@ -28,12 +25,18 @@ internal sealed class ChangesTabView : FrameView
     private readonly Action _onLeaveTab;
     private readonly Action? _onStateChange;
     private readonly CancellationToken _lifetimeToken;
+    private readonly Action<MaintenanceQueueEntry>? _onActivateEntry;
+    private readonly Action<Func<Task>, string>? _runTask;
+    private readonly Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? _activateEntryAsync;
+    private readonly ChangesSelectionGate _selectionRequests;
+    private long _selectionGeneration;
 
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _status;
     private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
+    private string _coverageDetail = string.Empty;
     private long _loadGeneration;
     private readonly CancellationOperationSlot _loadCancellations;
 
@@ -46,7 +49,10 @@ internal sealed class ChangesTabView : FrameView
         Action onLeaveTab,
         Action? onStateChange = null,
         CancellationToken lifetimeToken = default,
-        Action<AggregateException>? onCancellationCallbackException = null)
+        Action<AggregateException>? onCancellationCallbackException = null,
+        Action<MaintenanceQueueEntry>? onActivateEntry = null,
+        Action<Func<Task>, string>? runTask = null,
+        Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null)
     {
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -56,6 +62,10 @@ internal sealed class ChangesTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onStateChange = onStateChange;
         _lifetimeToken = lifetimeToken;
+        _onActivateEntry = onActivateEntry;
+        _runTask = runTask;
+        _activateEntryAsync = activateEntryAsync;
+        _selectionRequests = new ChangesSelectionGate(onCancellationCallbackException);
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
 
         BorderStyle = LineStyle.None;
@@ -115,6 +125,7 @@ internal sealed class ChangesTabView : FrameView
     /// Load the maintenance queue from the inventory snapshot.
     internal async Task LoadAsync()
     {
+        CancelSelectedRequest();
         var gen = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -124,26 +135,21 @@ internal sealed class ChangesTabView : FrameView
         try
         {
             var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
-            // Only queue items backed by real pending state.
-            // Update availability is unknown until the user runs a dry-run; Doctor
-            // is always accessible via 'd'. Neither belongs in the pending queue.
-            var cleanupItems = CleanupClassifier
-                            .Classify(snapshot, snapshot.ScannedRoots)
-                            .ToArray();
-            var cleanup = cleanupItems.Select(c => new ChangesQueueRow(
-                Kind: "Cleanup",
-                Title: $"{TuiHelpers.ShortKind(c.Kind)}  {Path.GetFileName(c.Path)}",
-                Detail: CleanupScreen.RenderDetail(c)));
-            var summary = DescribeWorkspaceSummary(snapshot, cleanupItems.Length > 0);
+            var queue = MaintenanceQueueBuilder.Build(snapshot, loadCancellation.Token);
+            var projection = ChangesQueueBuilder.Build(queue, loadCancellation.Token);
+            var summary = (queue.Partial ? "Partial inventory · " : "")
+                + "update availability and sessions unknown · r refresh disk inventory";
 
             await _runOnUi(() =>
             {
-                if (Interlocked.Read(ref _loadGeneration) != gen) return;
-                LoadRows(
-                [
-                    .. cleanup,
-                ],
-                summary);
+                if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
+                _coverageDetail = projection.CoverageDetail;
+                if (projection.OmittedRows > 0)
+                    summary += $" · {projection.OmittedRows} rows omitted by presentation limit; queue --json captures all observations";
+                LoadRows(projection.Rows, summary, loadCancellation.Token);
+                if (projection.Rows.Count == 0)
+                    _detail.Text = "## Maintenance observations\n\nNo matching physical installations or cleanup observations. Update availability and active sessions remain unknown.\n"
+                        + _coverageDetail;
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -154,7 +160,7 @@ internal sealed class ChangesTabView : FrameView
         {
             await _runOnUi(() =>
             {
-                if (Interlocked.Read(ref _loadGeneration) != gen) return;
+                if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
                 _status.Text = $" load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                 SetLoading(false);
             }).ConfigureAwait(false);
@@ -173,7 +179,8 @@ internal sealed class ChangesTabView : FrameView
 
     private void LoadRows(
         IReadOnlyList<ChangesQueueRow> rows,
-        string summary)
+        string summary,
+        CancellationToken renderToken = default)
     {
         _rows = rows;
         var source = new EnumerableTableSource<ChangesQueueRow>(
@@ -194,7 +201,7 @@ internal sealed class ChangesTabView : FrameView
         RecomputeColumnWidths();
         _table.Update();
         _status.Text = BuildStatusText(summary);
-        UpdateDetail();
+        UpdateDetail(renderToken);
 
         if (_rows.Count > 0)
         {
@@ -221,6 +228,28 @@ internal sealed class ChangesTabView : FrameView
     {
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _rows.Count) return;
+        if (_rows[row].Entry is { } entry)
+        {
+            if (_activateEntryAsync is not null && _runTask is not null)
+            {
+                var generation = Interlocked.Increment(ref _selectionGeneration);
+                _selectionRequests.Cancel();
+                _runTask(async () =>
+                {
+                    if (Interlocked.Read(ref _selectionGeneration) != generation || !Visible || _lifetimeToken.IsCancellationRequested) return;
+                    using var request = _selectionRequests.Begin(_lifetimeToken);
+                    if (request is null) return;
+                    try
+                    {
+                        if (request.IsCurrent) await _activateEntryAsync(entry, request).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+                }, "changes.selected-review");
+                return;
+            }
+            _onActivateEntry?.Invoke(entry);
+            return;
+        }
         var kind = _rows[row].Kind;
         switch (kind)
         {
@@ -230,12 +259,21 @@ internal sealed class ChangesTabView : FrameView
         }
     }
 
-    private void UpdateDetail()
+    private void UpdateDetail(CancellationToken token = default)
     {
-        var row = _table.GetSelectedRow();
-        _detail.Text = row >= 0 && row < _rows.Count
-            ? _rows[row].Detail ?? RenderDetail(_rows[row])
-            : "## Changes\n\n_No pending work._";
+        if (!token.CanBeCanceled) token = _lifetimeToken;
+        if (token.IsCancellationRequested) return;
+        try
+        {
+            var row = _table.GetSelectedRow();
+            var detail = row >= 0 && row < _rows.Count
+                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token)
+                    : _rows[row].Detail ?? RenderDetail(_rows[row])) + _coverageDetail
+                : "## Changes\n\n_No pending work._";
+            token.ThrowIfCancellationRequested();
+            _detail.Text = detail;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
 
     private static string RenderDetail(ChangesQueueRow row)
@@ -258,6 +296,7 @@ internal sealed class ChangesTabView : FrameView
             return $" {summary}";
         }
 
+        if (_rows.Any(row => row.Entry is not null)) return $" {summary} · {_rows.Count} observations";
         var label = DescribeQueueLabel();
         return label == "Changes"
             ? $" {summary} · {_rows.Count} items"
@@ -270,6 +309,7 @@ internal sealed class ChangesTabView : FrameView
         {
             return string.Empty;
         }
+        if (_rows.Any(row => row.Entry is not null)) return "Maintenance observations";
 
         var distinctKinds = _rows
             .Select(row => row.Kind)
@@ -320,30 +360,16 @@ internal sealed class ChangesTabView : FrameView
             key.Handled = true;
             ActivateSelectedRow();
         }
-    }
-
-    private static string DescribeWorkspaceSummary(InventorySnapshot snapshot, bool hasPendingCleanup)
-    {
-        // Only show health concerns if they translate to actionable queue rows.
-        // Health flags by themselves matter for the Installed detail pane but
-        // don't belong in Changes unless cleanup items are actually queued.
-        // This summary describes cleanup state only — update availability is
-        // unknown until dry-run and diagnostics are always accessible via 'd'.
-        if (snapshot.IsPartial) return "Partial inventory — review scan diagnostics";
-        if (hasPendingCleanup)
+        if (key.AsRune.Value == 'r' && _runTask is not null)
         {
-            if (snapshot.Skills.Any(skill => !skill.IsSymlinked && skill.Validity != ValidityState.Valid))
-                return "Needs review";
-            if (snapshot.Skills.Any(skill => skill.IsSymlinked))
-                return "Symlink";
-            return "Maintenance pending";
+            key.Handled = true;
+            _runTask(LoadAsync, "changes.refresh-disk");
         }
-
-        return "No cleanup items";
     }
 
     internal void CancelPendingLoad()
     {
+        CancelSelectedRequest();
         Interlocked.Increment(ref _loadGeneration);
         _loadCancellations.Cancel();
         SetLoading(false);
@@ -353,5 +379,11 @@ internal sealed class ChangesTabView : FrameView
     {
         _spinner.Visible = loading;
         _spinner.AutoSpin = loading;
+    }
+
+    private void CancelSelectedRequest()
+    {
+        Interlocked.Increment(ref _selectionGeneration);
+        _selectionRequests.Cancel();
     }
 }

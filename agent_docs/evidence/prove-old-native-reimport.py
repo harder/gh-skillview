@@ -1,4 +1,4 @@
-"""Actual frozen schema5 producer -> current native reimport restart contract.
+"""Actual frozen schema5/6 producer -> current native restart contracts.
 
 Run only against disposable private fixtures. The producer is pinned to the
 verified final PR68 merge; current-consumer native compatibility remains unproved
@@ -23,6 +23,11 @@ import time
 # Verified corrected PR68 merge (tree 9a58bbdb0a1786328dcb883e829ea5ea56e7cb10).
 # Build this exact source as the schema5 producer; never normalize old plan bytes.
 BASELINE = '4649d75fc3a4f9fdd7c22ca5593e629a1b559298'
+# Verified PR70 merge (tree cfcb6cfe819ef2d7cc302cd1b6006f4cbb8e90b1).
+# Build this actual pre-review schema6 producer; never synthesize old plan bytes
+# or assemble a historical producer from current source-review code.
+SOURCE_SWITCH_BASELINE = '5822f81077a8675724012670c6acd4c4c6abc0c9'
+_baseline = BASELINE
 _HELPERS = Path(__file__).with_name('prove-local-reimport.py')
 _output = None
 _raw = None
@@ -45,11 +50,23 @@ def frozen_gh_version(stdout):
     return value
 
 
+def legacy_contract(schema):
+    if schema == 5:
+        baseline, family, purpose = BASELINE, 'reimport', 'local-reimport'
+    elif schema == 6:
+        baseline, family, purpose = SOURCE_SWITCH_BASELINE, 'source-switch', 'switch-local-source'
+    else:
+        raise ValueError('Unsupported frozen native producer schema')
+    if len(baseline) != 40 or any(value not in '0123456789abcdef' for value in baseline):
+        raise ValueError(f'Old schema{schema} proof is disabled until its final merged baseline is locked')
+    return baseline, family, purpose
+
+
 def publish(status, **fields):
     if _output is not None:
         _output.parent.mkdir(parents=True, exist_ok=True)
         _output.write_text(json.dumps(dict(schemaVersion=1, proofCompleted=False,
-            compatibilityVerified=False, status=status, baselineCommit=BASELINE,
+            compatibilityVerified=False, status=status, baselineCommit=_baseline,
             commands=_commands, rawArtifacts=_artifacts, **fields), indent=2) + '\n')
 
 
@@ -178,7 +195,7 @@ def native_tool(helpers, requested):
 
 def fixture_environment(root, home, state, gh, proxy):
     env = {key: value for key, value in os.environ.items()
-           if not key.startswith(('GIT_', 'GH_', 'GITHUB_')) and key not in {
+           if not key.upper().startswith(('GIT_', 'GH_', 'GITHUB_')) and key.upper() not in {
                'CODEX_HOME', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_PLUGIN_CACHE_DIR',
                'CLAUDE_CODE_PLUGIN_DIRS', 'CLAUDE_CODE_PLUGIN_SEED_DIR'}}
     env.update(HOME=str(home), USERPROFILE=str(home), GH_EXTENSION='1', GH_PATH=str(gh),
@@ -229,10 +246,11 @@ def native_objects(directory):
 
 
 def main():
-    global _output, _raw
+    global _output, _raw, _baseline
     bootstrap_output(sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--old-app', required=True, type=Path)
+    parser.add_argument('--legacy-schema', type=int, choices=(5, 6), default=5)
     binding = parser.add_mutually_exclusive_group(required=True)
     binding.add_argument('--old-checkout', type=Path)
     binding.add_argument('--old-source-receipt', type=Path)
@@ -244,8 +262,8 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     _output = args.output
-    if len(BASELINE) != 40 or any(value not in '0123456789abcdef' for value in BASELINE):
-        raise RuntimeError('Old schema5 proof is disabled until the corrected final merged baseline is locked')
+    _baseline = SOURCE_SWITCH_BASELINE if args.legacy_schema == 6 else BASELINE
+    _baseline, family, purpose = legacy_contract(args.legacy_schema)
     # A fresh raw packet makes old success artifacts unavailable for reuse.
     _raw = args.output.with_name(args.output.stem + '-raw')
     _raw.mkdir(parents=True, exist_ok=False)
@@ -267,7 +285,7 @@ def main():
         if args.old_checkout:
             checkout = args.old_checkout.resolve(strict=True)
             assert old.is_relative_to(checkout), 'Frozen binary is not beneath its source checkout'
-            git_env = {key: value for key, value in env.items() if not key.startswith('GIT_')}
+            git_env = {key: value for key, value in env.items() if not key.upper().startswith('GIT_')}
             git_env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_COUNT='0', GIT_OPTIONAL_LOCKS='0')
             def git(*arguments):
                 observed, stdout, _ = child(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', checkout, *arguments], git_env, root, timeout=30)
@@ -279,7 +297,7 @@ def main():
             receipt_bytes = args.old_source_receipt.read_bytes()
             source_receipt = json.loads(receipt_bytes)
             artifact('old-source-receipt.json', receipt_bytes)
-        assert source_receipt['sourceCommit'] == BASELINE and source_receipt['trackedClean'] is True, 'Frozen source commit or clean status mismatch'
+        assert source_receipt['sourceCommit'] == _baseline and source_receipt['trackedClean'] is True, 'Frozen source commit or clean status mismatch'
         assert source_receipt['binarySha256'].lower() == old_tool['sha256'], 'Frozen binary differs from source build receipt'
         version_result, version_bytes, _ = child([gh, '--version'], env, root, timeout=30)
         assert version_result['exitCode'] == 0
@@ -290,6 +308,11 @@ def main():
         custom = root / 'custom'
         installed, _, _ = child([gh, 'skill', 'install', '--from-local', '--dir', custom, '--', source, 'legacy-local'], env, root, timeout=90)
         assert installed['exitCode'] == 0, installed
+        previous_source = source
+        previous_before, previous_ids = helpers.manifest(previous_source), native_objects(previous_source)
+        if args.legacy_schema == 6:
+            source = root / 'new-source-parent' / 'legacy-local'
+            source.mkdir(parents=True)
         payload = custom / 'legacy-local'
         payload.joinpath('installed-only').write_bytes(b'Exact old installed-only payload\x00\xff')
         payload.joinpath('.skillview-ignore').write_bytes(b'Original legacy exclusion marker\r\n')
@@ -300,8 +323,17 @@ def main():
         if os.name == 'nt':
             Path(str(payload) + ':skillview-root-proof').write_bytes(b'Exact original root alternate stream\x00\xff')
         expected_skill = ('---\r\n# Real captured C comment\r\nname: legacy-local\r\ndescription: New local source\r\nmetadata:\r\n  local-path: '
-            + json.dumps(str(source)) + ' # Keep comment\r\n  custom-field: original-native-schema5\r\n---\r\nUpdated C bytes\r\n').encode()
-        source.joinpath('SKILL.md').write_bytes(expected_skill)
+            + json.dumps(str(source)) + ' # Keep comment\r\n  custom-field: original-native-schema' + str(args.legacy_schema)
+            + '\r\n---\r\nUpdated C bytes\r\n').encode()
+        authored_skill = expected_skill
+        if args.legacy_schema == 6:
+            # The real installer must rebind this known fixture scalar from the
+            # old recorded address to the explicitly selected new source.
+            authored_skill = expected_skill.replace(
+                ('  local-path: ' + json.dumps(str(source))).encode(),
+                ('  local-path: ' + json.dumps(str(previous_source))).encode(), 1)
+            assert authored_skill != expected_skill
+        source.joinpath('SKILL.md').write_bytes(authored_skill)
         source.joinpath('empty-directory').mkdir()
         scripts = source / 'scripts'
         scripts.mkdir()
@@ -321,9 +353,12 @@ def main():
             assert not marker.exists() and not any(path.exists() for path in registries)
             return json.loads(stdout)
 
-        prepared = run(old, 'reimport-plan', '--path', payload, expected=1 if args.expect_metadata_refusal else 0)
+        plan_arguments = ['--path', payload]
+        if args.legacy_schema == 6:
+            plan_arguments += ['--new-source', source]
+        prepared = run(old, family + '-plan', *plan_arguments, expected=1 if args.expect_metadata_refusal else 0)
         result = dict(oldSource=source_receipt, oldHost=old_tool, currentHost=app_tool,
-            proofHost=host_tool, gh=gh_tool, ghVersion=gh_version, savedSchemaVersion=5,
+            proofHost=host_tool, gh=gh_tool, ghVersion=gh_version, savedSchemaVersion=args.legacy_schema,
             killBoundary=args.kill_boundary, httpProxiesBlocked=True, githubCredentialsRemoved=True,
             privateHomeStateCwdAndGit=True, payloadScriptsExecuted=False,
             scriptSha256=helpers.digest(Path(__file__)), sharedFixtureHelpersSha256=helpers.digest(_HELPERS))
@@ -331,6 +366,8 @@ def main():
             assert prepared.get('succeeded') is False and args.expect_metadata_refusal in prepared.get('error', ''), prepared
             assert helpers.manifest(payload) == before and native_objects(payload) == before_ids
             assert helpers.manifest(source) == source_before and native_objects(source) == source_ids
+            if args.legacy_schema == 6:
+                assert helpers.manifest(previous_source) == previous_before and native_objects(previous_source) == previous_ids
             assert not list(state.rglob('plan.json'))
             result.update(compatibilityVerified=False, oldNativePublicationRefused=True,
                 actualOldNativePlanCreated=False, currentConsumerLifecycleExecuted=False,
@@ -340,13 +377,20 @@ def main():
             assert saved['succeeded'] and saved['status'] == 'planned'
             plan_path = Path(saved['planPath'])
             frozen = plan_path.read_bytes()
-            artifact('old-schema5-plan.json', frozen)
+            artifact(f'old-schema{args.legacy_schema}-plan.json', frozen)
             plan = json.loads(frozen)
-            assert plan['schemaVersion'] == 5 and plan['purpose'] == 'local-reimport'
-            assert all(field not in plan for field in ('localSourceSwitch', 'revision', 'localDisposition', 'pinPolicy'))
+            assert plan['schemaVersion'] == args.legacy_schema and plan['purpose'] == purpose
+            assert all(field not in plan for field in ('sourceReview', 'revision', 'localDisposition', 'pinPolicy'))
+            if args.legacy_schema == 5:
+                assert 'localSourceSwitch' not in plan
+            else:
+                assert plan['localSourceSwitch']['previousRecordedPath'] == str(previous_source)
+                assert plan['localSourceSwitch']['capturedSourceRecordedPath'] == str(previous_source)
+                assert plan['localSourceSwitch']['previousPlacement']['canonicalPath'] == str(previous_source)
             policy = plan['localImport']
             assert policy['sourcePath'] == str(source) and policy['canonicalSourcePath'] == str(source)
-            assert policy['disposition'] == 'replace-local-retain-original'
+            assert policy['disposition'] == ('replace-local-retain-original' if args.legacy_schema == 5
+                                             else 'replace-local-source-retain-original')
             assert policy['gh']['binarySha256'].lower() == gh_tool['sha256'], 'Saved gh binary hash differs from the staged native tool'
             assert policy['gh']['version'] == gh_version, 'Saved gh version differs from the complete native version witness'
             frozen_archives = {}
@@ -365,35 +409,50 @@ def main():
                 assert stat.S_IMODE(candidate.joinpath('scripts/never-run.py').stat().st_mode) == 0o751
             assert helpers.manifest(payload) == before and native_objects(payload) == before_ids
             assert helpers.manifest(source) == source_before and native_objects(source) == source_ids
-            inspected = run(app, 'reimport-inspect', '--id', saved['id'])['operation']
+            inspected = run(app, family + '-inspect', '--id', saved['id'])['operation']
             assert inspected['status'] == 'ready' and inspected['planFingerprint'] == saved['planFingerprint']
-            assert 'localSourceSwitch' not in inspected and inspected['localImport'] == saved['localImport']
+            if args.legacy_schema == 5:
+                assert 'localSourceSwitch' not in inspected
+            else:
+                assert inspected['localSourceSwitch'] == saved['localSourceSwitch']
+            assert inspected['localImport'] == saved['localImport']
+            assert not list(plan_path.parent.glob('source-review-*.json')), 'Legacy review acknowledgement was invented'
             assert plan_path.read_bytes() == frozen
-            killed, _, _ = child([host, root, gh, saved['id'], saved['planFingerprint'], 'apply-reimport', args.kill_boundary], env, root,
+            killed, _, _ = child([host, root, gh, saved['id'], saved['planFingerprint'], 'apply-' + family, args.kill_boundary], env, root,
                                  boundary=args.kill_boundary, timeout=90)
-            interrupted = run(app, 'reimport-inspect', '--id', saved['id'])['operation']
+            interrupted = run(app, family + '-inspect', '--id', saved['id'])['operation']
             assert interrupted['status'] == ('original-retained' if args.kill_boundary == 'retain-moved' else 'installed')
             assert interrupted['localSource']['status'] == 'not-required-after-retain'
             assert helpers.manifest(source) == source_before and native_objects(source) == source_ids
+            if args.legacy_schema == 6:
+                assert helpers.manifest(previous_source) == previous_before and native_objects(previous_source) == previous_ids
             # Delete only the known generated ordinary source after actual retain.
             assert source.is_relative_to(root) and not source.is_symlink()
             shutil.rmtree(source)
-            frozen_inspection = run(app, 'reimport-inspect', '--id', saved['id'])['operation']
+            if args.legacy_schema == 6:
+                assert previous_source.is_relative_to(root) and not previous_source.is_symlink()
+                shutil.rmtree(previous_source)
+            frozen_inspection = run(app, family + '-inspect', '--id', saved['id'])['operation']
             assert frozen_inspection['localSource']['status'] == 'not-required-after-retain'
-            recovered = run(app, 'reimport-recover', '--id', saved['id'], '--yes', '--expect', frozen_inspection['reviewFingerprint'])['operation']
+            recovered = run(app, family + '-recover', '--id', saved['id'], '--yes', '--expect', frozen_inspection['reviewFingerprint'])['operation']
             assert recovered['succeeded'] and recovered['status'] == 'installed'
             assert helpers.manifest(payload) == candidate_bytes and native_objects(payload) == candidate_ids
             assert helpers.manifest(Path(saved['retainedPath'])) == before and native_objects(Path(saved['retainedPath'])) == before_ids
             assert helpers.root_security(payload) == before_security
-            fresh = run(app, 'reimport-inspect', '--id', saved['id'])['operation']
-            restored = run(app, 'reimport-undo', '--id', saved['id'], '--yes', '--expect', fresh['reviewFingerprint'])['operation']
+            fresh = run(app, family + '-inspect', '--id', saved['id'])['operation']
+            restored = run(app, family + '-undo', '--id', saved['id'], '--yes', '--expect', fresh['reviewFingerprint'])['operation']
             assert restored['succeeded'] and restored['status'] == 'restored'
             assert helpers.manifest(payload) == before and native_objects(payload) == before_ids
             assert helpers.root_security(payload) == before_security
             assert helpers.manifest(Path(saved['displacedPath'])) == candidate_bytes
             assert plan_path.read_bytes() == frozen
             assert restored['planFingerprint'] == saved['planFingerprint']
-            assert all('localSourceSwitch' not in item for item in (interrupted, frozen_inspection, recovered, fresh, restored))
+            if args.legacy_schema == 5:
+                assert all('localSourceSwitch' not in item for item in (interrupted, frozen_inspection, recovered, fresh, restored))
+            else:
+                assert all(item['localSourceSwitch'] == saved['localSourceSwitch']
+                           for item in (interrupted, frozen_inspection, recovered, fresh, restored))
+            assert not list(plan_path.parent.glob('source-review-*.json')), 'Legacy review acknowledgement was invented'
             for slot, expected_files in frozen_archives.items():
                 directory = plan_path.parent / slot
                 assert {str(path.relative_to(directory)): helpers.digest(path) for path in directory.rglob('*') if path.is_file()} == expected_files
@@ -402,13 +461,18 @@ def main():
                 frozenRecoveryWithoutExternalSource=True, forwardRecoveryVerified=True,
                 exactOriginalNativeObjectsAndBytesRestored=True, originalExclusionAndExtrasRestored=True,
                 originalRootPrivacyRestored=True, oldPlanAndArchiveBytesUnchanged=True,
-                absentLocalSourceSwitchRemainsOmitted=True, savedPlanSha256=sha(frozen),
+                absentSourceReviewRemainsOmitted=True, noLegacyReviewAcknowledgementInvented=True,
+                savedPlanSha256=sha(frozen),
                 savedPlanFingerprint=saved['planFingerprint'], sourceUnchangedUntilExplicitPostRetainDeletion=True)
+            if args.legacy_schema == 5:
+                result['absentLocalSourceSwitchRemainsOmitted'] = True
+            else:
+                result['bothExternalSourcesRemovedBeforeRecovery'] = True
         assert not marker.exists() and not any(path.exists() for path in registries)
         for tool in (old_tool, app_tool, host_tool, gh_tool):
             assert helpers.digest(Path(tool['path'])) == tool['sha256'], 'Executable changed during proof'
         result.update(schemaVersion=1, proofCompleted=True, status='completed', commands=_commands,
-                      rawArtifacts=_artifacts, mode='metadata-refusal' if args.expect_metadata_refusal else 'actual-old-native-schema5')
+                      rawArtifacts=_artifacts, mode='metadata-refusal' if args.expect_metadata_refusal else f'actual-old-native-schema{args.legacy_schema}')
         args.output.write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(dict(output=str(args.output), compatibilityVerified=result['compatibilityVerified'],
                               mode=result['mode'], commands=len(_commands))))

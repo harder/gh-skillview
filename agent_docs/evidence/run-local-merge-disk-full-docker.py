@@ -94,7 +94,7 @@ with tempfile.TemporaryDirectory(prefix='skillview-disk-full-tools-') as tempora
         shutil.copy2(extra.resolve(), tools / ('gh-extra-' + str(index)))
         extra_gh_arguments += ' --gh /proof-tools/gh-extra-' + str(index)
     proof_scripts = ('prove-local-reimport.py',) if args.local_reimport else ('prove-shared-revision-update.py',) if args.unpin_only else ('prove-local-merge-update.py', 'prove-disk-full-guards.py', 'prove-local-merge-disk-full.sh')
-    for name in proof_scripts:
+    for name in (*proof_scripts, 'source_review_proof.py'):
         shutil.copy2(scripts / name, tools / name)
     legacy_command = ''
     if args.legacy_app:

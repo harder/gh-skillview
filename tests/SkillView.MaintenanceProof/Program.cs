@@ -33,10 +33,11 @@ try
         return 0;
     }
     var checkpoint = diskFullMode ? args[5]["disk-full:".Length..] : args[5];
-    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
+    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
         || checkpoint is not ("local-retain-intent" or "retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
-            or "owner-repair-intent" or "owner-repaired" or "compensation-truncated")
+            or "owner-repair-intent" or "owner-repaired" or "compensation-truncated" or "workflow")
+        || (args[4] == "recover-source-switch-reviewed") != (checkpoint == "workflow")
         || diskFullMode && (args[4] is not ("apply-merged" or "undo")
             || checkpoint is not ("retain-moved" or "install-moved" or "displace-moved" or "restore-moved")))
         throw new ArgumentException("Unsupported proof action or checkpoint.");
@@ -47,20 +48,22 @@ try
         new(ScanRoots: [Path.Combine(root, "custom")], AllowHiddenDirs: true), lifetime.Token);
     var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(MaintenanceBackupStore.ResolveRoot(services.Runner))!, "replacements"),
         logger, Checkpoint, services.Runner);
-    var result = args[4] switch
-    {
-        "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),
-        "apply-merged" => store.Apply(args[2], args[3], inventory, lifetime.Token, "merge-reviewed"),
-        "apply-unpin" => store.Apply(args[2], args[3], inventory, lifetime.Token, "unpin-only", "unpin-only"),
-        "apply-reimport" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-retain-original", "local-reimport"),
-        "apply-source-switch" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-source-retain-original", "switch-local-source"),
-        "undo-unpin" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "unpin-only"),
-        "undo-reimport" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "local-reimport"),
-        "undo-source-switch" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "switch-local-source"),
-        "repair-unpin" => store.RepairOwner(args[2], args[3], inventory, lifetime.Token, "unpin-only"),
-        "undo" => store.Recover(args[2], args[3], inventory, true, lifetime.Token),
-        _ => store.RepairOwner(args[2], args[3], inventory, lifetime.Token)
-    };
+    var result = args[4] == "recover-source-switch-reviewed"
+        ? await SourceSwitchWorkflowProof.RunAsync(services, root, args[1], args[2], args[3], inventory, lifetime.Token)
+        : args[4] switch
+        {
+            "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),
+            "apply-merged" => store.Apply(args[2], args[3], inventory, lifetime.Token, "merge-reviewed"),
+            "apply-unpin" => store.Apply(args[2], args[3], inventory, lifetime.Token, "unpin-only", "unpin-only"),
+            "apply-reimport" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-retain-original", "local-reimport"),
+            "apply-source-switch" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-source-retain-original", "switch-local-source"),
+            "undo-unpin" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "unpin-only"),
+            "undo-reimport" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "local-reimport"),
+            "undo-source-switch" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "switch-local-source"),
+            "repair-unpin" => store.RepairOwner(args[2], args[3], inventory, lifetime.Token, "unpin-only"),
+            "undo" => store.Recover(args[2], args[3], inventory, true, lifetime.Token),
+            _ => store.RepairOwner(args[2], args[3], inventory, lifetime.Token)
+        };
     Console.WriteLine(JsonSerializer.Serialize(result, ReplacementJsonContext.Default.ReplacementResult));
     return result.Succeeded ? 0 : 2;
 

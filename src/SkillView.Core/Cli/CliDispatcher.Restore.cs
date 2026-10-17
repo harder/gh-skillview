@@ -10,7 +10,8 @@ namespace SkillView.Cli;
 
 public static partial class CliDispatcher
 {
-    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
+    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token,
+        MaintenancePlanReference? reference = null)
     {
         var requestedCommand = options.SubcommandName!;
         var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
@@ -21,7 +22,7 @@ public static partial class CliDispatcher
         var expectedPurpose = sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
-        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null;
+        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null;
         var execute = false;
         var json = false;
         var allowHidden = false;
@@ -38,7 +39,8 @@ public static partial class CliDispatcher
                 if (args[index] == "--path" && command == "restore-plan" && path is null && installId is null) { path = args[++index]; continue; }
                 if (args[index] == "--install-id" && command == "restore-plan" && path is null && installId is null) { installId = args[++index]; continue; }
                 if (args[index] == "--id" && command != "restore-plan" && id is null) { id = args[++index]; continue; }
-                if (args[index] == "--expect" && command is "restore-apply" or "restore-recover" or "restore-undo" or "restore-repair-owner" && expected is null) { expected = args[++index]; continue; }
+                if (args[index] == "--review" && command == "restore-ack-source" && sourceReview is null) { sourceReview = args[++index]; continue; }
+                if (args[index] == "--expect" && command is "restore-ack-source" or "restore-apply" or "restore-recover" or "restore-undo" or "restore-repair-owner" && expected is null) { expected = args[++index]; continue; }
                 if (args[index] == "--disposition" && command == "restore-apply" && disposition is null) { disposition = args[++index]; continue; }
             }
             Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
@@ -48,9 +50,10 @@ public static partial class CliDispatcher
             || command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
             || command == "restore-apply" && (!execute || !(sourceSwitch ? disposition == ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-ack-source" && (!execute || !QuarantineStore.ValidHash(expected!) || !QuarantineStore.ValidHash(sourceReview!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. source-switch-plan also requires --new-source <absolute directory>; source-switch-apply requires replace-local-source-retain-original. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. source-switch-plan also requires --new-source <absolute directory>; source-switch-apply requires replace-local-source-retain-original. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Source acknowledgement needs --id --expect <plan fingerprint> --review <source-review fingerprint> --yes. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
         }
         OperationImpact? frozenImpact = null;
@@ -62,7 +65,14 @@ public static partial class CliDispatcher
                 new LocalInventoryService.Options(options.ScanRoots, allowHidden, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token).ConfigureAwait(false);
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger,
-                runner: services.Runner, subjectObserved: impact => frozenImpact = impact with { Operation = requestedCommand });
+                runner: services.Runner, subjectObserved: impact => frozenImpact = impact with { Operation = requestedCommand }, sourceReviewRequired: true);
+            if (reference is not null)
+            {
+                var referenced = store.Inspect(id!, inventory, token, expectedPurpose);
+                reference.RequireMatch(referenced.Reference);
+                if (command == "restore-recover" && referenced.Status == "ready")
+                    throw new IOException("The saved candidate has not replaced the installation. Use apply with explicit retention consent; repair cannot start a ready plan. If inspection reports an interrupted pre-move journal, review the specialist recovery command explicitly.");
+            }
             ReplacementResult result;
             if (command == "restore-plan")
             {
@@ -97,6 +107,8 @@ public static partial class CliDispatcher
                         if (json) WriteJson(w =>
                         {
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                            w.WriteString("status", "unchanged"); w.WriteString("reason", current.Message);
+                            w.WriteBoolean("partial", current.CleanupWarning is not null);
                             w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
                             w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
                             WriteImpact(w, frozenImpact);
@@ -121,6 +133,7 @@ public static partial class CliDispatcher
             }
             else result = await Task.Run(() => command switch
             {
+                "restore-ack-source" => store.AcknowledgeSourceReview(id!, expected!, sourceReview!, inventory, token, expectedPurpose),
                 "restore-inspect" => store.Inspect(id!, inventory, token, expectedPurpose),
                 "restore-apply" => store.Apply(id!, expected!, inventory, token, disposition!, expectedPurpose),
                 "restore-repair-owner" => store.RepairOwner(id!, expected!, inventory, token, expectedPurpose),
@@ -129,7 +142,13 @@ public static partial class CliDispatcher
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                w.WriteString("status", result.Canceled ? "canceled" : result.Succeeded ? result.Status : result.MutationObserved ? "partial" : "refused");
+                w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
+                WritePlanReference(w, result);
+                w.WriteString("diskVerification", result.Succeeded
+                    ? command == "restore-ack-source" ? "not-performed; source-review acknowledgement only" : "verified-saved-locations"
+                    : "incomplete; inspect operation status and retained evidence");
                 if ((unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
                 {
                     w.WriteStartArray("applyArguments");
@@ -142,7 +161,8 @@ public static partial class CliDispatcher
             });
             else Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
-                + string.Join("\n", result.ChangedPaths.Select(change => "Changed: " + change)) + "\n" + result.Message));
+                + string.Join("\n", result.ChangedPaths.Take(128).Select(change => "Changed: " + change)) + (result.ChangedPaths.Length > 128 ? $"\nOmitted changed paths: {result.ChangedPaths.Length - 128}; complete list in the saved plan." : "") + "\n" + result.Message));
+            if (!json) Console.WriteLine(SourceReviewScreen.RenderText(result));
             if (!json && result.LocalImport is not null) Console.WriteLine(LocalReimportScreen.RenderText(result));
             if (!json) WriteImpactText(result.Impact ?? frozenImpact);
             if (!json && (unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
@@ -155,6 +175,8 @@ public static partial class CliDispatcher
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message);
+                w.WriteString("status", ex is OperationCanceledException ? "canceled" : "refused");
+                w.WriteString("reason", ex.Message); w.WriteString("sessionState", "unknown");
                 w.WriteBoolean("canceled", ex is OperationCanceledException);
                 WriteImpact(w, frozenImpact is { } impact ? impact with { Operation = requestedCommand } : null);
                 if (ex is GhSourceRequestException source)

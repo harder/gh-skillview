@@ -54,6 +54,7 @@ internal sealed partial class UpdatesTabView : FrameView
     private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
     private int _nameW = 12;
     private long _loadGeneration;
+    private OperationSubject? _drillInSubject;
     private readonly CancellationOperationSlot _loadCancellations;
     private readonly CancellationOperationSlot _operationCancellations;
 
@@ -93,7 +94,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _tableLabel = new Label
         {
-            Text = "Space marks · a all · u update row · U marked · p unpin row",
+            Text = "Space marks · c compare/plan row · u review · U marked · p unpin",
             X = 0,
             Y = 0,
         };
@@ -102,7 +103,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Percent(45),
-            Height = Dim.Fill(8),
+            Height = Dim.Fill(9),
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
@@ -114,7 +115,7 @@ internal sealed partial class UpdatesTabView : FrameView
             X = Pos.Right(_table) + 1,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(8),
+            Height = Dim.Fill(9),
             Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
@@ -216,12 +217,14 @@ internal sealed partial class UpdatesTabView : FrameView
 
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar, _retainBox, _applyButton, _nextButton);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
         Disposing += (_, _) => CancelPendingWork();
     }
 
-    internal async Task LoadAsync()
+    internal Task LoadAsync() => LoadForSubjectAsync(_drillInSubject);
+
+    internal async Task LoadForSubjectAsync(OperationSubject? selected)
     {
         if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
@@ -239,7 +242,8 @@ internal sealed partial class UpdatesTabView : FrameView
                     return;
                 }
 
-                Populate(snapshot);
+                if (selected is null) Populate(snapshot);
+                else PopulateSelected(snapshot, selected);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -286,9 +290,31 @@ internal sealed partial class UpdatesTabView : FrameView
         SetBusy(false);
     }
 
+    private void PopulateSelected(InventorySnapshot snapshot, OperationSubject selected)
+    {
+        var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected);
+        // A missing or ambiguous ID must not silently select the first same-name
+        // row. Restrict this drill-in to one fresh physical target, and clear
+        // broad/batch choices left over from earlier visits.
+        _allBox.Value = CheckState.UnChecked;
+        _unpinBox.Value = CheckState.UnChecked;
+        Populate(snapshot with { Skills = target is null ? [] : [target] });
+        if (target is null)
+        {
+            _status.Text = " selected installation is missing or ambiguous — refresh Changes";
+            _preview.Text = "## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Changes and refresh disk inventory.";
+            return;
+        }
+        _table.SetSelectedRow(0);
+        _wrapper?.CheckedRows.Add(0);
+        _status.Text = " exact installation selected · availability unknown · Dry-run checks; c compares/plans";
+        _preview.Text = "## Selected installation\n\n" + InstalledScreen.RenderDetail(target)
+            + "\n\nUpdate availability is unknown until **Dry-run**. Runtime session state is unknown. **c** compares installed content with one saved candidate and opens its plan review for this installation. Inspect the comparison and approve retention before apply; its result verifies disk, not session activation.";
+    }
+
 
     private bool IsCurrentLoad(long loadGeneration) =>
-        Interlocked.Read(ref _loadGeneration) == loadGeneration;
+        Interlocked.Read(ref _loadGeneration) == loadGeneration && !_lifetimeToken.IsCancellationRequested;
 
     internal CheckBox UnpinBoxForTests => _unpinBox;
     internal void MarkRowForTests(int row) => _wrapper?.CheckedRows.Add(row);
@@ -305,11 +331,12 @@ internal sealed partial class UpdatesTabView : FrameView
 
     /// Activate this view as a drill-in from the Changes workspace.
     /// Hides the Changes tab via <paramref name="hideChanges"/>, then shows and loads this view.
-    internal void ActivateFromChanges(Action hideChanges)
+    internal void ActivateFromChanges(Action hideChanges, OperationSubject? selected = null)
     {
+        _drillInSubject = selected;
         hideChanges();
         Visible = true;
-        _runTask(LoadAsync, "updates.load");
+        _runTask(() => LoadForSubjectAsync(selected), "updates.load");
     }
 
     private void RecomputeColumnWidths()
@@ -350,7 +377,7 @@ internal sealed partial class UpdatesTabView : FrameView
             key.Handled = true;
             ClearAllMarks();
         }
-        else if (rune == 'u')
+        else if (rune is 'u' or 'c')
         {
             key.Handled = true;
             UpdateCurrentRow();
@@ -496,6 +523,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _queue.Clear();
         _queueOptions = null;
         _retainBox.Value = CheckState.UnChecked;
+        _sourceReviewBox.Value = CheckState.UnChecked;
         SetBusy(false);
         SetOperationControlsEnabled(true);
     }
