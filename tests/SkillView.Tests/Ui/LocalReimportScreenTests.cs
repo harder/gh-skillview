@@ -20,7 +20,9 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class LocalReimportScreenTests
 {
-    private static InstalledSkill Target() => new()
+    private static string NewSourcePath => Path.Combine(Path.GetTempPath(), "skillview-ui-source", "demo");
+
+    internal static InstalledSkill Target() => new()
     {
         Name = "demo",
         ResolvedPath = "/skills/demo",
@@ -35,7 +37,7 @@ public sealed class LocalReimportScreenTests
         InstalledAt = null
     };
 
-    private static ReplacementResult Plan()
+    internal static ReplacementResult Plan()
     {
         var target = Target();
         return new(new('a', 32), "planned", true, false, false, target.ResolvedPath, "/state/original", "/state/candidate", "/state/displaced",
@@ -43,6 +45,40 @@ public sealed class LocalReimportScreenTests
             "/state/plan.json", 448, 448, LocalImport: new("/source/demo", "/canonical/source/demo", default, new('d', 64), new('e', 64), target.FrontMatter,
                 "I root privacy; C descendants", [], new("/tools/gh", new('f', 64), "2.102.0", "/preview/input", "/preview/output", new('1', 64), new('2', 64), [], "child-only")))
         { LocalSource = new("current", "Source capture matches.") };
+    }
+
+    internal static ReplacementResult SourceSwitchPlan()
+    {
+        var plan = Plan();
+        return plan with
+        {
+            LocalImport = plan.LocalImport! with
+            {
+                SourcePath = NewSourcePath,
+                CanonicalSourcePath = NewSourcePath,
+                DesiredMetadata = plan.Subject.Metadata with { LocalPath = NewSourcePath },
+                Disposition = ReplacementPlanStore.LocalSourceSwitchDisposition
+            },
+            LocalSourceSwitch = new("/source/demo", new("/source/demo", "/source/demo", default, []), "/copied/old/demo")
+        };
+    }
+
+    [Fact]
+    public void SourceSwitchJsonAndUiKeepFamiliesDistinctAndOldFieldsOmitted()
+    {
+        var plan = SourceSwitchPlan();
+        Assert.True(Path.IsPathFullyQualified(plan.LocalImport!.SourcePath));
+        Assert.True(LocalReimportScreen.IsLocalSourceSwitch(plan)); Assert.False(LocalReimportScreen.IsLocalReimport(plan));
+        Assert.False(LocalReimportScreen.IsLocalSourceSwitch(Plan()));
+        using var data = JsonDocument.Parse(JsonSerializer.Serialize(plan, ReplacementJsonContext.Default.ReplacementResult));
+        Assert.Equal("/source/demo", data.RootElement.GetProperty("localSourceSwitch").GetProperty("previousRecordedPath").GetString());
+        Assert.Equal("/copied/old/demo", data.RootElement.GetProperty("localSourceSwitch").GetProperty("capturedSourceRecordedPath").GetString());
+        Assert.Equal(NewSourcePath, data.RootElement.GetProperty("localImport").GetProperty("desiredMetadata").GetProperty("localPath").GetString());
+        foreach (var field in new[] { "revision", "pinPolicy", "localDisposition" }) Assert.False(data.RootElement.TryGetProperty(field, out _));
+        var legacy = JsonSerializer.Serialize(Plan(), ReplacementJsonContext.Default.ReplacementResult);
+        Assert.DoesNotContain("localSourceSwitch", legacy);
+        var text = LocalReimportScreen.RenderText(plan);
+        foreach (var label in new[] { "Previous recorded source", "Captured C recorded source", "no ancestry", "Git-managed sources remain unsupported" }) Assert.Contains(label, text);
     }
 
     [Fact]
@@ -70,38 +106,46 @@ public sealed class LocalReimportScreenTests
     {
         using var app = Application.Create().Init("ansi");
         app.Driver!.SetScreenSize(100, 26);
-        var target = Target(); InstalledSkill? selected = null; InstalledSkill? checkedSkill = null; var shellReceived = false;
+        var target = Target(); InstalledSkill? selected = null; InstalledSkill? checkedSkill = null; InstalledSkill? switched = null; var shellReceived = false;
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
             _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { }, () => { },
-            onPackageCheck: skill => checkedSkill = skill, onLocalReimport: skill => selected = skill)
+            onPackageCheck: skill => checkedSkill = skill, onLocalReimport: skill => selected = skill, onLocalSourceSwitch: skill => switched = skill)
         { Width = Dim.Fill(), Height = Dim.Fill() };
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [target] });
         window.Add(view);
-        window.KeyDown += (_, key) => { if (!key.Handled && key.AsRune.Value is 'R' or 'K') shellReceived = true; };
+        window.KeyDown += (_, key) => { if (!key.Handled && key.AsRune.Value is 'R' or 'K' or 'T') shellReceived = true; };
         var session = app.Begin(window);
         try
         {
             view.FocusFilterForTests(); Assert.True(view.FilterHasFocusForTests);
             Press('R'); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("R", view.GetFilterText());
             Press('K'); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("RK", view.GetFilterText());
+            Press('T'); Assert.Null(switched); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("RKT", view.GetFilterText());
             view.SetFilterTextForTests(""); view.FocusList(); Assert.False(view.FilterHasFocusForTests);
             shellReceived = false; Press('R'); Assert.Same(target, selected); Assert.False(shellReceived);
             Assert.Null(checkedSkill); selected = null;
             Press('K'); Assert.Same(target, checkedSkill); Assert.Null(selected); Assert.False(shellReceived);
+            checkedSkill = null; Press('T'); Assert.Same(target, switched); Assert.Null(checkedSkill); Assert.Null(selected); Assert.False(shellReceived);
         }
         finally { app.End(session!); }
         void Press(char value) { app.Keyboard.RaiseKeyDownEvent(new Key(value)); window.Draw(new DrawContext()); }
     }
 
-    [Fact]
-    public Task KeyboardApplyRequiresFreshRetentionApproval() => KeyboardApprovalAsync("Apply");
-    [Fact]
-    public Task KeyboardRecoverRequiresFreshRetentionApproval() => KeyboardApprovalAsync("Recover");
-    [Fact]
-    public Task KeyboardUndoRequiresFreshRetentionApproval() => KeyboardApprovalAsync("Undo");
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task KeyboardApplyRequiresFreshRetentionApproval(bool sourceSwitch) => KeyboardApprovalAsync("Apply", sourceSwitch);
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task KeyboardRecoverRequiresFreshRetentionApproval(bool sourceSwitch) => KeyboardApprovalAsync("Recover", sourceSwitch);
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task KeyboardUndoRequiresFreshRetentionApproval(bool sourceSwitch) => KeyboardApprovalAsync("Undo", sourceSwitch);
 
-    private async Task KeyboardApprovalAsync(string actionName)
+    private async Task KeyboardApprovalAsync(string actionName, bool sourceSwitch)
     {
         var action = Enum.Parse<LocalReimportAction>(actionName);
         var requests = new ConcurrentQueue<LocalReimportRequest>(); var timedOut = false; var exactReview = false;
@@ -114,7 +158,7 @@ public sealed class LocalReimportScreenTests
                 using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(100, 30);
                 using var lifetime = new CancellationTokenSource();
                 Dialog? dialog = null; var phase = 0;
-                var plan = Plan() with { Status = action == LocalReimportAction.Apply ? "planned" : "original-retained" };
+                var plan = (sourceSwitch ? SourceSwitchPlan() : Plan()) with { Status = action == LocalReimportAction.Apply ? "planned" : "original-retained" };
                 var actionLabel = action == LocalReimportAction.Apply ? "_Apply reviewed" : action == LocalReimportAction.Recover ? "_Recover reviewed" : "_Undo reviewed";
                 app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; lifetime.Cancel(); app.RequestStop(); return true; });
                 app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
@@ -126,7 +170,9 @@ public sealed class LocalReimportScreenTests
                     if (phase == 0)
                     {
                         phase = 1;
-                        if (action != LocalReimportAction.Apply) dialog.SubViews.OfType<TextField>().Single().Text = plan.Id;
+                        var fields = dialog.SubViews.OfType<TextField>().ToArray();
+                        if (sourceSwitch) fields[1].Text = plan.LocalImport!.SourcePath;
+                        if (action != LocalReimportAction.Apply) fields[0].Text = plan.Id;
                         Press(action == LocalReimportAction.Apply ? "_Prepare" : "_Inspect saved ID");
                     }
                     else if (phase == 1 && dialog.SubViews.OfType<CheckBox>().Single(value => value.Text.StartsWith("Replace from", StringComparison.Ordinal)).Enabled)
@@ -149,9 +195,10 @@ public sealed class LocalReimportScreenTests
                     requests.Enqueue(request);
                     if (request.Action is LocalReimportAction.Prepare or LocalReimportAction.Inspect)
                         return Task.FromResult(new LocalReimportResponse(Plan: plan));
-                    exactReview = request.Action == action && ReferenceEquals(plan, request.Review) && request.Id == plan.Id;
+                    exactReview = request.Action == action && ReferenceEquals(plan, request.Review) && request.Id == plan.Id
+                        && (!sourceSwitch || request.NewSourcePath == plan.LocalImport!.SourcePath);
                     return Task.FromResult(new LocalReimportResponse(Plan: plan with { Status = "installed" }));
-                }, lifetime.Token, readyForTests: value => dialog = value);
+                }, lifetime.Token, readyForTests: value => dialog = value, sourceSwitch: sourceSwitch);
                 void Press(string label)
                 {
                     var button = dialog!.SubViews.OfType<Button>().Single(value => value.Text == label);
@@ -168,7 +215,48 @@ public sealed class LocalReimportScreenTests
     }
 
     [Fact]
-    public async Task ClosingActivePreparationCancelsAndDrainsBeforeReturning()
+    public async Task EditingNewSourceWithActualFocusInvalidatesSavedApproval()
+    {
+        var timedOut = false; var invalidated = false; var prepared = 0;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(100, 30);
+            using var lifetime = new CancellationTokenSource();
+            Dialog? dialog = null; var phase = 0;
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; lifetime.Cancel(); app.RequestStop(); return true; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (dialog is null) return true;
+                var retention = dialog.SubViews.OfType<CheckBox>().Single(value => value.Text.StartsWith("Replace from", StringComparison.Ordinal));
+                if (phase == 0)
+                {
+                    phase = 1;
+                    dialog.SubViews.OfType<Button>().Single(button => button.Text == "_Prepare").SetFocus();
+                    app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                }
+                else if (phase == 1 && retention.Enabled)
+                {
+                    retention.SetFocus(); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                    var apply = dialog.SubViews.OfType<Button>().Single(button => button.Text == "_Apply reviewed");
+                    Assert.True(apply.Enabled);
+                    var input = dialog.SubViews.OfType<TextField>().Last(); input.SetFocus(); Assert.True(input.HasFocus);
+                    app.Keyboard.RaiseKeyDownEvent(new Key('x'));
+                    Assert.False(apply.Enabled); Assert.False(retention.Enabled); Assert.Equal(CheckState.UnChecked, retention.Value);
+                    invalidated = true; phase = 2; app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc)); return false;
+                }
+                return true;
+            });
+            LocalReimportScreen.Show(app, new Logger(), Target(), (_, _) =>
+            { prepared++; return Task.FromResult(new LocalReimportResponse(Plan: SourceSwitchPlan())); }, lifetime.Token,
+                readyForTests: value => { dialog = value; value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, sourceSwitch: true);
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(invalidated); Assert.Equal(1, prepared); Assert.False(timedOut);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClosingActivePreparationCancelsAndDrainsBeforeReturning(bool sourceSwitch)
     {
         var started = 0; var drained = 0; var closing = false; var timedOut = false;
         await Task.Run(() =>
@@ -188,7 +276,7 @@ public sealed class LocalReimportScreenTests
                 Interlocked.Increment(ref started);
                 try { return await new TaskCompletionSource<LocalReimportResponse>().Task.WaitAsync(token); }
                 finally { Interlocked.Increment(ref drained); }
-            }, readyForTests: value => dialog = value);
+            }, readyForTests: value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, sourceSwitch: sourceSwitch);
             Assert.Equal(1, Volatile.Read(ref drained));
             void Press(string label)
             { dialog!.SubViews.OfType<Button>().Single(button => button.Text == label).SetFocus(); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); }
@@ -196,8 +284,10 @@ public sealed class LocalReimportScreenTests
         Assert.Equal(1, started); Assert.True(closing); Assert.False(timedOut);
     }
 
-    [Fact]
-    public async Task ParentCancellationAfterWorkerCompletionRejectsQueuedReview()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ParentCancellationAfterWorkerCompletionRejectsQueuedReview(bool sourceSwitch)
     {
         var queued = new ConcurrentQueue<Action>(); var committed = false; var lateStatusMutation = false; var timedOut = false;
         var logger = new Logger();
@@ -217,32 +307,37 @@ public sealed class LocalReimportScreenTests
                 }
                 else if (queued.TryDequeue(out var completion))
                 {
-                    var priorStatus = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:").Text;
+                    var priorStatus = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:" && value.Text != "New source:").Text;
                     parent.Cancel(); completion();
-                    lateStatusMutation = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:").Text != priorStatus;
-                    committed = dialog.SubViews.OfType<TextField>().Single().Text.Length > 0;
+                    lateStatusMutation = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:" && value.Text != "New source:").Text != priorStatus;
+                    committed = dialog.SubViews.OfType<TextField>().First().Text.Length > 0;
                     return false;
                 }
                 return true;
             });
-            LocalReimportScreen.Show(app, logger, Target(), (_, _) => Task.FromResult(new LocalReimportResponse(Plan: Plan())),
-                parent.Token, value => dialog = value, action => queued.Enqueue(action));
+            LocalReimportScreen.Show(app, logger, Target(), (_, _) => Task.FromResult(new LocalReimportResponse(Plan: sourceSwitch ? SourceSwitchPlan() : Plan())),
+                parent.Token, value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, action => queued.Enqueue(action), sourceSwitch: sourceSwitch);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.False(committed); Assert.False(lateStatusMutation); Assert.False(timedOut);
         Assert.Contains(logger.Snapshot(), entry => entry.Message.Contains(new string('a', 32), StringComparison.Ordinal) && entry.Message.Contains("/state/plan.json", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData("Apply")]
-    [InlineData("Recover")]
-    [InlineData("Undo")]
-    public async Task QueuedFailedLifecycleDisplaysDiagnosticsEvenWithCurrentSavedPlan(string actionName)
+    [InlineData("Apply", false, true)]
+    [InlineData("Recover", false, true)]
+    [InlineData("Undo", false, true)]
+    [InlineData("Apply", true, true)]
+    [InlineData("Recover", true, true)]
+    [InlineData("Undo", true, true)]
+    [InlineData("Apply", false, false)]
+    [InlineData("Apply", true, false)]
+    public async Task QueuedFailedLifecycleDisplaysDiagnosticsEvenWithCurrentSavedPlan(string actionName, bool sourceSwitch, bool includeSavedPlan)
     {
         var action = Enum.Parse<LocalReimportAction>(actionName);
         var queued = new ConcurrentQueue<Action>();
         var requests = new ConcurrentQueue<LocalReimportRequest>();
         var timedOut = false; var verified = false;
-        var plan = Plan() with { Status = action == LocalReimportAction.Apply ? "planned" : "original-retained" };
+        var plan = (sourceSwitch ? SourceSwitchPlan() : Plan()) with { Status = action == LocalReimportAction.Apply ? "planned" : "original-retained" };
         var explanation = "Retained original needs exact recovery " + "\u001b[31m" + new string('x', 9000) + "DIAGNOSTIC_TAIL";
         await Task.Run(() =>
         {
@@ -258,7 +353,8 @@ public sealed class LocalReimportScreenTests
                 if (phase == 0)
                 {
                     phase = 1;
-                    if (action != LocalReimportAction.Apply) dialog.SubViews.OfType<TextField>().Single().Text = plan.Id;
+                    if (sourceSwitch) dialog.SubViews.OfType<TextField>().Last().Text = plan.LocalImport!.SourcePath;
+                    if (action != LocalReimportAction.Apply) dialog.SubViews.OfType<TextField>().First().Text = plan.Id;
                     Press(action == LocalReimportAction.Apply ? "_Prepare" : "_Inspect saved ID");
                 }
                 else if (phase == 1 && retention.Enabled)
@@ -269,17 +365,18 @@ public sealed class LocalReimportScreenTests
                 else if (phase == 2 && requests.Count == 2 && dialog.SubViews.OfType<Button>().Single(value => value.Text == "_Prepare").Enabled)
                 {
                     var text = dialog.SubViews.OfType<Editor>().Single().Text;
-                    var status = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:").Text;
+                    var status = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:" && value.Text != "New source:").Text;
                     Assert.Contains("Retained original needs exact recovery", text);
                     Assert.Contains("Failed/refused", status);
                     Assert.DoesNotContain('\u001b', text); Assert.DoesNotContain("DIAGNOSTIC_TAIL", text);
                     Assert.Contains("omitted", text);
                     if (action == LocalReimportAction.Apply)
                     {
+                        Assert.Contains(sourceSwitch ? "Local source switch results" : "Local reimport results", text);
                         Assert.Contains("Reconciliation needs fresh inventory", text);
                         Assert.Contains("Child stderr retained", text);
                     }
-                    Assert.Equal(plan.Id, dialog.SubViews.OfType<TextField>().Single().Text);
+                    Assert.Equal(plan.Id, dialog.SubViews.OfType<TextField>().First().Text);
                     Assert.Equal(CheckState.UnChecked, retention.Value);
                     foreach (var name in new[] { "_Apply reviewed", "_Recover reviewed", "_Undo reviewed" })
                         Assert.False(dialog.SubViews.OfType<Button>().Single(value => value.Text == name).Enabled);
@@ -302,13 +399,13 @@ public sealed class LocalReimportScreenTests
                     return Task.FromResult(new LocalReimportResponse(Plan: plan with { Succeeded = false, Status = "needs-recovery", Message = explanation }));
                 var failed = UpdateResult.Failure(false, 2, "Child stderr retained", []) with
                 {
-                    SavedPlan = plan,
+                    SavedPlan = includeSavedPlan ? plan : null,
                     ErrorMessage = explanation,
                     ReconciliationPartial = true,
                     Notices = [new("reconciliation", "Reconciliation needs fresh inventory")]
                 };
                 return Task.FromResult(new LocalReimportResponse(Preparation: failed));
-            }, parent.Token, value => dialog = value, callback => queued.Enqueue(callback));
+            }, parent.Token, value => dialog = value, callback => queued.Enqueue(callback), sourceSwitch: sourceSwitch);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.True(verified); Assert.False(timedOut); Assert.Equal(2, requests.Count);
     }

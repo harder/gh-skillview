@@ -54,6 +54,7 @@ public static partial class CliDispatcher
                 "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
                     or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
+            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
                     or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -83,6 +84,7 @@ public static partial class CliDispatcher
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
+            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
             or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner"
             or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
@@ -2306,6 +2308,8 @@ public static partial class CliDispatcher
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
             | `update-plan` | Resolve and stage an immutable newer revision, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--unpin`, `--allow-hidden-dirs`, `--json` |
+            | `source-switch-plan` | Review an ownerless local installation switching to a different existing durable ordinary local source. | exactly one `--path` or `--install-id`, `--new-source <absolute directory>`, `--json` |
+            | `source-switch-inspect`, `source-switch-apply`, `source-switch-recover`, `source-switch-undo` | Inspect or execute schema6; exact original retained; frozen recovery after retain. | `--id`, `--expect`, `--yes`, `--disposition replace-local-source-retain-original`, `--json` |
             | `reimport-plan` | Save a baseline-less replacement from the same recorded local source; retain the exact installed original. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
             | `reimport-inspect`, `reimport-apply`, `reimport-recover`, `reimport-undo` | Inspect or execute a saved local reimport. Recovery after the first retain uses frozen evidence. | `--id`, `--expect`, `--yes`, `--disposition replace-local-retain-original`, `--json` |
             | `unpin-plan` | Save a pin-only change to one physical installation, preserving installed content and its recorded source revision. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |

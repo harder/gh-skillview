@@ -20,6 +20,12 @@ parallel publish processes can contend on files such as
 `SkillView.Core.deps.json`. That contention is a verification artifact, not a
 product failure.
 
+Frozen native compatibility checkouts explicitly use `core.autocrlf=false` and
+`core.eol=lf` when creating their worktrees. Their later source-cleanliness checks
+disable inherited global Git configuration; a checkout converted by a Windows
+global setting can otherwise appear modified under that verification environment.
+Keep the clean-source refusal intact, including for genuine source edits.
+
 On a Linux ARM64 development host, solution restore can infer `linux-arm64` for
 the self-contained product hosts, outside the committed release RID matrix. For
 focused unit/UI verification, locked-restore and test `SkillView.Tests.csproj`
@@ -38,6 +44,11 @@ lease's canonical path, then require the copy to preserve that exact address.
 Lexical temporary paths can differ on macOS (`/var` versus `/private/var`).
 Exercise a real scan-root alias on Unix rather than normalizing away a mismatch;
 keep exact archive fingerprints, native identities and blob comparisons.
+For generic directory placement controls, use read-only native identity capture;
+relocation leases require an actual skill directory. Derive canonical expectations
+from that opened object so macOS `/var` aliases remain meaningful test inputs.
+TUI source-path fixtures must be fully qualified on the executing OS: `/new/demo`
+is root-relative on Windows and correctly fails preparation admission.
 
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,

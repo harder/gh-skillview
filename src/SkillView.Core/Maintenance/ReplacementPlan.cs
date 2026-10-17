@@ -52,7 +52,8 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRevision? Revision = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -70,7 +71,8 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerObservation? Owner = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ReplacementLocalSourceObservation? LocalSource { get; init; }

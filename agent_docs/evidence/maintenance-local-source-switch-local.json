@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 1,
+  "kind": "unpublished-local-source-switch-checkpoint",
+  "createdUtc": "2026-10-16T23:48:14.503767+00:00",
+  "baseCommit": "8e18345d01819512eb0568b86722d7ea7f13b968",
+  "branch": "codex/local-source-switch",
+  "publication": "Uncommitted isolated sixth worktree. PR68 is actually merged and verified at 4649d75fc3a4f9fdd7c22ca5593e629a1b559298; the schema5 producer is pinned to that exact merge. Actual merged link-retention/source6 base integration, final-source runtime compatibility proofs and fresh native gates remain required before publication. No branch Git operation was performed for this literal-only propagation.",
+  "implemented": "Schema6 ownerless local to different existing durable ordinary source: purpose-specific saved lifecycle and explicit replace-local-source-retain-original approval, raw C tracking splice and full supported metadata policy, old placement evidence separate from content/history, full new-C freshness before first actual retain and frozen recovery/undo thereafter, CLI source-switch family and Installed T owned modal. Schema1\u20135 new-field omission and family guards retained.",
+  "finalReviewedSource": {
+    "path": "/tmp/skillview-source-switch-evidence/local/source-hashes-final.json",
+    "sha256": "cd928881243c77c96ccaac66405e3ea4b4af4aa0558f2dfb82edef113639f047",
+    "totalFiles": 29,
+    "authorFiles": 27,
+    "rootDraftFiles": [
+      "agent_docs/evidence/prove-local-source-switch.py",
+      "tests/SkillView.MaintenanceProof/Program.cs"
+    ],
+    "hashes": {
+      "AGENTS.md": "fd205c8247cc88a64039ccc3884e2c47109e9f05228dd85c87a11bd36a7317ba",
+      "agent_docs/evidence/prove-local-source-switch.py": "59e78af92b3fa5cae4ec3417ecc3e9af0edee77c8e90b3c94a6e9d332d4be131",
+      "agent_docs/maintenance-local-source-switch.md": "30119c451d79cb36422dc344d60fc253b74bca701903f4d5c53a7c18124a56a7",
+      "docs/usage.md": "bc47f4d50e1c49d6c9fddc85e2fcd7ee9c150a1fab63f220d6b0a6ded9262661",
+      "src/SkillView.Core/Cli/CliDispatcher.Restore.cs": "bf906ff07ca87d53d58a9dd883d2adae8487114a389592b83bef0299ccb41f42",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "34cb1fd0b92d2632c3f45127439b1ca8efb68f059dcc00cbb8ad51f4c05538e0",
+      "src/SkillView.Core/Inventory/NativePlacementLease.cs": "af8b60cebf538293da1e8a9788ce28b4b882c1a3864c22da3a2e6d2f4bee349f",
+      "src/SkillView.Core/Inventory/UnixPlacement.cs": "b501554f00786fc89d8c7a213168360027401ca60e8e2e016da8442b46674580",
+      "src/SkillView.Core/Inventory/WindowsPlacement.cs": "3e9eb445998456a04d9b2a6e50f23025da3dea64c438d79f187c44f58df9741e",
+      "src/SkillView.Core/Maintenance/ReplacementLocalSourceSwitch.cs": "b95f9f1731060875c6e2faa7557958e73ba677a7b0bffa9cc38d480549dfd42d",
+      "src/SkillView.Core/Maintenance/ReplacementPlan.cs": "fadf58114da376df395c64feda90d1af97c40c4acae78d1f3a68e2a982e8a78a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.Validation.cs": "065964690601b08beec17dfb667a16fce027a5ce6b3d862e2c0a919f952ac243",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.cs": "415055c6c5f6f3d1e9103813ad2d75b1c081856ae9c66cea266d3982c118290a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalSourceSwitch.cs": "c3574e3afbd936b86fb2de24c9b4286b7dbb845a724d4d30423347c316cf8119",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unpin.cs": "9b740b697c833ab7247d990209ba4436d35fc644363d52ae19d347c6ca91ff2a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs": "c62f285427ade8b88bfc6bff750109a51bf82e835d6cfe8c4b2dc68651dd6cb0",
+      "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs": "d6a15e479f3ceb64d77135e35cce1d4ac2a81ff0b04e545f1eda532aa7f15693",
+      "src/SkillView.Core/Ui/InstalledScreen.cs": "8ac041ecc127ce4ce8ec719a29cbc4c153db510ede0695daefed5ab59d77b8a0",
+      "src/SkillView.Core/Ui/LocalReimportScreen.cs": "eccb02393340f3e2236442f9a3a261bab71deb64b3cbb23a63b7c43705a4ad7a",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "6f6d7e0a0912d40b648107b9c56801df5255af0b3ca574157e0c125803595218",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "414b99503d8c220dc978081a7b9c46f070ec66f88e741a2631ff836b0fce1f21",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "9969a254bd236e27f255feb0b75ab470c20b9e0bbe37da89bd28e59546a4dfb3",
+      "src/SkillView.Core/Ui/UpdateScreen.cs": "434893d922bc96ddc0a2b1024434fe3430887c53cf3d0117a71e3ab16faa9393",
+      "tests/SkillView.MaintenanceProof/Program.cs": "bcf1cb6e5e3013e95ebeadc7fce4d85277a0d39d5494a5d1daa0ef74c7c25276",
+      "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs": "2bb5ff54bc8fc515d352d845133afa9290bdb1c7b50000723dceb7e84a0e32dd",
+      "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs": "40784cecfdf7b7626572da6c792e023885b6d53b59ac51ec6d4494c323551f73",
+      "tests/SkillView.Tests/Inventory/NativePlacementTests.cs": "4b6d221e62e5eed5b639fdde0f804029b46fca18e482e7ebeb62e59550537352",
+      "tests/SkillView.Tests/Maintenance/LocalSourceSwitchTests.cs": "f52d4bf17f44ebf59c779ec641b6dadaef7805df932d9f810945834daf576cf8",
+      "tests/SkillView.Tests/Ui/LocalReimportScreenTests.cs": "b2de52d3173634eda60b59aa992738f6c549cfdd3a10e4df853e9de53950f7fb"
+    },
+    "qualification": "Historical final alias/placement snapshot before upstream corrections; current source is recorded separately below."
+  },
+  "validation": {
+    "sdk": "10.0.402",
+    "platform": "Linux ARM64",
+    "childTmpDir": "/var/tmp/skillview-source-switch-tests",
+    "finalReceipt": "/tmp/skillview-source-switch-evidence/local/validation-final.json",
+    "finalReceiptSha256": "a43a5acdad00e4cee210a270dc934ce633176b891c80a445c88ec15dddc6f58c",
+    "rawCommandsPath": "/tmp/skillview-source-switch-evidence/local/alias-final-execution.json",
+    "rawCommandsSha256": "caa443e452a428cd27648c081cef3433320ad9ca81cd1764a334c2847c9d75c5",
+    "finalCommands": [
+      {
+        "name": "alias-final-tests-format-write",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-tests-format-write.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "alias-final-build-tests",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-build-tests.log",
+        "sha256": "6aaa4fd85952dedcbd7d9f0f972ec8e783d309c87cbd8d4986d95f3662b659f7"
+      },
+      {
+        "name": "alias-final-build-proof",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-build-proof.log",
+        "sha256": "f0eaf96546571e59ad6d3beb3d1a1fe7081ef39bbf29d9fa29cd154f20828473"
+      },
+      {
+        "name": "alias-final-NativePlacementTests",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-NativePlacementTests.log",
+        "sha256": "1c9be72fdb3a5a6facc372558b9d72fd2ac1fed8d43d81af7a3da74ebcf72f40",
+        "tests": {
+          "total": 10,
+          "failed": 0,
+          "succeeded": 10,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "alias-final-LocalSourceSwitchTests",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-LocalSourceSwitchTests.log",
+        "sha256": "c0f29b8536272f4df64b25b2a1736205a55e60f9afcf3cd521d4d2b53b03e415",
+        "tests": {
+          "total": 17,
+          "failed": 0,
+          "succeeded": 17,
+          "skipped": 0
+        }
+      },
+      {
+        "name": "alias-final-format-core-verify",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-format-core-verify.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "alias-final-format-tests-verify",
+        "exitCode": 0,
+        "log": "/tmp/skillview-source-switch-evidence/local/alias-final-format-tests-verify.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "finalFocused": {
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "classes": {
+        "NativePlacementTests": 10,
+        "LocalSourceSwitchTests": 17
+      }
+    },
+    "builds": "Final Tests and MaintenanceProof JIT builds passed with zero warnings/errors. Core and Tests format verification passed.",
+    "historicalPreMountSource": {
+      "manifest": "/tmp/skillview-source-switch-evidence/local/source-hashes-before-mount-fix.json",
+      "sha256": "c46c99a2da9f943b5e1031ed4d0b63abdd5d90de79d389fab6b060e3bf21b8aa",
+      "commands": "/tmp/skillview-source-switch-evidence/local/final-execution.json",
+      "commandsSha256": "e6e4939c80d0c6ecbe34c6c03e325a4fb2e3a500da4df4efd412d0d527ef8093",
+      "unitTests": 377,
+      "integrationTests": 9,
+      "failed": 0,
+      "skipped": 0,
+      "builds": 3,
+      "scopedCachedLockedRestores": 2,
+      "formatVerifies": 4,
+      "qualification": "Before accepted Linux mount/alias/exact-address correction. These counts are historical and are not final-source whole-suite claims."
+    },
+    "failurePreservation": "Raw initial compilation failure and actual6/7 absolute-alias trial remain in final receipt. NO_XDEV was not relaxed; bounded native link expansion now proves same-boundary aliases and refuses mount/unknown/broken/dot cases.",
+    "fixtureIsolation": "Current source-switch fixtures use private HOME/USERPROFILE/CWD and explicit private GIT_DIR/WORK_TREE/COMMON_DIR plus GIT_CONFIG_COUNT=0; parent environment unchanged. Restores used only local package cache source, locked mode."
+  },
+  "independentReview": {
+    "path": "/tmp/skillview-source-switch-review/independent-product-review-alias-final.json",
+    "sha256": "28279bfce05ce271687cdc1f2611ba68c709832ae4edf0dceb614a5daaa1b589",
+    "result": "clear",
+    "scope": "Initial27-file product review plus final10-file mount/alias/exact-address delta and final27 test evidence; root proof drafts separately owned. Initial bind-alias finding closed.",
+    "qualification": "Historical scoped clear at the recorded 29-file snapshot; current upstream-fix delta has separate source and validation reviews below. Neither establishes native plan publication."
+  },
+  "limits": [
+    "Linux source/state placement refuses bind/mount transitions from held filesystem root, including legitimate directories on another mounted filesystem. Raw ancestor-link dot/dotdot targets and raw external dot paths refuse before normalization.",
+    "No actual successful schema6 plan publication/apply/recovery/App-AOT/private-Docker/macOS/Windows proof in this local receipt. Ordinary Linux fullmetadata refusal remains explicit, and existing tests may exercise refusal rather than positive publication.",
+    "Root-owned new runtime/nativeCI proofs and frozen actual schema1\u20135 compatibility remain pending. Schema5 producer source is now locked to verified PR68 merge 4649d75fc3a4f9fdd7c22ca5593e629a1b559298; actual producer build/current-consumer compatibility execution remains unverified.",
+    "Git-managed sources, owner transitions, fork creation, detachment and automatic merge remain unsupported. No fake B/revision/remote evidence.",
+    "Broader final-source tests require actual merged-base integration; no reuse of unrelated historical full-suite totals."
+  ],
+  "acceptance": {
+    "completed": 9,
+    "total": 21,
+    "M08": "incomplete",
+    "allOriginalCriteriaRetained": true,
+    "promotion": false
+  },
+  "knownInheritedIssues": {
+    "status": "corrected-locally-native-gates-pending",
+    "productFrozen": true,
+    "issues": [
+      {
+        "path": "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.Validation.cs",
+        "issue": "Lowercase Hash(skill) differs from uppercase native candidate PayloadEntry hashes; unchanged NativeUnpinEntry comparison rejects every changed plan before publication.",
+        "resolution": "Reviewed PR68 correction integrated while preserving schema6 guards; current local validation below."
+      },
+      {
+        "path": "src/SkillView.Core/Ui/LocalReimportScreen.cs",
+        "issue": "SavedPlan rendering hides Preparation.ErrorMessage/notices; direct recover/undo Plan.Message is omitted.",
+        "resolution": "Reviewed PR68 correction integrated while preserving schema6 guards; current local validation below."
+      },
+      {
+        "path": "src/SkillView.Core/Inventory/LocalInventoryService.cs",
+        "issue": "Local gh sourceURL was incorrectly projected into Upstream and blocked valid local admission.",
+        "resolution": "Native paths classified before URI parsing; exact local tracking and conflicting/unknown/legacy evidence retained. Exact reviewed upstream inventory bytes integrated."
+      }
+    ],
+    "qualification": "Historical scope before the merged-schema5 baseline binding recorded below. Prior 29-file counts remain historical. Current 38-file source includes reviewed corrections and 89 passing local focused tests. No successful changed schema5/6 native publication is claimed.",
+    "oldSchema5ProofBaseline": "Historical at this snapshot: UNSET-FINAL-MERGED-SCHEMA5-BASELINE; provisional 7d90 is not a valid positive producer because of the hash-case bug. No old-plan fabrication or saved fingerprint normalization is permitted."
+  },
+  "updatedUtc": "2026-10-17T02:02:32.083699+00:00",
+  "upstreamCorrections": {
+    "source": {
+      "path": "/tmp/skillview-source-switch-evidence/local/upstream-fixes-source-pretest.json",
+      "sha256": "baa1a949298d103f3a6c75f8687a6f6cde1b365556bf90001e3059374751f69e"
+    },
+    "files": {
+      "AGENTS.md": "368072bb25dd1bdebb2ae9103d8445bcdb1303bf2552251b62469a6b070eac88",
+      "agent_docs/evidence/prove-local-source-switch.py": "59e78af92b3fa5cae4ec3417ecc3e9af0edee77c8e90b3c94a6e9d332d4be131",
+      "agent_docs/evidence/prove-old-native-reimport.py": "1454c145424260664aec776dab26af37bc6904cc6fe16ec761d2776268a8b46b",
+      "agent_docs/evidence/run-local-source-switch-docker.py": "02bf10a18bd3605fc7e196b3811d016eec7a6399fba3ade3d1d67e0ca32b92a1",
+      "agent_docs/maintenance-local-reimport.md": "e2243fc9a352ef178adf61c79dbc8326511c98d1bed4ee1c3a56352520a7cc9b",
+      "agent_docs/maintenance-local-source-switch.md": "30119c451d79cb36422dc344d60fc253b74bca701903f4d5c53a7c18124a56a7",
+      "docs/usage.md": "bc47f4d50e1c49d6c9fddc85e2fcd7ee9c150a1fab63f220d6b0a6ded9262661",
+      "src/SkillView.Core/Cli/CliDispatcher.Restore.cs": "bf906ff07ca87d53d58a9dd883d2adae8487114a389592b83bef0299ccb41f42",
+      "src/SkillView.Core/Cli/CliDispatcher.cs": "34cb1fd0b92d2632c3f45127439b1ca8efb68f059dcc00cbb8ad51f4c05538e0",
+      "src/SkillView.Core/Inventory/LocalInventoryService.cs": "ba2a06f09240974e9c47ae2f79157c7a8250053412eba687cd5dabddfd7a6be2",
+      "src/SkillView.Core/Inventory/NativePlacementLease.cs": "af8b60cebf538293da1e8a9788ce28b4b882c1a3864c22da3a2e6d2f4bee349f",
+      "src/SkillView.Core/Inventory/UnixPlacement.cs": "b501554f00786fc89d8c7a213168360027401ca60e8e2e016da8442b46674580",
+      "src/SkillView.Core/Inventory/WindowsPlacement.cs": "3e9eb445998456a04d9b2a6e50f23025da3dea64c438d79f187c44f58df9741e",
+      "src/SkillView.Core/Maintenance/ReplacementLocalSourceSwitch.cs": "b95f9f1731060875c6e2faa7557958e73ba677a7b0bffa9cc38d480549dfd42d",
+      "src/SkillView.Core/Maintenance/ReplacementPlan.cs": "fadf58114da376df395c64feda90d1af97c40c4acae78d1f3a68e2a982e8a78a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.Validation.cs": "ff27350edd7c753355ccbc4c6dd04b5fadd6618c76db78891c550f6e44d19bc5",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalReimport.cs": "415055c6c5f6f3d1e9103813ad2d75b1c081856ae9c66cea266d3982c118290a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.LocalSourceSwitch.cs": "c3574e3afbd936b86fb2de24c9b4286b7dbb845a724d4d30423347c316cf8119",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.Unpin.cs": "9b740b697c833ab7247d990209ba4436d35fc644363d52ae19d347c6ca91ff2a",
+      "src/SkillView.Core/Maintenance/ReplacementPlanStore.cs": "c62f285427ade8b88bfc6bff750109a51bf82e835d6cfe8c4b2dc68651dd6cb0",
+      "src/SkillView.Core/Maintenance/SavedUpdateCoordinator.cs": "d6a15e479f3ceb64d77135e35cce1d4ac2a81ff0b04e545f1eda532aa7f15693",
+      "src/SkillView.Core/Ui/InstalledScreen.cs": "8ac041ecc127ce4ce8ec719a29cbc4c153db510ede0695daefed5ab59d77b8a0",
+      "src/SkillView.Core/Ui/LocalReimportScreen.cs": "c617a5a8012a01cf0b1405aefd938f4bce2a064c0c4e6053085fa245f4b1128d",
+      "src/SkillView.Core/Ui/SkillViewApp.cs": "6f6d7e0a0912d40b648107b9c56801df5255af0b3ca574157e0c125803595218",
+      "src/SkillView.Core/Ui/SkillViewWorkflowCoordinator.cs": "414b99503d8c220dc978081a7b9c46f070ec66f88e741a2631ff836b0fce1f21",
+      "src/SkillView.Core/Ui/Tabs/InstalledTabView.cs": "9969a254bd236e27f255feb0b75ab470c20b9e0bbe37da89bd28e59546a4dfb3",
+      "src/SkillView.Core/Ui/UpdateScreen.cs": "4d906615c330e12af86b8729ea3c5d7c9143577119c23615a26aba0cf856a4d7",
+      "tests/SkillView.MaintenanceProof/Program.cs": "bcf1cb6e5e3013e95ebeadc7fce4d85277a0d39d5494a5d1daa0ef74c7c25276",
+      "tests/SkillView.Tests/Cli/CliDispatcherErrorTests.cs": "2bb5ff54bc8fc515d352d845133afa9290bdb1c7b50000723dceb7e84a0e32dd",
+      "tests/SkillView.Tests/Cli/CliDispatcherHelpTests.cs": "40784cecfdf7b7626572da6c792e023885b6d53b59ac51ec6d4494c323551f73",
+      "tests/SkillView.Tests/Inventory/LocalCatalogSourceTests.cs": "3227988ba9ae7c37702d04155bd07d8244b22df4b9d1a0eea2bdcc788659066b",
+      "tests/SkillView.Tests/Inventory/NativePlacementTests.cs": "4b6d221e62e5eed5b639fdde0f804029b46fca18e482e7ebeb62e59550537352",
+      "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs": "a81a504f564d767a8ef616a455a70ac68755c6cb8332d5dcd145e843b0da99bb",
+      "tests/SkillView.Tests/Maintenance/LocalReimportAdmissionTests.cs": "0a749b39cdc57f723fce23f59c7a657b9b62e0c876f85492161469976e11ea12",
+      "tests/SkillView.Tests/Maintenance/LocalReimportCandidateValidationTests.cs": "dc8d93e30684d73296d2afb7e71e7f15a1f0b68d537713a33e2d0a4faf7e7dfd",
+      "tests/SkillView.Tests/Maintenance/LocalSourceSwitchTests.cs": "f52d4bf17f44ebf59c779ec641b6dadaef7805df932d9f810945834daf576cf8",
+      "tests/SkillView.Tests/Ui/LocalReimportScreenTests.cs": "c8a9a5d293bb6ae80b1cd719ef454e291262009947f4abbeed6c7ec4410ff141",
+      "tests/SkillView.Tests/Ui/UpdateScreenTests.cs": "18dd4e04b2c6259554ba71937d6b654ed8deeca2da09445f410d9eb3388a28e1"
+    },
+    "upstreamLocalCommit": "49f482cdd20a24351d6d832005ec6bb0f9d60731",
+    "upstreamPublication": "Historical at this local snapshot: Not yet pushed or merged; not an eligible frozen schema5 baseline.",
+    "validation": {
+      "path": "/tmp/skillview-source-switch-evidence/local/upstream-fixes-validation/summary.json",
+      "sha256": "b4d33212290c01509d3a4ae66b7ac8357e0902b71cec928e3ebdb3e237e54b60"
+    },
+    "focusedPassed": 89,
+    "failed": 0,
+    "skipped": 0,
+    "sourceUnchanged": true,
+    "staticReview": {
+      "path": "/tmp/skillview-source-switch-review/upstream-fixes-propagation-independent.json",
+      "sha256": "2ef33fe39e6323f845da52e58557f35d43e3c91e1dc7819830e9a1323815f22a"
+    },
+    "validationReview": {
+      "path": "/tmp/skillview-source-switch-review/upstream-fixes-propagation-validation-independent.json",
+      "sha256": "93be2b6e993789d1b154297310cffc5f12f339662804df6a3a7f63fdea9cc9cc"
+    },
+    "qualification": "Historical scope before the merged-schema5 baseline binding recorded below. Tests and Proof builds and Core/Tests format verification pass on Linux ARM64. Actual queued failure cases cover both modal families with and without a saved plan. No whole-suite, actual merged-base integration, native publication, Docker or AOT claim."
+  },
+  "newProofDrafts": {
+    "oldSchema5Script": {
+      "path": "/home/kevin/code/gh-skillview-local-source-switch/agent_docs/evidence/prove-old-native-reimport.py",
+      "sha256": "1454c145424260664aec776dab26af37bc6904cc6fe16ec761d2776268a8b46b"
+    },
+    "oldSchema5IndependentStaticReview": {
+      "path": "/tmp/skillview-source-switch-review/old-schema5-proof-root-independent.json",
+      "sha256": "80131ef90306c83c9174f23593653fcdcd3d4e50b9cd38a777e77253a78d6f3f"
+    },
+    "rootFilesystemDockerWrapper": {
+      "path": "/home/kevin/code/gh-skillview-local-source-switch/agent_docs/evidence/run-local-source-switch-docker.py",
+      "sha256": "02bf10a18bd3605fc7e196b3811d016eec7a6399fba3ade3d1d67e0ca32b92a1"
+    },
+    "wrapperIndependentReview": {
+      "path": "/tmp/skillview-source-switch-review/docker-wrapper-independent.json",
+      "sha256": "5a4f1ce05098868eef39529a6e45fb1032acda75a674a4b5b2547a45ecb1dbea"
+    },
+    "wrapperGuardReview": {
+      "path": "/tmp/skillview-source-switch-review/docker-wrapper-guard-supplement.json",
+      "sha256": "4a03cebfd96a7a7a34dfc2270a65972f70fb60032e6622b3b690aa6f0db7096e"
+    },
+    "actualGuards": {
+      "path": "/tmp/skillview-source-switch-evidence/local/draft-proof-guard-checks/summary.json",
+      "sha256": "eaa90fa38007aa49f839381d4a1d5be33c4d2a0dfa3f02bf3d4cd71e200bc59e"
+    },
+    "qualification": "Historical scope before the merged-schema5 baseline binding recorded below. Baseline remains UNSET and native execution refuses. AST/help, failure invalidation, no-allocation guard, generated shell syntax and actual two-repository inherited-Git-redirection regression only. Docker is unavailable locally; no native compatibility or workflow result."
+  },
+  "ciWiring": {
+    "workflow": {
+      "path": "/home/kevin/code/gh-skillview-local-source-switch/.github/workflows/ci.yml",
+      "sha256": "821e752c2b6c22f1a0c0a4b304b460bc8f36ff260164b9bf7676dfd4bc06d163"
+    },
+    "independentStaticReview": {
+      "path": "/tmp/skillview-source-switch-review/ci-wiring-independent.json",
+      "sha256": "3b32a7f669d20170e9d2dbe87aa632c1743d0a9cfc3431f7c6a9c5e27a4cb5af"
+    },
+    "actualLocalGuardAndRoutingChecks": {
+      "path": "/tmp/skillview-source-switch-evidence/local/ci-wiring-checks/summary.json",
+      "sha256": "318d7fdb7b8184c40633e187fadb03b1bbb80cc8dc9156387884e3a31593c691"
+    },
+    "independentGuardReview": {
+      "path": "/tmp/skillview-source-switch-review/ci-wiring-guards-independent.json",
+      "sha256": "a81f07be6f68bbd8ce6f66bba04ef1340c168d0e521645875ca261a943ce7993"
+    },
+    "checks": 7,
+    "scope": "Exact same-RID locked native schema5 baseline build; App/extension source-switch at both gh versions; actual old5 recovery at opposite kill boundaries; ordinary Linux root-mount CAP refusal separate from privileged root-filesystem Docker positives; raw proof and five input-source artifacts.",
+    "qualification": "Historical scope before the merged-schema5 baseline binding recorded below. Only YAML/bash syntax, actual disabled-baseline guard and shell command routing with test doubles. No new native App/proof/gh/Docker/privileged sudo or GitHub workflow execution. Existing non-AOT jobs and old run scripts unchanged; artifact paths extended; current UNSET baseline prevents fetch/publish. Native source-switch and compatibility results remain unverified."
+  },
+  "latestVerificationCorrections": {
+    "upstreamPublishedHead": "b5fff2cc086d207690eefd4019bd9dbdf771f1fd",
+    "copiedExactFiles": [
+      "agent_docs/evidence/prove-tracking-roundtrip.py",
+      "agent_docs/running-tests.md",
+      "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs"
+    ],
+    "sourceManifest": {
+      "path": "/tmp/skillview-source-switch-evidence/local/tracking-proof-correction/source-pretest.json",
+      "sha256": "f8dcf97647763d60fdde4bc1c97a5b99a1dd9a92ff3f140983901557846be9c3"
+    },
+    "totalFiles": 40,
+    "changedFromPrior38": [
+      "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs"
+    ],
+    "unchangedPriorFiles": 37,
+    "localValidation": {
+      "path": "/tmp/skillview-source-switch-evidence/local/tracking-proof-correction/summary.json",
+      "sha256": "526ca13883c9b63de84efed939dbcd9016b20dba8c25fa989ef42268e7955a29"
+    },
+    "archiveFocusedPassed": 6,
+    "archiveFocusedFailed": 0,
+    "archiveFocusedSkipped": 0,
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "formatExitCode": 0,
+    "upstreamIndependentSourceReview": {
+      "path": "/tmp/skillview-local-reimport-review/tracking-proof-correction-independent.json",
+      "sha256": "87bb1b1339d06ec6b9e483d40cbe99dd9a1e5e0240e6b173116c0124ef277ace"
+    },
+    "upstreamIndependentDocsReview": {
+      "path": "/tmp/skillview-local-reimport-review/tracking-proof-correction-docs-independent.json",
+      "sha256": "74ef2c16bed0fdfbe51b645017f67128a61cf57e66b7c49b2980349740e40ce2"
+    },
+    "qualification": "Historical scope before the merged-schema5 baseline binding recorded below. The earlier 38-file/89-test receipt remains historical for its exact source. Only the archive test class changed among those 38 files; it was rebuilt and rerun in full here with the real Unix alias. Production and the other 37 files are unchanged. Tracking proof and fixture are byte-identical to reviewed published b5fff2c. No actual merged-base/native/macOS/full-suite/schema5 compatibility result; old-schema5 baseline remains UNSET."
+  },
+  "mergedSchema5BaselineBinding": {
+    "baselineCommit": "4649d75fc3a4f9fdd7c22ca5593e629a1b559298",
+    "baselineTree": "9a58bbdb0a1786328dcb883e829ea5ea56e7cb10",
+    "reviewedHead": "b5fff2cc086d207690eefd4019bd9dbdf771f1fd",
+    "mergeVerification": {
+      "path": "/tmp/skillview-local-reimport-evidence/pr68-b5fff2/merge-readiness/merge-verified.json",
+      "sha256": "bd5a99b165eaf57cfb1a16b885d3f4257410fe3e3e34801e9e66ecd1e1910cfa"
+    },
+    "producer": {
+      "path": "/home/kevin/code/gh-skillview-local-source-switch/agent_docs/evidence/prove-old-native-reimport.py",
+      "sha256": "de9bc28528bfe364e647514557153c3cde3e075ce3aabf241e9dffe0b227244e"
+    },
+    "source40Manifest": {
+      "path": "/tmp/skillview-source-switch-evidence/local/merged-schema5-baseline/source-final.json",
+      "sha256": "f8d52a6287ed4c5cf16bfc6210bc9c02c6185684eebfe1470d455b24a9eabd1f"
+    },
+    "sourceDelta": {
+      "path": "/tmp/skillview-source-switch-evidence/local/merged-schema5-baseline/source-delta.json",
+      "sha256": "0780479208594df6946979bfa6169e68302230307520ca9359ffb83950873fe0"
+    },
+    "changedPaths": 1,
+    "unchangedPrior40Paths": 39,
+    "ciAndDockerBinding": "Existing CI and Docker wrapper extract this single literal and retain exact-source/tracked-clean/binary-hash checks. Their source hashes are unchanged. No independent alternate baseline or guard relaxation was added.",
+    "validation": {
+      "path": "/tmp/skillview-source-switch-evidence/local/merged-schema5-baseline/summary.json",
+      "sha256": "797aeca00dfcbf188da34bd99792cd1ea1bb67af8a2983b6a2aa66448d9405ec"
+    },
+    "checksPassed": 8,
+    "checksScope": "AST/help, exact CI literal extraction, actual missing-tool prior-positive invalidation, Docker-unavailable before output allocation, and malformed-baseline producer/wrapper early refusal. All other executable AST is identical to the reviewed producer; old raw bytes, fingerprints, archive hashes and absent schema6 fields remain asserted.",
+    "noSdkRequired": "No C# changes, SDK/build/tests, actual native executable, Git command, Docker, network, AI client or skill script execution in this delta.",
+    "historicalTests": "Prior40 six archive tests and prior38 89 focused tests remain historical for their exact source snapshots; no full-suite/native result is reused for the changed proof literal.",
+    "stillPending": "Actual same-RID baseline native publish and schema5 App/extension kill/recover/undo packets, actual merged link-retention/source6 base integration, full final-source gates and independent native artifact reviews. Freezing the producer is not proof of compatibility.",
+    "acceptance": "Original9/21 and all original criteria unchanged; M08 remains incomplete."
+  }
+}

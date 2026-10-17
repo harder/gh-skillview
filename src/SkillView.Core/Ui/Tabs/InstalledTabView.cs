@@ -43,6 +43,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill>? _onEffectiveLoading;
     private readonly Action<InstalledSkill>? _onPackageCheck;
     private readonly Action<InstalledSkill>? _onLocalReimport;
+    private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
     private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
@@ -84,7 +85,7 @@ internal sealed class InstalledTabView : FrameView
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onEffectiveLoading = null,
         Action<InstalledSkill>? onPackageCheck = null,
-        Action<InstalledSkill>? onLocalReimport = null)
+        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -97,6 +98,7 @@ internal sealed class InstalledTabView : FrameView
         _onEffectiveLoading = onEffectiveLoading;
         _onPackageCheck = onPackageCheck;
         _onLocalReimport = onLocalReimport;
+        _onLocalSourceSwitch = onLocalSourceSwitch;
         _lifetimeToken = lifetimeToken;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
@@ -617,6 +619,13 @@ internal sealed class InstalledTabView : FrameView
         {
             key.Handled = true;
             if (GetSelectedSkill() is { } selected) _onLocalReimport(selected);
+            return;
+        }
+        if (!_filterField.HasFocus && key.AsRune.Value == 'T' && _onLocalSourceSwitch is not null
+            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
+        {
+            key.Handled = true;
+            if (GetSelectedSkill() is { } selected) _onLocalSourceSwitch(selected);
             return;
         }
         // `P` (capital) cycles the pin filter — handled here rather than via

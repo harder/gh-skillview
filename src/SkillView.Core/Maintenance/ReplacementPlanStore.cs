@@ -169,7 +169,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             + (observation.Owner is null ? "" : " Registry owner state: " + observation.Owner.State + ".")
             + (observation.Owner?.Repair is not { } repair ? "" : $" Explicit owner repair would restore the entire retained registry image {repair.ImageHash} ({repair.Bytes} bytes, selected entry {repair.EntryState}, {repair.Direction} write {repair.WriteId}). Review its retained intent before authorizing repair. A matching prefix is evidence, not proof of which process changed the file."), observation.Owner)
             with
-        { LocalSource = InspectLocalSource(plan, session.Operation, observation.Topology, token) };
+        { LocalSource = InspectLocalSource(plan, session.Operation, observation.Topology, inventory, token) };
     }
 
     internal ReplacementResult Apply(string id, string expectedPlan, InventorySnapshot inventory, CancellationToken token,
@@ -288,6 +288,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             if (action == "retain")
             {
                 if (plan.LocalImport is not null) checkpoint?.Invoke("local-retain-intent");
+                RequireFreshPreviousPlacement(plan, inventory, token);
                 RequireFreshLocalSource(plan, session.Operation, token);
             }
             try
@@ -633,7 +634,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         new(plan.Id, status, succeeded, changed, canceled, plan.OriginalPath, Path.Combine(Root, plan.Id, "original"),
             Path.Combine(Root, plan.Id, CandidateName(plan)), Path.Combine(Root, plan.Id, "displaced"),
             plan.ReviewFingerprint, review, plan.ChangedPaths, message, plan.Subject, Path.Combine(Root, plan.Id, PlanName(plan)),
-            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport)
+            plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport, plan.LocalSourceSwitch)
         {
             Impact = PlanImpact(plan, status)
         };
@@ -723,11 +724,12 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 }
             }
             var plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
-            if (!((plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
+            if (!((plan.LocalSourceSwitch is null && plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 3 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is not null && plan.PinPolicy is null && hasMergePlan
                     || plan.SchemaVersion == 4 && plan.Purpose == "unpin-only" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is not null && !hasMergePlan))
-                    || plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is not null && !hasMergePlan)
+                    || plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.LocalSourceSwitch is null && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is not null && !hasMergePlan
+                    || plan.SchemaVersion == 6 && plan.Purpose == LocalSourceSwitchPurpose && plan.LocalSourceSwitch is not null && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && plan.LocalImport is not null && !hasMergePlan)
                 || plan.Id != id
                 || plan.LocalDisposition is { } disposition && (!IsMergeSlot(disposition.MergedSlot) || PlanName(plan) != latestPlanName)
                 || plan.Subject is null || plan.Original is null || plan.Candidate is null || plan.Subject.Metadata is null

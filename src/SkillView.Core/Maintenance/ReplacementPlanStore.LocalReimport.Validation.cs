@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using SkillView.Inventory;
+using SkillView.Inventory.Models;
 
 namespace SkillView.Maintenance;
 
@@ -10,10 +11,12 @@ internal sealed partial class ReplacementPlanStore
     {
         if (plan.LocalImport is not { } policy) return;
         _ = EffectiveOwner(plan);
+        ValidateLocalSourceSwitch(plan);
+        var switching = plan.LocalSourceSwitch is not null;
         RequireLocalSourceMetadata(plan.Subject.Metadata, true);
         RequireLocalSourceMetadata(policy.DesiredMetadata, true);
-        if (policy.SourcePath != plan.Subject.Metadata.LocalPath || policy.DesiredMetadata.LocalPath != policy.SourcePath
-            || !Path.IsPathFullyQualified(policy.CanonicalSourcePath) || policy.Disposition != LocalReimportDisposition
+        if (!switching && policy.SourcePath != plan.Subject.Metadata.LocalPath || policy.DesiredMetadata.LocalPath != policy.SourcePath
+            || !Path.IsPathFullyQualified(policy.CanonicalSourcePath) || policy.Disposition != (switching ? LocalSourceSwitchDisposition : LocalReimportDisposition)
             || policy.MetadataPolicy != PayloadMetadataReview.LocalImportPolicy || policy.Metadata.IsDefault
             || policy.Metadata.Any(item => item is null || item.Basis is null)
             || policy.SourceRootIdentity.CanonicalPath != Path.GetDirectoryName(policy.CanonicalSourcePath)
@@ -37,10 +40,18 @@ internal sealed partial class ReplacementPlanStore
         var output = CapturedPayloadArchive.Load(outputState, policy.Gh.OutputArchiveFingerprint, token).Archive;
         VerifyUnpinOriginal(plan.Original, installed, token);
         SameTracking(plan.Subject.Metadata, installed.Snapshot.FrontMatter ?? throw new IOException("Installed local metadata missing."));
+        if (switching && !SameParsedMetadata(plan.Subject.Metadata, installed.Snapshot.FrontMatter!))
+            throw new IOException("Saved source-switch subject metadata differs from captured I.");
         RequireLocalSourceMetadata(source.Snapshot.FrontMatter ?? throw new IOException("Captured local source metadata missing."), false);
         RequireSingleLocalSkill(source);
+        if (switching)
+        {
+            RequireOptionalCapturedLocalPath(source.Snapshot.FrontMatter!.LocalPath);
+            if (source.Snapshot.FrontMatter.LocalPath != plan.LocalSourceSwitch!.CapturedSourceRecordedPath)
+                throw new IOException("Captured source tracking observation differs from its immutable archive.");
+        }
         if (source.Snapshot.Path != policy.CanonicalSourcePath || source.Snapshot.FrontMatter!.Name != plan.Subject.Metadata.Name
-            || source.Snapshot.FrontMatter.LocalPath is { } path && path != policy.SourcePath
+            || !switching && source.Snapshot.FrontMatter.LocalPath is { } path && path != policy.SourcePath
             || source.Entries.Any(entry => entry.Entry.Kind == "link" || Path.GetFileName(entry.Entry.Path) is ".skill-lock.json" or "skills-lock.json")
             || input.Snapshot.Path != policy.Gh.InputPath || output.Snapshot.Path != policy.Gh.OutputPath
             || !source.Snapshot.Entries.SequenceEqual(input.Snapshot.Entries)
@@ -104,11 +115,11 @@ internal sealed partial class ReplacementPlanStore
     }
 
     private ReplacementLocalSourceObservation? InspectLocalSource(ReplacementPlan plan, NativeStateDirectory operation,
-        string topology, CancellationToken token)
+        string topology, InventorySnapshot inventory, CancellationToken token)
     {
         if (plan.LocalImport is null) return null;
         if (topology != "ready") return new("not-required-after-retain", "Recovery and undo use the frozen captured source; its current external path is not required.");
-        try { RequireFreshLocalSource(plan, operation, token); return new("current", "Durable local source still matches the full captured native evidence."); }
+        try { RequireFreshPreviousPlacement(plan, inventory, token); RequireFreshLocalSource(plan, operation, token); return new("current", "Durable local source still matches the full captured native evidence."); }
         catch (FileNotFoundException ex) { return new("unavailable", ex.Message); }
         catch (DirectoryNotFoundException ex) { return new("unavailable", ex.Message); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new("stale", ex.Message); }

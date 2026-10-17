@@ -9,7 +9,7 @@ namespace SkillView.Maintenance;
 internal sealed partial class ReplacementPlanStore
 {
     internal const string UnpinPurpose = "unpin-only";
-    internal static string Disposition(ReplacementPlan plan) => plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
+    internal static string Disposition(ReplacementPlan plan) => plan.LocalSourceSwitch is not null ? LocalSourceSwitchDisposition : plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
         : plan.LocalDisposition is null ? "retain-original" : "merge-reviewed";
 
     private static void RequirePurpose(ReplacementPlan plan, string? expectedPurpose)
@@ -22,12 +22,13 @@ internal sealed partial class ReplacementPlanStore
     {
         if (plan.LocalImport is not null)
         {
-            if (plan.SchemaVersion != 5 || plan.Purpose != LocalReimportPurpose || plan.Revision is not null
+            if (!(plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.LocalSourceSwitch is null
+                || plan.SchemaVersion == 6 && plan.Purpose == LocalSourceSwitchPurpose && plan.LocalSourceSwitch is not null) || plan.Revision is not null
                 || plan.LocalDisposition is not null || plan.PinPolicy is not null || !plan.Subject.Owners.IsEmpty)
                 throw new IOException("Local reimport conflicts with saved schema, purpose or owner authority.");
             return null;
         }
-        if (plan.SchemaVersion == 5 || plan.Purpose == LocalReimportPurpose)
+        if (plan.SchemaVersion is 5 or 6 || plan.Purpose is LocalReimportPurpose or LocalSourceSwitchPurpose || plan.LocalSourceSwitch is not null)
             throw new IOException("Local reimport lacks its explicit source policy.");
         if (plan.PinPolicy is not null)
         {

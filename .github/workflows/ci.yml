@@ -32,6 +32,8 @@ jobs:
         run: node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js
       - name: Test Homebrew formula renderer
         run: python3 -m unittest discover -s .github/scripts -p test_homebrew_formula.py
+      - name: Test frozen native-plan fixture contracts
+        run: python3 -m unittest discover -s agent_docs/evidence -p 'test_old_native_*.py'
 
   dependency-review:
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
@@ -169,6 +171,8 @@ jobs:
             --filter-class SkillView.Tests.Maintenance.CapturedResolutionArchiveTests \
             --filter-class SkillView.Tests.Maintenance.ReplacementLocalReviewTests \
             --filter-class SkillView.Tests.Inventory.NativeExposureLinkTests \
+            --filter-class SkillView.Tests.Inventory.NativePlacementTests \
+            --filter-class SkillView.Tests.Maintenance.LocalSourceSwitchTests \
             --filter-class SkillView.Tests.Maintenance.NativePayloadBorrowedHandleTests \
             | tee dist/windows-metadata-tests.log
       - name: Retain Windows metadata evidence
@@ -235,7 +239,7 @@ jobs:
           baseline_sha=0dba59be59776e6e654123aa1ce1e5496074763e
           baseline_path="$RUNNER_TEMP/skillview-unpin-baseline"
           git fetch --no-tags origin "$baseline_sha"
-          git worktree add --detach "$baseline_path" "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
           dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
@@ -249,13 +253,37 @@ jobs:
           baseline_sha=c919199a6861b9aaf9301e31c4b2945e098da799
           baseline_path="$RUNNER_TEMP/skillview-local-reimport-baseline"
           git fetch --no-tags origin "$baseline_sha"
-          git worktree add --detach "$baseline_path" "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
           dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
             -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
             -o "$baseline_path/dist/app"
           printf 'SKILLVIEW_UNPIN_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
+      - name: Build exact local-reimport native host for schema5 compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline_sha="$(python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path('agent_docs/evidence/prove-old-native-reimport.py').read_text())
+          values = [ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == 'BASELINE' for target in node.targets)]
+          assert len(values) == 1 and isinstance(values[0], str) and len(values[0]) == 40, 'Corrected merged schema5 baseline is not frozen'
+          assert all(character in '0123456789abcdef' for character in values[0]), 'Corrected merged schema5 baseline is not frozen'
+          print(values[0])
+          PY
+          )"
+          baseline_path="$RUNNER_TEMP/skillview-source-switch-baseline"
+          git fetch --no-tags origin "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
+          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
+            -c Release -r ${{ matrix.rid }} \
+            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
+            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
+            -o "$baseline_path/dist/app"
+          printf 'SKILLVIEW_REIMPORT_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
       - name: Prepare checksum-verified minimum and recorded current gh proof hosts
         shell: bash
         run: |
@@ -455,6 +483,65 @@ jobs:
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/local-reimport-privileged-$proof_name-proof" --platform linux/amd64
           done
+      - name: Prove local source switching and actual schema5 recovery on both native hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
+          proof_gh_minimum="$RUNNER_TEMP/skillview-proof-gh-minimum/gh${{ matrix.ext }}"
+          if [ '${{ matrix.rid }}' = linux-x64 ]; then
+            source_switch_tmp="$(sudo mktemp -d /skillview-source-switch-refusal.XXXXXXXX)"
+            sudo chown "$(id -u):$(id -g)" "$source_switch_tmp"
+            trap 'sudo rmdir -- "$source_switch_tmp"' EXIT
+            export TMPDIR="$source_switch_tmp"
+            python - <<'PY'
+          import os
+          assert os.stat('/').st_dev == os.stat(os.environ['TMPDIR']).st_dev
+          assert not os.path.ismount(os.environ['TMPDIR']), 'Placement refusal fixtures require the root mount'
+          PY
+          fi
+          prove_switch() {
+            if [ '${{ matrix.rid }}' = linux-x64 ]; then
+              python agent_docs/evidence/prove-local-source-switch.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-local-source-switch.py "$@"
+            fi
+          }
+          prove_schema5() {
+            if [ '${{ matrix.rid }}' = linux-x64 ]; then
+              python agent_docs/evidence/prove-old-native-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python agent_docs/evidence/prove-old-native-reimport.py "$@"
+            fi
+          }
+          prove_switch --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/local-source-switch-app-proof.json
+          prove_switch --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/local-source-switch-extension-proof.json
+          prove_schema5 --old-app "$SKILLVIEW_REIMPORT_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REIMPORT_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-reimport-app-proof.json
+          prove_schema5 --old-app "$SKILLVIEW_REIMPORT_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REIMPORT_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-reimport-extension-proof.json
+      - name: Prove privileged Linux source switching on the private container root
+        if: matrix.rid == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            proof_boundary=retain-moved
+            if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
+            python3 agent_docs/evidence/run-local-source-switch-docker.py \
+              --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
+              --gh "$RUNNER_TEMP/skillview-proof-gh-current/gh" --extra-gh "$RUNNER_TEMP/skillview-proof-gh-minimum/gh" \
+              --legacy-app "$SKILLVIEW_REIMPORT_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_REIMPORT_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
+              --output "dist/local-source-switch-privileged-$proof_name-proof" --platform linux/amd64
+          done
+      - name: Capture source-switch proof inputs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source-switch-proof-inputs
+          cp agent_docs/evidence/prove-local-source-switch.py agent_docs/evidence/prove-old-native-reimport.py \
+            agent_docs/evidence/prove-local-reimport.py agent_docs/evidence/run-local-source-switch-docker.py \
+            tests/SkillView.MaintenanceProof/Program.cs dist/source-switch-proof-inputs/
       - name: Prove actual previous native saved plans survive the new schema boundary
         shell: bash
         env:
@@ -540,5 +627,8 @@ jobs:
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**
             dist/local-reimport-privileged-*-proof/**
+            dist/local-source-switch-privileged-*-proof/**
+            dist/old-native-reimport-*-proof-raw/**
+            dist/source-switch-proof-inputs/**
           if-no-files-found: warn
           retention-days: 14

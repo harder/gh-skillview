@@ -149,6 +149,18 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
 
+- Local source switching uses schema6 `switch-local-source`, a separate
+  `LocalSourceSwitch` placement/history observation and explicit
+  `replace-local-source-retain-original` disposition. Keep schema5 exact.
+  Prove old-source canonical placement or native first-missing boundary before
+  private writes; unknown resolution must not use lexical fallback. Linux
+  placement follows ordinary ancestor aliases with `openat2` NO_XDEV, refusing
+  bind/cross-filesystem transitions rather than comparing namespace strings alone.
+  Old content
+  is never a base/freshness dependency; after actual retain, neither external
+  source is required for frozen recovery. See
+  `agent_docs/maintenance-local-source-switch.md`.
+
 - Local reimport uses schema5 `local-reimport` with `LocalImport`, omitting
   Revision/LocalDisposition/PinPolicy and preserving schema1–4 hashes. The same
   recorded ownerless local source must be fresh before the first actual retain;
