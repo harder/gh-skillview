@@ -13,16 +13,20 @@ public static partial class CliDispatcher
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token,
         MaintenancePlanReference? reference = null)
     {
+        services = services.CaptureContext();
         var requestedCommand = options.SubcommandName!;
+        var selectedRevision = requestedCommand.StartsWith("selected-", StringComparison.Ordinal);
+        var approvedRestore = requestedCommand.StartsWith("approved-", StringComparison.Ordinal);
         var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
         var localReimport = requestedCommand.StartsWith("reimport-", StringComparison.Ordinal);
         var unpinOnly = requestedCommand.StartsWith("unpin-", StringComparison.Ordinal);
-        var command = sourceSwitch ? "restore-" + requestedCommand[14..] : requestedCommand.StartsWith("update-", StringComparison.Ordinal)
+        var command = selectedRevision ? "restore-" + requestedCommand[9..] : approvedRestore ? "restore-" + requestedCommand[9..] : sourceSwitch ? "restore-" + requestedCommand[14..] : requestedCommand.StartsWith("update-", StringComparison.Ordinal)
             ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : localReimport ? "restore-" + requestedCommand[9..] : requestedCommand;
-        var expectedPurpose = sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
+        var expectedPurpose = selectedRevision ? ReplacementPlanStore.SelectedRevisionPurpose : approvedRestore ? ReplacementPlanStore.ApprovedRestorePurpose : sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
-        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null;
+        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null, approvalId = null, approvalExpected = null, revisionKind = null, revisionValue = null;
+        var selectedPin = false;
         var execute = false;
         var json = false;
         var allowHidden = false;
@@ -30,11 +34,16 @@ public static partial class CliDispatcher
         for (var index = 0; index < args.Count; index++)
         {
             if (args[index] == "--allow-hidden-dirs" && !allowHidden) { allowHidden = true; continue; }
+            if (args[index] == "--pin" && selectedRevision && command == "restore-plan" && !selectedPin) { selectedPin = true; continue; }
             if (args[index] == "--unpin" && latest && !unpin) { unpin = true; continue; }
             if (args[index] == "--json" && !json) { json = true; continue; }
             if (args[index] == "--yes" && !execute && command is not ("restore-plan" or "restore-inspect")) { execute = true; continue; }
             if (index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
             {
+                if (args[index] == "--revision-kind" && selectedRevision && command == "restore-plan" && revisionKind is null) { revisionKind = args[++index]; continue; }
+                if (args[index] == "--revision" && selectedRevision && command == "restore-plan" && revisionValue is null) { revisionValue = args[++index]; continue; }
+                if (args[index] == "--approval-id" && approvedRestore && command == "restore-plan" && approvalId is null) { approvalId = args[++index]; continue; }
+                if (args[index] == "--approval-expect" && approvedRestore && command == "restore-plan" && approvalExpected is null) { approvalExpected = args[++index]; continue; }
                 if (args[index] == "--new-source" && sourceSwitch && command == "restore-plan" && newSource is null) { newSource = args[++index]; continue; }
                 if (args[index] == "--path" && command == "restore-plan" && path is null && installId is null) { path = args[++index]; continue; }
                 if (args[index] == "--install-id" && command == "restore-plan" && path is null && installId is null) { installId = args[++index]; continue; }
@@ -46,10 +55,12 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
             return ExitCodes.InvalidUsage;
         }
-        if (sourceSwitch && command == "restore-plan" && (string.IsNullOrWhiteSpace(newSource) || !Path.IsPathFullyQualified(newSource) || newSource.Any(char.IsControl))
+        if (selectedRevision && command == "restore-plan" && (revisionKind is not ("tag" or "commit") || string.IsNullOrWhiteSpace(revisionValue) || revisionValue.Any(char.IsControl))
+            || approvedRestore && command == "restore-plan" && (!QuarantineStore.ValidId(approvalId!) || !QuarantineStore.ValidHash(approvalExpected!))
+            || sourceSwitch && command == "restore-plan" && (string.IsNullOrWhiteSpace(newSource) || !Path.IsPathFullyQualified(newSource) || newSource.Any(char.IsControl))
             || command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
-            || command == "restore-apply" && (!execute || !(sourceSwitch ? disposition == ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
+            || command == "restore-apply" && (!execute || !(selectedRevision ? disposition == ReplacementPlanStore.SelectedRevisionDisposition : approvedRestore ? disposition == ReplacementPlanStore.ApprovedRestoreDisposition : sourceSwitch ? disposition == ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command == "restore-ack-source" && (!execute || !QuarantineStore.ValidHash(expected!) || !QuarantineStore.ValidHash(sourceReview!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
@@ -76,7 +87,7 @@ public static partial class CliDispatcher
             ReplacementResult result;
             if (command == "restore-plan")
             {
-                if (gh is null && !unpinOnly) throw new IOException("Saved replacement staging requires GitHub CLI.");
+                if (gh is null && !unpinOnly && !approvedRestore) throw new IOException("Saved replacement staging requires GitHub CLI.");
                 InstalledSkill target;
                 if (localReimport || sourceSwitch) target = SelectLocalReimportTarget(inventory, path, installId);
                 else
@@ -87,9 +98,16 @@ public static partial class CliDispatcher
                     target = selected[0];
                 }
                 frozenImpact = OperationImpact.Payload(OperationSubject.From(target), requestedCommand);
-                if (latest || unpinOnly || localReimport || sourceSwitch)
+                if (approvedRestore)
                 {
-                    var preparation = sourceSwitch
+                    var approvals = ApprovedPayloadStore.For(services.Runner, services.Logger);
+                    result = await Task.Run(() => store.PlanApproved(new(approvals.Root, approvalId!, approvalExpected!), target, inventory, token), token).ConfigureAwait(false);
+                }
+                else if (latest || selectedRevision || unpinOnly || localReimport || sourceSwitch)
+                {
+                    var preparation = selectedRevision
+                        ? await Task.Run(() => store.PlanSelectedAsync(gh!, target, inventory, new(revisionKind!, revisionValue!, selectedPin), token), token).ConfigureAwait(false)
+                        : sourceSwitch
                         ? await Task.Run(() => store.PlanLocalSourceSwitchAsync(gh!, target, newSource!, inventory, token), token).ConfigureAwait(false)
                         : localReimport
                         ? await Task.Run(() => store.PlanLocalReimportAsync(gh!, target, inventory, token), token).ConfigureAwait(false)

@@ -13,7 +13,7 @@ internal sealed record GhApiPayload(int Status, string Body)
 
 /// Resolves the same latest-release/default-branch policy as gh, once. Every
 /// subsequent tree request is addressed by a full immutable Git object ID.
-internal sealed class GhRevisionResolver
+internal sealed partial class GhRevisionResolver
 {
     private readonly Func<string, CancellationToken, Task<GhApiPayload>> request;
     internal GhRevisionResolver(ProcessRunner runner, string ghPath) : this(async (endpoint, token) =>
@@ -39,14 +39,7 @@ internal sealed class GhRevisionResolver
     {
         token.ThrowIfCancellationRequested();
         var repo = Repository(repositoryUrl);
-        if (sourcePath is null) throw new IOException("An observed source subpath is required; update does not guess from a skill name.");
-        // gh accepts a recorded directory, a trailing slash, or its SKILL.md.
-        var path = SkillSourceIdentity.NormalizeSubpath(sourcePath)
-            ?? throw new IOException("The recorded source subpath is unsupported.");
-        if (path.Length > 4096 || path.Split('/').Length > 16
-            || path.Length > 0 && path.Split('/').Any(part => part is "" or "." or ".." or ".git"
-                || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
-            throw new IOException("The recorded source subpath is unsupported.");
+        var path = SourcePath(sourcePath);
         try
         {
             var release = await request($"repos/{repo}/releases/latest", token).ConfigureAwait(false);
@@ -57,60 +50,76 @@ internal sealed class GhRevisionResolver
                 var repository = await Get($"repos/{repo}", token).ConfigureAwait(false);
                 var branch = RequiredText(repository, "default_branch");
                 reference = "refs/heads/" + branch;
-                commit = await ResolveRef("heads", branch).ConfigureAwait(false);
+                commit = await ResolveRef(repo, "heads", branch, token).ConfigureAwait(false);
             }
             else
             {
                 RequireSuccess(release);
                 var tag = RequiredText(release.Body, "tag_name");
                 reference = "refs/tags/" + tag;
-                commit = await ResolveRef("tags", tag).ConfigureAwait(false);
+                commit = await ResolveRef(repo, "tags", tag, token).ConfigureAwait(false);
             }
-            var commitBody = await Get($"repos/{repo}/git/commits/{commit}", token).ConfigureAwait(false);
-            using var document = JsonDocument.Parse(commitBody);
-            if (document.RootElement.GetProperty("sha").GetString() != commit) throw new IOException("Resolved commit identity disagrees.");
-            var tree = FullId(document.RootElement.GetProperty("tree").GetProperty("sha").GetString());
-            foreach (var component in path.Length == 0 ? [] : path.Split('/'))
-            {
-                using var listing = JsonDocument.Parse(await Get($"repos/{repo}/git/trees/{tree}", token).ConfigureAwait(false));
-                var root = listing.RootElement;
-                if (root.GetProperty("sha").GetString() != tree || root.GetProperty("truncated").GetBoolean())
-                    throw new IOException("Source subpath tree coverage is incomplete.");
-                var items = root.GetProperty("tree");
-                if (items.GetArrayLength() > PayloadSnapshot.MaxEntries) throw new IOException("Source subpath tree entry limit exceeded.");
-                var selected = items.EnumerateArray().Where(item => item.GetProperty("path").GetString() == component).ToArray();
-                if (selected.Length != 1 || selected[0].GetProperty("type").GetString() != "tree"
-                    || selected[0].GetProperty("mode").GetString() != "040000")
-                    throw new IOException("The recorded source subpath is absent or is no longer a directory; review a source migration.");
-                tree = FullId(selected[0].GetProperty("sha").GetString());
-            }
+            var tree = await ResolveTree(repo, commit, path, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             return new(repositoryUrl, reference, commit, tree, path);
-
-            async Task<string> ResolveRef(string kind, string name)
-            {
-                if (string.IsNullOrWhiteSpace(name) || name.Length > 1024 || name.Any(char.IsControl))
-                    throw new IOException("Source ref is invalid.");
-                var body = await Get($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token).ConfigureAwait(false);
-                using var refDocument = JsonDocument.Parse(body);
-                if (refDocument.RootElement.GetProperty("ref").GetString() != "refs/" + kind + "/" + name)
-                    throw new IOException("Source reference response disagrees with the selected ref.");
-                var value = refDocument.RootElement.GetProperty("object");
-                for (var depth = 0; depth < 8; depth++)
-                {
-                    var sha = FullId(value.GetProperty("sha").GetString());
-                    if (value.GetProperty("type").GetString() == "commit") return sha;
-                    if (kind != "tags" || value.GetProperty("type").GetString() != "tag")
-                        throw new IOException("Source ref does not resolve to a commit.");
-                    using var tag = JsonDocument.Parse(await Get($"repos/{repo}/git/tags/{sha}", token).ConfigureAwait(false));
-                    if (tag.RootElement.GetProperty("sha").GetString() != sha) throw new IOException("Annotated tag identity disagrees.");
-                    value = tag.RootElement.GetProperty("object").Clone();
-                }
-                throw new IOException("Annotated tag depth limit exceeded.");
-            }
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
         { throw new IOException("Source revision response is malformed or unsupported.", ex); }
+    }
+
+    private static string SourcePath(string? sourcePath)
+    {
+        if (sourcePath is null) throw new IOException("An observed source subpath is required; update does not guess from a skill name.");
+        var path = SkillSourceIdentity.NormalizeSubpath(sourcePath)
+            ?? throw new IOException("The recorded source subpath is unsupported.");
+        if (path.Length > 4096 || path.Split('/').Length > 16
+            || path.Length > 0 && path.Split('/').Any(part => part is "" or "." or ".." or ".git"
+                || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
+            throw new IOException("The recorded source subpath is unsupported.");
+        return path;
+    }
+
+    private async Task<string> ResolveRef(string repo, string kind, string name, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 1024 || name.Any(char.IsControl))
+            throw new IOException("Source ref is invalid.");
+        using var document = JsonDocument.Parse(await Get($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token).ConfigureAwait(false));
+        if (document.RootElement.GetProperty("ref").GetString() != "refs/" + kind + "/" + name)
+            throw new IOException("Source reference response disagrees with the selected ref.");
+        var value = document.RootElement.GetProperty("object");
+        for (var depth = 0; depth < 8; depth++)
+        {
+            var sha = FullId(value.GetProperty("sha").GetString());
+            if (value.GetProperty("type").GetString() == "commit") return sha;
+            if (kind != "tags" || value.GetProperty("type").GetString() != "tag")
+                throw new IOException("Source ref does not resolve to a commit.");
+            using var tag = JsonDocument.Parse(await Get($"repos/{repo}/git/tags/{sha}", token).ConfigureAwait(false));
+            if (tag.RootElement.GetProperty("sha").GetString() != sha) throw new IOException("Annotated tag identity disagrees.");
+            value = tag.RootElement.GetProperty("object").Clone();
+        }
+        throw new IOException("Annotated tag depth limit exceeded.");
+    }
+
+    private async Task<string> ResolveTree(string repo, string commit, string path, CancellationToken token)
+    {
+        using var document = JsonDocument.Parse(await Get($"repos/{repo}/git/commits/{commit}", token).ConfigureAwait(false));
+        if (document.RootElement.GetProperty("sha").GetString() != commit) throw new IOException("Resolved commit identity disagrees.");
+        var tree = FullId(document.RootElement.GetProperty("tree").GetProperty("sha").GetString());
+        foreach (var component in path.Length == 0 ? [] : path.Split('/'))
+        {
+            using var listing = JsonDocument.Parse(await Get($"repos/{repo}/git/trees/{tree}", token).ConfigureAwait(false));
+            var root = listing.RootElement;
+            if (root.GetProperty("sha").GetString() != tree || root.GetProperty("truncated").GetBoolean())
+                throw new IOException("Source subpath tree coverage is incomplete.");
+            var items = root.GetProperty("tree");
+            if (items.GetArrayLength() > PayloadSnapshot.MaxEntries) throw new IOException("Source subpath tree entry limit exceeded.");
+            var selected = items.EnumerateArray().Where(item => item.GetProperty("path").GetString() == component).ToArray();
+            if (selected.Length != 1 || selected[0].GetProperty("type").GetString() != "tree"
+                || selected[0].GetProperty("mode").GetString() != "040000")
+                throw new IOException("The recorded source subpath is absent or is no longer a directory; review a source migration.");
+            tree = FullId(selected[0].GetProperty("sha").GetString());
+        }
+        return tree;
     }
 
     private async Task<string> Get(string endpoint, CancellationToken token)

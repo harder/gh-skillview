@@ -48,7 +48,7 @@ internal sealed record MaintenancePlanReference(int SchemaVersion, string Id, st
         if (result.SchemaVersion != 1 || !QuarantineStore.ValidId(result.Id)
             || !QuarantineStore.ValidHash(result.PlanFingerprint) || !QuarantineStore.ValidHash(result.ContextFingerprint)
             || !QuarantineStore.ValidHash(result.InstallationId) || !Path.IsPathFullyQualified(result.OriginalPath)
-            || result.Purpose is not ("update-revision" or "restore-recorded" or "unpin-only" or "local-reimport" or "switch-local-source"))
+            || result.Purpose is not ("update-revision" or "restore-recorded" or "unpin-only" or "local-reimport" or "switch-local-source" or "selected-revision" or "restore-approved"))
             throw new IOException("Unsupported or incomplete local plan reference.");
         return result;
     }

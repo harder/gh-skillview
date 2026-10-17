@@ -30,10 +30,10 @@ public sealed class GhBinaryLocator
         : this(
             runner,
             logger,
-            () => Environment.GetEnvironmentVariable("PATH"),
+            () => runner.GetEffectiveEnvironmentVariable("PATH"),
             File.Exists,
-            () => Environment.GetEnvironmentVariable("GH_PATH"),
-            () => Environment.GetEnvironmentVariable("GH_EXTENSION"))
+            () => runner.GetEffectiveEnvironmentVariable("GH_PATH"),
+            () => runner.GetEffectiveEnvironmentVariable("GH_EXTENSION"))
     {
     }
 
@@ -86,7 +86,7 @@ public sealed class GhBinaryLocator
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var candidate = Path.Combine(entry, executable);
+                var candidate = Path.GetFullPath(Path.Combine(entry, executable), _runner.EffectiveWorkingDirectory);
                 var exists = _fileExists(candidate);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (exists)

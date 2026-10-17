@@ -203,21 +203,25 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
-        var requiredDisposition = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchDisposition : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
+        var requiredDisposition = review.Approval is not null ? ReplacementPlanStore.ApprovedRestoreDisposition : review.Selection is not null ? ReplacementPlanStore.SelectedRevisionDisposition : review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchDisposition : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
             : review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
         if (disposition != requiredDisposition)
             return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
             { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "The saved local-change disposition needs explicit approval.")] };
+        var purpose = review.Approval is not null ? ReplacementPlanStore.ApprovedRestorePurpose
+            : review.Selection is not null ? ReplacementPlanStore.SelectedRevisionPurpose
+            : review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose
+            : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null;
         var result = Empty(false) with { SavedPlan = review };
         var attempted = false;
         try
         {
             token.ThrowIfCancellationRequested();
             if (review.SourceReview is { } source && review.AcknowledgeSourceReview)
-                plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token);
+                plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token, purpose);
             attempted = true;
             var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
-                review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);
+                purpose);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
@@ -308,6 +312,6 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
             status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
-            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.LocalSourceSwitch is not null ? "source-switch-inspect" : plan.LocalImport is not null ? "reimport-inspect" : plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
+            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.Approval is not null ? "approved-inspect" : plan.Selection is not null ? "selected-inspect" : plan.LocalSourceSwitch is not null ? "source-switch-inspect" : plan.LocalImport is not null ? "reimport-inspect" : plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
         { Impact = plan.Impact };
 }

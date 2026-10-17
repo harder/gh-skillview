@@ -80,7 +80,7 @@ public static class UpdateScreen
     {
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
-        sb.AppendLine(plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
+        sb.AppendLine(plan.Approval is not null ? "### Saved approved restore review" : plan.Selection is not null ? "### Saved selected revision review" : plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);
         Field("Installation ID", plan.Subject.InstallationId);
@@ -89,8 +89,17 @@ public static class UpdateScreen
         Field("Manifest", plan.PlanPath);
         Field("Retained original", plan.RetainedPath);
         Field("Candidate", plan.CandidatePath);
-        Field("Disposition", plan.LocalImport is not null ? plan.LocalImport.Disposition : plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
+        Field("Disposition", plan.Approval is not null ? SkillView.Maintenance.ReplacementPlanStore.ApprovedRestoreDisposition : plan.Selection is not null ? SkillView.Maintenance.ReplacementPlanStore.SelectedRevisionDisposition : plan.LocalImport is not null ? plan.LocalImport.Disposition : plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
         Field("Review fingerprint", plan.ReviewFingerprint);
+        if (plan.Approval is { } approval)
+        {
+            Field("Approval ID", approval.Reference.Id); Field("Approval fingerprint", approval.Reference.Fingerprint);
+            Field("Captured provenance", approval.Header.Kind); Field("Captured source", approval.Header.Subject.Metadata.Upstream ?? approval.Header.Subject.Metadata.LocalPath);
+            Field("Captured ref", approval.Header.Subject.Metadata.GithubRef); Field("Captured tree", approval.Header.Subject.Metadata.GithubTreeSha);
+            Field("Captured actual pin", approval.Header.Subject.Metadata.PinnedRef ?? (approval.Header.Subject.Metadata.Pinned ? "recorded" : "none observed"));
+            Field("Captured payload", approval.Header.Captured.Payload); Field("Metadata policy", approval.Header.MetadataPolicy);
+            sb.AppendLine("This is captured installed/custom evidence, not proof of pristine upstream authenticity or session activation. Desired intent was a separate consent. Applying retains the exact current original; started recovery/undo uses copied archives without external approval/source access.");
+        }
         if (plan.LocalSourceSwitch is { } change)
         {
             Field("Previous recorded source", change.PreviousRecordedPath);
@@ -168,7 +177,9 @@ public static class UpdateScreen
             var resultVersion = plan.LocalDisposition is { } disposition ? disposition.ResultAuthoredVersion : revision.DesiredMetadata.Version;
             Field("Authored version", $"{plan.Subject.Metadata.Version ?? "unspecified"} -> {resultVersion ?? "unspecified"}");
             if (plan.LocalDisposition is not null) Field("Source authored version", revision.DesiredMetadata.Version ?? "unspecified");
-            Field("Pin", plan.Subject.Metadata.Pinned || plan.Subject.Metadata.PinnedRef is not null
+            if (plan.Selection is not null)
+                Field("Pin", $"{plan.Subject.Metadata.PinnedRef ?? (plan.Subject.Metadata.Pinned ? "recorded" : "unpinned")} -> {revision.DesiredMetadata.PinnedRef ?? (revision.DesiredMetadata.Pinned ? "recorded" : "unpinned")}");
+            else Field("Pin", plan.Subject.Metadata.Pinned || plan.Subject.Metadata.PinnedRef is not null
                 ? $"{plan.Subject.Metadata.PinnedRef ?? plan.Subject.Metadata.GithubRef} -> explicitly unpinned" : "unpinned -> unpinned");
             Field("Local changes", revision.LocalChanges.Length.ToString());
             foreach (var path in revision.LocalChanges) Field("Local", path);

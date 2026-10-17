@@ -44,6 +44,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill>? _onPackageCheck;
     private readonly Action<InstalledSkill>? _onLocalReimport;
     private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
+    private readonly Action<InstalledSkill>? _onApprovedPayload;
     private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
@@ -85,7 +86,7 @@ internal sealed class InstalledTabView : FrameView
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onEffectiveLoading = null,
         Action<InstalledSkill>? onPackageCheck = null,
-        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null)
+        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null, Action<InstalledSkill>? onApprovedPayload = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -99,6 +100,7 @@ internal sealed class InstalledTabView : FrameView
         _onPackageCheck = onPackageCheck;
         _onLocalReimport = onLocalReimport;
         _onLocalSourceSwitch = onLocalSourceSwitch;
+        _onApprovedPayload = onApprovedPayload;
         _lifetimeToken = lifetimeToken;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
@@ -501,7 +503,7 @@ internal sealed class InstalledTabView : FrameView
     internal static string BuildSearchScopeText() => "name · path · agent · package";
 
     internal static string BuildLegendText() =>
-        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check · R local reimport";
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check · R local reimport · T source switch · A immutable approval";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -619,6 +621,13 @@ internal sealed class InstalledTabView : FrameView
         {
             key.Handled = true;
             if (GetSelectedSkill() is { } selected) _onLocalReimport(selected);
+            return;
+        }
+        if (!_filterField.HasFocus && key.AsRune.Value == 'A' && _onApprovedPayload is not null
+            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
+        {
+            key.Handled = true;
+            if (GetSelectedSkill() is { } selected) _onApprovedPayload(selected);
             return;
         }
         if (!_filterField.HasFocus && key.AsRune.Value == 'T' && _onLocalSourceSwitch is not null

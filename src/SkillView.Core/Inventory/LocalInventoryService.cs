@@ -206,14 +206,26 @@ public sealed class LocalInventoryService
         {
             var read = CleanupSuppressionStore.ReadFor(_contextRunner, snapshot.ProtectedRoots.Select(root => root.Path)
                 .Concat(observed.Select(skill => skill.ResolvedPath)).ToArray(), cancellationToken);
+            var desired = DesiredRevisionPolicyStore.ReadFor(_contextRunner, snapshot.ProtectedRoots.Select(root => root.Path)
+                .Concat(observed.Select(skill => skill.ResolvedPath)).ToArray(), cancellationToken);
             long byteBudget = 32 * 1024 * 1024;
             var enriched = observed.Select(skill =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var suppression = CleanupSuppressionStore.Match(skill, read, cancellationToken, ref byteBudget);
-                return skill with { Ignored = suppression.Active, CleanupSuppression = suppression };
+                return skill with
+                {
+                    Ignored = suppression.Active,
+                    CleanupSuppression = suppression,
+                    DesiredPolicy = DesiredRevisionPolicyStore.Match(skill, desired)
+                };
             }).ToImmutableArray();
-            return snapshot with { Skills = enriched, PreferenceDiagnostics = read.Diagnostic is { } message ? [message] : [] };
+            return snapshot with
+            {
+                Skills = enriched,
+                PreferenceDiagnostics = new[] { read.Diagnostic, desired.Diagnostic }
+                .OfType<string>().ToImmutableArray()
+            };
         }, cancellationToken).ConfigureAwait(false);
     }
 

@@ -8,7 +8,7 @@ internal sealed partial class ReplacementPlanStore
     private ReplacementPlan FreezeSourceReview(ReplacementPlan plan, NativeStateDirectory operation,
         NativeDirectoryMoveLease original, NativeDirectoryMoveLease candidate, CancellationToken token)
     {
-        if (!sourceReviewRequired || plan.PinPolicy is not null) return plan;
+        if ((!sourceReviewRequired && !RequiresSourceReview(plan)) || plan.PinPolicy is not null) return plan;
         var suffix = plan.LocalDisposition?.MergedSlot ?? "candidate";
         var oldName = "review-installed-" + suffix; var newName = "review-source-" + suffix;
         CapturedPayloadArchive.Capture(operation, oldName, original, token);
@@ -19,8 +19,8 @@ internal sealed partial class ReplacementPlanStore
     private ReplacementPlan ReviewFromArchives(ReplacementPlan plan, NativeStateDirectory operation,
         string oldName, string newName, CancellationToken token)
     {
-        using var oldState = OpenArchive(operation, oldName, token);
-        using var newState = OpenArchive(operation, newName, token);
+        using var oldState = OpenSourceReviewArchive(plan, operation, oldName, token);
+        using var newState = OpenSourceReviewArchive(plan, operation, newName, token);
         var before = CapturedPayloadArchive.Load(oldState, null, token);
         var after = CapturedPayloadArchive.Load(newState, null, token);
         if (before.Archive.Snapshot.Fingerprint != plan.Original.Payload
@@ -34,6 +34,10 @@ internal sealed partial class ReplacementPlanStore
             SourceUpdateReview.Hash(report), report)
         };
     }
+
+    private static NativeStateDirectory OpenSourceReviewArchive(ReplacementPlan plan, NativeStateDirectory operation,
+        string name, CancellationToken token) => RequiresSourceReview(plan)
+            ? operation.OpenExistingDirectory(name, token) : OpenArchive(operation, name, token);
 
     private const int MaxSourceReviewEntries = 3 * (MaxMergeAttempts + 1);
     private static bool IsSourceReviewEntry(string name) =>
@@ -80,9 +84,15 @@ internal sealed partial class ReplacementPlanStore
         return new(1, plan.Id, plan.ReviewFingerprint, review.Fingerprint, review.InstalledManifest,
             review.CandidateManifest, plan.Original.Payload, plan.Candidate.Payload, plan.ContextFingerprint, SourceUpdateReview.Declaration);
     }
+    private static bool RequiresSourceReview(ReplacementPlan plan) => plan.SchemaVersion is SelectedRevisionSchema or ApprovedRestoreSchema;
+
     private static void RequireSourceReceipt(Session session, CancellationToken token)
     {
-        if (session.Plan.SourceReview is null) return; // Explicit legacy contract, never a reviewed state.
+        if (session.Plan.SourceReview is null)
+        {
+            if (RequiresSourceReview(session.Plan)) throw new IOException("Schema7/8 requires frozen independent source-review evidence; no receipt-less producer exists.");
+            return; // Explicit historical schemas1–6 contract, never a reviewed state.
+        }
         SourceReviewReceipt actual;
         try { actual = Read(session.Operation, ReceiptName(session.Plan), SourceReviewJsonContext.Default.SourceReviewReceipt, token); }
         catch (IOException ex) { throw new IOException("Explicit source-review acknowledgement is required for this exact saved plan. Inspect its frozen diff and acknowledge its source-review fingerprint separately from retention approval.", ex); }
@@ -105,15 +115,19 @@ internal sealed partial class ReplacementPlanStore
     }
     private static void ValidateSourceReview(ReplacementPlan plan, NativeStateDirectory operation, CancellationToken token, bool verifyBytes = false)
     {
-        if (plan.SourceReview is not { } review) return;
+        if (plan.SourceReview is not { } review)
+        {
+            if (RequiresSourceReview(plan)) throw new IOException("Schema7/8 requires its actual independent source-review contract.");
+            return;
+        }
         var suffix = plan.LocalDisposition?.MergedSlot ?? "candidate";
         if (review.Version != 1 || plan.PinPolicy is not null
             || review.InstalledArchive != "review-installed-" + suffix || review.CandidateArchive != "review-source-" + suffix
             || !QuarantineStore.ValidHash(review.InstalledManifest) || !QuarantineStore.ValidHash(review.CandidateManifest)
             || !QuarantineStore.ValidHash(review.Fingerprint) || review.Report is null || SourceUpdateReview.Hash(review.Report) != review.Fingerprint)
             throw new IOException("Source-review contract or report fingerprint is invalid.");
-        using var oldState = OpenArchive(operation, review.InstalledArchive, token);
-        using var newState = OpenArchive(operation, review.CandidateArchive, token);
+        using var oldState = OpenSourceReviewArchive(plan, operation, review.InstalledArchive, token);
+        using var newState = OpenSourceReviewArchive(plan, operation, review.CandidateArchive, token);
         var before = CapturedPayloadArchive.Load(oldState, review.InstalledManifest, token).Archive;
         var after = CapturedPayloadArchive.Load(newState, review.CandidateManifest, token).Archive;
         if (before.Snapshot.Fingerprint != plan.Original.Payload || after.Snapshot.Fingerprint != plan.Candidate.Payload)

@@ -35,6 +35,45 @@ public sealed class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task CapturedContextCopiesCallerValuesAndDerivedChildrenUseThatSnapshot()
+    {
+        using var folder = new ContextDirectory();
+        const string name = "SKILLVIEW_CAPTURE_TEST";
+        const string late = "SKILLVIEW_CAPTURE_LATE";
+        var values = new Dictionary<string, string> { [name] = "captured", [late] = "" };
+        var runner = new ProcessRunner(new Logger(), environment: values, defaultWorkingDirectory: folder.Path);
+        var captured = runner.CaptureContext(); var fingerprint = captured.CaptureContextFingerprint();
+        values[name] = "changed"; values[late] = "added-later";
+        var absent = "SKILLVIEW_CAPTURE_ABSENT_" + Guid.NewGuid().ToString("N");
+        values[absent] = "added-later";
+        Assert.Same(captured, captured.CaptureContext());
+        Assert.Equal("captured", captured.GetEffectiveEnvironmentVariable(name));
+        Assert.Equal("", captured.GetEffectiveEnvironmentVariable(late));
+        Assert.Null(captured.GetEffectiveEnvironmentVariable(absent));
+        Assert.False(captured.CaptureEnvironment().ContainsKey(absent));
+        Assert.Equal(fingerprint, captured.CaptureContextFingerprint());
+        Assert.NotEqual(fingerprint, runner.CaptureContextFingerprint());
+        var copied = captured.CaptureEnvironment(); copied[name] = "copy-mutation";
+        Assert.Equal("captured", captured.GetEffectiveEnvironmentVariable(name));
+        var child = captured.WithContext(folder.Path, new Dictionary<string, string> { [name] = "derived" });
+        var command = OperatingSystem.IsWindows()
+            ? ("pwsh", new[] { "-NoProfile", "-Command", "[Console]::Write($env:SKILLVIEW_CAPTURE_TEST + '|' + $env:SKILLVIEW_CAPTURE_LATE)" })
+            : ("/bin/sh", new[] { "-c", "printf '%s|%s' \"$SKILLVIEW_CAPTURE_TEST\" \"$SKILLVIEW_CAPTURE_LATE\"" });
+        var result = await child.RunAsync(command.Item1, command.Item2, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(result.Succeeded, result.StdErr);
+        Assert.Equal("derived|", result.StdOut);
+        Assert.Equal(folder.Path, child.EffectiveWorkingDirectory);
+        Assert.Equal("captured", captured.GetEffectiveEnvironmentVariable(name));
+    }
+
+    private sealed class ContextDirectory : IDisposable
+    {
+        private readonly DirectoryInfo folder = Directory.CreateTempSubdirectory("skillview-context-");
+        internal string Path => folder.FullName;
+        public void Dispose() => folder.Delete(true);
+    }
+
+    [Fact]
     public async Task RunAsync_EnvironmentOverridesAreChildOnly()
     {
         const string name = "SKILLVIEW_STAGE_TEST";

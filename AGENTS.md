@@ -12,6 +12,40 @@
   host credentials/config or weaker fallback. Fake process tests prove protocol,
   not actual isolation or agent quality. See `agent_docs/maintenance-isolated-evaluation.md`.
 
+- Approved payload archives are independent native retained evidence, never
+  pristine upstream B/C merely because installed/custom bytes were captured.
+  Require a held completed approval and separate expected fingerprint to set
+  desired intent; an ID/string pair is insufficient. Schema8 restore-approved
+  retains its copied evidence for started recovery/undo without source access.
+  Schema7/8 producers freeze actual independent source-review archives and require
+  their exact receipt below CLI, for first Apply and forward Recover; absent-field
+  legacy fallback is not applicable. See also
+  `agent_docs/maintenance-approved-existing-target.md`.
+  See `agent_docs/maintenance-approved-payloads.md`.
+
+- The gh locator must use its runner's effective PATH/GH_PATH/GH_EXTENSION,
+  resolving relative PATH components against that runner's CWD. Captured or
+  isolated children must never select a parent-environment executable by fallback.
+
+- Selected revision preparation freezes a typed tag/full commit and actual gh
+  output; never invent a symbolic commit ref or revisit a tag during apply.
+  Provider archive capture does not imply complete native metadata authority.
+  Compare every authored SKILL header/body/mode with the selected source before
+  publication; validate original YAML before installer-only normalization.
+  Freeze full child environment/CWD once at preparation entry, derive private
+  contexts from that snapshot, and persist only its digest. Schema7 has no
+  receipt-less legacy producer: first apply/recovery requires its policy receipt.
+  Schema7 uses its own purpose/disposition and omits Selection from schemas1–5.
+  See `agent_docs/maintenance-selected-revisions.md`.
+
+- Desired revision intent is separate private policy. Only positive native
+  missing-child evidence authorizes default allow; corrupt/inaccessible/stale
+  policy refuses. Hold the desired-policy writer before replacement/operation/
+  registry/payload authorities and bind first apply to its immutable receipt.
+  Started native recovery and undo retain their existing authority independently
+  of later policy. Clearing intent never clears actual pins or revives old
+  approvals. See `agent_docs/maintenance-desired-revisions.md`.
+
 - `gh skill list` uses `sourceURL` for both repository URLs and local paths.
   Classify native absolute paths before URI parsing and preserve the exact
   scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.

@@ -7,7 +7,7 @@ using Terminal.Gui.App;
 
 namespace SkillView.Ui;
 
-internal sealed class SkillViewWorkflowCoordinator
+internal sealed partial class SkillViewWorkflowCoordinator
 {
     private readonly TuiServices _services;
     private readonly AppOptions _options;

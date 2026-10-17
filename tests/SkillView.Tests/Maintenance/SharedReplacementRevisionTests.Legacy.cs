@@ -72,6 +72,10 @@ public sealed partial class SharedReplacementRevisionTests
         using (var writer = new Utf8JsonWriter(bytes)) Canonical(document.RootElement, writer);
         saved = saved with { ReviewFingerprint = Convert.ToHexStringLower(SHA256.HashData(bytes.ToArray())) };
         File.WriteAllBytes(planned.PlanPath, JsonSerializer.SerializeToUtf8Bytes(saved, ReplacementJsonContext.Default.ReplacementPlan));
+        // The frozen historical image predates policy receipts as well as the
+        // equal-owner optimization. Do not retain a receipt for the different
+        // current-helper fingerprint used to seed this compatibility fixture.
+        File.Delete(Path.Combine(Path.GetDirectoryName(planned.PlanPath)!, "desired-policy.json"));
         return planned with { PlanFingerprint = saved.ReviewFingerprint, Revision = saved.Revision };
 
         static void Canonical(JsonElement value, Utf8JsonWriter writer)

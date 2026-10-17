@@ -10,6 +10,7 @@ public static partial class CliDispatcher
 {
     private static async Task<int> MaintenanceAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
+        services = services.CaptureContext();
         var command = options.SubcommandName!;
         var arguments = options.SubcommandArgs.ToList();
         var json = arguments.Contains("--json");
@@ -58,12 +59,35 @@ public static partial class CliDispatcher
                 "unpin-only" => "unpin",
                 "local-reimport" => "reimport",
                 "switch-local-source" => "source-switch",
+                "restore-approved" => "approved",
+                "selected-revision" => "selected",
                 _ => throw new ArgumentException("Unsupported plan purpose; no owner transition was selected.")
             };
+            if (command == "plan" && purpose != "selected-revision" && (arguments.Contains("--revision") || arguments.Contains("--revision-kind") || arguments.Contains("--pin")))
+                throw new ArgumentException("Typed revision options require selected-revision purpose.");
+            if (command == "plan" && purpose == "selected-revision" && (!arguments.Contains("--revision") || !arguments.Contains("--revision-kind")))
+                throw new ArgumentException("Selected revision requires --revision-kind tag|commit --revision VALUE and optional explicit --pin.");
             if (command == "plan" && arguments.Contains("--unpin") && purpose != "update-revision")
                 throw new ArgumentException("--unpin is supported only by an update-revision plan; standalone unpin uses purpose unpin-only.");
             if (command == "plan" && arguments.Contains("--new-source") && purpose != "switch-local-source")
                 throw new ArgumentException("--new-source is supported only by a switch-local-source plan.");
+            if (command == "plan" && purpose != "restore-approved" && (arguments.Contains("--approval-id") || arguments.Contains("--approval-expect")))
+                throw new ArgumentException("Approval options require restore-approved purpose.");
+            if (command == "plan" && purpose == "restore-approved" && (!arguments.Contains("--approval-id") || !arguments.Contains("--approval-expect")))
+                throw new ArgumentException("Approved restore requires --approval-id --approval-expect separate from later source and retention consent.");
+            if (command == "plan" && purpose == "restore-approved")
+            {
+                if (!QuarantineStore.ValidId(arguments[arguments.IndexOf("--approval-id") + 1])
+                    || !QuarantineStore.ValidHash(arguments[arguments.IndexOf("--approval-expect") + 1]))
+                    throw new ArgumentException("Approved restore requires an exact archive ID and separate fingerprint.");
+            }
+            if (command == "plan" && purpose == "selected-revision")
+            {
+                var kind = arguments[arguments.IndexOf("--revision-kind") + 1];
+                var value = arguments[arguments.IndexOf("--revision") + 1];
+                try { new SelectedRevisionRequest(kind, value, arguments.Contains("--pin")).Validate(); }
+                catch (IOException ex) { throw new ArgumentException(ex.Message, ex); }
+            }
             if (command == "plan" && purpose == "switch-local-source")
             {
                 var sourceIndex = arguments.IndexOf("--new-source");
@@ -95,6 +119,8 @@ public static partial class CliDispatcher
                     {
                         "local-reimport" => disposition == "replace-local-retain-original",
                         "switch-local-source" => disposition == ReplacementPlanStore.LocalSourceSwitchDisposition,
+                        "restore-approved" => disposition == ReplacementPlanStore.ApprovedRestoreDisposition,
+                        "selected-revision" => disposition == ReplacementPlanStore.SelectedRevisionDisposition,
                         "unpin-only" => disposition == "unpin-only",
                         "update-revision" => disposition is "retain-original" or "merge-reviewed",
                         _ => disposition == "retain-original"
@@ -134,8 +160,8 @@ public static partial class CliDispatcher
             if (!seen.Add(argument)) throw new ArgumentException("Duplicate maintenance option: " + argument);
             if (argument is "--json" or "--allow-hidden-dirs") continue;
             if (argument == "--yes" && command is "apply" or "repair" or "undo") continue;
-            if (argument == "--unpin" && command == "plan") continue;
-            var valued = command == "plan" ? argument is "--purpose" or "--path" or "--install-id" or "--new-source"
+            if (argument is "--unpin" or "--pin" && command == "plan") continue;
+            var valued = command == "plan" ? argument is "--purpose" or "--path" or "--install-id" or "--new-source" or "--approval-id" or "--approval-expect" or "--revision-kind" or "--revision"
                 : argument == "--plan-file" || argument == "--expect" && command is "apply" or "repair" or "undo"
                     || argument == "--disposition" && command == "apply";
             if (!valued || ++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index])

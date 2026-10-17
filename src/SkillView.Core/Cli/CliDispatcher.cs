@@ -47,6 +47,8 @@ public static partial class CliDispatcher
                 "queue" => await QueueAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "inspect" or "plan" or "apply" or "repair" or "verify" => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "undo" when options.SubcommandArgs.Contains("--plan-file") => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "approval-inspect" or "approval-capture" => await ApprovalAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "policy-inspect" or "policy-set" or "policy-clear" => await DesiredPolicyAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -59,7 +61,7 @@ public static partial class CliDispatcher
                 "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
                     or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "selected-plan" or "selected-ack-source" or "selected-inspect" or "selected-apply" or "selected-recover" or "selected-undo" or "approved-plan" or "approved-ack-source" or "approved-inspect" or "approved-apply" or "approved-recover" or "approved-undo" or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
                     or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -87,11 +89,11 @@ public static partial class CliDispatcher
         "evaluate-review" => TimeSpan.FromMinutes(2),
         "evaluate-run" => TimeSpan.FromMinutes(10),
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "check" or "authoring-validate" or "queue" or "inspect" or "verify" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "approval-inspect" or "approval-capture" or "policy-inspect" or "policy-set" or "policy-clear" or "list" or "effective" or "check" or "authoring-validate" or "queue" or "inspect" or "verify" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "plan" or "apply" or "repair" or "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "selected-plan" or "selected-ack-source" or "selected-inspect" or "selected-apply" or "selected-recover" or "selected-undo" or "approved-plan" or "approved-ack-source" or "approved-inspect" or "approved-apply" or "approved-recover" or "approved-undo" or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
             or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner"
             or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
@@ -444,6 +446,15 @@ public static partial class CliDispatcher
             w.WriteBoolean("isSymlinked", skill.IsSymlinked);
             w.WriteBoolean("ignored", skill.Ignored);
             WriteSuppression(w, skill.CleanupSuppression);
+            w.WritePropertyName("desiredRevisionPolicy");
+            if (skill.DesiredPolicy is not { } desired) w.WriteNullValue();
+            else
+            {
+                w.WriteStartObject(); w.WriteString("status", desired.Status); w.WriteString("reason", desired.Reason);
+                w.WriteString("fingerprint", desired.Fingerprint); w.WritePropertyName("intent");
+                JsonSerializer.Serialize(w, desired.Policy, SkillView.Preferences.DesiredPolicyJsonContext.Default.DesiredRevisionPolicy);
+                w.WriteString("runtimeState", "unknown"); w.WriteEndObject();
+            }
             w.WriteString("githubTreeSha", skill.TreeSha);
             w.WriteString("version", skill.FrontMatter.Version);
             w.WriteString("description", skill.FrontMatter.Description);
@@ -2312,8 +2323,11 @@ public static partial class CliDispatcher
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
             | `queue` | Refresh read-only maintenance observations grouped by issue and physical installation. Update availability and running-session state remain unknown. | `--install-id`, `--allow-hidden-dirs`, `--json` (schema 1) |
             | `inspect` | Inspect one exact installation, or verify locations of a saved local plan reference. | `--path` / `--install-id`, or `--plan-file`, `--json` |
-            | `plan` | Save one immutable specialist candidate and compare installed/candidate file evidence. JSON includes a local plan reference. | `--purpose update-revision` / `restore-recorded` / `unpin-only` / `local-reimport` / `switch-local-source`, `--path` / `--install-id`, `--new-source` for source switching, `--json` |
+            | `plan` | Save one immutable specialist candidate and compare installed/candidate file evidence. JSON includes a local plan reference. | `--purpose update-revision` / `restore-recorded` / `unpin-only` / `local-reimport` / `switch-local-source` / `restore-approved` / `selected-revision`, `--path` / `--install-id`, `--new-source` for source switching, approved restore `--approval-id --approval-expect`; selected revision `--revision-kind tag|commit --revision VALUE [--pin]`, `--json` |
             | `apply`, `repair`, `undo`, `verify` | Resolve a bounded local plan-reference file through the retained native store. Repair resumes a recognized transaction; it never invents owner repair. | `--plan-file`, execution requires separate `--yes --expect`; apply also requires explicit specialist `--disposition`; `--json` |
+            | `approval-inspect`, `approval-capture` | Preview actual installed bytes or retain an immutable native archive; capture never sets desired intent or approves source. | `--path` / `--install-id`, inspection `--id --expect`, capture `--yes --expect-payload`, optional `--selected-plan-file`, `--json` |
+            | `policy-inspect` | Inspect desired revision intent separately from actual pin and session state. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `policy-set`, `policy-clear` | Publish selected installation intent without changing payloads or actual pin metadata. | `--path` or `--install-id`, `--mode`, `--ref`, `--expect`, `--yes`, `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |

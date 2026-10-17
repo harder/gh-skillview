@@ -479,7 +479,8 @@ public sealed class SkillViewApp
             onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill),
             onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
-            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()))
+            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
+            onApprovedPayload: skill => _workflows.ShowApprovedPayload(skill, GetRunLifetimeToken()))
         {
             X = 0,
             Y = 2,

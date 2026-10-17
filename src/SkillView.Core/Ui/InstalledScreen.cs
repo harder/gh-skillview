@@ -98,6 +98,12 @@ public static class InstalledScreen
             s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
         AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
         AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned)));
+        if (s.DesiredPolicy is { } desired)
+        {
+            AppendDetailItem(sb, "Desired revision policy", MarkdownTableFormatter.FormatCodeSpan(desired.Policy?.Mode ?? desired.Status));
+            AppendDetailItem(sb, "Desired policy evidence", MarkdownTableFormatter.FormatTableCell(desired.Reason));
+            if (desired.Policy?.RequestedRef is { } requested) AppendDetailItem(sb, "Desired ref", MarkdownTableFormatter.FormatCodeSpan(requested));
+        }
         if (s.FrontMatter.GithubRef is { } repositoryRef) AppendDetailItem(sb, "Repository ref", MarkdownTableFormatter.FormatCodeSpan(repositoryRef));
         if (s.FrontMatter.PinnedRef is { } pinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(pinnedRef));
         if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));

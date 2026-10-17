@@ -9,17 +9,35 @@ namespace SkillView.Maintenance;
 internal sealed partial class ReplacementPlanStore
 {
     internal const string UnpinPurpose = "unpin-only";
-    internal static string Disposition(ReplacementPlan plan) => plan.LocalSourceSwitch is not null ? LocalSourceSwitchDisposition : plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
+    internal static string Disposition(ReplacementPlan plan) => plan.Approval is not null ? ApprovedRestoreDisposition : plan.Selection is not null ? SelectedRevisionDisposition : plan.LocalSourceSwitch is not null ? LocalSourceSwitchDisposition : plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
         : plan.LocalDisposition is null ? "retain-original" : "merge-reviewed";
 
     private static void RequirePurpose(ReplacementPlan plan, string? expectedPurpose)
     {
-        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null : plan.Purpose != expectedPurpose)
+        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null || plan.Selection is not null || plan.Approval is not null : plan.Purpose != expectedPurpose)
             throw new IOException("This command cannot operate on the saved " + plan.Purpose + " purpose.");
     }
 
     private static ReplacementOwnerTransition? EffectiveOwner(ReplacementPlan plan)
     {
+        if (plan.Approval is not null)
+        {
+            if (plan.SchemaVersion != ApprovedRestoreSchema || plan.Purpose != ApprovedRestorePurpose || plan.Revision is not null
+                || plan.LocalDisposition is not null || plan.PinPolicy is not null || plan.LocalImport is not null || plan.LocalSourceSwitch is not null || plan.Selection is not null)
+                throw new IOException("Approved restore conflicts with its saved purpose or owner authority.");
+            return plan.Approval.Owner;
+        }
+        if (plan.SchemaVersion == ApprovedRestoreSchema || plan.Purpose == ApprovedRestorePurpose)
+            throw new IOException("Approved restore lacks its exact captured approval authority.");
+        if (plan.Selection is not null)
+        {
+            if (plan.SchemaVersion != SelectedRevisionSchema || plan.Purpose != SelectedRevisionPurpose || plan.Revision is null
+                || plan.LocalDisposition is not null || plan.PinPolicy is not null || plan.LocalImport is not null || plan.LocalSourceSwitch is not null)
+                throw new IOException("Selected revision conflicts with its saved purpose or owner authority.");
+            return plan.Revision.Owner;
+        }
+        if (plan.SchemaVersion == SelectedRevisionSchema || plan.Purpose == SelectedRevisionPurpose)
+            throw new IOException("Selected revision lacks its provider and request evidence.");
         if (plan.LocalImport is not null)
         {
             if (!(plan.SchemaVersion == 5 && plan.Purpose == LocalReimportPurpose && plan.LocalSourceSwitch is null
@@ -90,6 +108,7 @@ internal sealed partial class ReplacementPlanStore
         }
         // Initialize private ancestors before freezing the registry-parent
         // generation; creating state must never refresh an already saved plan.
+        using var desiredPolicy = AcquireDesiredPolicy(target, inventory, UnpinPurpose, token);
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token); CheckWriter(writer);
         var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
@@ -136,6 +155,7 @@ internal sealed partial class ReplacementPlanStore
             ValidatePinPolicy(plan, operation, token);
             plan = plan with { ReviewFingerprint = PlanHash(plan) };
             Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
+            WriteDesiredPolicyReceipt(operation, plan, desiredPolicy, token);
             return ReplacementPreparation.Saved(Result(plan, "planned", true, false, false, plan.ReviewFingerprint,
                 "Saved standalone unpin. Source, recorded ref/tree and authored payload are preserved; no source was resolved. All shown exposures share this policy change. Applying swaps a metadata-preserving clone with new native object identities and regenerated timestamps; exact original native objects remain retained for undo. Review pin/owner changes and approve retention before applying."));
         }

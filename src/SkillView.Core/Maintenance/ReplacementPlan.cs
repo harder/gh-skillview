@@ -35,6 +35,9 @@ internal sealed record ReplacementRevision(ResolvedSkillRevision Source, SkillFr
     ReplacementEvidence? RecordedBase, ImmutableArray<string> LocalChanges,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementOwnerTransition? Owner = null);
 
+internal sealed record ReplacementSelection(GhPinnedRevisionWitness Provider, string MetadataPolicy,
+    ImmutableArray<PayloadMetadataRecipe> Metadata);
+
 internal sealed record ReplacementOwnerTransition(string RegistryPath, string Selector, SecureFileIdentity Identity,
     byte[] BeforeEntry, byte[] DesiredEntry, string BeforeFingerprint, string DesiredFingerprint, DateTimeOffset UpdatedAt,
     SecureFileIdentity ParentIdentity);
@@ -54,7 +57,9 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceReviewEvidence? SourceReview = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceReviewEvidence? SourceReview = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementSelection? Selection = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementApproval? Approval = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -73,7 +78,9 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementSelection? Selection = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementApproval? Approval = null)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ReplacementLocalSourceObservation? LocalSource { get; init; }

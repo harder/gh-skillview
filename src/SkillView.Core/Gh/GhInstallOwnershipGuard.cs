@@ -11,8 +11,10 @@ internal static class GhInstallOwnershipGuard
     internal sealed record Context(ImmutableArray<SkillPackage> Claims, ManagedSkillDiscovery.Observation Managed,
         ProcessRunner Runner, GhSkillInstallService.Options Options)
     {
+        internal ImmutableArray<InstalledSkill> Pins { get; init; } = [];
         internal bool NeedsManagedSelectors(IReadOnlyList<string> destinations) => Managed.Regions.Any(region =>
             destinations.Any(destination => region.Covers(destination) || region.IsInside(destination)));
+        internal bool NeedsExactSelectors(IReadOnlyList<string> destinations) => !Pins.IsEmpty || NeedsManagedSelectors(destinations);
     }
 
     internal static Context Capture(IReadOnlyList<string> destinations, ProcessRunner runner,
@@ -33,8 +35,19 @@ internal static class GhInstallOwnershipGuard
         bool Covers(IEnumerable<string> roots) => roots.Any(root => destinations.Any(destination => SameDirectory(root, destination)));
         if (diagnostics.Any(diagnostic => diagnostic.CoveredRoots.IsEmpty || Covers(diagnostic.CoveredRoots)))
             throw new IOException("Destination ownership is incomplete; resolve its lockfile diagnostics before installing.");
+        var inaccessible = new List<string>();
+        var existing = discoveryRoots.Where(path => !NativeStatePresence.IsMissing(path, token)).ToArray();
+        var scanned = new LocalSkillScanner(logger).ScanWithCancellation(existing.Select(path => new ScanRoot(path, Scope.Custom, null)).ToArray(),
+            new(AllowHiddenDirs: true), token, inaccessible);
+        if (inaccessible.Count > 0) throw new IOException("Destination pin-policy inspection is incomplete; no install write was admitted.");
+        if (scanned.Any(skill => skill.Validity is ValidityState.InvalidMetadata or ValidityState.UnparsableFrontMatter
+            || !skill.FrontMatter.Diagnostics.IsDefaultOrEmpty || !skill.MetadataConflicts.IsDefaultOrEmpty
+            || !skill.OwnershipDiagnostics.IsDefaultOrEmpty))
+            throw new IOException("Destination tracking or pin metadata is invalid or unknown; no install child was admitted.");
+        var pins = scanned.Where(skill => skill.Pinned || skill.Revision.PinnedRef is not null).ToImmutableArray();
         return new(observations.Where(observation => Covers(observation.Package.CoveredRoots))
-            .Select(observation => observation.Package).ToImmutableArray(), managed, runner, options);
+            .Select(observation => observation.Package).ToImmutableArray(), managed, runner, options)
+        { Pins = pins };
     }
 
     internal static void Validate(Context context, IReadOnlyList<string> destinations, IReadOnlyList<string>? selectors,
@@ -52,6 +65,10 @@ internal static class GhInstallOwnershipGuard
             context.Options.ProcessEnvironment, context.Options.WorkingDirectory, discoverPayloads: false);
         ManagedSkillDiscovery.Refuse(live, selected);
         ManagedSkillDiscovery.Refuse(live, replacements, includeContainedRegions: true);
+        if (!context.Pins.IsEmpty)
+        {
+            throw new IOException("An admitted install root contains an exact pinned installation. Use a saved exact-target workflow; selector-to-native placement is not proven for protected siblings.");
+        }
         if (context.Claims.IsEmpty) return;
         if (selectors is null || selectors.Count == 0)
             throw new IOException("The source's exact installation names are unresolved in an owned destination; use a coordinated maintenance plan.");

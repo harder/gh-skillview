@@ -68,6 +68,21 @@ public sealed class ReplacementPlanStoreTests : IDisposable
         Assert.True(result.Succeeded, result.Message); Assert.Equal("installed", result.Status); return result;
     }
 
+    [Theory]
+    [InlineData("approved-payload")]
+    [InlineData("approved-original")]
+    [InlineData("approved-selected-source")]
+    [InlineData("approved-selected-provider")]
+    public async Task ApprovalArchiveNamesNeverAdmitUnexpectedDirectoriesToLegacyPlans(string name)
+    {
+        var plan = await Plan(); var before = PayloadSnapshot.Capture(Payload, Token);
+        Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(plan.PlanPath)!, name));
+        var error = Assert.Throws<IOException>(() => Store().Inspect(plan.Id, Inventory(), Token));
+        Assert.Contains("Unsafe replacement journal entry", error.Message);
+        Assert.False(Directory.Exists(plan.RetainedPath));
+        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+    }
+
     [Fact]
     public async Task TransientIdentityProjectionsDoNotAlterSavedSubjectOrResultSerialization()
     {

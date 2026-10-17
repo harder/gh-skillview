@@ -23,6 +23,12 @@ internal abstract class NativeStateDirectory : IDisposable
         throw new IOException("Anonymous native metadata witnesses are unavailable.");
     internal abstract void ValidateLocation(CancellationToken token);
     internal abstract NativeStateDirectory CreateStagingDirectory(string name, CancellationToken token);
+    // Existing descendants remain relative to this held parent. A canonical
+    // pathname alone cannot bind a separately reopened child to its owner.
+    // Child lifetime must be nested inside parent lifetime: the child borrows
+    // its parent's guard/handles and must be disposed before that parent.
+    internal virtual NativeStateDirectory OpenExistingDirectory(string name, CancellationToken token) =>
+        throw new IOException("Held state child admission is unavailable.");
     internal virtual NativePayloadDirectory CreatePayloadDirectory(string name, CancellationToken token) =>
         throw new IOException("Payload materialization is unavailable for this state authority.");
     internal virtual NativePayloadDirectory CreateMetadataPayloadDirectory(string name, CancellationToken token) => CreatePayloadDirectory(name, token);

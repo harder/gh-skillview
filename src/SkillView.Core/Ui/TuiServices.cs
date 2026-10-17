@@ -41,6 +41,13 @@ public sealed class TuiServices
         { ["GH_NO_UPDATE_NOTIFIER"] = "1", ["GH_NO_EXTENSION_UPDATE_NOTIFIER"] = "1", ["GH_TELEMETRY"] = "false" };
         if (processEnvironment is not null) foreach (var (key, value) in processEnvironment) childEnvironment[key] = value;
         var runner = new ProcessRunner(logger, environment: childEnvironment, defaultWorkingDirectory: workingDirectory ?? Environment.CurrentDirectory);
+        return Compose(logger, runner, fileLogSink, logDirectory);
+    }
+
+    internal TuiServices CaptureContext() => Compose(Logger, Runner.CaptureContext(), FileLogSink, LogDirectory);
+
+    private static TuiServices Compose(Logger logger, ProcessRunner runner, FileLogSink? fileLogSink, string? logDirectory)
+    {
         var locator = new GhBinaryLocator(runner, logger);
         var auth = new GhAuthService(runner, logger);
         var dir = logDirectory ?? LogPaths.Resolve();

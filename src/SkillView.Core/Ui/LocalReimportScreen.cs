@@ -60,12 +60,12 @@ internal static class LocalReimportScreen
 
     internal static void Show(IApplication app, Logger logger, InstalledSkill selected,
         Func<LocalReimportRequest, CancellationToken, Task<LocalReimportResponse>> execute,
-        CancellationToken lifetimeToken = default, Action<Dialog>? readyForTests = null, Action<Action>? invokeForTests = null, bool sourceSwitch = false)
+        CancellationToken lifetimeToken = default, Action<Dialog>? readyForTests = null, Action<Action>? invokeForTests = null, bool sourceSwitch = false, bool approvedRestore = false, ReplacementResult? initialPlan = null)
     {
         if (lifetimeToken.IsCancellationRequested) return;
-        var family = sourceSwitch ? "local source switch" : "local reimport";
-        bool CorrectFamily(ReplacementResult plan) => sourceSwitch ? IsLocalSourceSwitch(plan) : IsLocalReimport(plan);
-        using var dialog = new Dialog { Title = sourceSwitch ? " Local source switch " : " Local reimport ", Width = Dim.Percent(96), Height = Dim.Percent(94), SchemeName = SchemeNames.Dialog };
+        var family = approvedRestore ? "approved restore" : sourceSwitch ? "local source switch" : "local reimport";
+        bool CorrectFamily(ReplacementResult plan) => approvedRestore ? plan.Approval is not null && plan.LocalImport is null && plan.Selection is null : sourceSwitch ? IsLocalSourceSwitch(plan) : IsLocalReimport(plan);
+        using var dialog = new Dialog { Title = approvedRestore ? " Approved restore " : sourceSwitch ? " Local source switch " : " Local reimport ", Width = Dim.Percent(96), Height = Dim.Percent(94), SchemeName = SchemeNames.Dialog };
         var id = new TextField { X = 16, Y = 0, Width = Dim.Fill(), Text = "" };
         using var newSource = new TextField { X = 16, Y = 1, Width = Dim.Fill(), Text = "" };
         using var operation = new ModalOperationTracker(invokeForTests ?? app.Invoke, logger, "reimport.ui");
@@ -83,7 +83,7 @@ internal static class LocalReimportScreen
         };
         var status = new Label { X = 0, Y = 3 + rowOffset, Width = Dim.Fill(), Text = $"Prepare, or inspect a saved {family} ID." };
         var sourceReview = new CheckBox { X = 0, Y = Pos.AnchorEnd(6), Width = Dim.Fill(), Text = "I reviewed frozen source changes/omissions; no authenticity or safety claim", Enabled = false };
-        var retain = new CheckBox { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Text = "Replace from local source; retain exact original for every consumer", Enabled = false };
+        var retain = new CheckBox { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Text = approvedRestore ? "Restore approved archive; retain exact original for every consumer" : "Replace from local source; retain exact original for every consumer", Enabled = false };
         var prepare = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(4), Text = "_Prepare" };
         var inspect = new SingleRowButton { X = Pos.Right(prepare) + 2, Y = Pos.AnchorEnd(4), Text = "_Inspect saved ID" };
         var apply = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(3), Text = "_Apply reviewed", Enabled = false };
@@ -99,6 +99,7 @@ internal static class LocalReimportScreen
         {
             var idle = (terminalCommit || operation.CurrentOwnership == ModalOperationTracker.Ownership.None) && !lifetimeToken.IsCancellationRequested;
             id.Enabled = hidden.Enabled = newSource.Enabled = prepare.Enabled = inspect.Enabled = idle;
+            prepare.Enabled &= !approvedRestore;
             retain.Enabled = idle && review is not null;
             sourceReview.Enabled = idle && review?.SourceReview is not null;
             apply.Enabled = idle && review is { Succeeded: true, Status: "ready" or "planned" }
@@ -241,6 +242,14 @@ internal static class LocalReimportScreen
         TuiHelpers.ConfigureTextInput(id, SchemeNames.Dialog);
         TuiHelpers.ConfigureReadOnlyPane(output, SchemeNames.Dialog);
         TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, id, hidden, status, output, sourceReview, retain, prepare, inspect, apply, recover, undo, close);
+        if (initialPlan is not null)
+        {
+            if (!CorrectFamily(initialPlan)) throw new ArgumentException("Initial saved plan has another purpose.");
+            id.Text = initialPlan.Id;
+            review = initialPlan;
+            output.Text = RenderText(initialPlan);
+            Refresh();
+        }
         readyForTests?.Invoke(dialog);
         app.Run(dialog);
     }

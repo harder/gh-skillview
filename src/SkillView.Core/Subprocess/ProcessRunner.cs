@@ -15,7 +15,7 @@ public sealed class ProcessRunner
     private readonly TimeSpan _terminationWait;
     private readonly IReadOnlyDictionary<string, string>? _environment;
     private readonly string? _defaultWorkingDirectory;
-    private bool ReplaceEnvironment { get; init; }
+    private readonly bool _frozenEnvironment;
     internal string EffectiveWorkingDirectory => _defaultWorkingDirectory ?? Environment.CurrentDirectory;
 
     internal string? GetEffectiveEnvironmentVariable(string name, IReadOnlyDictionary<string, string>? overrides = null)
@@ -24,7 +24,7 @@ public sealed class ProcessRunner
         var local = overrides?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
         if (local?.Key is not null) return local.Value.Value;
         var configured = _environment?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
-        return configured?.Key is not null ? configured.Value.Value : ReplaceEnvironment ? null : Environment.GetEnvironmentVariable(name);
+        return configured?.Key is not null ? configured.Value.Value : _frozenEnvironment ? null : Environment.GetEnvironmentVariable(name);
     }
 
     public ProcessRunner(
@@ -32,6 +32,11 @@ public sealed class ProcessRunner
         int maxCapturedCharsPerStream = DefaultMaxCapturedCharsPerStream,
         TimeSpan? terminationWait = null,
         IReadOnlyDictionary<string, string>? environment = null, string? defaultWorkingDirectory = null)
+        : this(logger, maxCapturedCharsPerStream, terminationWait, environment, defaultWorkingDirectory, false)
+    { }
+
+    private ProcessRunner(Logger logger, int maxCapturedCharsPerStream, TimeSpan? terminationWait,
+        IReadOnlyDictionary<string, string>? environment, string? defaultWorkingDirectory, bool frozenEnvironment)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCapturedCharsPerStream, 1);
         var resolvedTerminationWait = terminationWait ?? DefaultTerminationWait;
@@ -44,17 +49,47 @@ public sealed class ProcessRunner
         _terminationWait = resolvedTerminationWait;
         _environment = environment;
         _defaultWorkingDirectory = defaultWorkingDirectory is null ? null : Path.GetFullPath(defaultWorkingDirectory);
+        _frozenEnvironment = frozenEnvironment;
     }
 
     internal ProcessRunner WithContext(string workingDirectory, IReadOnlyDictionary<string, string> overrides)
     {
+        var values = CaptureEnvironment();
+        foreach (var pair in overrides) values[pair.Key] = pair.Value;
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory, true);
+    }
+
+    internal ProcessRunner CaptureContext() => _frozenEnvironment ? this : new(_logger, _maxCapturedCharsPerStream,
+        _terminationWait, CaptureEnvironment(), Path.GetFullPath(EffectiveWorkingDirectory), true);
+
+    internal Dictionary<string, string> CaptureEnvironment()
+    {
         var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        if (!ReplaceEnvironment)
+        if (!_frozenEnvironment)
             foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
                 if (entry.Key is string key && entry.Value is string value) values[key] = value;
         if (_environment is not null) foreach (var pair in _environment) values[pair.Key] = pair.Value;
-        foreach (var pair in overrides) values[pair.Key] = pair.Value;
-        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+        return values;
+    }
+
+    internal string CaptureContextFingerprint()
+    {
+        var values = new SortedDictionary<string, string>(CaptureEnvironment(),
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        using var bytes = new MemoryStream();
+        using (var writer = new BinaryWriter(bytes, new UTF8Encoding(false, true), leaveOpen: true))
+        {
+            writer.Write(Path.GetFullPath(EffectiveWorkingDirectory));
+            if (values.Count > 4096) throw new IOException("Saved process context exceeds its environment-entry budget.");
+            foreach (var pair in values)
+            {
+                if (pair.Key.Length > 32768 || pair.Value.Length > 65536 || bytes.Length > 2 * 1024 * 1024)
+                    throw new IOException("Saved process context exceeds its environment-byte budget.");
+                writer.Write(pair.Key); writer.Write(pair.Value);
+            }
+        }
+        if (bytes.Length > 2 * 1024 * 1024) throw new IOException("Saved process context exceeds its environment-byte budget.");
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes.GetBuffer().AsSpan(0, checked((int)bytes.Length))));
     }
 
     /// An explicit allowlist context uses the same frozen-environment mechanism
@@ -63,12 +98,11 @@ public sealed class ProcessRunner
     {
         var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (var pair in environment) values[pair.Key] = pair.Value;
-        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory, true);
     }
 
     internal ProcessRunner WithCaptureLimit(int remainingCharacters) =>
-        new(_logger, Math.Min(_maxCapturedCharsPerStream, Math.Max(1, remainingCharacters)), _terminationWait, _environment, _defaultWorkingDirectory)
-        { ReplaceEnvironment = ReplaceEnvironment };
+        new(_logger, Math.Min(_maxCapturedCharsPerStream, Math.Max(1, remainingCharacters)), _terminationWait, _environment, _defaultWorkingDirectory, _frozenEnvironment);
 
     public async Task<ProcessResult> RunAsync(
         string executable,
@@ -96,7 +130,7 @@ public sealed class ProcessRunner
         {
             psi.ArgumentList.Add(arg);
         }
-        if (ReplaceEnvironment) psi.Environment.Clear();
+        if (_frozenEnvironment) psi.Environment.Clear();
         if (_environment is not null)
             foreach (var (name, value) in _environment) psi.Environment[name] = value;
         if (environment is not null)

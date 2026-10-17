@@ -8,6 +8,31 @@ namespace SkillView.Tests.Gh;
 public class GhBinaryLocatorTests
 {
     [Fact]
+    public void DefaultLocatorUsesItsCapturedRunnerPathAndHostRatherThanParentEnvironment()
+    {
+        var directory = Directory.CreateTempSubdirectory("skillview-locator-context-");
+        try
+        {
+            var name = OperatingSystem.IsWindows() ? "gh.exe" : "gh";
+            var candidate = Path.Combine(directory.FullName, name); File.WriteAllText(candidate, "inert address fixture; never executed");
+            var host = Path.Combine(directory.FullName, "explicit-host"); File.WriteAllText(host, "inert host fixture; never executed");
+            var logger = new Logger();
+            var values = new Dictionary<string, string> { ["PATH"] = directory.FullName, ["GH_EXTENSION"] = "0", ["GH_PATH"] = host };
+            var runner = new ProcessRunner(logger, environment: values).CaptureContext();
+            values["PATH"] = ""; values["GH_EXTENSION"] = "1";
+            Assert.Equal(candidate, new GhBinaryLocator(runner, logger).FindOnPath(TestContext.Current.CancellationToken));
+            var relative = new ProcessRunner(logger, environment: new Dictionary<string, string>
+            { ["PATH"] = ".", ["GH_EXTENSION"] = "0" }, defaultWorkingDirectory: directory.FullName).CaptureContext();
+            Assert.Equal(candidate, new GhBinaryLocator(relative, logger).FindOnPath(TestContext.Current.CancellationToken));
+            var hosted = runner.WithContext(directory.FullName, new Dictionary<string, string> { ["GH_EXTENSION"] = "1" });
+            Assert.Equal(host, new GhBinaryLocator(hosted, logger).FindOnPath(TestContext.Current.CancellationToken));
+            var isolated = runner.WithIsolatedContext(directory.FullName, new Dictionary<string, string>());
+            Assert.Null(new GhBinaryLocator(isolated, logger).FindOnPath(TestContext.Current.CancellationToken));
+        }
+        finally { directory.Delete(true); }
+    }
+
+    [Fact]
     public void FindOnPath_PrefersGhPathSuppliedByExtensionHost()
     {
         var logger = new Logger(LogLevel.Debug);
