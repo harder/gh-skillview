@@ -9,17 +9,26 @@ namespace SkillView.Maintenance;
 internal sealed partial class ReplacementPlanStore
 {
     internal const string UnpinPurpose = "unpin-only";
-    internal static string Disposition(ReplacementPlan plan) => plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
+    internal static string Disposition(ReplacementPlan plan) => plan.Selection is not null ? SelectedRevisionDisposition : plan.LocalImport is not null ? LocalReimportDisposition : plan.PinPolicy is not null ? UnpinPurpose
         : plan.LocalDisposition is null ? "retain-original" : "merge-reviewed";
 
     private static void RequirePurpose(ReplacementPlan plan, string? expectedPurpose)
     {
-        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null : plan.Purpose != expectedPurpose)
+        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null || plan.Selection is not null : plan.Purpose != expectedPurpose)
             throw new IOException("This command cannot operate on the saved " + plan.Purpose + " purpose.");
     }
 
     private static ReplacementOwnerTransition? EffectiveOwner(ReplacementPlan plan)
     {
+        if (plan.Selection is not null)
+        {
+            if (plan.SchemaVersion != SelectedRevisionSchema || plan.Purpose != SelectedRevisionPurpose || plan.Revision is null
+                || plan.LocalDisposition is not null || plan.PinPolicy is not null || plan.LocalImport is not null)
+                throw new IOException("Selected revision conflicts with its saved purpose or owner authority.");
+            return plan.Revision.Owner;
+        }
+        if (plan.SchemaVersion == SelectedRevisionSchema || plan.Purpose == SelectedRevisionPurpose)
+            throw new IOException("Selected revision lacks its provider and request evidence.");
         if (plan.LocalImport is not null)
         {
             if (plan.SchemaVersion != 5 || plan.Purpose != LocalReimportPurpose || plan.Revision is not null

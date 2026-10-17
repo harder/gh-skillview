@@ -9,7 +9,8 @@ namespace SkillView.Maintenance;
 internal sealed partial class ReplacementPlanStore
 {
     private ReplacementOwnerTransition? PrepareOwner(InstalledSkill target, ResolvedSkillRevision? source, InventorySnapshot inventory, CancellationToken token,
-        bool unpinOnly = false, bool initializeState = true)
+        bool unpinOnly = false, bool initializeState = true, SelectedRevisionRequest? selection = null,
+        string? selectedTree = null)
     {
         var claims = target.AllOwnershipClaims.ToArray();
         if (claims.Length == 0) return null;
@@ -36,13 +37,23 @@ internal sealed partial class ReplacementPlanStore
         var snapshot = held.Read(token);
         var updated = DateTimeOffset.UtcNow;
         var patch = unpinOnly ? GhRegistryEditor.PrepareUnpin(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, token)
-            : GhRegistryEditor.Prepare(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, source!.Tree, null, updated, token);
+            : GhRegistryEditor.Prepare(snapshot.Bytes, claim.Selector!, claim.EntryFingerprint!, OwnerTree(source, selection, selectedTree), selection is { Pin: true } ? selection.Selector : null, updated, token);
         var before = GhRegistryEditor.CaptureEntry(patch.BeforeBytes, claim.Selector!, token);
         var desired = GhRegistryEditor.CaptureEntry(patch.DesiredBytes, claim.Selector!, token);
         var transition = new ReplacementOwnerTransition(held.CanonicalPath, claim.Selector!, snapshot.Identity,
             before.Bytes, desired.Bytes, before.Fingerprint, desired.Fingerprint, updated, held.ParentIdentity);
-        ValidateOwnerTransition(target.FrontMatter, claims.ToImmutableArray(), source, transition, token, unpinOnly);
+        ValidateOwnerTransition(target.FrontMatter, claims.ToImmutableArray(), source, transition, token, unpinOnly, selection, selectedTree);
         return transition;
+    }
+
+    private static string OwnerTree(ResolvedSkillRevision? source, SelectedRevisionRequest? selection, string? selectedTree)
+    {
+        if (source is not null) return source.Tree;
+        // Read-only selected-owner preflight binds the actual installed tree;
+        // it does not invent a commit/ref or claim a completed desired plan.
+        if (selection is null || selectedTree is not { Length: 40 } || !selectedTree.All(char.IsAsciiHexDigit))
+            throw new IOException("Selected owner preflight requires an observed full installed tree.");
+        selection.Validate(); return selectedTree;
     }
 
     private string GlobalRegistryPath()
@@ -82,7 +93,8 @@ internal sealed partial class ReplacementPlanStore
     }
 
     private static void ValidateOwnerTransition(SkillFrontMatter metadata, ImmutableArray<SkillPackage> claims,
-        ResolvedSkillRevision? source, ReplacementOwnerTransition transition, CancellationToken token, bool unpinOnly = false)
+        ResolvedSkillRevision? source, ReplacementOwnerTransition transition, CancellationToken token, bool unpinOnly = false,
+        SelectedRevisionRequest? selection = null, string? selectedTree = null)
     {
         if (string.IsNullOrWhiteSpace(transition.Selector) || !Path.IsPathFullyQualified(transition.RegistryPath)
             || Path.GetFileName(transition.RegistryPath) != SkillLockFileReader.FileName
@@ -98,9 +110,9 @@ internal sealed partial class ReplacementPlanStore
             throw new IOException("Saved gh owner authority or captured claim is inconsistent.");
         var before = EntryRegistry(transition.Selector, transition.BeforeEntry);
         var patch = unpinOnly ? GhRegistryEditor.PrepareUnpin(before, transition.Selector, transition.BeforeFingerprint, token)
-            : GhRegistryEditor.Prepare(before, transition.Selector, transition.BeforeFingerprint, source!.Tree, null, transition.UpdatedAt, token);
+            : GhRegistryEditor.Prepare(before, transition.Selector, transition.BeforeFingerprint, OwnerTree(source, selection, selectedTree), selection is { Pin: true } ? selection.Selector : null, transition.UpdatedAt, token);
         var desired = GhRegistryEditor.CaptureEntry(EntryRegistry(transition.Selector, transition.DesiredEntry), transition.Selector, token);
-        if (!unpinOnly && !Matches(patch))
+        if (!unpinOnly && selection is null && !Matches(patch))
             patch = GhRegistryEditor.RecreateSavedTransition(before, transition.Selector, transition.BeforeFingerprint, source!.Tree, null, transition.UpdatedAt, token);
         if (!Matches(patch))
             throw new IOException("Saved owner transition changes fields outside the approved tree/pin/timestamp policy.");

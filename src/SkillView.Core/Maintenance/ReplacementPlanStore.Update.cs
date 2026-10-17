@@ -12,7 +12,7 @@ internal sealed partial class ReplacementPlanStore
 
     private static bool IsUnchangedRevision(ReplacementPlan plan, bool payloadsMatch)
     {
-        if (plan.Revision is not { } revision || plan.Original.Mode != plan.Candidate.Mode
+        if (plan.Selection is not null || plan.Revision is not { } revision || plan.Original.Mode != plan.Candidate.Mode
             || !payloadsMatch
             || revision.Owner is { } owner && owner.BeforeFingerprint != owner.DesiredFingerprint)
             return false;
@@ -107,9 +107,10 @@ internal sealed partial class ReplacementPlanStore
             || revision.LocalChanges.IsDefault || revision.LocalChanges.Length > PayloadSnapshot.MaxEntries
             || revision.LocalChanges.Any(path => string.IsNullOrEmpty(path)))
             throw new IOException("Saved update baseline or owner transition is invalid.");
-        ValidateSource(plan.Subject.Metadata, revision);
+        if (plan.Selection is null) ValidateSource(plan.Subject.Metadata, revision);
         ValidateEvidence(baseline);
-        if (revision.Owner is { } owner) ValidateOwnerTransition(plan.Subject.Metadata, plan.Subject.Owners, revision.Source, owner, token);
+        if (revision.Owner is { } owner) ValidateOwnerTransition(plan.Subject.Metadata, plan.Subject.Owners, revision.Source, owner, token,
+            selection: plan.Selection?.Provider.Selection.Request);
         else if (!plan.Subject.Owners.IsEmpty) throw new IOException("Saved update lacks the required owner transition.");
     }
 }

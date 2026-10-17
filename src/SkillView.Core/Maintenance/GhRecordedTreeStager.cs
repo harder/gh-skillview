@@ -1,10 +1,13 @@
 using System.Text.Json;
 using System.Text;
 using System.Security.Cryptography;
+using System.Collections.Immutable;
 using SkillView.Subprocess;
 using SkillView.Inventory;
 
 namespace SkillView.Maintenance;
+
+internal sealed record RecordedGitEntry(string Path, string Kind, string Mode, string Sha, long Bytes);
 
 /// Fetches an immutable recorded Git tree through gh's authenticated API. A
 /// moving branch is not used as evidence of the original installed content.
@@ -25,8 +28,12 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
 
     internal async Task StageIntoAsync(string ghPath, string repositoryUrl, string treeSha,
         NativeStateDirectory destination, Func<byte[], byte[]>? skillTransform, CancellationToken cancellationToken)
+        => _ = await CaptureIntoAsync(ghPath, repositoryUrl, treeSha, destination, skillTransform, cancellationToken).ConfigureAwait(false);
+
+    internal async Task<ImmutableArray<RecordedGitEntry>> CaptureIntoAsync(string ghPath, string repositoryUrl, string treeSha,
+        NativeStateDirectory destination, Func<byte[], byte[]>? skillTransform, CancellationToken cancellationToken)
     {
-        try { await StageCoreAsync(ghPath, repositoryUrl, treeSha, destination, skillTransform, cancellationToken).ConfigureAwait(false); }
+        try { return await StageCoreAsync(ghPath, repositoryUrl, treeSha, destination, skillTransform, cancellationToken).ConfigureAwait(false); }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or FormatException or JsonException or OverflowException)
         { throw new IOException("Recorded source response has an unsupported or malformed schema.", ex); }
     }
@@ -63,7 +70,7 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
         }
     }
 
-    private async Task StageCoreAsync(string ghPath, string repositoryUrl,
+    private async Task<ImmutableArray<RecordedGitEntry>> StageCoreAsync(string ghPath, string repositoryUrl,
         string treeSha, NativeStateDirectory destination, Func<byte[], byte[]>? skillTransform, CancellationToken token)
     {
         if (treeSha.Length != 40 || !treeSha.All(char.IsAsciiHexDigit))
@@ -90,6 +97,9 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
             if (!blob.Succeeded) throw new GhSourceRequestException($"Recorded blob is inaccessible: {blob.StdErr}", blob);
             return Convert.FromBase64String(blob.StdOut);
         }, skillTransform, token).ConfigureAwait(false);
+        return tree.EnumerateArray().Select(item => new RecordedGitEntry(item.GetProperty("path").GetString()!,
+            item.GetProperty("type").GetString()!, item.GetProperty("mode").GetString()!, item.GetProperty("sha").GetString()!,
+            item.GetProperty("type").GetString() == "tree" ? 0 : item.GetProperty("size").GetInt64())).ToImmutableArray();
     }
 
     internal static async Task MaterializeAsync(JsonElement tree, string treeSha, NativeStateDirectory destination,
@@ -156,6 +166,66 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
         hash.AppendData(Encoding.ASCII.GetBytes($"{kind} {bytes.Length}\0"));
         hash.AppendData(bytes);
         return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
+
+    internal static void VerifyArchiveTree(CapturedPayloadArchive source, CapturedPayloadArchive.Reader reader,
+        ImmutableArray<RecordedGitEntry> recorded, string expectedTree, CancellationToken token)
+    {
+        source.Validate();
+        if (recorded.IsDefault || recorded.Length != source.Entries.Length || recorded.Length > PayloadSnapshot.MaxEntries)
+            throw new IOException("Selected source Git entry evidence is incomplete.");
+        if (recorded.Any(item => item is null || string.IsNullOrEmpty(item.Path))
+            || recorded.Select(item => item.Path).Distinct(StringComparer.Ordinal).Count() != recorded.Length)
+            throw new IOException("Selected source Git entry addresses are missing or ambiguous.");
+        var git = recorded.ToDictionary(item => item.Path, StringComparer.Ordinal);
+        var items = new Dictionary<string, (string Mode, string Sha, bool Directory)>(StringComparer.Ordinal);
+        long total = 0;
+        foreach (var item in source.Entries)
+        {
+            token.ThrowIfCancellationRequested();
+            var entry = item.Entry;
+            if (!git.TryGetValue(entry.Path, out var evidence) || evidence.Sha is not { Length: 40 } || !evidence.Sha.All(char.IsAsciiHexDigit))
+                throw new IOException("Selected source Git entry identity is incomplete.");
+            if (entry.Kind == "directory")
+            {
+                if (evidence.Kind != "tree" || evidence.Mode != "040000" || evidence.Bytes != 0) throw new IOException("Selected source Git directory evidence disagrees.");
+                items.Add(entry.Path, ("40000", "", true)); continue;
+            }
+            if (entry.Kind != "file" || evidence.Kind != "blob" || evidence.Mode is not ("100644" or "100755")
+                || evidence.Bytes != entry.Bytes || entry.UnixMode is not null && entry.UnixMode != (evidence.Mode == "100755" ? 493 : 420)
+                || entry.Bytes is < 0 or > 512 * 1024 || entry.Bytes > PayloadSnapshot.MaxBytes - total)
+                throw new IOException("Selected source archive cannot establish supported immutable Git files.");
+            total += entry.Bytes;
+            using var bytes = new MemoryStream(); reader.CopyEntry(entry.Path, bytes, token);
+            var blob = GitObjectHash("blob", bytes.ToArray());
+            if (blob != evidence.Sha) throw new IOException("Captured selected source differs from its Git blob identity.");
+            items.Add(entry.Path, (evidence.Mode, blob, false));
+        }
+        var children = items.Keys.GroupBy(Parent).ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        foreach (var directory in items.Where(item => item.Value.Directory).Select(item => item.Key)
+            .OrderByDescending(path => path.Count(c => c == '/')).ThenByDescending(path => path.Length).Append(""))
+        {
+            token.ThrowIfCancellationRequested();
+            using var content = new MemoryStream();
+            foreach (var child in (children.GetValueOrDefault(directory) ?? []).OrderBy(path =>
+                Encoding.UTF8.GetBytes(Path.GetFileName(path) + (items[path].Directory ? "/" : "")), ByteComparer.Instance))
+            {
+                var item = items[child];
+                content.Write(Encoding.UTF8.GetBytes(item.Mode + " " + Path.GetFileName(child) + "\0"));
+                content.Write(Convert.FromHexString(item.Sha));
+            }
+            var tree = GitObjectHash("tree", content.ToArray());
+            if (directory.Length == 0)
+            {
+                if (tree != expectedTree) throw new IOException("Captured selected source bytes and modes do not match the immutable Git tree.");
+            }
+            else
+            {
+                if (tree != git[directory].Sha) throw new IOException("Captured selected source directory differs from its Git tree identity.");
+                items[directory] = ("40000", tree, true);
+            }
+        }
+        static string Parent(string path) => path.LastIndexOf('/') is var slash && slash >= 0 ? path[..slash] : "";
     }
 
     internal static void VerifyTreeIdentity(JsonElement tree, string expected)

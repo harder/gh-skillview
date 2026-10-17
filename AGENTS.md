@@ -1,5 +1,16 @@
 # AGENTS.md
 
+- Selected revision preparation freezes a typed tag/full commit and actual gh
+  output; never invent a symbolic commit ref or revisit a tag during apply.
+  Provider archive capture does not imply complete native metadata authority.
+  Compare every authored SKILL header/body/mode with the selected source before
+  publication; validate original YAML before installer-only normalization.
+  Freeze full child environment/CWD once at preparation entry, derive private
+  contexts from that snapshot, and persist only its digest. Schema7 has no
+  receipt-less legacy producer: first apply/recovery requires its policy receipt.
+  Schema7 uses its own purpose/disposition and omits Selection from schemas1–5.
+  See `agent_docs/maintenance-selected-revisions.md`.
+
 - Desired revision intent is separate private policy. Only positive native
   missing-child evidence authorizes default allow; corrupt/inaccessible/stale
   policy refuses. Hold the desired-policy writer before replacement/operation/
