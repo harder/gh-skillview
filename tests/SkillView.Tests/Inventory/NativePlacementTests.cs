@@ -132,4 +132,63 @@ public sealed class NativePlacementTests : IDisposable
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(() => NativePlacementLease.Open(temp.FullName, cancellation.Token));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WindowsInitialCaptureRestartsFromFreshRootAfterParentNamespaceChanges(bool missing)
+    {
+        if (!OperatingSystem.IsWindows()) { Assert.Skip("Windows held-parent generation checks require native Windows execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Path.Combine(parent, "child");
+        if (!missing) Directory.CreateDirectory(child);
+        var observedAttempts = new List<int>();
+        using var lease = WindowsSecureRemovalBackend.OpenPlacement(child, Token, (attempt, capturedParent, name) =>
+        {
+            if (name != "child" || !PathIdentity.Equals(capturedParent, parent)) return;
+            observedAttempts.Add(attempt);
+            if (observedAttempts.Count == 1) File.WriteAllText(Path.Combine(parent, "namespace-change"), "changed");
+        });
+        Assert.Equal(2, observedAttempts.Count);
+        Assert.True(observedAttempts[1] > observedAttempts[0]);
+        Assert.Equal(missing ? new[] { "child" } : [], lease.Evidence.MissingSuffix);
+        lease.Revalidate(Token);
+        // A completed lease is still stale after a real target/absence change.
+        if (missing) Directory.CreateDirectory(child);
+        else { Directory.Move(child, child + "-retained"); Directory.CreateDirectory(child); }
+        Assert.Throws<IOException>(() => lease.Revalidate(Token));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WindowsContinuousParentChurnIsBoundedAndCancellationStopsRestart(bool cancel)
+    {
+        if (!OperatingSystem.IsWindows()) { Assert.Skip("Windows held-parent generation checks require native Windows execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Path.Combine(parent, "missing");
+        using var cancellation = new CancellationTokenSource();
+        var changes = 0;
+        var attempts = new HashSet<int>();
+        void Change(int attempt, string capturedParent, string name)
+        {
+            attempts.Add(attempt);
+            if (name != "missing" || !PathIdentity.Equals(capturedParent, parent)) return;
+            File.WriteAllText(Path.Combine(parent, "namespace-change-" + changes++), "changed");
+            if (cancel) cancellation.Cancel();
+        }
+        if (cancel)
+        {
+            var error = Assert.Throws<OperationCanceledException>(() => WindowsSecureRemovalBackend.OpenPlacement(child, cancellation.Token, Change));
+            Assert.Equal(cancellation.Token, error.CancellationToken);
+            Assert.Equal(1, changes);
+        }
+        else
+        {
+            var error = Assert.ThrowsAny<IOException>(() => WindowsSecureRemovalBackend.OpenPlacement(child, Token, Change));
+            Assert.Contains("parent changed", error.Message);
+            Assert.InRange(changes, 1, WindowsSecureRemovalBackend.PlacementCaptureAttempts);
+            Assert.Equal(Enumerable.Range(0, WindowsSecureRemovalBackend.PlacementCaptureAttempts), attempts.Order());
+        }
+    }
 }

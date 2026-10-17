@@ -4,7 +4,33 @@ namespace SkillView.Inventory;
 
 internal sealed partial class WindowsSecureRemovalBackend
 {
-    internal static NativePlacementLease OpenPlacement(string path, CancellationToken token)
+    internal const int PlacementCaptureAttempts = 4;
+    private sealed class PlacementParentChangedException(string message) : IOException(message);
+
+    internal static NativePlacementLease OpenPlacement(string path, CancellationToken token,
+        Action<int, string, string>? beforeParentCheckForTests = null)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                return OpenPlacementAttempt(path, token, beforeParentCheckForTests is null ? null
+                    : (parent, name) => beforeParentCheckForTests(attempt, parent, name));
+            }
+            catch (PlacementParentChangedException)
+            {
+                // No placement evidence has escaped this attempt. Release every
+                // handle and start from the volume root; never reuse a child or
+                // weaken a generation comparison after namespace churn.
+                token.ThrowIfCancellationRequested();
+                if (attempt + 1 >= PlacementCaptureAttempts) throw;
+            }
+        }
+    }
+
+    private static NativePlacementLease OpenPlacementAttempt(string path, CancellationToken token,
+        Action<string, string>? beforeParentCheck)
     {
         var full = Path.GetFullPath(path);
         var parts = Path.GetRelativePath(Path.GetPathRoot(full)!, full).Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
@@ -20,7 +46,9 @@ internal sealed partial class WindowsSecureRemovalBackend
                 try { next = OpenEntryAt(current, parts[index], null, false, requestDeleteAccess: false); }
                 catch (WindowsOpenException ex) when (ex.NativeError is ErrorFileNotFound or ErrorPathNotFound)
                 {
-                    if (!Matches(before, ReadIdentity(current))) throw new IOException("Placement parent changed during missing observation.");
+                    beforeParentCheck?.Invoke(ReadFinalPath(current), parts[index]);
+                    token.ThrowIfCancellationRequested();
+                    if (!Matches(before, ReadIdentity(current))) throw new PlacementParentChangedException("Placement parent changed during missing observation.");
                     return Finish(parts.Skip(index).ToImmutableArray());
                 }
                 try
@@ -39,7 +67,10 @@ internal sealed partial class WindowsSecureRemovalBackend
                         }
                         finally { followed?.Dispose(); }
                     }
-                    if (!ReadIdentity(next).IsDirectory || !Matches(before, ReadIdentity(current))) throw new IOException("Source placement parent changed.");
+                    beforeParentCheck?.Invoke(ReadFinalPath(current), parts[index]);
+                    token.ThrowIfCancellationRequested();
+                    if (!ReadIdentity(next).IsDirectory) throw new IOException("Source placement requires an ordinary directory.");
+                    if (!Matches(before, ReadIdentity(current))) throw new PlacementParentChangedException("Source placement parent changed.");
                     current.Dispose(); current = next; next = null!;
                 }
                 finally { next?.Dispose(); }

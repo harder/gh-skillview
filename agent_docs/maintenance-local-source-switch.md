@@ -38,7 +38,15 @@ removed by the reviewed replacement; the exact original native objects remain
 retained for undo. New active IDs/timestamps are disclosed.
 
 Before any private writes or gh work, the old address receives a separate native
-placement observation. A genuinely absent path requires an explicit first
+placement observation. Windows initial placement capture may restart a maximum
+of four complete walks from the volume root when a held parent's generation
+changes during that unfinished read-only observation. Every failed attempt
+releases its handles; no child/evidence is reused and every retry checks
+cancellation. Alias, type and policy refusals are not retryable. A completed
+lease still requires exact fresh-address/anchor comparison; this is not a retry
+of stale approval or a mutation. Shared system-temp ancestor churn in parallel
+tests must not be mistaken for cancellation reaching the payload checkpoint.
+A genuinely absent path requires an explicit first
 missing child under a held existing canonical directory; the remaining lexical
 suffix is unreachable below that boundary. Access/I/O errors, broken links,
 non-directory ancestors, ambiguous resolution and bounded exhaustion refuse;
