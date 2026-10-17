@@ -109,3 +109,9 @@ Frozen schema5 compatibility evidence retains the complete bounded `gh --version
 stdout after trimming its outer whitespace, including the release URL and internal
 line endings, exactly as the native producer records it. Check the staged binary
 hash independently; a first-line banner is not the saved version witness.
+
+Windows restart-bound fixtures perform real namespace changes and explicitly
+advance the private parent's native creation-time generation, checking it back.
+Rapid directory-entry changes can share a timestamp, so clock progress alone
+cannot deterministically exercise every retry. Production generation checks and
+the four-attempt bound remain unchanged.

@@ -188,7 +188,9 @@ jobs:
     if: inputs.verification != 'windows-metadata'
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    # Both product hosts plus four historical native producers and restart
+    # proofs run sequentially; retain a bounded budget for the expanded suite.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -239,7 +241,7 @@ jobs:
           baseline_sha=0dba59be59776e6e654123aa1ce1e5496074763e
           baseline_path="$RUNNER_TEMP/skillview-unpin-baseline"
           git fetch --no-tags origin "$baseline_sha"
-          git worktree add --detach "$baseline_path" "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
           dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
@@ -253,7 +255,7 @@ jobs:
           baseline_sha=c919199a6861b9aaf9301e31c4b2945e098da799
           baseline_path="$RUNNER_TEMP/skillview-local-reimport-baseline"
           git fetch --no-tags origin "$baseline_sha"
-          git worktree add --detach "$baseline_path" "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
           dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
@@ -277,7 +279,7 @@ jobs:
           )"
           baseline_path="$RUNNER_TEMP/skillview-source-switch-baseline"
           git fetch --no-tags origin "$baseline_sha"
-          git worktree add --detach "$baseline_path" "$baseline_sha"
+          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
           dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
