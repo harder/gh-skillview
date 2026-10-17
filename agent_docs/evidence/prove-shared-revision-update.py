@@ -441,6 +441,9 @@ for gh_path in args.gh:
                 ('repair', 'registry-truncated', True, False),
                 ('repair', 'owner-repair-intent', True, False)]:
             saved = plan()
+            # Every matrix row has its own immutable plan and source review;
+            # the earlier successful row's receipt cannot authorize this one.
+            acknowledge_frozen_source(run, saved)
             before = registry_path.read_bytes()
             if undo:
                 assert run('update-apply', '--id', saved['id'], '--yes', '--disposition', apply_disposition,
