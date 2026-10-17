@@ -369,6 +369,19 @@ public class CliDispatcherErrorTests : IDisposable
     [InlineData("update-plan", "")]
     [InlineData("update-plan", "--path demo --yes")]
     [InlineData("update-plan", "--path demo --unpin --unpin")]
+    [InlineData("reimport-plan", "")]
+    [InlineData("reimport-plan", "--path first --path second")]
+    [InlineData("reimport-plan", "--path first --install-id second")]
+    [InlineData("reimport-plan", "--path demo --yes")]
+    [InlineData("reimport-plan", "--path demo --unpin")]
+    [InlineData("reimport-plan", "--path demo --all")]
+    [InlineData("reimport-inspect", "--id ../outside")]
+    [InlineData("reimport-inspect", "--id 00000000000000000000000000000000 --yes")]
+    [InlineData("reimport-apply", "--id 00000000000000000000000000000000 --yes --disposition retain-original --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("reimport-apply", "--id 00000000000000000000000000000000 --yes --disposition unpin-only --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("reimport-apply", "--id 00000000000000000000000000000000 --disposition replace-local-retain-original --expect 0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("reimport-recover", "--id 00000000000000000000000000000000 --yes")]
+    [InlineData("reimport-undo", "--id 00000000000000000000000000000000 --expect bad")]
     [InlineData("unpin-plan", "")]
     [InlineData("unpin-plan", "--path first --install-id second")]
     [InlineData("unpin-plan", "--path demo --yes")]
@@ -414,6 +427,24 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(result.RootElement.GetProperty("succeeded").GetBoolean());
         Assert.Contains("one exact captured installation", result.RootElement.GetProperty("error").GetString());
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Theory]
+    [InlineData("reimport-inspect", false)]
+    [InlineData("reimport-recover", true)]
+    [InlineData("reimport-undo", true)]
+    public async Task LocalReimportSavedCommandsEmitJsonFailureWithoutInventedRevision(string command, bool approval)
+    {
+        string[] arguments = [command, "--id", new string('0', 32), "--allow-hidden-dirs", "--json"];
+        if (approval) arguments = [.. arguments, "--yes", "--expect", new string('0', 64)];
+        var (code, output, _) = await RunCliAsync("skillview", arguments);
+        Assert.Equal(ExitCodes.UserError, code);
+        using var document = JsonDocument.Parse(output);
+        Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.False(document.RootElement.GetProperty("succeeded").GetBoolean());
+        Assert.False(document.RootElement.GetProperty("canceled").GetBoolean());
+        Assert.False(document.RootElement.TryGetProperty("revision", out _));
+        Assert.False(document.RootElement.TryGetProperty("localImport", out _));
     }
 
     [Fact]

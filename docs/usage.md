@@ -71,6 +71,7 @@ Installed tab:
 |---|---|
 | `f` | Focus the filter field |
 | `s` | Cycle sort (name / package / location) |
+| `R` | Review replacement from the selected installation’s same recorded local source; reopen saved history by ID |
 | `P` | Cycle pin filter (all / pinned only / unpinned only) |
 | `K` | Check selected local package metadata and supported references |
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
@@ -195,6 +196,39 @@ or `--install-id <id>` from `list --json`. A name shared by several installation
 requires one of these selectors. `--all` selects the captured inventory; in the
 Updates tab, applying marked rows still applies only those rows. `--agent` and
 `--scope` are install options and are rejected for updates.
+
+A local install can be reimported from its same recorded absolute source path:
+
+```bash
+skillview --scan-root /path/to/skills reimport-plan --path /path/to/skills/demo --json
+skillview reimport-inspect --id <saved-id> --json
+skillview reimport-apply --id <saved-id> --yes --disposition replace-local-retain-original --expect <plan-fingerprint>
+```
+
+This replaces installed content, including extras and source deletions, without
+an automatic merge or a recorded base. Review the captured installed/source
+archives, metadata policy, changed paths, exact fingerprint and every affected
+consumer. The exact original directory remains retained for undo. Supported
+source descendant metadata is preserved with installed root privacy; new active
+objects have new IDs and timestamps. Owner-managed, pinned, mixed tracking,
+linked final source directories or payload entries, overlapping sources, and
+incomplete evidence are refused. Ancestor aliases must retain their captured
+lexical/canonical mapping. Packages containing nested `SKILL.md` files are
+currently refused before staging; nested-skill adapter support remains pending.
+Tracking also requires supported scalar metadata in a block mapping; nested or
+sequence metadata and ambiguous tracking syntax are refused.
+
+In Installed, select the physical row and press **R**. Choose **Prepare**, review,
+check retention approval, then **Apply reviewed**. Enter an existing saved ID and
+**Inspect saved ID** to reopen retained history. Recovery/undo each need fresh
+inspection and explicit retention approval. The CLI equivalents are
+`reimport-recover` and `reimport-undo`, with `--id --yes --expect
+<current-review-fingerprint>`. Source freshness is required before the first
+retain move. After that move, recovery and undo use frozen evidence even if the
+source changes or disappears. When observed, source status is reported separately in JSON's
+`operation.localSource` (or `unchanged.localSource` for a verified no-op);
+`operation.localImport` records the local source and gh staging witness.
+This is a partial local-reimport workflow; other maintenance obligations remain.
 
 Updates preserve exact pins unless `--unpin` is explicit. Ordinary `update`
 prepares one immutable candidate for review and reports other selected targets as

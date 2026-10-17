@@ -42,6 +42,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action? _onStateChange;
     private readonly Action<InstalledSkill>? _onEffectiveLoading;
     private readonly Action<InstalledSkill>? _onPackageCheck;
+    private readonly Action<InstalledSkill>? _onLocalReimport;
     private readonly CancellationToken _lifetimeToken;
 
     private readonly TextField _filterField;
@@ -82,7 +83,8 @@ internal sealed class InstalledTabView : FrameView
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onEffectiveLoading = null,
-        Action<InstalledSkill>? onPackageCheck = null)
+        Action<InstalledSkill>? onPackageCheck = null,
+        Action<InstalledSkill>? onLocalReimport = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -94,6 +96,7 @@ internal sealed class InstalledTabView : FrameView
         _onStateChange = onStateChange;
         _onEffectiveLoading = onEffectiveLoading;
         _onPackageCheck = onPackageCheck;
+        _onLocalReimport = onLocalReimport;
         _lifetimeToken = lifetimeToken;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
@@ -496,7 +499,7 @@ internal sealed class InstalledTabView : FrameView
     internal static string BuildSearchScopeText() => "name · path · agent · package";
 
     internal static string BuildLegendText() =>
-        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check";
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check · R local reimport";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -607,6 +610,13 @@ internal sealed class InstalledTabView : FrameView
         {
             key.Handled = true;
             if (GetSelectedSkill() is { } selected) _onEffectiveLoading(selected);
+            return;
+        }
+        if (!_filterField.HasFocus && key.AsRune.Value == 'R' && _onLocalReimport is not null
+            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
+        {
+            key.Handled = true;
+            if (GetSelectedSkill() is { } selected) _onLocalReimport(selected);
             return;
         }
         // `P` (capital) cycles the pin filter — handled here rather than via

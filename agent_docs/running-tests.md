@@ -33,6 +33,12 @@ outside those ancestors, for example beneath `/var/tmp`. Keep the placement guar
 and sandbox marker intact. Record the initial environment refusal separately
 from the isolated rerun.
 
+Archive-copy fixtures compare their recorded address with the held native
+lease's canonical path, then require the copy to preserve that exact address.
+Lexical temporary paths can differ on macOS (`/var` versus `/private/var`).
+Exercise a real scan-root alias on Unix rather than normalizing away a mismatch;
+keep exact archive fingerprints, native identities and blob comparisons.
+
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,
 `--filter-class`, `--filter-not-class`, `--filter-trait`,

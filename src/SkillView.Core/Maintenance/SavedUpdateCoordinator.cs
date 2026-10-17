@@ -13,6 +13,62 @@ namespace SkillView.Maintenance;
 internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
+    internal async Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, CancellationToken token)
+    {
+        try
+        {
+            var preparation = await plans.PlanLocalReimportAsync(ghPath, target, inventory, token).ConfigureAwait(false);
+            return Empty(false) with
+            {
+                SavedPlan = preparation.Plan,
+                Succeeded = preparation.Unchanged?.CleanupWarning is null,
+                ExitCode = preparation.Unchanged?.CleanupWarning is null ? 0 : 2,
+                ErrorMessage = preparation.Unchanged?.CleanupWarning,
+                Outcomes = [preparation.Plan is { } plan ? FromPlan(plan, "review-required", plan.Message)
+                    : Outcome(target, "unchanged", preparation.Unchanged!.Message
+                        + (preparation.Unchanged.LocalSource is { } local ? $" Local source {local.Status}: {local.Message}" : "")
+                        + (preparation.Unchanged.CleanupWarning is { } warning ? " " + warning : ""))]
+            };
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            logger.Warn("reimport", ex.ToString());
+            return Empty(false) with
+            {
+                Succeeded = false,
+                Cancelled = true,
+                ExitCode = 130,
+                ErrorMessage = ex.Message,
+                Outcomes = [Outcome(target, "canceled", ex.Message)]
+            };
+        }
+        catch (GhSourceRequestException ex)
+        {
+            logger.Warn("reimport", ex.ToString());
+            return Empty(false) with
+            {
+                Succeeded = false,
+                ExitCode = 2,
+                ErrorMessage = ex.Message,
+                StdOut = ex.StdOut,
+                StdErr = ex.StdErr,
+                Outcomes = [Outcome(target, "refused", ex.Message)]
+            };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Text.Json.JsonException or EntryPointNotFoundException)
+        {
+            logger.Warn("reimport", ex.ToString());
+            return Empty(false) with
+            {
+                Succeeded = false,
+                ExitCode = 2,
+                ErrorMessage = ex.Message,
+                Outcomes = [Outcome(target, "refused", ex.Message)]
+            };
+        }
+    }
+
     internal UpdateResult PrepareUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token)
     {
         try
@@ -135,7 +191,8 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     internal async Task<UpdateResult> ApplyAsync(ReplacementResult review, string disposition,
         InventorySnapshot inventory, Func<CancellationToken, Task<InventorySnapshot>> reconcile, CancellationToken token)
     {
-        var requiredDisposition = review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
+        var requiredDisposition = review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
+            : review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
         if (disposition != requiredDisposition)
             return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
             { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "The saved local-change disposition needs explicit approval.")] };
@@ -146,7 +203,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             token.ThrowIfCancellationRequested();
             attempted = true;
             var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
-                review.PinPolicy is not null ? "unpin-only" : null);
+                review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {
@@ -237,6 +294,6 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         new(plan.Subject.InstallationId, plan.OriginalPath, status, null, null,
             status == "unchanged" ? [] : plan.ChangedPaths.Take(128).ToImmutableArray(), status == "unchanged" ? 0 : plan.ChangedPaths.Length,
             plan.Subject.Agents.Select(agent => $"{agent.AgentId}: {agent.Path}").ToImmutableArray(),
-            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
+            $"{message} Saved plan {plan.Id}; manifest: {plan.PlanPath}. Inspect with {(plan.LocalImport is not null ? "reimport-inspect" : plan.PinPolicy is not null ? "unpin-inspect" : "update-inspect")} --id {plan.Id} before recovery or undo.")
         { Impact = plan.Impact };
 }

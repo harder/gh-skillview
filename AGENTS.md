@@ -1,5 +1,12 @@
 # AGENTS.md
 
+- `gh skill list` uses `sourceURL` for both repository URLs and local paths.
+  Classify native absolute paths before URI parsing and preserve the exact
+  scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.
+  Never turn a local catalog source into GitHub tracking. Native payload-entry
+  digests and saved-plan fingerprints use separate encodings; keep their hash
+  domains unchanged when comparing a materialized candidate.
+
 - Offline package checks must exclude unsupported Markdown contexts from both
   reference-definition and reference-use passes. Unsupported reference contexts
   cannot justify definite missing-file findings. Check each captured link prefix
@@ -113,10 +120,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   targets. `codeql.yml` analyzes C# and Actions. `contract-tests.yml` tests
   both the minimum supported `gh` and the latest `gh`; both lanes are required
   and failures create a follow-up issue.
-  Contract authentication checks repository API access with the supplied Actions
-  token: `gh auth status` can reject an installation token when `/user` is
-  forbidden. Keep the required contract tests and minimum token permissions;
-  retain actual response headers to distinguish access errors from quota errors.
+  Contract authentication checks the required repository API with the supplied
+  Actions token. A `/user` denial does not establish that `gh auth status` fails
+  or that the token cannot read repository data. Keep required tests and minimum
+  permissions; retain response headers to distinguish access from quota errors.
 - `release.yml` uses locked restore, tests, AOT publishes, version and checksum
   checks, provenance attestations, a complete-asset check, and a draft release
   before publication. Published tag reruns are refused. Stable releases also
@@ -141,6 +148,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   parent/root generations change. Keep the next preparation after prior apply
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
+
+- Local reimport uses schema5 `local-reimport` with `LocalImport`, omitting
+  Revision/LocalDisposition/PinPolicy and preserving schema1–4 hashes. The same
+  recorded ownerless local source must be fresh before the first actual retain;
+  subsequent recovery/undo uses frozen archives even when that source disappears.
+  Promote previews by held immutable copies into a fresh operation, never by
+  renaming active native state. See `agent_docs/maintenance-local-reimport.md`.
 
 - Standalone unpin uses schema4 `unpin-only`: bind actual installed capture and
   pin policy without fabricated revision/B/C evidence. Remove only verified raw

@@ -1326,3 +1326,153 @@ API failure. Local YAML/Bash and actual-response validation pass; new workflow
 runtime remains pending. No C# source changed after the 2,056-unit/9-integration
 verification. See `evidence/maintenance-static-package-check-ci-preflight.json`.
 Original acceptance remains 9/21; M19 is incomplete.
+
+## Local reimport: partial M08/M18 local checkpoint
+
+This isolated branch adds saved baseline-less I/C replacement from an ownerless
+installation's same recorded absolute source. Review covers all consumers and
+exact bytes/supported metadata; apply needs the saved fingerprint and explicit
+original retention. Fresh source evidence gates first retain; later recovery
+uses frozen archives. No-op precedes retained quota. Nested skills/unsupported
+metadata are explicit adapter limits; native owners/fork/adoption/detach remain
+pending.
+
+Final managed checks pass 2,044 Tests and 9 Integration tests without skips.
+Tests/Integration/MaintenanceProof builds have no warnings/errors; four scoped
+formatting checks pass. The initial one /tmp cross-mount refusal is preserved;
+unchanged-source private child TMPDIR execution passes. Actual minimum/current
+gh local import succeeds in the exact private child environment. These results
+do not claim actual App/extension/native proof.
+
+Independent source/proof reviews are clear. Four-platform native hosts, process
+death, metadata and actual old-native schema1–4 proof remain CI pending. The
+shared dialog ownership race is reproduced/fixed; the original Mac Down-arrow
+crash remains unreproduced. Acceptance stays 9/21; M08/M18 remain incomplete.
+See evidence/maintenance-local-reimport-local.json for hashes, exact local
+receipts, proof scope and remaining gates.
+
+### Local reimport: combined package-checker integration
+
+The unpublished local reimport candidate is integrated onto the reviewed static
+package checker. Both Installed K/R actions, CLI families and native proof steps
+remain available. A same-view keyboard regression verifies filter typing invokes
+neither callback and each list shortcut invokes only its selected action. The
+eight overlapping source/docs/CI files and ledger resolution passed independent
+review; shared modal ownership code is identical.
+
+The integrated snapshot passes 2,090 Tests and 9 Integration tests, zero skipped;
+Tests/Integration/MaintenanceProof builds have no warnings/errors and all four
+scoped formatting checks pass. The earlier isolated counts retain their original
+source scopes. New-feature App/extension runtime and four-RID native proof remain
+pending. Acceptance stays 9/21; M08/M18/M19 remain incomplete. See
+`evidence/maintenance-local-reimport-integration-local.json`.
+
+## Actions-token diagnostic interpretation correction
+
+The later post-reset diagnostic at 22:33:05 UTC succeeded for both the required
+repository tag read and `gh auth status`, while `/user` still returned permission
+HTTP403. This withdraws the earlier inference that the user-endpoint denial
+explained auth-status failure. Actual response artifacts from the two PR67
+22:26 contract requests prove exhausted core quota: limit/used 5,000, remaining
+zero, reset 22:32:38 UTC. The earlier `2da52ab` auth-status HTTP cause remains
+uncaptured. These are separate observations.
+
+Keep the precise authenticated repository preflight and response evidence. The
+post-reset diagnostic supports a bounded retry, not a passing product gate. See
+`evidence/maintenance-actions-token-diagnostic-correction.json`. Product/test
+source is unchanged; original acceptance remains 9/21.
+
+## PR67 final merge closure and post-merge local reimport base
+
+The static package-check change merged from the exact reviewed head
+`8677be990e9d3e82fadfaa12fc80ecb824704cda` as
+`6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44`. The merge tree
+`e168038ba39ab6bd64bcd4cd1004608ba5212d81` exactly matches the reviewed head
+tree; its parents are `ab23a7b1f3c0719926a78d3178f78849d1aa0ea2` and the
+reviewed PR head. The root merge guard receipt is
+`/tmp/skillview-package-check-evidence/final-merge-root-guard/merge-verified.json`.
+This section supersedes the earlier PR67 paragraphs above that recorded fresh
+native gates and review resolution as pending; those earlier entries remain
+historical snapshots of their respective heads and observations.
+
+On that exact head, CI attempt 2, both minimum/latest `gh` contract lanes, and
+both actual CodeQL analyses succeeded. Six review threads were resolved. The
+18 observed final check-runs comprise 17 successes and the expected skipped
+`notify-failure` job; this records observed statuses without asserting the
+repository's branch-protection required-status configuration. Each of the three
+platform test jobs reported 2,065 passed (2,056 unit plus 9 integration), with
+zero failures/skips. Both Windows metadata jobs reported 207 passed, zero
+failures/skips.
+
+All four fresh attempt-2 native artifacts were matched to GitHub's SHA-256
+digest and independently reviewed. Across the four RIDs, the artifacts contain
+88 eleven-scenario package-check rows, 144 standalone-unpin recovery rows
+(App and extension at `gh` 2.97.0 and 2.102.0), and 24 actual legacy schema
+1/2/3 rows. Linux positive publication evidence comes from the privileged
+private tmpfs fixture; ordinary Linux refusal rows are not counted as positive
+publication. The legacy fixtures record `registryExtensionsIncluded` false for
+schema 1 and true for schemas 2/3. Runtime binary hashes and CLI versions are
+recorded, but the binaries themselves were not archived. The four-RID artifact
+index and independent-review receipts are in
+`/tmp/skillview-package-check-evidence/final-merge-root-guard/four-rid-independent-index.json`.
+
+The initial same-head CI/contracts attempt stopped after exact API repository
+reads returned Actions installation-token HTTP 403 with core quota exhausted
+(limit/used 5,000; remaining zero; reset 2026-10-16T22:32:38Z). Its partial
+artifacts remain historical; the successful results above come from the one
+failed-only retry for each run. A later read-only probe observed the exact tag
+GET return HTTP 200 with 4,997 remaining, `/user` return 403, and `gh auth
+status` exit successfully. This correction withdraws any claim that the `/user`
+denial explains an auth-status failure. It does not explain the earlier
+`2da52ab` failure, whose HTTP cause remains uncaptured. Details are in
+`agent_docs/evidence/maintenance-batch-17-final.json`.
+
+The four unpublished local-reimport commits were rebased onto the actual merge
+commit without changing their tree: old and new tree are both
+`3ff8058f6b7340e4b4bb513f3475458b9bf83d76`, and the rebased head is
+`e62961fc1686813711be562983bbe2c6b505c271`. The existing identical-tree local
+verification reports 2,121 unit plus 9 integration tests, zero failures/skips;
+that receipt predates the rebase and is not a fresh native proof for local
+reimport. Native App/extension gates for that candidate remain outstanding.
+The original acceptance remains 9/21 and M19 is partial. The original Mac
+Down-arrow crash remains unreproduced.
+
+
+## PR68 local reimport: first-head corrections and local verification
+
+The first published head `7d90f864f85971f1831503c5a8bba20820b8bdbf`
+did not pass CI. Windows and macOS each exposed one test-fixture problem;
+Linux native reimport exposed catalog local paths incorrectly projected into
+repository tracking. Copilot also found the native candidate digest-case mismatch
+and hidden modal failure diagnostics. These are corrected with independent review
+and regressions; production metadata barriers and mixed-source refusals remain.
+
+Actual private `gh` 2.97.0 and 2.102.0 list observations confirm the local
+`sourceURL` shape, with installed/source native snapshots unchanged. The corrected
+local source has 2,150 unit and 9 integration tests passed,
+zero failed/skipped; managed/build inputs match before and after. The overlapping
+focused runs include 38 candidate/modal/fixture tests and 116 inventory/affected
+tests, including 22 catalog regressions; these are not additive counts.
+
+All four first-head AOT jobs failed. The macOS API response proves an exhausted
+Actions installation core quota (5,000 used, zero remaining; reset
+2026-10-17T00:35:08Z). Windows API failures lack their own response rate headers.
+Neither partial artifacts nor the first-head contract/CodeQL successes establish
+final-head native success. Fresh published-head gates and independent artifact
+review remain required. Evidence and exact source/log/review hashes are in
+`agent_docs/evidence/maintenance-local-reimport-ci-corrections-local.json`.
+Original acceptance remains 9/21; M08/M18 and all other open obligations remain.
+The original Mac Installed Down-arrow crash remains unreproduced.
+
+PR68 at `49f482c` then exposed two verification assumptions: the tracking proof
+expected a local catalog path in the repository `source` field, and the archive
+fixture compared its lexical address with macOS's held canonical address.
+The proof now requires the exact raw `localSourcePath` and an empty repository
+source for local installs, retaining remote equality and the separate normalized
+origin check. The fixture compares held before/after archive addresses and uses
+an actual Unix scan-root alias. Seven captured-result helper checks and six
+archive tests pass; build and scoped format verification pass. Production and
+408 of the earlier 409 managed/build inputs are unchanged; the changed test class
+was rerun in full. Fresh final-head native gates remain required. See
+[evidence](evidence/maintenance-local-reimport-tracking-proof-corrections-local.json).
+Original acceptance remains **9/21**; the original Mac crash remains unreproduced.

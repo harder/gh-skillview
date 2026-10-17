@@ -11,7 +11,7 @@ try
 {
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
     if (!checkDiskFullRoot && args.Length != 6)
-        throw new ArgumentException("root gh id fingerprint apply|apply-merged|apply-unpin|undo|undo-unpin|repair|repair-unpin [disk-full:]checkpoint; or --check-disk-full-root root");
+        throw new ArgumentException("root gh id fingerprint apply|apply-merged|apply-unpin|apply-reimport|undo|undo-unpin|undo-reimport|repair|repair-unpin [disk-full:]checkpoint; or --check-disk-full-root root");
     if (!SecureRemovalBackend.TryCanonicalizePath(Path.GetFullPath(args[checkDiskFullRoot ? 1 : 0]), out var root, out var rootError))
         throw new IOException("Cannot establish native proof-root authority: " + rootError);
     var home = Environment.GetEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
@@ -29,8 +29,8 @@ try
         return 0;
     }
     var checkpoint = diskFullMode ? args[5]["disk-full:".Length..] : args[5];
-    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "undo" or "undo-unpin" or "repair" or "repair-unpin")
-        || checkpoint is not ("retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
+    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "undo" or "undo-unpin" or "undo-reimport" or "repair" or "repair-unpin")
+        || checkpoint is not ("local-retain-intent" or "retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
             or "owner-repair-intent" or "owner-repaired" or "compensation-truncated")
         || diskFullMode && (args[4] is not ("apply-merged" or "undo")
@@ -48,7 +48,9 @@ try
         "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),
         "apply-merged" => store.Apply(args[2], args[3], inventory, lifetime.Token, "merge-reviewed"),
         "apply-unpin" => store.Apply(args[2], args[3], inventory, lifetime.Token, "unpin-only", "unpin-only"),
+        "apply-reimport" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-retain-original", "local-reimport"),
         "undo-unpin" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "unpin-only"),
+        "undo-reimport" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "local-reimport"),
         "repair-unpin" => store.RepairOwner(args[2], args[3], inventory, lifetime.Token, "unpin-only"),
         "undo" => store.Recover(args[2], args[3], inventory, true, lifetime.Token),
         _ => store.RepairOwner(args[2], args[3], inventory, lifetime.Token)

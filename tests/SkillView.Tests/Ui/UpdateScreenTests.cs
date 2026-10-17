@@ -7,6 +7,22 @@ namespace SkillView.Tests.Ui;
 
 public sealed class UpdateScreenTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EmptyOutputCompletionIsOnlyReportedForSuccessfulResult(bool succeeded)
+    {
+        var result = UpdateResult.Failure(false, 2, "", []) with
+        { Succeeded = succeeded, ExitCode = succeeded ? 0 : 2, ErrorMessage = succeeded ? null : "Native transition refused" };
+        var body = UpdateScreen.RenderResult(result, false, false, ["demo"], localReimport: true);
+        Assert.Equal(succeeded, body.Contains("Completed with no output", StringComparison.Ordinal));
+        if (!succeeded)
+        {
+            Assert.Contains("Failed or refused", body);
+            Assert.Contains("Native transition refused", body);
+        }
+    }
+
     [Fact]
     public void RenderResult_FormatsSingleSkillScopeSafely()
     {

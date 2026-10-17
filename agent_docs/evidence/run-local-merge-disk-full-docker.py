@@ -1,4 +1,4 @@
-"""Stage owned tools for guarded ENOSPC or standalone-unpin proofs in Docker tmpfs."""
+"""Stage owned tools for guarded ENOSPC, unpin or local-reimport proofs in Docker tmpfs."""
 import argparse
 import hashlib
 import json
@@ -15,20 +15,23 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--proof-host-dir', required=True, type=Path)
 parser.add_argument('--gh', required=True, type=Path)
-parser.add_argument('--extra-gh', action='append', type=Path, default=[], help='Additional checked gh binaries for standalone-unpin contracts.')
+parser.add_argument('--extra-gh', action='append', type=Path, default=[], help='Additional checked gh binaries for unpin/reimport contracts.')
 parser.add_argument('--output', required=True, type=Path)
-parser.add_argument('--unpin-only', action='store_true', help='Run standalone-unpin recovery without filling any filesystem.')
-parser.add_argument('--legacy-app', type=Path, help='Optional frozen native baseline for unpin schema compatibility.')
+mode = parser.add_mutually_exclusive_group()
+mode.add_argument('--unpin-only', action='store_true', help='Run standalone-unpin recovery without filling any filesystem.')
+mode.add_argument('--local-reimport', action='store_true', help='Run local-only reimport recovery without authentication or filling any filesystem.')
+parser.add_argument('--legacy-app', type=Path, help='Optional frozen native baseline: schemas1-3 for unpin mode, schema4 for local-reimport mode.')
 parser.add_argument('--legacy-kill-boundary', choices=('retain-moved', 'install-moved'), default='retain-moved')
 parser.add_argument('--legacy-checkout', type=Path, help='Exact clean baseline checkout used to build --legacy-app; never mounted.')
 parser.add_argument('--platform', choices=('linux/amd64', 'linux/arm64'))
 parser.add_argument('--pull', choices=('missing', 'never'), default='missing')
 args = parser.parse_args()
-if args.extra_gh and not args.unpin_only:
-    parser.error('--extra-gh requires --unpin-only.')
-if bool(args.legacy_app) != bool(args.legacy_checkout) or args.legacy_app and not args.unpin_only:
-    parser.error('Use --legacy-app and --legacy-checkout together with --unpin-only.')
-if not (os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')):
+non_filling = args.unpin_only or args.local_reimport
+if args.extra_gh and not non_filling:
+    parser.error('--extra-gh requires --unpin-only or --local-reimport.')
+if bool(args.legacy_app) != bool(args.legacy_checkout) or args.legacy_app and not non_filling:
+    parser.error('Use --legacy-app and --legacy-checkout together with --unpin-only or --local-reimport.')
+if not args.local_reimport and not (os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')):
     parser.error('A child GH_TOKEN/GITHUB_TOKEN is required; its value is never printed.')
 docker = shutil.which('docker')
 if docker is None:
@@ -66,7 +69,7 @@ output = requested_output.resolve(strict=True)
 scripts = Path(__file__).resolve().parent
 app, proof, gh = args.app.resolve(), args.proof_host_dir.resolve(), args.gh.resolve()
 assert app.is_file() and (proof / 'SkillView.MaintenanceProof').is_file() and gh.is_file()
-container = ('skillview-unpin-' if args.unpin_only else 'skillview-disk-full-') + uuid.uuid4().hex
+container = ('skillview-local-reimport-' if args.local_reimport else 'skillview-unpin-' if args.unpin_only else 'skillview-disk-full-') + uuid.uuid4().hex
 
 
 def digest(path):
@@ -90,12 +93,12 @@ with tempfile.TemporaryDirectory(prefix='skillview-disk-full-tools-') as tempora
         assert extra.resolve().is_file()
         shutil.copy2(extra.resolve(), tools / ('gh-extra-' + str(index)))
         extra_gh_arguments += ' --gh /proof-tools/gh-extra-' + str(index)
-    proof_scripts = ('prove-shared-revision-update.py',) if args.unpin_only else ('prove-local-merge-update.py', 'prove-disk-full-guards.py', 'prove-local-merge-disk-full.sh')
+    proof_scripts = ('prove-local-reimport.py',) if args.local_reimport else ('prove-shared-revision-update.py',) if args.unpin_only else ('prove-local-merge-update.py', 'prove-disk-full-guards.py', 'prove-local-merge-disk-full.sh')
     for name in proof_scripts:
         shutil.copy2(scripts / name, tools / name)
     legacy_command = ''
     if args.legacy_app:
-        baseline = '0dba59be59776e6e654123aa1ce1e5496074763e'
+        baseline = 'c919199a6861b9aaf9301e31c4b2945e098da799' if args.local_reimport else '0dba59be59776e6e654123aa1ce1e5496074763e'
         checkout, old_app = args.legacy_checkout.resolve(), args.legacy_app.resolve()
         assert old_app.is_relative_to(checkout), 'Baseline binary must be beneath its exact source checkout'
         observed = subprocess.check_output(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], text=True).strip()
@@ -104,9 +107,11 @@ with tempfile.TemporaryDirectory(prefix='skillview-disk-full-tools-') as tempora
         copy_tools(old_app.parent, tools / 'legacy')
         (tools / 'legacy-source.json').write_text(json.dumps(dict(sourceCommit=observed, trackedClean=clean,
             binarySha256=digest(old_app)), indent=2) + '\n')
-        shutil.copy2(scripts / 'prove-old-native-plans.py', tools / 'prove-old-native-plans.py')
-        legacy_command = 'python3 /proof-tools/prove-old-native-plans.py --old-app /proof-tools/legacy/' + shlex.quote(old_app.name) + ' --old-source-receipt /proof-tools/legacy-source.json --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh --kill-boundary ' + args.legacy_kill_boundary + ' --output /proof-results/old-native-proof.json\n'
+        legacy_script = 'prove-old-native-unpin.py' if args.local_reimport else 'prove-old-native-plans.py'
+        shutil.copy2(scripts / legacy_script, tools / legacy_script)
+        legacy_command = 'python3 /proof-tools/' + legacy_script + ' --old-app /proof-tools/legacy/' + shlex.quote(old_app.name) + ' --old-source-receipt /proof-tools/legacy-source.json --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh --kill-boundary ' + args.legacy_kill_boundary + ' --output /proof-results/old-native-proof.json\n'
     proof_command = ('export TMPDIR=/proof-fixtures\n'
+        'python3 /proof-tools/prove-local-reimport.py --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh' + extra_gh_arguments + ' --output /proof-results/local-reimport-proof.json\n' + legacy_command) if args.local_reimport else ('export TMPDIR=/proof-fixtures\n'
         'python3 /proof-tools/prove-shared-revision-update.py --unpin-only --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh' + extra_gh_arguments + ' --output /proof-results/standalone-unpin-proof.json\n' + legacy_command) if args.unpin_only else 'sh /proof-tools/prove-local-merge-disk-full.sh "$1" /proof-tools/proof/SkillView.MaintenanceProof /proof-tools/gh /proof-results\n'
     (tools / 'entry.sh').write_text('''#!/bin/sh
 set -eu
@@ -117,23 +122,26 @@ apt-get install -y -qq python3 git >> /proof-results/container-tools.log 2>&1
 ''' + proof_command)
     tool_hashes = {str(path.relative_to(tools)): digest(path) for path in sorted(tools.rglob('*')) if path.is_file()}
     (output / 'inputs.json').write_text(json.dumps(dict(sdkImage='mcr.microsoft.com/dotnet/sdk:10.0.402',
-        platform=args.platform, proofKind='standalone-unpin' if args.unpin_only else 'real-enospc',
+        platform=args.platform, proofKind='local-reimport' if args.local_reimport else 'standalone-unpin' if args.unpin_only else 'real-enospc',
         hashes=tool_hashes, fixtureTmpfsBytes=64 * 1024 * 1024,
-        oversizedNegativeTmpfsBytes=None if args.unpin_only else 256 * 1024 * 1024,
-        sharedNegativeTmpfsBytes=None if args.unpin_only else 64 * 1024 * 1024), indent=2) + '\n')
+        oversizedNegativeTmpfsBytes=None if non_filling else 256 * 1024 * 1024,
+        sharedNegativeTmpfsBytes=None if non_filling else 64 * 1024 * 1024), indent=2) + '\n')
     command = [docker, 'run', '--rm', '--name', container, '--pull=' + args.pull,
                '--cap-add=SYS_ADMIN', '--shm-size=64m',
                '--tmpfs', '/proof-fixtures:rw,size=64m,mode=700',
                '--mount', f'type=bind,src={tools},dst=/proof-tools,readonly',
                '--mount', f'type=bind,src={output},dst=/proof-results',
-               '--env', 'GH_TOKEN', '--env', 'DOTNET_EnableDiagnostics=0']
-    if not args.unpin_only:
+               '--env', 'DOTNET_EnableDiagnostics=0']
+    if not args.local_reimport:
+        command += ['--env', 'GH_TOKEN']
+    if not non_filling:
         command += ['--tmpfs', '/proof-too-large:rw,size=256m,mode=700']
     if args.platform:
         command += ['--platform', args.platform]
     command += ['mcr.microsoft.com/dotnet/sdk:10.0.402', 'sh', '/proof-tools/entry.sh', '/proof-tools/app/' + app.name]
     env = os.environ.copy()
-    env['GH_TOKEN'] = env.get('GH_TOKEN') or env['GITHUB_TOKEN']
+    if not args.local_reimport:
+        env['GH_TOKEN'] = env.get('GH_TOKEN') or env['GITHUB_TOKEN']
     process = None
     try:
         with (output / 'docker.log').open('w') as log:

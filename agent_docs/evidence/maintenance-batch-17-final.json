@@ -1,0 +1,355 @@
+{
+  "acceptance": {
+    "M19": "partial/incomplete",
+    "complete": 9,
+    "originalCriteriaUnchanged": true,
+    "total": 21
+  },
+  "createdUtc": "2026-10-16T23:39:48Z",
+  "durableQualifications": {
+    "binaryHashes": "runtime observations only; binaries not archived",
+    "originalMacDownArrowCrash": "not reproduced",
+    "preMergeMonitoringSummary": {
+      "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/final-summary.json",
+      "sha256": "26cd34c482d4a77e454b81e57d1a02af9226108e340e6d7f99ae52d2a743dc8b",
+      "status": "pre-merge evidence snapshot; not a post-merge receipt"
+    },
+    "sourceAuthenticityCompatibilityBehavioralSafety": "not established by static package checking"
+  },
+  "finalGates": {
+    "ci": {
+      "attempt": 2,
+      "conclusion": "success",
+      "head": "8677be990e9d3e82fadfaa12fc80ecb824704cda",
+      "jobs": {
+        "AOT publish smoke (linux-x64)": "success",
+        "AOT publish smoke (osx-arm64)": "success",
+        "AOT publish smoke (win-arm64)": "success",
+        "AOT publish smoke (win-x64)": "success",
+        "Windows metadata (windows-11-arm)": "success",
+        "Windows metadata (windows-latest)": "success",
+        "dependency-review": "success",
+        "site-check": "success",
+        "test (macos-15)": "success",
+        "test (ubuntu-latest)": "success",
+        "test (windows-latest)": "success",
+        "workflow-lint": "success"
+      },
+      "runId": 38975711216,
+      "snapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/ci-final.json",
+        "sha256": "dc3f48ce642d3ebea0fcea6c88bb0075e1db316ec252d58df873c2482b6a4495"
+      }
+    },
+    "codeql": {
+      "actionsAnalysis": "success",
+      "attempt": 1,
+      "csharpAnalysis": "success",
+      "head": "8677be990e9d3e82fadfaa12fc80ecb824704cda",
+      "runId": 38975711233,
+      "snapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/codeql-final.json",
+        "sha256": "49908e998b402134337fe2ec0a0f7226b61396769b5af1196a100a91aa5976b7"
+      }
+    },
+    "contracts": {
+      "attempt": 2,
+      "head": "8677be990e9d3e82fadfaa12fc80ecb824704cda",
+      "latest": "success",
+      "minimum": "success",
+      "notifyFailure": "skipped",
+      "runId": 38975735264,
+      "snapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/contracts-final.json",
+        "sha256": "b3dc00f225ff622ea07f372883e4c21324e3f9af63414809afe84c55121593dc"
+      }
+    },
+    "observedChecks": {
+      "failed": 0,
+      "inProgress": 0,
+      "qualification": "This lists observed check-runs and does not assert repository branch-protection required-status configuration.",
+      "skipped": 1,
+      "skippedJob": "notify-failure",
+      "snapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/check-runs-final.json",
+        "sha256": "2f3c24410c83b73298a6f2ec622624896e14d8826e2beb7120b7d5b32dd05c6d"
+      },
+      "success": 17,
+      "total": 18
+    },
+    "reviewThreads": {
+      "prSnapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/pr-final.json",
+        "sha256": "3e1b11106f694a106bc0e44cf52d5f135438bdb23ec6b82dd78f3fad4f35804c"
+      },
+      "snapshot": {
+        "path": "/tmp/skillview-package-check-evidence/ci-preflight-head/review-threads-final.json",
+        "sha256": "b97b564254a255ae54aab4566b2f14d1dd64a5fe9142d75686a6b6225fea4d13"
+      },
+      "total": 6,
+      "unresolved": 0
+    }
+  },
+  "nativeArtifacts": {
+    "actualOldNativeSchemas": {
+      "registryExtensionsIncludedBySchema": [
+        false,
+        true,
+        true
+      ],
+      "rowsPerRid": 6,
+      "schemas": [
+        1,
+        2,
+        3
+      ],
+      "totalRows": 24
+    },
+    "artifacts": [
+      {
+        "artifactId": 12080176440,
+        "createdAt": "2026-10-16T22:52:57Z",
+        "downloadedZipSha256": "6678000a3c1e45834b5ffcd03490f96ed31c2a299d54d18d7f284ca6f08e2698",
+        "githubDigest": "sha256:6678000a3c1e45834b5ffcd03490f96ed31c2a299d54d18d7f284ca6f08e2698",
+        "independentReview": {
+          "path": "/tmp/skillview-package-check-review/pr67-linux-attempt2-artifact-independent.json",
+          "result": "clear",
+          "sha256": "eb3fcef995c9c660c6a1773cced32a87f1f389a97b5c225f88a28d468e47e213"
+        },
+        "jobId": 117227376736,
+        "memberManifestSha256": "3c65472ff8ac0ba0a2ca229550e966d335a051025b29c469d5000a922f98d552",
+        "rid": "linux-x64",
+        "zipMembers": 63
+      },
+      {
+        "artifactId": 12080043534,
+        "createdAt": "2026-10-16T23:08:02Z",
+        "downloadedZipSha256": "64cd3a43067757408fd026c43410fb36e8096cb5bfacc26e05f62070a44b5ff8",
+        "githubDigest": "sha256:64cd3a43067757408fd026c43410fb36e8096cb5bfacc26e05f62070a44b5ff8",
+        "independentReview": {
+          "path": "/tmp/skillview-package-check-review/pr67-macos-attempt2-artifact-independent.json",
+          "result": "clear",
+          "sha256": "a66dcd0fd8aa89227aa23a330e8b825cae35ddd754c9e42a80549fa7d5c6b235"
+        },
+        "jobId": 117227376683,
+        "memberManifestSha256": "55ac1f82354eaa77615ed73115112da908a8a183fac83e1cc6cd8f6ee8673e06",
+        "rid": "osx-arm64",
+        "zipMembers": 45
+      },
+      {
+        "artifactId": 12080449420,
+        "createdAt": "2026-10-16T23:18:26Z",
+        "downloadedZipSha256": "0bba7bcaabe8d469afc920b61b56ae39ee9f254dc9fad2fd24d6a3aa815b5222",
+        "githubDigest": "sha256:0bba7bcaabe8d469afc920b61b56ae39ee9f254dc9fad2fd24d6a3aa815b5222",
+        "independentReview": {
+          "path": "/tmp/skillview-package-check-review/pr67-windows-x64-attempt2-artifact-independent.json",
+          "result": "clear",
+          "sha256": "607428b2328449428bf269f89d8ccb34383b1347f558f0a6034d7546954bc1c4"
+        },
+        "jobId": 117227376795,
+        "memberManifestSha256": "08a6e4c455b5514b8968ebd830997d4c5ec3413834a78176ddad0e3fe1e41dbf",
+        "rid": "win-x64",
+        "zipMembers": 43
+      },
+      {
+        "artifactId": 12081870638,
+        "createdAt": "2026-10-16T23:36:15Z",
+        "downloadedZipSha256": "0edae2576c03dd31f3a9b1f26b11f0a707072e25b4b59c39667bbd58561249c8",
+        "githubDigest": "sha256:0edae2576c03dd31f3a9b1f26b11f0a707072e25b4b59c39667bbd58561249c8",
+        "independentReview": {
+          "path": "/tmp/skillview-package-check-review/pr67-windows-arm64-attempt2-artifact-independent.json",
+          "result": "clear",
+          "sha256": "b5d570a3e7132ed9f3343448eaa3b91ba105cd9a55571a9865c70672d758314d"
+        },
+        "jobId": 117227376713,
+        "memberManifestSha256": "ecb7529984d727783b1ac53d1427c54e947dbda968dd7e5f22337b00820fcd94",
+        "rid": "win-arm64",
+        "zipMembers": 43
+      }
+    ],
+    "attempt": 2,
+    "packageChecking": {
+      "assertion": "Source payload unchanged and referenced script not executed.",
+      "productHosts": [
+        "App",
+        "gh-extension"
+      ],
+      "rowCountPerRid": 22,
+      "scenarioCountPerProductHost": 11,
+      "totalRows": 88
+    },
+    "qualifications": [
+      "Ordinary Linux refusal proofs are not counted as positive publication: the positive Linux rows use the privileged private tmpfs fixture.",
+      "The archived artifact JSON records runtime binary hashes and actual gh versions, but the binaries themselves were not archived."
+    ],
+    "reviewedHead": "8677be990e9d3e82fadfaa12fc80ecb824704cda",
+    "rootIndependentIndex": {
+      "path": "/tmp/skillview-package-check-evidence/final-merge-root-guard/four-rid-independent-index.json",
+      "sha256": "0abbaae9110d075019c8185b3b88441d8cab139d25e18955d7f1423da3d76fed"
+    },
+    "runId": 38975711216,
+    "selection": "Four fresh final-head attempt-2 artifacts only; earlier attempt-1 partial/quota artifacts are historical and excluded.",
+    "standaloneUnpin": {
+      "assertion": "Actual process-kill/recovery fixtures, exact owner/native undo, schema4 and no source resolution.",
+      "binaryKinds": [
+        "App",
+        "gh-extension"
+      ],
+      "fixtureRowsPerBinaryAndGhVersion": 9,
+      "ghVersions": [
+        "2.97.0",
+        "2.102.0"
+      ],
+      "rowsPerRid": 36,
+      "totalRows": 144
+    },
+    "totalZipMembers": 194
+  },
+  "pullRequest": {
+    "exactReviewedTreeMerged": true,
+    "mergeCommit": "6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44",
+    "mergeTree": "e168038ba39ab6bd64bcd4cd1004608ba5212d81",
+    "mergedAt": "2026-10-16T23:38:39Z",
+    "number": 67,
+    "parents": [
+      "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2",
+      "8677be990e9d3e82fadfaa12fc80ecb824704cda"
+    ],
+    "reviewedHead": "8677be990e9d3e82fadfaa12fc80ecb824704cda",
+    "reviewedHeadTree": "e168038ba39ab6bd64bcd4cd1004608ba5212d81",
+    "rootMergeGuard": {
+      "path": "/tmp/skillview-package-check-evidence/final-merge-root-guard/merge-verified.json",
+      "sha256": "b259aeba325557cf366a073dfa7cfcf79600cb93fda9a92cab6be17978a069e8"
+    },
+    "url": "https://github.com/harder/gh-skillview/pull/67"
+  },
+  "quotaHistory": {
+    "attempt1": {
+      "capturedCause": "The four AOT jobs\u2019 exact Actions installation-token repository/API preflight calls returned HTTP 403 with core limit=5000, used=5000, remaining=0, reset 2026-10-16T22:32:38Z. Those four package-check proof pairs had completed; later stages had not.",
+      "ciRunId": 38975711216,
+      "conclusion": "failure",
+      "contractsAttempt1Conclusion": "failure",
+      "contractsRunId": 38975735264,
+      "dependencyReviewFirstFailure": {
+        "cause": "uncaptured/unknown",
+        "diagnostic": "Generic dependency-review unsupported-repository diagnostic.",
+        "httpHeadersRetained": false,
+        "qualification": "Its later attempt-2 success does not prove the repository configuration was disabled or that quota caused the first failure. Do not infer its cause from the AOT jobs."
+      },
+      "failedContractLanes": [
+        "gh 2.97.0 contract tests",
+        "gh latest contract tests"
+      ],
+      "failedJobs": [
+        "AOT publish smoke (linux-x64)",
+        "AOT publish smoke (osx-arm64)",
+        "AOT publish smoke (win-x64)",
+        "AOT publish smoke (win-arm64)",
+        "dependency-review"
+      ]
+    },
+    "boundedAttempt2": {
+      "ciAndContractsRerun": "Failed-only reruns, each once, after exact-head verification and fresh diagnostic response."
+    },
+    "older2daHead": {
+      "doNotInferFromPr67": true,
+      "httpCause": "uncaptured/unknown"
+    },
+    "readOnlyProbe": {
+      "artifactId": 12079490145,
+      "attempt": 2,
+      "exactTagGet": "HTTP200, remaining4997",
+      "ghAuthStatusExit": 0,
+      "head": "977d6b2fb13239e7b8340ee89ab4a7ecd872fb51",
+      "interpretation": "The /user denial does not explain a gh auth status failure in this probe. The probe supports only the bounded PR67 failed-only retries; it does not explain the separate earlier 2da52 attempt.",
+      "receiptPath": "/tmp/skillview-package-check-evidence/ci-preflight-head/quota-probe-attempt2/attempt2-summary.json",
+      "receiptSha256": "fee9e457c2c797dad0455839767f9e3afc46376b38f4448a3534f1d00fb45c44",
+      "runId": 38974480873,
+      "userGet": "HTTP403 Resource not accessible by integration",
+      "zipSha256": "fd7f29b4d1b7d31c7ef56e5a0661610ca328338b02b2fd3ffadc7e1a969c0895"
+    }
+  },
+  "reimportIntegration": {
+    "actualBase": "6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44",
+    "combinedLocalVerification": {
+      "failed": 0,
+      "integrationTests": 9,
+      "receipt": {
+        "path": "/tmp/skillview-local-reimport-evidence/combined-integration/parser-fixes-base/verification.json",
+        "sha256": "6a864bda338333de8dfc3fbcb28ad8fefe2c6a8b77fecd0f6e0514e1bd7dfc29"
+      },
+      "skipped": 0,
+      "unitTests": 2121
+    },
+    "entireProductAndTestTreeUnchanged": true,
+    "newTree": "3ff8058f6b7340e4b4bb513f3475458b9bf83d76",
+    "newUnpublishedHead": "e62961fc1686813711be562983bbe2c6b505c271",
+    "oldTree": "3ff8058f6b7340e4b4bb513f3475458b9bf83d76",
+    "oldUnpublishedHead": "8e18345d01819512eb0568b86722d7ea7f13b968",
+    "qualification": "The test receipt was produced before the four unpublished commits were rebased onto the actual merge commit; integration confirms identical source/test tree, so counts remain tied to that identical tree. The local reimport candidate itself has not yet received fresh native App/extension gates.",
+    "verificationReceipt": {
+      "path": "/tmp/skillview-local-reimport-evidence/actual-pr67-merge-integration.json",
+      "sha256": "5eb6554a3783df89a99029f528a573be9c0ce5956f90098b222ec2e2cbe5e2be"
+    },
+    "worktreeCleanAtReceipt": true
+  },
+  "schemaVersion": 1,
+  "scope": "PR67 final merge closure and post-merge base integration receipt; M19 remains partial and acceptance unchanged",
+  "testResults": {
+    "platformTests": [
+      {
+        "failed": 0,
+        "integration": 9,
+        "jobId": 117227411406,
+        "logSha256": "0b7e0a36738553653e80f61bc9087820cf07c1b1ff33df91c0b4d3faf96335b0",
+        "platform": "ubuntu-latest",
+        "rawLog": "/tmp/skillview-package-check-evidence/ci-preflight-head/retained-green-jobs/job-117227411406.log",
+        "skipped": 0,
+        "total": 2065,
+        "unit": 2056
+      },
+      {
+        "failed": 0,
+        "integration": 9,
+        "jobId": 117227378083,
+        "logSha256": "85b296ca698244327a34ee769ee266bdf4ac1ef278142385620b79ad3953b040",
+        "platform": "macos-15",
+        "rawLog": "/tmp/skillview-package-check-evidence/ci-preflight-head/retained-green-jobs/job-117227378083.log",
+        "skipped": 0,
+        "total": 2065,
+        "unit": 2056
+      },
+      {
+        "failed": 0,
+        "integration": 9,
+        "jobId": 117227411486,
+        "logSha256": "9e85d3547a896a63862e032591ab5a2d7cf4fa979fb54342dd5dc866dd3dc609",
+        "platform": "windows-latest",
+        "rawLog": "/tmp/skillview-package-check-evidence/ci-preflight-head/retained-green-jobs/job-117227411486.log",
+        "skipped": 0,
+        "total": 2065,
+        "unit": 2056
+      }
+    ],
+    "windowsMetadata": [
+      {
+        "failed": 0,
+        "jobId": 117227377885,
+        "logSha256": "5d00fe8e7efb415470787d0da0116f8b781530a1e51e8207cc618175ca2d9ea4",
+        "platform": "windows-latest",
+        "rawLog": "/tmp/skillview-package-check-evidence/ci-preflight-head/retained-green-jobs/job-117227377885.log",
+        "skipped": 0,
+        "total": 207
+      },
+      {
+        "failed": 0,
+        "jobId": 117227378729,
+        "logSha256": "ed020a60d43dd084c3d6adf38a4f758436a62d3a9a9a36f0c3f75393463fb9a6",
+        "platform": "windows-11-arm",
+        "rawLog": "/tmp/skillview-package-check-evidence/ci-preflight-head/retained-green-jobs/job-117227378729.log",
+        "skipped": 0,
+        "total": 207
+      }
+    ]
+  }
+}

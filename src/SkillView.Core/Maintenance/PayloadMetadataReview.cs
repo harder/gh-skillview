@@ -39,6 +39,7 @@ internal sealed class PayloadMetadataReview : IDisposable
     private const string WindowsPolicy = "windows-full-security-backup-streams-attributes-v1; compatible installed metadata preserved; new source streams/attributes and installed-parent security; times regenerated; unsupported/unknown metadata refused";
     internal static string PolicyFor(PayloadNativeMetadata metadata) => metadata.Platform == "windows" ? WindowsPolicy : Policy;
     internal string PolicyName => PolicyFor(recipes[""].Basis);
+    internal const string LocalImportPolicy = "local-reimport-v1; installed root metadata preserved; captured source descendant metadata copied; native identities and times regenerated; unsupported metadata refused";
     private readonly Dictionary<string, PayloadMetadataRecipe> recipes = new(StringComparer.Ordinal);
     internal PayloadMetadataAuthority Authority { get; }
     internal ImmutableArray<PayloadMetadataRecipe> Recipes => recipes.Values.OrderBy(recipe => recipe.Path, StringComparer.Ordinal).ToImmutableArray();
@@ -112,6 +113,21 @@ internal sealed class PayloadMetadataReview : IDisposable
         installed.Validate();
         var authority = reader.OpenMetadataAuthority(token);
         try { return new(installed, authority); }
+        catch { authority.Dispose(); throw; }
+    }
+
+    internal static PayloadMetadataReview ReplaceFromLocal(CapturedPayloadArchive installed, CapturedPayloadArchive source,
+        CapturedPayloadArchive.Reader sourceReader, CancellationToken token)
+    {
+        installed.Validate(); source.Validate();
+        var authority = sourceReader.OpenMetadataAuthority(token);
+        try
+        {
+            var result = new PayloadMetadataReview(source, authority);
+            var root = Require(installed.RootMetadata, "/");
+            result.recipes[""] = new("", "", root, "directory", installed.Snapshot.RootUnixMode, true);
+            return result;
+        }
         catch { authority.Dispose(); throw; }
     }
 

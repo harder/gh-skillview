@@ -101,7 +101,11 @@ public static class InstalledScreen
         if (s.FrontMatter.GithubRef is { } repositoryRef) AppendDetailItem(sb, "Repository ref", MarkdownTableFormatter.FormatCodeSpan(repositoryRef));
         if (s.FrontMatter.PinnedRef is { } pinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(pinnedRef));
         if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));
-        if (s.FrontMatter.LocalPath is { } localPath) AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
+        if (s.FrontMatter.LocalPath is { } localPath)
+        {
+            AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
+            AppendDetailItem(sb, "Local reimport", "Press **R** to review replacement from this same recorded local source, retaining the exact installed original. All consumers are affected; recovery uses frozen evidence after the first retain.");
+        }
         AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
         if (s.CleanupSuppression is { } suppression)
             AppendDetailItem(sb, "Cleanup suppression", MarkdownTableFormatter.FormatTableCell(
