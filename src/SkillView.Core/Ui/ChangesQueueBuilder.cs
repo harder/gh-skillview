@@ -34,7 +34,8 @@ internal static class ChangesQueueBuilder
             // the frozen entry and are never shortened into routing selectors.
             var title = entry.Title.Length <= 160 ? entry.Title : entry.Title[..160] + "…";
             rows.Add(new(entry.Cleanup is null ? "Review" : "Cleanup",
-                TerminalEscapeSanitizer.Sanitize(entry.Issue + " · " + title) ?? string.Empty) { Entry = entry });
+                TerminalEscapeSanitizer.Sanitize(entry.Issue + " · " + title) ?? string.Empty)
+            { Entry = entry });
         }
         token.ThrowIfCancellationRequested();
         return rows;

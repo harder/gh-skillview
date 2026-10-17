@@ -34,7 +34,7 @@ public static partial class CliDispatcher
             if (command == "plan")
             {
                 var index = arguments.IndexOf("--purpose");
-                if (index < 0 || index + 1 >= arguments.Count) throw new ArgumentException("plan requires --purpose update-revision, restore-recorded, unpin-only or local-reimport and one exact --path/--install-id.");
+                if (index < 0 || index + 1 >= arguments.Count) throw new ArgumentException("plan requires --purpose update-revision, restore-recorded, unpin-only, local-reimport or switch-local-source and one exact --path/--install-id.");
                 purpose = arguments[index + 1];
                 arguments.RemoveRange(index, 2);
                 if (arguments.Contains("--path") == arguments.Contains("--install-id"))
@@ -53,16 +53,30 @@ public static partial class CliDispatcher
             }
             var prefix = purpose switch
             {
-                "update-revision" => "update", "restore-recorded" => "restore",
-                "unpin-only" => "unpin", "local-reimport" => "reimport",
+                "update-revision" => "update",
+                "restore-recorded" => "restore",
+                "unpin-only" => "unpin",
+                "local-reimport" => "reimport",
+                "switch-local-source" => "source-switch",
                 _ => throw new ArgumentException("Unsupported plan purpose; no owner transition was selected.")
             };
             if (command == "plan" && arguments.Contains("--unpin") && purpose != "update-revision")
                 throw new ArgumentException("--unpin is supported only by an update-revision plan; standalone unpin uses purpose unpin-only.");
+            if (command == "plan" && arguments.Contains("--new-source") && purpose != "switch-local-source")
+                throw new ArgumentException("--new-source is supported only by a switch-local-source plan.");
+            if (command == "plan" && purpose == "switch-local-source")
+            {
+                var sourceIndex = arguments.IndexOf("--new-source");
+                if (sourceIndex < 0 || sourceIndex + 1 >= arguments.Count || !Path.IsPathFullyQualified(arguments[sourceIndex + 1]))
+                    throw new ArgumentException("A switch-local-source plan requires --new-source <absolute directory>.");
+            }
             var action = command switch
             {
-                "plan" => "plan", "inspect" or "verify" => "inspect", "apply" => "apply",
-                "undo" => "undo", "repair" => "recover",
+                "plan" => "plan",
+                "inspect" or "verify" => "inspect",
+                "apply" => "apply",
+                "undo" => "undo",
+                "repair" => "recover",
                 _ => throw new ArgumentException("Unsupported maintenance operation.")
             };
             if (action is "apply" or "recover" or "undo")
@@ -80,6 +94,7 @@ public static partial class CliDispatcher
                     var accepted = purpose switch
                     {
                         "local-reimport" => disposition == "replace-local-retain-original",
+                        "switch-local-source" => disposition == ReplacementPlanStore.LocalSourceSwitchDisposition,
                         "unpin-only" => disposition == "unpin-only",
                         "update-revision" => disposition is "retain-original" or "merge-reviewed",
                         _ => disposition == "retain-original"
@@ -120,7 +135,7 @@ public static partial class CliDispatcher
             if (argument is "--json" or "--allow-hidden-dirs") continue;
             if (argument == "--yes" && command is "apply" or "repair" or "undo") continue;
             if (argument == "--unpin" && command == "plan") continue;
-            var valued = command == "plan" ? argument is "--purpose" or "--path" or "--install-id"
+            var valued = command == "plan" ? argument is "--purpose" or "--path" or "--install-id" or "--new-source"
                 : argument == "--plan-file" || argument == "--expect" && command is "apply" or "repair" or "undo"
                     || argument == "--disposition" && command == "apply";
             if (!valued || ++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index])

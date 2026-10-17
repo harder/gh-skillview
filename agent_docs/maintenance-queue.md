@@ -47,10 +47,12 @@ to refresh disk inventory; checking availability is a separate explicit action.
 `inspect --path/--install-id` selects one physical installation using the existing
 exact-selection contract. `check` remains the bounded static package checker;
 availability remains the explicitly requested `update --dry-run` specialist.
-`plan --purpose update-revision|restore-recorded|unpin-only|local-reimport` routes
+`plan --purpose update-revision|restore-recorded|unpin-only|local-reimport|switch-local-source` routes
 to the existing specialist planner. Its JSON response includes a schema-1
 `planReference`, identifying the locally retained plan ID, plan/context fingerprints,
 purpose, installation ID and original path. It contains no payload authority.
+Source switching additionally requires `--new-source <absolute directory>` and
+its `replace-local-source-retain-original` retention disposition.
 Plan and inspection envelopes can be redirected to a file; a bare `planReference`
 object is also accepted. Limit: 256 KiB UTF-8 JSON, depth 32, regular native file,
 no duplicate reference members, unknown reference fields or arbitrary archive paths.
@@ -72,9 +74,10 @@ Legacy quarantine `undo --id` remains separate.
 
 These fields are transient projections (`JsonIgnore` on `ReplacementResult`), so
 persisted plan/result hashes and schemas remain unchanged. A merged plan needs a
-fresh specialist inspection/export because its fingerprint changes. Adjacent source
-review work is not assumed on this base: any later source-review acknowledgement
-must stay in the underlying specialist admission path, including generic aliases.
+fresh specialist inspection/export because its fingerprint changes. A source-review
+acknowledgement is independent of the reference and retention approval. Generic
+apply enforces the same persisted receipt as specialist apply; declare the exact
+frozen source review with its purpose-specific `*-ack-source` command first.
 
 Queue JSON and operation output distinguish affected and retained exposures from
 retained payload locations. Reload instructions are separate from disk verification.

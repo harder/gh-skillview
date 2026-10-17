@@ -16,8 +16,10 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class MaintenanceQueueKeyboardTests
 {
-    [Fact]
-    public async Task ExactDrillIn_ComparisonKeyboardStagesOnlySelectedAddressAndRequiresRetentionBeforeApply()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExactDrillIn_ComparisonKeyboardStagesOnlySelectedAddressAndRequiresIndependentApprovals(bool sourceReviewRequired)
     {
         using var app = Application.Create().Init("ansi");
         app.Driver!.SetScreenSize(100, 26);
@@ -34,6 +36,12 @@ public sealed class MaintenanceQueueKeyboardTests
                 new("SKILL.md", "file", new('1', 64), new('1', 64), 10, 384, null),
                 new("SKILL.md", "file", new('2', 64), new('2', 64), 20, 384, null))])
         };
+        if (sourceReviewRequired)
+        {
+            var report = new SourceReviewReport([], 0, 0, new("limited", [], 0, [], 0), new("limited", [], 0, [], 0), [], 0,
+                "Presentation fixture only; no saved execution authority");
+            review = review with { SourceReview = new(1, "review-installed-candidate", "review-source-candidate", new('3', 64), new('4', 64), SourceUpdateReview.Hash(report), report) };
+        }
         UpdateResult Result(ReplacementResult saved, bool applied = false) => new()
         {
             DryRun = false,
@@ -57,7 +65,13 @@ public sealed class MaintenanceQueueKeyboardTests
                 Assert.False(options.All); calls.Add("compare-plan"); return Task.FromResult(Result(review));
             }, () => "/gh", new Logger(), () => { }, () => { }, applyRunner: (saved, _, _) =>
             {
-                Assert.Same(review, saved); calls.Add("apply");
+                if (sourceReviewRequired)
+                {
+                    Assert.True(saved.AcknowledgeSourceReview); Assert.Same(review.SourceReview, saved.SourceReview);
+                    Assert.Equal(review.PlanFingerprint, saved.PlanFingerprint);
+                }
+                else Assert.Same(review, saved);
+                calls.Add("apply");
                 return Task.FromResult(Result(saved with { Status = "installed", Message = "Verified saved disk locations; session unknown" }, true));
             })
         { Width = Dim.Fill(), Height = Dim.Fill() };
@@ -78,6 +92,17 @@ public sealed class MaintenanceQueueKeyboardTests
             Assert.Single(calls);
             view.RetainBoxForTests.SetFocus(); Assert.True(view.RetainBoxForTests.HasFocus);
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+            if (sourceReviewRequired)
+            {
+                Assert.False(view.ApplyButtonForTests.Enabled);
+                await view.ApplyReviewForTestsAsync(); Assert.Single(calls);
+                view.SourceReviewBoxForTests.SetFocus(); Assert.True(view.SourceReviewBoxForTests.HasFocus);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                Assert.True(view.ApplyButtonForTests.Enabled);
+                view.RetainBoxForTests.SetFocus(); Assert.True(view.RetainBoxForTests.HasFocus);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space)); Assert.False(view.ApplyButtonForTests.Enabled);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+            }
             Assert.True(view.ApplyButtonForTests.Enabled);
             view.ApplyButtonForTests.SetFocus(); Assert.True(view.ApplyButtonForTests.HasFocus);
             app.Keyboard.RaiseKeyDownEvent(Key.Enter);

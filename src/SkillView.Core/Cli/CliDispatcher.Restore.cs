@@ -146,7 +146,9 @@ public static partial class CliDispatcher
                 w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
                 WritePlanReference(w, result);
-                w.WriteString("diskVerification", result.Succeeded ? "verified-saved-locations" : "incomplete; inspect operation status and retained evidence");
+                w.WriteString("diskVerification", result.Succeeded
+                    ? command == "restore-ack-source" ? "not-performed; source-review acknowledgement only" : "verified-saved-locations"
+                    : "incomplete; inspect operation status and retained evidence");
                 if ((unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
                 {
                     w.WriteStartArray("applyArguments");

@@ -92,6 +92,17 @@ public sealed class MaintenancePlanFileTests : IDisposable
             Assert.Equal(ExitCodes.UserError, recover.Code);
             Assert.Contains("repair cannot start a ready plan", recover.Output);
         }
+        var noSourceReview = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
+        Assert.Equal(ExitCodes.UserError, noSourceReview.Code);
+        Assert.Contains("source-review acknowledgement", noSourceReview.Output);
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")));
+        Assert.False(Directory.Exists(plan.RetainedPath));
+        var sourceReview = Assert.IsType<SourceReviewEvidence>(plan.SourceReview);
+        var acknowledged = await Run("restore-ack-source", "--id", plan.Id, "--expect", plan.PlanFingerprint,
+            "--review", sourceReview.Fingerprint, "--yes", "--json");
+        Assert.Equal(ExitCodes.Success, acknowledged.Code);
+        using (var declaration = JsonDocument.Parse(acknowledged.Output))
+            Assert.Equal("not-performed; source-review acknowledgement only", declaration.RootElement.GetProperty("diskVerification").GetString());
         var applied = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
         Assert.Equal(ExitCodes.Success, applied.Code);
         Assert.Contains("Saved candidate instructions", File.ReadAllText(Path.Combine(Payload, "SKILL.md")));
@@ -105,6 +116,21 @@ public sealed class MaintenancePlanFileTests : IDisposable
         Assert.Equal(ExitCodes.Success, undo.Code);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")));
         Assert.Equal(referenceBytes, File.ReadAllBytes(ReferencePath));
+    }
+
+    [Fact]
+    public async Task SourceSwitchLocatorIsReadableButCannotRetypeAnotherNativePlan()
+    {
+        var plan = await Prepare();
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        var forged = plan.Reference! with { Purpose = ReplacementPlanStore.LocalSourceSwitchPurpose };
+        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(forged, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
+        Assert.Equal(forged, MaintenancePlanReference.Read(ReferencePath, Token));
+        var refused = await Run("verify", "--plan-file", ReferencePath, "--json");
+        Assert.Equal(ExitCodes.UserError, refused.Code);
+        Assert.Contains("purpose", refused.Output, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+        Assert.False(Directory.Exists(plan.RetainedPath));
     }
 
     [Fact]
@@ -145,6 +171,9 @@ public sealed class MaintenancePlanFileTests : IDisposable
     [Theory]
     [InlineData("plan --purpose update-revision --path one --path two --json")]
     [InlineData("plan --purpose owner-adoption --path one --json")]
+    [InlineData("plan --purpose restore-recorded --path one --new-source /unrelated --json")]
+    [InlineData("plan --purpose switch-local-source --path one --json")]
+    [InlineData("plan --purpose switch-local-source --path one --new-source relative --json")]
     [InlineData("inspect --plan-file missing --json --json")]
     [InlineData("apply --plan-file missing --id override --json")]
     [InlineData("verify --plan-file missing --execute --json")]

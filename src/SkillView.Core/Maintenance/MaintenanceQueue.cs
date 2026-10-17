@@ -37,7 +37,8 @@ public static class MaintenanceQueueBuilder
                 subject.Name ?? Path.GetFileName(candidate.Path), subject,
                 Paths(candidate.Path, impact.AffectedExposures),
                 candidate.ReviewOnly ? "review-required" : "observed-candidate", candidate.Reason,
-                "review-cleanup", candidate.Skill?.Ignored ?? false, IsPinned(candidate.Skill)) { Cleanup = candidate });
+                "review-cleanup", candidate.Skill?.Ignored ?? false, IsPinned(candidate.Skill))
+            { Cleanup = candidate });
         }
 
         // Unknown availability is a review opportunity, never an available update.
