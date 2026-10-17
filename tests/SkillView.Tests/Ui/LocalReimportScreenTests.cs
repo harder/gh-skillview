@@ -20,6 +20,8 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class LocalReimportScreenTests
 {
+    private static string NewSourcePath => Path.Combine(Path.GetTempPath(), "skillview-ui-source", "demo");
+
     internal static InstalledSkill Target() => new()
     {
         Name = "demo",
@@ -52,9 +54,9 @@ public sealed class LocalReimportScreenTests
         {
             LocalImport = plan.LocalImport! with
             {
-                SourcePath = "/new/demo",
-                CanonicalSourcePath = "/new/demo",
-                DesiredMetadata = plan.Subject.Metadata with { LocalPath = "/new/demo" },
+                SourcePath = NewSourcePath,
+                CanonicalSourcePath = NewSourcePath,
+                DesiredMetadata = plan.Subject.Metadata with { LocalPath = NewSourcePath },
                 Disposition = ReplacementPlanStore.LocalSourceSwitchDisposition
             },
             LocalSourceSwitch = new("/source/demo", new("/source/demo", "/source/demo", default, []), "/copied/old/demo")
@@ -65,12 +67,13 @@ public sealed class LocalReimportScreenTests
     public void SourceSwitchJsonAndUiKeepFamiliesDistinctAndOldFieldsOmitted()
     {
         var plan = SourceSwitchPlan();
+        Assert.True(Path.IsPathFullyQualified(plan.LocalImport!.SourcePath));
         Assert.True(LocalReimportScreen.IsLocalSourceSwitch(plan)); Assert.False(LocalReimportScreen.IsLocalReimport(plan));
         Assert.False(LocalReimportScreen.IsLocalSourceSwitch(Plan()));
         using var data = JsonDocument.Parse(JsonSerializer.Serialize(plan, ReplacementJsonContext.Default.ReplacementResult));
         Assert.Equal("/source/demo", data.RootElement.GetProperty("localSourceSwitch").GetProperty("previousRecordedPath").GetString());
         Assert.Equal("/copied/old/demo", data.RootElement.GetProperty("localSourceSwitch").GetProperty("capturedSourceRecordedPath").GetString());
-        Assert.Equal("/new/demo", data.RootElement.GetProperty("localImport").GetProperty("desiredMetadata").GetProperty("localPath").GetString());
+        Assert.Equal(NewSourcePath, data.RootElement.GetProperty("localImport").GetProperty("desiredMetadata").GetProperty("localPath").GetString());
         foreach (var field in new[] { "revision", "pinPolicy", "localDisposition" }) Assert.False(data.RootElement.TryGetProperty(field, out _));
         var legacy = JsonSerializer.Serialize(Plan(), ReplacementJsonContext.Default.ReplacementResult);
         Assert.DoesNotContain("localSourceSwitch", legacy);
@@ -245,7 +248,7 @@ public sealed class LocalReimportScreenTests
             });
             LocalReimportScreen.Show(app, new Logger(), Target(), (_, _) =>
             { prepared++; return Task.FromResult(new LocalReimportResponse(Plan: SourceSwitchPlan())); }, lifetime.Token,
-                readyForTests: value => { dialog = value; value.SubViews.OfType<TextField>().Last().Text = "/new/demo"; }, sourceSwitch: true);
+                readyForTests: value => { dialog = value; value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, sourceSwitch: true);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.True(invalidated); Assert.Equal(1, prepared); Assert.False(timedOut);
     }
@@ -273,7 +276,7 @@ public sealed class LocalReimportScreenTests
                 Interlocked.Increment(ref started);
                 try { return await new TaskCompletionSource<LocalReimportResponse>().Task.WaitAsync(token); }
                 finally { Interlocked.Increment(ref drained); }
-            }, readyForTests: value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = "/new/demo"; }, sourceSwitch: sourceSwitch);
+            }, readyForTests: value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, sourceSwitch: sourceSwitch);
             Assert.Equal(1, Volatile.Read(ref drained));
             void Press(string label)
             { dialog!.SubViews.OfType<Button>().Single(button => button.Text == label).SetFocus(); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); }
@@ -313,7 +316,7 @@ public sealed class LocalReimportScreenTests
                 return true;
             });
             LocalReimportScreen.Show(app, logger, Target(), (_, _) => Task.FromResult(new LocalReimportResponse(Plan: sourceSwitch ? SourceSwitchPlan() : Plan())),
-                parent.Token, value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = "/new/demo"; }, action => queued.Enqueue(action), sourceSwitch: sourceSwitch);
+                parent.Token, value => { dialog = value; if (sourceSwitch) value.SubViews.OfType<TextField>().Last().Text = NewSourcePath; }, action => queued.Enqueue(action), sourceSwitch: sourceSwitch);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.False(committed); Assert.False(lateStatusMutation); Assert.False(timedOut);
         Assert.Contains(logger.Snapshot(), entry => entry.Message.Contains(new string('a', 32), StringComparison.Ordinal) && entry.Message.Contains("/state/plan.json", StringComparison.Ordinal));

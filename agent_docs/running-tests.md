@@ -38,6 +38,11 @@ lease's canonical path, then require the copy to preserve that exact address.
 Lexical temporary paths can differ on macOS (`/var` versus `/private/var`).
 Exercise a real scan-root alias on Unix rather than normalizing away a mismatch;
 keep exact archive fingerprints, native identities and blob comparisons.
+For generic directory placement controls, use read-only native identity capture;
+relocation leases require an actual skill directory. Derive canonical expectations
+from that opened object so macOS `/var` aliases remain meaningful test inputs.
+TUI source-path fixtures must be fully qualified on the executing OS: `/new/demo`
+is root-relative on Windows and correctly fails preparation admission.
 
 **Filtered runs:** pass xunit's MTP-native `--filter-*` flags directly to
 `dotnet test` (no `--` needed): `--filter-namespace`, `--filter-not-namespace`,

@@ -44,9 +44,11 @@ public sealed class NativePlacementTests : IDisposable
         var actual = Directory.CreateDirectory(Path.Combine(temp.FullName, "actual")).FullName;
         var alias = Path.Combine(temp.FullName, "alias"); Directory.CreateSymbolicLink(alias, relative ? "actual" : actual);
         var requested = alias + Path.DirectorySeparatorChar + Path.DirectorySeparatorChar + "missing" + Path.DirectorySeparatorChar + "leaf";
+        Assert.True(SecureRemovalBackend.TryCaptureIdentity(actual, out var actualIdentity, out var identityError), identityError);
         using var lease = NativePlacementLease.Open(requested, Token);
         Assert.Equal(requested, lease.Evidence.Path);
-        Assert.Equal(Path.Combine(actual, "missing", "leaf"), lease.Evidence.CanonicalPath);
+        Assert.Equal(Path.Combine(actualIdentity.CanonicalPath, "missing", "leaf"), lease.Evidence.CanonicalPath);
+        Assert.Equal(actualIdentity, lease.Evidence.ExistingAncestor);
         lease.Revalidate(Token);
         var other = Directory.CreateDirectory(Path.Combine(temp.FullName, "other")).FullName;
         Directory.Delete(alias); Directory.CreateSymbolicLink(alias, other);

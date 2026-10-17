@@ -488,7 +488,7 @@ jobs:
           if [ '${{ matrix.rid }}' = linux-x64 ]; then
             source_switch_tmp="$(sudo mktemp -d /skillview-source-switch-refusal.XXXXXXXX)"
             sudo chown "$(id -u):$(id -g)" "$source_switch_tmp"
-            trap 'rmdir -- "$source_switch_tmp"' EXIT
+            trap 'sudo rmdir -- "$source_switch_tmp"' EXIT
             export TMPDIR="$source_switch_tmp"
             python - <<'PY'
           import os

@@ -252,7 +252,7 @@ def main():
         blocked.bind(('127.0.0.1', 0))
         home, state = root / 'home', root / 'state'
         home.mkdir(); state.mkdir()
-        root.joinpath('disposable-proof-marker').write_bytes(b'SkillView disposable schema5 compatibility fixture\n')
+        root.joinpath('disposable-proof-marker').write_bytes(b'SkillView disposable process proof\n')
         env = fixture_environment(root, home, state, gh, 'http://127.0.0.1:' + str(blocked.getsockname()[1]))
         if args.old_checkout:
             checkout = args.old_checkout.resolve(strict=True)
