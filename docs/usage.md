@@ -596,3 +596,21 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
+
+### Validate a source repository while authoring
+
+Run `skillview authoring-validate --repository /path/to/source-repository --dry-run`
+(or add `--json` for schema-1 evidence). This explicitly invokes
+`gh skill publish --dry-run`; it is separate from installed-package `check`.
+GitHub remote advisories may contact GitHub, and gh may write cache/config state.
+The command never requests publishing, `--fix`, skill-script execution or an AI
+client. It preserves raw gh diagnostics and checks observed candidate payload
+bytes before/after, reporting unexpected changes without repairing them.
+
+A completed result means the bounded gh command succeeded with unchanged observed
+candidate bytes. It does not certify safety, whole-agent compatibility, authentic
+source or source review. Unsupported/incomplete discovery, truncation, cancellation
+and changes have explicit refused/skipped/partial results. Root-only `SKILL.md`
+layout is explicitly unavailable in this repository workflow. See the
+[authoring validation guide](../agent_docs/maintenance-authoring-validation.md)
+for discovery scope, bounds, status and exit-code semantics.

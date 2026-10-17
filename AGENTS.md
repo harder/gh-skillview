@@ -1,5 +1,11 @@
 # AGENTS.md
 
+- Authoring validation is explicit `authoring-validate --repository PATH --dry-run`,
+  separate from installed `check` and updates. gh dry-run may perform advisory
+  API reads and cache writes; never infer safety/source review or comprehensive
+  discovery from exit zero. Preserve authored bytes and report changes, never
+  invoke `--fix`. See `agent_docs/maintenance-authoring-validation.md`.
+
 - `gh skill list` uses `sourceURL` for both repository URLs and local paths.
   Classify native absolute paths before URI parsing and preserve the exact
   scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.
