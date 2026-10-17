@@ -54,7 +54,13 @@ internal sealed partial class ReplacementPlanStore
         // Refuse missing/inadmissible payloads before private writes, but do
         // not retain preflight generations across our namespace initialization.
         using (NativeDirectoryMoveLease.Open(containing, canonical, token)) { }
-        using (NativeDirectoryMoveLease.Open(Path.GetDirectoryName(sourceCanonical)!, sourceCanonical, token)) { }
+        using (var preflightSource = NativeDirectoryMoveLease.Open(Path.GetDirectoryName(sourceCanonical)!, sourceCanonical, token))
+        {
+            // Reject ambiguous copied tracking through the held source before
+            // metadata archiving or private writes can mask that diagnosis.
+            // The completed archive is checked again below before publication.
+            if (switching) RequireOptionalCapturedLocalPath(preflightSource.CaptureInto((_, _) => { }, null, token).FrontMatter?.LocalPath);
+        }
         // Initialize admitted namespaces before freezing payload parents: a
         // first-use ancestor or sibling creation can change their generation.
         // This admits no retained operation, replacement writer or plan quota.

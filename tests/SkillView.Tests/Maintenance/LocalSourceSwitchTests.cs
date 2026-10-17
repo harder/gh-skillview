@@ -143,9 +143,15 @@ public sealed class LocalSourceSwitchTests : IDisposable
     [Fact]
     public async Task CopiedSourceRelativeTrackingRefusesExplicitlyRatherThanRelaxingSchemaFive()
     {
-        var (store, inventory, _, source) = Fixture("relative-c");
-        var error = await Assert.ThrowsAsync<IOException>(() => store.PlanLocalSourceSwitchAsync(Path.Combine(temp.FullName, "must-not-launch"), Assert.Single(inventory.Skills), source, inventory, Token));
-        Assert.Contains("Captured source local-path must be absent or an absolute", error.Message);
+        var (store, inventory, state, source) = Fixture("relative-c");
+        var target = Assert.Single(inventory.Skills);
+        var beforeI = File.ReadAllBytes(Path.Combine(target.ResolvedPath, "SKILL.md"));
+        var beforeC = File.ReadAllBytes(Path.Combine(source, "SKILL.md"));
+        var error = await Assert.ThrowsAsync<IOException>(() => store.PlanLocalSourceSwitchAsync(Path.Combine(temp.FullName, "must-not-launch"), target, source, inventory, Token));
+        Assert.True(error.Message.Contains("Captured source local-path must be absent or an absolute", StringComparison.Ordinal), error.ToString());
+        Assert.False(Directory.Exists(state)); Assert.False(Directory.Exists(state + "-local-previews"));
+        Assert.Equal(beforeI, File.ReadAllBytes(Path.Combine(target.ResolvedPath, "SKILL.md")));
+        Assert.Equal(beforeC, File.ReadAllBytes(Path.Combine(source, "SKILL.md")));
     }
 
     [Fact]
