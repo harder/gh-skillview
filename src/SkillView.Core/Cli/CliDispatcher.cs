@@ -2298,7 +2298,7 @@ public static partial class CliDispatcher
             | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `effective` | Explain conditional loading policy for an exact agent/profile/project. Native inventory and active-session state stay separate. | `--agent`, `--profile`, `--project`, `--cwd`, `--config-dir`, `--client-version`, `--agent-name`, `--trust`, `--json` |
-            | `check` | Check bounded local package metadata and supported references without running skill code. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |

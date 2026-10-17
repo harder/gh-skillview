@@ -1,5 +1,6 @@
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.PackageChecking;
 using SkillView.Tests.Cli;
 using SkillView.Ui;
 using SkillView.Ui.Tabs;
@@ -129,6 +130,50 @@ public sealed class PackageCheckScreenTests
             Assert.Equal(1, canceled);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.Equal(1, started); Assert.True(closeSent); Assert.False(timedOut);
+    }
+
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 40)]
+    public async Task CompletedDialogShowsIndependentAssessmentsAndUnknownDependencyEvidence(int width, int height)
+    {
+        var observed = false; var timedOut = false;
+        var report = PackageCheckCliTests.Report() with
+        {
+            ReferenceStatus = "findings",
+            HasErrors = true,
+            Findings = [new("reference", "reference-missing", "SKILL.md", 5, "assets/missing.png", "Missing asset", "Restore the authored asset")],
+            FindingCount = 1,
+            AgentAssessment = new("incompatible", "Version-cited fixture rule", "root-sha", ["Known framing rejection"], []),
+            Observations = [new("dependency", "dependencies", "package.json", null, "name@^2\x1b[31m", "availability-unknown", "Provide in the selected environment")],
+            ObservationCount = 1
+        };
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(width, height);
+            Dialog? modal = null;
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (modal is null || !modal.SubViews.OfType<Button>().Single(b => b.Text == "_Check again").Enabled) return true;
+                var output = modal.SubViews.OfType<Terminal.Gui.Editor.Editor>().Single();
+                Assert.True(output.ReadOnly);
+                Assert.Contains("Format: valid; agent compatibility: incompatible; payload intact: unknown; source reviewed: not-reviewed", output.Text);
+                Assert.Contains("Observed condition: local-defects-observed", output.Text);
+                Assert.Contains("availability-unknown", output.Text);
+                Assert.Contains("No source-review acknowledgement", output.Text);
+                Assert.DoesNotContain('\x1b', output.Text);
+                var status = modal.SubViews.OfType<Label>().Single().Text;
+                Assert.Contains("agent: incompatible", status);
+                Assert.Contains("source: not-reviewed", status);
+                observed = true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                return false;
+            });
+            PackageCheckScreen.Show(app, new Logger(), Target("demo"), _ => Task.FromResult(report), readyForTests: dialog => modal = dialog);
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(observed); Assert.False(timedOut);
     }
 
     private static InstalledSkill Target(string name) => new()

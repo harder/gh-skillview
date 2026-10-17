@@ -302,17 +302,63 @@ to check one observed installation. `--install-id ID` also selects a physical
 installation; an observed agent exposure path may be used with `--path`.
 In Installed, select a row and press **K** to open the same read-only check.
 
-Reports separate metadata validity, supported local references and observation
-coverage. Findings include source paths, line numbers, target paths and repair
-guidance. Read `referenceScope` for the limited Markdown/code-path syntax that was
-checked. A clean result does not establish source authenticity, agent compatibility
-or behavioral safety. Skill code is never executed, and the check performs no
-remote source lookup or automated repair.
+JSON schema 2 and the dialog show four independent assessments: portable metadata
+format, agent compatibility, payload integrity,
+and source review. A valid header can coexist with a broken asset or incompatible
+agent framing. Source review remains `not-reviewed`: viewing this report does not
+acknowledge source changes or establish authenticity or behavioral safety. A complete
+capture and matching local references leave integrity **unknown** because this
+command has no trusted or explicitly declared expected payload baseline. Its
+separate `observedCondition` records local defects, partial coverage or no defects
+within the checked reference scope. The
+legacy `agentCompatibility` and `sourceReview` strings retain their schema-1
+`not-assessed` meaning; the new `assessments` object carries scoped evidence,
+fingerprints, cited rules and unavailable reasons. Saved update fingerprints are
+unchanged. `rootMetadataSha256` is a separate raw-file hash.
 
-Exit 0 means the requested limited checks completed without errors; findings or
-unknown/partial coverage return 1. Invalid selectors return 2; no unique inventory
+Findings include source paths, available line numbers, targets and repair guidance.
+Read `referenceScope` for the limited Markdown/code-path grammar. Internal fragments
+support plain ASCII ATX headings and duplicate heading suffixes; rich headings,
+HTML IDs, setext headings and other renderer-specific IDs remain unknown instead
+of producing definite missing-anchor findings. Captured links are never followed.
+
+Literal declarations are separate observations. Supported `package.json` dependency
+mappings and plain `requirements.txt` names, extras and version constraints report
+dependency availability as **unknown**. Missing package-local `file:`/`link:` targets
+and `-r` includes have concrete file-repair guidance.
+Home-relative `file:~/...` declarations remain unknown; HOME is never expanded and
+external dependency paths are never probed. Omitted, unreadable or linked Markdown
+also makes declaration coverage partial because Markdown supplies literal evidence.
+No installed package manager,
+interpreter, credentials or dependency environment is probed. Unsupported manifests,
+requirement options/markers/URLs, nonregular inputs and exhausted bounds retain
+partial coverage. `declarationScope` states the supported grammar.
+
+Portability observations cover case collisions, Windows path restrictions,
+environment-specific references and selected scripts' shebangs/CRLF endings. A URL
+observation means literal captured text, including examples; it does not establish
+network behavior. Authored tool declarations do not establish effective permissions.
+Skill code is never executed, and the check performs no remote lookup or repair.
+
+Optionally select a package rule target, for example:
+`skillview --scan-root /path/to/skills check --path /path/to/skills/demo --agent gemini-cli --agent-version 0.46.0 --json`.
+This reuses existing version-cited loading rules without launching a client. Known
+Gemini 0.46.0 framing rejection can report `incompatible`; passing that limited rule
+leaves whole-agent compatibility `unknown`. Unmodeled agents or versions never
+receive assumed compatibility. The dialog leaves agent/version unspecified.
+
+Exit 0 means the limited format/reference/declaration checks completed without
+errors or partial coverage; it does not turn unknown dependency availability,
+unknown agent compatibility or unreviewed source into passed assessments. Findings,
+partial coverage or an observed agent incompatibility return 1. Invalid selectors return 2; no unique inventory
 match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
+
+This remains a partial implementation of [M19](../agent_docs/maintenance-audit.json).
+Frozen update content/declaration diffs, new destination/dependency deltas, explicit
+source-review acknowledgement, opt-in isolated prompt evaluation and authoring
+`gh skill publish --dry-run` integration remain separate future work. `publish --fix`
+is never a repair action for installed payloads; no authored bytes are rewritten.
 
 ### Global flags
 
