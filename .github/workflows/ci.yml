@@ -566,7 +566,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist/source-switch-proof-inputs
           cp agent_docs/evidence/prove-local-source-switch.py agent_docs/evidence/prove-old-native-reimport.py \
-            agent_docs/evidence/prove-local-reimport.py agent_docs/evidence/run-local-source-switch-docker.py \
+            agent_docs/evidence/prove-local-reimport.py agent_docs/evidence/source_review_proof.py agent_docs/evidence/run-local-source-switch-docker.py \
             tests/SkillView.MaintenanceProof/Program.cs dist/source-switch-proof-inputs/
       - name: Prove actual previous native saved plans survive the new schema boundary
         shell: bash

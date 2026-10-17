@@ -35,7 +35,7 @@ internal static class SourceReviewScreen
         foreach (var delta in review.Report.NewlyObserved)
             Line($"{delta.Evidence}: {delta.Observation.Category}/{delta.Observation.Kind} {delta.Observation.Path}: {delta.Observation.Value}");
         Line("Omitted declaration deltas: " + review.Report.OmittedDeltas);
-        var prefix = plan.LocalImport is not null ? "reimport" : plan.Revision is not null ? "update" : "restore";
+        var prefix = plan.LocalSourceSwitch is not null ? "source-switch" : plan.LocalImport is not null ? "reimport" : plan.Revision is not null ? "update" : "restore";
         Line($"Acknowledge after review: skillview {prefix}-ack-source --id {plan.Id} --expect {plan.PlanFingerprint} --review {review.Fingerprint} --yes (reuse the same scan/workspace/profile and environment context)");
         Line(SourceUpdateReview.Declaration);
         return output.ToString();

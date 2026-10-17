@@ -100,7 +100,7 @@ def main():
             assert extra.resolve(strict=True).is_file()
             shutil.copy2(extra.resolve(strict=True), tools / ('gh-extra-' + str(index)))
             gh_arguments += ' --gh /proof-tools/gh-extra-' + str(index)
-        for name in ('prove-local-source-switch.py', 'prove-local-reimport.py', 'prove-old-native-reimport.py'):
+        for name in ('prove-local-source-switch.py', 'prove-local-reimport.py', 'prove-old-native-reimport.py', 'source_review_proof.py'):
             shutil.copy2(scripts / name, tools / name)
         (tools / 'legacy-source.json').write_text(json.dumps(dict(sourceCommit=observed,
             trackedClean=clean, binarySha256=digest(old_app)), indent=2) + '\n')

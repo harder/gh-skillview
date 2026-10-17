@@ -388,7 +388,7 @@ internal sealed class SkillViewWorkflowCoordinator
             throw new ArgumentException("Unsupported local reimport action.");
         if (request.Action == LocalReimportAction.Recover && review.AcknowledgeSourceReview && review.SourceReview is { } source)
             await Task.Run(() => _services.SavedUpdatePlans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint,
-                source.Fingerprint, inventory, token, "local-reimport"), token).ConfigureAwait(false);
+                source.Fingerprint, inventory, token, purpose), token).ConfigureAwait(false);
         // Reconciliation survives canceled UI delivery and uses its own deadline.
         SkillView.Maintenance.ReplacementResult result;
         string? reconciliationWarning = null;

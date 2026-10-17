@@ -94,6 +94,17 @@ App/extension proofs. Four-RID minimum/current-gh lifecycle and real old-native
 schema1–5 compatibility require actual final-source CI evidence; the design and
 local refusal tests alone do not establish those gates.
 
+New product plans also freeze installed/candidate source-review archives. Review
+their changes and omissions, then declare the exact source review separately
+from retention approval with `source-switch-ack-source`. The local dialog
+requires both approvals and closes both when ID, source or hidden-directory
+options change. A declared review supplies no authenticity or safety assurance.
+The native proof includes a fresh ready plan recovered through the real workflow
+coordinator with its source-review declaration, followed by exact native undo.
+That proof is pending until its final native hosts execute. Compatibility with
+pre-review schema6 plans additionally needs an actual final PR70 native producer;
+source inspection and schemas1–5 restart proofs do not substitute for it.
+
 Frozen schema5 compatibility evidence retains the complete bounded `gh --version`
 stdout after trimming its outer whitespace, including the release URL and internal
 line endings, exactly as the native producer records it. Check the staged binary

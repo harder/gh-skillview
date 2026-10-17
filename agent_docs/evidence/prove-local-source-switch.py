@@ -252,7 +252,8 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
             assert manifest(payload) == before and objects(payload) == before_objects
             assert not Path(saved['retainedPath']).exists()
             source_unchanged()
-        acknowledge_frozen_source(run, saved, 'source-switch')
+        if case != 'coordinator-recover':
+            acknowledge_frozen_source(run, saved, 'source-switch')
         if case == 'normal':
             private_before = manifest(plan_path.parent)
             for family, disposition in [('restore', 'retain-original'), ('update', 'retain-original'),
@@ -282,7 +283,19 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
                         staleNewSourceRefusedBeforeRetain=True,
                         persistedRetainIntent=case == 'local-retain-intent', installedNativeObjectsUnchanged=True,
                         immutablePlanUnchanged=True, commands=commands, processKills=kills)
-        if case in ('retain-moved', 'install-moved'):
+        if case == 'coordinator-recover':
+            inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
+            assert inspection['status'] == 'ready' and not inspection['sourceReviewAcknowledged'], inspection
+            assert not list(plan_path.parent.glob('source-review-*.json'))
+            process = subprocess.run([str(proof_host), str(root), str(gh), saved['id'], inspection['reviewFingerprint'],
+                                      'recover-source-switch-reviewed', 'workflow'], env=env, cwd=root,
+                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+            assert process.returncode == 0, (process.returncode, process.stdout, process.stderr)
+            applied = json.loads(process.stdout)
+            commands.append(dict(command='coordinator-source-switch-recover-reviewed', exitCode=process.returncode))
+            assert applied['sourceReviewAcknowledged'] and list(plan_path.parent.glob('source-review-*.json')), applied
+            assert not marker.exists() and not any(path.exists() for path in registries)
+        elif case in ('retain-moved', 'install-moved'):
             kill_at(saved, 'apply-source-switch', saved['planFingerprint'], case)
             shutil.rmtree(source); shutil.rmtree(old_source)
             inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
@@ -318,6 +331,7 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         return dict(case=case, candidateNativePreparationSucceeded=True, liveReplacementInstalled=True,
                     actualGhWitnessVerified=True, oldPlacementNativeAncestorAndMissingBoundaryVerified=True,
                     distinctLocalSourceTrackingReviewed=True, capturedAuthoredBytesPreservedExceptApprovedLocalPath=True,
+                    coordinatorRecoverCreatedExactSourceReviewReceipt=case == 'coordinator-recover',
                     equalAuthoredTrackingChangePlans=case == 'equal-authored', missingOldSourceAdmitted=case == 'old-source-missing',
                     sameRecordedSourceRefusedBeforePlan=case == 'normal', legacyCommandFamiliesRefusedWithoutWrites=case == 'normal',
                     installedRootPrivacyPreserved=True,
@@ -345,7 +359,7 @@ def main():
     for gh in gh_paths:
         version = subprocess.check_output([str(gh), '--version'], text=True, timeout=30).splitlines()[0]
         cases = ('metadata-refusal',) if args.expect_metadata_refusal else (
-            'normal', 'equal-authored', 'old-source-missing', 'stale-source', 'local-retain-intent',
+            'normal', 'coordinator-recover', 'equal-authored', 'old-source-missing', 'stale-source', 'local-retain-intent',
             'retain-moved', 'install-moved', 'displace-moved', 'restore-moved')
         for case in cases:
             row = run_case(app, proof_host, gh, case, args.expect_metadata_refusal)
