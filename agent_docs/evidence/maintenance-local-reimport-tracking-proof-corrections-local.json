@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-reimport-tracking-proof-and-canonical-archive-fixture-correction",
+  "parentPublishedHead": "49f482cdd20a24351d6d832005ec6bb0f9d60731",
+  "status": "locally-verified-fresh-final-head-native-ci-required",
+  "changes": [
+    {
+      "path": "agent_docs/evidence/prove-tracking-roundtrip.py",
+      "reason": "The gh sourceURL field contains the exact recorded filesystem path for local installs. CLI source is the separate repository field and must remain null; localSourcePath must equal that raw catalog path. Existing local provider/nonconflict and samefile origin assertions, remote equality, native payload and registry preservation checks remain."
+    },
+    {
+      "path": "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs",
+      "reason": "Archive addresses bind the held native canonical path, which may differ from lexical fixture spelling on macOS. Assert held address equals captured before/after archive paths. A real Unix scan-root alias fixture requires distinct lexical/native addresses while retaining writer ownership, complete archive fingerprints and every stored blob byte."
+    }
+  ],
+  "sourceHashes": {
+    "agent_docs/evidence/prove-tracking-roundtrip.py": "7d5cb847a1b002dab08d1e0f8e7d96d06be86b915b3d0ae44205553906d125c9",
+    "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs": "e74f01267c60bb5dfb7632f07c344b40372184581818aebd8ead6bf4525e97a8"
+  },
+  "actualFailures": {
+    "ciRun": 38987173364,
+    "sourceHead": "49f482cdd20a24351d6d832005ec6bb0f9d60731",
+    "url": "https://github.com/harder/gh-skillview/actions/runs/38987173364",
+    "linuxTrackingLog": {
+      "path": "/tmp/skillview-local-reimport-evidence/pr68-49f/linux-aot-failed-log.txt",
+      "sha256": "a7140bc205fc62433946b2c5e3b6c3bf2d200cb1f51d0402c9014d0880fd80d0"
+    },
+    "macosTrackingLog": {
+      "path": "/tmp/skillview-local-reimport-evidence/pr68-49f/macos-aot-failed-log.txt",
+      "sha256": "b885f48d8f9a531136271f9dd345432fe1238bfc1e639c91bf055282a9b386fe"
+    },
+    "macosFixtureLog": {
+      "path": "/tmp/skillview-local-reimport-evidence/pr68-49f/macos-test-failed-log.txt",
+      "sha256": "564438dddb560e6d735abcd852f904eb2dfe21157876016e2c132ee4f4a36121"
+    },
+    "qualification": "Native Linux/macOS gates stopped at the earlier tracking proof, before new reimport proofs. macOS unit failure is lexical /var versus held /private/var spelling. No native publication success inferred."
+  },
+  "localValidation": {
+    "helper": {
+      "path": "/tmp/skillview-local-reimport-evidence/tracking-proof-correction/helper-validation.json",
+      "sha256": "b2f863fef649429296dc4a53f65ed257de3cad8964e3163e52371ebd8de74661"
+    },
+    "helperPassed": 7,
+    "helperScope": "Exact production proof helper extracted via AST, actual failed local native tuple and two prior actual remote tuples, with four rejecting counterexamples; no complete native proof execution.",
+    "dotnet": {
+      "path": "/tmp/skillview-local-reimport-evidence/tracking-proof-correction/dotnet-validation.json",
+      "sha256": "97b48aaa8b71733c2e7fecf3c5de3fb360375c76614eb801bb59f911d5649dbf"
+    },
+    "archiveFocusedPassed": 6,
+    "archiveFocusedFailed": 0,
+    "archiveFocusedSkipped": 0,
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "formatExitCode": 0,
+    "nativeAliasFixtureActuallyExecuted": true,
+    "sdk": "10.0.402",
+    "host": "Linux ARM64",
+    "childTmpdir": "/var/tmp/skillview-reimport-proof-correction"
+  },
+  "priorFullSuiteScope": {
+    "summary": {
+      "path": "/tmp/skillview-local-reimport-evidence/final-full/summary.json",
+      "sha256": "b7e824c349b2763c1a0c89ae6b265bdfc25291091d091ca5a5af006ead1d219b"
+    },
+    "unitPassed": 2150,
+    "integrationPassed": 9,
+    "sourceManifest": {
+      "path": "/tmp/skillview-local-reimport-evidence/final-full/source-after.json",
+      "sha256": "85943bd38fd04fe4c01366f877eda93cfa5a06c5106cb7fdc0c2e885e93ed0f3"
+    },
+    "managedBuildInputFiles": 409,
+    "unchangedFiles": 408,
+    "changedFiles": [
+      "tests/SkillView.Tests/Maintenance/LocalImportArchiveCopyTests.cs"
+    ],
+    "qualification": "Prior full-suite source remains unchanged except the one archive-copy test class, which was rebuilt and rerun in full here. No repeated whole-suite or native/macOS result is claimed."
+  },
+  "publication": {
+    "freshFinalHeadCiAndFourNativeArtifactsRequired": true,
+    "newHeadPublished": false,
+    "mergePerformed": false
+  },
+  "acceptance": {
+    "completed": 9,
+    "total": 21,
+    "promotion": false,
+    "originalMacDownArrowCrashReproduced": false
+  },
+  "independentReview": {
+    "path": "/tmp/skillview-local-reimport-review/tracking-proof-correction-independent.json",
+    "sha256": "87bb1b1339d06ec6b9e483d40cbe99dd9a1e5e0240e6b173116c0124ef277ace"
+  }
+}

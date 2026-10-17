@@ -42,6 +42,14 @@ def short_ref(value):
     return value
 
 
+def assert_catalog_source_fields(kind, skill, record):
+    if kind.startswith('local-'):
+        assert skill['source'] is None, (kind, skill, record)
+        assert skill['localSourcePath'] == record['sourceURL'], (kind, skill, record)
+    else:
+        assert skill['source'] == record['sourceURL'], (kind, skill, record)
+
+
 results = []
 for gh_path in gh_paths:
     gh = gh_path.resolve()
@@ -105,7 +113,7 @@ for gh_path in gh_paths:
             assert os.path.samefile(record['path'], payload) and os.path.samefile(skill['resolvedPath'], payload)
             assert re.fullmatch(r'[0-9a-f]{64}', skill['installationId'] or ''), skill
             assert skill['validity'] == 'Valid' and not skill['diagnostics'], skill
-            assert skill['source'] == record['sourceURL'], (kind, skill, record)
+            assert_catalog_source_fields(kind, skill, record)
             assert skill['pinned'] == record['pinned'] == (kind == 'pinned'), (kind, skill, record)
             assert not skill['sourceIdentity']['conflicted'], skill
             if kind.startswith('local-'):

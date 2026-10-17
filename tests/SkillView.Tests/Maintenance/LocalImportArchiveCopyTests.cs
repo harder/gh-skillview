@@ -15,7 +15,14 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
     public void HeldCopyRetainsExactManifestAndAllBlobBytesAtNewStateAddress()
     {
         var sourcePath = MakeSource();
-        using var lease = NativeDirectoryMoveLease.Open(temp.FullName, sourcePath, Token);
+        var scanRoot = temp.FullName;
+        if (!OperatingSystem.IsWindows())
+        {
+            scanRoot = Path.Combine(temp.FullName, "root-alias");
+            Directory.CreateSymbolicLink(scanRoot, temp.FullName);
+            sourcePath = Path.Combine(scanRoot, "source");
+        }
+        using var lease = NativeDirectoryMoveLease.Open(scanRoot, sourcePath, Token);
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "state"), [sourcePath], Token);
         using var writer = state.OpenFile("writer.lock", true, Token);
         _ = CapturedPayloadArchive.Capture(state, "source", lease, Token);
@@ -25,7 +32,9 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
         using var copy = Open(state, "copy");
         var after = CapturedPayloadArchive.Load(copy, before.Fingerprint, Token);
         Assert.Equal(before.Fingerprint, after.Fingerprint);
-        Assert.Equal(sourcePath, after.Archive.Snapshot.Path);
+        if (!OperatingSystem.IsWindows()) Assert.NotEqual(sourcePath, lease.CurrentPath);
+        Assert.Equal(lease.CurrentPath, before.Archive.Snapshot.Path);
+        Assert.Equal(before.Archive.Snapshot.Path, after.Archive.Snapshot.Path);
         Assert.Equal(before.Archive.Snapshot.RootIdentity, after.Archive.Snapshot.RootIdentity);
         foreach (var name in source.EnumerateEntries(Token).Select(entry => entry.Name))
         {

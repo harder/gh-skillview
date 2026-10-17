@@ -1463,3 +1463,16 @@ review remain required. Evidence and exact source/log/review hashes are in
 `agent_docs/evidence/maintenance-local-reimport-ci-corrections-local.json`.
 Original acceptance remains 9/21; M08/M18 and all other open obligations remain.
 The original Mac Installed Down-arrow crash remains unreproduced.
+
+PR68 at `49f482c` then exposed two verification assumptions: the tracking proof
+expected a local catalog path in the repository `source` field, and the archive
+fixture compared its lexical address with macOS's held canonical address.
+The proof now requires the exact raw `localSourcePath` and an empty repository
+source for local installs, retaining remote equality and the separate normalized
+origin check. The fixture compares held before/after archive addresses and uses
+an actual Unix scan-root alias. Seven captured-result helper checks and six
+archive tests pass; build and scoped format verification pass. Production and
+408 of the earlier 409 managed/build inputs are unchanged; the changed test class
+was rerun in full. Fresh final-head native gates remain required. See
+[evidence](evidence/maintenance-local-reimport-tracking-proof-corrections-local.json).
+Original acceptance remains **9/21**; the original Mac crash remains unreproduced.
