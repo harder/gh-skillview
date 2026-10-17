@@ -20,6 +20,12 @@ parallel publish processes can contend on files such as
 `SkillView.Core.deps.json`. That contention is a verification artifact, not a
 product failure.
 
+Frozen native compatibility checkouts explicitly use `core.autocrlf=false` and
+`core.eol=lf` when creating their worktrees. Their later source-cleanliness checks
+disable inherited global Git configuration; a checkout converted by a Windows
+global setting can otherwise appear modified under that verification environment.
+Keep the clean-source refusal intact, including for genuine source edits.
+
 On a Linux ARM64 development host, solution restore can infer `linux-arm64` for
 the self-contained product hosts, outside the committed release RID matrix. For
 focused unit/UI verification, locked-restore and test `SkillView.Tests.csproj`
