@@ -49,6 +49,11 @@ selectors. A verified selector-to-native placement contract is not available in
 this base; sibling installs can therefore be conservatively refused. The final
 root policy check repeats under the writer. Missing install roots are
 omitted from pin scanning only after the native presence helper proves absence.
+Validate destination rows before filtering actual pins: malformed pin metadata
+can produce diagnostics with `Pinned=false`, which never proves an absent pin.
+Real update admission also rejects captured invalid/conflicted/incomplete-owner
+subjects and fresh tracking diagnostics even when repository/ref/tree/pin values
+still match. Read-only list observations and adapter dry-run stay independent.
 The legacy mutable update adapter also requires one exact captured selector and
 directory and holds its original application-context policy writer through the
 child; incidental child HOME isolation cannot select a different policy store.

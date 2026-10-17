@@ -74,6 +74,9 @@ public sealed class GhSkillUpdateService
                         || options.All || options.Directory is null)
                         throw new IOException("A real adapter update requires one exact captured installation, directory and selector; use the saved update workflow.");
                     var target = options.Targets[0];
+                    if (target.Validity != ValidityState.Valid || !target.FrontMatter.Diagnostics.IsDefaultOrEmpty
+                        || !target.MetadataConflicts.IsDefaultOrEmpty || !target.OwnershipDiagnostics.IsDefaultOrEmpty)
+                        throw new IOException("Captured update metadata or owner evidence is invalid, conflicted or incomplete; refresh before updating.");
                     if (!OwnershipPath.Same(options.Directory, Path.GetDirectoryName(target.ResolvedPath)!)
                         || options.Skills[0] != Path.GetFileName(target.ResolvedPath))
                         throw new IOException("The update selector/directory does not identify its exact captured physical installation.");
@@ -82,6 +85,8 @@ public sealed class GhSkillUpdateService
                     desiredPolicy = DesiredRevisionPolicyStore.For(_runner).Acquire([target.ScanRoot, target.ResolvedPath], cancellationToken);
                     var current = PayloadSnapshot.Capture(target.ResolvedPath, cancellationToken).FrontMatter
                         ?? throw new IOException("Current update tracking metadata is unavailable.");
+                    if (!current.Diagnostics.IsDefaultOrEmpty)
+                        throw new IOException("Current update tracking metadata is invalid or unknown; no update child was admitted.");
                     var live = target with { FrontMatter = current };
                     if (DesiredRevisionPolicyStore.Bind(live) != DesiredRevisionPolicyStore.Bind(target)
                         || current.GithubRef != target.FrontMatter.GithubRef || current.GithubTreeSha != target.FrontMatter.GithubTreeSha

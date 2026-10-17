@@ -37,9 +37,14 @@ internal static class GhInstallOwnershipGuard
             throw new IOException("Destination ownership is incomplete; resolve its lockfile diagnostics before installing.");
         var inaccessible = new List<string>();
         var existing = discoveryRoots.Where(path => !NativeStatePresence.IsMissing(path, token)).ToArray();
-        var pins = new LocalSkillScanner(logger).ScanWithCancellation(existing.Select(path => new ScanRoot(path, Scope.Custom, null)).ToArray(),
-            new(AllowHiddenDirs: true), token, inaccessible).Where(skill => skill.Pinned || skill.Revision.PinnedRef is not null).ToImmutableArray();
+        var scanned = new LocalSkillScanner(logger).ScanWithCancellation(existing.Select(path => new ScanRoot(path, Scope.Custom, null)).ToArray(),
+            new(AllowHiddenDirs: true), token, inaccessible);
         if (inaccessible.Count > 0) throw new IOException("Destination pin-policy inspection is incomplete; no install write was admitted.");
+        if (scanned.Any(skill => skill.Validity is ValidityState.InvalidMetadata or ValidityState.UnparsableFrontMatter
+            || !skill.FrontMatter.Diagnostics.IsDefaultOrEmpty || !skill.MetadataConflicts.IsDefaultOrEmpty
+            || !skill.OwnershipDiagnostics.IsDefaultOrEmpty))
+            throw new IOException("Destination tracking or pin metadata is invalid or unknown; no install child was admitted.");
+        var pins = scanned.Where(skill => skill.Pinned || skill.Revision.PinnedRef is not null).ToImmutableArray();
         return new(observations.Where(observation => Covers(observation.Package.CoveredRoots))
             .Select(observation => observation.Package).ToImmutableArray(), managed, runner, options)
         { Pins = pins };
