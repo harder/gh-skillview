@@ -361,7 +361,9 @@ public sealed class GhSkillInstallService
             }
         }
 
-        if (!string.IsNullOrEmpty(options.Scope))
+        // --dir owns placement. In particular, SkillView's UI "custom" scope
+        // is not a valid gh --scope value (gh accepts only project/user).
+        if (string.IsNullOrEmpty(options.Path) && !string.IsNullOrEmpty(options.Scope))
         {
             args.Add("--scope");
             args.Add(options.Scope);

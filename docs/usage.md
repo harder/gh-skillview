@@ -131,8 +131,8 @@ skillview update --dry-run
 skillview cleanup --apply --yes
 ```
 
-For `install`, use `--agent <id>` to choose an agent and `--scope project|user|custom`
-to choose the destination scope. `--path <dir>` selects a custom directory;
+For `install`, use `--agent <id>` to choose an agent and `--scope project|user`
+to choose the destination scope. `--path <dir>` selects a custom directory and overrides scope;
 `--all` installs every skill found in a repository. To install a specific ref,
 pass `--version <ref>` or use `OWNER/REPO@<ref>` as shorthand. Add `--pin` only
 when a ref is supplied; for an entire repository, `OWNER/REPO@<ref> --all --pin`
