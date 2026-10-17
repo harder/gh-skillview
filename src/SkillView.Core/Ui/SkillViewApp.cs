@@ -521,7 +521,11 @@ public sealed class SkillViewApp
 
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
-            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
+            snapshotLoader: token =>
+            {
+                _services.ListAdapter.Invalidate();
+                return _workflows.CaptureInventorySnapshotAsync(token);
+            },
             onActivateUpdates: OpenUpdatesWorkspace,
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
@@ -531,7 +535,14 @@ public sealed class SkillViewApp
             onStateChange: UpdateContextBar,
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
-                CancellationCallbackReporter.For(_services.Logger, "changes tab"))
+                CancellationCallbackReporter.For(_services.Logger, "changes tab"),
+            activateEntryAsync: (entry, request) =>
+            {
+                if (entry.Cleanup is not null) return _workflows.ShowSelectedCleanupAsync(entry, request);
+                if (request.IsCurrent) OpenUpdatesWorkspace(entry.Subject);
+                return Task.CompletedTask;
+            },
+            runTask: RunOwnedTask)
         {
             X = 0,
             Y = 2,
@@ -1067,7 +1078,9 @@ public sealed class SkillViewApp
         && _doctorLifetime is { IsCancellationRequested: false };
 
     /// Open update review without requiring an update-available queue row.
-    private void OpenUpdatesWorkspace()
+    private void OpenUpdatesWorkspace() => OpenUpdatesWorkspace(null);
+
+    private void OpenUpdatesWorkspace(OperationSubject? selected)
     {
         if (_updatesTab is null || _changesTab is null || _updatesTab.Visible) return;
         ActivateTab(SkillViewTab.Changes);
@@ -1075,7 +1088,7 @@ public sealed class SkillViewApp
         _changesTab.CancelPendingLoad();
         _workflows.OpenUpdatesFromChanges(
             hideChanges: () => _changesTab.Visible = false,
-            activateUpdates: hideChanges => _updatesTab.ActivateFromChanges(hideChanges));
+            activateUpdates: hideChanges => _updatesTab.ActivateFromChanges(hideChanges, selected));
     }
 
     /// Esc returns from the update workspace to Changes.
@@ -1994,7 +2007,7 @@ public sealed class SkillViewApp
                 RunOwnedTask(_installedTab.LoadAsync, "installed.refresh");
                 break;
             case SkillViewTab.Changes when _changesTab is not null:
-                SetStatus("refreshing updates…");
+                SetStatus("refreshing disk inventory; update availability remains unknown…");
                 RunOwnedTask(_changesTab.LoadAsync, "changes.refresh");
                 break;
             case SkillViewTab.Discover:

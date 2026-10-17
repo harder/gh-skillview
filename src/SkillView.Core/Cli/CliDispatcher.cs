@@ -44,6 +44,7 @@ public static partial class CliDispatcher
                 "check" => await CheckAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "authoring-validate" => await AuthoringAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "evaluate-review" or "evaluate-run" => await EvaluateAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "queue" => await QueueAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -84,7 +85,7 @@ public static partial class CliDispatcher
         "evaluate-review" => TimeSpan.FromMinutes(2),
         "evaluate-run" => TimeSpan.FromMinutes(10),
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "check" or "authoring-validate" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "list" or "effective" or "check" or "authoring-validate" or "queue" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
@@ -2306,6 +2307,7 @@ public static partial class CliDispatcher
             | `evaluate-review` | Freeze a package, explicit offline Docker environment and representative prompts without launching Docker. | `--path`, `--config`, `--json` |
             | `evaluate-run` | Explicitly run the reviewed offline evaluation. Requires a local Linux Docker daemon and already-local digest-pinned image. | `--path`, `--config`, `--review`, `--consent-run`, `--json` |
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
+            | `queue` | Refresh read-only maintenance observations grouped by issue and physical installation. Update availability and running-session state remain unknown. | `--install-id`, `--allow-hidden-dirs`, `--json` (schema 1) |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |

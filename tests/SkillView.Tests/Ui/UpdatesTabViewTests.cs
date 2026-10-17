@@ -12,6 +12,57 @@ namespace SkillView.Tests.Ui;
 
 public sealed class UpdatesTabViewTests
 {
+    [Fact]
+    public async Task QueueDrillIn_SelectsOnlyExactPhysicalInstallAndDoesNotStartAnUpdate()
+    {
+        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
+        var calls = 0;
+        GhSkillUpdateService.Options? checkedOptions = null;
+        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) => { calls++; checkedOptions = options; return Task.FromResult(SuccessfulDryRun()); });
+        view.AllBoxForTests.Value = CheckState.Checked;
+
+        await view.LoadForSubjectAsync(OperationSubject.From(second));
+
+        Assert.Equal(0, calls);
+        Assert.Equal(CheckState.UnChecked, view.AllBoxForTests.Value);
+        Assert.Single(view.LoadedSkillNamesForTests);
+        Assert.Contains("availability unknown", view.StatusTextForTests);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
+        Assert.Equal(second.InstallationId, Assert.Single(checkedOptions!.Targets!).InstallationId);
+    }
+
+    [Fact]
+    public async Task QueueDrillIn_MissingTargetCannotUpdateSameNamedSibling()
+    {
+        var missing = MaintenanceQueueTests.Skill("/skills/missing", "https://github.com/one/repo");
+        var sibling = MaintenanceQueueTests.Skill("/skills/sibling", "https://github.com/two/repo");
+        var calls = 0;
+        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [sibling] }),
+            (_, _, _) => { calls++; return Task.FromResult(SuccessfulDryRun()); });
+        await view.LoadForSubjectAsync(OperationSubject.From(missing));
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Contains("missing or ambiguous", view.StatusTextForTests);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task QueueDrillIn_RefreshRetainsExactSelectionAndRefusesItsDisappearance()
+    {
+        var selected = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var sibling = selected with { ResolvedPath = "/skills/two" };
+        var snapshot = InventorySnapshot.Empty with { Skills = [selected, sibling] };
+        var view = CreateUpdatesTab(() => Task.FromResult(snapshot));
+        view.ActivateFromChanges(static () => { }, OperationSubject.From(selected));
+        Assert.Single(view.LoadedSkillNamesForTests);
+        snapshot = snapshot with { Skills = [sibling] };
+        await view.LoadAsync();
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Contains("missing or ambiguous", view.StatusTextForTests);
+    }
+
     // gh ≥ 2.94 is required, so every update flag is always available; the
     // Updates tab no longer has per-capability UI state to test.
 

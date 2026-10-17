@@ -160,6 +160,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   hashes and stay unreviewed. Pin-only changes are distinct. See
   `agent_docs/maintenance-update-source-review.md`.
 
+- Maintenance queue rows are frozen observations, never mutation authority.
+  Route by exact issue/path/installation ID against fresh inventory and refuse
+  missing or ambiguous selections. Preserve the single-install Updates drill-in
+  restriction across refresh; never fall back to a same-name sibling. Disk
+  refresh does not check upstream availability or observe running sessions.
+  Keep selected hand-off ownership through awaited UI dispatch; retired Changes
+  requests cannot open a modal, and started dispatch stays exclusive until return.
+  See `agent_docs/maintenance-queue.md` for the first M20 slice and its limits.
+
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention
   approval. Only availability checks use the low-level mutable gh update adapter

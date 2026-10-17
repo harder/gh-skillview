@@ -47,6 +47,33 @@ public class CliDispatcherErrorTests : IDisposable
     // --- remove parser edge cases ----------------------------------------
 
     [Fact]
+    public async Task QueueJson_DispatchesExactReadOnlyObservationsWithoutPreparingPlans()
+    {
+        var scanRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "queue-skills")).FullName;
+        var target = Directory.CreateDirectory(Path.Combine(scanRoot, "demo")).FullName;
+        var metadata = "---\nname: demo\ndescription: Read-only queue fixture\n---\nNever execute this skill.\n";
+        File.WriteAllText(Path.Combine(target, "SKILL.md"), metadata);
+        var (code, output, _) = await RunCliAsync("skillview", "--scan-root", scanRoot, "queue", "--json");
+        Assert.True(code is ExitCodes.Success or ExitCodes.UserError);
+        using var json = JsonDocument.Parse(output);
+        Assert.False(json.RootElement.GetProperty("mutationAuthority").GetBoolean());
+        var row = Assert.Single(json.RootElement.GetProperty("entries").EnumerateArray(), entry =>
+            entry.GetProperty("issue").GetString() == "installation-review"
+            && entry.GetProperty("subject").GetProperty("path").GetString() == target);
+        var id = row.GetProperty("subject").GetProperty("installationId").GetString()!;
+        var (filteredCode, filteredOutput, _) = await RunCliAsync("skillview", "--scan-root", scanRoot,
+            "queue", "--install-id", id, "--json");
+        Assert.True(filteredCode is ExitCodes.Success or ExitCodes.UserError);
+        using var filtered = JsonDocument.Parse(filteredOutput);
+        Assert.NotEmpty(filtered.RootElement.GetProperty("entries").EnumerateArray());
+        Assert.All(filtered.RootElement.GetProperty("entries").EnumerateArray(), entry =>
+            Assert.Equal(id, entry.GetProperty("subject").GetProperty("installationId").GetString()));
+        Assert.Equal(metadata, File.ReadAllText(Path.Combine(target, "SKILL.md")));
+        Assert.Single(Directory.EnumerateFileSystemEntries(target));
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
+    [Fact]
     public void ParseRemoveArgs_NoName_ReturnsNull()
     {
         var args = CliDispatcher.ParseRemoveArgs(new[] { "--yes", "--json" });

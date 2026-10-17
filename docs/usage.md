@@ -6,13 +6,13 @@ For installation and a quick start, see the [README](../README.md).
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes uses a full-width table for the maintenance queue. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes pairs its maintenance queue with frozen observation details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
+| **Changes** △ | Maintenance observations grouped by issue and physical installation, including cleanup review and unchecked installations. Enter opens the exact selected target. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
@@ -82,6 +82,25 @@ Changes tab:
 | Key | Action |
 |---|---|
 | `Enter` | Open the selected maintenance item |
+| `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
+
+Each observation retains its installation address ID, exact affected paths,
+source/ref/tree, recorded owners and consumers. Cleanup issues reopen only that
+issue at that physical address after a fresh inventory capture. Installation
+review opens Updates with only that exact installation selected, clearing prior
+batch and `--all` choices. A missing or ambiguous ID refuses the hand-off instead
+of choosing a same-name sibling. Press **Dry-run** explicitly to check update
+availability; **u** prepares the existing saved-plan review. Entry into the
+workspace performs neither action. Refresh keeps an exact Updates selection.
+The TUI caps visible rows and selected-detail text, reports omitted row/field
+counts, and omits exact fields whole. `queue --json` makes a fresh capture with
+full evidence; keep the same global workspace/profile/scan-root options.
+
+Cleanup suppression, agent disablement, pinning and migration remain separate:
+suppressed installations still appear for inspection, pins require explicit unpin
+review, and disablement/migration are not assessed by this queue. Disk inventory
+cannot establish what a running agent has loaded. The queue does not launch
+agents or offer unverified provider reload commands.
 
 Other:
 
@@ -107,6 +126,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 |---|---|
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
+| `skillview queue --json` | Refresh maintenance observations with schema 1 JSON and exact physical installation IDs; no upstream check or mutation |
 | `skillview effective --agent <id> --project <directory>` | Explain conditional loading policy for an agent, profile and project, retaining every observed copy |
 | `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
 | `skillview backup --path <installed-directory>` | Capture private, bounded payload evidence with a durable creating/captured journal |
