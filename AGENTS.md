@@ -167,7 +167,15 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   refresh does not check upstream availability or observe running sessions.
   Keep selected hand-off ownership through awaited UI dispatch; retired Changes
   requests cannot open a modal, and started dispatch stays exclusive until return.
-  See `agent_docs/maintenance-queue.md` for the first M20 slice and its limits.
+  See `agent_docs/maintenance-queue.md` for the M20 workflow and its limits.
+
+- Maintenance plan files are bounded local references, never imported payload
+  authority or approval. Read them through `RegularFileInspection.Capture` and
+  match ID/purpose/fingerprints/address/context against the native retained store.
+  Keep independent `--expect`, explicit retention, source-review and native
+  transition gates in specialist workflows. Generic repair cannot start a ready
+  replacement. Disk verification and conditional agent reload instructions never
+  establish active-session state. See `agent_docs/maintenance-queue.md`.
 
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention

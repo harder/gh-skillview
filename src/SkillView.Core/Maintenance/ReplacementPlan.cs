@@ -86,6 +86,10 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     internal bool AcknowledgeSourceReview { get; init; }
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }
+    [JsonIgnore]
+    internal MaintenancePlanReference? Reference { get; init; }
+    [JsonIgnore]
+    internal MaintenancePlanComparison? Comparison { get; init; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

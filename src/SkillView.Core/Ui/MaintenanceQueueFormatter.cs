@@ -27,7 +27,7 @@ internal static class MaintenanceQueueFormatter
         text.AppendLine($"\nFields omitted from this bounded preview: {rendered.OmittedFields}. Exact fields are omitted whole, never shortened into selectors.");
         text.AppendLine($"For full evidence, make a fresh capture with **queue --install-id {entry.Subject.InstallationId} --json** (retain the same global workspace/profile/scan-root options).");
         text.AppendLine(entry.Cleanup is null
-            ? "**Enter:** select this exact installation in Updates. **Dry-run** checks availability; **u** prepares a saved review. Neither runs on entry."
+            ? "**Enter:** select this exact installation in Updates. **Dry-run** checks availability; **c** compares installed content with one saved candidate and opens its plan review. Explicit retention approval enables apply; the result verifies disk locations. Neither runs on entry."
             : "**Enter:** refresh and review only this exact cleanup issue. Review is required before any action.");
         text.AppendLine("**r:** refresh disk inventory only. Update availability and active sessions remain unknown. The queue is observation, not mutation approval.");
         return text.ToString();
@@ -82,6 +82,12 @@ internal static class MaintenanceQueueFormatter
         yield return ("Update reason", entry.UpdateReason);
         yield return ("Active session", entry.RuntimeState);
         yield return ("Session reason", entry.RuntimeReason);
+        foreach (var reload in AgentReloadGuidance.For(subject))
+        {
+            yield return ("Reload for " + reload.Agent, reload.Requirement + ": " + reload.Reason);
+            yield return ("Reload source", reload.Source);
+            yield return ("Reload source version", reload.SourceVersion);
+        }
         yield return ("Materialization", subject.Materialization);
         yield return ("Captured", subject.CapturedAt?.ToString("O"));
         yield return ("Native observation", subject.NativeObject.Status);

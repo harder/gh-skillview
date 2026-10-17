@@ -10,7 +10,8 @@ namespace SkillView.Cli;
 
 public static partial class CliDispatcher
 {
-    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
+    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token,
+        MaintenancePlanReference? reference = null)
     {
         var requestedCommand = options.SubcommandName!;
         var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
@@ -65,6 +66,13 @@ public static partial class CliDispatcher
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger,
                 runner: services.Runner, subjectObserved: impact => frozenImpact = impact with { Operation = requestedCommand }, sourceReviewRequired: true);
+            if (reference is not null)
+            {
+                var referenced = store.Inspect(id!, inventory, token, expectedPurpose);
+                reference.RequireMatch(referenced.Reference);
+                if (command == "restore-recover" && referenced.Status == "ready")
+                    throw new IOException("The saved candidate has not replaced the installation. Use apply with explicit retention consent; repair cannot start a ready plan. If inspection reports an interrupted pre-move journal, review the specialist recovery command explicitly.");
+            }
             ReplacementResult result;
             if (command == "restore-plan")
             {
@@ -99,6 +107,8 @@ public static partial class CliDispatcher
                         if (json) WriteJson(w =>
                         {
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                            w.WriteString("status", "unchanged"); w.WriteString("reason", current.Message);
+                            w.WriteBoolean("partial", current.CleanupWarning is not null);
                             w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
                             w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
                             WriteImpact(w, frozenImpact);
@@ -132,7 +142,11 @@ public static partial class CliDispatcher
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                w.WriteString("status", result.Canceled ? "canceled" : result.Succeeded ? result.Status : result.MutationObserved ? "partial" : "refused");
+                w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
+                WritePlanReference(w, result);
+                w.WriteString("diskVerification", result.Succeeded ? "verified-saved-locations" : "incomplete; inspect operation status and retained evidence");
                 if ((unpinOnly || localReimport || sourceSwitch) && command == "restore-plan")
                 {
                     w.WriteStartArray("applyArguments");
@@ -159,6 +173,8 @@ public static partial class CliDispatcher
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteBoolean("succeeded", false); w.WriteString("error", ex.Message);
+                w.WriteString("status", ex is OperationCanceledException ? "canceled" : "refused");
+                w.WriteString("reason", ex.Message); w.WriteString("sessionState", "unknown");
                 w.WriteBoolean("canceled", ex is OperationCanceledException);
                 WriteImpact(w, frozenImpact is { } impact ? impact with { Operation = requestedCommand } : null);
                 if (ex is GhSourceRequestException source)

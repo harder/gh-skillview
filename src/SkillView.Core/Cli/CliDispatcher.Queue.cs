@@ -79,6 +79,7 @@ public static partial class CliDispatcher
             writer.WriteString("disablementState", entry.DisablementState); writer.WriteString("migrationState", entry.MigrationState);
             writer.WriteString("updateState", entry.UpdateState); writer.WriteString("updateReason", entry.UpdateReason);
             writer.WriteString("runtimeState", entry.RuntimeState); writer.WriteString("runtimeReason", entry.RuntimeReason);
+            WriteImpact(writer, entry.Cleanup?.Impact ?? SkillView.Inventory.Models.OperationImpact.Payload(entry.Subject, "review-observation"));
             WriteSubject(writer, entry.Subject); writer.WriteEndObject();
         }
         writer.WriteEndArray(); writer.WriteEndObject();
@@ -98,8 +99,14 @@ public static partial class CliDispatcher
                 text.AppendLine($"  owner: {owner.Provider}: {owner.Source}; registry={owner.LockFilePath ?? "unknown"}");
             foreach (var exposure in entry.Subject.Exposures)
                 text.AppendLine("  exposure: " + OperationImpactFormatter.Exposure(exposure));
+            var impact = entry.Cleanup?.Impact ?? SkillView.Inventory.Models.OperationImpact.Payload(entry.Subject, "review-observation");
+            foreach (var exposure in impact.AffectedExposures) text.AppendLine("  affected exposure: " + exposure.Membership.Path);
+            foreach (var exposure in impact.RetainedExposures) text.AppendLine("  retained exposure: " + exposure.Membership.Path);
+            if (impact.PayloadRetained) text.AppendLine("  retained payload: " + (impact.RetainedPayloadPath ?? "unknown; inspect saved evidence"));
             text.AppendLine($"  policies: cleanup suppression={entry.CleanupSuppressed}; recorded pin={entry.Pinned}; disablement={entry.DisablementState}; migration={entry.MigrationState}");
             text.AppendLine("  action: " + entry.RecommendedAction + "; " + entry.Reason);
+            foreach (var reload in AgentReloadGuidance.For(entry.Subject))
+                text.AppendLine("  reload for " + reload.Agent + ": " + reload.Requirement + "; " + reload.Reason + " Source: " + (reload.Source ?? reload.SourceVersion));
         }
         foreach (var diagnostic in queue.Diagnostics) text.AppendLine("Coverage: " + diagnostic);
         text.AppendLine("Update availability and active-session state: unknown. Run queue again to refresh disk inventory only.");

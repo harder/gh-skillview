@@ -652,7 +652,10 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             plan.Original.Mode, plan.Candidate.Mode, plan.Revision, owner, plan.LocalDisposition, plan.PinPolicy, plan.LocalImport, plan.LocalSourceSwitch)
         {
             SourceReview = plan.SourceReview,
-            Impact = PlanImpact(plan, status)
+            Impact = PlanImpact(plan, status),
+            Reference = new(1, plan.Id, plan.Purpose, plan.ReviewFingerprint,
+                plan.ContextFingerprint, plan.Subject.InstallationId, plan.OriginalPath),
+            Comparison = MaintenancePlanComparison.From(plan)
         };
 
     private OperationImpact PlanImpact(ReplacementPlan plan, string? status = null) => OperationImpact.Payload(

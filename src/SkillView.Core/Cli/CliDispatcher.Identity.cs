@@ -28,8 +28,23 @@ public static partial class CliDispatcher
         WriteSubject(w, impact.Subject);
         WriteExposures(w, "affectedExposures", impact.AffectedExposures);
         WriteExposures(w, "retainedExposures", impact.RetainedExposures);
+        WriteReloadInstructions(w, impact.Subject);
         WriteNativeObservation(w, "executionEvidence", impact.ExecutionEvidence);
         w.WriteEndObject();
+    }
+
+    private static void WriteReloadInstructions(Utf8JsonWriter writer, OperationSubject subject)
+    {
+        writer.WriteString("sessionState", "unknown");
+        writer.WriteStartArray("reloadInstructions");
+        foreach (var reload in SkillView.Maintenance.AgentReloadGuidance.For(subject))
+        {
+            writer.WriteStartObject(); writer.WriteString("agent", reload.Agent);
+            writer.WriteString("requirement", reload.Requirement); writer.WriteString("reason", reload.Reason);
+            writer.WriteString("source", reload.Source); writer.WriteString("sourceVersion", reload.SourceVersion);
+            writer.WriteString("sessionObservation", "unknown"); writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
     }
 
     private static void WriteSubject(Utf8JsonWriter w, OperationSubject subject)

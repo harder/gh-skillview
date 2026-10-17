@@ -94,7 +94,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _tableLabel = new Label
         {
-            Text = "Space marks · a all · u update row · U marked · p unpin row",
+            Text = "Space marks · c compare/plan row · u review · U marked · p unpin",
             X = 0,
             Y = 0,
         };
@@ -307,9 +307,9 @@ internal sealed partial class UpdatesTabView : FrameView
         }
         _table.SetSelectedRow(0);
         _wrapper?.CheckedRows.Add(0);
-        _status.Text = " exact installation selected · availability unknown · Dry-run checks; u prepares review";
+        _status.Text = " exact installation selected · availability unknown · Dry-run checks; c compares/plans";
         _preview.Text = "## Selected installation\n\n" + InstalledScreen.RenderDetail(target)
-            + "\n\nUpdate availability is unknown until **Dry-run**. Runtime session state is unknown. **u** prepares a saved plan for this installation; apply still requires its review.";
+            + "\n\nUpdate availability is unknown until **Dry-run**. Runtime session state is unknown. **c** compares installed content with one saved candidate and opens its plan review for this installation. Inspect the comparison and approve retention before apply; its result verifies disk, not session activation.";
     }
 
 
@@ -377,7 +377,7 @@ internal sealed partial class UpdatesTabView : FrameView
             key.Handled = true;
             ClearAllMarks();
         }
-        else if (rune == 'u')
+        else if (rune is 'u' or 'c')
         {
             key.Handled = true;
             UpdateCurrentRow();

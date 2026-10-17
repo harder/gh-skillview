@@ -90,7 +90,8 @@ issue at that physical address after a fresh inventory capture. Installation
 review opens Updates with only that exact installation selected, clearing prior
 batch and `--all` choices. A missing or ambiguous ID refuses the hand-off instead
 of choosing a same-name sibling. Press **Dry-run** explicitly to check update
-availability; **u** prepares the existing saved-plan review. Entry into the
+availability; **c** compares installed content with one immutable saved candidate
+and opens its plan review (**u** also prepares review). Entry into the
 workspace performs neither action. Refresh keeps an exact Updates selection.
 The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
@@ -100,7 +101,42 @@ Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin
 review, and disablement/migration are not assessed by this queue. Disk inventory
 cannot establish what a running agent has loaded. The queue does not launch
-agents or offer unverified provider reload commands.
+agents. Reload guidance is conditional on the observed agent and delivery type.
+For Claude plugin deliveries, background updates change disk while an existing
+session retains its loaded version: use `/reload-plugins` or a new session,
+following the [official plugin guidance](https://code.claude.com/docs/en/discover-plugins#keep-plugins-updated).
+For newly installed Codex skills, the [official catalog](https://github.com/openai/skills#installing-a-skill)
+instructs restarting Codex. Other combinations explain that their reload rule is
+unknown. Successful disk verification never claims that a running session reloaded.
+
+The CLI exposes the same saved replacement workflows through local plan references:
+
+```bash
+skillview --scan-root /path/to/skills inspect --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills check --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills plan --purpose update-revision --install-id INSTALLATION_ID --json > review.json
+skillview --scan-root /path/to/skills inspect --plan-file review.json --json
+# Review the comparison, all consumers, source and retention disposition first.
+# Supply the reviewed planFingerprint independently; the file is not approval.
+skillview --scan-root /path/to/skills apply --plan-file review.json --expect REVIEWED_PLAN_FINGERPRINT --yes --disposition retain-original --json
+skillview --scan-root /path/to/skills verify --plan-file review.json --json
+# Undo uses the fresh inspection's reviewFingerprint, not the plan fingerprint.
+skillview --scan-root /path/to/skills undo --plan-file review.json --expect CURRENT_REVIEW_FINGERPRINT --yes --json
+```
+
+Keep HOME, state, CWD and global scan/workspace/profile options unchanged. The
+schema-1 `planReference` names an exact plan already retained locally, its purpose,
+fingerprints and installation context. It imports no files and cannot authorize a
+write. The file must be a bounded regular JSON file (256 KiB maximum); large plan
+responses can use only their `planReference` object. After a merge produces a new
+plan fingerprint, export a fresh reference with the specialist `update-inspect`.
+`plan` also accepts `restore-recorded`, `unpin-only` and `local-reimport` purposes;
+apply requires their existing explicit retention disposition. `repair --plan-file`
+resumes a recognized interrupted transaction after current inspection; it refuses
+to start a ready replacement. Torn owner-image repairs and cleanup remain explicit
+specialist operations. Legacy quarantine `undo --id` continues to use its own
+review contract. JSON retains exact per-path before/after file evidence, operation
+status/reason, affected/retained consumers and unknown session state.
 
 Other:
 
