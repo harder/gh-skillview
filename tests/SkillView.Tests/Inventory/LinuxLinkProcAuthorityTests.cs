@@ -156,6 +156,7 @@ public sealed class LinuxLinkProcAuthorityTests
         var token = Token;
         var temporary = Directory.CreateTempSubdirectory("skillview-thread-fd-");
         var path = Path.Combine(temporary.FullName, "only-this-thread"); File.WriteAllText(path, "private descriptor");
+        var requiredExt4 = System.Environment.GetEnvironmentVariable("SKILLVIEW_LINUX_EXPOSURE_PRESERVATION_PROOF") == "1";
         Exception? failure = null; var denied = 0; var positive = false;
         var worker = new Thread(() =>
         {
@@ -175,19 +176,43 @@ public sealed class LinuxLinkProcAuthorityTests
                 Assert.NotEqual(path, new FileInfo($"/proc/self/fd/{fd}").LinkTarget);
                 using var authority = LinuxLinkProcAuthority.Open(token);
                 authority.Check(token);
-                var observed = authority.ObserveHandle(handle, token);
-                Assert.Equal(0xef53UL, observed.FileSystem.Type);
-                Assert.True(observed.MountId > 0);
+                // Descriptor-table authority is filesystem-independent. The
+                // required preservation proof separately demands actual ext4;
+                // ordinary tmpfs/non-ext4 temporary roots are not test failures.
+                if (requiredExt4)
+                {
+                    var observed = authority.ObserveHandle(handle, token);
+                    Assert.Equal(0xef53UL, observed.FileSystem.Type);
+                    Assert.True(observed.MountId > 0);
+                }
+                authority.Check(token);
                 positive = true;
             }
             catch (Exception ex) { failure = ex; }
         });
         try
         {
+            // Required native proof must refuse a non-ext4 fixture even when
+            // CLONE_FILES is later unavailable. Unknown proc/identity failures
+            // propagate; ordinary descriptor-table testing has no ext4 gate.
+            if (requiredExt4)
+            {
+                using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var authority = LinuxLinkProcAuthority.Open(token);
+                var observed = authority.ObserveHandle(handle, token);
+                Assert.Equal(0xef53UL, observed.FileSystem.Type);
+                Assert.True(observed.MountId > 0);
+            }
             worker.Start(); worker.Join();
             Assert.Null(failure);
             if (denied != 0) TestContext.Current.TestOutputHelper!.WriteLine("CLONE_FILES fixture unavailable: unshare returned EPERM; no descriptor-divergence positive claim.");
-            else { Assert.True(positive); TestContext.Current.TestOutputHelper!.WriteLine("CLONE_FILES fixture positive: current-thread descriptor differs from leader and held native fdinfo/mount observation passed."); }
+            else
+            {
+                Assert.True(positive);
+                TestContext.Current.TestOutputHelper!.WriteLine(requiredExt4
+                    ? "CLONE_FILES fixture positive: current-thread descriptor differs from leader; held proc authority and required ext4 observation passed."
+                    : "CLONE_FILES fixture positive: current-thread descriptor differs from leader and held proc authority passed; no ext4 admission claimed.");
+            }
         }
         finally { temporary.Delete(true); }
     }

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using SkillView.Inventory;
 using SkillView.Maintenance;
+using SkillView.Tests.Maintenance;
 using Xunit;
 
 namespace SkillView.Tests.Inventory;
@@ -97,6 +98,10 @@ public sealed class NativeExposureLinkTests : IDisposable
                 : fixture.TargetRoot;
             CreateWindowsJunction(alias, destination);
         }
+        // Declared before native leases so they close before removing this
+        // known junction leaf; generic recursive fixture teardown must not walk it.
+        using var junctionCleanup = spelling.Contains("junction", StringComparison.Ordinal)
+            ? new KnownJunctionCleanup(alias) : null;
         var rawTarget = spelling switch
         {
             "leading-parent" => @"..\targets\payload",
@@ -114,7 +119,7 @@ public sealed class NativeExposureLinkTests : IDisposable
             "absolute-junction-no-dot" => Path.Combine(alias, "payload"),
             _ => throw new InvalidOperationException()
         };
-        Directory.CreateSymbolicLink(fixture.Link, rawTarget);
+        CreateFixtureExposure(fixture.Link, rawTarget);
         using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
         var targetBefore = target.Capture(Token);
         using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
@@ -130,7 +135,7 @@ public sealed class NativeExposureLinkTests : IDisposable
         { Assert.Skip("Windows raw parity ran, but full native link metadata is unavailable for retain/restore."); return; }
         var retained = lease.Retain(fixture.Slot, Token); fixture.State.FlushPublication(Token);
         Assert.False(PathResolver.IsSymlink(fixture.Link));
-        Assert.Throws<IOException>(() => directory.ResolveLink("demo", Token));
+        Assert.ThrowsAny<IOException>(() => directory.ResolveLink("demo", Token));
         // E is absent now: raw bytes are resolved from its ORIGINAL parent,
         // matching the OS-followed pre-retain identity and still-held T.
         Assert.Equal(followed, directory.ResolveRawTarget(retained.RawTarget.AsSpan(), Token));
@@ -158,11 +163,24 @@ public sealed class NativeExposureLinkTests : IDisposable
         Assert.Equal(target.TargetIdentity, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
         Directory.Move(fixture.ExposureRoot, fixture.ExposureRoot + "-moved");
         Directory.CreateDirectory(fixture.ExposureRoot);
-        Directory.CreateSymbolicLink(fixture.Link, fixture.Payload);
+        CreateFixtureExposure(fixture.Link, fixture.Payload);
         Assert.Throws<IOException>(() => directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
         Assert.True(PathResolver.IsSymlink(fixture.Link));
         Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
         Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    private sealed class KnownJunctionCleanup(string path) : IDisposable
+    {
+        public void Dispose() => Directory.Delete(path, recursive: false);
+    }
+
+    private static void CreateFixtureExposure(string path, string target)
+    {
+        Directory.CreateSymbolicLink(path, target);
+        // Set the effective-token owner on the link itself, before freezing
+        // metadata. Elevated Windows otherwise creates an Administrators owner.
+        if (OperatingSystem.IsWindows()) WindowsPayloadMetadataTests.SetFixtureOwner(path);
     }
 
     private static void CreateWindowsJunction(string link, string target)
@@ -203,11 +221,92 @@ public sealed class NativeExposureLinkTests : IDisposable
         using var fixture = Create(false);
         var indirect = Path.Combine(fixture.ExposureRoot, "indirect");
         Directory.CreateSymbolicLink(indirect, fixture.Payload);
-        Directory.Delete(fixture.Link); Directory.CreateSymbolicLink(fixture.Link, "indirect");
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, "indirect");
         using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
         Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
         Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
         Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
+    }
+
+    [Theory]
+    [InlineData(false, "/")]
+    [InlineData(false, "///")]
+    [InlineData(true, "/")]
+    [InlineData(true, "///")]
+    public void UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(bool absolute, string suffix)
+    {
+        if (OperatingSystem.IsWindows())
+        { Assert.Skip("Unix no-follow target resolution requires native Unix execution."); return; }
+        using var fixture = Create(false);
+        var indirect = Path.Combine(fixture.ExposureRoot, "indirect");
+        Directory.CreateSymbolicLink(indirect, fixture.Payload);
+        var raw = (absolute ? indirect : "indirect") + suffix;
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, raw);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(raw), original.RawTarget.ToArray());
+        // OS-followed E reaches T, but raw final-target admission must refuse
+        // the second link even when trailing separators make O_NOFOLLOW follow it.
+        Assert.Equal(target.TargetIdentity, directory.ResolveLink("demo", Token));
+        Assert.Throws<IOException>(() => directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        Assert.Throws<IOException>(() => NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token));
+        Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        var unchanged = directory.ReadLink("demo", Token);
+        Assert.Equal(original.Identity, unchanged.Identity);
+        Assert.Equal(original.RawTarget.ToArray(), unchanged.RawTarget.ToArray());
+        Assert.Equal(original.MetadataFingerprint, unchanged.MetadataFingerprint);
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+    }
+
+    [Theory]
+    [InlineData(false, "/")]
+    [InlineData(false, "///")]
+    [InlineData(true, "/")]
+    [InlineData(true, "///")]
+    public async Task UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(bool absolute, string suffix)
+    {
+        if (OperatingSystem.IsWindows())
+        { Assert.Skip("Unix raw-target trailing separators require native Unix execution."); return; }
+        using var fixture = Create(false);
+        var raw = (absolute ? fixture.Payload : Path.GetRelativePath(fixture.ExposureRoot, fixture.Payload)) + suffix;
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, raw);
+        using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
+        var before = target.Capture(Token);
+        using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+        var original = directory.ReadLink("demo", Token);
+        var rawBytes = System.Text.Encoding.UTF8.GetBytes(raw);
+        Assert.Equal(rawBytes, original.RawTarget.ToArray());
+        Assert.Equal(target.TargetIdentity, directory.ResolveRawTarget(original.RawTarget.AsSpan(), Token));
+        if (OperatingSystem.IsLinux())
+        {
+            using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
+            if (owned is null) { Assert.Skip("Linux owned preservation unavailable; read-only trailing-separator parity passed."); return; }
+            var retained = await owned.Context.RetainAsync(Token);
+            Assert.True(retained.Succeeded, retained.Error);
+            Assert.Equal(rawBytes, retained.Observation!.Current.RawTarget.ToArray());
+            var restored = await owned.Context.RestoreAsync(Token);
+            Assert.True(restored.Succeeded, restored.Error);
+            Assert.Equal(rawBytes, restored.Observation!.Current.RawTarget.ToArray());
+            Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Observation.Current.Identity));
+            Assert.True(restored.Observation.RetainedSlotEmpty);
+        }
+        else
+        {
+            using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
+            RequirePositiveProofMetadata(lease);
+            if (!lease.Original.Metadata.Supported)
+            { Assert.Skip("Native full link metadata unavailable; read-only trailing-separator parity passed."); return; }
+            var retained = lease.Retain(fixture.Slot, Token); fixture.State.FlushPublication(Token);
+            Assert.Equal(rawBytes, retained.RawTarget.ToArray());
+            var restored = lease.Restore(Token); fixture.State.FlushPublication(Token);
+            Assert.Equal(rawBytes, restored.RawTarget.ToArray());
+            Assert.True(NativeDirectoryMoveLease.SameObject(original.Identity, restored.Identity));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+        }
+        Assert.Equal(rawBytes, directory.ReadLink("demo", Token).RawTarget.ToArray());
+        Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
     }
 
     [Fact]
@@ -226,7 +325,7 @@ public sealed class NativeExposureLinkTests : IDisposable
         using var fixture = Create(true);
         using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
         using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
-        Directory.Delete(fixture.Link); Directory.CreateSymbolicLink(fixture.Link, Path.GetRelativePath(fixture.ExposureRoot, fixture.Payload));
+        Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, Path.GetRelativePath(fixture.ExposureRoot, fixture.Payload));
         Assert.Throws<IOException>(() => lease.Revalidate(Token));
         Assert.False(lease.MutationAttempted); Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
         Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Payload, "SKILL.md")));
@@ -238,7 +337,32 @@ public sealed class NativeExposureLinkTests : IDisposable
         using var fixture = Create(false);
         using var target = NativeDirectoryMoveLease.Open(fixture.TargetRoot, fixture.Payload, Token);
         using var lease = NativeExposureLinkLease.Open(fixture.ExposureRoot, fixture.Link, target, Token);
-        Directory.Move(fixture.ExposureRoot, fixture.ExposureRoot + "-moved");
+        var before = target.Capture(Token);
+        var original = lease.Original;
+        var moved = fixture.ExposureRoot + "-moved";
+        try { Directory.Move(fixture.ExposureRoot, moved); }
+        catch (Exception error) when (OperatingSystem.IsWindows()
+            && (error is IOException or UnauthorizedAccessException) && (error.HResult & 0xffff) is 5 or 32)
+        {
+            // A live original-link pin can make Windows prevent the parent
+            // rename. This is prevention evidence, not a successful-rename proof.
+            lease.Revalidate(Token);
+            using var directory = NativeExposureDirectory.Open(fixture.ExposureRoot, fixture.Link, Token);
+            NativeExposureLinkLease.SameLink(original, directory.ReadLink("demo", Token), sameGeneration: true);
+            var current = directory.Capture(Token);
+            Assert.Equal(lease.OriginalDirectory.Root, current.Root);
+            Assert.Equal(lease.OriginalDirectory.Parent, current.Parent);
+            Assert.True(lease.OriginalDirectory.Entries.SequenceEqual(current.Entries));
+            Assert.DoesNotContain(Path.GetFileName(moved),
+                Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(moved)!).Select(Path.GetFileName));
+            Assert.Equal(before.Fingerprint, target.Capture(Token).Fingerprint);
+            Assert.Equal(before.ObjectStateFingerprint, target.Capture(Token).ObjectStateFingerprint);
+            Assert.Equal(fixture.SkillBytes, File.ReadAllBytes(Path.Combine(fixture.Link, "SKILL.md")));
+            Assert.Empty(fixture.Slot.Directory.Capture(Token).Entries);
+            Assert.False(lease.MutationAttempted);
+            TestContext.Current.TestOutputHelper!.WriteLine($"Windows prevented pinned-parent rename (native error {error.HResult & 0xffff}); unchanged authority revalidated, no actual parent-rename claim.");
+            return;
+        }
         Directory.CreateDirectory(fixture.ExposureRoot); File.WriteAllText(fixture.Link, "foreign");
         Assert.Throws<IOException>(() => lease.Revalidate(Token));
         Assert.Equal("foreign", File.ReadAllText(fixture.Link)); Assert.False(lease.MutationAttempted);
@@ -314,7 +438,7 @@ public sealed class NativeExposureLinkTests : IDisposable
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temporary.FullName, "private-shared"), [common], Token);
         using var writer = state.OpenFile("writer.lock", true, Token);
         using var slot = NativeRetainedLinkSlot.Create(state, "retained-link", Token);
-        var link = Path.Combine(common, "exposure"); Directory.CreateSymbolicLink(link, "payload");
+        var link = Path.Combine(common, "exposure"); CreateFixtureExposure(link, "payload");
         using var target = NativeDirectoryMoveLease.Open(common, payload, Token);
         var before = target.Capture(Token);
         using var lease = NativeExposureLinkLease.Open(common, link, target, Token);
@@ -407,7 +531,7 @@ public sealed class NativeExposureLinkTests : IDisposable
         using var fixture = Create(true);
         using var owned = await OpenOwned(fixture, fixture.ExposureRoot);
         if (owned is null) return;
-        if (change == "link") { Directory.Delete(fixture.Link); Directory.CreateSymbolicLink(fixture.Link, fixture.Payload); }
+        if (change == "link") { Directory.Delete(fixture.Link); CreateFixtureExposure(fixture.Link, fixture.Payload); }
         else if (change == "target") { Directory.Move(fixture.Payload, fixture.Payload + "-original"); WriteSkill(fixture.Payload); }
         else File.WriteAllText(Path.Combine(owned.SlotPath, "entry"), "foreign");
         var refusal = await owned.Context.RetainAsync(Token);
@@ -624,7 +748,7 @@ public sealed class NativeExposureLinkTests : IDisposable
             writer = state.OpenFile("writer.lock", true, Token);
             slot = NativeRetainedLinkSlot.Create(state, "retained-link", Token);
             var link = Path.Combine(exposures, "demo");
-            Directory.CreateSymbolicLink(link, relative ? Path.GetRelativePath(exposures, payload) : payload);
+            CreateFixtureExposure(link, relative ? Path.GetRelativePath(exposures, payload) : payload);
             return new(state, writer, slot, targets, payload, exposures, link, File.ReadAllBytes(Path.Combine(payload, "SKILL.md")));
         }
         catch { slot?.Dispose(); writer?.Dispose(); state.Dispose(); throw; }

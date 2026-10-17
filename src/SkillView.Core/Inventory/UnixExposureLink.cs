@@ -114,7 +114,12 @@ internal sealed partial class UnixSecureRemovalBackend
         internal override SecureFileIdentity ResolveRawTarget(ReadOnlySpan<byte> raw, CancellationToken token)
         {
             if (raw.IsEmpty || raw.Length > 32768 || raw.Contains((byte)0)) throw new IOException("Unsupported raw Unix link target.");
-            return Resolve(new UTF8Encoding(false, true).GetString(raw), token, followFinal: false);
+            var path = new UTF8Encoding(false, true).GetString(raw);
+            // A final slash makes Unix open follow a final symlink despite
+            // O_NOFOLLOW. Strip separators only from this no-follow candidate;
+            // preserve root-only addresses, dot components and stored raw bytes.
+            var candidate = path.TrimEnd('/');
+            return Resolve(candidate.Length == 0 ? path : candidate, token, followFinal: false);
         }
         private SecureFileIdentity Resolve(string path, CancellationToken token, bool followFinal = true)
         {
