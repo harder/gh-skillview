@@ -142,12 +142,20 @@ public sealed class NativePlacementTests : IDisposable
         var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
         var child = Path.Combine(parent, "child");
         if (!missing) Directory.CreateDirectory(child);
+        var creation = Directory.GetCreationTimeUtc(parent);
         var observedAttempts = new List<int>();
         using var lease = WindowsSecureRemovalBackend.OpenPlacement(child, Token, (attempt, capturedParent, name) =>
         {
             if (name != "child" || !PathIdentity.Equals(capturedParent, parent)) return;
             observedAttempts.Add(attempt);
-            if (observedAttempts.Count == 1) File.WriteAllText(Path.Combine(parent, "namespace-change"), "changed");
+            if (observedAttempts.Count == 1)
+            {
+                File.WriteAllText(Path.Combine(parent, "namespace-change"), "changed");
+                // Namespace timestamps can coalesce on Windows. Force a distinct
+                // real native generation instead of depending on clock progress.
+                Directory.SetCreationTimeUtc(parent, creation.AddSeconds(1));
+                Assert.NotEqual(creation, Directory.GetCreationTimeUtc(parent));
+            }
         });
         Assert.Equal(2, observedAttempts.Count);
         Assert.True(observedAttempts[1] > observedAttempts[0]);
@@ -167,6 +175,7 @@ public sealed class NativePlacementTests : IDisposable
         if (!OperatingSystem.IsWindows()) { Assert.Skip("Windows held-parent generation checks require native Windows execution."); return; }
         var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
         var child = Path.Combine(parent, "missing");
+        var creation = Directory.GetCreationTimeUtc(parent);
         using var cancellation = new CancellationTokenSource();
         var changes = 0;
         var attempts = new HashSet<int>();
@@ -175,6 +184,8 @@ public sealed class NativePlacementTests : IDisposable
             attempts.Add(attempt);
             if (name != "missing" || !PathIdentity.Equals(capturedParent, parent)) return;
             File.WriteAllText(Path.Combine(parent, "namespace-change-" + changes++), "changed");
+            Directory.SetCreationTimeUtc(parent, creation.AddSeconds(changes));
+            Assert.Equal(creation.AddSeconds(changes), Directory.GetCreationTimeUtc(parent));
             if (cancel) cancellation.Cancel();
         }
         if (cancel)
