@@ -32,6 +32,13 @@ before start. Do not silently pull/build/download or invoke host clients/APIs.
 
 Tests with an injected process boundary prove review/consent, argv/environment,
 refusals and cleanup flow. They do not prove container isolation or model quality.
-Local development for this change did not authorize actual container/AI execution.
-A future real-runtime fixture requires explicit authorization and its own evidence.
+The Linux AOT workflow has a separate explicitly prepared BusyBox runtime fixture.
+It resolves the pre-pulled image's digest/ID and records the actual binary and a
+transparent Docker recorder's hashes, raw inspect outputs, consent refusals,
+successful/nonzero/deadline executions and independent post-cleanup container
+absence. The source script is not run. The fixture checks protocol tasks and
+selected filesystem/environment restrictions, not model quality or container
+escape resistance. Adding this harness is not evidence that it passed: retain
+the exact-head CI artifact before making any real-runtime claim. Local development
+does not execute Docker, models or APIs merely to prepare this harness.
 See [user contract](../docs/isolated-evaluations.md).
