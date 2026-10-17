@@ -23,8 +23,11 @@ internal sealed partial class ReplacementPlanStore
         using var newState = OpenArchive(operation, newName, token);
         var before = CapturedPayloadArchive.Load(oldState, null, token);
         var after = CapturedPayloadArchive.Load(newState, null, token);
-        if (before.Archive.Snapshot.Fingerprint != plan.Original.Payload
-            || after.Archive.Snapshot.Fingerprint != plan.Candidate.Payload)
+        // Historical replacement evidence deliberately excludes Unix link
+        // modes. Bound archives retain them. Adapt only the comparison domain;
+        // preserve the complete raw archive, manifest hash and report below.
+        if (LegacyProjection(before.Archive.Snapshot, token).Fingerprint != plan.Original.Payload
+            || LegacyProjection(after.Archive.Snapshot, token).Fingerprint != plan.Candidate.Payload)
             throw new IOException("Review archives differ from the saved payloads.");
         var report = SourceUpdateReview.Analyze(before.Archive.Snapshot, before.Archive.OpenReader(oldState),
             after.Archive.Snapshot, after.Archive.OpenReader(newState), token);
@@ -116,7 +119,8 @@ internal sealed partial class ReplacementPlanStore
         using var newState = OpenArchive(operation, review.CandidateArchive, token);
         var before = CapturedPayloadArchive.Load(oldState, review.InstalledManifest, token).Archive;
         var after = CapturedPayloadArchive.Load(newState, review.CandidateManifest, token).Archive;
-        if (before.Snapshot.Fingerprint != plan.Original.Payload || after.Snapshot.Fingerprint != plan.Candidate.Payload)
+        if (LegacyProjection(before.Snapshot, token).Fingerprint != plan.Original.Payload
+            || LegacyProjection(after.Snapshot, token).Fingerprint != plan.Candidate.Payload)
             throw new IOException("Source-review manifests do not match the saved payloads.");
         if (!verifyBytes) return;
         foreach (var item in before.Entries.Where(e => e.Blob is not null)) before.CopyEntry(oldState, item.Entry.Path, Stream.Null, token);

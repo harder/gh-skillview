@@ -12,6 +12,13 @@ explicit argv; empty configured arguments must not revive image CMD. Use explici
 absolute Docker executable and local unix socket, cleared child environment and
 private Docker config. Never inherit runtime context, credentials or mounts.
 
+Read-only review parses `dockerExecutable` as a Linux path declaration on every
+host: a leading `/` establishes Linux absolute syntax, independently of Windows
+drive rules. Do not use host-native path qualification or resolve/probe that
+declared executable during review. Retain its exact text and config hash. Actual
+run admission still refuses non-Linux before private staging or runtime calls;
+consent, native input capture and image/runtime verification remain separate.
+
 Copy bytes only through completed `PayloadSnapshot.CaptureWithEntrySink` evidence
 and rehash the held second read. Publish temporary input with native directory
 handles, keep writer/ownership leases, and clean through held ownership. This is

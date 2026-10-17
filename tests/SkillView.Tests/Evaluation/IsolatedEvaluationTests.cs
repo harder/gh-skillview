@@ -201,6 +201,45 @@ public sealed class IsolatedEvaluationTests : IDisposable
 
     private static bool NativeRunSupported => OperatingSystem.IsLinux() && SecureRemovalBackend.IsSupported;
 
+    [Theory]
+    [InlineData("/usr/bin/docker")]
+    [InlineData("/explicit/docker")]
+    [InlineData("/opt/offline tools/docker")]
+    public void LinuxExecutableDeclarationIsPortableAndRetainsExactText(string executable)
+    {
+        WriteConfig(executable: executable);
+        var environment = EvaluationReview.Parse(File.ReadAllBytes(Config));
+        Assert.Equal(executable, environment.DockerExecutable);
+        Assert.Empty(calls);
+    }
+
+    [Theory]
+    [InlineData("docker")]
+    [InlineData("usr/bin/docker")]
+    [InlineData("C:/Docker/docker.exe")]
+    [InlineData(@"C:\Docker\docker.exe")]
+    [InlineData(@"\usr\bin\docker")]
+    [InlineData(@"\\server\share\docker.exe")]
+    public void NonLinuxRootedAndRelativeExecutableDeclarationsRemainRefused(string executable)
+    {
+        WriteConfig(executable: executable);
+        var refused = Assert.Throws<ArgumentException>(() => EvaluationReview.Parse(File.ReadAllBytes(Config)));
+        Assert.Contains("explicit absolute Linux path", refused.Message);
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public async Task NonLinuxRunRefusesValidReviewedLinuxPathBeforeStagingOrProcess()
+    {
+        Assert.SkipUnless(!OperatingSystem.IsLinux(), "Non-Linux runner admission regression; portable parsing runs on every host.");
+        WriteConfig(executable: "/usr/bin/docker");
+        var frozen = Capture();
+        var refused = await Assert.ThrowsAsync<IOException>(() => new IsolatedEvaluationRunner(new Logger(), Invoke)
+            .RunAsync(frozen, frozen.Fingerprint, true, Token));
+        Assert.Contains("local Linux host only", refused.Message);
+        Assert.Empty(calls);
+    }
+
     [Fact]
     public void ReviewHasNoProcessBoundaryAndPreservesRawPayload()
     {
