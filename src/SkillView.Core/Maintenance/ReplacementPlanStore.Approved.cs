@@ -60,7 +60,7 @@ internal sealed partial class ReplacementPlanStore
         try
         {
             var installed = CapturedPayloadArchive.Capture(operation, "approved-original", original, token);
-            VerifyPayload(ReplacementEvidence.From(before), installed.Snapshot);
+            VerifyPayload(ReplacementEvidence.From(before), LegacyProjection(installed.Snapshot, token));
             if (installed.Snapshot.FrontMatter is not { } live || !SameParsedMetadata(target.FrontMatter, live))
                 throw new IOException("Current installed authored/source metadata changed before approved restore planning.");
             using (var installedState = operation.OpenExistingDirectory("approved-original", token))
@@ -75,7 +75,9 @@ internal sealed partial class ReplacementPlanStore
             using var candidate = NativeDirectoryMoveLease.Open(operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "candidate"), token);
             var desired = candidate.FlushPayload(token);
             VerifyPayload(ReplacementEvidence.From(LegacyProjection(staged, token)), desired);
-            if (desired.Fingerprint != reviewed.Captured.Payload || desired.RootUnixMode != reviewed.Captured.Mode)
+            // The immutable header still binds the full archive (including
+            // link modes); native replacement slots use its historical view.
+            if (desired.Fingerprint != LegacyProjection(archived.Snapshot, token).Fingerprint || desired.RootUnixMode != reviewed.Captured.Mode)
                 throw new IOException("Materialized approved bytes/modes differ from the immutable archive.");
             original.Revalidate(token); VerifyPayload(ReplacementEvidence.From(before), original.Capture(token));
             if (Context(target, inventory, token, owner: owner) != context) throw new IOException("Original owner/consumer context changed during approved staging.");
@@ -127,9 +129,9 @@ internal sealed partial class ReplacementPlanStore
         ApprovedPayloadStore.Validate(header, loaded.Archive, loaded.Archive.OpenReader(archive), operation, token, savedOperation: true);
         using var original = operation.OpenExistingDirectory("approved-original", token);
         var captured = CapturedPayloadArchive.Load(original, null, token).Archive;
-        VerifyPayload(plan.Original, captured.Snapshot);
+        VerifyPayload(plan.Original, LegacyProjection(captured.Snapshot, token));
         if (captured.Snapshot.FrontMatter is not { } prior || !SameParsedMetadata(plan.Subject.Metadata, prior)
-            || plan.Candidate.Payload != header.Captured.Payload || plan.Candidate.Mode != header.Captured.Mode)
+            || plan.Candidate.Payload != LegacyProjection(loaded.Archive.Snapshot, token).Fingerprint || plan.Candidate.Mode != header.Captured.Mode)
             throw new IOException("Approved plan original or candidate is not its retained captured subject.");
         if (approval.Owner is { } owner)
             ValidateOwnerTransition(plan.Subject.Metadata, plan.Subject.Owners, null, owner, token, approvedMetadata: header.Subject.Metadata);

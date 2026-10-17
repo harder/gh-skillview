@@ -66,6 +66,14 @@ retention admission. Started recovery keeps copied authority; undo does not
 invent a source acknowledgement. The retained header's historical contract
 label is only a routing declaration, never a substitute receipt.
 
+Approval headers and manifests retain full bound link modes and native evidence.
+Native replacement snapshots use the historical hash domain that omits Unix
+link modes. Adapt only comparisons between those domains with `LegacyProjection`;
+never normalize the saved archive/header or weaken metadata-copy verification.
+This applies to custom/selected capture, current-I capture, candidate staging
+and reopened schema8 validation. Completed selected-result archive evidence
+continues to use the full archive fingerprint.
+
 Schemas1–6 preserve absent-field/hash compatibility, while every current M19
 source-changing product factory retains its existing SourceReview behavior.
 Schema4 pin-only operations remain separate. Approved bytes are observed I,

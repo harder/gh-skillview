@@ -244,9 +244,51 @@ public sealed class ApprovedPayloadStoreTests : IDisposable
     }
 
     [Fact]
-    public void SourceCanDisappearBeforeCustomRestoreAndExactNativeUndo()
+    public void HeldCustomCapturePreservesFullLinkEvidenceAcrossHistoricalPreview()
     {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix link-mode comparison; Windows uses a separate link metadata contract."); return; }
+        Assert.SkipUnless(SecureRemovalBackend.IsSupported, SecureRemovalBackend.UnsupportedReason ?? "Native directory capture unavailable.");
+        File.CreateSymbolicLink(Path.Combine(Payload, "resource-link"), "extra.sh");
+        var inventory = Inventory(); var target = Assert.Single(inventory.Skills);
+        var preview = Plans.PreviewApprovedPayload(target, inventory, Token);
+        Assert.Null(preview.Entries.Single(entry => entry.Path == "resource-link").UnixMode);
+        var before = PayloadSnapshot.CaptureEvidence(Payload, Token);
+        var statePath = Path.Combine(Home, "link-capture-observation");
+        using (var state = NativeStateDirectory.OpenOrCreate(statePath, [Skills], Token))
+        {
+            using var writer = state.OpenFile("writer.lock", true, Token);
+            var captured = Plans.CaptureApprovedPayload(target, inventory, state, preview.Payload, null, null, Token);
+            Assert.Null(captured.Selected);
+            using var payload = state.OpenExistingDirectory("payload", Token);
+            var archive = CapturedPayloadArchive.Load(payload, null, Token).Archive;
+            var link = archive.Entries.Single(item => item.Entry.Path == "resource-link");
+            Assert.NotNull(link.Entry.UnixMode);
+            Assert.NotEqual(preview.Payload, archive.Snapshot.Fingerprint);
+            using var raw = new MemoryStream(); archive.CopyEntry(payload, "resource-link", raw, Token);
+            Assert.Equal(Encoding.UTF8.GetBytes("extra.sh"), raw.ToArray());
+        }
+        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.CaptureEvidence(Payload, Token).ObjectStateFingerprint);
+        Assert.Empty(Directory.EnumerateFiles(statePath, "approved.json", SearchOption.AllDirectories));
+        Assert.False(Directory.Exists(Store.Root)); // Observation alone publishes no completed approval.
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceCanDisappearBeforeCustomRestoreAndExactNativeUndo(bool linkedResource)
+    {
+        if (linkedResource)
+        {
+            if (OperatingSystem.IsWindows()) { Assert.Skip("Unix link-mode restore; Windows uses a separate link metadata contract."); return; }
+            File.CreateSymbolicLink(Path.Combine(Payload, "resource-link"), "extra.sh");
+        }
         var reference = CaptureOrSkip(); var approved = PayloadSnapshot.Capture(Payload, Token);
+        if (linkedResource)
+        {
+            using var held = Store.Open(reference, [Skills], Token);
+            Assert.NotNull(held.Header.Captured.Entries.Single(entry => entry.Path == "resource-link").UnixMode);
+            Assert.NotEqual(approved.Fingerprint, held.Header.Captured.Payload);
+        }
         Directory.Delete(Source, true);
         File.WriteAllText(Path.Combine(Payload, "SKILL.md"), File.ReadAllText(Path.Combine(Payload, "SKILL.md")).Replace("Intentionally customized", "Later installed"));
         File.Delete(Path.Combine(Payload, "extra.sh")); File.WriteAllText(Path.Combine(Payload, "not-approved"), "must disappear from active payload\n");

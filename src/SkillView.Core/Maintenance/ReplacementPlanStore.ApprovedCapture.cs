@@ -31,7 +31,9 @@ internal sealed partial class ReplacementPlanStore
         if (before.Fingerprint != expectedPayload) throw new IOException("Installed bytes differ from the independently reviewed approval capture.");
         var context = Context(target, inventory, token, owner: owner);
         var archive = CapturedPayloadArchive.Capture(capture, "payload", held, token);
-        VerifyPayload(ReplacementEvidence.From(before), archive.Snapshot);
+        // Native replacement evidence omits Unix link modes; retain the full
+        // bound archive and adapt only this historical evidence comparison.
+        VerifyPayload(ReplacementEvidence.From(before), LegacyProjection(archive.Snapshot, token));
         if (archive.Snapshot.FrontMatter is not { } metadata || !metadata.Diagnostics.IsEmpty
             || !SameParsedMetadata(target.FrontMatter, metadata))
             throw new IOException("Installed authored/source metadata changed before immutable approval capture.");
@@ -67,7 +69,7 @@ internal sealed partial class ReplacementPlanStore
         using var held = NativeDirectoryMoveLease.Open(plan.RootPath, plan.OriginalPath, token);
         VerifyPayload(plan.Candidate, held.Capture(token));
         var archive = CapturedPayloadArchive.Capture(capture, "payload", held, token);
-        VerifyPayload(plan.Candidate, archive.Snapshot);
+        VerifyPayload(plan.Candidate, LegacyProjection(archive.Snapshot, token));
         if (archive.Snapshot.FrontMatter is not { } metadata || !SameParsedMetadata(target.FrontMatter, metadata)
             || !SameParsedMetadata(plan.Revision.DesiredMetadata, metadata))
             throw new IOException("Installed selected metadata differs from actual captured result.");
