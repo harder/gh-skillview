@@ -1477,6 +1477,38 @@ was rerun in full. Fresh final-head native gates remain required. See
 [evidence](evidence/maintenance-local-reimport-tracking-proof-corrections-local.json).
 Original acceptance remains **9/21**; the original Mac crash remains unreproduced.
 
+## PR68 local reimport: final merged gates
+
+PR68 merged the exact reviewed head `b5fff2cc086d207690eefd4019bd9dbdf771f1fd`
+onto `6b288f1e1c2000d6b2f8bf3a797223fdb2c02a44` as
+`4649d75fc3a4f9fdd7c22ca5593e629a1b559298`. The merge tree
+`9a58bbdb0a1786328dcb883e829ea5ea56e7cb10` matches both the reviewed head and
+CI's merge checkout tree; `origin/main` was fetched and verified at the merge
+commit. All CI, both CodeQL analyses and both minimum/latest `gh` contract lanes
+passed. Fifteen observed PR check entries were successful and no review threads
+remained unresolved. `notify-failure` was skipped after contract success. The
+repository reported no configured required status names, so this records
+observed results rather than branch-protection configuration.
+
+Each platform test job passed 2,159 tests (2,150 unit plus 9 integration), with
+zero failures or skips; both Windows metadata jobs passed 207 tests. All four
+native artifact ZIP digests match GitHub and all four independent artifact
+reviews are clear. The four archives contain 220 members total (77 Linux x64,
+49 macOS ARM64, 47 Windows x64 and 47 Windows ARM64). Their assertion rows
+include 88 static package checks, 112 local-reimport assertions (80 live
+publication and 32 guard/refusal rows), 144 schema4 unpin recovery cases, and
+24 positive old schema1–3 recovery cases. Linux's six positive old-schema rows
+ran on private ext4; six ordinary Linux rows remain distinct (four schema1/2
+positives and two schema3 CAP_SYS_ADMIN refusals). Old schema4 unpin
+compatibility is recorded separately. Runtime binary hashes and `gh` versions
+are recorded, but the binaries were not archived. The original Mac Down-arrow
+crash remains unreproduced.
+
+The merge verification and four-RID artifact/review index are in
+[evidence](evidence/maintenance-batch-18-pr68-merge-final.json). Original
+acceptance remains 9/21; M08, M18 and M19 are not complete, and the full 21-item
+objective remains open.
+
 ## Target-backed link retention: native primitive local checkpoint
 
 An internal primitive binds an ordinary exposure symlink to a separately held
@@ -1520,3 +1552,33 @@ proofs remain pending. Separate reconciliation and publication deadlines are
 cooperative phases, not a single hard wall-clock bound. See
 `evidence/maintenance-linux-link-preservation-local.json`. Original acceptance
 remains 9/21 and M08 is incomplete.
+
+## Link retention: actual merged PR68 base verification
+
+The reviewed link primitive is locally rebased at
+`2320fd4f2fe36b14cf2862d4888c4c21d5b20197` onto actual PR68 merge
+`4649d75fc3a4f9fdd7c22ca5593e629a1b559298`. Parent-verified tree
+`84d81fb3f65af48cdc5767b66f628abb08988524` matches the earlier private
+`b5 + link5e` integration. This verification made no source or Git changes and
+preserves the complete preceding PR68 closure and historical primitive records.
+
+The first integrated managed run passed **2,217** unit tests with zero failures
+and **10 explicit opt-in native-lifetime skips** (2,227 total), plus **9/9**
+Integration tests without skips. Three scoped locked restores, three builds
+(Tests/Integration/Proof, zero warnings/errors) and four project format verifies
+pass using SDK10.0.402 and child-only `/var/tmp/skillview-link-retention-tests`
+with inherited `GIT_*` removed. All **419** source/project/lock/resource input
+hashes remained unchanged before/after. No solution/RID restore or lock
+regeneration was used.
+
+The ten skipped lifecycle subprocesses provide no new FD-table/cleanup evidence.
+The prior actual39 native receipt remains historical: its five stage2 C#
+production/test/proof hashes still match, but its entire source/Program/assembly
+is not claimed identical to this integration or reexecuted here. Existing
+primitive/owner records are retained. Fresh published-head four-RID native/AOT
+gates and independent artifact review remain pending; JIT Proof builds do not
+prove App/extension AOT or a saved detach/restart workflow. Actual source-switch
+and detach merged-base integrations remain separate. See
+[evidence](evidence/maintenance-link-retention-merged-pr68-local.json). Original
+acceptance remains **9/21**, all criteria retained; M08/M13/M15 remain incomplete
+and the original Mac crash remains unreproduced. No commit or push is claimed.
