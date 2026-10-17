@@ -70,7 +70,7 @@ public static class UpdateScreen
             sb.AppendLine($"### {MarkdownTableFormatter.FormatTableCell(notice.Stream)}");
             AppendFencedBlock(sb, notice.Text);
         }
-        if (result.Outcomes.IsDefaultOrEmpty && string.IsNullOrWhiteSpace(result.StdOut)
+        if (result.Succeeded && result.Outcomes.IsDefaultOrEmpty && string.IsNullOrWhiteSpace(result.StdOut)
             && string.IsNullOrWhiteSpace(result.StdErr))
             sb.AppendLine("_Completed with no output; availability was not independently established._");
         return sb.ToString();

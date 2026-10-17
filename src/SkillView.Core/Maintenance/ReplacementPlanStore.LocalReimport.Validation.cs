@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using SkillView.Inventory;
 
@@ -51,11 +52,7 @@ internal sealed partial class ReplacementPlanStore
         var skill = LocalTrackingWriter.Bind(GhLocalImportStager.ReadSkill(reader, token), policy.SourcePath);
         var (_, desired, valid) = FrontMatterParser.Parse(new UTF8Encoding(false, true).GetString(skill));
         if (!valid || !SameParsedMetadata(desired, policy.DesiredMetadata)) throw new IOException("Local candidate metadata differs from the captured-source splice.");
-        var hash = Hash(skill);
-        var expected = source.Snapshot.Entries.Select(entry => NativeUnpinEntry(entry.Path == "SKILL.md"
-            ? entry with { Bytes = skill.Length, ContentHash = hash } : entry)).ToArray();
-        if (!plan.Candidate.Entries.SequenceEqual(expected) || plan.Candidate.Mode != plan.Original.Mode)
-            throw new IOException("Local candidate differs from its exact captured-source bytes or installed root privacy.");
+        ValidateLocalCandidateEntries(source.Snapshot, skill, plan.Candidate, plan.Original.Mode);
         using var metadata = PayloadMetadataReview.ReplaceFromLocal(installed, source, reader, token);
         if (!SameRecipes(metadata.Recipes, policy.Metadata)) throw new IOException("Saved local native metadata recipes differ from captured evidence.");
         foreach (var state in new[] { installedState, sourceState, inputState, outputState })
@@ -64,6 +61,18 @@ internal sealed partial class ReplacementPlanStore
             var archiveReader = archive.OpenReader(state);
             foreach (var entry in archive.Entries.Where(entry => entry.Blob is not null)) archiveReader.CopyEntry(entry.Entry.Path, Stream.Null, token);
         }
+    }
+
+    internal static void ValidateLocalCandidateEntries(PayloadSnapshot source, byte[] skill,
+        ReplacementEvidence candidate, int? originalMode)
+    {
+        // PayloadEntry stores the native walker's uppercase raw digest. The
+        // saved-plan Hash helper has a separate lowercase fingerprint domain.
+        var hash = Convert.ToHexString(SHA256.HashData(skill));
+        var expected = source.Entries.Select(entry => NativeUnpinEntry(entry.Path == "SKILL.md"
+            ? entry with { Bytes = skill.Length, ContentHash = hash } : entry)).ToArray();
+        if (!candidate.Entries.SequenceEqual(expected) || candidate.Mode != originalMode)
+            throw new IOException("Local candidate differs from its exact captured-source bytes or installed root privacy.");
     }
 
     private static bool SameRecipes(System.Collections.Immutable.ImmutableArray<PayloadMetadataRecipe> expected,

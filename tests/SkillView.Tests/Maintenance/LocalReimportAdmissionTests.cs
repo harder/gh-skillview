@@ -41,12 +41,15 @@ public sealed class LocalReimportAdmissionTests : IDisposable
             ConfiguredRootsComplete = kind != "partial"
         };
         var state = Path.Combine(temp.FullName, "private", "plans");
-        var store = new ReplacementPlanStore(state, new Logger(), runner: new ProcessRunner(new Logger(),
+        var logger = new Logger(LogLevel.Debug);
+        var forbiddenGh = Path.Combine(temp.FullName, "must-not-run");
+        var store = new ReplacementPlanStore(state, logger, runner: new ProcessRunner(logger,
             environment: new Dictionary<string, string> { ["HOME"] = temp.FullName, ["USERPROFILE"] = temp.FullName }, defaultWorkingDirectory: temp.FullName));
         var before = File.ReadAllBytes(Path.Combine(payload, "SKILL.md"));
-        await Assert.ThrowsAsync<IOException>(() => store.PlanLocalReimportAsync(Path.Combine(temp.FullName, "must-not-run"), Assert.Single(inventory.Skills), inventory, Token));
+        await Assert.ThrowsAnyAsync<IOException>(() => store.PlanLocalReimportAsync(forbiddenGh, Assert.Single(inventory.Skills), inventory, Token));
         Assert.False(Directory.Exists(state)); Assert.False(Directory.Exists(state + "-local-previews"));
         Assert.Equal(before, File.ReadAllBytes(Path.Combine(payload, "SKILL.md")));
+        Assert.DoesNotContain(logger.Snapshot(), entry => entry.Category == "subprocess" && entry.Message.Contains(forbiddenGh, StringComparison.Ordinal));
     }
 
     [Fact]

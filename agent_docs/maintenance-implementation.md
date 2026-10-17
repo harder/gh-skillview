@@ -1436,3 +1436,30 @@ that receipt predates the rebase and is not a fresh native proof for local
 reimport. Native App/extension gates for that candidate remain outstanding.
 The original acceptance remains 9/21 and M19 is partial. The original Mac
 Down-arrow crash remains unreproduced.
+
+
+## PR68 local reimport: first-head corrections and local verification
+
+The first published head `7d90f864f85971f1831503c5a8bba20820b8bdbf`
+did not pass CI. Windows and macOS each exposed one test-fixture problem;
+Linux native reimport exposed catalog local paths incorrectly projected into
+repository tracking. Copilot also found the native candidate digest-case mismatch
+and hidden modal failure diagnostics. These are corrected with independent review
+and regressions; production metadata barriers and mixed-source refusals remain.
+
+Actual private `gh` 2.97.0 and 2.102.0 list observations confirm the local
+`sourceURL` shape, with installed/source native snapshots unchanged. The corrected
+local source has 2,150 unit and 9 integration tests passed,
+zero failed/skipped; managed/build inputs match before and after. The overlapping
+focused runs include 38 candidate/modal/fixture tests and 116 inventory/affected
+tests, including 22 catalog regressions; these are not additive counts.
+
+All four first-head AOT jobs failed. The macOS API response proves an exhausted
+Actions installation core quota (5,000 used, zero remaining; reset
+2026-10-17T00:35:08Z). Windows API failures lack their own response rate headers.
+Neither partial artifacts nor the first-head contract/CodeQL successes establish
+final-head native success. Fresh published-head gates and independent artifact
+review remain required. Evidence and exact source/log/review hashes are in
+`agent_docs/evidence/maintenance-local-reimport-ci-corrections-local.json`.
+Original acceptance remains 9/21; M08/M18 and all other open obligations remain.
+The original Mac Installed Down-arrow crash remains unreproduced.

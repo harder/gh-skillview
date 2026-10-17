@@ -17,6 +17,7 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
         var sourcePath = MakeSource();
         using var lease = NativeDirectoryMoveLease.Open(temp.FullName, sourcePath, Token);
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "state"), [sourcePath], Token);
+        using var writer = state.OpenFile("writer.lock", true, Token);
         _ = CapturedPayloadArchive.Capture(state, "source", lease, Token);
         using var source = Open(state, "source");
         var before = CapturedPayloadArchive.Load(source, null, Token);
@@ -42,6 +43,7 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
         var sourcePath = MakeSource();
         using var lease = NativeDirectoryMoveLease.Open(temp.FullName, sourcePath, Token);
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "state"), [sourcePath], Token);
+        using var writer = state.OpenFile("writer.lock", true, Token);
         _ = CapturedPayloadArchive.Capture(state, "source", lease, Token);
         using var source = Open(state, "source");
         var captured = CapturedPayloadArchive.Load(source, null, Token);
@@ -57,6 +59,7 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
         var sourcePath = MakeSource();
         using var lease = NativeDirectoryMoveLease.Open(temp.FullName, sourcePath, Token);
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "state"), [sourcePath], Token);
+        using var writer = state.OpenFile("writer.lock", true, Token);
         _ = CapturedPayloadArchive.Capture(state, "source", lease, Token);
         using var source = Open(state, "source");
         Assert.Throws<IOException>(() => CapturedPayloadArchive.CopyInto(source, state, "wrong", new('f', 64), Token));
@@ -76,6 +79,7 @@ public sealed class LocalImportArchiveCopyTests : IDisposable
         var nested = Directory.CreateDirectory(Path.Combine(sourcePath, "nested")).FullName;
         File.WriteAllText(Path.Combine(nested, "kept"), "before");
         using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "state"), [sourcePath], Token);
+        using var writer = state.OpenFile("writer.lock", true, Token);
         CapturedPayloadArchive captured;
         using (var initial = NativeDirectoryMoveLease.Open(temp.FullName, sourcePath, Token))
             captured = CapturedPayloadArchive.Capture(state, "source", initial, Token);

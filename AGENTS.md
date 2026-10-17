@@ -1,5 +1,12 @@
 # AGENTS.md
 
+- `gh skill list` uses `sourceURL` for both repository URLs and local paths.
+  Classify native absolute paths before URI parsing and preserve the exact
+  scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.
+  Never turn a local catalog source into GitHub tracking. Native payload-entry
+  digests and saved-plan fingerprints use separate encodings; keep their hash
+  domains unchanged when comparing a materialized candidate.
+
 - Offline package checks must exclude unsupported Markdown contexts from both
   reference-definition and reference-use passes. Unsupported reference contexts
   cannot justify definite missing-file findings. Check each captured link prefix

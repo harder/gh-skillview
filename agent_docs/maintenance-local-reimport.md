@@ -30,6 +30,12 @@ members; nested/sequence metadata, flow tracking, aliases and tags are refused
 under the existing parser/splice contract. Supported unknown authored fields,
 comments, BOM, line endings and body bytes stay captured exactly.
 
+The gh catalog's `sourceURL` can be an absolute local filesystem path. Inventory
+must classify it before URI parsing, merge it into `LocalPath`, and retain the
+exact scanned tracking scalar. A different catalog source, repository evidence,
+or unresolved source remains a conflict; pins and revision evidence still block
+local reimport. Local catalog observations cannot synthesize `Upstream`.
+
 Capture I and C through held native handles into immutable byte and native
 metadata archives. The actual minimum/current gh invocation consumes a bounded
 private C input using trusted flags before `--`, selects exactly the root name,
@@ -71,6 +77,10 @@ for each apply/recover/undo. After any operation, inspect again before authorizi
 a recovery action. Cancellation and failure must retain their private evidence
 ID/path in reports and logs even if UI delivery is canceled. Reconciliation must
 survive UI cancellation and use its own bounded lifetime.
+Show the complete preparation result even when it includes a saved plan: errors,
+notices and child streams still describe the attempted operation. Direct recovery
+and undo must show their outcome message. Bound and sanitize rendered diagnostics,
+retain full logs, and invalidate approval after failure or partial reconciliation.
 
 This is a partial M08 checkpoint. Acceptance remains 9/21; all 21 obligations
 remain tracked. Native process-death, min/current gh and prior-schema receipts

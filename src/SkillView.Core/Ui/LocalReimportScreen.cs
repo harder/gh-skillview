@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Cli;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
@@ -22,7 +23,33 @@ internal sealed record LocalReimportResponse(ReplacementResult? Plan = null, Upd
 /// its queued completion. Reopening never prepares or approves a new plan.
 internal static class LocalReimportScreen
 {
-    internal static string RenderText(ReplacementResult plan) => UpdateScreen.RenderPlan(plan);
+    private const int DiagnosticLimit = 8192;
+
+    private static string DisplayDiagnostic(string? text)
+    {
+        var bounded = text is { Length: > DiagnosticLimit }
+            ? text[..DiagnosticLimit] + "\n[Additional diagnostic text omitted from this view.]" : text;
+        return TerminalEscapeSanitizer.Sanitize(bounded) ?? "";
+    }
+
+    internal static string RenderText(ReplacementResult plan) =>
+        $"### Operation outcome: {(plan.Canceled ? "Canceled" : plan.Succeeded ? "Succeeded" : "Failed/refused")}\n\n"
+        + MarkdownTableFormatter.FormatCodeSpan(DisplayDiagnostic(plan.Message)) + "\n\n" + UpdateScreen.RenderPlan(plan);
+
+    private static string RenderPreparation(UpdateResult prepared, string selectedName)
+    {
+        var bounded = prepared with
+        {
+            ErrorMessage = DisplayDiagnostic(prepared.ErrorMessage),
+            StdOut = DisplayDiagnostic(prepared.StdOut),
+            StdErr = DisplayDiagnostic(prepared.StdErr),
+            Notices = prepared.Notices.Select(notice => notice with { Text = DisplayDiagnostic(notice.Text) }).ToImmutableArray(),
+            Outcomes = prepared.Outcomes.Select(outcome => outcome with { Message = DisplayDiagnostic(outcome.Message) }).ToImmutableArray()
+        };
+        var message = prepared.SavedPlan is { } saved
+            ? "\n\nSaved operation message: " + MarkdownTableFormatter.FormatCodeSpan(DisplayDiagnostic(saved.Message)) : "";
+        return TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(bounded, false, false, [selectedName], localReimport: true) + message) ?? "";
+    }
 
     internal static bool IsLocalReimport(ReplacementResult plan) => plan.LocalImport is not null
         && plan.Revision is null && plan.PinPolicy is null && plan.LocalDisposition is null;
@@ -98,8 +125,14 @@ internal static class LocalReimportScreen
                 // Evidence remains discoverable even when cancellation prevents UI delivery.
                 if ((response?.Plan ?? response?.Preparation?.SavedPlan) is { } retained)
                     logger.Info("reimport.ui", $"Saved local reimport {retained.Id}; manifest: {retained.PlanPath}; original retention path: {retained.RetainedPath}. {retained.Message}");
-                else if (response?.Preparation?.ErrorMessage is { } detail)
+                if (response?.Preparation?.ErrorMessage is { } detail)
                     logger.Warn("reimport.ui", detail);
+                if (response?.Preparation is { } diagnostics)
+                {
+                    if (diagnostics.StdOut.Length > 0) logger.Info("reimport.ui", diagnostics.StdOut);
+                    if (diagnostics.StdErr.Length > 0) logger.Warn("reimport.ui", diagnostics.StdErr);
+                    foreach (var notice in diagnostics.Notices) logger.Warn("reimport.ui", notice.Stream + ": " + notice.Text);
+                }
                 operation.InvokeTerminalIfActive(() =>
                 {
                     logger.Debug("reimport.ui", $"Terminal {action}; ownership={operation.CurrentOwnership}; parentCanceled={lifetimeToken.IsCancellationRequested}.");
@@ -111,30 +144,36 @@ internal static class LocalReimportScreen
                     { status.Text = "Canceled; inspect the retained saved ID before resuming."; Finish(); return; }
                     if (failure is not null)
                     {
-                        output.Text = TerminalEscapeSanitizer.Sanitize(failure.Message) ?? "Operation failed.";
+                        output.Text = DisplayDiagnostic(failure.Message);
                         status.Text = "Failed/refused; retained evidence is identified below. Inspect before retrying.";
                     }
                     else if (response is not null)
                     {
                         var result = response.Plan ?? response.Preparation?.SavedPlan;
                         if (result is not null && !IsLocalReimport(result))
-                        { output.Text = "Refused: this saved plan is not a local reimport."; }
+                        {
+                            output.Text = "Refused: this saved plan is not a local reimport.";
+                            status.Text = "Failed/refused; inspect the correct saved purpose before continuing.";
+                        }
                         else
                         {
                             id.Text = result?.Id ?? id.Text;
+                            var canceled = response.Preparation?.Cancelled == true || result?.Canceled == true;
+                            var failed = response.Preparation is { Succeeded: false } or { ReconciliationPartial: true } || result is { Succeeded: false };
                             // Never reuse post-mutation observations without a new Inspect.
-                            review = action is LocalReimportAction.Prepare or LocalReimportAction.Inspect ? result : null;
+                            review = !canceled && !failed && (action is LocalReimportAction.Prepare or LocalReimportAction.Inspect) ? result : null;
                             inspected = action == LocalReimportAction.Inspect && review is not null;
-                            output.Text = result is not null ? RenderText(result) : response.Preparation is { } prepared
-                                ? TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(prepared, false, false, [selected.Name], localReimport: true)) ?? ""
-                                : "No saved evidence returned.";
-                            status.Text = result?.LocalSource is { } source ? $"{source.Status}: {TerminalEscapeSanitizer.Sanitize(source.Message)}"
+                            output.Text = response.Preparation is { } prepared ? RenderPreparation(prepared, selected.Name)
+                                : result is not null ? RenderText(result) : "No saved evidence returned.";
+                            status.Text = canceled ? "Canceled; inspect the retained saved ID before resuming."
+                                : failed ? "Failed/refused; inspect saved evidence before recovery or retry."
+                                : result?.LocalSource is { } source ? $"{source.Status}: {DisplayDiagnostic(source.Message)}"
                                 : "Review the result. Inspect the saved ID for recovery or undo.";
                         }
                     }
                     if (response?.ReconciliationWarning is { } warning)
                     {
-                        output.Text += "\n\nReconciliation partial: " + TerminalEscapeSanitizer.Sanitize(warning);
+                        output.Text += "\n\nReconciliation partial: " + DisplayDiagnostic(warning);
                         status.Text = "Reconciliation partial; inspect saved evidence and refresh inventory before continuing.";
                         review = null; inspected = false;
                     }

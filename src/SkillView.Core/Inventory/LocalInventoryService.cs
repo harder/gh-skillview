@@ -391,6 +391,7 @@ public sealed class LocalInventoryService
             var hosts = record.Hosts.IsDefaultOrEmpty
                 ? (record.Agent is null ? [] : ImmutableArray.Create(record.Agent))
                 : record.Hosts;
+            var tracking = CatalogTracking(record);
             var observation = new InstalledSkill
             {
                 Name = record.Name ?? Path.GetFileName(path.TrimEnd('/')),
@@ -401,8 +402,9 @@ public sealed class LocalInventoryService
                 FrontMatter = new SkillFrontMatter
                 {
                     Name = record.Name,
-                    GithubRef = record.Version,
-                    Upstream = record.SourceUrl ?? record.Repo,
+                    GithubRef = string.IsNullOrEmpty(record.Version) ? null : record.Version,
+                    LocalPath = tracking.LocalPath,
+                    Upstream = tracking.Upstream,
                     GithubTreeSha = record.GithubTreeSha,
                     Pinned = record.Pinned,
                 },
@@ -411,6 +413,7 @@ public sealed class LocalInventoryService
                 Ignored = false,
                 IsSymlinked = record.IsSymlink,
                 InstalledAt = null,
+                MetadataConflicts = tracking.Conflicts,
             };
             index[key] = index.TryGetValue(key, out var match) ? Combine(match, observation) : observation;
         }
@@ -418,13 +421,64 @@ public sealed class LocalInventoryService
             .ThenBy(skill => skill.ResolvedPath, StringComparer.Ordinal).ToImmutableArray();
     }
 
+    private enum CatalogSourceKind { Empty, Local, Remote, Unknown }
+    private readonly record struct CatalogSource(string? Raw, CatalogSourceKind Kind);
+
+    private static (string? LocalPath, string? Upstream, ImmutableArray<string> Conflicts) CatalogTracking(GhSkillListRecord record)
+    {
+        var modern = ClassifyCatalogSource(record.SourceUrl, legacyRepo: false);
+        var legacy = ClassifyCatalogSource(record.Repo, legacyRepo: true);
+        var sources = new[] { modern, legacy };
+        var conflicts = ImmutableArray.CreateBuilder<string>();
+        if (modern.Kind == CatalogSourceKind.Unknown) conflicts.Add("Unresolved catalog sourceURL: " + modern.Raw);
+        if (legacy.Kind == CatalogSourceKind.Unknown) conflicts.Add("Unresolved legacy catalog repository: " + legacy.Raw);
+        var local = sources.FirstOrDefault(source => source.Kind == CatalogSourceKind.Local).Raw;
+        var remote = sources.FirstOrDefault(source => source.Kind == CatalogSourceKind.Remote).Raw;
+        if (modern.Kind == CatalogSourceKind.Local && legacy.Kind == CatalogSourceKind.Local && modern.Raw != legacy.Raw
+            || modern.Kind == CatalogSourceKind.Remote && legacy.Kind == CatalogSourceKind.Remote
+            && NormalizeCatalogRepository(modern.Raw!) != NormalizeCatalogRepository(legacy.Raw!))
+            conflicts.Add($"Conflicting catalog sources: {modern.Raw} / {legacy.Raw}");
+        if (local is not null && remote is not null)
+            conflicts.Add($"Conflicting local and repository catalog sources: {local} / {remote}");
+        return (local, remote, conflicts.ToImmutable());
+    }
+
+    private static CatalogSource ClassifyCatalogSource(string? raw, bool legacyRepo)
+    {
+        if (string.IsNullOrEmpty(raw)) return new(raw, CatalogSourceKind.Empty);
+        if (raw.Any(char.IsControl)) return new(raw, CatalogSourceKind.Unknown);
+        // Native paths precede URI parsing: drive syntax and POSIX paths can
+        // otherwise be interpreted as URI schemes or file URIs. A foreign OS
+        // path is unresolved evidence, never a repository or a CWD-relative path.
+        if (Path.IsPathFullyQualified(raw)) return new(raw, CatalogSourceKind.Local);
+        if (raw.StartsWith('\\') || raw.Length >= 2 && char.IsAsciiLetter(raw[0]) && raw[1] == ':')
+            return new(raw, CatalogSourceKind.Unknown);
+        if (Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+            return new(raw, !uri.IsFile && (uri.Scheme is "http" or "https" or "ssh" or "git") && uri.Host.Length > 0
+                ? CatalogSourceKind.Remote : CatalogSourceKind.Unknown);
+        return new(raw, legacyRepo && IsCompactCatalogRepository(raw) ? CatalogSourceKind.Remote : CatalogSourceKind.Unknown);
+    }
+
+    private static bool IsCompactCatalogRepository(string value)
+    {
+        var parts = value.Split('/');
+        return parts.Length == 2 && parts.All(part => part.Length > 0 && part is not ("." or "..")
+            && part.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'));
+    }
+
+    private static string NormalizeCatalogRepository(string value) => SkillSourceIdentity.NormalizeRepository(
+        IsCompactCatalogRepository(value) ? "https://github.com/" + value : value);
+
     private static InstalledSkill Combine(InstalledSkill first, InstalledSkill next)
     {
         var conflicts = first.MetadataConflicts.AddRange(next.MetadataConflicts).ToBuilder();
         string? Prefer(string? local, string? remote, string field)
         {
             if (!string.IsNullOrWhiteSpace(local) && !string.IsNullOrWhiteSpace(remote)
-                && !(field == "repository ref" ? EquivalentRef(local, remote) : string.Equals(local.TrimEnd('/'), remote.TrimEnd('/'), StringComparison.Ordinal)))
+                && !(field == "repository ref" ? EquivalentRef(local, remote)
+                    : field == "local source" ? string.Equals(local, remote, StringComparison.Ordinal)
+                    : field == "source" ? NormalizeCatalogRepository(local) == NormalizeCatalogRepository(remote)
+                    : string.Equals(local.TrimEnd('/'), remote.TrimEnd('/'), StringComparison.Ordinal)))
                 conflicts.Add($"Conflicting {field}: {local} / {remote}");
             return string.IsNullOrWhiteSpace(local) ? string.IsNullOrWhiteSpace(remote) ? null : remote : local;
         }
@@ -438,11 +492,14 @@ public sealed class LocalInventoryService
         var fm = a with
         {
             Upstream = Prefer(a.Upstream, b.Upstream, "source"),
+            LocalPath = Prefer(a.LocalPath, b.LocalPath, "local source"),
             GithubTreeSha = Prefer(a.GithubTreeSha, b.GithubTreeSha, "tree SHA"),
             GithubRef = Prefer(a.GithubRef, b.GithubRef, "repository ref"),
             Version = isCli ? a.Version : Prefer(a.Version, b.Version, "authored version"),
             Pinned = a.Pinned || b.Pinned,
         };
+        if (!string.IsNullOrWhiteSpace(fm.LocalPath) && !string.IsNullOrWhiteSpace(fm.Upstream))
+            conflicts.Add($"Conflicting local and repository sources: {fm.LocalPath} / {fm.Upstream}");
         var memberships = first.Agents.Concat(next.Agents)
             .GroupBy(agent => (AgentIdentity.Normalize(agent.AgentId), PathIdentity.NormalizeKey(agent.Path), agent.Scope, agent.Profile))
             .SelectMany(group =>
