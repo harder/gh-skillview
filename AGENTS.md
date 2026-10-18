@@ -112,6 +112,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and confirm locked restore again.
 - Build verification: `dotnet build`
 - CI style verification: `dotnet format SkillView.sln --no-restore --verify-no-changes`
+- Run scoped formatting from the repository root, or use absolute `--include`
+  paths. Relative includes resolve from the formatter's working directory;
+  private test-host CWDs can silently select zero files. Include new/untracked
+  C# files explicitly and verify that formatting actually processed files.
 - Full tests: `dotnet test --no-build`
 - Run product publish commands sequentially. The App and gh-extension publishes
   share `SkillView.Core` intermediate/output files, so parallel publishes can

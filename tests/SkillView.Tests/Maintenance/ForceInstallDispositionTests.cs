@@ -32,16 +32,29 @@ public sealed class ForceInstallDispositionTests : IDisposable
         var bin = Directory.CreateDirectory(Path.Combine(root.FullName, "bin")).FullName;
         return new(StringComparer.Ordinal)
         {
-            ["HOME"] = home, ["USERPROFILE"] = home, ["PATH"] = bin, ["GH_EXTENSION"] = "0",
-            ["XDG_STATE_HOME"] = Path.Combine(home, "state"), ["XDG_CONFIG_HOME"] = Path.Combine(home, "config"),
-            ["XDG_DATA_HOME"] = Path.Combine(home, "data"), ["XDG_CACHE_HOME"] = Path.Combine(home, "cache"),
-            ["SKILLVIEW_STATE_HOME"] = Path.Combine(home, "maintenance"), ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, "claude"),
-            ["CODEX_HOME"] = Path.Combine(home, "codex"), ["PI_CODING_AGENT_DIR"] = Path.Combine(home, "pi"),
-            ["APPDATA"] = Path.Combine(home, "appdata"), ["LOCALAPPDATA"] = Path.Combine(home, "localappdata"),
-            ["GIT_DIR"] = Path.Combine(root.FullName, "private.git"), ["GIT_WORK_TREE"] = root.FullName,
-            ["GIT_COMMON_DIR"] = Path.Combine(root.FullName, "private.git"), ["GIT_CONFIG_COUNT"] = "0",
+            ["HOME"] = home,
+            ["USERPROFILE"] = home,
+            ["PATH"] = bin,
+            ["GH_EXTENSION"] = "0",
+            ["XDG_STATE_HOME"] = Path.Combine(home, "state"),
+            ["XDG_CONFIG_HOME"] = Path.Combine(home, "config"),
+            ["XDG_DATA_HOME"] = Path.Combine(home, "data"),
+            ["XDG_CACHE_HOME"] = Path.Combine(home, "cache"),
+            ["SKILLVIEW_STATE_HOME"] = Path.Combine(home, "maintenance"),
+            ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, "claude"),
+            ["CODEX_HOME"] = Path.Combine(home, "codex"),
+            ["PI_CODING_AGENT_DIR"] = Path.Combine(home, "pi"),
+            ["APPDATA"] = Path.Combine(home, "appdata"),
+            ["LOCALAPPDATA"] = Path.Combine(home, "localappdata"),
+            ["GIT_DIR"] = Path.Combine(root.FullName, "private.git"),
+            ["GIT_WORK_TREE"] = root.FullName,
+            ["GIT_COMMON_DIR"] = Path.Combine(root.FullName, "private.git"),
+            ["GIT_CONFIG_COUNT"] = "0",
             ["TMPDIR"] = OperatingSystem.IsWindows() ? Path.GetTempPath() : "/var/tmp",
-            ["GH_TOKEN"] = "", ["GITHUB_TOKEN"] = "", ["GH_ENTERPRISE_TOKEN"] = "", ["GITHUB_ENTERPRISE_TOKEN"] = "",
+            ["GH_TOKEN"] = "",
+            ["GITHUB_TOKEN"] = "",
+            ["GH_ENTERPRISE_TOKEN"] = "",
+            ["GITHUB_ENTERPRISE_TOKEN"] = "",
             ["SKILLVIEW_TEST_MARKER"] = Marker
         };
     }
@@ -85,13 +98,22 @@ public sealed class ForceInstallDispositionTests : IDisposable
         var logs = Path.Combine(root.FullName, "logs");
         return new()
         {
-            Logger = logger, Runner = runner, GhLocator = locator, AuthService = auth,
+            Logger = logger,
+            Runner = runner,
+            GhLocator = locator,
+            AuthService = auth,
             EnvironmentProbe = new EnvironmentProbe(locator, auth, runner, logger, logs),
-            SearchService = new(runner, logger), PreviewService = new(runner, logger),
-            InstallService = new(runner, logger), UpdateService = new(runner, logger),
-            ListAdapter = list, ScanRootResolver = resolver, Scanner = scanner,
+            SearchService = new(runner, logger),
+            PreviewService = new(runner, logger),
+            InstallService = new(runner, logger),
+            UpdateService = new(runner, logger),
+            ListAdapter = list,
+            ScanRootResolver = resolver,
+            Scanner = scanner,
             InventoryService = new(resolver, scanner, list, logger, runner),
-            RemoveService = new(logger), FileLogSink = null, LogDirectory = logs
+            RemoveService = new(logger),
+            FileLogSink = null,
+            LogDirectory = logs
         };
     }
 
