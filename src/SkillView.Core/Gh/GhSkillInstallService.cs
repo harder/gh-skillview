@@ -51,9 +51,9 @@ public sealed class GhSkillInstallService
             var mutates = options.All || !string.IsNullOrEmpty(skillName);
             var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
             var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
-            if (mutates) GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
             if (options.All && context?.NeedsManagedSelectors(destinations) == true)
                 throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
+            if (mutates) GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
             IReadOnlyList<string>? resolvedSelectors = null;
             string? registryHome = null;
             System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;

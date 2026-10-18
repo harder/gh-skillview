@@ -152,6 +152,21 @@ public sealed class ForceInstallDispositionTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(Destination, "unrelated-name")));
     }
 
+    [Fact]
+    public async Task ManagedAllRefusalRetainsSpecificDiagnosisBeforeForceVacancyChecks()
+    {
+        var managed = Directory.CreateDirectory(Path.Combine(Destination, "managed-child")).FullName;
+        File.WriteAllText(Path.Combine(managed, "plugin.json"), "{\"name\":\"fixture\"}");
+        var before = Bytes();
+        var environment = EnvironmentMap();
+        var result = await Service(environment).InstallAsync(FakeGh(environment), "/unavailable/source", null,
+            new(Path: Destination, All: true, FromLocal: true, Overwrite: true), Token);
+        Assert.False(result.Succeeded);
+        Assert.Contains("immutable staged maintenance plan", result.ErrorMessage);
+        Assert.Equal(before, Bytes());
+        Assert.False(File.Exists(Marker));
+    }
+
     [Theory]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]
