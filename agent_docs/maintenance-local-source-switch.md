@@ -119,3 +119,11 @@ advance the private parent's native creation-time generation, checking it back.
 Rapid directory-entry changes can share a timestamp, so clock progress alone
 cannot deterministically exercise every retry. Production generation checks and
 the four-attempt bound remain unchanged.
+
+Fresh local reimport and source-switch apply proofs enter the real saved-update
+coordinator with separate source-review and retention approvals. Missing either
+approval and a mismatched source-review fingerprint must leave the installation
+unchanged and create no acknowledgement receipt. Both valid approvals must create
+the exact receipt, install the frozen candidate, and preserve exact native undo.
+Acknowledgement and apply must use the same local plan purpose; the generic
+replacement purpose cannot acknowledge either local family.

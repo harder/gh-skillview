@@ -205,6 +205,8 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
     {
         var requiredDisposition = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchDisposition : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
             : review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
+        var purpose = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose
+            : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null;
         if (disposition != requiredDisposition)
             return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
             { SavedPlan = review, Outcomes = [FromPlan(review, "refused", "The saved local-change disposition needs explicit approval.")] };
@@ -214,10 +216,9 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         {
             token.ThrowIfCancellationRequested();
             if (review.SourceReview is { } source && review.AcknowledgeSourceReview)
-                plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token);
+                plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token, purpose);
             attempted = true;
-            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
-                review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null);
+            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition, purpose);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {

@@ -230,6 +230,17 @@ internal sealed partial class UpdatesTabView : FrameView
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
+        if (selected is not null)
+        {
+            // A failed or canceled capture must not leave a previous workspace's
+            // targets actionable after this load lease ends.
+            _skills = [];
+            _wrapper = null;
+            _table.Table = null;
+            _allBox.Value = CheckState.UnChecked;
+            _unpinBox.Value = CheckState.UnChecked;
+            _preview.Text = "## Selected installation\n\nCapturing fresh inventory for this exact installation.";
+        }
         SetBusy(true);
         _status.Text = " loading inventory…";
         try
