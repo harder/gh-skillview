@@ -14,7 +14,7 @@ try
     if (args.Length == 2 && args[0] == "--exposure-link-roundtrip")
         return ExposureLinkProof.Run(args[1]);
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
-    if (!checkDiskFullRoot && args.Length != 6)
+    if (!checkDiskFullRoot && args.Length is not (6 or 8))
         throw new ArgumentException("root gh id fingerprint apply|apply-merged|apply-unpin|apply-reimport|apply-source-switch|undo|undo-unpin|undo-reimport|undo-source-switch|repair|repair-unpin [disk-full:]checkpoint; or --check-disk-full-root root");
     if (!SecureRemovalBackend.TryCanonicalizePath(Path.GetFullPath(args[checkDiskFullRoot ? 1 : 0]), out var root, out var rootError))
         throw new IOException("Cannot establish native proof-root authority: " + rootError);
@@ -33,7 +33,13 @@ try
         return 0;
     }
     var checkpoint = diskFullMode ? args[5]["disk-full:".Length..] : args[5];
-    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
+    var desiredPause = args[4] is "apply-selected" or "apply-approved";
+    if (desiredPause ? args.Length != 8 || args[6] != "--yes"
+            || args[7] != "--disposition=" + (args[4] == "apply-selected" ? ReplacementPlanStore.SelectedRevisionDisposition : ReplacementPlanStore.ApprovedRestoreDisposition)
+            || diskFullMode || checkpoint is not ("retain-moved" or "install-moved")
+        : args.Length != 6)
+        throw new ArgumentException("Selected/approved pause requires its exact purpose, --yes, matching explicit --disposition and a retain/install checkpoint.");
+    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "apply-selected" or "apply-approved" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
         || checkpoint is not ("local-retain-intent" or "retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
             or "owner-repair-intent" or "owner-repaired" or "compensation-truncated" or "workflow")
@@ -57,6 +63,8 @@ try
             "apply-unpin" => store.Apply(args[2], args[3], inventory, lifetime.Token, "unpin-only", "unpin-only"),
             "apply-reimport" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-retain-original", "local-reimport"),
             "apply-source-switch" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-source-retain-original", "switch-local-source"),
+            "apply-selected" => store.Apply(args[2], args[3], inventory, lifetime.Token, ReplacementPlanStore.SelectedRevisionDisposition, ReplacementPlanStore.SelectedRevisionPurpose),
+            "apply-approved" => store.Apply(args[2], args[3], inventory, lifetime.Token, ReplacementPlanStore.ApprovedRestoreDisposition, ReplacementPlanStore.ApprovedRestorePurpose),
             "undo-unpin" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "unpin-only"),
             "undo-reimport" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "local-reimport"),
             "undo-source-switch" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "switch-local-source"),
