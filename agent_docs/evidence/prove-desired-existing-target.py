@@ -1,7 +1,7 @@
 """Source-only until separately approved: actual App/gh existing-target M17 proof.
 
 No live GitHub, client/model/skill execution or synthetic installed tracking.
-The dependency is the exact separately reviewed be20 consolidation supervisor;
+The dependency is the exact tracked, separately reviewed consolidation supervisor;
 it supplies bounded process/HTTP/cleanup code, not consolidation product flows.
 """
 import argparse
@@ -17,8 +17,10 @@ import time
 from types import ModuleType
 import uuid
 
-SUPERVISOR_COMMIT = 'be20fbb48e8231133adf965f49e4572e17becdda'
-SUPERVISOR_SHA = '6187621d3092632cf364ca3d0e37f3b32dc959681cd7dccb1407c86d021ecfbe'
+SUPERVISOR_COMMIT = 'bccb7bd810827f81602b1bb6aa9e2b5b388fdb71'
+SUPERVISOR_SHA = '6dc5e150149f8d36cc7f0ff0a170e9cd05c9f78aae1313db205feef9e3f761de'
+AUTH_PRIMARY_RECEIPT = 'consolidation-auth-primary-source-receipt.json'
+AUTH_PRIMARY_RECEIPT_SHA = '3c87c4b3b4ca1a902c11568aba718fb045c57dd577a1360d0071a9f9c10e0725'
 PROVENANCE_SHA = '5427f2378b85ada8bdcc48738ec7f5c3ae794a68ad79dc28fa6b11cbda92e07a'
 PRIMARY_SHA = '22421f1bad4316f91479e5beaf7e4a24a68c38fe544e785e722a3602a9ec6563'
 SCENARIOS = ('selected-tag-shared', 'selected-commit-custom', 'captured-custom',
@@ -48,12 +50,12 @@ def digest(path):
 def load_supervisor(path):
     require(path.is_absolute() and path.resolve(strict=True) == path
             and stat.S_ISREG(path.lstat().st_mode) and path.stat().st_size < 1024 * 1024,
-            'Exact reviewed be20 supervisor is required; no latest substitution')
+            'Exact reviewed bccb7bd supervisor is required; no latest substitution')
     with path.open('rb') as stream:
         source = stream.read(1024 * 1024 + 1)
     require(len(source) <= 1024 * 1024 and hashlib.sha256(source).hexdigest() == SUPERVISOR_SHA,
-            'Exact reviewed be20 supervisor is required; no latest substitution')
-    module = ModuleType('frozen_be20_supervisor')
+            'Exact reviewed bccb7bd supervisor is required; no latest substitution')
+    module = ModuleType('frozen_bccb7bd_consolidation_supervisor')
     module.__file__ = str(path)
     # Execute the admitted bytes themselves, not a second pathname/pyc read.
     # Only reviewed definitions run; the dependency's main stays guarded.
@@ -539,6 +541,8 @@ def main():
     report = {'status': 'running', 'privateProductSourceBase': 'c64034209119abd35e63b70ed51e584768178381',
         'scriptSha256': digest(Path(__file__)), 'supervisorCommit': SUPERVISOR_COMMIT,
         'supervisorSha256': SUPERVISOR_SHA, 'bindingsSha256': args.bindings_sha256,
+        'authPrimaryProvenance': {'trackedReceipt': AUTH_PRIMARY_RECEIPT, 'sha256': AUTH_PRIMARY_RECEIPT_SHA,
+            'role': 'Source-review provenance only; historical capture paths are not runtime inputs.'},
         'primaryEvidence': sources, 'cases': [], 'nativePositivePolicy': 'all required; no automatic metadata skip',
         'limits': {'freshCases': 12, 'caseSeconds': 180, 'overallSeconds': 1800, 'events': 200,
                    'directStarts': 32, 'combinedProcessBytes': 1048576},

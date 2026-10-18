@@ -7,27 +7,46 @@ M17 acceptance follows from this script, its pure tests or prior local skips.
 Profiles/portable sets, absent targets/parents, new owner entries/exposure links
 and publication to vacant locations stay outside this existing-target boundary.
 
-The script reuses the exact reviewed consolidation supervisor from private
-`be20fbb48e8231133adf965f49e4572e17becdda`, source SHA256
-`6187621d3092632cf364ca3d0e37f3b32dc959681cd7dccb1407c86d021ecfbe`.
-Supply an absolute canonical regular `--supervisor` file with those exact bytes;
-it is hash-admitted before importing definitions, never resolved from mutable
-latest. The script does not call its consolidation Case/main. Preserve its
-cleanup review and18-test validation separately; do not rewrite old packets.
-The first separately authorized consolidation run with that dependency stopped
-at `Unexpected HTTP method/version`, before native positives. Preserve the failed
+The script reuses the exact reviewed consolidation supervisor, now copied
+byte-for-byte into tracked [`evidence/prove-consolidation.py`](evidence/prove-consolidation.py)
+from private source checkpoint `bccb7bd810827f81602b1bb6aa9e2b5b388fdb71`, SHA256
+`6dc5e150149f8d36cc7f0ff0a170e9cd05c9f78aae1313db205feef9e3f761de`.
+Supply that tracked file's absolute canonical regular address as `--supervisor`;
+the loader hashes one bounded raw read before executing those exact reviewed
+definitions under a dedicated module identity. Its standalone `main` remains
+guarded; the M17 script never calls consolidation Case/main. Checkout line-ending
+conversion or any other byte change refuses admission; do not normalize bytes
+inside the loader. Public CI can use this tracked copy and does not fetch a
+private Git object or import the mutable consolidation worktree. Preserve the
+helper's separate cleanup/auth/binding-reader review and23-pure-test validation;
+this copy adds no independent consolidation runtime or acceptance claim.
+
+The first separately authorized consolidation run using historical be20 stopped
+at `Unexpected HTTP method/version`, before native positives. Preserve that
 packet under `/var/tmp/skillview-consolidation-evidence/fresh-app-binding/run-20261017-01`.
-This is a known runtime prerequisite for any new invocation: review the actual
-request and a narrowly corrected/frozen supervisor first. This new source keeps
-the approved be20 binding; it does not silently accept another helper or broaden
-HTTP admission. No execution readiness follows from the source-only protocol.
-Both helper checkpoints are private. A future public CI proof must deliberately
-integrate the exact reviewed helper as a tracked copied input, or select an
-actually public reviewed source with explicit raw-byte/source equivalence for
-that platform. Neither a private Git object nor the mutable consolidation
-worktree is an available public dependency. Current assertions intentionally
-fail closed until that separately reviewed helper/input closure is integrated;
-there is no shared-module refactor or invented public provenance here.
+The admitted copy includes the reviewed exact `UserCurrent` auth POST, root-scope
+GET, signal-safe cleanup and same-byte binding reader corrections. It admits only
+`POST /graphql` with the fixed45-byte UTF-8 body
+`{"query":"query UserCurrent{viewer{login}}"}` followed by LF; the fixed fixture
+viewer is `disposable-fixture`. Query-free `GET /` returns a fixture scope header.
+These declarations establish no actual upstream authentication or token rights.
+All unknown methods/queries/fields/routes remain fatal under unchanged bounds.
+
+Tracked [`evidence/consolidation-auth-primary-source-receipt.json`](evidence/consolidation-auth-primary-source-receipt.json)
+is the byte-identical provenance index, SHA256
+`3c87c4b3b4ca1a902c11568aba718fb045c57dd577a1360d0071a9f9c10e0725`.
+It records18 pinned public raw-source origins and retained bytes/hashes: both
+cli2.97.0/2.102.0 auth status, login-query, API-client, dependency and scope paths;
+go-gh2.13.0/2.16.1 module/GraphQL clients; the REST-root path helpers; and
+cli/shurcooL-graphql0.0.4 query builder/POST encoder. The dependency chain binds
+the named query and omitted nil variables. The receipt's absolute paths and
+HTTP capture fields describe that local read-only capture, not portable file
+availability or runtime inputs. These source files neither execute nor determine
+runtime policy: fixed reviewed helper literals do. No new runtime source reader,
+auth input flag or fetch is introduced. Future CI separately prepares the already
+required tools, eight primary install sources and runtime closure; it uses this
+tracked helper directly. The receipt is source-review provenance, not a new
+publisher/source-authenticity claim or authorization to rerun the failed proof.
 
 Other required retained inputs are the real official gh2.97.0/2.102.0 binaries
 and provenance receipt `/tmp/skillview-unpin-tools/manifest.json` (SHA256
@@ -130,7 +149,8 @@ close/join and receipts. This is not an OS process/filesystem sandbox or a proof
 against escaped process groups. A full-metadata refusal **fails** native mode;
 it cannot count as a publication/recovery/undo positive. In particular the
 resource-link capture is a required intended positive. A fresh actual product
-closure must include root's reviewed `2110` link-domain projection fix; prior
+closure must include root's reviewed
+`2110c0a5683f9ed5557075e123d5f59f305bb47a` link-domain projection fix; prior
 `c6403420` outputs are insufficient. Full approval/archive fingerprints remain
 unchanged; only native-evidence comparisons use the existing legacy projection.
 The fixture must not drop the link merely to pass. Python observed-xattr values
@@ -146,7 +166,9 @@ pause, exact commit-probe/tag-movement, hash-before-import, actual App binding,
 exact-refusal and immutable-reference protocols without a process/server/client.
 Two full-reader regressions replace each manifest on raw-read close with another
 valid binding/row set and require the originally hashed result; their inert
-files are protocol data and are never executed.
+files are protocol data and are never executed. Focused helper admission tests
+also bind the tracked helper bytes/guarded module identity and the18-origin
+provenance index without opening its historical raw-source paths.
 Root/peer source review and Luna syntax/pure/build checks precede any separately
 authorized actual native invocation. Supported-host native positives, genuine
 UI-native lifecycle where separately required, actual-session adoption and full

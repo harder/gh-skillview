@@ -79,8 +79,39 @@ class DesiredProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary).resolve() / 'unreviewed.py'
             path.write_text('raise AssertionError("Unreviewed import must never run")\n')
-            with self.assertRaisesRegex(RuntimeError, 'Exact reviewed be20 supervisor'):
+            with self.assertRaisesRegex(RuntimeError, 'Exact reviewed bccb7bd supervisor'):
                 proof.load_supervisor(path)
+
+    def test_tracked_exact_supervisor_loads_guarded_reviewed_definitions(self):
+        path = Path(__file__).with_name('prove-consolidation.py').resolve(strict=True)
+        self.assertEqual('6dc5e150149f8d36cc7f0ff0a170e9cd05c9f78aae1313db205feef9e3f761de',
+                         hashlib.sha256(path.read_bytes()).hexdigest())
+        helper = proof.load_supervisor(path)
+        self.assertEqual('frozen_bccb7bd_consolidation_supervisor', helper.__name__)
+        self.assertEqual(str(path), helper.__file__)
+        self.assertEqual((180, 1800, 200, 32, 1048576),
+                         (helper.CASE_SECONDS, helper.OVERALL_SECONDS, helper.MAX_EVENTS,
+                          helper.MAX_STARTS, helper.PROCESS_BYTES))
+        self.assertEqual(b'{"query":"query UserCurrent{viewer{login}}"}\n', helper.AUTH_LOGIN_BODY)
+        self.assertEqual(set(), helper.ACTIVE)  # Import definitions only; standalone main remains guarded.
+
+    def test_auth_contract_provenance_is_exact_index_with_eighteen_pinned_origins(self):
+        path = Path(__file__).with_name(proof.AUTH_PRIMARY_RECEIPT)
+        raw = path.read_bytes()
+        self.assertEqual('3c87c4b3b4ca1a902c11568aba718fb045c57dd577a1360d0071a9f9c10e0725',
+                         hashlib.sha256(raw).hexdigest())
+        self.assertEqual(proof.AUTH_PRIMARY_RECEIPT_SHA, hashlib.sha256(raw).hexdigest())
+        value = json.loads(raw.decode('utf-8'))
+        self.assertEqual(18, value['count'])
+        self.assertEqual(list(range(1, 19)), [row['index'] for row in value['sources']])
+        self.assertEqual(18, len({row['url'] for row in value['sources']}))
+        for row in value['sources']:
+            self.assertTrue(row['url'].startswith('https://raw.githubusercontent.com/cli/'))
+            self.assertEqual(row['url'], row['finalUrl'])
+            self.assertEqual('200', row['httpStatus'])
+        self.assertEqual('987a71c9a565d3921d6b5fcad971734d829d78d5e6429c119cf45ef6ee57d6ca',
+                         value['sourceReferencesSha256'])
+        # Historical absolute paths describe the capture; this test never opens them.
 
     def test_clone_values_keep_policy_metadata_separate_from_regenerated_object_times(self):
         before = {'path': 'resource', 'bytes': 3, 'sha256': 'a' * 64, 'observedXattrs': {'user.fixture': {'bytes': 1, 'sha256': 'b' * 64}},
@@ -210,7 +241,7 @@ class DesiredProtocolTests(unittest.TestCase):
         self.assertEqual(6, len(proof.SCENARIOS))
         self.assertEqual(set(proof.SCENARIOS), set(proof.START_BUDGETS))
         self.assertTrue(all(0 < count <= 32 for count in proof.START_BUDGETS.values()))
-        self.assertEqual('be20fbb48e8231133adf965f49e4572e17becdda', proof.SUPERVISOR_COMMIT)
+        self.assertEqual('bccb7bd810827f81602b1bb6aa9e2b5b388fdb71', proof.SUPERVISOR_COMMIT)
         self.assertEqual(64, len(proof.SUPERVISOR_SHA))
 
 
