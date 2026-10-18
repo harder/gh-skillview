@@ -1,5 +1,15 @@
 # AGENTS.md
 
+- `install --force` is admitted only for positively missing or empty native
+  destination roots. Current source selectors do not prove native placement
+  names, so even an unrelated occupied root requires a qualified refusal. Keep
+  the initial and final vacancy checks around discovery/ownership checks;
+  existing payloads need an evidence-backed saved disposition and retention.
+  Vacancy grants ordinary install authority only: remove `--force` from the
+  effective child argv after admission, retaining requested intent separately.
+  Unknown provenance never implies that a saved repair is available. See
+  `agent_docs/maintenance-force-install-disposition.md`.
+
 - Authoring validation is explicit `authoring-validate --repository PATH --dry-run`,
   separate from installed `check` and updates. gh dry-run may perform advisory
   API reads and cache writes; never infer safety/source review or comprehensive

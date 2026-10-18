@@ -51,6 +51,7 @@ public sealed class GhSkillInstallService
             var mutates = options.All || !string.IsNullOrEmpty(skillName);
             var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
             var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
+            if (mutates) GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
             if (options.All && context?.NeedsManagedSelectors(destinations) == true)
                 throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
             IReadOnlyList<string>? resolvedSelectors = null;
@@ -112,10 +113,15 @@ public sealed class GhSkillInstallService
                     if (current.Keys.Except(capturedRegistry.Keys, StringComparer.Ordinal).Any())
                         throw new IOException("Shared records changed during install preparation; refresh before installing.");
                 }
+                GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
+        // Vacancy admits only ordinary fresh-install authority. Do not let a
+        // target appearing after the final observation receive --force.
+        // CLI force intent stays in ParsedInstallArgs; CommandLine is effective.
+        if (options.Overwrite) args = BuildArgs(repo, skillName, options with { Overwrite = false });
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
             environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
         if (!result.Succeeded)
