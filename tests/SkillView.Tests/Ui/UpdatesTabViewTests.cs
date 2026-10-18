@@ -12,6 +12,93 @@ namespace SkillView.Tests.Ui;
 
 public sealed class UpdatesTabViewTests
 {
+    [Fact]
+    public async Task QueueDrillIn_SelectsOnlyExactPhysicalInstallAndDoesNotStartAnUpdate()
+    {
+        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
+        var calls = 0;
+        GhSkillUpdateService.Options? checkedOptions = null;
+        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) => { calls++; checkedOptions = options; return Task.FromResult(SuccessfulDryRun()); });
+        view.AllBoxForTests.Value = CheckState.Checked;
+
+        await view.LoadForSubjectAsync(OperationSubject.From(second));
+
+        Assert.Equal(0, calls);
+        Assert.Equal(CheckState.UnChecked, view.AllBoxForTests.Value);
+        Assert.Single(view.LoadedSkillNamesForTests);
+        Assert.Contains("availability unknown", view.StatusTextForTests);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
+        Assert.Equal(second.InstallationId, Assert.Single(checkedOptions!.Targets!).InstallationId);
+    }
+
+    [Fact]
+    public async Task QueueDrillIn_MissingTargetCannotUpdateSameNamedSibling()
+    {
+        var missing = MaintenanceQueueTests.Skill("/skills/missing", "https://github.com/one/repo");
+        var sibling = MaintenanceQueueTests.Skill("/skills/sibling", "https://github.com/two/repo");
+        var calls = 0;
+        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [sibling] }),
+            (_, _, _) => { calls++; return Task.FromResult(SuccessfulDryRun()); });
+        await view.LoadForSubjectAsync(OperationSubject.From(missing));
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Contains("missing or ambiguous", view.StatusTextForTests);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task QueueDrillIn_FailedCaptureClearsPreviousTargetsAndCannotRunUpdateOrUnpin()
+    {
+        var unrelated = MaintenanceQueueTests.Skill("/skills/unrelated", "https://github.com/other/repo");
+        var selected = MaintenanceQueueTests.Skill("/skills/selected", "https://github.com/selected/repo");
+        var capture = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loads = 0;
+        var updates = 0;
+        var unpins = 0;
+        using var view = CreateUpdatesTab(
+            () => ++loads == 1 ? Task.FromResult(InventorySnapshot.Empty with { Skills = [unrelated] }) : capture.Task,
+            (_, _, _) => { updates++; return Task.FromResult(SuccessfulDryRun()); },
+            (_, _, _) => { unpins++; return Task.FromResult(SuccessfulDryRun()); });
+        await view.LoadAsync();
+        view.MarkRowForTests(0);
+        view.SelectRowForTests(0);
+        view.AllBoxForTests.Value = CheckState.Checked;
+        view.UnpinBoxForTests.Value = CheckState.Checked;
+
+        var load = view.LoadForSubjectAsync(OperationSubject.From(selected));
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Equal(CheckState.UnChecked, view.AllBoxForTests.Value);
+        Assert.Equal(CheckState.UnChecked, view.UnpinBoxForTests.Value);
+        capture.SetException(new IOException("Selected inventory unavailable"));
+        await load;
+        Assert.Contains("inventory load failed", view.StatusTextForTests);
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
+        await view.RunForTestsAsync(dryRun: false, batchOnly: false);
+        await view.RunForTestsAsync(dryRun: false, batchOnly: true);
+        view.UpdateCurrentRowForTests();
+        await view.PlanUnpinForTestsAsync();
+        Assert.Equal(0, updates);
+        Assert.Equal(0, unpins);
+    }
+
+    [Fact]
+    public async Task QueueDrillIn_RefreshRetainsExactSelectionAndRefusesItsDisappearance()
+    {
+        var selected = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var sibling = selected with { ResolvedPath = "/skills/two" };
+        var snapshot = InventorySnapshot.Empty with { Skills = [selected, sibling] };
+        var view = CreateUpdatesTab(() => Task.FromResult(snapshot));
+        view.ActivateFromChanges(static () => { }, OperationSubject.From(selected));
+        Assert.Single(view.LoadedSkillNamesForTests);
+        snapshot = snapshot with { Skills = [sibling] };
+        await view.LoadAsync();
+        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Contains("missing or ambiguous", view.StatusTextForTests);
+    }
+
     // gh ≥ 2.94 is required, so every update flag is always available; the
     // Updates tab no longer has per-capability UI state to test.
 
@@ -242,7 +329,8 @@ public sealed class UpdatesTabViewTests
 
     private static UpdatesTabView CreateUpdatesTab(
         Func<Task<InventorySnapshot>> snapshotLoader,
-        Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>>? updateRunner = null)
+        Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>>? updateRunner = null,
+        Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null)
     {
         var logger = new Logger(LogLevel.Debug);
         return new UpdatesTabView(
@@ -257,7 +345,8 @@ public sealed class UpdatesTabViewTests
             ghPathProvider: static () => "/usr/bin/gh",
             logger: logger,
             onLeaveTab: static () => { },
-            onUpdateApplied: static () => { });
+            onUpdateApplied: static () => { },
+            unpinRunner: unpinRunner);
     }
 
     private static UpdateResult SuccessfulDryRun() => new()

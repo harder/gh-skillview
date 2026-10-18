@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SkillView.Tests.PackageChecking;
 
-public sealed class StaticPackageCheckerTests : IDisposable
+public sealed partial class StaticPackageCheckerTests : IDisposable
 {
     private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-package-check-");
     private CancellationToken Token => TestContext.Current.CancellationToken;
@@ -49,7 +49,7 @@ public sealed class StaticPackageCheckerTests : IDisposable
     [Fact]
     public async Task HealthyExplicitReferencesAreObservedWithoutExecutingOrChangingAnyPayload()
     {
-        Write("SKILL.md", Metadata + "[Guide](references/guide.md) `scripts/check.py` ![image](assets/image.bin)\n");
+        Write("SKILL.md", Metadata + "# Part\n[Guide](references/guide.md) `scripts/check.py` ![image](assets/image.bin)\n");
         Write("references/guide.md", "[Main](../SKILL.md#part)\n");
         Write("scripts/check.py", "raise Exception('This must never run')\n");
         Write("assets/image.bin", "Exact local bytes");
@@ -62,6 +62,8 @@ public sealed class StaticPackageCheckerTests : IDisposable
         Assert.Equal(4, result.Coverage.AnalyzedReferences);
         Assert.Empty(result.Findings); Assert.False(result.HasErrors);
         Assert.Equal("not-assessed", result.AgentCompatibility); Assert.Equal("not-assessed", result.SourceReview);
+        Assert.Equal("unknown", result.PayloadIntact.State);
+        Assert.Equal("no-supported-reference-defects-observed", result.PayloadIntact.ObservedCondition);
         Assert.Equal("none", result.Execution);
         var after = PayloadSnapshot.CaptureEvidence(Payload, Token);
         Assert.Equal(before.Fingerprint, after.Fingerprint);
@@ -87,6 +89,8 @@ public sealed class StaticPackageCheckerTests : IDisposable
         Write("README.md", "[Missing](assets/missing.png)\n");
         var result = await new StaticPackageChecker().CheckAsync(Target(), Token);
         Assert.Equal("missing", result.FormatStatus); Assert.Equal("complete", result.Coverage.Payload);
+        Assert.Equal("unknown", result.PayloadIntact.State);
+        Assert.Equal("local-defects-observed", result.PayloadIntact.ObservedCondition);
         Assert.Contains(result.Findings, finding => finding.Code == "skill-file-missing");
         Assert.Contains(result.Findings, finding => finding.Code == "reference-missing");
     }

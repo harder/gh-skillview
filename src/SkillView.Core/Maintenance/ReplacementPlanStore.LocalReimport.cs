@@ -164,6 +164,12 @@ internal sealed partial class ReplacementPlanStore
                         LocalSourceSwitch: switching ? new(target.FrontMatter.LocalPath!, previousPlacement!.Evidence,
                             captured.Archive.Snapshot.FrontMatter!.LocalPath) : null);
                     ValidateLocalImport(plan, operation, token);
+                    if (sourceReviewRequired)
+                    {
+                        CapturedPayloadArchive.CopyInto(installedState, operation, "review-installed-candidate", installed.Fingerprint, token);
+                        CapturedPayloadArchive.Capture(operation, "review-source-candidate", candidate, token);
+                        plan = ReviewFromArchives(plan, operation, "review-installed-candidate", "review-source-candidate", token);
+                    }
                     plan = plan with { ReviewFingerprint = PlanHash(plan) };
                     Write(operation, "plan.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
                     state.FlushPublication(token);

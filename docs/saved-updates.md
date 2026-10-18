@@ -185,3 +185,32 @@ remain untouched and count against bounded recovery allowances.
 Source switches, renamed skills, local-source reimport and plugin updates need
 their own migration/owner workflows. Existing running agent sessions may retain
 loaded instructions; filesystem verification does not prove session reload.
+
+## Frozen source review
+
+New source-changing plans show captured instruction/script/configuration diffs,
+raw type/mode/hash summaries and bounded literal declaration deltas before apply.
+Review omissions through the complete captured manifests and raw blobs named in
+the report. A literal destination is an observation, not a connection; partial
+old coverage cannot prove a newly introduced dependency or destination.
+
+After inspection, explicitly acknowledge that exact source review separately:
+
+```text
+skillview update-ack-source --id ID --expect PLAN_FINGERPRINT --review SOURCE_REVIEW_FINGERPRINT --yes
+```
+
+Then use the existing apply command with its retention approval. Local reimport
+uses `reimport-ack-source`; recorded restoration uses `restore-ack-source`. The
+Updates tab and local reimport dialog offer a separate source-review checkbox.
+Acknowledgement binds the saved plan, raw manifests, payloads and context. It is
+your declaration of review, not authenticity, compatibility or behavioral safety
+assurance. Format, agent compatibility and payload integrity remain independent.
+Displaying a check or diff never acknowledges review. Legacy saved plans remain
+explicitly unreviewed under their original admission rules; prepare a new product
+plan to get frozen review evidence. Pin-only unpin has no upstream source changes.
+
+Forward recovery of a new contract also needs its matching receipt; undo uses its
+existing fresh physical inspection approval. See the
+[source-review contract](../agent_docs/maintenance-update-source-review.md) for
+bounds, archive access, legacy compatibility and the remaining M19 work.

@@ -18,6 +18,8 @@ public sealed class PackageCheckCliTests
     [InlineData("--path --json")]
     [InlineData("--path /one --execute")]
     [InlineData("--path /one --json --json")]
+    [InlineData("--path /one --agent-version 0.46.0")]
+    [InlineData("--path /one --agent gemini --agent codex")]
     public void MissingDuplicateAndUnsupportedSelectorsRefuse(string arguments)
     {
         var parsed = CliDispatcher.ParseCheckArgs(arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries));
@@ -62,11 +64,17 @@ public sealed class PackageCheckCliTests
         };
         using var json = JsonDocument.Parse(CliDispatcher.RenderPackageCheckJson(report));
         var root = json.RootElement;
-        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(2, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal("none", root.GetProperty("execution").GetString());
         Assert.Equal("not-assessed", root.GetProperty("sourceReview").GetString());
         Assert.Equal("not-assessed", root.GetProperty("agentCompatibility").GetString());
         Assert.Equal("valid", root.GetProperty("formatStatus").GetString());
+        var assessments = root.GetProperty("assessments");
+        Assert.Equal("valid", assessments.GetProperty("format").GetProperty("state").GetString());
+        Assert.Equal("unknown", assessments.GetProperty("agentCompatibility").GetProperty("state").GetString());
+        Assert.Equal("unknown", assessments.GetProperty("payloadIntact").GetProperty("state").GetString());
+        Assert.Equal("local-defects-observed", assessments.GetProperty("payloadIntact").GetProperty("observedCondition").GetString());
+        Assert.Equal("not-reviewed", assessments.GetProperty("sourceReviewed").GetProperty("state").GetString());
         Assert.Equal("limited", root.GetProperty("coverage").GetProperty("references").GetString());
         Assert.Equal("scripts/missing.sh", Assert.Single(root.GetProperty("findings").EnumerateArray()).GetProperty("target").GetString());
         Assert.Equal(3, root.GetProperty("findingCount").GetInt32());
@@ -83,11 +91,41 @@ public sealed class PackageCheckCliTests
         Assert.Equal(ExitCodes.UserError, CliDispatcher.PackageCheckExitCode(complete with { Coverage = complete.Coverage with { References = "partial" } }));
         Assert.Equal(ExitCodes.UserError, CliDispatcher.PackageCheckExitCode(complete with { FormatStatus = "unknown" }));
         Assert.Equal(ExitCodes.UserError, CliDispatcher.PackageCheckExitCode(complete with { ReferenceStatus = "unknown" }));
+        Assert.Equal(ExitCodes.UserError, CliDispatcher.PackageCheckExitCode(complete with { DeclarationCoverage = "partial" }));
+        Assert.Equal(ExitCodes.UserError, CliDispatcher.PackageCheckExitCode(complete with { AgentAssessment = complete.AgentAssessment with { State = "incompatible" } }));
         Assert.DoesNotContain('\x1b', CliDispatcher.RenderPackageCheckText(complete with { Path = "bad\x1b[31m" }));
     }
 
+    [Fact]
+    public void ExplicitAgentVersionRetainsSelectionWithoutProbingAndUnknownDimensionsDoNotBecomePassed()
+    {
+        var parsed = CliDispatcher.ParseCheckArgs(["--path", "demo", "--agent", "gemini-cli", "--agent-version", "0.46.0"]);
+        Assert.Null(parsed.Error);
+        Assert.Equal("gemini-cli", parsed.Agent);
+        Assert.Equal("0.46.0", parsed.AgentVersion);
+        var report = Report() with
+        {
+            Observations = [new("dependency", "dependencies", "package.json", null, "name@^2\x1b[31m", "availability-unknown", "Provide it in a selected environment")],
+            ObservationCount = 1
+        };
+        using var json = JsonDocument.Parse(CliDispatcher.RenderPackageCheckJson(report));
+        var observation = Assert.Single(json.RootElement.GetProperty("observations").EnumerateArray());
+        Assert.Equal("availability-unknown", observation.GetProperty("state").GetString());
+        Assert.Contains('\x1b', observation.GetProperty("value").GetString()!);
+        var rendered = CliDispatcher.RenderPackageCheckText(report);
+        Assert.Contains("agent compatibility: unknown", rendered);
+        Assert.Contains("source reviewed: not-reviewed", rendered);
+        Assert.Contains("availability-unknown", rendered);
+        Assert.Contains("expected payload baseline", rendered);
+        Assert.Equal("unknown", json.RootElement.GetProperty("assessments").GetProperty("payloadIntact").GetProperty("state").GetString());
+        Assert.Equal("no-supported-reference-defects-observed", json.RootElement.GetProperty("assessments").GetProperty("payloadIntact").GetProperty("observedCondition").GetString());
+        Assert.DoesNotContain('\x1b', rendered);
+        Assert.Equal(ExitCodes.Success, CliDispatcher.PackageCheckExitCode(report));
+    }
+
     internal static PackageCheckReport Report() => new("fixture", "/skills/demo", "valid", "none-observed",
-        new("complete", "limited", 2, 123, 1, 1, []), "fingerprint", [], 0, 0, false);
+        new("complete", "limited", 2, 123, 1, 1, []), "fingerprint", [], 0, 0, false)
+    { DeclarationCoverage = "limited" };
 
     private static InstalledSkill Target() => new()
     {

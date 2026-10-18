@@ -106,6 +106,15 @@ internal sealed partial class ReplacementPlanStore
                 evidence.SelectionFingerprint, session.Plan.Candidate, merged.MetadataPolicy, mergedName, merged.Snapshot.FrontMatter!.Version),
             ReviewFingerprint = ""
         };
+        if (sourceReviewRequired || session.Plan.SourceReview is not null)
+        {
+            var oldName = "review-installed-" + mergedName; var newName = "review-source-" + mergedName;
+            CapturedPayloadArchive.CopyInto(installedArchive, session.Operation, oldName,
+                CapturedPayloadArchive.Load(installedArchive, null, token).Fingerprint, token);
+            checkpoint?.Invoke("merge-source-review-installed-captured");
+            CapturedPayloadArchive.Capture(session.Operation, newName, mergedLease, token);
+            plan = ReviewFromArchives(plan, session.Operation, oldName, newName, token);
+        }
         plan = plan with { ReviewFingerprint = PlanHash(plan) };
         using var owner = OpenOwner(EffectiveOwner(plan)!, token, requireBefore: true);
         var current = Observe(plan, session.Operation, inventory, token, owner);

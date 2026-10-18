@@ -24,6 +24,8 @@ old_commit = '33789149b9def6b66ddf247438a79fac94e22074'
 results = []
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def snapshot(directory):
     entries = []
     for path in [directory, *sorted(directory.rglob('*'))]:
@@ -84,6 +86,7 @@ for gh_path in gh_paths:
         prepared = run('update', '--path', payload, '--unpin')
         plan = prepared['savedPlan']
         assert plan and prepared['outcomes'][0]['status'] == 'review-required' and not prepared['mutationAttempted']
+        acknowledge_frozen_source(run, plan)
         applied = run('update-apply', '--id', plan['id'], '--yes', '--disposition', 'retain-original', '--expect', plan['planFingerprint'])['operation']
         assert applied['status'] == 'installed' and applied['mutationObserved'] and applied['changedPaths']
         assert snapshot(Path(applied['retainedPath'])) == initial
@@ -128,6 +131,7 @@ for gh_path in gh_paths:
         assert repair_plan and repair_plan['revision']['source']['tree'] == plan['revision']['source']['tree']
         assert {'SKILL.md', 'user-extra'}.issubset(repair_plan['changedPaths'])
         assert snapshot(payload) == edited
+        acknowledge_frozen_source(run, repair_plan)
         repaired = run('update-apply', '--id', repair_plan['id'], '--yes', '--disposition', 'retain-original',
                        '--expect', repair_plan['planFingerprint'])['operation']
         assert repaired['mutationObserved'] and {'SKILL.md', 'user-extra'}.issubset(repaired['changedPaths'])

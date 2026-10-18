@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Ui.Tabs;
+using SkillView.Maintenance;
+using Terminal.Gui.Input;
 using Terminal.Gui.Views;
 using Xunit;
 
@@ -9,6 +11,44 @@ namespace SkillView.Tests.Ui;
 
 public sealed class ChangesTabViewTests
 {
+    [Fact]
+    public async Task Enter_RoutesExactSelectedIssueAndPhysicalInstallation()
+    {
+        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
+        MaintenanceQueueEntry? activated = null;
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            static () => throw new InvalidOperationException("Untargeted updates must not be used."),
+            static () => throw new InvalidOperationException("Untargeted cleanup must not be used."),
+            static () => { }, static () => { }, onActivateEntry: entry => activated = entry);
+        await view.LoadAsync();
+        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
+        table.SetSelection(0, 1, false); // NameCollision at the second physical address.
+        table.NewKeyDownEvent(Key.Enter);
+        Assert.NotNull(activated);
+        Assert.Equal("NameCollision", activated.Issue);
+        Assert.Equal(second.InstallationId, activated.Subject.InstallationId);
+        Assert.Equal(second.ResolvedPath, activated.Cleanup!.Path);
+    }
+
+    [Fact]
+    public async Task CancelBeforeQueuedUiDispatch_DoesNotPublishRows()
+    {
+        Action? queued = null;
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var view = new ChangesTabView(action => { queued = action; return dispatched.Task; },
+            _ => Task.FromResult(SnapshotWithMalformedSkill()), static () => { }, static () => { },
+            static () => { }, static () => { });
+        var loading = view.LoadAsync();
+        Assert.NotNull(queued);
+        view.CancelPendingLoad();
+        queued();
+        dispatched.SetResult();
+        await loading;
+        Assert.Equal(0, view.RowCountForTests);
+    }
+
     [Fact]
     public void Load_ShowsDetailForTheFirstPendingItemWithoutNeedingEnter()
     {
@@ -92,7 +132,7 @@ public sealed class ChangesTabViewTests
     }
 
     [Fact]
-    public async Task LoadAsync_CleanupOnlyQueue_UsesCleanupCandidateCopyInsteadOfGenericPendingCopy()
+    public async Task LoadAsync_LabelsUnknownUpdateRowsAsObservations()
     {
         var view = new ChangesTabView(
             runOnUi: action =>
@@ -108,8 +148,8 @@ public sealed class ChangesTabViewTests
 
         await view.LoadAsync();
 
-        Assert.Contains("cleanup candidate", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("pending", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("observations", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("availability and sessions unknown", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
     }
 
     private static InventorySnapshot SnapshotWithMalformedSkill() => InventorySnapshot.Empty with

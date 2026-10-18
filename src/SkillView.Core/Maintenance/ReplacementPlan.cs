@@ -53,7 +53,8 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalDisposition? LocalDisposition = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceReviewEvidence? SourceReview = null);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -76,8 +77,19 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ReplacementLocalSourceObservation? LocalSource { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SourceReviewEvidence? SourceReview { get; init; }
+    public bool SourceReviewAcknowledged { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SourceReviewWarning { get; init; }
+    [JsonIgnore]
+    internal bool AcknowledgeSourceReview { get; init; }
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }
+    [JsonIgnore]
+    internal MaintenancePlanReference? Reference { get; init; }
+    [JsonIgnore]
+    internal MaintenancePlanComparison? Comparison { get; init; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

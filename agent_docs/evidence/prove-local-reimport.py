@@ -19,8 +19,25 @@ import time
 import uuid
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def verify_source_receipt(plan_path, plan):
+    receipts = list(plan_path.parent.glob('source-review-*.json'))
+    expected_path = plan_path.parent / ('source-review-' + plan['reviewFingerprint'] + '.json')
+    assert receipts == [expected_path] and expected_path.is_file() and not expected_path.is_symlink(), receipts
+    raw = expected_path.read_bytes()
+    assert len(raw) <= 16384
+    source = plan['sourceReview']
+    assert json.loads(raw) == dict(
+        version=1, id=plan['id'], planFingerprint=plan['reviewFingerprint'], reviewFingerprint=source['fingerprint'],
+        installedManifest=source['installedManifest'], candidateManifest=source['candidateManifest'],
+        originalPayload=plan['original']['payload'], candidatePayload=plan['candidate']['payload'],
+        contextFingerprint=plan['contextFingerprint'],
+        declaration='I reviewed the frozen source changes and reported omissions. This is my review acknowledgement, not authenticity, compatibility or behavioral safety evidence.')
 
 
 def manifest(directory):
@@ -248,6 +265,8 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         assert manifest(source) == source_before
         assert planned['applyArguments'] == ['reimport-apply', '--id', saved['id'], '--yes', '--disposition',
                                              'replace-local-retain-original', '--expect', saved['planFingerprint'], '--allow-hidden-dirs']
+        if case != 'coordinator-apply':
+            acknowledge_frozen_source(run, saved, 'reimport')
         if case in ('stale-source', 'local-retain-intent'):
             if case == 'local-retain-intent':
                 kill_at(saved, 'apply-reimport', saved['planFingerprint'], case)
@@ -267,7 +286,20 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
             return dict(case=case, nativePublicationSucceeded=True, staleSourceRefusedBeforeRetain=True,
                         persistedRetainIntent=case == 'local-retain-intent', installedNativeObjectsUnchanged=True,
                         immutablePlanUnchanged=True, commands=commands)
-        if case in ('retain-moved', 'install-moved'):
+        if case == 'coordinator-apply':
+            inspection = run('reimport-inspect', '--id', saved['id'])['operation']
+            assert inspection['status'] == 'ready' and not inspection['sourceReviewAcknowledged'], inspection
+            assert not list(plan_path.parent.glob('source-review-*.json'))
+            process = subprocess.run([str(proof_host), str(root), str(gh), saved['id'], inspection['reviewFingerprint'],
+                                      'apply-reimport-reviewed', 'workflow'], env=env, cwd=root,
+                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+            assert process.returncode == 0, (process.returncode, process.stdout, process.stderr)
+            applied = json.loads(process.stdout)
+            commands.append(dict(command='coordinator-reimport-apply-reviewed', exitCode=process.returncode))
+            assert applied['sourceReviewAcknowledged'], applied
+            verify_source_receipt(plan_path, plan)
+            assert not marker.exists() and not any(path.exists() for path in registries)
+        elif case in ('retain-moved', 'install-moved'):
             kill_at(saved, 'apply-reimport', saved['planFingerprint'], case)
             shutil.rmtree(source)  # Owned generated fixture, outside captured I/C archives.
             inspection = run('reimport-inspect', '--id', saved['id'])['operation']
@@ -343,6 +375,7 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
                     observedRootPrivacy=original_root_security,
                     exactOriginalNativeObjectsRestored=True, immutablePlanUnchanged=True,
                     noOpAllocatesNoPlanAndPreservesObjects=case == 'normal',
+                    coordinatorApplyEnforcedIndependentApprovalsAndCreatedExactReceipt=case == 'coordinator-apply',
                     fullRetainedQuotaNoOpVerified=case == 'normal', metadataOnlySourceChangeRequiresReview=case == 'normal',
                     frozenRecoveryWithoutExternalSource=case in ('retain-moved', 'install-moved', 'displace-moved', 'restore-moved'),
                     commands=commands)
@@ -362,7 +395,7 @@ def main():
     for gh in gh_paths:
         version = subprocess.check_output([str(gh), '--version'], text=True, timeout=30).splitlines()[0]
         cases = ('metadata-refusal',) if args.expect_metadata_refusal else (
-            'normal', 'stale-source', 'local-retain-intent', 'retain-moved', 'install-moved', 'displace-moved', 'restore-moved')
+            'normal', 'coordinator-apply', 'stale-source', 'local-retain-intent', 'retain-moved', 'install-moved', 'displace-moved', 'restore-moved')
         for case in cases:
             row = run_case(app, proof_host, gh, case, args.expect_metadata_refusal)
             row.update(host=str(app), hostSha256=digest(app), proofHostSha256=digest(proof_host),

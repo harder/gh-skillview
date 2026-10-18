@@ -76,12 +76,13 @@ internal static class LocalReimportScreen
             X = 0,
             Y = 4 + rowOffset,
             Width = Dim.Fill(),
-            Height = Dim.Fill(6),
+            Height = Dim.Fill(7),
             ReadOnly = true,
             WordWrap = true,
             Text = sourceSwitch ? $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nChoose a different existing durable ordinary local source. Baseline-less replacement retains the exact installed original for every consumer. The old source is placement-only and may be missing; it is never a historical base. Git-managed sources remain unsupported.\n\nInspect a saved ID to recover or undo from frozen evidence after the first retain. No automatic merge or fork ancestry is claimed." : $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nPrepare replaces this installation from its same recorded local source. Review all changed paths and consumers; the exact original is retained. No recorded base or automatic merge exists.\n\nTo reopen retained history, enter a saved plan ID and Inspect. Inspection does not prepare another candidate. Source freshness gates the first retain; later recovery and undo use frozen evidence even if that source disappears."
         };
         var status = new Label { X = 0, Y = 3 + rowOffset, Width = Dim.Fill(), Text = $"Prepare, or inspect a saved {family} ID." };
+        var sourceReview = new CheckBox { X = 0, Y = Pos.AnchorEnd(6), Width = Dim.Fill(), Text = "I reviewed frozen source changes/omissions; no authenticity or safety claim", Enabled = false };
         var retain = new CheckBox { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Text = "Replace from local source; retain exact original for every consumer", Enabled = false };
         var prepare = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(4), Text = "_Prepare" };
         var inspect = new SingleRowButton { X = Pos.Right(prepare) + 2, Y = Pos.AnchorEnd(4), Text = "_Inspect saved ID" };
@@ -99,14 +100,18 @@ internal static class LocalReimportScreen
             var idle = (terminalCommit || operation.CurrentOwnership == ModalOperationTracker.Ownership.None) && !lifetimeToken.IsCancellationRequested;
             id.Enabled = hidden.Enabled = newSource.Enabled = prepare.Enabled = inspect.Enabled = idle;
             retain.Enabled = idle && review is not null;
+            sourceReview.Enabled = idle && review?.SourceReview is not null;
             apply.Enabled = idle && review is { Succeeded: true, Status: "ready" or "planned" }
-                && review.LocalSource?.Status is not ("stale" or "unavailable") && retain.Value == CheckState.Checked;
+                && review.LocalSource?.Status is not ("stale" or "unavailable") && retain.Value == CheckState.Checked
+                && (review.SourceReview is null || sourceReview.Value == CheckState.Checked);
             recover.Enabled = undo.Enabled = idle && inspected && review is not null && retain.Value == CheckState.Checked;
+            recover.Enabled &= review?.SourceReview is null || review.SourceReviewAcknowledged || sourceReview.Value == CheckState.Checked;
         }
+        sourceReview.ValueChanged += (_, _) => Refresh();
         retain.ValueChanged += (_, _) => Refresh();
-        id.TextChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; Refresh(); };
-        newSource.TextChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; Refresh(); };
-        hidden.ValueChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; Refresh(); };
+        id.TextChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; sourceReview.Value = CheckState.UnChecked; Refresh(); };
+        newSource.TextChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; sourceReview.Value = CheckState.UnChecked; Refresh(); };
+        hidden.ValueChanged += (_, _) => { review = null; inspected = false; retain.Value = CheckState.UnChecked; sourceReview.Value = CheckState.UnChecked; Refresh(); };
         void Start(LocalReimportAction action)
         {
             if (lifetimeToken.IsCancellationRequested || operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
@@ -119,10 +124,15 @@ internal static class LocalReimportScreen
             if (sourceSwitch && action == LocalReimportAction.Prepare
                 && (!Path.IsPathFullyQualified(newSource.Text) || newSource.Text.Any(char.IsControl)))
             { status.Text = "Enter an absolute existing ordinary new source directory."; return; }
+            if (captured?.SourceReview is not null && action is LocalReimportAction.Apply or LocalReimportAction.Recover)
+            {
+                if (!captured.SourceReviewAcknowledged && sourceReview.Value != CheckState.Checked) return;
+                captured = captured with { AcknowledgeSourceReview = sourceReview.Value == CheckState.Checked };
+            }
             var request = new LocalReimportRequest(action, action == LocalReimportAction.Inspect ? id.Text.Trim() : captured?.Id,
                 captured, hidden.Value == CheckState.Checked, sourceSwitch ? newSource.Text : null);
             // Close all prior approvals before starting private writes or lifecycle work.
-            review = null; inspected = false; retain.Value = CheckState.UnChecked;
+            review = null; inspected = false; retain.Value = CheckState.UnChecked; sourceReview.Value = CheckState.UnChecked;
             var currentGeneration = ++generation;
             status.Text = $"{action} in progress…";
             if (!operation.TryStart(async trackerToken =>
@@ -222,7 +232,7 @@ internal static class LocalReimportScreen
             args.Cancel = true; RequestClose();
         };
         dialog.KeyDown += (_, key) => { if (key.KeyCode == KeyCode.Esc) { key.Handled = true; RequestClose(); } };
-        dialog.Add(new Label { X = 0, Y = 0, Text = "Saved plan ID:" }, id, hidden, status, output, retain, prepare, inspect, apply, recover, undo, close);
+        dialog.Add(new Label { X = 0, Y = 0, Text = "Saved plan ID:" }, id, hidden, status, output, sourceReview, retain, prepare, inspect, apply, recover, undo, close);
         if (sourceSwitch)
         {
             dialog.Add(new Label { X = 0, Y = 1, Text = "New source:" }, newSource);
@@ -230,7 +240,7 @@ internal static class LocalReimportScreen
         }
         TuiHelpers.ConfigureTextInput(id, SchemeNames.Dialog);
         TuiHelpers.ConfigureReadOnlyPane(output, SchemeNames.Dialog);
-        TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, id, hidden, status, output, retain, prepare, inspect, apply, recover, undo, close);
+        TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, id, hidden, status, output, sourceReview, retain, prepare, inspect, apply, recover, undo, close);
         readyForTests?.Invoke(dialog);
         app.Run(dialog);
     }

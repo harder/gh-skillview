@@ -6,13 +6,13 @@ For installation and a quick start, see the [README](../README.md).
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes uses a full-width table for the maintenance queue. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes pairs its maintenance queue with frozen observation details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Changes** △ | Maintenance queue showing pending cleanup tasks. Press Enter to open the appropriate specialist view. | `3`, `u`, click the pill, or `←/→` |
+| **Changes** △ | Maintenance observations grouped by issue and physical installation, including cleanup review and unchecked installations. Enter opens the exact selected target. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
@@ -82,6 +82,61 @@ Changes tab:
 | Key | Action |
 |---|---|
 | `Enter` | Open the selected maintenance item |
+| `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
+
+Each observation retains its installation address ID, exact affected paths,
+source/ref/tree, recorded owners and consumers. Cleanup issues reopen only that
+issue at that physical address after a fresh inventory capture. Installation
+review opens Updates with only that exact installation selected, clearing prior
+batch and `--all` choices. A missing or ambiguous ID refuses the hand-off instead
+of choosing a same-name sibling. Press **Dry-run** explicitly to check update
+availability; **c** compares installed content with one immutable saved candidate
+and opens its plan review (**u** also prepares review). Entry into the
+workspace performs neither action. Refresh keeps an exact Updates selection.
+The TUI caps visible rows and selected-detail text, reports omitted row/field
+counts, and omits exact fields whole. `queue --json` makes a fresh capture with
+full evidence; keep the same global workspace/profile/scan-root options.
+
+Cleanup suppression, agent disablement, pinning and migration remain separate:
+suppressed installations still appear for inspection, pins require explicit unpin
+review, and disablement/migration are not assessed by this queue. Disk inventory
+cannot establish what a running agent has loaded. The queue does not launch
+agents. Reload guidance is conditional on the observed agent and delivery type.
+For Claude plugin deliveries, background updates change disk while an existing
+session retains its loaded version: use `/reload-plugins` or a new session,
+following the [official plugin guidance](https://code.claude.com/docs/en/discover-plugins#keep-plugins-updated).
+For newly installed Codex skills, the [official catalog](https://github.com/openai/skills#installing-a-skill)
+instructs restarting Codex. Other combinations explain that their reload rule is
+unknown. Successful disk verification never claims that a running session reloaded.
+
+The CLI exposes the same saved replacement workflows through local plan references:
+
+```bash
+skillview --scan-root /path/to/skills inspect --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills check --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills plan --purpose update-revision --install-id INSTALLATION_ID --json > review.json
+skillview --scan-root /path/to/skills inspect --plan-file review.json --json
+# Review the comparison, all consumers, source and retention disposition first.
+# Supply the reviewed planFingerprint independently; the file is not approval.
+skillview --scan-root /path/to/skills apply --plan-file review.json --expect REVIEWED_PLAN_FINGERPRINT --yes --disposition retain-original --json
+skillview --scan-root /path/to/skills verify --plan-file review.json --json
+# Undo uses the fresh inspection's reviewFingerprint, not the plan fingerprint.
+skillview --scan-root /path/to/skills undo --plan-file review.json --expect CURRENT_REVIEW_FINGERPRINT --yes --json
+```
+
+Keep HOME, state, CWD and global scan/workspace/profile options unchanged. The
+schema-1 `planReference` names an exact plan already retained locally, its purpose,
+fingerprints and installation context. It imports no files and cannot authorize a
+write. The file must be a bounded regular JSON file (256 KiB maximum); large plan
+responses can use only their `planReference` object. After a merge produces a new
+plan fingerprint, export a fresh reference with the specialist `update-inspect`.
+`plan` also accepts `restore-recorded`, `unpin-only` and `local-reimport` purposes;
+apply requires their existing explicit retention disposition. `repair --plan-file`
+resumes a recognized interrupted transaction after current inspection; it refuses
+to start a ready replacement. Torn owner-image repairs and cleanup remain explicit
+specialist operations. Legacy quarantine `undo --id` continues to use its own
+review contract. JSON retains exact per-path before/after file evidence, operation
+status/reason, affected/retained consumers and unknown session state.
 
 Other:
 
@@ -107,6 +162,7 @@ SkillView runs in CLI mode when you provide a subcommand.
 |---|---|
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
+| `skillview queue --json` | Refresh maintenance observations with schema 1 JSON and exact physical installation IDs; no upstream check or mutation |
 | `skillview effective --agent <id> --project <directory>` | Explain conditional loading policy for an agent, profile and project, retaining every observed copy |
 | `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
 | `skillview backup --path <installed-directory>` | Capture private, bounded payload evidence with a durable creating/captured journal |
@@ -302,17 +358,63 @@ to check one observed installation. `--install-id ID` also selects a physical
 installation; an observed agent exposure path may be used with `--path`.
 In Installed, select a row and press **K** to open the same read-only check.
 
-Reports separate metadata validity, supported local references and observation
-coverage. Findings include source paths, line numbers, target paths and repair
-guidance. Read `referenceScope` for the limited Markdown/code-path syntax that was
-checked. A clean result does not establish source authenticity, agent compatibility
-or behavioral safety. Skill code is never executed, and the check performs no
-remote source lookup or automated repair.
+JSON schema 2 and the dialog show four independent assessments: portable metadata
+format, agent compatibility, payload integrity,
+and source review. A valid header can coexist with a broken asset or incompatible
+agent framing. Source review remains `not-reviewed`: viewing this report does not
+acknowledge source changes or establish authenticity or behavioral safety. A complete
+capture and matching local references leave integrity **unknown** because this
+command has no trusted or explicitly declared expected payload baseline. Its
+separate `observedCondition` records local defects, partial coverage or no defects
+within the checked reference scope. The
+legacy `agentCompatibility` and `sourceReview` strings retain their schema-1
+`not-assessed` meaning; the new `assessments` object carries scoped evidence,
+fingerprints, cited rules and unavailable reasons. Saved update fingerprints are
+unchanged. `rootMetadataSha256` is a separate raw-file hash.
 
-Exit 0 means the requested limited checks completed without errors; findings or
-unknown/partial coverage return 1. Invalid selectors return 2; no unique inventory
+Findings include source paths, available line numbers, targets and repair guidance.
+Read `referenceScope` for the limited Markdown/code-path grammar. Internal fragments
+support plain ASCII ATX headings and duplicate heading suffixes; rich headings,
+HTML IDs, setext headings and other renderer-specific IDs remain unknown instead
+of producing definite missing-anchor findings. Captured links are never followed.
+
+Literal declarations are separate observations. Supported `package.json` dependency
+mappings and plain `requirements.txt` names, extras and version constraints report
+dependency availability as **unknown**. Missing package-local `file:`/`link:` targets
+and `-r` includes have concrete file-repair guidance.
+Home-relative `file:~/...` declarations remain unknown; HOME is never expanded and
+external dependency paths are never probed. Omitted, unreadable or linked Markdown
+also makes declaration coverage partial because Markdown supplies literal evidence.
+No installed package manager,
+interpreter, credentials or dependency environment is probed. Unsupported manifests,
+requirement options/markers/URLs, nonregular inputs and exhausted bounds retain
+partial coverage. `declarationScope` states the supported grammar.
+
+Portability observations cover case collisions, Windows path restrictions,
+environment-specific references and selected scripts' shebangs/CRLF endings. A URL
+observation means literal captured text, including examples; it does not establish
+network behavior. Authored tool declarations do not establish effective permissions.
+Skill code is never executed, and the check performs no remote lookup or repair.
+
+Optionally select a package rule target, for example:
+`skillview --scan-root /path/to/skills check --path /path/to/skills/demo --agent gemini-cli --agent-version 0.46.0 --json`.
+This reuses existing version-cited loading rules without launching a client. Known
+Gemini 0.46.0 framing rejection can report `incompatible`; passing that limited rule
+leaves whole-agent compatibility `unknown`. Unmodeled agents or versions never
+receive assumed compatibility. The dialog leaves agent/version unspecified.
+
+Exit 0 means the limited format/reference/declaration checks completed without
+errors or partial coverage; it does not turn unknown dependency availability,
+unknown agent compatibility or unreviewed source into passed assessments. Findings,
+partial coverage or an observed agent incompatibility return 1. Invalid selectors return 2; no unique inventory
 match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
+
+This remains a partial implementation of [M19](../agent_docs/maintenance-audit.json).
+Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
+Opt-in isolated prompt evaluation and authoring `gh skill publish --dry-run`
+integration remain separate future work. `publish --fix`
+is never a repair action for installed payloads; no authored bytes are rewritten.
 
 ### Global flags
 
@@ -524,6 +626,7 @@ source; **K** checks the package offline. The CLI flow is:
 ```sh
 skillview --scan-root /path/to/skills source-switch-plan --path /path/to/skills/demo --new-source /durable/new/demo --json
 skillview source-switch-inspect --id <saved-id> --json
+skillview source-switch-ack-source --id <saved-id> --expect <plan-fingerprint> --review <source-review-fingerprint> --yes
 skillview source-switch-apply --id <saved-id> --yes --disposition replace-local-source-retain-original --expect <plan-fingerprint>
 ```
 
@@ -544,3 +647,33 @@ unknown/inaccessible or overlapping placement refuses before private staging.
 Linux placement also refuses mount/bind transitions, including otherwise legitimate
 sources on another mounted filesystem.
 See [the detailed contract](../agent_docs/maintenance-local-source-switch.md).
+
+Saved source-changing updates also provide a [frozen source review](saved-updates.md#frozen-source-review)
+with captured diffs and a separate explicit acknowledgement. This user declaration
+supplies no authenticity, compatibility or safety assurance; local `check` remains
+unreviewed without a matching explicit review workflow.
+
+### Validate a source repository while authoring
+
+Run `skillview authoring-validate --repository /path/to/source-repository --dry-run`
+(or add `--json` for schema-1 evidence). This explicitly invokes
+`gh skill publish --dry-run`; it is separate from installed-package `check`.
+GitHub remote advisories may contact GitHub, and gh may write cache/config state.
+The command never requests publishing, `--fix`, skill-script execution or an AI
+client. It preserves raw gh diagnostics and checks observed candidate payload
+bytes before/after, reporting unexpected changes without repairing them.
+
+A completed result means the bounded gh command succeeded with unchanged observed
+candidate bytes. It does not certify safety, whole-agent compatibility, authentic
+source or source review. Unsupported/incomplete discovery, truncation, cancellation
+and changes have explicit refused/skipped/partial results. Root-only `SKILL.md`
+layout is explicitly unavailable in this repository workflow. See the
+[authoring validation guide](../agent_docs/maintenance-authoring-validation.md)
+for discovery scope, bounds, status and exit-code semantics.
+
+## Opt-in offline evaluations
+
+Use `evaluate-review` to inspect a frozen package, your representative prompts and
+an explicit already-local offline Docker evaluator. `evaluate-run` requires the
+exact review fingerprint and `--consent-run`. No routine inspection or update
+starts evaluations. See [environment, protocol and limitations](isolated-evaluations.md).

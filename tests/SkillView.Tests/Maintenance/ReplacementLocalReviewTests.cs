@@ -19,9 +19,9 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
     private const string OldTree = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", NewTree = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private const string Metadata = "---\nname: demo\ndescription: Fixture\nversion: '1.0'\nmetadata:\n  github-repo: https://github.com/harder/fixture\n  github-ref: refs/heads/main\n  github-path: skills/demo\n  github-tree-sha: " + OldTree + "\n---\n";
     private static ResolvedSkillRevision Source => new("https://github.com/harder/fixture", "refs/tags/v2", new('c', 40), NewTree, "skills/demo");
-    private ReplacementPlanStore Store(Action<string>? checkpoint = null) => new(State, new Logger(), checkpoint,
+    private ReplacementPlanStore Store(Action<string>? checkpoint = null, bool sourceReviewRequired = false) => new(State, new Logger(), checkpoint,
         new ProcessRunner(new Logger(), environment: new Dictionary<string, string>
-        { ["HOME"] = temporary.FullName, ["USERPROFILE"] = temporary.FullName }, defaultWorkingDirectory: temporary.FullName));
+        { ["HOME"] = temporary.FullName, ["USERPROFILE"] = temporary.FullName }, defaultWorkingDirectory: temporary.FullName), sourceReviewRequired: sourceReviewRequired);
     public ReplacementLocalReviewTests()
     {
         Directory.CreateDirectory(Payload);

@@ -3,12 +3,45 @@ using System.Text;
 
 namespace SkillView.PackageChecking;
 
-internal sealed record PackageMarkdownReference(string Target, int Line, bool DecodeUrl, bool UndefinedLabel = false);
+internal sealed record PackageMarkdownReference(string Target, int Line, bool DecodeUrl, bool UndefinedLabel = false, bool Dependency = false);
 internal sealed record PackageMarkdownScan(ImmutableArray<PackageMarkdownReference> References, ImmutableArray<string> Reasons);
+internal sealed record PackageAnchorScan(ImmutableHashSet<string> Anchors, ImmutableArray<string> Reasons);
 
 /// Deliberately limited local-reference syntax. This is not a full Markdown or shell parser.
 internal static class MarkdownPackageReferences
 {
+    internal static PackageAnchorScan Anchors(string text, CancellationToken token)
+    {
+        var reasons = new HashSet<string>(StringComparer.Ordinal);
+        var anchors = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var (line, _) in Lines(text, token, reasons))
+        {
+            var heading = line.TrimStart(' ');
+            if (heading.Contains('<'))
+                reasons.Add("Inline HTML anchor IDs are not inspected.");
+            if (heading.Length > 1 && heading[0] is '-' or '+' or '*' && char.IsWhiteSpace(heading[1])
+                || char.IsAsciiDigit(heading.FirstOrDefault()) && heading.Contains(". ", StringComparison.Ordinal)
+                || char.IsAsciiDigit(heading.FirstOrDefault()) && heading.Contains(") ", StringComparison.Ordinal))
+                reasons.Add("List-contained heading IDs are not fully inspected.");
+            if (heading.Length > 0 && heading.All(c => c is '=' or '-' or ' '))
+            { reasons.Add("Setext headings have unsupported anchor IDs."); continue; }
+            var hashes = 0;
+            while (hashes < heading.Length && heading[hashes] == '#') hashes++;
+            if (hashes is < 1 or > 6 || hashes < heading.Length && heading[hashes] is not (' ' or '\t')) continue;
+            heading = heading[hashes..].Trim();
+            var suffix = heading.Length;
+            while (suffix > 0 && heading[suffix - 1] == '#') suffix--;
+            if (suffix > 0 && suffix < heading.Length && char.IsWhiteSpace(heading[suffix - 1])) heading = heading[..suffix].TrimEnd();
+            if (heading.Length == 0 || heading.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not (' ' or '-' or '_')))
+            { reasons.Add("Only plain ASCII ATX headings have supported anchor IDs; rich/non-ASCII heading IDs remain unknown."); continue; }
+            if (anchors.Count >= 4096) { reasons.Add("Document anchor limit exceeded."); break; }
+            var id = heading.ToLowerInvariant().Replace(' ', '-');
+            var candidate = id; var duplicate = 0;
+            while (!anchors.Add(candidate)) { token.ThrowIfCancellationRequested(); candidate = id + "-" + ++duplicate; }
+        }
+        return new(anchors.ToImmutable(), reasons.Order(StringComparer.Ordinal).ToImmutableArray());
+    }
+
     internal static PackageMarkdownScan Scan(string text, int maximum, CancellationToken token, int lineOffset = 0)
     {
         var definitions = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

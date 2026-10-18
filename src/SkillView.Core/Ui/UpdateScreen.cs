@@ -100,6 +100,11 @@ public static class UpdateScreen
             Field("Future update policy", change.FutureUpdatePolicy);
             sb.AppendLine("Old source placement is not a captured base or old-content freshness requirement. The selected source may be a copied local installation; no ancestry or independent physical fork is inferred. Git-managed sources remain unsupported.");
         }
+        sb.AppendLine("### Frozen source changes");
+        // Indented code preserves diff lines and prevents authored Markdown from
+        // becoming review controls, links or headings.
+        foreach (var line in SourceReviewScreen.RenderText(plan).Split('\n')) sb.Append("    ").AppendLine(line);
+        sb.AppendLine();
         if (plan.LocalImport is { } import)
         {
             Field("Recorded local source", import.SourcePath);
@@ -176,10 +181,26 @@ public static class UpdateScreen
         }
         if (plan.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         else foreach (var agent in plan.Subject.Agents) Field("Affected consumer", $"{agent.AgentId}: {agent.Path}");
-        foreach (var path in plan.ChangedPaths) Field("Changed path", path);
+        foreach (var path in plan.ChangedPaths.Take(128)) Field("Changed path", path);
+        if (plan.ChangedPaths.Length > 128) Field("Omitted changed paths (complete saved plan retained)", (plan.ChangedPaths.Length - 128).ToString());
+        if (plan.Comparison is { } comparison)
+        {
+            sb.AppendLine("### Installed → saved candidate comparison");
+            Field("Installed payload", comparison.InstalledPayload);
+            Field("Candidate payload", comparison.CandidatePayload);
+            var rendered = MaintenanceQueueFormatter.RenderFields(comparison.Paths.Take(128)
+                .Select(change => ("Path " + change.Path, (string?)$"{Describe(change.Installed)} -> {Describe(change.Candidate)}")),
+                CancellationToken.None, MaintenanceQueueFormatter.MaxDetailCharacters);
+            sb.Append(rendered.Text);
+            Field("Comparison paths omitted from preview", (Math.Max(0, comparison.Paths.Length - 128) + rendered.OmittedFields).ToString());
+            sb.AppendLine("Regular-file SHA256, kind, bytes and mode compare frozen evidence. Inspect instructions and supporting files before approval; this is not behavioral evaluation. Complete file evidence remains in plan JSON.");
+        }
         sb.AppendLine("The original directory, including local edits and extras, is retained for explicit recovery/undo. Agent session state is unknown.");
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
     }
+
+    private static string Describe(SkillView.Maintenance.PayloadEntry? entry) => entry is null ? "absent"
+        : $"{entry.Kind}; SHA256={entry.ContentHash}; bytes={entry.Bytes}; mode={entry.UnixMode}; link={entry.LinkTarget ?? "none"}";
 
     private static void AppendFencedBlock(System.Text.StringBuilder sb, string text)
     {
