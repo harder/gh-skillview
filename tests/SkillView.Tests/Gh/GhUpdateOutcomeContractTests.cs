@@ -75,7 +75,13 @@ public sealed class GhUpdateOutcomeContractTests
         view.UnpinBoxForTests.Value = CheckState.Checked;
         await view.RunForTestsAsync(false, false);
         Assert.Contains("review required", view.StatusTextForTests);
+        Assert.True(view.SourceReviewBoxForTests.Enabled);
+        Assert.Equal(CheckState.UnChecked, view.SourceReviewBoxForTests.Value);
         view.RetainBoxForTests.Value = CheckState.Checked;
+        await view.ApplyReviewForTestsAsync();
+        Assert.Null(applied);
+        Assert.Equal(firstBefore.ObjectStateFingerprint, PayloadSnapshot.Capture(targets[0].ResolvedPath, Token).ObjectStateFingerprint);
+        view.SourceReviewBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync();
         Assert.NotNull(applied);
         Assert.True(applied.Succeeded, applied.ErrorMessage);
