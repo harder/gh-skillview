@@ -56,7 +56,11 @@ public sealed class SkillUpdateCoordinator(
                 var policyExclusions = targets.SelectMany(item => new[] { item.ScanRoot, item.ResolvedPath }).Distinct(StringComparer.Ordinal).ToArray();
                 var desiredPolicy = SkillView.Preferences.DesiredRevisionPolicyStore.For(sourceRunner ?? updater.Runner)
                     .Observe(target, policyExclusions, cancellationToken);
-                DesiredRevisionPolicyGate.RequireAllowed(target, desiredPolicy, "update-revision", explicitUnpin: options.Unpin);
+                // Availability preserves a known actual pin as a benign retained
+                // outcome; it does not request mutation or imply unpin consent.
+                // Explicit desired intent and unknown policy still refuse below.
+                DesiredRevisionPolicyGate.RequireAllowed(target, desiredPolicy,
+                    options.DryRun ? "update-preview" : "update-revision", explicitUnpin: options.Unpin);
                 ManagedSkillDiscovery.RefuseTarget(target, cancellationToken, sourceRunner ?? updater.Runner);
                 if (!target.MetadataConflicts.IsDefaultOrEmpty)
                     throw new IOException("Resolve conflicting tracking observations before updating.");

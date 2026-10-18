@@ -239,7 +239,9 @@ public sealed class SkillIdentityTests : IDisposable
             Agents = [new("codex", skill.ResolvedPath, false, Scope.User, Context: "context-one", Profile: "one"),
             new("codex", skill.ResolvedPath, false, Scope.Project, Context: "context-two", Profile: "two")]
         });
-        var runner = Runner();
+        var runner = Runner().WithContext(temporary.FullName, new Dictionary<string, string>
+        { ["SKILLVIEW_STATE_HOME"] = Path.Combine(temporary.FullName, "private-state") });
+        var before = PayloadSnapshot.Capture(skill.ResolvedPath, Token);
         var install = new GhSkillInstallService(runner, logger);
         var update = new GhSkillUpdateService(runner, logger);
         var adapter = new GhSkillListAdapter(runner, logger);
@@ -247,6 +249,15 @@ public sealed class SkillIdentityTests : IDisposable
         var result = await coordinator.UpdateAsync("unused-no-process", new(Targets: [skill], DryRun: true), Token);
         var outcome = Assert.Single(result.Outcomes);
         Assert.Equal("pinned", outcome.Status); Assert.Same(skill.ObservedSubject, outcome.Impact!.Subject);
+        Assert.True(result.Succeeded); Assert.Equal(0, result.ExitCode);
+        Assert.False(result.MutationAttempted); Assert.Empty(result.CommandLine);
+        Assert.Contains("Exact pin retained", outcome.Message);
+        var mutation = await coordinator.UpdateAsync("unused-no-process", new(Targets: [skill]), Token);
+        Assert.Equal("refused", Assert.Single(mutation.Outcomes).Status);
+        Assert.Contains("Unpin must be explicitly reviewed", mutation.Outcomes[0].Message);
+        Assert.False(mutation.Succeeded); Assert.False(mutation.MutationAttempted); Assert.Empty(mutation.CommandLine);
+        var after = PayloadSnapshot.Capture(skill.ResolvedPath, Token);
+        Assert.Equal(before.Fingerprint, after.Fingerprint); Assert.Equal(before.Objects, after.Objects);
         Assert.Equal(2, outcome.Impact.AffectedExposures.Length);
         Assert.True(outcome.Impact.PayloadRetained);
         Assert.Equal(skill.ResolvedPath, outcome.Impact.RetainedPayloadPath);
@@ -259,6 +270,43 @@ public sealed class SkillIdentityTests : IDisposable
         var affected = json.RootElement.GetProperty("outcomes")[0].GetProperty("impact").GetProperty("affectedExposures");
         Assert.Equal("context-two", affected[1].GetProperty("context").GetString());
         Assert.Equal("two", affected[1].GetProperty("profile").GetString());
+    }
+
+    [Theory]
+    [InlineData("manual-fork")]
+    [InlineData("exact-pin")]
+    [InlineData("native-manager")]
+    [InlineData("follow-chosen-track")]
+    [InlineData("unknown")]
+    public async Task PinnedAvailabilityDoesNotBypassProtectedOrUnknownDesiredPolicy(string mode)
+    {
+        var skill = Observe(Skill("policy-pinned/demo", new() { Pinned = true }));
+        var runner = Runner().WithContext(temporary.FullName, new Dictionary<string, string>
+        { ["SKILLVIEW_STATE_HOME"] = Path.Combine(temporary.FullName, "policy-state") });
+        var policies = SkillView.Preferences.DesiredRevisionPolicyStore.For(runner);
+        if (mode == "unknown")
+        {
+            Directory.CreateDirectory(policies.Root); // No native writer: existing incomplete policy is unknown.
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(policies.Root,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Assert.False(policies.Observe(skill, [skill.ScanRoot], Token).Known);
+        }
+        else
+        {
+            var observed = policies.Observe(skill, [skill.ScanRoot], Token);
+            using var writer = policies.Acquire([skill.ScanRoot], Token);
+            writer.Set(skill, new(mode, mode is "exact-pin" or "follow-chosen-track" ? "v1" : null), observed.Fingerprint!, Token);
+        }
+        var before = PayloadSnapshot.Capture(skill.ResolvedPath, Token);
+        var adapter = new GhSkillListAdapter(runner, logger);
+        var coordinator = new SkillUpdateCoordinator(new(runner, logger), new(runner, logger), adapter, logger, runner);
+        var result = await coordinator.UpdateAsync("unused-no-process", new(Targets: [skill], DryRun: true), Token);
+        var outcome = Assert.Single(result.Outcomes);
+        Assert.Equal("refused", outcome.Status); Assert.False(result.Succeeded); Assert.Equal(2, result.ExitCode);
+        Assert.False(result.MutationAttempted); Assert.Empty(result.CommandLine);
+        Assert.True(outcome.Impact!.PayloadRetained);
+        var after = PayloadSnapshot.Capture(skill.ResolvedPath, Token);
+        Assert.Equal(before.Fingerprint, after.Fingerprint); Assert.Equal(before.Objects, after.Objects);
     }
 
     [Theory]
