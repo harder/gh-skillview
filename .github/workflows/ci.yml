@@ -687,6 +687,7 @@ jobs:
             dist/local-reimport-privileged-*-proof/**
             dist/local-source-switch-privileged-*-proof/**
             dist/old-native-reimport-*-proof-raw/**
+            dist/old-native-source-switch-*-proof-raw/**
             dist/source-switch-proof-inputs/**
           if-no-files-found: warn
           retention-days: 14

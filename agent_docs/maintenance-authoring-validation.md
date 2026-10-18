@@ -1,4 +1,4 @@
-# Explicit repository authoring validation (partial M19)
+# Explicit repository authoring validation (M19)
 
 `authoring-validate --repository PATH --dry-run [--json]` explicitly selects a
 local source directory and runs exactly `gh skill publish --dry-run -- PATH`,
@@ -72,6 +72,8 @@ nothing. Independent assessments remain format `gh-diagnostics-only`, agent
 compatibility and payload integrity `unknown`, safety `not-assessed`, and source
 `not-reviewed`. Before/after equality is not evidence of an authentic baseline.
 
-Original M19 and the 21-item acceptance audit remain incomplete (9/21 accepted).
-Real opt-in representative-prompt evaluations still require an explicit runnable
-isolated environment and separate authorization for any agent/API execution.
+PR71 completed the [original combined M19 acceptance](evidence/maintenance-pr71-m19-m20-final.json),
+including both native product hosts with gh 2.97.0 and 2.102.0. Other original
+maintenance findings remain open. Opt-in representative-prompt evaluations
+require an explicit runnable isolated environment and separate authorization for
+any agent/API execution.

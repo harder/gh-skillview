@@ -91,10 +91,12 @@ for newly installed skills; it does not prove what an existing session loaded.
 Other agent/delivery combinations retain an explicit unavailable reload reason.
 Client versions/surfaces can differ; guidance does not launch or inspect a client.
 
-This remains bounded M20 implementation, not proof of every original acceptance
-clause. The queue does not retain availability results across a later disk refresh;
+PR71 completed the [original M20 acceptance](evidence/maintenance-pr71-m19-m20-final.json)
+after exact-head platform/native checks and merge. The queue does not retain
+availability results across a later disk refresh;
 unsupported owner transitions, disablement and migrations remain specialist/refused
-actions, not invented generic capabilities. Native platform behavior is inherited
-from the existing backends and needs final-base cross-platform verification.
+actions, not invented generic capabilities. Native platform behavior remains
+subject to the existing backends' supported and explicitly refused cases.
 No session or loaded-version fact is inferred from inventory or a read-only client
-list handler. Keep the original audit acceptance unchanged until final review.
+list handler. The original audit clauses remain unchanged; other maintenance
+findings retain their separate incomplete status.
