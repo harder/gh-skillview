@@ -50,7 +50,7 @@ internal static class MaintenanceQueueFormatter
                 omitted++;
                 continue;
             }
-            var formatted = $"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value)}  \n";
+            var formatted = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}  \n";
             token.ThrowIfCancellationRequested();
             if (formatted.Length > remaining) omitted++;
             else text.Append(formatted);

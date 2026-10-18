@@ -220,8 +220,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             if (review.SourceReview is { } source && review.AcknowledgeSourceReview)
                 plans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint, source.Fingerprint, inventory, token, purpose);
             attempted = true;
-            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition,
-                purpose);
+            var applied = plans.Apply(review.Id, review.PlanFingerprint, inventory, token, disposition, purpose);
             if (applied.Status == "unchanged" && !applied.MutationObserved) attempted = false;
             result = result with
             {

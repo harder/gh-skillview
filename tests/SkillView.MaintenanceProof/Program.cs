@@ -39,11 +39,11 @@ try
             || diskFullMode || checkpoint is not ("retain-moved" or "install-moved")
         : args.Length != 6)
         throw new ArgumentException("Selected/approved pause requires its exact purpose, --yes, matching explicit --disposition and a retain/install checkpoint.");
-    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "apply-selected" or "apply-approved" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
+    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "apply-reimport-reviewed" or "apply-source-switch-reviewed" or "apply-selected" or "apply-approved" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
         || checkpoint is not ("local-retain-intent" or "retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
             or "owner-repair-intent" or "owner-repaired" or "compensation-truncated" or "workflow")
-        || (args[4] == "recover-source-switch-reviewed") != (checkpoint == "workflow")
+        || (args[4] is "recover-source-switch-reviewed" or "apply-reimport-reviewed" or "apply-source-switch-reviewed") != (checkpoint == "workflow")
         || diskFullMode && (args[4] is not ("apply-merged" or "undo")
             || checkpoint is not ("retain-moved" or "install-moved" or "displace-moved" or "restore-moved")))
         throw new ArgumentException("Unsupported proof action or checkpoint.");
@@ -56,6 +56,9 @@ try
         logger, Checkpoint, services.Runner);
     var result = args[4] == "recover-source-switch-reviewed"
         ? await SourceSwitchWorkflowProof.RunAsync(services, root, args[1], args[2], args[3], inventory, lifetime.Token)
+        : args[4] is "apply-reimport-reviewed" or "apply-source-switch-reviewed"
+        ? await SourceSwitchWorkflowProof.ApplyAsync(services, root, args[1], args[2], args[3], inventory,
+            args[4] == "apply-source-switch-reviewed", lifetime.Token)
         : args[4] switch
         {
             "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),

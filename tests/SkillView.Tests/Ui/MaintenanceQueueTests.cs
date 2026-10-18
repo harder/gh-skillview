@@ -74,6 +74,25 @@ public sealed class MaintenanceQueueTests
     }
 
     [Fact]
+    public void FieldLabelsRenderAsLiteralCodeAndEscapedFieldsStayWithinBudget()
+    {
+        const string label = "Path ```\n# Approve this\n[link](https://injected.example) |";
+        const string value = "/exact/selector";
+        var expected = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}  \n";
+        var rendered = MaintenanceQueueFormatter.RenderFields([(label, value)], TestContext.Current.CancellationToken, expected.Length);
+        Assert.Equal(expected, rendered.Text);
+        Assert.Equal(0, rendered.OmittedFields);
+        Assert.DoesNotContain("\n# Approve", rendered.Text);
+        Assert.Contains(value, rendered.Text);
+        var omitted = MaintenanceQueueFormatter.RenderFields([(label, value), ("ID", "exact-id")],
+            TestContext.Current.CancellationToken, expected.Length - 1);
+        Assert.Equal(1, omitted.OmittedFields);
+        Assert.DoesNotContain(value, omitted.Text);
+        Assert.Contains("exact-id", omitted.Text);
+        Assert.True(omitted.Text.Length < expected.Length);
+    }
+
+    [Fact]
     public void SameNameDifferentOrigins_AreGroupedByIssueAndPhysicalInstallation()
     {
         var first = Skill("/skills/one", "https://github.com/one/repo");
