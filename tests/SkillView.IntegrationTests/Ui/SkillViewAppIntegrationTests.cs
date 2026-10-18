@@ -97,7 +97,9 @@ public sealed class SkillViewAppIntegrationTests
             });
             return terminal;
         }, probeOnRun: false);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        // This watchdog bounds a stalled event loop, not rendering performance.
+        // Loaded Windows runners need time to paint both 50-key phases.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var exitCode = await skillview.RunAsync(deadline.Token);
 
