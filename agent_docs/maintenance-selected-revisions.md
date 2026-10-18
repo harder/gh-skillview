@@ -1,11 +1,11 @@
 # Selected immutable revision preparation
 
-The internal selected-revision workflow is separate from routine latest updates.
+The selected-revision workflow is separate from routine latest updates.
 Its schema 7/purpose `selected-revision` reserves schema 6 for the separately
 reviewed source-switch workflow. `Selection` is omitted entirely from schemas
-1–5 and historical hashes. Public CLI/UI wiring and durable approval captures
-are subsequent M17 boundaries; this internal preparation alone is not complete
-desired-state or reprovision support.
+1–5 and historical hashes. Public CLI/UI consumers and durable approval captures
+are described in [the existing-target guide](maintenance-approved-existing-target.md).
+Selected preparation alone is not complete desired-state or reprovision support.
 
 `SelectedRevisionRequest` identifies a tag or a full commit, plus explicit pin
 intent. Resolve only that kind, retain the immutable commit/subtree tree, and

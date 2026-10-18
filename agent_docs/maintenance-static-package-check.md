@@ -1,4 +1,4 @@
-# Bounded static package checks (partial M19)
+# Bounded static package checks (M19)
 
 `check --path PATH` and `check --install-id ID` select exactly one local inventory
 installation. Paths may identify the physical payload or a captured agent exposure.
@@ -81,9 +81,9 @@ from installed dependencies, actual connections and effective permission grants.
 
 No skill scripts, agent clients, remote fetches, or automated fixes are part of
 this workflow. It does not establish authenticity, whole-agent compatibility,
-behavioral safety or source review; execution is `none`. M19 and the original
-21-item acceptance audit remain incomplete. This
-feature is a partial implementation, with original acceptance still 9/21.
+behavioral safety or source review; execution is `none`. Static checking is one
+part of the combined [original M19 acceptance](evidence/maintenance-pr71-m19-m20-final.json),
+verified and merged in PR71. Other original maintenance findings remain open.
 
 The [saved-update source-review phase](maintenance-update-source-review.md) adds
 frozen content diffs, bounded declaration deltas and explicit acknowledgement to
@@ -92,9 +92,10 @@ workflow is documented in [authoring validation](maintenance-authoring-validatio
 its gh command result is separate from installed-package static evidence.
 The [explicit offline evaluation workflow](maintenance-isolated-evaluation.md)
 requires a reviewed environment and prompts plus separate execution consent.
-Its real container/runtime proof and final combined verification remain pending;
-the [original M19 acceptance](maintenance-audit.json) is still incomplete. Never use `publish --fix`
-to repair installed updates or silently edit authored instructions.
+PR71's Linux proof exercised the explicit offline evaluator and cleanup; its
+four native hosts separately verified static checks and actual authoring dry-runs.
+Those results do not establish model quality or skill safety. Never use
+`publish --fix` to repair installed updates or silently edit authored instructions.
 
 The dialog uses `ModalOperationTracker` ownership through queued completion.
 Closing cancels and drains its worker before disposing controls; parent lifetime

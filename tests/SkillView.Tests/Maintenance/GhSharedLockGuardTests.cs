@@ -121,9 +121,25 @@ public sealed class GhSharedLockGuardTests
             var marker = Path.Combine(home.FullName, "mutated");
             var logger = new Logger();
             var runner = new ProcessRunner(logger, maxCapturedCharsPerStream: truncate ? 64 : 4096,
-                environment: new Dictionary<string, string> { ["HOME"] = home.FullName, ["SKILLVIEW_TEST_MUTATION"] = marker });
+                environment: new Dictionary<string, string>
+                {
+                    ["HOME"] = home.FullName,
+                    ["USERPROFILE"] = home.FullName,
+                    ["SKILLVIEW_STATE_HOME"] = Path.Combine(home.FullName, "maintenance-state"),
+                    ["XDG_STATE_HOME"] = Path.Combine(home.FullName, "state"),
+                    ["CLAUDE_CONFIG_DIR"] = Path.Combine(home.FullName, "claude"),
+                    ["CODEX_HOME"] = Path.Combine(home.FullName, "codex"),
+                    ["PI_CODING_AGENT_DIR"] = Path.Combine(home.FullName, "pi"),
+                    ["GIT_DIR"] = Path.Combine(home.FullName, "git-context"),
+                    ["GIT_COMMON_DIR"] = Path.Combine(home.FullName, "git-context"),
+                    ["GIT_WORK_TREE"] = home.FullName,
+                    ["GIT_CONFIG_COUNT"] = "0",
+                    ["SKILLVIEW_TEST_MUTATION"] = marker
+                }, defaultWorkingDirectory: home.FullName);
             var result = await new GhSkillInstallService(runner, logger).InstallAsync(fake, "different/repo", requested,
-                new(All: requested is null), TestContext.Current.CancellationToken);
+                // The 64-character cap exercises gh's selector listing. User
+                // placement keeps unrelated Git-root output outside that cap.
+                new(Scope: "user", All: requested is null), TestContext.Current.CancellationToken);
             Assert.False(result.Succeeded);
             Assert.Contains(truncate ? "truncated" : "existing shared selector", result.ErrorMessage, StringComparison.Ordinal);
             Assert.False(File.Exists(marker));
@@ -132,9 +148,11 @@ public sealed class GhSharedLockGuardTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ContextualDestinationOwnerBlocksRemoteAndLocalOverwrite(bool xdg)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ContextualDestinationOwnerBlocksRemoteAndLocalInstall(bool xdg, bool overwrite)
     {
         if (OperatingSystem.IsWindows()) return; // Shell child marker; portable owner guard policy tested separately.
         var root = Directory.CreateTempSubdirectory("skillview-destination-owner-");
@@ -163,9 +181,9 @@ public sealed class GhSharedLockGuardTests
             foreach (var local in new[] { false, true })
             {
                 var result = await service.InstallAsync(fake, "different/repo", "demo",
-                    new(Path: destination, Overwrite: true, FromLocal: local), TestContext.Current.CancellationToken);
+                    new(Path: destination, Overwrite: overwrite, FromLocal: local), TestContext.Current.CancellationToken);
                 Assert.False(result.Succeeded);
-                Assert.Contains("contextual owner", result.ErrorMessage, StringComparison.Ordinal);
+                Assert.Contains(overwrite ? "Force install refused" : "contextual owner", result.ErrorMessage, StringComparison.Ordinal);
                 Assert.False(File.Exists(marker));
                 Assert.Equal(content, File.ReadAllText(payload));
                 Assert.Equal(bytes, File.ReadAllText(lockPath));

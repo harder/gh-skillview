@@ -115,6 +115,43 @@ internal static class GhInstallOwnershipGuard
         }
     }
 
+    // No selector-to-native-name guess can authorize replacement. Until that
+    // mapping is proven, force is a fresh-install option only: every admitted
+    // root must be positively missing or an empty ordinary native directory.
+    internal static void RequireVacantForceDestinations(IReadOnlyList<string> destinations,
+        GhSkillInstallService.Options options, CancellationToken token)
+    {
+        if (!options.Overwrite) return;
+        if (destinations.Count is 0 or > 128) throw new IOException("Force install destination coverage is incomplete.");
+        foreach (var destination in destinations)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                using var placement = NativePlacementLease.Open(destination, token);
+                if (placement.Evidence.MissingSuffix.IsEmpty)
+                {
+                    var canonical = placement.Evidence.CanonicalPath;
+                    using var directory = NativeExposureDirectory.Open(canonical, Path.Combine(canonical, "force-install-vacancy"), token);
+                    var observed = directory.Capture(token);
+                    if ((observed.Root with { DirectoryFingerprint = null }) != (placement.Evidence.ExistingAncestor with { DirectoryFingerprint = null })
+                        || observed.Parent != observed.Root || !observed.Entries.IsEmpty)
+                        throw new IOException("Destination is occupied or its native namespace changed.");
+                    placement.Revalidate(token);
+                    directory.Validate(observed, token);
+                }
+                else placement.Revalidate(token);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException($"Force install refused for destination '{destination}': {error.Message} "
+                    + "Existing or uncertain contents are not a reviewed local-change disposition. No selector-to-native target was inferred. "
+                    + "Inspect the exact installation and its source; use a supported saved update/restore or local reimport/source-switch review with explicit retention where evidence permits. "
+                    + "Unknown provenance does not imply an available repair.", error);
+            }
+        }
+    }
+
     internal static void ValidateUnchanged(Context context, CancellationToken token)
     {
         foreach (var group in context.Claims.GroupBy(claim => claim.LockFilePath, StringComparer.Ordinal))

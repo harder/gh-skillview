@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "kind": "original-maintenance-acceptance",
+  "sourceAudit": "maintenance-audit.json",
+  "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
+  "reviewedHead": "602153ca585cf534b335b63fe871c7ce5d92d8f4",
+  "reviewedTree": "3d3ef52cf80dd493c804e2cffb69045aca47814a",
+  "verifiedMainCommit": "bf3aaf05c175cb71365a0ed30e81d98f1d9df50d",
+  "mergedPullRequest": 71,
+  "mergedAt": "2026-10-18T04:44:57Z",
+  "mergeReceiptSha256": "3c7ce404d59d6651e6facf534fb07dd140416ffa71b908f80bbc4cab63475b42",
+  "independentOriginalClauseReviewSha256": "472c0ceef47998e69470a546303679d7aaacad9fdb73bc0130d03f4f4e63df06",
+  "finalSourceBindingsSha256": "48d054a19f28de6d4788732db1e572d07a681298f20726bed6d8367efd03f3d5",
+  "acceptedItems": [
+    {
+      "id": "M19",
+      "change": "Add bounded static lint for required metadata, missing scripts/assets/references, case mismatches, broken internal links, portability and agent-specific configuration. Show content diffs for instructions, scripts and permission/tool declarations before update. Surface newly introduced network destinations or dependencies as review evidence, without declaring a skill safe based on a heuristic score. Offer opt-in isolated evaluations with representative prompts; never execute skill scripts as part of routine inventory. Reuse gh publish --dry-run for authoring validation where its repository discovery fits. gh publish --fix strips installation metadata: it is not a repair command for installed updates.",
+      "acceptance": "Valid format, agent-compatible, intact payload and reviewed source are separate states. Missing dependencies have concrete repair guidance. Evaluations require an explicit runnable environment and cannot silently incur agent/API execution. Preserve user-authored instructions unless a reviewed edit is selected."
+    },
+    {
+      "id": "M20",
+      "change": "Offer one maintenance queue grouped by issue and physical install, with source, revision, owner, exposures, confidence and recommended action. Permit row\u2192compare\u2192plan\u2192apply\u2192verify. Mark unknown update state honestly and provide an explicit refresh. Add CLI inspect/check/plan/apply/repair/undo with exact IDs, versioned JSON schemas, meaningful skipped/partial/refused codes and a plan-file contract. Separate cleanup suppression, disablement, pinning and migration. Report disk-updated versus active-session state, and agent-specific reload/restart instructions.",
+      "acceptance": "A selected row always identifies exact affected paths. Every skip/partial result explains what happened. Current Claude plugin docs say running sessions retain loaded plugin versions after background updates; display that as a reload requirement, not failed filesystem verification. Runtime state is unknown unless observed."
+    }
+  ],
+  "gates": {
+    "ciRun": 39091883468,
+    "finalAttempt": 2,
+    "conclusion": "success",
+    "codeQlRun": 39091883498,
+    "codeQlConclusion": "success",
+    "contractsRun": 39092063680,
+    "contractsConclusion": "success",
+    "contractsVersions": [
+      "2.97.0",
+      "latest"
+    ],
+    "windowsFirstAttempt": {
+      "jobId": 117570181984,
+      "conclusion": "failure",
+      "reason": "20-second ANSI watchdog expired after 90 of 100 actual navigation keys; per-key row/focus assertions remained correct.",
+      "logSha256": "db545742a08ed0af50b4111565c901818fb7e1c4f76bcde0786cae3b0d93812f"
+    },
+    "targetedRetry": {
+      "count": 1,
+      "jobId": 117587454952,
+      "conclusion": "success",
+      "totals": {
+        "failed": 0,
+        "passed": 2466,
+        "skipped": 33,
+        "total": 2499
+      },
+      "logSha256": "e44ca5b69b91ecc91e562ae7add1338ea0aed2becbcc4d83c8ad3cc641d068d7",
+      "sourceChanged": false,
+      "previouslySuccessfulAotJobsRebuilt": false
+    }
+  },
+  "artifacts": [
+    {
+      "rid": "linux-x64",
+      "artifactId": 12123671608,
+      "jobId": 117570181953,
+      "attempt": 1,
+      "zipBytes": 513345,
+      "zipSha256": "19c360866a16e6b056c7504c85fcc6862189c4317164dad3dcfb4aef0352a2d4",
+      "regularMembers": 306,
+      "semanticReviewSha256": "3be1bc9650156a71970ee15334a24925a6216108ff5c154b22a570e46cd29f07",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/39091883468/artifacts/12123671608"
+    },
+    {
+      "rid": "osx-arm64",
+      "artifactId": 12124327837,
+      "jobId": 117570181861,
+      "attempt": 1,
+      "zipBytes": 247107,
+      "zipSha256": "2b8fd49e442d1b201b9c81261b710204eceb603e359fe8a72879b22e1198fb79",
+      "regularMembers": 129,
+      "semanticReviewSha256": "08e70bde7aba1a841c46dba8c13ef51d0cf09fb1ec39f59c506b065e8757b338",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/39091883468/artifacts/12124327837"
+    },
+    {
+      "rid": "win-x64",
+      "artifactId": 12124664182,
+      "jobId": 117570181975,
+      "attempt": 1,
+      "zipBytes": 250725,
+      "zipSha256": "4c82074f4fd2e6ba46c57fdf76959c3f01bc3974aa0b3b17a77f3071ab8b6f63",
+      "regularMembers": 127,
+      "semanticReviewSha256": "8da0e0a83f6583550217b6c169bee6ee5a88c794ff34382866e14621e7a0dbea",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/39091883468/artifacts/12124664182"
+    },
+    {
+      "rid": "win-arm64",
+      "artifactId": 12125058265,
+      "jobId": 117570182019,
+      "attempt": 1,
+      "zipBytes": 249636,
+      "zipSha256": "d063db865844d6fe72c03bd443ae63301f7ffc53dc1211b7a83990f9dbb70aab",
+      "regularMembers": 127,
+      "semanticReviewSha256": "4e4832f0330dedcb7ba13b6cb99e86349c4c9db5cc833f457d40702a7b73ab3c",
+      "url": "https://github.com/harder/gh-skillview/actions/runs/39091883468/artifacts/12125058265"
+    }
+  ],
+  "observations": {
+    "eachProductOnEachNativeHost": {
+      "staticPackageCases": 18,
+      "actualGhAuthoringCases": 4,
+      "sourceSwitchRows": 22,
+      "sourceSwitchNativeUndoPositives": 18,
+      "localReimportRows": 16,
+      "localReimportNativeUndoPositives": 12,
+      "sourceFreeRecoveriesPerFamily": 8
+    },
+    "linuxEachProduct": {
+      "evaluationCases": 8,
+      "actualContainerLifecycles": 3,
+      "lifecycleOutcomes": [
+        "success",
+        "evaluator-failure",
+        "deadline-cancellation"
+      ],
+      "independentlyVerifiedCleanup": true
+    },
+    "queue": "Exact selected paths, explained partial/refused outcomes, conditional reload guidance and explicit unknown session state.",
+    "static": "Format, compatibility, payload integrity and source review remain separate assessments.",
+    "sourceReview": "Candidate bytes/declarations require independent purpose-specific acknowledgement and explicit retention."
+  },
+  "qualifications": [
+    "Four native ZIPs are attempt1 artifacts. Only the Windows test job was rerun; original failure is preserved.",
+    "All six Windows source captures differ from Git/Linux only by verified CRLF pairs; raw bytes and normalized hashes are retained separately.",
+    "Linux retains 88 nested schema5/6 raw files. macOS/Windows retain schema5 raw files but omit declared schema6 raw files because of the artifact glob; those schema6 summaries/source assertions are reviewed, not full raw replay.",
+    "New coordinator receipt flags are asserted by captured source and positive runtime rows; separate complete raw receipt files are not retained.",
+    "Evaluation fixtures use an explicit offline deterministic evaluator. They do not establish skill safety, model quality, authenticity or general container escape resistance.",
+    "Native skips/refusals remain qualified; 33 Windows full-test skips are not positive executions.",
+    "M03, M08, M09, M13-M18, M21 remain incomplete. This accepts only the original M19/M20 change and acceptance clauses."
+  ]
+}

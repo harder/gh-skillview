@@ -1122,7 +1122,7 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: install requires a repo (OWNER/REPO)");
             Console.Error.WriteLine(
                 "usage: skillview install <owner/repo>[@<ref>] [<skill>|--all] [--agent <id>]..." +
-                " [--scope project|user|custom] [--path <dir>] [--version <ref>] [--pin]" +
+                " [--scope project|user] [--path <dir>] [--version <ref>] [--pin]" +
                 " [--force] [--upstream] [--from-local]" +
                 " [--allow-hidden-dirs] [--json]");
             return ExitCodes.InvalidUsage;

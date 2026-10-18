@@ -1,6 +1,6 @@
 # Existing-target desired revisions and immutable approvals
 
-This private integration adds public consumers for the reviewed M17 stores and
+These existing-target commands provide public consumers for the reviewed M17 stores and
 M19 frozen source review. It is not full M17 acceptance. Portable sets/profiles,
 missing targets/parents, new exposure links and new shared-owner entries remain
 separate work. Actual merged-base continuity and admitted native proofs remain

@@ -64,6 +64,7 @@ public sealed class GhSkillInstallService
                     throw new IOException("An admitted install root contains an exact pinned installation. Use a saved exact-target workflow; selector-to-native placement is not proven for protected siblings.");
                 if (options.All && context?.NeedsManagedSelectors(destinations) == true)
                     throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");
+                if (mutates) GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
                 IReadOnlyList<string>? resolvedSelectors = null;
                 string? registryHome = null;
                 System.Collections.Immutable.ImmutableDictionary<string, GhSharedLockGuard.Record>? capturedRegistry = null;
@@ -126,9 +127,14 @@ public sealed class GhSkillInstallService
                     }
                     desiredPolicy?.Revalidate(cancellationToken);
                 }
+                GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
+            // Vacancy admits only ordinary fresh-install authority. A target
+            // appearing after the final observation must not receive --force.
+            // Hold the desired-policy lease through the effective child launch.
+            if (options.Overwrite) args = BuildArgs(repo, skillName, options with { Overwrite = false });
             var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
                 environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
             if (!result.Succeeded)
@@ -376,7 +382,9 @@ public sealed class GhSkillInstallService
             }
         }
 
-        if (!string.IsNullOrEmpty(options.Scope))
+        // --dir owns placement. In particular, SkillView's UI "custom" scope
+        // is not a valid gh --scope value (gh accepts only project/user).
+        if (string.IsNullOrEmpty(options.Path) && !string.IsNullOrEmpty(options.Scope))
         {
             args.Add("--scope");
             args.Add(options.Scope);
