@@ -1,5 +1,17 @@
 # AGENTS.md
 
+- Authoring validation is explicit `authoring-validate --repository PATH --dry-run`,
+  separate from installed `check` and updates. gh dry-run may perform advisory
+  API reads and cache writes; never infer safety/source review or comprehensive
+  discovery from exit zero. Preserve authored bytes and report changes, never
+  invoke `--fix`. See `agent_docs/maintenance-authoring-validation.md`.
+
+- Isolated evaluation is explicit `evaluate-review` then `evaluate-run` with an
+  exact fingerprint and `--consent-run`. Routine inspection/updates never execute
+  evaluators. Require the local digest-pinned offline Docker contract; no pulls,
+  host credentials/config or weaker fallback. Fake process tests prove protocol,
+  not actual isolation or agent quality. See `agent_docs/maintenance-isolated-evaluation.md`.
+
 - `gh skill list` uses `sourceURL` for both repository URLs and local paths.
   Classify native absolute paths before URI parsing and preserve the exact
   scanned `local-path`; retain conflicting/unknown catalog and legacy evidence.
@@ -140,6 +152,30 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   invariants in this file or focused `agent_docs/` guides.
 
 ## Critical agent notes
+
+- Product source-changing saved plans bind optional version-1 source-review
+  evidence and an explicit immutable acknowledgement separately from retention.
+  Analyze held immutable archives, never reopened live paths; enforce persisted
+  contracts even through legacy store instances. Legacy absent fields retain old
+  hashes and stay unreviewed. Pin-only changes are distinct. See
+  `agent_docs/maintenance-update-source-review.md`.
+
+- Maintenance queue rows are frozen observations, never mutation authority.
+  Route by exact issue/path/installation ID against fresh inventory and refuse
+  missing or ambiguous selections. Preserve the single-install Updates drill-in
+  restriction across refresh; never fall back to a same-name sibling. Disk
+  refresh does not check upstream availability or observe running sessions.
+  Keep selected hand-off ownership through awaited UI dispatch; retired Changes
+  requests cannot open a modal, and started dispatch stays exclusive until return.
+  See `agent_docs/maintenance-queue.md` for the M20 workflow and its limits.
+
+- Maintenance plan files are bounded local references, never imported payload
+  authority or approval. Read them through `RegularFileInspection.Capture` and
+  match ID/purpose/fingerprints/address/context against the native retained store.
+  Keep independent `--expect`, explicit retention, source-review and native
+  transition gates in specialist workflows. Generic repair cannot start a ready
+  replacement. Disk verification and conditional agent reload instructions never
+  establish active-session state. See `agent_docs/maintenance-queue.md`.
 
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention

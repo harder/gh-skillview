@@ -94,6 +94,21 @@ App/extension proofs. Four-RID minimum/current-gh lifecycle and real old-native
 schema1–5 compatibility require actual final-source CI evidence; the design and
 local refusal tests alone do not establish those gates.
 
+New product plans also freeze installed/candidate source-review archives. Review
+their changes and omissions, then declare the exact source review separately
+from retention approval with `source-switch-ack-source`. The local dialog
+requires both approvals and closes both when ID, source or hidden-directory
+options change. A declared review supplies no authenticity or safety assurance.
+The native proof includes a fresh ready plan recovered through the real workflow
+coordinator with its source-review declaration, followed by exact native undo.
+That proof is pending until its final native hosts execute. Compatibility with
+pre-review schema6 plans uses actual PR70 merge
+`5822f81077a8675724012670c6acd4c4c6abc0c9` (tree
+`cfcb6cfe819ef2d7cc302cd1b6006f4cbb8e90b1`) as its frozen native producer.
+The next native run must create its plan with that producer and exercise the
+new consumer through source disappearance, restart recovery and exact undo;
+source inspection and schemas1–5 restart proofs do not substitute for it.
+
 Frozen schema5 compatibility evidence retains the complete bounded `gh --version`
 stdout after trimming its outer whitespace, including the release URL and internal
 line endings, exactly as the native producer records it. Check the staged binary
@@ -104,3 +119,11 @@ advance the private parent's native creation-time generation, checking it back.
 Rapid directory-entry changes can share a timestamp, so clock progress alone
 cannot deterministically exercise every retry. Production generation checks and
 the four-attempt bound remain unchanged.
+
+Fresh local reimport and source-switch apply proofs enter the real saved-update
+coordinator with separate source-review and retention approvals. Missing either
+approval and a mismatched source-review fingerprint must leave the installation
+unchanged and create no acknowledgement receipt. Both valid approvals must create
+the exact receipt, install the frozen candidate, and preserve exact native undo.
+Acknowledgement and apply must use the same local plan purpose; the generic
+replacement purpose cannot acknowledge either local family.

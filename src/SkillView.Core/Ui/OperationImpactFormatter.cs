@@ -35,5 +35,11 @@ internal static class OperationImpactFormatter
             Field("Retained payload", impact.RetainedPayloadPath ?? "location unknown; inspect operation");
             Field("Retention evidence", impact.RetentionEvidence);
         }
+        Field("Active session", "unknown; filesystem verification observes disk only");
+        foreach (var reload in SkillView.Maintenance.AgentReloadGuidance.For(impact.Subject))
+        {
+            Field("Reload for " + reload.Agent, reload.Requirement + ": " + reload.Reason);
+            Field("Reload source", reload.Source ?? reload.SourceVersion);
+        }
     }
 }

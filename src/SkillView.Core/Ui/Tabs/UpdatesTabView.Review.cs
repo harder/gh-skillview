@@ -11,6 +11,7 @@ namespace SkillView.Ui.Tabs;
 internal sealed partial class UpdatesTabView
 {
     private readonly Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? _applyRunner;
+    private CheckBox _sourceReviewBox = null!;
     private CheckBox _retainBox = null!;
     private Button _applyButton = null!;
     private Button _nextButton = null!;
@@ -23,6 +24,14 @@ internal sealed partial class UpdatesTabView
 
     private void InitializeReviewControls()
     {
+        _sourceReviewBox = new CheckBox
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(8),
+            Text = "I reviewed frozen source changes and omissions (no authenticity/safety claim)",
+            Enabled = false
+        };
+        _sourceReviewBox.ValueChanged += (_, _) => RefreshReviewControls();
         _retainBox = new CheckBox
         {
             X = 0,
@@ -55,7 +64,7 @@ internal sealed partial class UpdatesTabView
             args.Handled = true;
             _runTask(SkipAndPrepareNextAsync, "updates.next-review");
         };
-        TuiHelpers.ApplyScheme(Theming.SchemeNames.Base, _retainBox, _applyButton, _nextButton);
+        TuiHelpers.ApplyScheme(Theming.SchemeNames.Base, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
     }
 
     private void RefreshReviewControls()
@@ -63,7 +72,9 @@ internal sealed partial class UpdatesTabView
         var idle = !_operationCancellations.HasActive && !_loadCancellations.HasActive;
         var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
         _retainBox.Enabled = idle && applicable;
-        _applyButton.Enabled = idle && applicable && _applyRunner is not null && _retainBox.Value == CheckState.Checked;
+        _sourceReviewBox.Enabled = idle && applicable && _review?.SourceReview is not null;
+        _applyButton.Enabled = idle && applicable && _applyRunner is not null && _retainBox.Value == CheckState.Checked
+            && (_review?.SourceReview is null || _sourceReviewBox.Value == CheckState.Checked);
         _applyButton.Text = _review?.PinPolicy is not null ? "Apply unpin only" : _review?.LocalDisposition is null ? "Replace reviewed" : "Apply reviewed merge";
         _retainBox.Text = _review?.PinPolicy is not null
             ? "Retain original; clear only pin policy for all affected consumers"
@@ -84,9 +95,11 @@ internal sealed partial class UpdatesTabView
     private async Task ApplyReviewAsync()
     {
         if (_review is not { } captured || _applyRunner is null || _retainBox.Value != CheckState.Checked
+            || captured.SourceReview is not null && _sourceReviewBox.Value != CheckState.Checked
             || _localReviewStarted && captured.LocalDisposition is null
             || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
         var hidden = _queueOptions?.AllowHiddenDirectories ?? false;
+        if (captured.SourceReview is not null) captured = captured with { AcknowledgeSourceReview = _sourceReviewBox.Value == CheckState.Checked };
         await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), dryRun: false, applying: true,
             unpinOnly: captured.PinPolicy is not null).ConfigureAwait(false);
     }
@@ -101,6 +114,7 @@ internal sealed partial class UpdatesTabView
             _review = null;
         }
         _retainBox.Value = CheckState.UnChecked;
+        _sourceReviewBox.Value = CheckState.UnChecked;
         ResetLocalReview();
         if (_queue.Count > 0) return PrepareNextAsync();
         _queueOptions = null;
@@ -134,6 +148,7 @@ internal sealed partial class UpdatesTabView
                     _review = applying ? null : result.SavedPlan;
                     ResetLocalReview();
                     _retainBox.Value = CheckState.UnChecked;
+                    _sourceReviewBox.Value = CheckState.UnChecked;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
                 }
                 _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, [], unpinOnly);
@@ -176,6 +191,7 @@ internal sealed partial class UpdatesTabView
 
     internal Task ApplyReviewForTestsAsync() => ApplyReviewAsync();
     internal Task NextReviewForTestsAsync() => SkipAndPrepareNextAsync();
+    internal CheckBox SourceReviewBoxForTests => _sourceReviewBox;
     internal CheckBox RetainBoxForTests => _retainBox;
     internal Button ApplyButtonForTests => _applyButton;
     internal string PreviewTextForTests => _preview.Text.ToString();

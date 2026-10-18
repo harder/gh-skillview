@@ -249,53 +249,54 @@ internal sealed class SkillViewWorkflowCoordinator
     public void ShowCleanupScreen()
     {
         var app = _getApp();
-        if (app is null)
-        {
-            return;
-        }
-
+        if (app is null) return;
         _setBusy("scanning for cleanup candidates…");
         _runBackground(async cancellationToken =>
         {
             var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
             var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            var candidates = CleanupClassifier.ClassifyWithCancellation(
-                snapshot,
-                snapshot.ScannedRoots,
-                options: null,
-                cancellationToken);
-            await _invokeAsync(
-                () =>
-                {
-                    _clearBusy();
-                    var screen = new CleanupScreen(
-                        app,
-                        _services.RemoveService,
-                        _services.Logger,
-                        candidates,
-                        snapshot.ProtectedRoots.ToArray(),
-                        snapshot.Skills, ownershipRunner: _services.Runner,
-                        captureInventory: token => CaptureInventoryAsync(report, token));
-                    screen.Show();
-                    if (screen.RemovedCount > 0
-                        || screen.RemovedFileCount > 0
-                        || screen.RemovedDirectoryCount > 0
-                        || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved)
-                    {
-                        _services.ListAdapter.Invalidate();
-                        // Cleanup can remove or ignore skills while the user is
-                        // sitting on the Installed/Updates list. The screen runs as
-                        // a modal overlay (not a tab switch), so nothing reloads the
-                        // underlying tab on its own — refresh it here so the list
-                        // reflects what cleanup just changed.
-                        _refreshActiveTab();
-                    }
-
-                    _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
-                },
-                cancellationToken).ConfigureAwait(false);
+            var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, cancellationToken);
+            await _invokeAsync(() =>
+            {
+                if (cancellationToken.IsCancellationRequested) return;
+                _clearBusy();
+                ShowCleanupReview(app, report, snapshot, candidates);
+            }, cancellationToken).ConfigureAwait(false);
         }, "cleanup");
     }
+
+    internal async Task ShowSelectedCleanupAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
+        ChangesSelectionGate.Lease request)
+    {
+        var app = _getApp();
+        if (app is null || !request.IsCurrent) return;
+        var report = await GetOrProbeReportAsync(request.Token).ConfigureAwait(false);
+        await SelectedCleanupHandoff.RunAsync(selected, request,
+            token => CaptureInventoryAsync(report, token), _invokeAsync,
+            (snapshot, candidates) => ShowCleanupReview(app, report, snapshot, candidates),
+            () => _setStatus("selected cleanup issue is missing or ambiguous — refresh Changes")).ConfigureAwait(false);
+    }
+
+    private void ShowCleanupReview(IApplication app, EnvironmentReport report, InventorySnapshot snapshot,
+        ImmutableArray<CleanupClassifier.Candidate> candidates)
+    {
+        var screen = new CleanupScreen(app, _services.RemoveService, _services.Logger, candidates,
+            snapshot.ProtectedRoots.ToArray(), snapshot.Skills, ownershipRunner: _services.Runner,
+            captureInventory: token => CaptureInventoryAsync(report, token));
+        screen.Show();
+        if (screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
+            || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved)
+        {
+            _services.ListAdapter.Invalidate();
+            _refreshActiveTab();
+        }
+        _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
+    }
+
+    internal static bool MatchesCleanupSelection(CleanupClassifier.Candidate candidate,
+        SkillView.Maintenance.MaintenanceQueueEntry selected) =>
+        candidate.Kind.ToString() == selected.Issue && PathIdentity.Equals(candidate.Path, selected.Cleanup?.Path ?? selected.Subject.Path)
+        && candidate.Impact?.Subject.InstallationId == selected.Subject.InstallationId;
 
 
 
@@ -386,6 +387,9 @@ internal sealed class SkillViewWorkflowCoordinator
                 reconciliation => CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, reconciliation), token), token).ConfigureAwait(false));
         if (request.Action is not (LocalReimportAction.Recover or LocalReimportAction.Undo))
             throw new ArgumentException("Unsupported local reimport action.");
+        if (request.Action == LocalReimportAction.Recover && review.AcknowledgeSourceReview && review.SourceReview is { } source)
+            await Task.Run(() => _services.SavedUpdatePlans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint,
+                source.Fingerprint, inventory, token, purpose), token).ConfigureAwait(false);
         // Reconciliation survives canceled UI delivery and uses its own deadline.
         SkillView.Maintenance.ReplacementResult result;
         string? reconciliationWarning = null;

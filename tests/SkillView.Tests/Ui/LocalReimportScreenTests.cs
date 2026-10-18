@@ -18,7 +18,7 @@ using Xunit;
 namespace SkillView.Tests.Ui;
 
 [Collection(TestCollections.TerminalGuiStaticState)]
-public sealed class LocalReimportScreenTests
+public sealed partial class LocalReimportScreenTests
 {
     private static string NewSourcePath => Path.Combine(Path.GetTempPath(), "skillview-ui-source", "demo");
 

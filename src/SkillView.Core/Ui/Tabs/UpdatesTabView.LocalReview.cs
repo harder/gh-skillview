@@ -35,7 +35,7 @@ internal sealed partial class UpdatesTabView
             () => _runTask(() => RunLocalActionAsync(LocalUpdateAction.Review), "updates.local-review"));
         _buildMergeButton = Action("Build merge", Pos.Right(_localReviewButton) + 1, Pos.AnchorEnd(7),
             () => _runTask(() => RunLocalActionAsync(LocalUpdateAction.Build), "updates.build-merge"));
-        _localPanel = new View { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(8), Visible = false, CanFocus = true };
+        _localPanel = new View { X = 0, Y = 1, Width = Dim.Fill(), Height = Dim.Fill(9), Visible = false, CanFocus = true };
         _localPaths = new TableView
         {
             X = 0,
@@ -133,6 +133,7 @@ internal sealed partial class UpdatesTabView
         // capture or UI delivery fails after creating private evidence.
         if (action != LocalUpdateAction.Preserve) _localReviewStarted = true;
         _retainBox.Value = CheckState.UnChecked;
+        _sourceReviewBox.Value = CheckState.UnChecked;
         SetBusy(true);
         SetOperationControlsEnabled(false);
         _status.Text = action switch

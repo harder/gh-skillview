@@ -36,6 +36,8 @@ old_commit = '33789149b9def6b66ddf247438a79fac94e22074'
 results = []
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def manifest(directory):
     rows = []
     for path in [directory, *sorted(directory.rglob('*'))]:
@@ -327,6 +329,7 @@ for gh_path in args.gh:
         merged_bytes = manifest(Path(merged['candidatePath']))
         merged_id = Path(merged['candidatePath']).stat().st_ino
         merged_objects = native_objects(Path(merged['candidatePath']))
+        acknowledge_frozen_source(run, merged)
         refused = run('update-apply', '--id', merged['id'], '--yes', '--disposition', 'retain-original', '--expect', merged['planFingerprint'], ok=False)
         assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], (commands[-1], refused.get('error'))
         assert 'exact saved disposition: merge-reviewed' in refused['error'].lower(), refused

@@ -65,14 +65,16 @@ def main():
                 'escaped-character-reference': '[Escaped](references/a\\&amp;b.md)\n',
                 'link-parent-segment': '`scripts/pointer/../tool.py`\n',
             }
-            for scenario in ('intact', 'missing-reference', 'case-mismatch', 'invalid-metadata', *edge_bodies):
+            additional = ('broken-anchor', 'anchor-case', 'dependency-local-missing', 'declared-dependency',
+                          'malformed-dependency', 'portability', 'gemini-bom')
+            for scenario in ('intact', 'missing-reference', 'case-mismatch', 'invalid-metadata', *edge_bodies, *additional):
                 payload = skills / scenario
                 (payload / 'references').mkdir(parents=True)
                 (payload / 'scripts').mkdir()
                 marker = root / (scenario + '-executed')
                 (payload / 'scripts' / 'check.py').write_text(
                     'from pathlib import Path\nPath(' + repr(str(marker)) + ').write_text("executed")\n', encoding='utf-8')
-                (payload / 'references' / 'guide.md').write_text('Local resource.\n', encoding='utf-8')
+                (payload / 'references' / 'guide.md').write_text('# Local Resource\n', encoding='utf-8')
                 (payload / 'references' / 'a&b.md').write_text('Local resource.\n', encoding='utf-8')
                 (payload / 'references' / 'a&amp;b.md').write_text('Local resource.\n', encoding='utf-8')
                 outside = None
@@ -89,25 +91,66 @@ def main():
                 if scenario == 'invalid-metadata':
                     header = '---\nname: ' + scenario + '\n---\n'
                 body = edge_bodies.get(scenario, '[Guide](' + target + ')\n')
+                if scenario in ('broken-anchor', 'anchor-case'):
+                    target = 'references/guide.md#' + ('missing' if scenario == 'broken-anchor' else 'Local-resource')
+                    body = '[Guide](' + target + ')\n'
+                if scenario in ('dependency-local-missing', 'declared-dependency', 'malformed-dependency'):
+                    dependency = {'dependencies': {'local': 'file:vendor/missing'}} if scenario == 'dependency-local-missing' else (
+                        {'dependencies': {'reviewed-name': '^2'}} if scenario == 'declared-dependency' else {'dependencies': []})
+                    (payload / 'package.json').write_text(json.dumps(dependency), encoding='utf-8')
+                if scenario == 'portability':
+                    (payload / 'scripts' / 'check.sh').write_bytes(b'#!/bin/bash\r\n# Not executed\r\n')
+                if scenario == 'gemini-bom':
+                    header = '\ufeff' + header
                 (payload / 'SKILL.md').write_text(header + '\n' + body + '\n`scripts/check.py`\n', encoding='utf-8')
                 before = manifest(payload)
-                process = subprocess.run([str(app), '--scan-root', str(skills), 'check', '--path', str(payload), '--json'],
+                command = [str(app), '--scan-root', str(skills), 'check', '--path', str(payload), '--json']
+                if scenario == 'gemini-bom':
+                    command += ['--agent', 'gemini-cli', '--agent-version', '0.46.0']
+                process = subprocess.run(command,
                                          cwd=root, env=env, capture_output=True, text=True, timeout=120)
                 report = json.loads(process.stdout)
-                assert report['schemaVersion'] == 1 and report['execution'] == 'none', report
+                assert report['schemaVersion'] == 2 and report['execution'] == 'none', report
                 assert report['agentCompatibility'] == report['sourceReview'] == 'not-assessed', report
+                dimensions = report['assessments']
+                assert dimensions['sourceReviewed']['state'] == 'not-reviewed', report
+                assert dimensions['format']['state'] == report['formatStatus'], report
+                assert dimensions['format']['fingerprint'] == hashlib.sha256((payload / 'SKILL.md').read_bytes()).hexdigest().upper(), report
+                assert dimensions['agentCompatibility']['state'] == ('incompatible' if scenario == 'gemini-bom' else 'unknown'), report
+                assert report['rootMetadataSha256'] == dimensions['format']['fingerprint'], report
                 assert report['coverage']['payload'] == 'complete', report
                 assert report['payloadFingerprint'] and report['installationId'], report
-                if scenario in ('intact', 'escaped-character-reference'):
+                if scenario in ('intact', 'escaped-character-reference', 'declared-dependency', 'portability'):
                     assert process.returncode == 0 and not report['hasErrors'], (process.returncode, report, process.stderr)
                     assert report['formatStatus'] == 'valid', report
                     assert report['referenceStatus'] == 'none-observed', report
                     assert report['coverage']['references'] == 'limited', report
+                    assert dimensions['payloadIntact']['state'] == 'unknown', report
+                    assert dimensions['payloadIntact']['observedCondition'] == 'no-supported-reference-defects-observed', report
+                    assert any('expected payload baseline' in reason for reason in dimensions['payloadIntact']['reasons']), report
+                    if scenario == 'declared-dependency':
+                        assert any(item['category'] == 'dependency' and item['value'] == 'reviewed-name@^2'
+                                   and item['state'] == 'availability-unknown' and 'selected Node environment' in item['repair']
+                                   for item in report['observations']), report
+                    if scenario == 'portability':
+                        assert any(item['kind'] == 'shebang-crlf' and item['state'] == 'review'
+                                   for item in report['observations']), report
+                elif scenario in ('gemini-bom', 'malformed-dependency'):
+                    assert process.returncode == 1 and not report['hasErrors'], (process.returncode, report, process.stderr)
+                    assert dimensions['format']['state'] == 'valid' and dimensions['payloadIntact']['state'] == 'unknown', report
+                    assert dimensions['payloadIntact']['observedCondition'] == 'no-supported-reference-defects-observed', report
+                    if scenario == 'gemini-bom':
+                        assert any(source['revision'] == 'v0.46.0' for source in dimensions['agentCompatibility']['sources']), report
+                    else:
+                        assert report['declarationCoverage'] == 'partial', report
+                        assert any(item['kind'] == 'unsupported-manifest' and item['state'] == 'unknown'
+                                   for item in report['observations']), report
                 elif scenario in edge_bodies:
                     assert not report['hasErrors'], (process.returncode, report, process.stderr)
                     assert report['formatStatus'] == 'valid', report
                     assert report['coverage']['references'] == 'partial' and report['referenceStatus'] == 'unknown', report
                     assert process.returncode == 1, (process.returncode, report)
+                    assert dimensions['payloadIntact']['state'] == 'unknown', report
                     assert not any(finding['code'] in ('reference-missing', 'reference-case-mismatch')
                                    for finding in report['findings']), report
                 else:
@@ -118,10 +161,15 @@ def main():
                         assert report['referenceStatus'] == 'none-observed', report
                     else:
                         assert report['formatStatus'] == 'valid', report
-                        expected_code = 'reference-missing' if scenario == 'missing-reference' else 'reference-case-mismatch'
-                        assert any(finding.get('target') == target and finding['code'] == expected_code
+                        expected_code = {'missing-reference': 'reference-missing', 'case-mismatch': 'reference-case-mismatch',
+                                         'broken-anchor': 'reference-anchor-missing', 'anchor-case': 'reference-anchor-case-mismatch',
+                                         'dependency-local-missing': 'dependency-file-missing'}[scenario]
+                        expected_target = 'vendor/missing' if scenario == 'dependency-local-missing' else target
+                        assert any(finding.get('target') == expected_target and finding['code'] == expected_code
                                    for finding in report['findings']), report
                         assert report['referenceStatus'] == 'findings', report
+                        assert dimensions['payloadIntact']['state'] == 'unknown', report
+                        assert dimensions['payloadIntact']['observedCondition'] == 'local-defects-observed', report
                 assert manifest(payload) == before, 'Check changed payload bytes, native objects or modes'
                 if outside is not None:
                     assert manifest(outside) == outside_before, 'Check changed the external link target'
@@ -129,9 +177,11 @@ def main():
                 rows.append(dict(scenario=scenario, exitCode=process.returncode, formatStatus=report['formatStatus'],
                                  referenceStatus=report['referenceStatus'], sourceUnchanged=True,
                                  referenceCoverage=report['coverage']['references'],
+                                 assessmentStates={key: value['state'] for key, value in dimensions.items()},
+                                 declarationCoverage=report['declarationCoverage'],
                                  referencedScriptNotExecuted=True, payloadFingerprint=report['payloadFingerprint']))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(dict(schemaVersion=1, appSha256=hashlib.sha256(app.read_bytes()).hexdigest(),
+    args.output.write_text(json.dumps(dict(schemaVersion=1, packageCheckSchemaVersion=2, appSha256=hashlib.sha256(app.read_bytes()).hexdigest(),
                                           httpProxiesBlocked=True, githubCredentialsRemoved=True, rows=rows), indent=2) + '\n', encoding='utf-8')
     print(args.output)
 

@@ -1,5 +1,8 @@
-"""Verify saved schema5 witnesses and checkout framing without product hosts."""
+"""Verify saved schema5/schema6 witnesses and checkout framing without product hosts."""
 import importlib.util
+import contextlib
+import io
+import json
 import os
 from pathlib import Path
 import shlex
@@ -7,13 +10,70 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('old_native_reimport_witness', Path(__file__).with_name('prove-old-native-reimport.py'))
 proof = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(proof)
+docker_spec = importlib.util.spec_from_file_location('old_native_source_switch_docker', Path(__file__).with_name('run-local-source-switch-docker.py'))
+docker = importlib.util.module_from_spec(docker_spec)
+docker_spec.loader.exec_module(docker)
 
 
 class OldNativeReimportWitnessTests(unittest.TestCase):
+    def test_container_proof_cannot_omit_or_substitute_the_schema6_producer(self):
+        with tempfile.TemporaryDirectory(prefix='skillview-producer-admission-') as temporary:
+            root = Path(temporary)
+            output = root / 'no-output'
+            common = [str(root / 'wrapper.py'), '--app', 'absent-current', '--proof-host-dir', 'absent-proof',
+                      '--gh', 'absent-gh', '--legacy-app', 'absent-schema5', '--legacy-checkout', 'absent-checkout5',
+                      '--legacy-kill-boundary', 'retain-moved', '--platform', 'linux/amd64', '--output', str(output)]
+            producer = ['--source-switch-legacy-app', 'absent-schema6', '--source-switch-legacy-checkout', 'absent-checkout6']
+            for captured6, extra, error in [('b' * 40, [], '--source-switch-legacy-app'),
+                                           ('', producer, 'schema6 baseline is unavailable'),
+                                           ('a' * 40, producer, 'distinct actual native producers')]:
+                with self.subTest(schema6=captured6, omitted=not extra):
+                    (root / 'prove-old-native-reimport.py').write_text(
+                        'BASELINE = ' + repr('a' * 40) + '\nSOURCE_SWITCH_BASELINE = ' + repr(captured6) + '\n')
+                    diagnostics = io.StringIO()
+                    with patch.object(docker, '__file__', str(root / 'wrapper.py')), \
+                         patch.object(sys, 'argv', common + extra), contextlib.redirect_stderr(diagnostics), \
+                         patch.object(docker.shutil, 'which', side_effect=AssertionError('Looked up Docker before producer admission')):
+                        with self.assertRaises(SystemExit) as refused:
+                            docker.main()
+                    self.assertNotEqual(0, refused.exception.code)
+                    self.assertIn(error, diagnostics.getvalue())
+                    self.assertFalse(output.exists())
+
+    def test_unbound_schema6_cannot_open_tools_or_leave_positive_evidence(self):
+        with tempfile.TemporaryDirectory(prefix='skillview-unbound-proof-') as temporary:
+            output = Path(temporary) / 'proof.json'
+            output.write_text('{"proofCompleted": true, "compatibilityVerified": true}')
+            arguments = [proof.__file__, '--legacy-schema', '6', '--old-app', 'absent-old',
+                         '--old-checkout', 'absent-checkout', '--app', 'absent-current',
+                         '--proof-host', 'absent-host', '--gh', 'absent-gh',
+                         '--kill-boundary', 'retain-moved', '--output', str(output)]
+            with patch.object(proof, 'SOURCE_SWITCH_BASELINE', ''), patch.object(sys, 'argv', arguments), \
+                 patch.object(proof, '_output', None), patch.object(proof, '_raw', None), \
+                 patch.object(proof, '_baseline', proof.BASELINE), \
+                 patch.object(proof, 'native_tool', side_effect=AssertionError('Opened a tool before binding')):
+                with self.assertRaisesRegex(ValueError, 'final merged baseline'):
+                    proof.main()
+            recorded = json.loads(output.read_text())
+            self.assertFalse(recorded['proofCompleted'])
+            self.assertFalse(recorded['compatibilityVerified'])
+            self.assertFalse(output.with_name('proof-raw').exists())
+
+    def test_fixture_environment_neutralizes_mixed_case_inherited_git_and_auth(self):
+        root = Path('/fixture')
+        with patch.dict(os.environ, {'git_dir': 'poison', 'Git_Work_Tree': 'poison',
+                                     'gh_token': 'poison', 'Github_Token': 'poison'}):
+            captured = proof.fixture_environment(root, root / 'home', root / 'state', root / 'gh', 'http://127.0.0.1:1')
+        self.assertFalse(any(value == 'poison' for value in captured.values()))
+        self.assertEqual(str(root / 'private-git'), captured['GIT_DIR'])
+        self.assertEqual(str(root), captured['GIT_WORK_TREE'])
+        self.assertEqual('0', captured['GIT_CONFIG_COUNT'])
+
     def test_ci_baseline_checkouts_stay_clean_when_global_config_converts_line_endings(self):
         workflow = Path(__file__).resolve().parents[2] / '.github/workflows/ci.yml'
         commands = [shlex.split(line.strip()) for line in workflow.read_text().splitlines()

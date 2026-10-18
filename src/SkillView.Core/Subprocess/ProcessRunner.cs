@@ -15,6 +15,7 @@ public sealed class ProcessRunner
     private readonly TimeSpan _terminationWait;
     private readonly IReadOnlyDictionary<string, string>? _environment;
     private readonly string? _defaultWorkingDirectory;
+    private bool ReplaceEnvironment { get; init; }
     internal string EffectiveWorkingDirectory => _defaultWorkingDirectory ?? Environment.CurrentDirectory;
 
     internal string? GetEffectiveEnvironmentVariable(string name, IReadOnlyDictionary<string, string>? overrides = null)
@@ -23,7 +24,7 @@ public sealed class ProcessRunner
         var local = overrides?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
         if (local?.Key is not null) return local.Value.Value;
         var configured = _environment?.FirstOrDefault(pair => string.Equals(pair.Key, name, comparison));
-        return configured?.Key is not null ? configured.Value.Value : Environment.GetEnvironmentVariable(name);
+        return configured?.Key is not null ? configured.Value.Value : ReplaceEnvironment ? null : Environment.GetEnvironmentVariable(name);
     }
 
     public ProcessRunner(
@@ -48,12 +49,26 @@ public sealed class ProcessRunner
     internal ProcessRunner WithContext(string workingDirectory, IReadOnlyDictionary<string, string> overrides)
     {
         var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
-            if (entry.Key is string key && entry.Value is string value) values[key] = value;
+        if (!ReplaceEnvironment)
+            foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+                if (entry.Key is string key && entry.Value is string value) values[key] = value;
         if (_environment is not null) foreach (var pair in _environment) values[pair.Key] = pair.Value;
         foreach (var pair in overrides) values[pair.Key] = pair.Value;
-        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory);
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
     }
+
+    /// An explicit allowlist context uses the same frozen-environment mechanism
+    /// as WithContext, but deliberately inherits no ambient/configured values.
+    internal ProcessRunner WithIsolatedContext(string workingDirectory, IReadOnlyDictionary<string, string> environment)
+    {
+        var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var pair in environment) values[pair.Key] = pair.Value;
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+    }
+
+    internal ProcessRunner WithCaptureLimit(int remainingCharacters) =>
+        new(_logger, Math.Min(_maxCapturedCharsPerStream, Math.Max(1, remainingCharacters)), _terminationWait, _environment, _defaultWorkingDirectory)
+        { ReplaceEnvironment = ReplaceEnvironment };
 
     public async Task<ProcessResult> RunAsync(
         string executable,
@@ -81,6 +96,7 @@ public sealed class ProcessRunner
         {
             psi.ArgumentList.Add(arg);
         }
+        if (ReplaceEnvironment) psi.Environment.Clear();
         if (_environment is not null)
             foreach (var (name, value) in _environment) psi.Environment[name] = value;
         if (environment is not null)
@@ -172,7 +188,7 @@ public sealed class ProcessRunner
                 catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException) { }
                 return new ProcessResult(executable, arguments, 130,
                     stdout.ToString(), stderr.ToString(), sw.Elapsed)
-                { Cancelled = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
+                { Started = true, Cancelled = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
             }
             throw;
         }
@@ -186,7 +202,7 @@ public sealed class ProcessRunner
             stdout.ToString(),
             stderr.ToString(),
             sw.Elapsed)
-        { StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
+        { Started = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
 
         _logger.Debug("subprocess",
             $"exit={result.ExitCode} dur={result.Duration.TotalMilliseconds:F0}ms {executable}");

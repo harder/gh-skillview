@@ -24,6 +24,8 @@ old_commit = '33789149b9def6b66ddf247438a79fac94e22074'
 results = []
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def manifest(directory):
     entries = [('/', 'directory', stat.S_IMODE(directory.stat().st_mode) if os.name != 'nt' else None, '')]
     for path in sorted(directory.rglob('*')):
@@ -94,6 +96,7 @@ for gh_path in gh_paths:
             assert 'SKILL.md' in revision['localChanges'] and 'user-extra' in revision['localChanges']
             assert revision['source']['tree'] != plan['subject']['metadata']['githubTreeSha'], 'Fixture requires an actual available update'
             assert manifest(payload) == original and registry_path.read_bytes() == registry
+            acknowledge_frozen_source(run, plan)
             approved = manifest(Path(plan['candidatePath']))
             stage_identity = Path(plan['candidatePath']).stat().st_ino
             run('update-apply', '--id', plan['id'], '--yes', '--disposition', 'retain-original', '--expect', '0' * 64, ok=False)
@@ -108,6 +111,7 @@ for gh_path in gh_paths:
             assert undone['succeeded'] and undone['status'] == 'restored', undone
             assert manifest(payload) == original and payload.stat().st_ino == identity
             restart_plan = run('update-plan', '--path', payload, '--unpin')['operation']
+            acknowledge_frozen_source(run, restart_plan)
             process = subprocess.Popen([str(app), '--scan-root', str(first), '--scan-root', str(second), 'update-apply',
                                         '--id', restart_plan['id'], '--yes', '--disposition', 'retain-original',
                                         '--expect', restart_plan['planFingerprint'], '--allow-hidden-dirs', '--json'],

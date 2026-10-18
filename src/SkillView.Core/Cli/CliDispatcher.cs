@@ -42,6 +42,11 @@ public static partial class CliDispatcher
                 "list" => await ListAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "effective" => await EffectiveAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "check" => await CheckAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "authoring-validate" => await AuthoringAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "evaluate-review" or "evaluate-run" => await EvaluateAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "queue" => await QueueAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "inspect" or "plan" or "apply" or "repair" or "verify" => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "undo" when options.SubcommandArgs.Contains("--plan-file") => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -51,10 +56,10 @@ public static partial class CliDispatcher
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => await LocalReviewAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+                "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
                     or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
                     or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner" => await RestoreAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "quarantine" or "undo" or "quarantine-history" => await QuarantineAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "remove" => await RemoveAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -79,12 +84,14 @@ public static partial class CliDispatcher
 
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
+        "evaluate-review" => TimeSpan.FromMinutes(2),
+        "evaluate-run" => TimeSpan.FromMinutes(10),
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "check" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
-        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+        "list" or "effective" or "check" or "authoring-validate" or "queue" or "inspect" or "verify" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "plan" or "apply" or "repair" or "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
-            or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
+            or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
             or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner"
             or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
@@ -1511,6 +1518,7 @@ public static partial class CliDispatcher
             foreach (var arg in new[] { "update-apply", "--id", plan.Id, "--expect", plan.PlanFingerprint, "--yes", "--disposition", "retain-original" }) w.WriteStringValue(arg);
             if (p.AllowHiddenDirectories) w.WriteStringValue("--allow-hidden-dirs");
             w.WriteEndArray();
+            WritePlanReference(w, plan);
             w.WriteString("applyContext", "Reuse the same HOME, state, working directory and global scan/workspace/profile options.");
         }
         w.WriteString("stdout", r.StdOut);
@@ -2298,7 +2306,14 @@ public static partial class CliDispatcher
             | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `effective` | Explain conditional loading policy for an exact agent/profile/project. Native inventory and active-session state stay separate. | `--agent`, `--profile`, `--project`, `--cwd`, `--config-dir`, `--client-version`, `--agent-name`, `--trust`, `--json` |
-            | `check` | Check bounded local package metadata and supported references without running skill code. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
+            | `authoring-validate` | Explicitly run gh publish dry-run on a selected source repository; may contact GitHub and write cache state. | `--repository PATH`, `--dry-run`, `--json` |
+            | `evaluate-review` | Freeze a package, explicit offline Docker environment and representative prompts without launching Docker. | `--path`, `--config`, `--json` |
+            | `evaluate-run` | Explicitly run the reviewed offline evaluation. Requires a local Linux Docker daemon and already-local digest-pinned image. | `--path`, `--config`, `--review`, `--consent-run`, `--json` |
+            | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
+            | `queue` | Refresh read-only maintenance observations grouped by issue and physical installation. Update availability and running-session state remain unknown. | `--install-id`, `--allow-hidden-dirs`, `--json` (schema 1) |
+            | `inspect` | Inspect one exact installation, or verify locations of a saved local plan reference. | `--path` / `--install-id`, or `--plan-file`, `--json` |
+            | `plan` | Save one immutable specialist candidate and compare installed/candidate file evidence. JSON includes a local plan reference. | `--purpose update-revision` / `restore-recorded` / `unpin-only` / `local-reimport` / `switch-local-source`, `--path` / `--install-id`, `--new-source` for source switching, `--json` |
+            | `apply`, `repair`, `undo`, `verify` | Resolve a bounded local plan-reference file through the retained native store. Repair resumes a recognized transaction; it never invents owner repair. | `--plan-file`, execution requires separate `--yes --expect`; apply also requires explicit specialist `--disposition`; `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |
@@ -2318,6 +2333,7 @@ public static partial class CliDispatcher
             | `update-merge-choose` | Save complete explicit path choices; use `/` for root mode. Freeze a custom regular file or reuse previously captured bytes. | `--id`, `--expect <local review fingerprint>`, repeated `--choose-installed <path>` / `--choose-source <path>` / `--choose-resolved <path>` / `--resolve <path> <file>`, `--json` |
             | `update-merge-plan` | Build and save a separately approved merged candidate with preserved supported native metadata. No live installation change. | `--id`, `--expect <local review fingerprint>`, `--json` |
             | `update-preserve` | Verify and keep the current installation without moving payloads, writing its owner or changing preferences. | `--id`, `--expect <plan fingerprint>`, `--json` |
+            | `update-ack-source`, `reimport-ack-source`, `source-switch-ack-source`, `restore-ack-source` | Declare review of an exact frozen diff, independently of retention approval. No authenticity or safety claim. | `--id --expect <plan> --review <source-review fingerprint> --yes`, `--json` |
             | `update-inspect`, `update-apply`, `update-recover`, `update-undo` | Inspect, apply, recover or undo a saved revision update. Apply must match its saved replacement or merged disposition. | `--id`, `--expect`, `--yes`, `--disposition retain-original` / `merge-reviewed`, `--json` |
             | `update-repair-owner` | Repair only a recognized torn registry from its explicitly reviewed retained image. Inspect again before resuming payload recovery. | `--id`, `--yes --expect`, `--json` |
             | `restore-inspect` | Verify saved plan locations and obtain a recovery review fingerprint. | `--id`, `--json` |

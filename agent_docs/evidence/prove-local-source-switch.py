@@ -15,19 +15,21 @@ import subprocess
 import tempfile
 import threading
 import time
+from source_review_proof import acknowledge_frozen_source
 
 _helpers_path = Path(__file__).with_name('prove-local-reimport.py')
 _proof_output = None
 
 
 def load_helpers():
-    global digest, manifest, objects, root_security, executable, prepare_windows_fixture_owner
+    global digest, manifest, objects, root_security, executable, prepare_windows_fixture_owner, verify_source_receipt
     spec = importlib.util.spec_from_file_location('skillview_reimport_fixture_helpers', _helpers_path)
     helpers = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helpers)
     digest, manifest, objects = helpers.digest, helpers.manifest, helpers.objects
     root_security, executable = helpers.root_security, helpers.executable
     prepare_windows_fixture_owner = helpers.prepare_windows_fixture_owner
+    verify_source_receipt = helpers.verify_source_receipt
 
 
 def native_directory_id(path):
@@ -198,7 +200,8 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
             kills.append(dict(action=action, boundary=boundary, readyObserved=True, killRequested=True,
                               exitCode=process.returncode, outputReaderDrained=not reader.is_alive()))
 
-        planned = run('source-switch-plan', '--path', payload, '--new-source', source,
+        plan_command = ('plan', '--purpose', 'switch-local-source') if case == 'normal' else ('source-switch-plan',)
+        planned = run(*plan_command, '--path', payload, '--new-source', source,
                       expected=1 if metadata_refusal else 0)
         if metadata_refusal:
             assert planned.get('succeeded') is False and metadata_refusal in planned.get('error', ''), planned
@@ -208,6 +211,11 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
                         explicitMetadataRefusal=metadata_refusal,
                         installedNativeObjectsUnchanged=True, bothExternalSourcesUnchanged=True, commands=commands, processKills=kills)
         saved = planned['operation']
+        reference_path = root / 'source-switch-reference.json'
+        if case == 'normal':
+            assert planned['planReference']['purpose'] == 'switch-local-source', planned
+            reference_path.write_text(json.dumps(planned['planReference']) + '\n')
+            reference_bytes = reference_path.read_bytes()
         assert saved['succeeded'] and saved['status'] == 'planned' and saved['localSource']['status'] == 'current', saved
         plan_path = Path(saved['planPath']); frozen_plan = plan_path.read_bytes(); plan = json.loads(frozen_plan)
         assert plan['schemaVersion'] == 6 and plan['purpose'] == 'switch-local-source'
@@ -245,6 +253,15 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         assert planned['applyArguments'] == ['source-switch-apply', '--id', saved['id'], '--yes', '--disposition',
                                              'replace-local-source-retain-original', '--expect', saved['planFingerprint'], '--allow-hidden-dirs']
         if case == 'normal':
+            refusal = run('apply', '--plan-file', reference_path, '--yes', '--disposition',
+                          'replace-local-source-retain-original', '--expect', saved['planFingerprint'], expected=1)
+            assert 'source-review acknowledgement' in refusal['error'], refusal
+            assert manifest(payload) == before and objects(payload) == before_objects
+            assert not Path(saved['retainedPath']).exists()
+            source_unchanged()
+        if case not in ('coordinator-recover', 'coordinator-apply'):
+            acknowledge_frozen_source(run, saved, 'source-switch')
+        if case == 'normal':
             private_before = manifest(plan_path.parent)
             for family, disposition in [('restore', 'retain-original'), ('update', 'retain-original'),
                                         ('unpin', 'unpin-only'), ('reimport', 'replace-local-retain-original')]:
@@ -273,12 +290,30 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
                         staleNewSourceRefusedBeforeRetain=True,
                         persistedRetainIntent=case == 'local-retain-intent', installedNativeObjectsUnchanged=True,
                         immutablePlanUnchanged=True, commands=commands, processKills=kills)
-        if case in ('retain-moved', 'install-moved'):
+        if case in ('coordinator-recover', 'coordinator-apply'):
+            inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
+            assert inspection['status'] == 'ready' and not inspection['sourceReviewAcknowledged'], inspection
+            assert not list(plan_path.parent.glob('source-review-*.json'))
+            process = subprocess.run([str(proof_host), str(root), str(gh), saved['id'], inspection['reviewFingerprint'],
+                                      'recover-source-switch-reviewed' if case == 'coordinator-recover' else 'apply-source-switch-reviewed',
+                                      'workflow'], env=env, cwd=root,
+                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+            assert process.returncode == 0, (process.returncode, process.stdout, process.stderr)
+            applied = json.loads(process.stdout)
+            commands.append(dict(command='coordinator-source-switch-' + ('recover' if case == 'coordinator-recover' else 'apply') + '-reviewed',
+                                 exitCode=process.returncode))
+            assert applied['sourceReviewAcknowledged'], applied
+            verify_source_receipt(plan_path, plan)
+            assert not marker.exists() and not any(path.exists() for path in registries)
+        elif case in ('retain-moved', 'install-moved'):
             kill_at(saved, 'apply-source-switch', saved['planFingerprint'], case)
             shutil.rmtree(source); shutil.rmtree(old_source)
             inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
             assert inspection['localSource']['status'] == 'not-required-after-retain', inspection
             applied = run('source-switch-recover', '--id', saved['id'], '--yes', '--expect', inspection['reviewFingerprint'])['operation']
+        elif case == 'normal':
+            applied = run('apply', '--plan-file', reference_path, '--yes', '--disposition',
+                          'replace-local-source-retain-original', '--expect', saved['planFingerprint'])['operation']
         else:
             applied = run('source-switch-apply', '--id', saved['id'], '--yes', '--disposition',
                           'replace-local-source-retain-original', '--expect', saved['planFingerprint'])['operation']
@@ -293,13 +328,17 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
             assert sorted(path.name for path in plan_path.parent.parent.iterdir()) == plan_ids
             assert manifest(payload) == candidate_bytes and objects(payload) == candidate_objects
             source_unchanged()
-        inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
+        inspection = (run('verify', '--plan-file', reference_path) if case == 'normal'
+                      else run('source-switch-inspect', '--id', saved['id']))['operation']
         if case in ('displace-moved', 'restore-moved'):
             kill_at(saved, 'undo-source-switch', inspection['reviewFingerprint'], case)
             shutil.rmtree(source); shutil.rmtree(old_source)
             inspection = run('source-switch-inspect', '--id', saved['id'])['operation']
             assert inspection['localSource']['status'] == 'not-required-after-retain', inspection
-        undone = run('source-switch-undo', '--id', saved['id'], '--yes', '--expect', inspection['reviewFingerprint'])['operation']
+        undone = (run('undo', '--plan-file', reference_path, '--yes', '--expect', inspection['reviewFingerprint']) if case == 'normal'
+                  else run('source-switch-undo', '--id', saved['id'], '--yes', '--expect', inspection['reviewFingerprint']))['operation']
+        if case == 'normal':
+            assert reference_path.read_bytes() == reference_bytes
         assert undone['succeeded'] and undone['status'] == 'restored', undone
         assert manifest(payload) == before and objects(payload) == before_objects
         assert root_security(payload) == original_root_security
@@ -309,6 +348,9 @@ def run_case(app, proof_host, gh, case, metadata_refusal):
         return dict(case=case, candidateNativePreparationSucceeded=True, liveReplacementInstalled=True,
                     actualGhWitnessVerified=True, oldPlacementNativeAncestorAndMissingBoundaryVerified=True,
                     distinctLocalSourceTrackingReviewed=True, capturedAuthoredBytesPreservedExceptApprovedLocalPath=True,
+                    coordinatorRecoverCreatedExactSourceReviewReceipt=case == 'coordinator-recover',
+                    coordinatorApplyEnforcedIndependentApprovalsAndCreatedExactReceipt=case == 'coordinator-apply',
+                    genericPlanReferenceLifecycleWithIndependentSourceApproval=case == 'normal',
                     equalAuthoredTrackingChangePlans=case == 'equal-authored', missingOldSourceAdmitted=case == 'old-source-missing',
                     sameRecordedSourceRefusedBeforePlan=case == 'normal', legacyCommandFamiliesRefusedWithoutWrites=case == 'normal',
                     installedRootPrivacyPreserved=True,
@@ -336,7 +378,7 @@ def main():
     for gh in gh_paths:
         version = subprocess.check_output([str(gh), '--version'], text=True, timeout=30).splitlines()[0]
         cases = ('metadata-refusal',) if args.expect_metadata_refusal else (
-            'normal', 'equal-authored', 'old-source-missing', 'stale-source', 'local-retain-intent',
+            'normal', 'coordinator-recover', 'coordinator-apply', 'equal-authored', 'old-source-missing', 'stale-source', 'local-retain-intent',
             'retain-moved', 'install-moved', 'displace-moved', 'restore-moved')
         for case in cases:
             row = run_case(app, proof_host, gh, case, args.expect_metadata_refusal)

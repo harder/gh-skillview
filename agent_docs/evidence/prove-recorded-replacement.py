@@ -24,6 +24,8 @@ revision = '33789149b9def6b66ddf247438a79fac94e22074'
 results = []
 
 
+from source_review_proof import acknowledge_frozen_source
+
 def manifest(directory):
     entries = [('/', 'directory', stat.S_IMODE(directory.stat().st_mode) if os.name != 'nt' else None, '')]
     for path in sorted(directory.rglob('*')):
@@ -96,6 +98,7 @@ for gh_path in gh_paths:
             assert plan['status'] == 'planned' and not plan['mutationObserved'], plan
             assert '.skillview-ignore' in plan['changedPaths'] and 'user-extra' in plan['changedPaths'], plan
             assert manifest(payload) == original and lock.read_bytes() == registry
+            acknowledge_frozen_source(run, plan, 'restore')
             candidate = Path(plan['candidatePath'])
             approved = manifest(candidate)
             stage_identity = candidate.stat().st_ino
@@ -119,6 +122,7 @@ for gh_path in gh_paths:
             if shared_target:
                 assert exposure.is_symlink() and manifest(exposure) == original
             restart_plan = run('restore-plan', '--path', payload)['operation']
+            acknowledge_frozen_source(run, restart_plan, 'restore')
             command = [str(app), '--scan-root', str(first), '--scan-root', str(second), 'restore-apply',
                        '--id', restart_plan['id'], '--yes', '--disposition', 'retain-original',
                        '--expect', restart_plan['planFingerprint'], '--allow-hidden-dirs', '--json']

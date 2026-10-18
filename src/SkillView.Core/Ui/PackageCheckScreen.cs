@@ -67,7 +67,7 @@ internal static class PackageCheckScreen
                         if (!ownedToken.IsCancellationRequested && !token.IsCancellationRequested && !lifetimeToken.IsCancellationRequested)
                         {
                             output.Text = rendered;
-                            status.Text = $"Metadata: {result.FormatStatus} · references: {result.ReferenceStatus} · payload coverage: {result.Coverage.Payload}";
+                            status.Text = $"Format: {result.Format.State} · agent: {result.AgentAssessment.State} · intact: {result.PayloadIntact.State} · source: {result.SourceReviewed.State}";
                         }
                         else if (!lifetimeToken.IsCancellationRequested) status.Text = "Check canceled.";
                         Finish();
