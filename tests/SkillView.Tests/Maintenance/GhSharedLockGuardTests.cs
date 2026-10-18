@@ -132,9 +132,11 @@ public sealed class GhSharedLockGuardTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ContextualDestinationOwnerBlocksRemoteAndLocalOverwrite(bool xdg)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ContextualDestinationOwnerBlocksRemoteAndLocalInstall(bool xdg, bool overwrite)
     {
         if (OperatingSystem.IsWindows()) return; // Shell child marker; portable owner guard policy tested separately.
         var root = Directory.CreateTempSubdirectory("skillview-destination-owner-");
@@ -163,9 +165,9 @@ public sealed class GhSharedLockGuardTests
             foreach (var local in new[] { false, true })
             {
                 var result = await service.InstallAsync(fake, "different/repo", "demo",
-                    new(Path: destination, Overwrite: true, FromLocal: local), TestContext.Current.CancellationToken);
+                    new(Path: destination, Overwrite: overwrite, FromLocal: local), TestContext.Current.CancellationToken);
                 Assert.False(result.Succeeded);
-                Assert.Contains("contextual owner", result.ErrorMessage, StringComparison.Ordinal);
+                Assert.Contains(overwrite ? "Force install refused" : "contextual owner", result.ErrorMessage, StringComparison.Ordinal);
                 Assert.False(File.Exists(marker));
                 Assert.Equal(content, File.ReadAllText(payload));
                 Assert.Equal(bytes, File.ReadAllText(lockPath));
