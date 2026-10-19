@@ -1,4 +1,5 @@
 using System.Text;
+using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Maintenance;
 
@@ -7,6 +8,7 @@ namespace SkillView.Ui;
 internal static class MaintenanceQueueFormatter
 {
     internal const int MaxDetailCharacters = 32768;
+    internal const int MaxSummaryCharacters = 4096;
     internal const int MaxCoverageCharacters = 8192;
     internal sealed record RenderedFields(string Text, int OmittedFields);
 
@@ -19,7 +21,106 @@ internal static class MaintenanceQueueFormatter
             + $"\nCoverage fields omitted: {rendered.OmittedFields}. Full captured diagnostics are emitted by queue --json; running it makes a fresh capture.\n";
     }
 
-    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token)
+    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token, bool showDetails = false)
+    {
+        if (showDetails) return RenderEvidence(entry, token);
+        var fields = RenderFields(SummaryFields(entry, token), token, MaxSummaryCharacters - 512);
+        var text = new StringBuilder("## Selected skill\n\n").Append(fields.Text);
+        if (fields.OmittedFields > 0)
+            text.AppendLine("\nSome values are too long for this summary; open details to inspect them.");
+        text.AppendLine("\nOpening review changes nothing. Confirm an action only after reviewing its effects.");
+        text.AppendLine("\n**Enter:** open review · **F2:** technical details · **r:** refresh inventory");
+        token.ThrowIfCancellationRequested();
+        return text.ToString();
+    }
+
+    internal static string DescribeIssue(MaintenanceQueueEntry entry) => entry.Issue switch
+    {
+        "installation-review" => "Check this installation",
+        "EmptyDirectory" => "Empty directory",
+        "Malformed" => "Missing or invalid skill file",
+        "BrokenSymlink" => "Broken link",
+        "BrokenSharedMapping" => "Shared link needs attention",
+        "NameCollision" => "Same name, multiple copies",
+        "Duplicate" => "Multiple copies",
+        "Untracked" => "Source not recorded",
+        "MetadataConflict" => "Conflicting installation records",
+        "HiddenNestedResidue" => "Nested files need review",
+        "SourceOrphaned" => "Source needs review",
+        "OrphanCanonicalCopy" => "Shared copy needs review",
+        _ => "Installation needs review"
+    };
+
+    private static IEnumerable<(string, string?)> SummaryFields(MaintenanceQueueEntry entry, CancellationToken token)
+    {
+        yield return ("Skill", entry.Title);
+        yield return ("Issue", DescribeIssue(entry));
+        yield return ("Why", DescribeReason(entry));
+        yield return ("Recommended action", entry.Cleanup is null
+            ? "Open Updates to check availability or compare a proposed update."
+            : entry.Cleanup.ReviewOnly ? "Inspect this issue before choosing an action; automatic cleanup is unavailable."
+            : "Open cleanup review for this entry.");
+        yield return ("What changes", DescribeEffect(entry));
+        yield return ("Undo", entry.Cleanup is null
+            ? "Saved updates retain the original for undo; inspect the update review before applying."
+            : "Opening review needs no undo. Deletion has no automatic undo; check the selected action before confirming.");
+        yield return ("Installation", entry.Subject.Path);
+        var impact = entry.Cleanup?.Impact;
+        var exposures = impact?.AffectedExposures ?? entry.Subject.Exposures;
+        var agents = new HashSet<(string?, Scope?, string?)>();
+        foreach (var exposure in exposures)
+        {
+            token.ThrowIfCancellationRequested();
+            var member = exposure.Membership;
+            if (!agents.Add((member.AgentId, member.Scope, member.Profile))) continue;
+            if (agents.Count > 8)
+            {
+                yield return ("More agents", "See technical details for additional recorded exposures.");
+                break;
+            }
+            yield return ("Affected agent", $"{member.AgentId ?? "unknown"} · {(member.Scope ?? entry.Subject.Scope)?.ToString() ?? "scope unknown"}"
+                + (member.Profile is null ? "" : " · " + member.Profile));
+        }
+        if (exposures.IsEmpty) yield return ("Affected agents", "No agent exposure was recorded.");
+        if (!(impact?.ExposureCoverageComplete ?? entry.Subject.ExposureCoverageComplete))
+            yield return ("Coverage", "Other agents may use this installation; discovery is incomplete.");
+        if (impact is { RetainedExposures.IsEmpty: false })
+            yield return ("Other consumers", "Other recorded exposures are retained by this link-only action; see details.");
+        if (entry.Pinned) yield return ("Pinned", "Routine updates leave this version pinned.");
+        if (entry.CleanupSuppressed) yield return ("Cleanup", "Cleanup suggestions are suppressed for this installation.");
+    }
+
+    private static string DescribeEffect(MaintenanceQueueEntry entry)
+    {
+        if (entry.Cleanup is not { } cleanup)
+            return "A confirmed update changes this copy; agents sharing its files use the updated content.";
+        if (cleanup.ReviewOnly)
+            return "Inspection only; this issue cannot be removed automatically.";
+        if (cleanup.Impact?.Operation == "unlink")
+            return "If confirmed, removes only this link. Files at its target are not deleted.";
+        if (cleanup.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
+            return "If confirmed, removes this directory only while it is empty.";
+        return "If confirmed, removes this installation. Its recorded consumers may lose access.";
+    }
+
+    private static string DescribeReason(MaintenanceQueueEntry entry) => entry.Cleanup?.Kind switch
+    {
+        null => "Update availability has not been checked.",
+        CleanupClassifier.CandidateKind.Malformed => entry.Cleanup.Skill?.Validity switch
+        {
+            ValidityState.MissingSkillMd => "This directory has no SKILL.md file.",
+            ValidityState.UnparsableFrontMatter => "The skill's metadata could not be read.",
+            ValidityState.NameMismatch => "The skill name and its installation directory do not match.",
+            _ => "The skill's metadata needs attention."
+        },
+        CleanupClassifier.CandidateKind.BrokenSymlink => "This link's target could not be found.",
+        CleanupClassifier.CandidateKind.NameCollision => "Another installation uses this name. Sources, versions, or local changes may differ.",
+        CleanupClassifier.CandidateKind.Untracked => "gh did not report this copy. It may have been installed another way.",
+        CleanupClassifier.CandidateKind.MetadataConflict => "Installation records disagree about this copy; inspect the details before changing it.",
+        _ => entry.Reason
+    };
+
+    private static string RenderEvidence(MaintenanceQueueEntry entry, CancellationToken token)
     {
         var rendered = RenderFields(Fields(entry), token, MaxDetailCharacters - 1536);
         token.ThrowIfCancellationRequested();

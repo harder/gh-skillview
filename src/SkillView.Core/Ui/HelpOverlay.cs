@@ -37,6 +37,8 @@ internal static class HelpOverlay
 
 ## Changes
 
+- **Enter** — review the selected issue without changing files
+- **F2** — switch between the issue summary and technical details
 - **c** — open cleanup
 - **d** — open Doctor
 

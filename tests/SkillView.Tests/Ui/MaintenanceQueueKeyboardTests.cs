@@ -140,6 +140,15 @@ public sealed class MaintenanceQueueKeyboardTests
             var table = view.SubViews.OfType<TableView>().Single();
             table.SetFocus();
             Assert.True(table.HasFocus);
+            var detail = view.SubViews.OfType<Markdown>().Single();
+            Assert.Contains("Recommended action", detail.Text.ToString());
+            Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
+            Press(new Key(KeyCode.F2));
+            Assert.Contains("Installation address ID", detail.Text.ToString());
+            Assert.Null(activated);
+            Assert.Equal(1, captures);
+            Press(new Key(KeyCode.F2));
+            Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
             Press(new Key('r'));
             Assert.Equal(2, captures);
             Assert.Null(activated);

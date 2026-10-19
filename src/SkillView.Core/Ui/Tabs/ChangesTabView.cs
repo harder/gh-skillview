@@ -37,6 +37,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private string _coverageDetail = string.Empty;
+    private bool _showDetails;
     private long _loadGeneration;
     private readonly CancellationOperationSlot _loadCancellations;
 
@@ -117,6 +118,13 @@ internal sealed class ChangesTabView : FrameView
         TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _detail, _spinner, _status);
 
         _table.KeyDown += OnTableKeyDown;
+        KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.KeyCode != KeyCode.F2) return;
+            key.Handled = true;
+            _showDetails = !_showDetails;
+            UpdateDetail();
+        };
 
         Add(_table, _detail, _spinner, _status);
         Disposing += (_, _) => CancelPendingLoad();
@@ -267,8 +275,10 @@ internal sealed class ChangesTabView : FrameView
         {
             var row = _table.GetSelectedRow();
             var detail = row >= 0 && row < _rows.Count
-                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token)
-                    : _rows[row].Detail ?? RenderDetail(_rows[row])) + _coverageDetail
+                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token, _showDetails)
+                    : _rows[row].Detail ?? RenderDetail(_rows[row]))
+                    + (_showDetails ? _coverageDetail : string.IsNullOrEmpty(_coverageDetail) ? string.Empty
+                        : "\nSome inventory locations could not be fully checked. Press **F2** for coverage details.\n")
                 : "## Changes\n\n_No pending work._";
             token.ThrowIfCancellationRequested();
             _detail.Text = detail;

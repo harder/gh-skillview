@@ -81,7 +81,8 @@ Changes tab:
 
 | Key | Action |
 |---|---|
-| `Enter` | Open the selected maintenance item |
+| `Enter` | Review the selected maintenance item without changing files |
+| `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
 
 Each observation retains its installation address ID, exact affected paths,

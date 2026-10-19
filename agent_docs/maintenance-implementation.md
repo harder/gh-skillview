@@ -1,5 +1,12 @@
 # Skill maintenance implementation and evidence
 
+**Prioritization update (2026-10-19):** the former all-21 completion goal is
+retired. Implementation is limited to explicitly approved practical work; this
+historical batch ledger is context, not a current release gate. See
+[deferred-maintenance-work.md](deferred-maintenance-work.md) for current priorities
+and verified locations. Existing recovery, ownership, and transaction code used
+by completed flows remains in use.
+
 The 2026-10-13 audit contains M01–M21. Implementation proceeds through separate
 PRs. Each batch needs local tests, disposable runtime proof, independent review,
 resolution of accepted findings, re-review, required CI, and merge before the next.

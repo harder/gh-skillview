@@ -128,7 +128,8 @@ public sealed class ChangesTabViewTests
 
         Assert.Contains("## Selected", rendered);
         Assert.Contains("/skills/codex-primary-runtime", rendered);
-        Assert.Contains("validity=MissingSkillMd", rendered);
+        Assert.Contains("This directory has no SKILL.md file", rendered);
+        Assert.DoesNotContain("validity=MissingSkillMd", rendered);
     }
 
     [Fact]

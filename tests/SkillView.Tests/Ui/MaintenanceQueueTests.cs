@@ -25,7 +25,7 @@ public sealed class MaintenanceQueueTests
         Assert.All(projected.Rows, row => { Assert.Null(row.Detail); Assert.Same(entry, row.Entry); });
         Assert.InRange(projected.CoverageDetail.Length, 1, MaintenanceQueueFormatter.MaxCoverageCharacters);
         Assert.Contains("Coverage fields omitted: 100", projected.CoverageDetail);
-        var detail = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
+        var detail = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
         Assert.InRange(detail.Length, 1, MaintenanceQueueFormatter.MaxDetailCharacters);
         Assert.Contains(entry.Subject.InstallationId, detail);
         Assert.Contains("Exact fields are omitted whole", detail);
@@ -33,6 +33,72 @@ public sealed class MaintenanceQueueTests
         var paths = json.RootElement.GetProperty("entries")[0].GetProperty("affectedPaths");
         Assert.Equal(1500, paths.GetArrayLength());
         Assert.Equal(entry.AffectedPaths[^1], paths[1499].GetString());
+    }
+
+    [Fact]
+    public void Summary_PutsReviewAndUndoBeforeTechnicalEvidenceWithoutPromisingAnUpdate()
+    {
+        var entry = Assert.Single(MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
+        { Skills = [Skill("/skills/one", "https://github.com/one/repo")] }, TestContext.Current.CancellationToken).Entries);
+        var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
+        Assert.Contains("Update availability has not been checked", summary);
+        Assert.Contains("Recommended action", summary);
+        Assert.Contains("Opening review changes nothing", summary);
+        Assert.Contains("Undo", summary);
+        Assert.Contains("claude", summary);
+        Assert.Contains("codex", summary);
+        Assert.Contains("discovery is incomplete", summary);
+        Assert.Contains("/skills/one", summary);
+        Assert.Contains("F2", summary);
+        Assert.DoesNotContain(entry.Subject.InstallationId, summary);
+        Assert.DoesNotContain("Native object ID", summary);
+        Assert.DoesNotContain("Installation address ID", summary);
+        Assert.InRange(summary.Length, 1, MaintenanceQueueFormatter.MaxSummaryCharacters);
+        Assert.True(summary.IndexOf("Recommended action", StringComparison.Ordinal) < summary.IndexOf("Installation", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CollisionSummary_RequiresReviewAndDoesNotPromiseReversibleDeletion()
+    {
+        var queue = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
+        { Skills = [Skill("/skills/one", "https://github.com/one/repo"), Skill("/skills/two", "https://github.com/two/repo")] },
+            TestContext.Current.CancellationToken);
+        var entry = queue.Entries.First(item => item.Issue == "NameCollision");
+        var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
+        Assert.Contains("Same name, multiple copies", summary);
+        Assert.Contains("automatic cleanup is unavailable", summary);
+        Assert.Contains("Deletion has no automatic undo", summary);
+        Assert.DoesNotContain("Saved updates retain", summary);
+        var evidence = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
+        Assert.Contains(entry.Subject.InstallationId, evidence);
+        Assert.Contains("https://github.com/one/repo", evidence);
+    }
+
+    [Fact]
+    public void CleanupSummary_DistinguishesEmptyDirectoryLinkOnlyAndReviewOnlyEffects()
+    {
+        var skill = Skill("/skills/one", "https://github.com/one/repo");
+        var entry = Assert.Single(MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
+        { Skills = [skill] }, TestContext.Current.CancellationToken).Entries);
+        var cleanup = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory,
+            skill.ResolvedPath, "empty directory", null);
+        var empty = MaintenanceQueueFormatter.Render(entry with { Cleanup = cleanup }, TestContext.Current.CancellationToken);
+        Assert.Contains("removes this directory only while it is empty", empty);
+
+        var impact = OperationImpact.Link(entry.Subject, skill.Agents[1]);
+        var linked = MaintenanceQueueFormatter.Render(entry with
+        {
+            Cleanup = cleanup with { Kind = CleanupClassifier.CandidateKind.BrokenSymlink, Impact = impact }
+        }, TestContext.Current.CancellationToken);
+        Assert.Contains("removes only this link", linked);
+        Assert.Contains("Files at its target are not deleted", linked);
+        Assert.Contains("codex", linked);
+        Assert.DoesNotContain("claude", linked);
+
+        var review = MaintenanceQueueFormatter.Render(entry with
+        { Cleanup = cleanup with { ReviewOnly = true } }, TestContext.Current.CancellationToken);
+        Assert.Contains("Inspection only", review);
+        Assert.DoesNotContain("If confirmed, removes", review);
     }
 
     [Fact]
