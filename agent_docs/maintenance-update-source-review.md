@@ -1,4 +1,4 @@
-# Frozen source review for saved updates (partial M19)
+# Frozen source review for saved updates (M19)
 
 Product saved-plan factories opt into optional `sourceReview` contract version 1
 on schema 1/2/3/5/6. The enclosing plan schema and all absent-field hash domains
@@ -113,8 +113,11 @@ distinct source commit, and a schema6 result proving source-free recovery; it
 cannot report a successful aggregate run after silently omitting that producer.
 Detach integration remains separate and must preserve its actual contracts.
 
-Original acceptance remains 9/21. M19 is incomplete. Opt-in isolated evaluation
-and authoring `gh skill publish --dry-run` have private implementations and proof
-harnesses; their actual native execution, schema6 compatibility and final-base
-App/full verification remain pending. These maintenance fixtures never execute
-payload scripts or establish behavioral safety or model quality.
+PR71 completed the [original combined M19 acceptance](evidence/maintenance-pr71-m19-m20-final.json).
+The reviewed head passed full platform tests, minimum/latest gh contracts and all
+four native/AOT lanes before merge. Actual authoring dry-runs and Linux offline
+evaluation lifecycles are recorded separately from source-review approval. The
+final record qualifies the macOS/Windows schema6 raw-artifact omission; those
+summaries are not full raw replay. These maintenance fixtures never execute
+payload scripts or establish behavioral safety or model quality. Other original
+maintenance findings, including detach integration, remain open.

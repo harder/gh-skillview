@@ -1730,3 +1730,33 @@ merge. Its UI resolution preserves PR69's bounded failure diagnostics and adds
 source-switch family routing and the corresponding lifecycle cases. Final
 integrated managed tests and native gates remain pending; earlier local results
 are not relabeled as merged-base evidence. Acceptance remains **9/21**.
+
+## PR71 merged; original M19 and M20 accepted
+
+PR71 merged as `bf3aaf05c175cb71365a0ed30e81d98f1d9df50d`, tree
+`3d3ef52cf80dd493c804e2cffb69045aca47814a`, identical to reviewed head
+`602153ca585cf534b335b63fe871c7ce5d92d8f4`. Independent source review mapped
+the original change and acceptance clauses to the implemented package checks,
+source-review approvals, explicit authoring/evaluation workflows, exact queue
+routing and separate disk/reload/session observations. Final source bindings,
+CodeQL, minimum/latest gh contracts and all four native/AOT lanes passed.
+
+The first Windows full-test attempt hit the navigation test's 20-second watchdog
+after 90 of 100 actual keys while every observed focus/row assertion was correct.
+Its log remains preserved. One targeted retry after the native jobs finished
+passed on the same source: 2,466 passed, 0 failed, 33 skipped. The four original
+AOT artifacts remain attempt 1 evidence; the retry did not rebuild them. A
+separately reviewed 60-second test watchdog is included in the next batch.
+
+Both native product hosts on each RID verified 18 static and 4 actual authoring
+cases. Linux additionally exercised the reviewed offline evaluator, runtime
+refusals and independently verified container cleanup. Source-switch/reimport
+proofs retain their exact positive/refused and source-free recovery counts.
+Linux retains 88 nested raw schema5/6 files. The macOS/Windows artifact glob
+omitted schema6 raw files; their summaries and bound source were reviewed, not
+claimed as complete raw replay. The next batch adds the missing retention glob.
+
+See [final evidence](evidence/maintenance-pr71-m19-m20-final.json) and the
+[acceptance ledger](maintenance-acceptance.json). Original acceptance is now
+**11/21**. M03, M08, M09, M13–M18 and M21 remain incomplete. The preceding 9/21
+statements are historical checkpoints; the original audit clauses are unchanged.

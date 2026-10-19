@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceAudit": "maintenance-audit.json",
   "sourceAuditSha256": "da78b199ef143ce02d23754a1652616bf597b3f6e0c3c5be0cc2c34056d964d4",
-  "verifiedMainCommit": "ab23a7b1f3c0719926a78d3178f78849d1aa0ea2",
+  "verifiedMainCommit": "bf3aaf05c175cb71365a0ed30e81d98f1d9df50d",
   "objective": "Implement all 21 findings in reviewable, verified and merged batches. No finding is complete solely because its protective foundations exist.",
   "items": [
     {
@@ -236,23 +236,29 @@
       "id": "M19",
       "title": "Review the whole skill package and distinguish quality from safety",
       "priority": "P2",
-      "status": "incomplete",
-      "implementedEvidenceSummary": "Bounded metadata parsing, payload evidence and terminal sanitization",
-      "remaining": "Static package lint, compatibility review and explicit isolated evaluations",
+      "status": "complete",
+      "implementedEvidenceSummary": "Bounded package/dependency/compatibility checks with separate integrity/source states; frozen content/declaration review and independent acknowledgement; explicit repository authoring dry-run; opt-in reviewed offline evaluations with actual native-host and Linux runtime proof.",
+      "remaining": null,
       "acceptance": "Valid format, agent-compatible, intact payload and reviewed source are separate states. Missing dependencies have concrete repair guidance. Evaluations require an explicit runnable environment and cannot silently incur agent/API execution. Preserve user-authored instructions unless a reviewed edit is selected.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-pr71-m19-m20-final.json",
+      "verifiedCommit": "bf3aaf05c175cb71365a0ed30e81d98f1d9df50d",
+      "mergedPullRequest": 71
     },
     {
       "id": "M20",
       "title": "Make the maintenance queue actionable and explain application state",
       "priority": "P2",
-      "status": "incomplete",
-      "implementedEvidenceSummary": "Exact selectors/results, compare/backup/history/quarantine/undo plus saved recorded-restore and ownerless/shared-gh newer-revision CLI plan/apply/inspect/recover/undo and explicit owner-image repair with versioned JSON",
-      "remaining": "Unified diagnosis/action queue and remaining TUI repair flows",
+      "status": "complete",
+      "implementedEvidenceSummary": "Exact physical maintenance queue and row-to-comparison/saved-plan routing, bounded explained omissions, versioned exact plan-file CLI lifecycle, independent source/retention approval, and separate disk/reload/unknown-session observations.",
+      "remaining": null,
       "acceptance": "A selected row always identifies exact affected paths. Every skip/partial result explains what happened. Current Claude plugin docs say running sessions retain loaded plugin versions after background updates; display that as a reload requirement, not failed filesystem verification. Runtime state is unknown unless observed.",
       "evidenceLedger": "maintenance-implementation.md",
-      "finalAcceptanceProven": false
+      "finalAcceptanceProven": true,
+      "finalAcceptanceEvidence": "evidence/maintenance-pr71-m19-m20-final.json",
+      "verifiedCommit": "bf3aaf05c175cb71365a0ed30e81d98f1d9df50d",
+      "mergedPullRequest": 71
     },
     {
       "id": "M21",

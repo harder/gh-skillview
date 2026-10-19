@@ -1,5 +1,15 @@
 # AGENTS.md
 
+- `install --force` is admitted only for positively missing or empty native
+  destination roots. Current source selectors do not prove native placement
+  names, so even an unrelated occupied root requires a qualified refusal. Keep
+  the initial and final vacancy checks around discovery/ownership checks;
+  existing payloads need an evidence-backed saved disposition and retention.
+  Vacancy grants ordinary install authority only: remove `--force` from the
+  effective child argv after admission, retaining requested intent separately.
+  Unknown provenance never implies that a saved repair is available. See
+  `agent_docs/maintenance-force-install-disposition.md`.
+
 - Authoring validation is explicit `authoring-validate --repository PATH --dry-run`,
   separate from installed `check` and updates. gh dry-run may perform advisory
   API reads and cache writes; never infer safety/source review or comprehensive
@@ -102,6 +112,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   and confirm locked restore again.
 - Build verification: `dotnet build`
 - CI style verification: `dotnet format SkillView.sln --no-restore --verify-no-changes`
+- Run scoped formatting from the repository root, or use absolute `--include`
+  paths. Relative includes resolve from the formatter's working directory;
+  private test-host CWDs can silently select zero files. Include new/untracked
+  C# files explicitly and verify that formatting actually processed files.
 - Full tests: `dotnet test --no-build`
 - Run product publish commands sequentially. The App and gh-extension publishes
   share `SkillView.Core` intermediate/output files, so parallel publishes can
@@ -313,6 +327,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   even while supporting older `gh` releases.
   `--upstream` is a boolean flag (use a checkbox in the TUI); it does not
   accept a URL value, which would become an unintended positional argument.
+  A custom `--dir` overrides scope. Do not emit `--scope` when `Options.Path`
+  is set: SkillView's "custom" UI scope is not a valid gh scope value;
+  gh accepts only `project` and `user`.
   A version suffix belongs on a skill selector, never the repository name;
   use `--pin=<ref>` for an entire-repository ref, including discovery listing.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`

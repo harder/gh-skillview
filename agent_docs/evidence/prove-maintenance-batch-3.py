@@ -75,7 +75,7 @@ for gh in args.gh:
         assert update['outcomes'][0]['status'] == 'changed'
         assert lock.read_bytes() == shared_record, 'Custom update replaced the shared record'
         before = (payload(left), payload(right))
-        process, install = run(['install', 'different/repo', 'gh-skill', '--path', str(custom), '--force', '--json'])
+        process, install = run(['install', 'different/repo', 'gh-skill', '--path', str(custom), '--json'])
         assert process.returncode != 0 and not install['succeeded'], install
         assert 'existing shared selector' in install['errorMessage']
         assert lock.read_bytes() == shared_record and before == (payload(left), payload(right))
@@ -105,7 +105,7 @@ for gh in args.gh:
             alias.symlink_to(project_destination, target_is_directory=True)
             destinations.append(alias)
         for destination in destinations:
-            process, install = run(['install', 'cli/cli', 'gh-skill', '--path', str(destination), '--force', '--json'])
+            process, install = run(['install', 'cli/cli', 'gh-skill', '--path', str(destination), '--json'])
             assert process.returncode != 0 and not install['succeeded'], install
             assert 'contextual owner' in install['errorMessage'], install
             assert payload(owned) == owned_before and project_lock.read_bytes() == lock_before
@@ -113,7 +113,7 @@ for gh in args.gh:
         state_lock.parent.mkdir(parents=True, exist_ok=True)
         state_lock.write_text(json.dumps(dict(version=3, skills={'gh-skill': dict(source='cli/cli', sourceType='github')})))
         exact_state = state_lock.read_bytes()
-        process, install = run(['install', 'cli/cli', 'gh-skill', '--path', str(shared), '--force', '--json'])
+        process, install = run(['install', 'cli/cli', 'gh-skill', '--path', str(shared), '--json'])
         assert process.returncode != 0 and not install['succeeded'], install
         assert 'contextual owner' in install['errorMessage'], install
         assert state_lock.read_bytes() == exact_state and before == (payload(left), payload(right))
