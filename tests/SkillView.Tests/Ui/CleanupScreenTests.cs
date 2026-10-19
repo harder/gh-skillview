@@ -347,10 +347,26 @@ public sealed class CleanupScreenTests
             Assert.Null(screen.LastReport);
             if (state is not null) Assert.Equal(0, state.PreValidationSkipped);
             Assert.Equal(1, screen.RemovedFileCount);
+            // Native directory enumeration does not promise a file order. If
+            // the interrupted attempt removed SKILL.md first, a fresh removal
+            // review must refuse the now-malformed directory. Repair this
+            // fixture explicitly before retrying; never relax that validation.
+            var metadata = Path.Combine(directory, "SKILL.md");
+            var repairMetadata = !File.Exists(metadata);
+            if (repairMetadata)
+            {
+                var refused = await screen.RemoveSelectedAsync([0, 1], TestContext.Current.CancellationToken, attemptState: state);
+                Assert.Equal(0, refused.Removed);
+                Assert.Equal(1, refused.Skipped);
+                Assert.Equal(1, refused.Failed);
+                Assert.Equal(1, screen.RemovedFileCount);
+                Assert.Single(Directory.EnumerateFiles(directory));
+                File.WriteAllText(metadata, "body");
+            }
             var retry = await screen.RemoveSelectedAsync([0, 1], TestContext.Current.CancellationToken, attemptState: state);
             Assert.Equal(1, retry.Removed); Assert.Equal(1, retry.Skipped);
             Assert.Equal(1, screen.RemovedCount);
-            Assert.Equal(2, screen.RemovedFileCount);
+            Assert.Equal(repairMetadata ? 3 : 2, screen.RemovedFileCount);
             Assert.Equal(1, screen.RemovedDirectoryCount);
             Assert.False(Directory.Exists(directory));
         }
