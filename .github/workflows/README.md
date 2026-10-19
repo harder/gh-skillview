@@ -26,6 +26,20 @@ Copilot seat. A Copilot failure leaves the factual alert intact and fails the
 workflow visibly. Manually dispatch with `issue_number` to assess an existing
 `critical-dependency` issue. Reruns never create duplicate assessment comments.
 
+CI's `.github/scripts/ci-change-scope.js` permits skipping managed/native proofs
+only for its explicit user-documentation, screenshot/animation and static-site
+allowlist. Workflow lint and site checks still run. All `agent_docs/` changes,
+proof fixtures/scripts, dependencies, workflows and unknown paths require full
+verification. The classifier compares exact local base/head commits, inspects
+both rename paths and file modes, and defaults to full verification on missing,
+empty, malformed or bounded diff evidence. Keep the allowlist narrow and run
+`node --test .github/scripts/ci-change-scope.test.js` when changing it.
+
+Native builds feed three independent proof groups per platform and reuse verified
+historical producer binaries. The existing AOT check names still require every
+group to pass. See [CI scope and native proof inputs](../../agent_docs/ci-runtime-optimization.md)
+for cache, artifact and rerun contracts.
+
 ## Release pipeline
 
 `release.yml` validates a version tag and refuses to republish an existing

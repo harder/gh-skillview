@@ -5,7 +5,6 @@ import io
 import json
 import os
 from pathlib import Path
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -18,6 +17,9 @@ spec.loader.exec_module(proof)
 docker_spec = importlib.util.spec_from_file_location('old_native_source_switch_docker', Path(__file__).with_name('run-local-source-switch-docker.py'))
 docker = importlib.util.module_from_spec(docker_spec)
 docker_spec.loader.exec_module(docker)
+native_spec = importlib.util.spec_from_file_location('native_ci_inputs', Path(__file__).resolve().parents[2] / '.github/scripts/native_proof_inputs.py')
+native = importlib.util.module_from_spec(native_spec)
+native_spec.loader.exec_module(native)
 
 
 class OldNativeReimportWitnessTests(unittest.TestCase):
@@ -75,10 +77,6 @@ class OldNativeReimportWitnessTests(unittest.TestCase):
         self.assertEqual('0', captured['GIT_CONFIG_COUNT'])
 
     def test_ci_baseline_checkouts_stay_clean_when_global_config_converts_line_endings(self):
-        workflow = Path(__file__).resolve().parents[2] / '.github/workflows/ci.yml'
-        commands = [shlex.split(line.strip()) for line in workflow.read_text().splitlines()
-                    if ' worktree add --detach ' in line]
-        self.assertTrue(commands, 'No frozen native baseline checkout commands found')
         temporary_parent = '/var/tmp' if sys.platform.startswith('linux') else None
         with tempfile.TemporaryDirectory(prefix='skillview-checkout-test-', dir=temporary_parent) as temporary:
             root = Path(temporary)
@@ -100,15 +98,18 @@ class OldNativeReimportWitnessTests(unittest.TestCase):
             git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                  'commit', '-m', 'Frozen LF source'])
             revision = git(['rev-parse', 'HEAD']).decode().strip()
+            git(['remote', 'add', 'origin', str(repo)])
+            # The helper neutralizes inherited global config. Local conversion
+            # remains enabled, so checkout must explicitly preserve LF bytes.
+            git(['config', 'core.autocrlf', 'true'])
             # Match the proof helper: inherited conversion settings are absent
             # during source verification, and status cannot refresh the index.
             proof_env = dict(env, GIT_CONFIG_GLOBAL=os.devnull, GIT_OPTIONAL_LOCKS='0')
-            for index, command in enumerate(commands):
-                with self.subTest(baseline=index):
-                    checkout = root / f'baseline-{index}'
-                    arguments = [str(checkout) if value == '$baseline_path' else
-                                 revision if value == '$baseline_sha' else value for value in command[1:]]
-                    git(arguments)
+            for index, family in enumerate(native.FAMILIES):
+                with self.subTest(baseline=family[0]), patch.object(native, 'ROOT', repo), patch.dict(
+                        os.environ, {**env, 'RUNNER_TEMP': str(root)}):
+                    spec = dict(family=family[0], sourceCommit=revision, directory=f'baseline-{index}')
+                    checkout = native.checkout(spec)
                     sample = checkout / 'sample.txt'
                     self.assertEqual(authored, sample.read_bytes())
                     timestamp = sample.stat().st_mtime + 2
@@ -116,8 +117,11 @@ class OldNativeReimportWitnessTests(unittest.TestCase):
                     status = ['--no-optional-locks', '-c', 'core.fsmonitor=false', 'status',
                               '--porcelain=v1', '--untracked-files=no', '--ignore-submodules=all']
                     self.assertEqual(b'', git(status, cwd=checkout, environment=proof_env))
+                    self.assertEqual(checkout, native.checkout(spec))
                     sample.write_bytes(authored + b'actual source edit\n')
                     self.assertIn(b' M sample.txt', git(status, cwd=checkout, environment=proof_env))
+                    with self.assertRaisesRegex(ValueError, 'tracked-clean'):
+                        native.checkout(spec)
 
     def test_native_version_witness_preserves_release_url_and_internal_line_endings(self):
         for newline in ['\n', '\r\n']:
