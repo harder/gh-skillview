@@ -1,8 +1,10 @@
 using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using SkillView.Maintenance;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Terminal.Gui.Views;
 using Xunit;
@@ -126,9 +128,10 @@ public sealed class ChangesTabViewTests
         var detail = Assert.IsType<Markdown>(view.SubViews.Single(child => child is Markdown));
         var rendered = detail.Text.ToString();
 
-        Assert.Contains("## Selected", rendered);
+        Assert.Contains("## Missing or invalid skill file", rendered);
         Assert.Contains("/skills/codex-primary-runtime", rendered);
-        Assert.Contains("validity=MissingSkillMd", rendered);
+        Assert.Contains("This directory has no SKILL.md file", rendered);
+        Assert.DoesNotContain("validity=MissingSkillMd", rendered);
     }
 
     [Fact]
@@ -149,7 +152,28 @@ public sealed class ChangesTabViewTests
         await view.LoadAsync();
 
         Assert.Contains("observations", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("availability and sessions unknown", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Enter Review", view.StatusTextForTests);
+        Assert.Contains("F2 Details", view.StatusTextForTests);
+    }
+
+    [Fact]
+    public async Task PresentationLimit_RemainsVisibleWhenTogglingDetails()
+    {
+        var skills = Enumerable.Range(0, ChangesQueueBuilder.MaxRows + 1).Select(index =>
+            MaintenanceQueueTests.Skill("/skills/" + index, "https://github.com/one/repo") with
+            { Name = "skill-" + index }).ToImmutableArray();
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = skills }),
+            static () => { }, static () => { }, static () => { }, static () => { });
+        await view.LoadAsync();
+        Assert.Equal(ChangesQueueBuilder.MaxRows, view.RowCountForTests);
+        Assert.Contains("1 omitted", view.StatusTextForTests);
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains("1 omitted", view.StatusTextForTests);
+        Assert.Contains("1 additional observations", view.SubViews.OfType<Markdown>().Single().Text.ToString());
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains("1 omitted", view.StatusTextForTests);
+        Assert.Contains("F2 Details", view.StatusTextForTests);
     }
 
     private static InventorySnapshot SnapshotWithMalformedSkill() => InventorySnapshot.Empty with

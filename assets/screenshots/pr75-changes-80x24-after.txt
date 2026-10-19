@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 13                                 │
+│───────────┬──────────────────────    Broken link                            ▲│
+│Kind       │Title                                                            █│
+│───────────┼──────────────────────    Skill: broken-link                     █│
+│Link       │broken-link · skills                                             █│
+│Metadata   │missing-meta · skills     Why: This link's target could not be   █│
+│Metadata   │shared-tool · one         found.                                 █│
+│Metadata   │shared-tool · shared                                             █│
+│Metadata   │shared-tool · two         Next: Review cleanup.                  █│
+│Copies     │shared-tool · one                                                █│
+│Copies     │shared-tool · shared      Changes: If confirmed, removes only    █│
+│Copies     │shared-tool · two         this link. Target files stay.          █│
+│Review     │broken-link · skills                                             █│
+│Review     │missing-meta · skills     Undo: Deletion has no automatic undo.  █│
+│Review     │shared-tool · one                                                ░│
+│Review     │shared-tool · shared      Agent: unknown · Custom                ░│
+│Review     │shared-tool · two                                                ░│
+│                                      Location:                              ▼│
+│   13 observations · Enter Review · F2 Details · r Refresh                    │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

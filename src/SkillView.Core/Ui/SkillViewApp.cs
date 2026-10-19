@@ -2370,7 +2370,8 @@ public sealed class SkillViewApp
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
             SkillViewTab.Changes => [
-                new StatusHint("Enter", "Open"),
+                new StatusHint("Enter", "Review"),
+                new StatusHint("F2", "Details"),
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),

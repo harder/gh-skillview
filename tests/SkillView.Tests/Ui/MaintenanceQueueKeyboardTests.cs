@@ -115,11 +115,14 @@ public sealed class MaintenanceQueueKeyboardTests
         finally { app.End(session!); }
     }
 
-    [Fact]
-    public async Task FocusedQueue_RefreshesAndRoutesExactRowThroughApplicationKeyboard()
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(100, 26)]
+    [InlineData(120, 36)]
+    public async Task FocusedQueue_RefreshesAndRoutesExactRowThroughApplicationKeyboard(int width, int height)
     {
         using var app = Application.Create().Init("ansi");
-        app.Driver!.SetScreenSize(100, 26);
+        app.Driver!.SetScreenSize(width, height);
         var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
         var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
         var captures = 0;
@@ -140,6 +143,18 @@ public sealed class MaintenanceQueueKeyboardTests
             var table = view.SubViews.OfType<TableView>().Single();
             table.SetFocus();
             Assert.True(table.HasFocus);
+            var detail = view.SubViews.OfType<Markdown>().Single();
+            Assert.Contains("Next", detail.Text.ToString());
+            Assert.Contains("Enter Review", view.StatusTextForTests);
+            Assert.Contains("F2 Details", view.StatusTextForTests);
+            Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
+            Press(new Key(KeyCode.F2));
+            Assert.Contains("Installation address ID", detail.Text.ToString());
+            Assert.Contains("F2 Summary", view.StatusTextForTests);
+            Assert.Null(activated);
+            Assert.Equal(1, captures);
+            Press(new Key(KeyCode.F2));
+            Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
             Press(new Key('r'));
             Assert.Equal(2, captures);
             Assert.Null(activated);
