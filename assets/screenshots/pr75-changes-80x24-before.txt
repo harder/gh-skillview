@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 13                                 │
+│───────────┬──────────────────────    Selected skill                         ▲│
+│Kind       │Title                                                            █│
+│───────────┼──────────────────────    Skill: broken-link Issue: Broken link  █│
+│Cleanup    │Broken link · broken-…    Why: This link's target could not be   █│
+│Cleanup    │Missing or invalid sk…    found. Recommended action: Open cleanup█│
+│Cleanup    │Missing or invalid sk…    review for this entry. What changes: If█│
+│Cleanup    │Missing or invalid sk…    confirmed, removes only this link.     █│
+│Cleanup    │Missing or invalid sk…    Files at its target are not deleted.   █│
+│Cleanup    │Same name, multiple c…    Undo: Opening review needs no undo.    █│
+│Cleanup    │Same name, multiple c…    Deletion has no automatic undo; check  █│
+│Cleanup    │Same name, multiple c…    the selected action before confirming. █│
+│Review     │Check this installati…    Installation:                          █│
+│Review     │Check this installati…    /var/tmp/skillview-pr75-ux/skills/broke█│
+│Review     │Check this installati…    -link Affected agent: unknown · Custom ░│
+│Review     │Check this installati…                                           ░│
+│Review     │Check this installati…    Opening review changes nothing. Confirm░│
+│                                      an action only after reviewing its     ▼│
+│   update availability and sessions unknown · r refresh disk inventory · 13   │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

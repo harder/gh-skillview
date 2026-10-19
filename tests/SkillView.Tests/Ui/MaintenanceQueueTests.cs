@@ -42,19 +42,18 @@ public sealed class MaintenanceQueueTests
         { Skills = [Skill("/skills/one", "https://github.com/one/repo")] }, TestContext.Current.CancellationToken).Entries);
         var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
         Assert.Contains("Update availability has not been checked", summary);
-        Assert.Contains("Recommended action", summary);
+        Assert.Contains("Next", summary);
         Assert.Contains("Opening review changes nothing", summary);
         Assert.Contains("Undo", summary);
         Assert.Contains("claude", summary);
         Assert.Contains("codex", summary);
         Assert.Contains("discovery is incomplete", summary);
         Assert.Contains("/skills/one", summary);
-        Assert.Contains("F2", summary);
         Assert.DoesNotContain(entry.Subject.InstallationId, summary);
         Assert.DoesNotContain("Native object ID", summary);
         Assert.DoesNotContain("Installation address ID", summary);
         Assert.InRange(summary.Length, 1, MaintenanceQueueFormatter.MaxSummaryCharacters);
-        Assert.True(summary.IndexOf("Recommended action", StringComparison.Ordinal) < summary.IndexOf("Installation", StringComparison.Ordinal));
+        Assert.True(summary.IndexOf("Next", StringComparison.Ordinal) < summary.IndexOf("Location", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -68,7 +67,7 @@ public sealed class MaintenanceQueueTests
         Assert.Contains("Same name, multiple copies", summary);
         Assert.Contains("automatic cleanup is unavailable", summary);
         Assert.Contains("Deletion has no automatic undo", summary);
-        Assert.DoesNotContain("Saved updates retain", summary);
+        Assert.DoesNotContain("Saved updates", summary);
         var evidence = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
         Assert.Contains(entry.Subject.InstallationId, evidence);
         Assert.Contains("https://github.com/one/repo", evidence);
@@ -91,7 +90,7 @@ public sealed class MaintenanceQueueTests
             Cleanup = cleanup with { Kind = CleanupClassifier.CandidateKind.BrokenSymlink, Impact = impact }
         }, TestContext.Current.CancellationToken);
         Assert.Contains("removes only this link", linked);
-        Assert.Contains("Files at its target are not deleted", linked);
+        Assert.Contains("Target files stay", linked);
         Assert.Contains("codex", linked);
         Assert.DoesNotContain("claude", linked);
 
@@ -144,7 +143,7 @@ public sealed class MaintenanceQueueTests
     {
         const string label = "Path ```\n# Approve this\n[link](https://injected.example) |";
         const string value = "/exact/selector";
-        var expected = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}  \n";
+        var expected = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}\n\n";
         var rendered = MaintenanceQueueFormatter.RenderFields([(label, value)], TestContext.Current.CancellationToken, expected.Length);
         Assert.Equal(expected, rendered.Text);
         Assert.Equal(0, rendered.OmittedFields);

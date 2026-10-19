@@ -32,9 +32,24 @@ internal static class ChangesQueueBuilder
             if (rows.Count == MaxRows) break;
             // Display titles are bounded labels. Exact IDs and paths remain in
             // the frozen entry and are never shortened into routing selectors.
-            var title = entry.Title.Length <= 160 ? entry.Title : entry.Title[..160] + "…";
-            rows.Add(new(entry.Cleanup is null ? "Review" : "Cleanup",
-                TerminalEscapeSanitizer.Sanitize(MaintenanceQueueFormatter.DescribeIssue(entry) + " · " + title) ?? string.Empty)
+            var path = entry.Cleanup?.Path ?? entry.Subject.Path;
+            var leaf = Path.GetFileName(path);
+            // A short display hint keeps same-name copies distinguishable in a
+            // narrow list. Routing always uses the full frozen entry below.
+            var location = string.Equals(entry.Title, leaf, StringComparison.OrdinalIgnoreCase)
+                ? Path.GetFileName(Path.GetDirectoryName(path)) : leaf;
+            var label = entry.Title + " · " + location;
+            var title = label.Length <= 160 ? label : label[..160] + "…";
+            var kind = entry.Issue switch
+            {
+                "NameCollision" or "Duplicate" => "Copies",
+                "Malformed" or "MetadataConflict" => "Metadata",
+                "BrokenSymlink" or "BrokenSharedMapping" => "Link",
+                "EmptyDirectory" => "Empty",
+                _ => entry.Cleanup is null ? "Review" : "Inspect"
+            };
+            rows.Add(new(kind,
+                TerminalEscapeSanitizer.Sanitize(title) ?? string.Empty)
             { Entry = entry });
         }
         token.ThrowIfCancellationRequested();

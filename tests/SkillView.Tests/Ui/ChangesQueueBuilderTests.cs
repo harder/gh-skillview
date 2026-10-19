@@ -32,6 +32,28 @@ public sealed class ChangesQueueBuilderTests
     }
 
     [Fact]
+    public void SameNameCopies_ShowSkillNameFirstAndDistinctLocations()
+    {
+        var queue = SkillView.Maintenance.MaintenanceQueueBuilder.Build(
+            SkillView.Inventory.Models.InventorySnapshot.Empty with
+            {
+                Skills = [MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo"),
+                    MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo")]
+            }, TestContext.Current.CancellationToken);
+        var rows = ChangesQueueBuilder.ProjectRows(queue.Entries.Where(entry => entry.Issue == "NameCollision"),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("Copies", row.Kind);
+            Assert.StartsWith("same-name · ", row.Title);
+        });
+        Assert.NotEqual(rows[0].Title, rows[1].Title);
+        Assert.EndsWith(" · one", rows[0].Title);
+        Assert.EndsWith(" · two", rows[1].Title);
+    }
+
+    [Fact]
     public void Build_OnlyUpdateItems_ReturnsOnlyUpdateRows()
     {
         var rows = ChangesQueueBuilder.BuildForTests(["skill1", "skill2"], [], []);

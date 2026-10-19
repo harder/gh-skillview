@@ -37,6 +37,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly SpinnerView _spinner;
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private string _coverageDetail = string.Empty;
+    private int _omittedRows;
     private bool _showDetails;
     private long _loadGeneration;
     private readonly CancellationOperationSlot _loadCancellations;
@@ -120,10 +121,11 @@ internal sealed class ChangesTabView : FrameView
         _table.KeyDown += OnTableKeyDown;
         KeyDown += (_, key) =>
         {
-            if (key.Handled || key.KeyCode != KeyCode.F2) return;
+            if (key.Handled || key.KeyCode != KeyCode.F2 || !_rows.Any(row => row.Entry is not null)) return;
             key.Handled = true;
             _showDetails = !_showDetails;
             UpdateDetail();
+            _status.Text = BuildStatusText(string.Empty);
         };
 
         Add(_table, _detail, _spinner, _status);
@@ -152,6 +154,7 @@ internal sealed class ChangesTabView : FrameView
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
                 _coverageDetail = projection.CoverageDetail;
+                _omittedRows = projection.OmittedRows;
                 if (projection.OmittedRows > 0)
                     summary += $" · {projection.OmittedRows} rows omitted by presentation limit; queue --json captures all observations";
                 LoadRows(projection.Rows, summary, loadCancellation.Token);
@@ -277,7 +280,9 @@ internal sealed class ChangesTabView : FrameView
             var detail = row >= 0 && row < _rows.Count
                 ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token, _showDetails)
                     : _rows[row].Detail ?? RenderDetail(_rows[row]))
-                    + (_showDetails ? _coverageDetail : string.IsNullOrEmpty(_coverageDetail) ? string.Empty
+                    + (_showDetails ? _coverageDetail + (_omittedRows > 0
+                        ? $"\n{_omittedRows} additional observations are omitted from the list. Use queue --json for all observations.\n" : string.Empty)
+                        : string.IsNullOrEmpty(_coverageDetail) ? string.Empty
                         : "\nSome inventory locations could not be fully checked. Press **F2** for coverage details.\n")
                 : "## Changes\n\n_No pending work._";
             token.ThrowIfCancellationRequested();
@@ -306,7 +311,11 @@ internal sealed class ChangesTabView : FrameView
             return $" {summary}";
         }
 
-        if (_rows.Any(row => row.Entry is not null)) return $" {summary} · {_rows.Count} observations";
+        if (_rows.Any(row => row.Entry is not null))
+        {
+            var count = _omittedRows > 0 ? $"{_rows.Count} shown + {_omittedRows} omitted" : $"{_rows.Count} observations";
+            return $" {(_coverageDetail.Length > 0 ? "Limited scan · " : "")}{count} · Enter Review · F2 {(_showDetails ? "Summary" : "Details")} · r Refresh";
+        }
         var label = DescribeQueueLabel();
         return label == "Changes"
             ? $" {summary} · {_rows.Count} items"

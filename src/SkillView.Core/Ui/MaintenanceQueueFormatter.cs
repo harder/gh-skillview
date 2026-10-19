@@ -25,11 +25,10 @@ internal static class MaintenanceQueueFormatter
     {
         if (showDetails) return RenderEvidence(entry, token);
         var fields = RenderFields(SummaryFields(entry, token), token, MaxSummaryCharacters - 512);
-        var text = new StringBuilder("## Selected skill\n\n").Append(fields.Text);
+        var text = new StringBuilder($"## {DescribeIssue(entry)}\n\n").Append(fields.Text);
         if (fields.OmittedFields > 0)
             text.AppendLine("\nSome values are too long for this summary; open details to inspect them.");
-        text.AppendLine("\nOpening review changes nothing. Confirm an action only after reviewing its effects.");
-        text.AppendLine("\n**Enter:** open review · **F2:** technical details · **r:** refresh inventory");
+        text.AppendLine("\nOpening review changes nothing.");
         token.ThrowIfCancellationRequested();
         return text.ToString();
     }
@@ -54,17 +53,15 @@ internal static class MaintenanceQueueFormatter
     private static IEnumerable<(string, string?)> SummaryFields(MaintenanceQueueEntry entry, CancellationToken token)
     {
         yield return ("Skill", entry.Title);
-        yield return ("Issue", DescribeIssue(entry));
         yield return ("Why", DescribeReason(entry));
-        yield return ("Recommended action", entry.Cleanup is null
-            ? "Open Updates to check availability or compare a proposed update."
-            : entry.Cleanup.ReviewOnly ? "Inspect this issue before choosing an action; automatic cleanup is unavailable."
-            : "Open cleanup review for this entry.");
-        yield return ("What changes", DescribeEffect(entry));
+        yield return ("Next", entry.Cleanup is null
+            ? "Check for updates."
+            : entry.Cleanup.ReviewOnly ? "Inspect this issue; automatic cleanup is unavailable."
+            : "Review cleanup.");
+        yield return ("Changes", DescribeEffect(entry));
         yield return ("Undo", entry.Cleanup is null
-            ? "Saved updates retain the original for undo; inspect the update review before applying."
-            : "Opening review needs no undo. Deletion has no automatic undo; check the selected action before confirming.");
-        yield return ("Installation", entry.Subject.Path);
+            ? "Saved updates keep the original for undo."
+            : "Deletion has no automatic undo.");
         var impact = entry.Cleanup?.Impact;
         var exposures = impact?.AffectedExposures ?? entry.Subject.Exposures;
         var agents = new HashSet<(string?, Scope?, string?)>();
@@ -78,26 +75,27 @@ internal static class MaintenanceQueueFormatter
                 yield return ("More agents", "See technical details for additional recorded exposures.");
                 break;
             }
-            yield return ("Affected agent", $"{member.AgentId ?? "unknown"} · {(member.Scope ?? entry.Subject.Scope)?.ToString() ?? "scope unknown"}"
+            yield return ("Agent", $"{member.AgentId ?? "unknown"} · {(member.Scope ?? entry.Subject.Scope)?.ToString() ?? "scope unknown"}"
                 + (member.Profile is null ? "" : " · " + member.Profile));
         }
         if (exposures.IsEmpty) yield return ("Affected agents", "No agent exposure was recorded.");
         if (!(impact?.ExposureCoverageComplete ?? entry.Subject.ExposureCoverageComplete))
-            yield return ("Coverage", "Other agents may use this installation; discovery is incomplete.");
+            yield return ("Coverage", "Other consumers may exist; discovery is incomplete.");
         if (impact is { RetainedExposures.IsEmpty: false })
             yield return ("Other consumers", "Other recorded exposures are retained by this link-only action; see details.");
         if (entry.Pinned) yield return ("Pinned", "Routine updates leave this version pinned.");
         if (entry.CleanupSuppressed) yield return ("Cleanup", "Cleanup suggestions are suppressed for this installation.");
+        yield return ("Location", entry.Subject.Path);
     }
 
     private static string DescribeEffect(MaintenanceQueueEntry entry)
     {
         if (entry.Cleanup is not { } cleanup)
-            return "A confirmed update changes this copy; agents sharing its files use the updated content.";
+            return "Updates affect this copy and agents sharing its files.";
         if (cleanup.ReviewOnly)
-            return "Inspection only; this issue cannot be removed automatically.";
+            return "Inspection only; no automatic removal.";
         if (cleanup.Impact?.Operation == "unlink")
-            return "If confirmed, removes only this link. Files at its target are not deleted.";
+            return "If confirmed, removes only this link. Target files stay.";
         if (cleanup.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
             return "If confirmed, removes this directory only while it is empty.";
         return "If confirmed, removes this installation. Its recorded consumers may lose access.";
@@ -114,8 +112,8 @@ internal static class MaintenanceQueueFormatter
             _ => "The skill's metadata needs attention."
         },
         CleanupClassifier.CandidateKind.BrokenSymlink => "This link's target could not be found.",
-        CleanupClassifier.CandidateKind.NameCollision => "Another installation uses this name. Sources, versions, or local changes may differ.",
-        CleanupClassifier.CandidateKind.Untracked => "gh did not report this copy. It may have been installed another way.",
+        CleanupClassifier.CandidateKind.NameCollision => "Other copies use this name; sources or versions may differ.",
+        CleanupClassifier.CandidateKind.Untracked => "Not listed by gh; another installer may own it.",
         CleanupClassifier.CandidateKind.MetadataConflict => "Installation records disagree about this copy; inspect the details before changing it.",
         _ => entry.Reason
     };
@@ -151,7 +149,7 @@ internal static class MaintenanceQueueFormatter
                 omitted++;
                 continue;
             }
-            var formatted = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}  \n";
+            var formatted = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}\n\n";
             token.ThrowIfCancellationRequested();
             if (formatted.Length > remaining) omitted++;
             else text.Append(formatted);
