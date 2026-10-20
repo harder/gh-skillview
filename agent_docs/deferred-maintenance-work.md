@@ -8,6 +8,13 @@ completed features. Finish a bounded item only when its remaining work is clear
 and proportionate. The status and priority judgments below are provisional where
 evidence is incomplete.
 
+The current project goal is to help users find skills, understand their physical
+installations and affected agents, diagnose installation/version/duplicate issues,
+and apply understandable repairs through existing safe operations. Excellent
+terminal UX is part of that goal. This ledger supersedes the former all-21
+completion objective and older handoff instructions to finish every audit item.
+The deferred table is context for future decisions, not a completion backlog.
+
 ## Snapshot and how to read it
 
 - Inventory date: 2026-10-19. The original inspected checkout is
@@ -84,14 +91,19 @@ broader acceptance or portability proof is unfinished.
 
 ## Next bounded priority
 
-PR #72 is merged. The approved Changes UX work is in progress on
-`codex/issue-summary-ux`, based on merge commit `65e07717086d1580c273ea81b83b1eb6b56521dd`.
-It adds a short issue summary for the affected installation or agents, recommended
-action, expected effect, and undo path, with F2 preserving access to technical
-evidence and existing specialist routes. No new queue framework is needed.
-Source inspection identified the gap; after implementation, the focused Release
-builds, formatter check, 30 focused unit tests, and 9 integration tests passed.
-The TUI was not launched, so interactive visual readiness remains unverified.
+PR #72's install safeguards, PR #75's Changes summaries and PR #76's CI runtime
+improvements are merged. Cleanup review UX is in PR #77, last observed open at
+`233ab76f792f35d7c1ea6e6bfd5746c11645caac`; final safety fixes are published and
+complete managed/native CI results remain to be checked. See that branch's
+`agent_docs/evidence/cleanup-review-ux.md` for validation and its limits.
+
+The user authorized a bounded comparison of PR #73 with the existing update flow
+on 2026-10-20. The result is [version-selection-scope.md](version-selection-scope.md).
+It recommends choosing a Git tag for one installed copy through existing saved
+update review/apply, with all shared consumers visible. It does not authorize
+product implementation or resuming PR #73 wholesale. Persistent approval and
+approved-restore policy remain deferred. The next decision is whether to approve
+that small implementation scope, including its explicit tag/pin limitations.
 
 ## Maintenance guidance
 
