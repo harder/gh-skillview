@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Gh.Models;
+using SkillView.Inventory.Models;
 using SkillView.Ui;
 using Xunit;
 
@@ -7,6 +8,37 @@ namespace SkillView.Tests.Ui;
 
 public sealed class UpdateScreenTests
 {
+    [Fact]
+    public void TagReviewLeadsWithVersionConsumersLocalChangesAndRetentionBeforeDetailedEvidence()
+    {
+        var fixture = LocalReimportScreenTests.Plan();
+        var longAgent = new string('x', 100);
+        var metadata = SkillFrontMatter.Empty with { GithubRef = "refs/tags/v2" };
+        var plan = fixture with
+        {
+            LocalImport = null,
+            Subject = fixture.Subject with
+            {
+                Metadata = metadata,
+                Agents = [.. fixture.Subject.Agents, new(longAgent, "/another/demo", true)]
+            },
+            Revision = new(new("https://github.com/test/repo", "refs/tags/v1", new('c', 40), new('d', 40), "skills/demo"), metadata, null, ["local.txt"])
+        };
+        var body = UpdateScreen.RenderPlan(plan);
+        var state = body.IndexOf("**State:**", StringComparison.Ordinal);
+        Assert.True(state > 0);
+        var summary = body[..state];
+        Assert.Contains("refs/tags/v2 -> refs/tags/v1", summary);
+        Assert.Contains("Affected recorded agents", summary); Assert.Contains("claude, codex", summary);
+        Assert.Contains("**Local changes:** `1`", summary);
+        Assert.Contains("Apply retains original, including local edits, for undo", summary);
+        Assert.Contains("later ordinary Update follows latest", summary);
+        Assert.Contains("Summary shortened", summary); Assert.DoesNotContain(longAgent, summary);
+        Assert.True(state < body.IndexOf("**Plan ID:**", StringComparison.Ordinal));
+        Assert.True(state < body.IndexOf("### Frozen source changes", StringComparison.Ordinal));
+        Assert.Contains(longAgent, body); Assert.Contains(new string('c', 40), body);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

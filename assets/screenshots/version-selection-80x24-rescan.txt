@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│ ┏┥Choose version┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓   │
+│R┃Installation: demo                                                      ┃   │
+│S┃                                                                        ┃   │
+│─┃Location: /var/tmp/skillview-version-scope/pty/skills/demo              ┃   │
+│ ┃                                                                        ┃   │
+│─┃Repository: https://github.com/fixture/repo                             ┃   │
+│☐┃                                                                        ┃   │
+│☐┃Current ref: refs/tags/v1.0                                             ┃   │
+│ ┃                                                                        ┃   │
+│ ┃Skill subpath: repository root                                          ┃   │
+│ ┃                                                                        ┃   │
+│ ┃                                                                        ┃   │
+│☐┃                                                                        ┃aim│
+│⟦┃Git tag:                                                                ┃   │
+│☐┃Example: v1.2.3. Tags only; branches and raw commits are excluded.      ┃   │
+│☐┃One-time choice; later ordinary Update follows latest.                  ┃   │
+│ ┃Every agent sharing this physical installation is affected.             ┃   │
+│⟦┃Pins require a separate reviewed unpin before choosing a tag.           ┃   │
+│⟦┃Enter prepares review; Esc cancels. Nothing is applied.                 ┃   │
+│ ┃⟦ Cancel ⟧  ⟦► Prepare tag ◄⟧                                           ┃d ││
+│ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛   │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

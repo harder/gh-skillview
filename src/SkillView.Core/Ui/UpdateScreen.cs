@@ -81,6 +81,21 @@ public static class UpdateScreen
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
         sb.AppendLine(plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
+        if (plan.Revision is { } tagRevision && tagRevision.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal)
+            && !tagRevision.DesiredMetadata.Pinned && tagRevision.DesiredMetadata.PinnedRef is null)
+        {
+            var previousRef = plan.Subject.Metadata.GithubRef ?? "unknown";
+            var agents = plan.Subject.Agents.Select(agent => agent.AgentId).Distinct(StringComparer.Ordinal).ToArray();
+            Field("Version", $"{TuiHelpers.Truncate(previousRef, 64)} -> {TuiHelpers.Truncate(tagRevision.Source.Ref, 64)}");
+            Field("Affected recorded agents", agents.Length == 0 ? "none recorded; inspect exposure evidence below"
+                : string.Join(", ", agents.Take(4).Select(agent => TuiHelpers.Truncate(agent, 24))));
+            Field("Local changes", tagRevision.LocalChanges.Length.ToString());
+            sb.AppendLine("Apply retains original, including local edits, for undo. One-time choice; later ordinary Update follows latest.");
+            if (previousRef != TuiHelpers.Truncate(previousRef, 64) || tagRevision.Source.Ref != TuiHelpers.Truncate(tagRevision.Source.Ref, 64)
+                || agents.Length > 4 || agents.Take(4).Any(agent => agent != TuiHelpers.Truncate(agent, 24)))
+                sb.AppendLine("Summary shortened; complete refs and affected consumer evidence remain below.");
+            sb.AppendLine();
+        }
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);
         Field("Installation ID", plan.Subject.InstallationId);
@@ -162,6 +177,7 @@ public static class UpdateScreen
         if (plan.Revision is { } revision)
         {
             Field("Repository", revision.Source.Repository);
+            Field("Recorded ref", plan.Subject.Metadata.GithubRef);
             Field("Resolved ref", revision.Source.Ref);
             Field("Commit", revision.Source.Commit);
             Field("Git tree", revision.Source.Tree);

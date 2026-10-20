@@ -12,7 +12,8 @@ objective is retired.
 - Its declared stacked PR #72 base: `4e77ee5d3c1732448fc1e0265156ba81baf71729`.
   The PR-only change from that base is 84 files, 8,205 additions and 259 deletions.
   This size describes the broader PR, not the effort for the proposed slice.
-- PR #77 remains separate; integrate against its final merged main before coding.
+- PR #77 remains separate; reconcile its final merged main before publication
+  when available. The user approved implementation while its CI was pending.
   Original dirty checkouts and private PR #73 fixes were not modified.
 
 ## What exists and what is missing
@@ -91,4 +92,9 @@ No product code was changed or built for this comparison. Existing test/source
 presence is evidence for reuse, not proof of the proposed new entry point.
 If implementation requires a new schema, approval store, provider witness or
 native mutation mechanism, stop and revisit this boundary before expanding it.
-Implementation awaits explicit approval of this scope and its limitations.
+The user approved this scope and its limitations on 2026-10-20. Implementation is
+on `codex/version-selection-scope`; the comparison above remains historical
+evidence for the boundary, not runtime proof of the implementation.
+Focused implementation and terminal verification are recorded in
+[the verification note](evidence/version-selection-ux.md). Hosted CI must still
+be assessed on the published implementation head.

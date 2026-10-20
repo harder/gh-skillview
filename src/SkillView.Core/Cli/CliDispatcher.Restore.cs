@@ -22,13 +22,14 @@ public static partial class CliDispatcher
         var expectedPurpose = sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
-        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null;
+        string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null, tag = null;
         var execute = false;
         var json = false;
         var allowHidden = false;
         var unpin = false;
         for (var index = 0; index < args.Count; index++)
         {
+            if (args[index].StartsWith("--tag=", StringComparison.Ordinal) && latest && tag is null) { tag = args[index][6..]; continue; }
             if (args[index] == "--allow-hidden-dirs" && !allowHidden) { allowHidden = true; continue; }
             if (args[index] == "--unpin" && latest && !unpin) { unpin = true; continue; }
             if (args[index] == "--json" && !json) { json = true; continue; }
@@ -36,6 +37,7 @@ public static partial class CliDispatcher
             if (index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
             {
                 if (args[index] == "--new-source" && sourceSwitch && command == "restore-plan" && newSource is null) { newSource = args[++index]; continue; }
+                if (args[index] == "--tag" && latest && tag is null) { tag = args[++index]; continue; }
                 if (args[index] == "--path" && command == "restore-plan" && path is null && installId is null) { path = args[++index]; continue; }
                 if (args[index] == "--install-id" && command == "restore-plan" && path is null && installId is null) { installId = args[++index]; continue; }
                 if (args[index] == "--id" && command != "restore-plan" && id is null) { id = args[++index]; continue; }
@@ -46,15 +48,21 @@ public static partial class CliDispatcher
             Console.Error.WriteLine("skillview: unsupported or incomplete saved replacement argument");
             return ExitCodes.InvalidUsage;
         }
-        if (sourceSwitch && command == "restore-plan" && (string.IsNullOrWhiteSpace(newSource) || !Path.IsPathFullyQualified(newSource) || newSource.Any(char.IsControl))
+        if (tag is not null && unpin
+            || sourceSwitch && command == "restore-plan" && (string.IsNullOrWhiteSpace(newSource) || !Path.IsPathFullyQualified(newSource) || newSource.Any(char.IsControl))
             || command == "restore-plan" && ((path is null) == (installId is null) || path is not null && string.IsNullOrWhiteSpace(path))
             || command != "restore-plan" && !QuarantineStore.ValidId(id!)
             || command == "restore-apply" && (!execute || !(sourceSwitch ? disposition == ReplacementPlanStore.LocalSourceSwitchDisposition : localReimport ? disposition == "replace-local-retain-original" : unpinOnly ? disposition == "unpin-only" : disposition == "retain-original" || requestedCommand == "update-apply" && disposition == "merge-reviewed") || !QuarantineStore.ValidHash(expected!))
             || command == "restore-ack-source" && (!execute || !QuarantineStore.ValidHash(expected!) || !QuarantineStore.ValidHash(sourceReview!))
             || command is "restore-recover" or "restore-undo" or "restore-repair-owner" && (!execute || !QuarantineStore.ValidHash(expected!)))
         {
-            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. source-switch-plan also requires --new-source <absolute directory>; source-switch-apply requires replace-local-source-retain-original. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Source acknowledgement needs --id --expect <plan fingerprint> --review <source-review fingerprint> --yes. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
+            Console.Error.WriteLine("skillview: restore-plan/update-plan/unpin-plan/reimport-plan need one --path/--install-id. update-plan accepts --tag TAG for one-time version choice; unpin separately before choosing a version. source-switch-plan also requires --new-source <absolute directory>; source-switch-apply requires replace-local-source-retain-original. Apply needs --id --yes --disposition retain-original (merge-reviewed for a merged update; unpin-only for unpin-apply; replace-local-retain-original for reimport-apply) --expect <plan fingerprint>. Source acknowledgement needs --id --expect <plan fingerprint> --review <source-review fingerprint> --yes. Recovery/undo/owner repair need --id --yes --expect <current inspection fingerprint>.");
             return ExitCodes.InvalidUsage;
+        }
+        if (tag is not null)
+        {
+            try { GhRevisionResolver.ValidateTag(tag); }
+            catch (IOException ex) { Console.Error.WriteLine("skillview: " + ex.Message); return ExitCodes.InvalidUsage; }
         }
         OperationImpact? frozenImpact = null;
         try
@@ -95,6 +103,8 @@ public static partial class CliDispatcher
                         ? await Task.Run(() => store.PlanLocalReimportAsync(gh!, target, inventory, token), token).ConfigureAwait(false)
                         : unpinOnly
                         ? await Task.Run(() => store.PlanUnpin(target, inventory, token), token).ConfigureAwait(false)
+                        : tag is not null
+                        ? await Task.Run(() => store.PlanTagAsync(gh!, target, inventory, tag, token), token).ConfigureAwait(false)
                         : await Task.Run(() => store.PlanLatestAsync(gh!, target, inventory, unpin, token), token).ConfigureAwait(false);
                     if (preparation.Unchanged is { } current)
                     {
@@ -108,6 +118,7 @@ public static partial class CliDispatcher
                         {
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                             w.WriteString("status", "unchanged"); w.WriteString("reason", current.Message);
+                            if (tag is not null) w.WriteString("versionSelection", "One-time tag choice; future ordinary updates follow latest. No pin is created.");
                             w.WriteBoolean("partial", current.CleanupWarning is not null);
                             w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
                             w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
@@ -116,6 +127,7 @@ public static partial class CliDispatcher
                         });
                         else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"
                             + (current.LocalSource is { } source ? $"\nLocal source: {source.Status}: {source.Message}" : "")));
+                        if (!json && tag is not null) Console.WriteLine("One-time tag choice; future ordinary updates follow latest. No pin is created.");
                         if (!json) WriteImpactText(frozenImpact);
                         return current.CleanupWarning is null ? ExitCodes.Success : ExitCodes.UserError;
                     }
@@ -144,6 +156,7 @@ public static partial class CliDispatcher
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WriteString("status", result.Canceled ? "canceled" : result.Succeeded ? result.Status : result.MutationObserved ? "partial" : "refused");
                 w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
+                if (tag is not null) w.WriteString("versionSelection", "One-time tag choice; all consumers share the change. Future ordinary updates follow latest. No pin is created.");
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
                 WritePlanReference(w, result);
                 w.WriteString("diskVerification", result.Succeeded
@@ -162,6 +175,12 @@ public static partial class CliDispatcher
             else Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
                 + string.Join("\n", result.ChangedPaths.Take(128).Select(change => "Changed: " + change)) + (result.ChangedPaths.Length > 128 ? $"\nOmitted changed paths: {result.ChangedPaths.Length - 128}; complete list in the saved plan." : "") + "\n" + result.Message));
+            if (!json && result.Revision is { } revision)
+            {
+                Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"Source ref: {revision.Source.Ref}\nCommit: {revision.Source.Commit}\nGit tree: {revision.Source.Tree}"));
+                if (revision.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal) && !revision.DesiredMetadata.Pinned)
+                    Console.WriteLine("One-time tag choice; all consumers share the change. Future ordinary updates follow latest. No pin is created.");
+            }
             if (!json) Console.WriteLine(SourceReviewScreen.RenderText(result));
             if (!json && result.LocalImport is not null) Console.WriteLine(LocalReimportScreen.RenderText(result));
             if (!json) WriteImpactText(result.Impact ?? frozenImpact);

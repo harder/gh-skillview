@@ -48,6 +48,9 @@ internal sealed partial class UpdatesTabView : FrameView
     private readonly Button _dryRunButton;
     private readonly Button _updateButton;
     private readonly Button _unpinOnlyButton;
+    private readonly Button _chooseVersionButton;
+    private readonly Func<InstalledSkill, string?> _chooseTag;
+    private bool _choosingVersion;
     private readonly StatusBar _statusBar;
 
     private CheckBoxTableSourceWrapperByIndex? _wrapper;
@@ -70,7 +73,8 @@ internal sealed partial class UpdatesTabView : FrameView
         CancellationToken lifetimeToken = default,
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null,
         Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? localReviewRunner = null,
-        Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null)
+        Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null,
+        Func<InstalledSkill, string?>? chooseTag = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -84,6 +88,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onUpdateApplied = onUpdateApplied;
         _lifetimeToken = lifetimeToken;
+        _chooseTag = chooseTag ?? (selected => App is { } app ? GitTagSelectionModal.Show(app, selected, _lifetimeToken) : null);
         var cancellationReporter = CancellationCallbackReporter.For(logger, "updates tab");
         _loadCancellations = new CancellationOperationSlot(cancellationReporter);
         _operationCancellations = new CancellationOperationSlot(cancellationReporter);
@@ -178,6 +183,14 @@ internal sealed partial class UpdatesTabView : FrameView
             Enabled = _unpinRunner is not null
         };
 
+        _chooseVersionButton = new SingleRowButton
+        {
+            Text = "Choose version...",
+            X = Pos.Right(_unpinOnlyButton) + 2,
+            Y = Pos.AnchorEnd(3)
+        };
+        _chooseVersionButton.Accepting += (_, args) => { args.Handled = true; ChooseVersion(); };
+
         InitializeReviewControls();
         InitializeLocalReviewControls();
 
@@ -211,13 +224,13 @@ internal sealed partial class UpdatesTabView : FrameView
         TuiHelpers.ApplyScheme(SchemeNames.Base,
             this, _tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _statusBar);
 
         KeyDown += OnKeyDown;
 
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
         Disposing += (_, _) => CancelPendingWork();
     }
@@ -226,7 +239,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     internal async Task LoadForSubjectAsync(OperationSubject? selected)
     {
-        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_choosingVersion || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -335,6 +348,8 @@ internal sealed partial class UpdatesTabView : FrameView
     internal Button DryRunButtonForTests => _dryRunButton;
     internal Button UnpinOnlyButtonForTests => _unpinOnlyButton;
     internal Task PlanUnpinForTestsAsync() => RunUnpinAsync();
+    internal void ChooseVersionForTests() => ChooseVersion();
+    internal Button ChooseVersionButtonForTests => _chooseVersionButton;
     internal string StatusTextForTests => _status.Text.ToString();
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
     internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
@@ -364,7 +379,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void OnKeyDown(object? sender, Key key)
     {
-        if (key.Handled) return;
+        if (key.Handled || _choosingVersion) return;
 
         if (key.KeyCode == KeyCode.Esc)
         {
@@ -551,6 +566,10 @@ internal sealed partial class UpdatesTabView : FrameView
         _dryRunButton.Enabled = enabled;
         _updateButton.Enabled = enabled;
         _unpinOnlyButton.Enabled = enabled && _unpinRunner is not null;
+        _chooseVersionButton.Enabled = enabled && !_lifetimeToken.IsCancellationRequested;
+        _tableLabel.Text = _queueOptions?.Tag is not null
+            ? "One-time tag choice · later ordinary Update follows latest"
+            : "Space marks · c compare/plan row · u review · U marked · p unpin";
         _allBox.Enabled = enabled;
         _hiddenBox.Enabled = enabled;
         _unpinBox.Enabled = enabled;

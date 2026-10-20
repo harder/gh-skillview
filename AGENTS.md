@@ -199,6 +199,13 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
 
+- One-time version choice uses the existing schema-2 saved update path for an
+  exact Git tag and one physical installation. Never fall back to latest or
+  forward tag options to mutable gh update adapters. Existing pins require a
+  separate unpin review. TUI version choice targets the current row regardless
+  of marks/All; every shared consumer remains affected. It creates no lasting
+  version policy: later ordinary updates still follow latest.
+
 - Local source switching uses schema6 `switch-local-source`, a separate
   `LocalSourceSwitch` placement/history observation and explicit
   `replace-local-source-retain-original` disposition. Keep schema5 exact.

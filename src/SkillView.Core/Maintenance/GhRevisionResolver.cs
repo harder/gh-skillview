@@ -35,7 +35,26 @@ internal sealed class GhRevisionResolver
     }
     internal GhRevisionResolver(Func<string, CancellationToken, Task<GhApiPayload>> request) => this.request = request;
 
-    internal async Task<ResolvedSkillRevision> ResolveLatestAsync(string repositoryUrl, string? sourcePath, CancellationToken token)
+    internal Task<ResolvedSkillRevision> ResolveLatestAsync(string repositoryUrl, string? sourcePath, CancellationToken token) =>
+        ResolveAsync(repositoryUrl, sourcePath, null, token);
+
+    internal Task<ResolvedSkillRevision> ResolveTagAsync(string repositoryUrl, string? sourcePath, string tag, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        ValidateTag(tag);
+        return ResolveAsync(repositoryUrl, sourcePath, tag, token);
+    }
+
+    internal static void ValidateTag(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || tag.Length > 1024 || tag == "@"
+            || tag.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || "~^:?*[\\".Contains(c))
+            || tag.Contains("..", StringComparison.Ordinal) || tag.Contains("@{", StringComparison.Ordinal)
+            || tag.Split('/').Any(part => part.Length == 0 || part.StartsWith('.') || part.EndsWith('.') || part.EndsWith(".lock", StringComparison.Ordinal)))
+            throw new IOException("Enter an exact Git tag, such as v1.2.0. Branches and raw commits are not selected by this action.");
+    }
+
+    private async Task<ResolvedSkillRevision> ResolveAsync(string repositoryUrl, string? sourcePath, string? selectedTag, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var repo = Repository(repositoryUrl);
@@ -49,22 +68,30 @@ internal sealed class GhRevisionResolver
             throw new IOException("The recorded source subpath is unsupported.");
         try
         {
-            var release = await request($"repos/{repo}/releases/latest", token).ConfigureAwait(false);
             string reference;
             string commit;
-            if (release.Status == 404 || release.Status == 200 && string.IsNullOrEmpty(Text(release.Body, "tag_name")))
+            if (selectedTag is not null)
             {
-                var repository = await Get($"repos/{repo}", token).ConfigureAwait(false);
-                var branch = RequiredText(repository, "default_branch");
-                reference = "refs/heads/" + branch;
-                commit = await ResolveRef("heads", branch).ConfigureAwait(false);
+                reference = "refs/tags/" + selectedTag;
+                commit = await ResolveRef("tags", selectedTag).ConfigureAwait(false);
             }
             else
             {
-                RequireSuccess(release);
-                var tag = RequiredText(release.Body, "tag_name");
-                reference = "refs/tags/" + tag;
-                commit = await ResolveRef("tags", tag).ConfigureAwait(false);
+                var release = await request($"repos/{repo}/releases/latest", token).ConfigureAwait(false);
+                if (release.Status == 404 || release.Status == 200 && string.IsNullOrEmpty(Text(release.Body, "tag_name")))
+                {
+                    var repository = await Get($"repos/{repo}", token).ConfigureAwait(false);
+                    var branch = RequiredText(repository, "default_branch");
+                    reference = "refs/heads/" + branch;
+                    commit = await ResolveRef("heads", branch).ConfigureAwait(false);
+                }
+                else
+                {
+                    RequireSuccess(release);
+                    var tag = RequiredText(release.Body, "tag_name");
+                    reference = "refs/tags/" + tag;
+                    commit = await ResolveRef("tags", tag).ConfigureAwait(false);
+                }
             }
             var commitBody = await Get($"repos/{repo}/git/commits/{commit}", token).ConfigureAwait(false);
             using var document = JsonDocument.Parse(commitBody);

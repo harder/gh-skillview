@@ -13,6 +13,28 @@ With several selected installations, one candidate is prepared; other targets
 are explicitly `not-started`. Prepare each next target after applying or skipping
 the current review. Applying a sibling changes captured directory generations.
 
+To choose a specific version for one installed copy, select **Choose version...**
+in Updates and enter its Git tag (for example, `v1.2.0`). This uses the current row,
+independently of marks or All. The equivalent CLI preparation is:
+
+```sh
+skillview --scan-root /path/to/skills update-plan --path /path/to/skills/demo --tag v1.2.0 --json
+```
+
+The review shows the exact resolved tag, commit, tree, local changes and affected
+consumers. Every agent sharing that physical copy sees the change; independent
+copies remain separate. Review the saved source and approve retaining the original
+before applying through the existing commands below. Canceling review leaves the
+installed copy unchanged. A missing or invalid tag refuses; it never selects latest
+instead. Apply uses the saved candidate even if the remote tag subsequently moves.
+
+Version selection is a one-time change, including a deliberate downgrade. It
+creates no pin; a later ordinary Update follows latest. For a pinned installation,
+complete the separately reviewed unpin operation first. `--tag` cannot be combined
+with `--unpin`. Branches and raw commits are not selected by this action; a tag
+named like a commit is still resolved only as a tag. New pin policy, automatic tag
+browsing and persistent version approvals are outside this flow.
+
 From a list, `u` opens the Updates workspace. There, `u` reviews the current physical installation, `U` queues
 marked installations, and Update uses marks or the explicit all selection.
 Each candidate has its own review, retention checkbox and **Replace reviewed**

@@ -56,6 +56,61 @@ public sealed class GhRevisionResolverTests
     private const string callsLatest = "repos/harder/fixture/releases/latest";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExplicitNestedTagNeverQueriesLatestAndFreezesImmutableObjects(bool annotated)
+    {
+        const string endpoint = "repos/harder/fixture/git/ref/tags/release%2Fv1";
+        responses[endpoint] = new(200, Ref("tags/release/v1", annotated ? Tag : Commit, annotated ? "tag" : "commit"));
+        if (annotated) responses[$"repos/harder/fixture/git/tags/{Tag}"] = new(200,
+            "{\"sha\":\"" + Tag + "\",\"object\":{\"sha\":\"" + Commit + "\",\"type\":\"commit\"}}");
+        var result = await Resolver().ResolveTagAsync(Repository, "skills/demo/SKILL.md", "release/v1", Token);
+        Assert.Equal(new(Repository, "refs/tags/release/v1", Commit, SkillTree, "skills/demo"), result);
+        Assert.Equal(endpoint, calls[0]);
+        Assert.DoesNotContain(callsLatest, calls);
+        Assert.DoesNotContain("repos/harder/fixture", calls);
+    }
+
+    [Theory]
+    [InlineData(404)]
+    [InlineData(401)]
+    [InlineData(403)]
+    [InlineData(429)]
+    [InlineData(500)]
+    public async Task ExplicitTagFailureNeverFallsBack(int status)
+    {
+        const string endpoint = "repos/harder/fixture/git/ref/tags/missing";
+        responses[endpoint] = new(status, "{}");
+        await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "", "missing", Token));
+        Assert.Equal([endpoint], calls);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("../main")]
+    [InlineData("a//b")]
+    [InlineData("a.lock")]
+    [InlineData("a/.hidden")]
+    [InlineData("a@{b")]
+    [InlineData("a~1")]
+    [InlineData("a b")]
+    [InlineData("a\\b")]
+    [InlineData("@")]
+    public async Task InvalidExplicitTagRefusesBeforeRequests(string tag)
+    {
+        await Assert.ThrowsAsync<IOException>(() => Resolver().ResolveTagAsync(Repository, "", tag, Token));
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public async Task ExplicitTagCancellationNeverQueriesSource()
+    {
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Resolver().ResolveTagAsync(Repository, "", "v1", new(true)));
+        Assert.Empty(calls);
+    }
+
+    [Theory]
     [InlineData(401)]
     [InlineData(403)]
     [InlineData(429)]

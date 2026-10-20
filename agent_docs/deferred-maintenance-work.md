@@ -94,16 +94,18 @@ broader acceptance or portability proof is unfinished.
 PR #72's install safeguards, PR #75's Changes summaries and PR #76's CI runtime
 improvements are merged. Cleanup review UX is in PR #77, last observed open at
 `233ab76f792f35d7c1ea6e6bfd5746c11645caac`; final safety fixes are published and
-complete managed/native CI results remain to be checked. See that branch's
+the managed/native CI run passed after one retry of canceled proof jobs. It
+remains unmerged. See that branch's
 `agent_docs/evidence/cleanup-review-ux.md` for validation and its limits.
 
 The user authorized a bounded comparison of PR #73 with the existing update flow
 on 2026-10-20. The result is [version-selection-scope.md](version-selection-scope.md).
 It recommends choosing a Git tag for one installed copy through existing saved
 update review/apply, with all shared consumers visible. It does not authorize
-product implementation or resuming PR #73 wholesale. Persistent approval and
-approved-restore policy remain deferred. The next decision is whether to approve
-that small implementation scope, including its explicit tag/pin limitations.
+resuming PR #73 wholesale. The user subsequently approved the documented tag-only
+implementation on 2026-10-20. Persistent approval and approved-restore policy,
+raw commits and new pin behavior remain deferred. The bounded finish point is
+the documented CLI/TUI flow, focused verification and a reviewable PR.
 
 ## Maintenance guidance
 

@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                │
+│One-time tag choice · later ordinary Update follows latest                    │
+│─┬────┬────────┬─────────────────── Update results                           ▲│
+│ │Name│Scope   │Flags                                                        █│
+│─┼────┼────────┼─────────────────── Saved update review                      ░│
+│☐│demo│Custom  │--                  Version: refs/tags/v2.0 -> refs/tags/v1.0░│
+│☐│demo│Custom  │--                  Affected recorded agents: unknown,       ░│
+│                                    universal Local changes: 2 Apply retains ░│
+│                                    original, including local edits, for     ░│
+│                                    undo. One-time choice; later ordinary    ▼│
+│                                                                              │
+│☐ I reviewed frozen source changes and omissions (no authenticity/safety claim│
+│⟦ Preserve installed ⟧ ⟦ Review local ⟧ ⟦ Build merge ⟧                       │
+│☐ Retain original, including local edits; apply this reviewed plan            │
+│☐ all     ☐ unpin     ☐ Include hidden directories                            │
+│   review required · 0 remaining · choose preserve, local review, or approve  │
+│⟦ Dry-run ⟧ev⟦► Update ◄⟧  ⟦ Plan unpin only ⟧  ⟦ Choose version... ⟧         │
+│⟦ Replace reviewed ⟧  ⟦ Next / skip ⟧                                         │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Dry-run  d ││
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘
