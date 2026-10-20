@@ -603,6 +603,18 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
+    public void ProtectedEmptySummaryKeepsLocationBeforeLongEvidenceAndDoesNotRepeatTheReason()
+    {
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory,
+            "/skills/empty", "context protection " + new string('x', 5000), null, ReviewOnly: true);
+        var summary = CleanupScreen.RenderDetail(candidate);
+        Assert.Contains("/skills/empty", summary);
+        Assert.Contains("press F2", summary);
+        Assert.DoesNotContain("Review needed", summary);
+        Assert.Contains("context protection", CleanupScreen.RenderDetail(candidate, showDetails: true));
+    }
+
+    [Fact]
     public void BuildShortcuts_UsesCompactOrderedCleanupActions()
     {
         var shortcuts = CleanupScreen.BuildShortcutsForTests();

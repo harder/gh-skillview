@@ -29,7 +29,11 @@ internal static class CleanupSuppressionWorkflow
                 }
                 try
                 {
-                    var current = inventory.Skills.SingleOrDefault(skill => PathIdentity.Equals(skill.ResolvedPath, reviewed.ResolvedPath));
+                    var matches = inventory.Skills.Where(skill => PathIdentity.Equals(skill.ResolvedPath, reviewed.ResolvedPath))
+                        .Take(2).ToArray();
+                    if (matches.Length > 1)
+                        throw new IOException("Selected installation is ambiguous in refreshed inventory; refresh or reconcile it before ignoring.");
+                    var current = matches.FirstOrDefault();
                     if (current is null || current.SourceIdentity != reviewed.SourceIdentity || current.Name != reviewed.Name
                         || CleanupSuppressionStore.OwnerNamespace(current) != CleanupSuppressionStore.OwnerNamespace(reviewed))
                         throw new IOException("Selected installation source/context changed; refresh before ignoring.");

@@ -94,10 +94,15 @@ public sealed class CleanupSuppressionScreenTests
                 table.SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
                 detail.SetFocus(); Assert.True(detail.HasFocus);
+                Assert.Equal("r", shortcuts[1].Title);
+                Assert.Contains(window.SubViews.OfType<Label>(), label => label.Text.ToString().Contains("r Review", StringComparison.Ordinal)
+                    && label.Text.ToString().Contains("Ctrl+C Copy", StringComparison.Ordinal));
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
                 Assert.Equal(0, reviews); // Enter in the reading pane never opens removal review.
                 shortcuts[1].InvokeCommand(Command.Accept);
                 Assert.Equal(1, reviews); // Deliberate footer acceptance does.
+                shortcuts[1].InvokeCommand(Command.Activate);
+                Assert.Equal(2, reviews); // Activate also dispatches exactly once.
                 shortcuts[2].InvokeCommand(Command.Accept);
                 Assert.Contains("## Technical details", detail.Text.ToString());
                 Assert.Equal("Summary", shortcuts[2].HelpText);
@@ -107,15 +112,16 @@ public sealed class CleanupSuppressionScreenTests
                 Assert.Equal("Details", shortcuts[2].HelpText);
                 shortcuts[0].InvokeCommand(Command.Activate); // Uncheck through the clickable footer action.
                 table.SetFocus();
+                Assert.Equal("Enter", shortcuts[1].Title);
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
-                Assert.Equal(1, reviews);
+                Assert.Equal(2, reviews);
                 shortcuts[0].InvokeCommand(Command.Accept); // Select again through its accepting path.
                 table.SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
-                Assert.Equal(2, reviews); // One Enter dispatches exactly one review.
+                Assert.Equal(3, reviews); // One Enter dispatches exactly one review.
                 detail.SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.R));
-                Assert.Equal(3, reviews); // The explicit review alias remains available.
+                Assert.Equal(4, reviews); // The explicit review alias remains available.
                 shortcuts[3].InvokeCommand(Command.Accept);
                 Assert.Contains("fresh inventory unavailable", window.SubViews.OfType<Label>().Single(
                     label => label.Text.ToString().Contains("fresh inventory unavailable", StringComparison.Ordinal)).Text.ToString());
@@ -125,7 +131,7 @@ public sealed class CleanupSuppressionScreenTests
             screen.Show(ready => window = ready);
             Assert.Null(screen.LastReport); Assert.Equal(0, screen.RemovedCount);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
-        Assert.False(timedOut); Assert.Equal(3, reviews);
+        Assert.False(timedOut); Assert.Equal(4, reviews);
     }
 
     [Fact]

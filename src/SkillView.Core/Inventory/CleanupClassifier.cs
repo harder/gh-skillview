@@ -245,7 +245,9 @@ public static class CleanupClassifier
         // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
         var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
-        var reviewReasons = result.Where(candidate => candidate.ReviewOnly && candidate.Kind != CandidateKind.Malformed)
+        // MissingSkillMd is superseded by the verified-empty observation below.
+        // Retain every other finding, including future actionable findings.
+        var reviewReasons = result.Where(candidate => candidate.Kind != CandidateKind.Malformed)
             .GroupBy(candidate => PathIdentity.NormalizeKey(candidate.Path), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => string.Join("; ", group.Select(candidate => candidate.Reason).Distinct()), StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
@@ -280,7 +282,9 @@ public static class CleanupClassifier
                     if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
                     // An empty link target is not permission to delete the target.
                     if (PathResolver.IsSymlink(child)) continue;
-                    var resolved = PathResolver.Resolve(child);
+                    // Inventory uses canonical entry addresses. Resolve the
+                    // parent too, so aliased roots match their recorded rows.
+                    var resolved = OwnershipPath.EntryAddress(child);
                     if (resolved is null) continue;
                     var key = PathIdentity.NormalizeKey(resolved);
                     if (knownResolved.Contains(key) || emptyPaths.Contains(key)) continue;
@@ -310,8 +314,7 @@ public static class CleanupClassifier
                             || recorded?.Any(skill => skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
                                 || !skill.MetadataConflicts.IsEmpty || skill.Provenance != Provenance.FsScan
                                 || skill.SourceIdentity.Provider != "unknown" || skill.ObservedSubject?.ExposureCoverageComplete == false) == true;
-                        var hasConsumers = recorded?.Any(skill => skill.Agents.Any(agent => agent.IsSymlink
-                            || !PathIdentity.Equals(agent.Path, resolved))) == true;
+                        var hasConsumers = recorded?.Any(skill => skill.Agents.Any(agent => IsOtherExposure(agent, resolved))) == true;
                         reviewReasons.TryGetValue(key, out var reviewReason);
                         emptyPaths.Add(key);
                         var reason = $"empty directory under scan root '{root.Path}'";
@@ -346,6 +349,22 @@ public static class CleanupClassifier
                 impact = OperationImpact.Link(OperationSubject.From(linked), membership);
             return candidate with { Impact = impact };
         }).ToImmutableArray();
+    }
+
+    private static bool IsOtherExposure(AgentMembership agent, string resolved)
+    {
+        if (agent.IsSymlink) return true;
+        if (PathIdentity.Equals(agent.Path, resolved)) return false;
+        try
+        {
+            // Resolve ancestor aliases without following the final entry. An
+            // incoming link is still a separate exposure, even to this target.
+            var entry = OwnershipPath.EntryAddress(agent.Path);
+            var canonical = OwnershipPath.EntryAddress(resolved);
+            return entry is null || canonical is null || !PathIdentity.Equals(entry, canonical);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { return true; }
     }
 
     private static bool WasCovered(InventorySnapshot snapshot, InstalledSkill skill)

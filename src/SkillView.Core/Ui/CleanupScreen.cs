@@ -204,6 +204,8 @@ public sealed class CleanupScreen
         };
 
         var shortcuts = BuildShortcuts();
+        var reviewShortcut = shortcuts.Single(shortcut => shortcut.Title == "Enter");
+        var detailsShortcut = shortcuts.Single(shortcut => shortcut.Title == "F2");
         var statusBar = new StatusBar(shortcuts);
         // StatusBar sets shortcut alignment (and resets child margins) when
         // adding items. Compact them afterward, keeping a gap before each key.
@@ -318,9 +320,17 @@ public sealed class CleanupScreen
             showDetails = !showDetails;
             var i = table.GetSelectedRow();
             if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
+            UpdateHints();
+        }
+
+        void UpdateHints()
+        {
             var action = showDetails ? "Summary" : "Details";
-            shortcuts[2].HelpText = action;
-            header.Text = BuildHeaderText().Replace("F2 Details", $"F2 {action}", StringComparison.Ordinal);
+            detailsShortcut.HelpText = action;
+            reviewShortcut.Title = detail.HasFocus ? "r" : "Enter";
+            header.Text = detail.HasFocus
+                ? $"r Review · F2 {action} · Ctrl+A Select · Ctrl+C Copy"
+                : BuildHeaderText().Replace("F2 Details", $"F2 {action}", StringComparison.Ordinal);
         }
 
         void IgnoreSelection()
@@ -374,13 +384,23 @@ public sealed class CleanupScreen
             _app.RequestStop();
         }
 
-        Action[] actions = [ToggleSelection, ReviewSelection, ToggleDetails, IgnoreSelection, Export, Close];
-        for (var i = 0; i < shortcuts.Length; i++)
+        void Bind(string title, Action action)
         {
-            var action = actions[i];
-            shortcuts[i].Action = action;
-            shortcuts[i].Accepting += (_, args) => { args.Handled = true; action(); };
+            var shortcut = shortcuts.Single(shortcut => shortcut.Title == title);
+            // Terminal.Gui invokes Action for Activate, but a programmatic
+            // Accept takes its separate Accepting route. Consume that route so
+            // both explicit commands run the action exactly once.
+            shortcut.Action = action;
+            shortcut.Accepting += (_, args) => { args.Handled = true; action(); };
         }
+        Bind("Space", ToggleSelection);
+        Bind("Enter", ReviewSelection);
+        Bind("F2", ToggleDetails);
+        Bind("i", IgnoreSelection);
+        Bind("x", Export);
+        Bind("Esc", Close);
+        table.HasFocusChanged += (_, _) => UpdateHints();
+        detail.HasFocusChanged += (_, _) => UpdateHints();
         // The window owns keyboard routing, including contextual Enter/Space.
         // Footer labels do not install competing global bindings; their actions
         // remain available to mouse and explicit command activation.

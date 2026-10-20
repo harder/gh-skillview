@@ -464,7 +464,7 @@ skillview doctor --json
 skillview list --json
 skillview search prompt --owner github --json
 skillview update --all --dry-run --json
-skillview cleanup --candidates --json
+skillview cleanup --candidates=EmptyDirectory --json
 ```
 
 ## Troubleshooting
@@ -531,6 +531,31 @@ metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
 removal of an unowned chosen install remains available through the Installed workflow.
 An incomplete scan is marked in the Installed footer and Changes summary.
+
+Cleanup reports a verified empty immediate child of a scan root as
+`EmptyDirectory`, even when inventory retained it as `MissingSkillMd`.
+Non-empty directories with missing or invalid skill metadata remain `Malformed`
+review items. This also changes the CLI JSON `kind` and candidate filtering:
+`--candidates=Malformed` no longer includes those empty-directory observations.
+Both `--candidates=EmptyDirectory` and `--candidates EmptyDirectory` are accepted;
+comma-separated kind names are matched without regard to case.
+
+Without `--apply`, cleanup only reports candidates and leaves installed entries
+unchanged. `--apply` requires `--yes`; it can now remove eligible empty-directory
+observations that previously appeared only as malformed review items. Native
+validation checks each directory again and refuses removal if it has become
+populated. Empty directories with recorded sources/ownership, other consumer
+exposures, conflicting records or incomplete discovery remain review-only.
+`--yes` does not override those protections. Cleanup deletion has no automatic
+undo. Review the JSON before applying, for example:
+
+```bash
+skillview --scan-root /path/to/skills cleanup --candidates=EmptyDirectory --json
+skillview --scan-root /path/to/skills cleanup --candidates EmptyDirectory --apply --yes --json
+```
+
+An apply batch can remove eligible entries while refusing protected entries;
+inspect the per-entry `applied` results and exit status.
 
 Cleanup's **Ignore** action stores a preference outside the skill directory. It
 suppresses suggestions for that physical installation across its consumer

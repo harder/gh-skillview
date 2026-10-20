@@ -51,24 +51,24 @@ internal static class CleanupReviewFormatter
 
     private static IEnumerable<(string, string?)> Fields(CleanupClassifier.Candidate candidate)
     {
+        // Preserve the actionable address ahead of potentially long captured
+        // reasons and consumer lists. Full evidence remains available with F2.
+        yield return ("Location", candidate.Path);
         yield return ("Why", candidate.Kind switch
         {
             CleanupClassifier.CandidateKind.BrokenSymlink => "This link's target could not be found.",
-            CleanupClassifier.CandidateKind.EmptyDirectory => "This directory contains no files.",
+            CleanupClassifier.CandidateKind.EmptyDirectory => candidate.ReviewOnly ? candidate.Reason : "This directory contains no files.",
             CleanupClassifier.CandidateKind.Malformed => "The skill file is missing or its metadata needs attention.",
             CleanupClassifier.CandidateKind.Duplicate or CleanupClassifier.CandidateKind.NameCollision => "Other copies use this name; compare their sources and versions.",
             CleanupClassifier.CandidateKind.Untracked => "Not listed by gh; another installer may own it.",
             _ => candidate.Reason
         });
-        if (candidate.ReviewOnly && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
-            yield return ("Review needed", candidate.Reason);
         yield return ("Next", candidate.ReviewOnly
             ? "Inspect the details and compare or repair this copy."
             : "Space selects; Enter reviews removal.");
         yield return ("Changes", Effect(candidate));
         yield return ("Undo", candidate.ReviewOnly ? "Inspection changes nothing." : "Deletion has no automatic undo.");
         foreach (var field in AgentFields(candidate)) yield return field;
-        yield return ("Location", candidate.Path);
     }
 
     private static IEnumerable<(string, string?)> AgentFields(CleanupClassifier.Candidate candidate)
