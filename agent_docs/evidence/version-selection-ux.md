@@ -133,3 +133,38 @@ Updates tab 13, tag modal 7, renderer 6, tag workflow 12, update CLI 11 and
 source-review CLI 1. Integration tests passed 9/9. Release test/App/integration
 builds had zero warnings/errors; scoped formatting and whitespace checks passed.
 These overlap earlier runs. Hosted checks must still pass on the final head.
+
+## Round-3 review decisions
+
+Fixed the useful UX/robustness cases (findings 2–4). A chooser exception is logged
+and shown, while a queued inventory refresh still runs without preparing a tag.
+Cancellation remains cancellation. Blank injected tags now share one refusal
+before preparation, whether or not a refresh occurred. Deferred refresh restores
+marks and current selection by unique physical installation ID, plus prior focus
+and broad-option values when the Changes context is unchanged. A new drill-in
+keeps its intentional option reset; missing/ambiguous rows are never re-marked.
+
+Finding 1's background-thread premise does not match the production path:
+`SkillViewApp.RefreshActiveTab` is called by UI shortcut handling, its
+`RunOwnedTask` overload passes `runOnThreadPool: false`, and
+`BackgroundTaskTracker.CompleteAsync` invokes `operation()` before awaiting it.
+The chooser handshake runs in that synchronous UI-thread prefix. Snapshot work
+can run off-thread; publication returns through `runOnUi`. This affinity is now
+documented beside the load entry point. Adding a lock would not fix an observed
+production race in this path.
+
+Findings 5–8 do not justify broader work here. The guards protect different
+async/lifetime stages; a shared predicate would not make those stages atomic.
+Short wording has its own terminal-width budget and is shared between the modal
+and header. The 404 already says a requested source object was missing or
+inaccessible, without asserting that a resolved tag does not exist; more detailed
+step labels are optional polish. Retained input is checked against the observed
+version/native address, while a fresh saved plan captures current owners and
+requires review. It is deliberately not an approval of unchanged ownership.
+No new mutation authority, persisted label or workflow framework was added.
+
+Round-3 verification passed all 83 affected tests (reviewed Updates 51, Updates
+tab 13, tag modal 7, tag workflow 12) and 9 integration tests. Release test/App
+builds had zero warnings/errors; scoped formatting and whitespace checks passed.
+Unchanged resolver/CLI behavior retains its round-2 evidence; hosted CI still
+must be assessed on the final head.

@@ -199,17 +199,17 @@ public sealed partial class ReviewedUpdatesTabTests
             chooseTag: _ =>
             {
                 if (choices++ > 0) return "v2";
-                view!.LoadForSubjectAsync(OperationSubject.From(Target("unrelated"))).GetAwaiter().GetResult();
+                view!.LoadForSubjectAsync(OperationSubject.From(throws ? target : Target("unrelated"))).GetAwaiter().GetResult();
                 if (throws) throw new IOException("modal failed");
                 view.CancelPendingLoad(); return "v1";
             }, snapshotLoader: _ => { loads++; return Task.FromResult(InventorySnapshot.Empty with { Skills = [target] }); });
         view = owned;
         await view.LoadAsync(); view.SelectRowForTests(0);
-        if (throws) Assert.Throws<IOException>(() => view.ChooseVersionForTests());
-        else view.ChooseVersionForTests();
-        Assert.Equal(0, prepares);
         view.ChooseVersionForTests();
-        Assert.Equal(1, prepares); Assert.Equal(1, loads);
+        Assert.Equal(0, prepares);
+        if (throws) Assert.Contains("version chooser failed: modal failed; inventory refreshed", view.StatusTextForTests);
+        view.ChooseVersionForTests();
+        Assert.Equal(1, prepares); Assert.Equal(throws ? 2 : 1, loads);
     }
 
     [Fact]
@@ -267,6 +267,60 @@ public sealed partial class ReviewedUpdatesTabTests
         view = owned;
         await view.LoadAsync(); view.SelectRowForTests(0); view.MarkRowForTests(0); view.ChooseVersionForTests();
         Assert.Equal(1, prepares); Assert.Equal(0, unpins);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeferredRefreshRetainsMarkedPhysicalRowsCurrentSelectionAndBroadOptions(bool accept)
+    {
+        var first = Target("marked-first"); var current = Target("chosen"); var last = Target("marked-last");
+        var refreshedCurrent = current with { Agents = current.Agents.ToArray().ToImmutableArray() };
+        var snapshot = InventorySnapshot.Empty with { Skills = [first, current, last] };
+        var prepared = new List<GhSkillUpdateService.Options>();
+        UpdatesTabView? view = null;
+        using var owned = View([first, current, last], (_, options, _) =>
+        { prepared.Add(options); return Task.FromResult(Result()); }, (_, _, _) => throw new InvalidOperationException("No apply"),
+            chooseTag: _ =>
+            {
+                snapshot = snapshot with { Skills = [last, first, refreshedCurrent] };
+                view!.LoadAsync().GetAwaiter().GetResult(); return accept ? "chosen-tag" : null;
+            }, snapshotLoader: _ => Task.FromResult(snapshot));
+        view = owned;
+        await view.LoadAsync(); view.SelectRowForTests(1); view.MarkRowForTests(0); view.MarkRowForTests(2);
+        view.AllBoxForTests.Value = CheckState.Checked; view.UnpinBoxForTests.Value = CheckState.Checked;
+        Assert.True(view.ChooseVersionButtonForTests.SetFocus());
+        view.ChooseVersionForTests();
+        Assert.Equal(current.InstallationId, view.SelectedInstallationForTests);
+        Assert.Equal(CheckState.Checked, view.AllBoxForTests.Value); Assert.Equal(CheckState.Checked, view.UnpinBoxForTests.Value);
+        if (accept)
+        {
+            var chosen = Assert.Single(prepared);
+            Assert.Same(refreshedCurrent, Assert.Single(chosen.Targets!)); Assert.Equal("chosen-tag", chosen.Tag);
+            Assert.False(chosen.All); Assert.False(chosen.Unpin);
+        }
+        else { Assert.Empty(prepared); Assert.True(view.ChooseVersionButtonForTests.HasFocus); }
+        await view.RunForTestsAsync(true, true);
+        var marked = prepared[^1]; Assert.True(marked.DryRun); Assert.Null(marked.Tag);
+        Assert.Equal(new[] { first.InstallationId, last.InstallationId }.Order(), marked.Targets!.Select(target => target.InstallationId).Order());
+    }
+
+    [Theory]
+    [InlineData(false, "")]
+    [InlineData(false, " ")]
+    [InlineData(true, "")]
+    [InlineData(true, " ")]
+    public async Task BlankInjectedTagHasTheSameRefusalWithOrWithoutDeferredRefresh(bool refresh, string tag)
+    {
+        var target = Target("demo");
+        UpdatesTabView? view = null;
+        using var owned = View([target], (_, _, _) => throw new InvalidOperationException("Blank tag cannot prepare"),
+            (_, _, _) => throw new InvalidOperationException("No apply"),
+            chooseTag: _ => { if (refresh) view!.LoadAsync().GetAwaiter().GetResult(); return tag; });
+        view = owned;
+        await view.LoadAsync(); view.SelectRowForTests(0); view.ChooseVersionForTests();
+        Assert.Contains("enter one Git tag; no candidate prepared", view.StatusTextForTests);
+        Assert.False(view.ApplyButtonForTests.Enabled);
     }
 
     [Theory]

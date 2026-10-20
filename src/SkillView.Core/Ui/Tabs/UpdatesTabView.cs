@@ -241,6 +241,9 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectCoreAsync(OperationSubject? selected)
     {
+        // App entry points use RunOwnedTask's default runOnThreadPool:false.
+        // This pre-await chooser handshake therefore runs on the UI thread;
+        // snapshot work may run elsewhere and publication returns through _runOnUi.
         if (_choosingVersion)
         {
             _versionReloadPending = true;
@@ -364,6 +367,7 @@ internal sealed partial class UpdatesTabView : FrameView
     internal Button ChooseVersionButtonForTests => _chooseVersionButton;
     internal string StatusTextForTests => _status.Text.ToString();
     internal string TableLabelForTests => _tableLabel.Text.ToString();
+    internal string? SelectedInstallationForTests => _table.GetSelectedRow() is var row && row >= 0 && row < _skills.Count ? _skills[row].InstallationId : null;
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
     internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
     internal Task RunForTestsAsync(bool dryRun, bool batchOnly) => RunAsync(dryRun, batchOnly);

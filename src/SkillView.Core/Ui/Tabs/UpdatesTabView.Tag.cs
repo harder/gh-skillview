@@ -2,6 +2,8 @@ using SkillView.Gh;
 using SkillView.Inventory.Models;
 using SkillView.Inventory;
 using SkillView.Maintenance;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 
 namespace SkillView.Ui.Tabs;
 
@@ -9,6 +11,8 @@ internal sealed partial class UpdatesTabView
 {
     private bool _versionReloadPending;
     private OperationSubject? _versionReloadSubject;
+    private sealed record VersionChoiceViewState(string[] MarkedIds, string SelectedId, string? ContextId,
+        CheckState All, CheckState Unpin, View? Focused);
 
     private void ChooseVersion()
     {
@@ -19,7 +23,11 @@ internal sealed partial class UpdatesTabView
         var selected = _skills[row];
         if (selected.Pinned)
         { _status.Text = " pin retained; plan and apply a separate unpin review before choosing a tag"; return; }
-        string? tag;
+        var viewState = new VersionChoiceViewState(_wrapper?.CheckedRows.Where(index => index >= 0 && index < _skills.Count)
+            .Select(index => _skills[index].InstallationId).ToArray() ?? [], selected.InstallationId,
+            _drillInSubject?.InstallationId, _allBox.Value, _unpinBox.Value, SubViews.FirstOrDefault(view => view.HasFocus));
+        string? tag = null;
+        string? chooserError = null;
         var loadGeneration = Interlocked.Read(ref _loadGeneration);
         var reload = false;
         OperationSubject? reloadSubject = null;
@@ -27,6 +35,12 @@ internal sealed partial class UpdatesTabView
         _versionReloadSubject = null;
         _choosingVersion = true;
         try { tag = _chooseTag(selected); }
+        catch (OperationCanceledException) { /* Cancellation remains a canceled choice. */ }
+        catch (Exception ex)
+        {
+            _logger.Error("updates.choose-version", ex.Message);
+            chooserError = TuiHelpers.ErrorSnippet(ex.Message);
+        }
         finally
         {
             _choosingVersion = false;
@@ -39,16 +53,16 @@ internal sealed partial class UpdatesTabView
         var hidden = _hiddenBox.Value == Terminal.Gui.Views.CheckState.Checked;
         if (reload)
         {
-            _runTask(() => ReloadChosenTagAsync(selected, tag, hidden, reloadSubject, loadGeneration), "updates.reload-after-version-choice");
+            _runTask(() => ReloadChosenTagAsync(selected, tag, hidden, reloadSubject, loadGeneration, viewState, chooserError), "updates.reload-after-version-choice");
             return;
         }
+        if (chooserError is not null) { _status.Text = $" version chooser failed: {chooserError}; no candidate prepared"; return; }
         if (tag is null) { _status.Text = " version selection canceled; no candidate prepared"; return; }
-        if (string.IsNullOrWhiteSpace(tag)) { _status.Text = " enter one Git tag; no candidate prepared"; return; }
         _runTask(() => RunChosenTagAsync(selected, tag, hidden), "updates.choose-version");
     }
 
     private async Task ReloadChosenTagAsync(InstalledSkill selected, string? tag, bool hidden,
-        OperationSubject? subject, long generation)
+        OperationSubject? subject, long generation, VersionChoiceViewState viewState, string? chooserError)
     {
         if (!IsCurrentLoad(generation)) return;
         if (_choosingVersion || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive)
@@ -61,6 +75,26 @@ internal sealed partial class UpdatesTabView
         await _runOnUi(() =>
         {
             if (!IsCurrentLoad(fresh.Generation)) return;
+            if (subject?.InstallationId == viewState.ContextId)
+            {
+                // Keep selection/marks by physical ID when rows reorder. A new
+                // Changes drill-in retains its deliberate broad-option reset.
+                var rows = _skills.Select((skill, index) => (skill.InstallationId, Index: index))
+                    .GroupBy(row => row.InstallationId).Where(group => group.Count() == 1)
+                    .ToDictionary(group => group.Key, group => group.Single().Index, StringComparer.Ordinal);
+                _wrapper?.CheckedRows.Clear();
+                foreach (var id in viewState.MarkedIds)
+                    if (rows.TryGetValue(id, out var marked)) _wrapper?.CheckedRows.Add(marked);
+                if (rows.TryGetValue(viewState.SelectedId, out var current)) _table.SetSelectedRow(current);
+                _allBox.Value = viewState.All;
+                _unpinBox.Value = viewState.Unpin;
+                viewState.Focused?.SetFocus();
+            }
+            if (chooserError is not null)
+            {
+                _status.Text = $" version chooser failed: {chooserError}; inventory refreshed; no candidate prepared";
+                return;
+            }
             if (tag is null)
             {
                 _status.Text = " version selection canceled; inventory refreshed; no candidate prepared";
@@ -84,7 +118,7 @@ internal sealed partial class UpdatesTabView
 
     private static bool SameVersionChoice(InstalledSkill selected, InstalledSkill fresh)
     {
-        // Retain input across an unchanged observation, not execution approval.
+        // Retain input across the same observed version/native address, not execution approval.
         // The saved planner still captures fresh payload/owner evidence for review.
         var before = selected.ObservedSubject?.NativeObject;
         var after = fresh.ObservedSubject?.NativeObject;
@@ -99,6 +133,7 @@ internal sealed partial class UpdatesTabView
     private async Task RunChosenTagAsync(InstalledSkill selected, string tag, bool hidden)
     {
         if (_lifetimeToken.IsCancellationRequested) return;
+        if (string.IsNullOrWhiteSpace(tag)) { _status.Text = " enter one Git tag; no candidate prepared"; return; }
         if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0)
         {
             _status.Text = " version choice not prepared; finish the current operation or review, then refresh inventory";
