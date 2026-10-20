@@ -66,9 +66,16 @@ public sealed class NativePlacementTests : IDisposable
         var first = Path.Combine(temp.FullName, "first"); var second = Path.Combine(temp.FullName, "second");
         Directory.CreateSymbolicLink(first, "second"); Directory.CreateSymbolicLink(second, "first");
         Assert.Throws<IOException>(() => NativePlacementLease.Open(Path.Combine(first, "leaf"), Token));
-        var dot = Path.Combine(temp.FullName, "dot"); Directory.CreateSymbolicLink(dot, "../different");
-        var error = Assert.Throws<IOException>(() => NativePlacementLease.Open(Path.Combine(dot, "leaf"), Token));
-        Assert.Contains("dot components", error.Message);
+        Directory.CreateDirectory(Path.Combine(temp.FullName, "actual"));
+        var leaf = Directory.CreateDirectory(Path.Combine(temp.FullName, "different", "leaf")).FullName;
+        var sentinel = Path.Combine(leaf, "keep.txt"); File.WriteAllText(sentinel, "unchanged");
+        var dot = Path.Combine(temp.FullName, "dot"); Directory.CreateSymbolicLink(dot, "actual/../different");
+        // The destination exists: a broken-target refusal must not satisfy this
+        // case. Earlier native identity/generation refusals are also valid when
+        // shared ancestors (for example /tmp) change during parallel tests.
+        Assert.Throws<IOException>(() => NativePlacementLease.Open(Path.Combine(dot, "leaf"), Token));
+        Assert.Equal("unchanged", File.ReadAllText(sentinel));
+        Assert.Equal("actual/../different", new DirectoryInfo(dot).LinkTarget);
         Assert.Throws<IOException>(() => NativePlacementLease.Open(Path.Combine(temp.FullName, "actual", "..", "leaf"), Token));
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(() => NativePlacementLease.Open(Path.Combine(first, "leaf"), cancellation.Token));

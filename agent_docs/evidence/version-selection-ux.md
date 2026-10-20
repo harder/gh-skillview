@@ -92,3 +92,10 @@ modal 7, reviewed Updates tab 34, Updates tab 13, update renderer 6, update CLI
 and integration builds had zero warnings/errors; scoped formatting and whitespace
 checks passed. These are overlapping follow-up runs, not an addition to the
 original unique-test count. Hosted checks still need the final published head.
+
+Hosted Ubuntu tests subsequently exposed an existing native-placement test that
+required a particular refusal message even though an earlier native identity
+check can validly refuse when a shared ancestor changes. Its fixture now points
+through dot components to an existing directory with a sentinel: the assertion
+requires refusal and unchanged target bytes/link text, without imposing error
+priority or relying on a broken target. Native production checks are unchanged.
