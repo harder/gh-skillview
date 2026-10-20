@@ -48,10 +48,58 @@ public sealed class CleanupScreenTests
             var screen = CreateScreen([new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision,
                 dir, "comparison required", skill, ReviewOnly: true)], [new ScanRoot(root.FullName, Scope.Custom, null)], [skill]);
             var result = await screen.RemoveSelectedAsync([0], TestContext.Current.CancellationToken);
-            Assert.Equal(0, result.Removed);
+            Assert.Equal(0, result.Removed); Assert.Equal(1, result.Skipped); Assert.Equal(0, result.Failed);
             Assert.Equal(content, File.ReadAllText(Path.Combine(dir, "SKILL.md")));
         }
         finally { root.Delete(recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MixedSelectionCountsKnownReviewAndDuplicatesAsSkippedButRealRefusalsAsFailed(bool cancel)
+    {
+        if (!SecureRemovalBackend.IsSupported) { Assert.Skip("Native removal backend required."); return; }
+        var root = Directory.CreateTempSubdirectory("skillview-cleanup-mixed-");
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            var active = Directory.CreateDirectory(Path.Combine(root.FullName, "active")).FullName;
+            File.WriteAllText(Path.Combine(active, "SKILL.md"), "body");
+            var protectedPath = Directory.CreateDirectory(Path.Combine(root.FullName, "protected")).FullName;
+            var stale = Directory.CreateDirectory(Path.Combine(root.FullName, "stale")).FullName;
+            File.WriteAllText(Path.Combine(stale, "keep"), "now populated");
+            var skill = Skill("active", active) with { ScanRoot = root.FullName };
+            var protectedSkill = Skill("protected", protectedPath);
+            var protectedImpact = OperationImpact.Payload(OperationSubject.From(protectedSkill), "cleanup");
+            var review = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory,
+                protectedPath, "inspection required", protectedSkill, true)
+            { Impact = protectedImpact };
+            var candidates = ImmutableArray.Create(
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, active, "fixture", skill),
+                review,
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory, stale, "was empty", null),
+                review);
+            var remove = new RemoveService(new Logger(), null, (_, _) => { if (cancel) cancellation.Cancel(); });
+            var screen = CreateScreen(candidates, [new(root.FullName, Scope.Custom, null)], [skill, protectedSkill], remove);
+            var attempt = new CleanupScreen.RemovalAttemptState();
+            if (cancel)
+            {
+                await Assert.ThrowsAsync<OperationCanceledException>(() => screen.RemoveSelectedAsync([0, 1, 2, 3], cancellation.Token, attemptState: attempt));
+                Assert.True(screen.LastReport!.IsCanceled);
+            }
+            else
+            {
+                var result = await screen.RemoveSelectedAsync([0, 1, 2, 3], TestContext.Current.CancellationToken, attemptState: attempt);
+                Assert.Equal(1, result.Removed); Assert.Equal(2, result.Skipped); Assert.Equal(1, result.Failed);
+            }
+            Assert.Equal(2, attempt.PreValidationSkipped);
+            Assert.Equal(2, screen.LastReport!.TargetsSkipped);
+            Assert.Equal(2, screen.LastReport.Impacts.Length);
+            Assert.All(screen.LastReport.Impacts, impact => Assert.Same(protectedImpact, impact));
+            Assert.True(Directory.Exists(protectedPath)); Assert.Equal("now populated", File.ReadAllText(Path.Combine(stale, "keep")));
+        }
+        finally { root.Delete(true); }
     }
 
     [Fact]
@@ -705,6 +753,41 @@ public sealed class CleanupScreenTests
         Assert.Contains("- Broken link: 1", text);
         Assert.Contains("/tmp/a", text);
         Assert.Contains("/tmp/c", text);
+    }
+
+    [Fact]
+    public void ConfirmationRefusesOversizedSelectionsFieldsAndConsumersAndKeepsApprovalsExact()
+    {
+        var path = "/skills/exact`address";
+        var small = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory, path, "empty", null);
+        var complete = CleanupScreen.BuildConfirmationReview([small]);
+        Assert.True(complete.Complete); Assert.Contains(path, complete.Text);
+        Assert.Contains("only if it is still empty", complete.Text);
+        var hugePath = small with { Path = new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1) };
+        var tooMany = Enumerable.Repeat(small, CleanupScreen.MaxConfirmationItems + 1).ToArray();
+        var consumers = Enumerable.Range(0, CleanupScreen.MaxConfirmationConsumers + 1)
+            .Select(index => new AgentMembership("agent", "/consumer/" + index, false)).ToImmutableArray();
+        var shared = small with { Skill = Skill("shared", path) with { Agents = consumers } };
+        foreach (var selected in new[] { new[] { hugePath }, tooMany, new[] { shared } })
+        {
+            var summary = CleanupScreen.BuildConfirmationReview(selected);
+            Assert.False(summary.Complete); Assert.Contains("Select fewer items", summary.Text);
+            Assert.True(summary.Text.Length <= MaintenanceQueueFormatter.MaxDetailCharacters);
+            var technical = CleanupScreen.BuildConfirmationReview(selected, showDetails: true);
+            Assert.True(technical.Text.Length <= MaintenanceQueueFormatter.MaxDetailCharacters);
+            Assert.Contains("Technical preview is bounded", technical.Text);
+        }
+    }
+
+    [Fact]
+    public void TechnicalDetailExplicitlyReportsWholeFieldOmissions()
+    {
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned,
+            "/skills/exact", new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1), null);
+        var detail = CleanupScreen.RenderDetail(candidate, showDetails: true);
+        Assert.Contains("/skills/exact", detail);
+        Assert.Contains("Technical fields omitted from this bounded preview: 1", detail);
+        Assert.DoesNotContain(new string('x', 100), detail);
     }
 
     [Fact]

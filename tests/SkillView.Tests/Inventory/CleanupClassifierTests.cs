@@ -234,14 +234,15 @@ public class CleanupClassifierTests : IDisposable
         { Agents = [new("claude", Path.Combine(alias, "empty"), false)] };
         var candidate = Assert.Single(CleanupClassifier.Classify(Snapshot(false, observation), [new(alias, Scope.User, null)]));
         Assert.False(candidate.ReviewOnly);
-        Assert.Equal(recordedPath, candidate.Path);
+        Assert.Equal(Path.Combine(alias, "empty"), candidate.Path);
+        Assert.Equal(recordedPath, candidate.Skill!.ResolvedPath);
         // A final-entry link remains a distinct consumer, even under an alias.
         var linked = observation with { Agents = [new("claude", Path.Combine(alias, "empty"), true)] };
         Assert.True(Assert.Single(CleanupClassifier.Classify(Snapshot(false, linked), [new(alias, Scope.User, null)])).ReviewOnly);
     }
 
     [Fact]
-    public void Classify_EmptyNameCollisionsRemainOneReviewOnlyRowPerPath()
+    public void Classify_EmptyNameCollisionsRemainOneEligibleRowPerPath()
     {
         var firstRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
         var secondRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
@@ -254,11 +255,36 @@ public class CleanupClassifierTests : IDisposable
         Assert.All(candidates, candidate =>
         {
             Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, candidate.Kind);
-            Assert.True(candidate.ReviewOnly);
+            Assert.False(candidate.ReviewOnly);
             Assert.Contains("share name 'foo'", candidate.Reason);
         });
         foreach (var ordered in new[] { candidates, candidates.Reverse().ToImmutableArray() })
-            Assert.All(CleanupClassifier.DeduplicateByPath(ordered, TestContext.Current.CancellationToken).Unique, candidate => Assert.True(candidate.ReviewOnly));
+            Assert.All(CleanupClassifier.DeduplicateByPath(ordered, TestContext.Current.CancellationToken).Unique, candidate => Assert.False(candidate.ReviewOnly));
+    }
+
+    [Fact]
+    public void Classify_EntryInspectionFailurePreservesOtherCandidates()
+    {
+        var bad = Directory.CreateDirectory(Path.Combine(_tempRoot, "bad")).FullName;
+        var good = Directory.CreateDirectory(Path.Combine(_tempRoot, "good")).FullName;
+        var snapshot = Snapshot(false, Skill("bad", bad, ValidityState.MissingSkillMd), Skill("good", good, ValidityState.MissingSkillMd));
+        var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken, path => path == bad ? throw new IOException("fixture observation failure") : OwnershipPath.EntryAddress(path));
+        Assert.Contains(candidates, candidate => candidate.Path == bad && candidate.Kind == CleanupClassifier.CandidateKind.Malformed && candidate.ReviewOnly);
+        Assert.Contains(candidates, candidate => candidate.Path == good && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory && !candidate.ReviewOnly);
+    }
+
+    [Fact]
+    public void Classify_NonemptyInventoryDoesNotResolveEntryKeys()
+    {
+        var paths = new[] { "first", "second" }.Select(name => Directory.CreateDirectory(Path.Combine(_tempRoot, name)).FullName).ToArray();
+        foreach (var path in paths) File.WriteAllText(Path.Combine(path, "SKILL.md"), "payload");
+        var snapshot = Snapshot(false, paths.Select(path => Skill("same-name", path)).ToArray());
+        var calls = 0;
+        var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken, _ => { calls++; throw new IOException("entry lookup must stay lazy"); });
+        Assert.Equal(2, candidates.Length);
+        Assert.Equal(0, calls);
     }
 
     [Fact]

@@ -546,6 +546,10 @@ observations that previously appeared only as malformed review items. Native
 validation checks each directory again and refuses removal if it has become
 populated. Empty directories with recorded sources/ownership, other consumer
 exposures, conflicting records or incomplete discovery remain review-only.
+Sharing a name alone does not protect an otherwise eligible empty directory;
+removing it leaves the real skill elsewhere unchanged. Empty-directory rows
+retain related findings in their reasons and use `EmptyDirectory` for kind
+filtering, including when the earlier observation was a name collision.
 `--yes` does not override those protections. Cleanup deletion has no automatic
 undo. Review the JSON before applying, for example:
 

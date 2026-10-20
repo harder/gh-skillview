@@ -224,7 +224,7 @@ public sealed class CleanupSuppressionStoreTests : IDisposable
         Assert.False(result.Canceled); Assert.Equal(1, mutations); Assert.Equal(1, changed);
         Assert.Contains("ambiguous", Assert.Single(result.Errors), StringComparison.OrdinalIgnoreCase);
         var record = Assert.Single(store.Read([], Token).Records);
-        Assert.True(PathIdentity.Equals(independent.ResolvedPath, record.Binding.Path));
+        Assert.True(OwnershipPath.Same(independent.ResolvedPath, record.Binding.Path));
         Assert.False(Observe(store, reviewed).Active); Assert.False(Observe(store, otherContext).Active);
         Assert.True(Observe(store, independent).External);
         Assert.Equal(beforeAmbiguous.Objects, PayloadSnapshot.CaptureEvidence(reviewed.ResolvedPath, Token).Objects);

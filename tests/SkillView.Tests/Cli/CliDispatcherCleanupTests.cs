@@ -89,6 +89,50 @@ public sealed class CliDispatcherCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task CliApplyRemovesEmptyNameCollisionAndRetainsTheRealSkill()
+    {
+        if (!SecureRemovalBackend.IsSupported) { Assert.Skip("Native removal backend required."); return; }
+        var firstRoot = CreateDirectory("first"); var secondRoot = CreateDirectory("second");
+        var empty = Directory.CreateDirectory(Path.Combine(firstRoot, "foo")).FullName;
+        var real = Directory.CreateDirectory(Path.Combine(secondRoot, "foo")).FullName;
+        var metadata = Path.Combine(real, "SKILL.md");
+        const string bytes = "---\nname: foo\ndescription: retained skill\n---\nKeep.\n";
+        File.WriteAllText(metadata, bytes);
+        var roots = new[] { new ScanRoot(firstRoot, Scope.Custom, null), new ScanRoot(secondRoot, Scope.Custom, null) };
+        var snapshot = InventorySnapshot.Empty with { Skills = new LocalSkillScanner(new Logger()).Scan(roots), ScannedRoots = roots.ToImmutableArray() };
+        var candidates = CleanupClassifier.Classify(snapshot, roots);
+        Assert.False(Assert.Single(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory).ReviewOnly);
+        var services = Services();
+        var result = await CliDispatcher.ApplyCleanupAsync(candidates, snapshot, services.RemoveService, services.Runner, Token);
+        Assert.Contains(result.Applied, item => item.C.Kind == CleanupClassifier.CandidateKind.EmptyDirectory && item.R.Succeeded);
+        Assert.False(Directory.Exists(empty));
+        Assert.Equal(bytes, File.ReadAllText(metadata));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CliApplyThroughAliasedRootHandlesCanonicalAndLexicalRecords(bool canonicalRecord)
+    {
+        if (OperatingSystem.IsWindows() || !SecureRemovalBackend.IsSupported)
+        { Assert.Skip("Unix alias fixture and native removal required."); return; }
+        var actual = CreateDirectory("actual");
+        var empty = Directory.CreateDirectory(Path.Combine(actual, "empty")).FullName;
+        var alias = Path.Combine(_temporary.FullName, "alias"); Directory.CreateSymbolicLink(alias, actual);
+        var roots = new[] { new ScanRoot(alias, Scope.Custom, null) };
+        var observed = Assert.Single(new LocalSkillScanner(new Logger()).Scan(roots));
+        if (canonicalRecord) observed = observed with { ResolvedPath = OwnershipPath.EntryAddress(empty)! };
+        var snapshot = InventorySnapshot.Empty with { Skills = [observed], ScannedRoots = roots.ToImmutableArray() };
+        var candidate = Assert.Single(CleanupClassifier.Classify(snapshot, roots));
+        Assert.Equal(Path.Combine(alias, "empty"), candidate.Path);
+        Assert.False(candidate.ReviewOnly);
+        var services = Services();
+        var result = await CliDispatcher.ApplyCleanupAsync([candidate], snapshot, services.RemoveService, services.Runner, Token);
+        Assert.True(Assert.Single(result.Applied).R.Succeeded);
+        Assert.False(Directory.Exists(empty));
+    }
+
+    [Fact]
     public async Task CliApplyRefusesTrackedExposedAndConflictedEmptyDirectories()
     {
         var root = CreateDirectory("protected-skills");

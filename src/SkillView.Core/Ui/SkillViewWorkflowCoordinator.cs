@@ -297,7 +297,7 @@ internal sealed class SkillViewWorkflowCoordinator
                 _refreshActiveTab();
                 status += " Inventory refresh requested.";
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _services.Logger.Error("cleanup.refresh", ex.ToString());
                 status += " Inventory refresh failed; refresh manually.";

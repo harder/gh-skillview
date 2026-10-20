@@ -180,6 +180,54 @@ public sealed class CleanupSuppressionScreenTests
     }
 
     [Fact]
+    public async Task IncompleteConfirmationCannotApplyEvenWhenTechnicalPreviewIsToggled()
+    {
+        var opened = false; var sent = false; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+            Window? window = null; var logger = new Logger();
+            var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory,
+                "/skills/" + new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1), "empty", null);
+            var screen = new CleanupScreen(app, new RemoveService(logger), logger, [candidate], [], []);
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (window is null || sent) return true;
+                sent = true;
+                window.SubViews.OfType<TableView>().Single().SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                return false;
+            });
+            app.AddTimeout(TimeSpan.FromMilliseconds(15), () =>
+            {
+                if (opened || app.TopRunnableView is not Dialog dialog) return true;
+                opened = true;
+                var remove = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Remove");
+                var review = dialog.SubViews.OfType<Markdown>().Single();
+                Assert.False(remove.Enabled);
+                Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Text.ToString().StartsWith("Review incomplete", StringComparison.Ordinal));
+                for (var i = 0; i < 4; i++)
+                {
+                    app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.F2));
+                    Assert.True(review.Text.ToString().Length <= MaintenanceQueueFormatter.MaxDetailCharacters);
+                    Assert.False(remove.Enabled);
+                }
+                remove.InvokeCommand(Command.Accept);
+                Assert.Same(dialog, app.TopRunnableView);
+                Assert.Null(screen.LastReport);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); // Default Cancel.
+                return false;
+            });
+            screen.Show(ready => window = ready);
+            Assert.Null(screen.LastReport); Assert.Equal(0, screen.RemovedCount);
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(opened); Assert.False(timedOut);
+    }
+
+    [Fact]
     public async Task RealConfirmationTabsFromCancelToRemoveAndEnterAppliesOnlyAfterReview()
     {
         var root = Directory.CreateTempSubdirectory("skillview-cleanup-confirm-");

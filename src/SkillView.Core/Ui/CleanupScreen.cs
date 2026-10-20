@@ -528,7 +528,7 @@ public sealed class CleanupScreen
         var selection = CleanupClassifier.DeduplicateByPath(
             selected,
             cancellationToken);
-        var skippedBeforeValidation = selection.Duplicates.Length;
+        var skippedBeforeValidation = selection.Duplicates.Length + selection.Unique.Count(candidate => candidate.ReviewOnly);
         attemptState?.SetPreValidationSkipped(skippedBeforeValidation);
         foreach (var candidate in selection.Duplicates)
         {
@@ -539,7 +539,7 @@ public sealed class CleanupScreen
 
         var report = await _remove.RemoveManyAsync(
             ValidateImmediatelyBeforeRemoval(
-                selection.Unique,
+                selection.Unique.Where(candidate => !candidate.ReviewOnly).ToImmutableArray(),
                 cancellationToken),
             cancellationToken: cancellationToken,
             progress: progress).ConfigureAwait(false);
@@ -611,28 +611,42 @@ public sealed class CleanupScreen
             ? $" canceling… removed {progress.TargetsDeleted} target(s)"
             : $" removing… {progress.TargetsProcessed} target(s), {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
 
+    internal const int MaxConfirmationItems = 128;
+    internal const int MaxConfirmationConsumers = 256;
+    internal sealed record ConfirmationReview(string Text, bool Complete);
+
     internal static string BuildRemoveConfirmationText(
+        IReadOnlyList<CleanupClassifier.Candidate> selected, bool showDetails = false) =>
+        BuildConfirmationReview(selected, showDetails).Text;
+
+    internal static ConfirmationReview BuildConfirmationReview(
         IReadOnlyList<CleanupClassifier.Candidate> selected, bool showDetails = false)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Review {selected.Count} cleanup item(s)");
-        sb.AppendLine();
-        sb.AppendLine("Cancel keeps all files. Deletion has no automatic undo.");
-        sb.AppendLine();
-        foreach (var group in selected
-                     .GroupBy(CleanupReviewFormatter.Issue)
-                     .OrderBy(group => group.Key, StringComparer.Ordinal))
-        {
-            sb.AppendLine($"- {group.Key}: {group.Count()}");
-        }
+        const string incomplete = "Review is incomplete. Select fewer items; removal is unavailable.";
+        var budget = MaintenanceQueueFormatter.MaxDetailCharacters;
+        var complete = selected.Count <= MaxConfirmationItems && CleanupReviewFormatter.FitsConfirmationBudget(
+            selected, budget, MaxConfirmationConsumers);
+        if (!showDetails && !complete)
+            return new("## Selection too large to review\n\n" + incomplete, false);
 
-        sb.AppendLine();
-        foreach (var candidate in selected)
-        {
-            CleanupReviewFormatter.AppendConfirmation(sb, candidate);
-            if (showDetails && candidate.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
-        }
-        return TerminalEscapeSanitizer.Sanitize(sb.ToString().TrimEnd()) ?? "";
+        var text = new StringBuilder($"Review {selected.Count} cleanup item(s)\n\nCancel keeps all files. Deletion has no automatic undo.\n\n");
+        foreach (var group in selected.Take(MaxConfirmationItems).GroupBy(CleanupReviewFormatter.Issue).OrderBy(group => group.Key, StringComparer.Ordinal))
+            text.AppendLine($"- {group.Key}: {group.Count()}");
+        text.AppendLine();
+        // Exact summary fields are omitted whole; any omission closes approval.
+        // Technical fields are also bounded, with their omissions made explicit.
+        var fields = selected.Take(MaxConfirmationItems).SelectMany(candidate => CleanupReviewFormatter.ConfirmationFields(candidate, showDetails));
+        var capturedFields = fields.Take(1025).ToArray();
+        var rendered = MaintenanceQueueFormatter.RenderFields(capturedFields.Take(1024), CancellationToken.None, budget - text.Length - 512);
+        complete &= capturedFields.Length <= 1024 && rendered.OmittedFields == 0;
+        text.Append(rendered.Text);
+        if (showDetails && (selected.Count > MaxConfirmationItems || capturedFields.Length > 1024))
+            text.AppendLine("Additional items or fields were omitted from this technical preview.");
+        if (!complete || showDetails)
+            text.AppendLine(showDetails
+                ? $"Technical preview is bounded: {rendered.OmittedFields} oversized fields omitted; at most {MaxConfirmationItems} items and 1024 fields are shown. Summary must be complete before removal. Additional distributor and reload evidence is not shown here."
+                : incomplete);
+        return new(TerminalEscapeSanitizer.Sanitize(text.ToString()) ?? "", complete);
     }
 
     private void DoExport(Label status)
@@ -674,9 +688,12 @@ public sealed class CleanupScreen
         var sb = new StringBuilder();
         sb.AppendLine("## Technical details");
         sb.AppendLine();
-        sb.AppendLine(MaintenanceQueueFormatter.RenderFields(
+        var fields = MaintenanceQueueFormatter.RenderFields(
             [("Kind", c.Kind.ToString()), ("Path", c.Path), ("Reason", c.Reason)],
-            CancellationToken.None, MaintenanceQueueFormatter.MaxDetailCharacters).Text);
+            CancellationToken.None, MaintenanceQueueFormatter.MaxDetailCharacters - 256);
+        sb.AppendLine(fields.Text);
+        if (fields.OmittedFields > 0)
+            sb.AppendLine($"Technical fields omitted from this bounded preview: {fields.OmittedFields}. Exact values are omitted whole, never shortened.");
         if (c.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         if (c.Skill is { } s)
         {
@@ -723,6 +740,8 @@ public sealed class CleanupScreen
     {
         var response = 0;
         var showDetails = false;
+        var summary = BuildConfirmationReview(selected);
+        ConfirmationReview? technical = null;
         using var dialog = new Dialog { Title = "Review cleanup removal", Width = Dim.Percent(90), Height = Dim.Percent(90) };
         var review = new Markdown
         {
@@ -730,30 +749,37 @@ public sealed class CleanupScreen
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(4),
-            Text = BuildRemoveConfirmationText(selected),
+            Text = summary.Text,
             ViewportSettings = ViewportSettingsFlags.HasVerticalScrollBar
         };
         TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
-        var canRemove = selected.Any(candidate => !candidate.ReviewOnly);
+        var canRemove = summary.Complete && selected.Any(candidate => !candidate.ReviewOnly);
         var explanation = new Label
         {
             X = 0,
             Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(),
             Height = 1,
-            Text = canRemove ? "Deletion has no automatic undo." : "Removal unavailable: inspect or repair these items first."
+            Text = !summary.Complete ? "Review incomplete: select fewer items; removal is unavailable."
+                : canRemove ? "Deletion has no automatic undo." : "Removal unavailable: inspect or repair these items first."
         };
         var hints = new Label { X = 0, Y = Pos.AnchorEnd(2), Width = Dim.Fill(), Height = 1, Text = "Tab Focus · PgDn Scroll · F2 Details" };
         var cancel = new Button { Text = "Cancel", X = Pos.Center() - 12, Y = Pos.AnchorEnd(1), IsDefault = true };
         var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1), Enabled = canRemove };
         cancel.Accepting += (_, args) => { args.Handled = true; _app.RequestStop(); };
-        remove.Accepting += (_, args) => { args.Handled = true; response = 1; _app.RequestStop(); };
+        remove.Accepting += (_, args) =>
+        {
+            args.Handled = true;
+            if (!canRemove) return;
+            response = 1; _app.RequestStop();
+        };
         dialog.KeyDown += (_, key) =>
         {
             if (key.Handled || key.KeyCode != KeyCode.F2) return;
             key.Handled = true;
             showDetails = !showDetails;
-            review.Text = BuildRemoveConfirmationText(selected, showDetails);
+            technical ??= showDetails ? BuildConfirmationReview(selected, showDetails: true) : null;
+            review.Text = showDetails ? technical!.Text : summary.Text;
             hints.Text = showDetails ? "Tab Focus · PgDn Scroll · F2 Summary" : "Tab Focus · PgDn Scroll · F2 Details";
         };
         dialog.Add(review, explanation, hints, cancel, remove);

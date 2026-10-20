@@ -83,9 +83,11 @@ public static class CleanupClassifier
         InventorySnapshot snapshot,
         IReadOnlyList<ScanRoot> scanRoots,
         Options? options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<string, string?>? inspectEntry = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        inspectEntry ??= OwnershipPath.EntryAddress;
         options ??= new Options();
         var result = ImmutableArray.CreateBuilder<Candidate>();
 
@@ -252,23 +254,28 @@ public static class CleanupClassifier
             var original = PathIdentity.NormalizeKey(path);
             if (entryKeys.TryGetValue(original, out var cached)) return cached;
             string? address = null;
-            try { address = OwnershipPath.EntryAddress(path); }
+            try { address = inspectEntry(path); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
             return entryKeys[original] = address is null ? original : PathIdentity.NormalizeKey(address);
         }
-        var emptyRecords = snapshot.Skills.GroupBy(skill => EntryKey(skill.ResolvedPath), StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
-        // MissingSkillMd is superseded by the verified-empty observation below.
-        // Retain every other finding, including future actionable findings.
-        var reviewReasons = result.Where(candidate => candidate.Kind != CandidateKind.Malformed)
-            .GroupBy(candidate => EntryKey(candidate.Path), StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => string.Join("; ", group.Select(candidate => candidate.Reason).Distinct()), StringComparer.Ordinal);
-        foreach (var skill in snapshot.Skills)
+        Dictionary<string, InstalledSkill[]>? emptyRecords = null;
+        Dictionary<string, Candidate[]>? relatedFindings = null;
+        void EnsureEmptyIndexes()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
-                || (skill.Ignored && !options.IncludeIgnored))
-                knownResolved.Add(EntryKey(skill.ResolvedPath));
+            if (emptyRecords is not null) return;
+            // These native lookups are unnecessary unless an empty child exists.
+            emptyRecords = snapshot.Skills.GroupBy(skill => EntryKey(skill.ResolvedPath), StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+            relatedFindings = result.Where(candidate => candidate.Kind != CandidateKind.Malformed)
+                .GroupBy(candidate => EntryKey(candidate.Path), StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+            foreach (var skill in snapshot.Skills)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
+                    || (skill.Ignored && !options.IncludeIgnored))
+                    knownResolved.Add(EntryKey(skill.ResolvedPath));
+            }
         }
 
         foreach (var root in scanRoots)
@@ -295,19 +302,22 @@ public static class CleanupClassifier
                     if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
                     // An empty link target is not permission to delete the target.
                     if (PathResolver.IsSymlink(child)) continue;
-                    // Inventory uses canonical entry addresses. Resolve the
-                    // parent too, so aliased roots match their recorded rows.
-                    var resolved = OwnershipPath.EntryAddress(child);
-                    if (resolved is null) continue;
-                    var key = PathIdentity.NormalizeKey(resolved);
-                    if (knownResolved.Contains(key) || emptyPaths.Contains(key)) continue;
                     bool empty;
-                    try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
+                    try { empty = !Directory.EnumerateFileSystemEntries(child).Any(); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
                     if (empty)
                     {
+                        // One unreadable/transient child must not abort other
+                        // observations. Cancellation remains a separate outcome.
+                        string? resolved;
+                        try { resolved = inspectEntry(child); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { continue; }
+                        if (resolved is null) continue;
+                        EnsureEmptyIndexes();
+                        var key = PathIdentity.NormalizeKey(resolved);
+                        if (knownResolved.Contains(key) || emptyPaths.Contains(key)) continue;
                         var leaf = Path.GetFileName(child);
-                        emptyRecords.TryGetValue(key, out var recorded);
+                        emptyRecords!.TryGetValue(key, out var recorded);
                         var observation = recorded?.FirstOrDefault() ?? new InstalledSkill
                         {
                             Name = leaf,
@@ -328,17 +338,20 @@ public static class CleanupClassifier
                                 || !skill.MetadataConflicts.IsEmpty || skill.Provenance != Provenance.FsScan
                                 || skill.SourceIdentity.Provider != "unknown" || skill.ObservedSubject?.ExposureCoverageComplete == false) == true;
                         var hasConsumers = recorded?.Any(skill => skill.Agents.Any(agent => IsOtherExposure(agent, resolved))) == true;
-                        reviewReasons.TryGetValue(key, out var reviewReason);
+                        relatedFindings!.TryGetValue(key, out var findings);
+                        // A name alone cannot make an empty, otherwise unowned
+                        // directory unsafe. Actual conflicting context still can.
+                        var contextConflict = findings?.Any(finding => finding.Kind != CandidateKind.NameCollision) == true;
                         emptyPaths.Add(key);
                         var reason = $"empty directory under scan root '{root.Path}'";
                         if (protectedOwner) reason += "; installation records or incomplete discovery require review";
                         if (hasConsumers) reason += "; other consumer exposures require review; removing the directory could break their links";
-                        if (reviewReason is not null) reason += "; " + reviewReason;
+                        if (findings is not null) reason += "; " + string.Join("; ", findings.Select(finding => finding.Reason).Distinct());
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
-                            observation.ResolvedPath,
+                            child,
                             reason,
-                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || reviewReason is not null));
+                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || contextConflict));
                     }
                 }
             }
@@ -346,7 +359,7 @@ public static class CleanupClassifier
 
         // Reclassification produces one row per path, retaining every earlier
         // review requirement. Selection order must never choose removal authority.
-        return result.Where(candidate => candidate.Kind == CandidateKind.EmptyDirectory
+        return result.Where(candidate => emptyPaths.Count == 0 || candidate.Kind == CandidateKind.EmptyDirectory
             || !emptyPaths.Contains(EntryKey(candidate.Path))).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();

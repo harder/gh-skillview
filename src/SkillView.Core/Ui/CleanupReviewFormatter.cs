@@ -1,4 +1,3 @@
-using System.Text;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 
@@ -36,17 +35,68 @@ internal static class CleanupReviewFormatter
             + "Opening review changes nothing.";
     }
 
-    internal static void AppendConfirmation(StringBuilder text, CleanupClassifier.Candidate candidate)
+    internal static bool FitsConfirmationBudget(IReadOnlyList<CleanupClassifier.Candidate> selected, int budget, int maxConsumers)
     {
-        text.AppendLine($"### {Issue(candidate)}");
-        text.AppendLine();
-        // Confirmation retains every exact selected path, even when the bounded
-        // overview omits a long field. These labels never become selectors.
-        Field(text, "Location", candidate.Path);
-        Field(text, "Changes", Effect(candidate));
+        long characters = 0;
+        var consumers = 0;
+        foreach (var candidate in selected)
+        {
+            characters += candidate.Path.Length + 256L;
+            if (candidate.ReviewOnly && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory) characters += candidate.Reason.Length;
+            var affected = candidate.Impact?.AffectedExposures.Select(exposure => exposure.Membership)
+                ?? candidate.Skill?.Agents.AsEnumerable() ?? [];
+            var retained = candidate.Impact?.RetainedExposures.Select(exposure => exposure.Membership) ?? [];
+            foreach (var member in affected.Concat(retained))
+            {
+                if (++consumers > maxConsumers) return false;
+                characters += member.AgentId.Length + (long)member.Path.Length + (member.Profile?.Length ?? 0) + (member.Context?.Length ?? 0) + 128;
+                if (characters > budget) return false;
+            }
+            if (characters > budget) return false;
+        }
+        return true;
+    }
+
+    internal static IEnumerable<(string, string?)> ConfirmationFields(CleanupClassifier.Candidate candidate, bool technical)
+    {
+        yield return ("Issue", Issue(candidate));
+        yield return ("Location", candidate.Path);
+        yield return ("Changes", Effect(candidate));
         if (candidate.ReviewOnly && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
-            Field(text, "Review needed", candidate.Reason);
-        foreach (var (label, value) in AgentFields(candidate)) Field(text, label, value);
+            yield return ("Review needed", candidate.Reason);
+        var affected = candidate.Impact?.AffectedExposures.Select(exposure => exposure.Membership)
+            ?? candidate.Skill?.Agents.AsEnumerable() ?? [];
+        var retained = candidate.Impact?.RetainedExposures.Select(exposure => exposure.Membership) ?? [];
+        var found = false;
+        foreach (var member in affected)
+        {
+            found = true;
+            foreach (var field in ConsumerFields("Affected", member)) yield return field;
+        }
+        if (!found) yield return ("Affected agents", "No agent exposure was recorded.");
+        foreach (var member in retained)
+            foreach (var field in ConsumerFields("Retained", member)) yield return field;
+        if (candidate.Impact is { } impact)
+        {
+            yield return ("Coverage", impact.ExposureCoverageComplete ? "Captured consumers shown; active sessions remain unknown." : "Other consumers may exist; discovery is incomplete.");
+            if (technical)
+            {
+                yield return ("Installation address ID", impact.Subject.InstallationId);
+                yield return ("Materialization", impact.Subject.Materialization);
+                yield return ("Native observation", impact.Subject.NativeObject.ObjectId);
+                yield return ("Source", impact.Subject.Source.Origin);
+                yield return ("Captured", impact.Subject.CapturedAt?.ToString("O"));
+            }
+        }
+    }
+
+    private static IEnumerable<(string, string?)> ConsumerFields(string role, AgentMembership member)
+    {
+        yield return (role + " agent", member.AgentId);
+        yield return (role + " location", member.Path);
+        yield return (role + " scope", member.Scope?.ToString());
+        yield return (role + " profile", member.Profile);
+        yield return (role + " context", member.Context);
     }
 
     private static IEnumerable<(string, string?)> Fields(CleanupClassifier.Candidate candidate)
@@ -97,9 +147,4 @@ internal static class CleanupReviewFormatter
         + (member.Profile is null ? "" : $" · profile {member.Profile}")
         + (member.Context is null ? "" : $" · {member.Context}");
 
-    private static void Field(StringBuilder text, string label, string? value)
-    {
-        text.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}");
-        text.AppendLine();
-    }
 }
