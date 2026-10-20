@@ -271,7 +271,65 @@ public class CleanupClassifierTests : IDisposable
         var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(_tempRoot, Scope.User, null)], null,
             TestContext.Current.CancellationToken, path => path == bad ? throw new IOException("fixture observation failure") : OwnershipPath.EntryAddress(path));
         Assert.Contains(candidates, candidate => candidate.Path == bad && candidate.Kind == CleanupClassifier.CandidateKind.Malformed && candidate.ReviewOnly);
-        Assert.Contains(candidates, candidate => candidate.Path == good && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory && !candidate.ReviewOnly);
+        var surviving = Assert.Single(candidates, candidate => candidate.Path == good && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.True(surviving.ReviewOnly);
+        Assert.Contains("native address lookup was incomplete", surviving.Reason);
+    }
+
+    [Theory]
+    [InlineData("owner", "io")]
+    [InlineData("owner", "access")]
+    [InlineData("owner", "null")]
+    [InlineData("consumer", "io")]
+    [InlineData("consumer", "access")]
+    [InlineData("consumer", "null")]
+    [InlineData("ignored", "io")]
+    [InlineData("ignored", "access")]
+    [InlineData("ignored", "null")]
+    [InlineData("symlinked", "io")]
+    [InlineData("symlinked", "access")]
+    [InlineData("symlinked", "null")]
+    public void Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(string protection, string failure)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix ancestor-alias fixture requires symlink support."); return; }
+        var realRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "actual")).FullName;
+        var empty = Directory.CreateDirectory(Path.Combine(realRoot, "empty")).FullName;
+        var alias = Path.Combine(_tempRoot, "root-alias");
+        Directory.CreateSymbolicLink(alias, realRoot);
+        var recordedPath = Path.Combine(alias, "empty");
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = alias, Selector = "empty" };
+        var observation = Skill("empty", recordedPath, ValidityState.MissingSkillMd,
+            ignored: protection == "ignored", symlinked: protection == "symlinked") with
+        {
+            OwnershipClaims = protection == "owner" ? [claim] : [],
+            Agents = protection == "consumer" ? [new("claude", Path.Combine(_tempRoot, "consumer", "empty"), true)] : []
+        };
+        var candidates = CleanupClassifier.ClassifyWithCancellation(Snapshot(false, observation),
+            [new(realRoot, Scope.User, null)], null, TestContext.Current.CancellationToken,
+            path => path != recordedPath ? OwnershipPath.EntryAddress(path) : failure switch
+            {
+                "io" => throw new IOException("fixture transient record lookup failure"),
+                "access" => throw new UnauthorizedAccessException("fixture denied record lookup"),
+                _ => null
+            });
+        var candidate = Assert.Single(candidates, item => item.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.Equal(empty, candidate.Path);
+        Assert.True(candidate.ReviewOnly);
+        Assert.Contains("native address lookup was incomplete", candidate.Reason);
+        Assert.DoesNotContain(candidates, item => !item.ReviewOnly);
+        Assert.True(Directory.Exists(empty));
+    }
+
+    [Fact]
+    public void Classify_RecordedAddressLookupCancellationPropagates()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "empty")).FullName;
+        var lookups = 0;
+        Assert.Throws<OperationCanceledException>(() => CleanupClassifier.ClassifyWithCancellation(
+            Snapshot(false, Skill("empty", empty, ValidityState.MissingSkillMd)), [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken,
+            path => ++lookups == 1 ? OwnershipPath.EntryAddress(path) : throw new OperationCanceledException()));
     }
 
     [Fact]

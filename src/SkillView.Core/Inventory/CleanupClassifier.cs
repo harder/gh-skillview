@@ -247,8 +247,9 @@ public static class CleanupClassifier
         // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
         var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
-        var entryKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        string EntryKey(string path)
+        var entryKeys = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var entryCoverageIncomplete = false;
+        string? EntryKey(string path)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var original = PathIdentity.NormalizeKey(path);
@@ -256,7 +257,8 @@ public static class CleanupClassifier
             string? address = null;
             try { address = inspectEntry(path); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
-            return entryKeys[original] = address is null ? original : PathIdentity.NormalizeKey(address);
+            if (address is null) entryCoverageIncomplete = true;
+            return entryKeys[original] = address is null ? null : PathIdentity.NormalizeKey(address);
         }
         Dictionary<string, InstalledSkill[]>? emptyRecords = null;
         Dictionary<string, Candidate[]>? relatedFindings = null;
@@ -264,17 +266,21 @@ public static class CleanupClassifier
         {
             if (emptyRecords is not null) return;
             // These native lookups are unnecessary unless an empty child exists.
-            emptyRecords = snapshot.Skills.GroupBy(skill => EntryKey(skill.ResolvedPath), StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
-            relatedFindings = result.Where(candidate => candidate.Kind != CandidateKind.Malformed)
-                .GroupBy(candidate => EntryKey(candidate.Path), StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+            emptyRecords = snapshot.Skills.Select(skill => (Skill: skill, Key: EntryKey(skill.ResolvedPath)))
+                .Where(entry => entry.Key is not null).GroupBy(entry => entry.Key!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Select(entry => entry.Skill).ToArray(), StringComparer.Ordinal);
+            // Inspect every earlier finding before granting any empty-directory
+            // action. Failed addresses may alias any child, so cannot be ignored.
+            relatedFindings = result.Select(candidate => (Candidate: candidate, Key: EntryKey(candidate.Path)))
+                .Where(entry => entry.Key is not null && entry.Candidate.Kind != CandidateKind.Malformed)
+                .GroupBy(entry => entry.Key!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Select(entry => entry.Candidate).ToArray(), StringComparer.Ordinal);
             foreach (var skill in snapshot.Skills)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
                     || (skill.Ignored && !options.IncludeIgnored))
-                    knownResolved.Add(EntryKey(skill.ResolvedPath));
+                    if (EntryKey(skill.ResolvedPath) is { } key) knownResolved.Add(key);
             }
         }
 
@@ -346,12 +352,13 @@ public static class CleanupClassifier
                         var reason = $"empty directory under scan root '{root.Path}'";
                         if (protectedOwner) reason += "; installation records or incomplete discovery require review";
                         if (hasConsumers) reason += "; other consumer exposures require review; removing the directory could break their links";
+                        if (entryCoverageIncomplete) reason += "; native address lookup was incomplete; ownership and consumer matching require review";
                         if (findings is not null) reason += "; " + string.Join("; ", findings.Select(finding => finding.Reason).Distinct());
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
                             child,
                             reason,
-                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || contextConflict));
+                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || contextConflict || entryCoverageIncomplete));
                     }
                 }
             }
@@ -360,7 +367,7 @@ public static class CleanupClassifier
         // Reclassification produces one row per path, retaining every earlier
         // review requirement. Selection order must never choose removal authority.
         return result.Where(candidate => emptyPaths.Count == 0 || candidate.Kind == CandidateKind.EmptyDirectory
-            || !emptyPaths.Contains(EntryKey(candidate.Path))).Select(candidate =>
+            || EntryKey(candidate.Path) is not { } key || !emptyPaths.Contains(key)).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var impact = candidate.Skill is { } skill
