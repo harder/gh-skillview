@@ -60,7 +60,7 @@ broader acceptance or portability proof is unfinished.
 | --- | --- | --- |
 | Search, preview, and install help users choose a skill before writing it. | Install/search screens and CLI dispatch are present in `src/SkillView.Core/Ui/InstallScreen.cs`, `InstallConfirmModal.cs`, and `src/SkillView.Core/Cli/CliDispatcher.cs`; merged into `origin/main`. | Existing TUI and CLI. Preserve the existing flow and catalog behavior. |
 | Inventory, cleanup, Doctor, and the Changes queue help users understand installations and find actionable work. | `src/SkillView.Core/Ui/Tabs/InstalledTabView.cs`, `DoctorTabView.cs`, `ChangesTabView.cs`, `ChangesQueueBuilder.cs`, `MaintenanceQueueFormatter.cs`, `src/SkillView.Core/Inventory/`; merged into `origin/main`. | PR #75 added the Changes issue summary, recommendation, affected agents, expected change and undo guidance; F2 retains technical evidence. Interactive checks at 80×24, 100×26 and 120×36 are recorded in `agent_docs/evidence/pr75-ux-testing.md`. Update availability stays unknown until checked. The Cleanup follow-up below adds readable review summaries and has private Review → Apply → Rescan evidence at 80×24 and 120×36. |
-| Compare, target one installation, and review an ordinary update before applying it. | `SkillComparisonService.cs`, `SavedUpdateCoordinator.cs`, `UpdatesTabView*.cs`, and `CliDispatcher.cs`; merged into `origin/main`. | Existing CLI/TUI review flows. Reuse these bounded flows. Do not expand into advanced selected-version approval without a specific user need. |
+| Compare, target one installation, and review an ordinary update or chosen Git tag before applying it. | `SkillComparisonService.cs`, `SavedUpdateCoordinator.cs`, `UpdatesTabView*.cs`, and `CliDispatcher.cs`; merged into `origin/main`, including tag selection in PR #78. | Existing CLI/TUI review flows. Reuse these bounded flows. Persistent revision approvals and approved-restore policy remain deferred. |
 | Backup/history, restore, quarantine/undo, and local-change review preserve a recovery path. | `MaintenanceBackupStore.cs`, `MaintenanceBackupHistory.cs`, `QuarantineStore*.cs`, `ReplacementPlanStore.LocalReview.cs`, `ThreeWayPayloadReview.cs`; merged through PR #65 in `origin/main`. See the maintenance guides linked above. | Existing backend and CLI/TUI operations. Supported native metadata and owner coordination are used by these flows. Keep them available; broad recovery foundations are not unused merely because broader cases are deferred. |
 | Basic pinning and protection against unintended replacement preserve desired revisions. | Install `--pin`, `ReplacementPinPolicy.cs`, and update review/CLI paths; merged into `origin/main`. | Existing CLI/UI pin creation and protection. Keep basic pin safety essential. |
 | Standalone unpin removes a verified pin while retaining installed content and source identity. | `origin/main` includes `Maintenance/ReplacementPlanStore.Unpin.cs`, batch-16 final evidence, and the Updates review/apply path with `PinPolicy`; see `agent_docs/maintenance-standalone-unpin.md`. | Merged into `origin/main`. CLI and Updates review/apply flows exist. Keep available; schema 1–3 compatibility and exact pin-member rules remain part of its contract. Release availability was not assessed. |
@@ -83,7 +83,7 @@ broader acceptance or portability proof is unfinished.
 | Generic transaction or migration framework expansion | Existing recovery/writer foundations in `src/SkillView.Core/Maintenance/`; private owner/registry and queue branches are in the worktree inventory. | Backend foundations already support current operations; no user-facing framework requirement established. Defer broadening; reconsider for one concrete repair with a defined recovery path. |
 | Automatic consolidation of duplicate/shared skills | Private `gh-skillview-consolidation` (`980763f`) and proof/integration worktrees. | UX readiness unknown; candidate includes substantial proof work. Survivor and ownership decisions need explicit user review. Keep compare; reconsider only as a previewable, bounded action. |
 | Machine profiles and broad profile management | Inventory observes configured profiles; private `gh-skillview-profile-*` worktrees. | Inventory UI/backend exists; profile lifecycle UX readiness unknown. Do not infer installed/enabled agents from shared placements. Defer absent a concrete user workflow. |
-| Persistent selected-revision approval and approved-restore policy | PR #73 open at `3fd2956`; observed macOS/Windows tests, Windows metadata and AOT failures; private `codex/desired-revisions*` and `codex/selected-approved-*`. | Keep the useful capability to select different versions for selected installations as a finish candidate. Defer the broader persistent approval/approved-restore policy until CI failures are understood and the recovery model is bounded. Preserve ordinary updates and basic desired-pin protection. |
+| Persistent selected-revision approval and approved-restore policy | PR #73 remains open at `3fd2956`; historical macOS/Windows tests, Windows metadata and AOT failures; private `codex/desired-revisions*` and `codex/selected-approved-*`. | Keep the merged one-time Git tag choice from PR #78. Defer the broader persistent approval/approved-restore policy until a concrete need and bounded recovery model are established. Preserve ordinary updates and basic desired-pin protection. |
 | Additional native owner mutations | Private `gh-skillview-native-owner-*`; existing checked owner accessors and journals remain in use. | Existing backend supports current owner-aware operations. New mutation UX/readiness unknown. Defer additional surfaces until a specific repair requires them; retain existing safety/recovery code. |
 | Broadening lint rules or turning package checks into a new general lint framework | In `origin/main`, `PackageChecking/StaticPackageChecker.cs`, `PackageCompatibilityChecker.cs`, `PackageDeclarationScanner.cs`, `MarkdownPackageReferences.cs`, `PackageCheckReport.cs`, `Ui/PackageCheckScreen.cs`, and `Maintenance/MaintenanceQueue.cs` already exist. | Keep current package checks and queue. Defer broad rule or framework expansion without a concrete user need and bounded criteria. `OpenCodePolicyShape.cs` is provider-specific policy shape, not portable skill lint. |
 | Broad remote-source adoption | Private `gh-skillview-remote-source-adoption` (`59d360a`); historical handoff calls it unverified. | UX and source trust/recovery readiness unknown. Local reimport/source switching is narrower. Reconsider only with an explicit trust and recovery model. |
@@ -113,7 +113,21 @@ resuming PR #73 wholesale. The user subsequently approved the documented tag-onl
 implementation on 2026-10-20. Persistent approval and approved-restore policy,
 raw commits and new pin behavior remain deferred. The bounded finish point is
 the documented CLI/TUI flow, focused verification and a reviewable PR. That
-implementation is now in PR #78, pending review and CI on its combined head.
+implementation merged in PR #78 as `4276809d4e186b0501a2cd7fd6fbf746eb7a4c49`.
+Managed tests, metadata checks, builds and CodeQL passed on its reviewed head;
+native CI jobs encountered GitHub installation rate limits. The user explicitly
+deferred the remaining native checks and merged it. This is not a completed
+native-platform or release proof.
+
+The next approved bounded task is **Copies and versions** in the Changes TUI,
+in [PR #79](https://github.com/harder/gh-skillview/pull/79)
+(`codex/copies-comparison-ux`): show related physical installations and recorded
+consumers, compare two explicitly with the existing read-only comparison engine,
+then hand the selected exact location to existing update/version or cleanup
+review. Keep this as a small navigation and presentation change. Automatic
+consolidation, exposure detach, new approval policy and new mutation machinery
+remain deferred. Validation is recorded in
+[evidence/copies-comparison-ux.md](evidence/copies-comparison-ux.md).
 
 ## Maintenance guidance
 

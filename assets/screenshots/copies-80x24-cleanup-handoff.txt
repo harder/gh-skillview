@@ -1,0 +1,24 @@
+┌┤Cleanup — 1 candidate(s)├────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                         │
+│─┬───────┬────────┬─────────────────────── Multiple copies                   ▲│
+│ │Kind   │Name    │Path                                                      █│
+│─┼───────┼────────┼─────────────────────── Location:                         █│
+│☐│compare│demo    │…/pty/other/demo        /var/tmp/skillview-copies-ux/pty/o█│
+│                                           ther/demo                         █│
+│                                                                             █│
+│                                           Why: Other copies use this name;  █│
+│                                           compare their sources and         █│
+│                                           versions.                         █│
+│                                                                             █│
+│                                           Next: Inspect the details and     █│
+│                                           compare or repair this copy.      █│
+│                                                                             █│
+│                                           Changes: Inspection only;         ░│
+│                                           automatic removal is unavailable. ░│
+│                                                                             ░│
+│                                           Undo: Inspection changes nothing. ░│
+│                                                                             ▼│
+│                                                                              │
+│   1 candidate(s)                                                             │
+│Select Space│Review Enter│Details F2│Ignore i│Export x│Back Esc               │
+└──────────────────────────────────────────────────────────────────────────────┘

@@ -265,6 +265,50 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "cleanup");
     }
 
+    internal static ImmutableArray<CleanupClassifier.Candidate> FilterCleanupForInstallation(
+        ImmutableArray<CleanupClassifier.Candidate> candidates, OperationSubject selected, string issue)
+    {
+        var matches = candidates.Where(candidate => candidate.Kind.ToString() == issue
+            && PathIdentity.Equals(candidate.Path, selected.Path)
+            && candidate.Impact?.Subject.InstallationId == selected.InstallationId
+            && PathIdentity.Equals(candidate.Impact.Subject.Path, selected.Path)).Take(2).ToImmutableArray();
+        return matches.Length == 1 ? matches : [];
+    }
+
+    internal async Task ShowCopiesAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
+        ChangesSelectionGate.Lease request, Action<OperationSubject> activateUpdates, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is not { } app || !request.IsCurrent) return;
+        var report = await GetOrProbeReportAsync(request.Token).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(report, request.Token).ConfigureAwait(false);
+        var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected.Subject);
+        var group = target is null ? null : CopiesPresentation.Build(snapshot, target, request.Token);
+        if (group is { Copies.Length: > 0 })
+        {
+            var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, request.Token);
+            group = group with
+            {
+                CleanupCandidates = group.Copies.Select(skill => (Id: skill.InstallationId,
+                        Matches: FilterCleanupForInstallation(candidates, OperationSubject.From(skill), selected.Issue)))
+                    .Where(row => row.Matches.Length == 1).ToImmutableDictionary(row => row.Id, row => row.Matches[0])
+            };
+        }
+        await _invokeAsync(() =>
+        {
+            if (!request.TryEnterDispatch() || lifetimeToken.IsCancellationRequested) return;
+            if (group is null || group.Copies.Length == 0)
+            { _setStatus("Selected installation is missing or ambiguous — refresh Changes."); return; }
+            var choice = CopiesScreen.Show(app, _services.Logger, group,
+                (left, right, token) => new SkillView.Maintenance.SkillComparisonService().CompareAsync(left, right, token,
+                    inventoryComplete: !group.Partial), lifetimeToken);
+            if (choice is null || lifetimeToken.IsCancellationRequested) return;
+            if (choice.Action == CopiesAction.Update) activateUpdates(choice.Subject);
+            else if (SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, choice.Subject) is not null
+                && group.CleanupCandidates.TryGetValue(choice.Subject.InstallationId, out var candidate))
+                ShowCleanupReview(app, report, snapshot, [candidate]);
+        }, request.Token).ConfigureAwait(false);
+    }
+
     internal async Task ShowSelectedCleanupAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
         ChangesSelectionGate.Lease request)
     {

@@ -65,6 +65,7 @@ public sealed class MaintenanceQueueTests
         var entry = queue.Entries.First(item => item.Issue == "NameCollision");
         var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
         Assert.Contains("Same name, multiple copies", summary);
+        Assert.Contains("Compare copies", summary);
         Assert.Contains("automatic cleanup is unavailable", summary);
         Assert.Contains("Deletion has no automatic undo", summary);
         Assert.DoesNotContain("Saved updates", summary);
@@ -214,6 +215,16 @@ public sealed class MaintenanceQueueTests
         Assert.Equal("unknown", entry.GetProperty("runtimeState").GetString());
         Assert.Contains("offline", root.GetProperty("diagnostics")[0].GetString());
         Assert.Equal(2, entry.GetProperty("affectedPaths").GetArrayLength());
+    }
+
+    [Fact]
+    public void UnresolvedConfiguredRootsMarkTheQueuePartialEvenWithSuccessfulProviders()
+    {
+        var snapshot = InventorySnapshot.Empty with { ConfiguredRootsComplete = false };
+        Assert.False(snapshot.IsPartial);
+        var queue = MaintenanceQueueBuilder.Build(snapshot, TestContext.Current.CancellationToken);
+        Assert.True(queue.Partial);
+        Assert.Contains("Configured-root discovery is incomplete.", queue.Diagnostics);
     }
 
     [Fact]

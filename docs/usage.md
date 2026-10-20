@@ -98,6 +98,24 @@ The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
 full evidence; keep the same global workspace/profile/scan-root options.
 
+For **Same name, multiple copies** or **Duplicate** observations, Enter opens
+**Copies and versions**. Each row is one physical installation; its recorded
+consumers share those files. Select a row to see its full location, source,
+recorded ref, authored version and pin. Related rows include matching names and
+matching recorded sources/subpaths; matching names alone do not prove a common
+source. Unknown provenance and incomplete discovery stay visible.
+
+The original selection is the reference. Select another row and press
+**Compare** to inspect local file differences, or **Use as reference** to change
+the pair. This does not check upstream availability or infer which version is
+best. **Update / version...** selects that exact location in the existing Updates
+workspace, where **Choose version...** offers a Git tag. **Cleanup review...**
+opens the matching captured issue at that location; name conflicts remain
+review-only. Actions without an applicable finding, and updates to managed
+read-only copies, are disabled with an explanation in the details.
+Opening either review changes no skill files. The list shows at most 128 copies;
+comparison summaries show at most 12 changed paths and report omissions.
+
 Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin
 review, and disablement/migration are not assessed by this queue. Disk inventory
