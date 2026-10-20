@@ -202,6 +202,36 @@ public sealed class CleanupSuppressionStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task WorkflowRefusesAmbiguousRefreshedPathAndContinuesWithIndependentSelection()
+    {
+        var reviewed = Skill(known: true);
+        var otherContext = reviewed with
+        {
+            Package = new("fixture/source", "github", null, null, null)
+            { Provider = "different-owner", ContextRoot = Path.Combine(_temp.FullName, "other-context") }
+        };
+        var independent = Skill("independent", known: true);
+        var beforeAmbiguous = PayloadSnapshot.CaptureEvidence(reviewed.ResolvedPath, Token);
+        var beforeIndependent = PayloadSnapshot.CaptureEvidence(independent.ResolvedPath, Token);
+        var store = Store(); var mutations = 0; var changed = 0;
+        var result = await CleanupSuppressionWorkflow.SetAsync(
+            [new(CleanupClassifier.CandidateKind.Untracked, reviewed.ResolvedPath, "ambiguous fixture", reviewed),
+             new(CleanupClassifier.CandidateKind.Untracked, independent.ResolvedPath, "independent fixture", independent)],
+            store, _ => Task.FromResult(Inventory(reviewed, otherContext, independent)),
+            () => mutations++, () => changed++, Token);
+
+        Assert.Equal(1, result.Failed); Assert.Equal(1, result.Changed); Assert.Equal(0, result.Skipped);
+        Assert.False(result.Canceled); Assert.Equal(1, mutations); Assert.Equal(1, changed);
+        Assert.Contains("ambiguous", Assert.Single(result.Errors), StringComparison.OrdinalIgnoreCase);
+        var record = Assert.Single(store.Read([], Token).Records);
+        Assert.True(OwnershipPath.Same(independent.ResolvedPath, record.Binding.Path));
+        Assert.False(Observe(store, reviewed).Active); Assert.False(Observe(store, otherContext).Active);
+        Assert.True(Observe(store, independent).External);
+        Assert.Equal(beforeAmbiguous.Objects, PayloadSnapshot.CaptureEvidence(reviewed.ResolvedPath, Token).Objects);
+        Assert.Equal(beforeIndependent.Objects, PayloadSnapshot.CaptureEvidence(independent.ResolvedPath, Token).Objects);
+    }
+
+    [Fact]
     public async Task WorkflowReportsUnsupportedRowsAndPartialCanceledMutation()
     {
         var target = Skill(known: true); var store = Store(); using var cancellation = new CancellationTokenSource();

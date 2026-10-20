@@ -52,7 +52,7 @@ broader acceptance or portability proof is unfinished.
 | Feature and user benefit | Code/status | UX readiness and limits |
 | --- | --- | --- |
 | Search, preview, and install help users choose a skill before writing it. | Install/search screens and CLI dispatch are present in `src/SkillView.Core/Ui/InstallScreen.cs`, `InstallConfirmModal.cs`, and `src/SkillView.Core/Cli/CliDispatcher.cs`; merged into `origin/main`. | Existing TUI and CLI. Preserve the existing flow and catalog behavior. |
-| Inventory, cleanup, Doctor, and the Changes queue help users understand installations and find actionable work. | `src/SkillView.Core/Ui/Tabs/InstalledTabView.cs`, `DoctorTabView.cs`, `ChangesTabView.cs`, `ChangesQueueBuilder.cs`, `MaintenanceQueueFormatter.cs`, `src/SkillView.Core/Inventory/`; merged into `origin/main`. | Structural UI exists: list/detail panes, “Maintenance observations,” unknown update/session states, and Enter routing to the selected installation's Updates view. The queue builds cleanup and installation-review rows; update availability stays unknown until dry-run. UX gap: a plain summary of issue, recommendation, affected agents, change, and undo is not yet established; technical evidence should remain available behind detail. Package checks are available separately. Static inspection only; no TUI launch. |
+| Inventory, cleanup, Doctor, and the Changes queue help users understand installations and find actionable work. | `src/SkillView.Core/Ui/Tabs/InstalledTabView.cs`, `DoctorTabView.cs`, `ChangesTabView.cs`, `ChangesQueueBuilder.cs`, `MaintenanceQueueFormatter.cs`, `src/SkillView.Core/Inventory/`; merged into `origin/main`. | PR #75 added the Changes issue summary, recommendation, affected agents, expected change and undo guidance; F2 retains technical evidence. Interactive checks at 80×24, 100×26 and 120×36 are recorded in `agent_docs/evidence/pr75-ux-testing.md`. Update availability stays unknown until checked. The Cleanup follow-up below adds readable review summaries and has private Review → Apply → Rescan evidence at 80×24 and 120×36. |
 | Compare, target one installation, and review an ordinary update before applying it. | `SkillComparisonService.cs`, `SavedUpdateCoordinator.cs`, `UpdatesTabView*.cs`, and `CliDispatcher.cs`; merged into `origin/main`. | Existing CLI/TUI review flows. Reuse these bounded flows. Do not expand into advanced selected-version approval without a specific user need. |
 | Backup/history, restore, quarantine/undo, and local-change review preserve a recovery path. | `MaintenanceBackupStore.cs`, `MaintenanceBackupHistory.cs`, `QuarantineStore*.cs`, `ReplacementPlanStore.LocalReview.cs`, `ThreeWayPayloadReview.cs`; merged through PR #65 in `origin/main`. See the maintenance guides linked above. | Existing backend and CLI/TUI operations. Supported native metadata and owner coordination are used by these flows. Keep them available; broad recovery foundations are not unused merely because broader cases are deferred. |
 | Basic pinning and protection against unintended replacement preserve desired revisions. | Install `--pin`, `ReplacementPinPolicy.cs`, and update review/CLI paths; merged into `origin/main`. | Existing CLI/UI pin creation and protection. Keep basic pin safety essential. |
@@ -84,14 +84,27 @@ broader acceptance or portability proof is unfinished.
 
 ## Next bounded priority
 
-PR #72 is merged. The approved Changes UX work is in progress on
-`codex/issue-summary-ux`, based on merge commit `65e07717086d1580c273ea81b83b1eb6b56521dd`.
-It adds a short issue summary for the affected installation or agents, recommended
-action, expected effect, and undo path, with F2 preserving access to technical
-evidence and existing specialist routes. No new queue framework is needed.
-Source inspection identified the gap; after implementation, the focused Release
-builds, formatter check, 30 focused unit tests, and 9 integration tests passed.
-The TUI was not launched, so interactive visual readiness remains unverified.
+PR #72's install safeguards and PR #75's Changes summaries are merged. PR #76's
+CI runtime improvements are also merged; these do not expand product scope.
+
+The current bounded change is Cleanup review UX on
+`codex/cleanup-review-ux`, based on `a9703a75273bdc9f3f0c2b5851bd224ccfcdc3e2`.
+It replaces default technical tables/IDs with a plain issue, action, affected-agent
+and recovery summary; F2 keeps technical evidence available. Private keyboard
+walkthroughs at 80×24 and 120×36 verified Review → Apply → Rescan for a broken
+link and an empty directory while retaining an unchanged healthy skill. Testing
+also exposed and fixed empty directories being mislabeled as malformed skills;
+owner, partial-coverage and symlink protections remain in force. Native validators
+and removal authority are unchanged. A deterministic UI test verifies Esc drains
+in-flight removal and retains partial-mutation counts. See
+`agent_docs/evidence/cleanup-review-ux.md` for verification and its limits. This
+branch is pending PR review; these statements do not claim merged or released
+availability.
+
+After that, consider selecting a version for one specific installed copy through
+the existing update flow. First establish a small implementation boundary from
+the useful parts of PR #73. Its broader persistent approval/approved-restore
+policy remains deferred; this is not approval to resume the whole PR.
 
 ## Maintenance guidance
 

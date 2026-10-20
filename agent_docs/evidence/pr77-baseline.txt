@@ -1,0 +1,52 @@
+PR #77 full-suite failure baseline
+
+Baseline: origin/main, a9703a75273bdc9f3f0c2b5851bd224ccfcdc3e2
+Worktree: detached at that exact commit in /home/kevin/code/gh-skillview-pr77-baseline
+Host: Linux 6.18.54.1-microsoft-standard-WSL2, aarch64
+SDK: /home/kevin/.dotnet/dotnet, .NET SDK 10.0.402
+Mounts: `/tmp` is a tmpfs; the repo worktree is on `/dev/sdd` ext4 mounted at `/`.
+This puts test-created temporary fixtures and the repo on different filesystems.
+
+Commands:
+
+    /home/kevin/.dotnet/dotnet restore SkillView.sln --locked-mode -p:SelfContained=false -p:UseDefaultPublishRuntimeIdentifier=false -p:UseAppHost=false
+    /home/kevin/.dotnet/dotnet build tests/SkillView.Tests/SkillView.Tests.csproj -c Release --no-restore -p:PublishAot=false -p:SelfContained=false -p:UseDefaultPublishRuntimeIdentifier=false
+
+Then each class was run once with the same test command, replacing CLASS with
+each name below:
+
+    /home/kevin/.dotnet/dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj -c Release --no-build --filter-class CLASS
+
+Classes: SkillView.Tests.Inventory.NativePlacementTests,
+SkillView.Tests.Inventory.RemoveValidatorTests,
+SkillView.Tests.Maintenance.GhSharedLockGuardTests,
+SkillView.Tests.Maintenance.GhInstallOwnershipTests, and
+SkillView.Tests.Maintenance.LocalSourceSwitchTests.
+
+Results: 81 tests total; 63 passed, 4 skipped, 14 failed. The 14 failed test
+names exactly match the 14 failures from the PR #77 full managed-suite run.
+The failures reproduce on this baseline and host; this does not assert that
+they fail on every supported host.
+
+Failing names:
+
+- NativePlacementTests.AliasCyclesAndDotTargetsAreBoundedAndRefuseRatherThanNormalizeAcrossLinks
+- NativePlacementTests.RecursiveAliasFailuresAndLeaseDisposalReleaseOwnedNativeAnchors
+- NativePlacementTests.MissingBoundaryIsNativeAndRevalidatedBeforeUse(suffix: "missing")
+- NativePlacementTests.MissingBoundaryIsNativeAndRevalidatedBeforeUse(suffix: "missing/deeper/leaf")
+- NativePlacementTests.AliasedAncestorsResolveAndBrokenOrFinalLinksCannotMasqueradeAsMissing(relative: False)
+- NativePlacementTests.AliasedAncestorsResolveAndBrokenOrFinalLinksCannotMasqueradeAsMissing(relative: True)
+- NativePlacementTests.ContentChangesDoNotInventOldSourceFreshnessButIdentityReplacementRefuses
+- RemoveValidatorTests.Validate_FilesystemRootScanRoot_Allowed
+- GhSharedLockGuardTests.SupportedSameSelectorRecordCannotBeReplacedByCustomInstall
+- GhInstallOwnershipTests.OwnerDisappearingDuringRepositoryDiscoveryCannotAdmitAWriter
+- LocalSourceSwitchTests.CopiedSourceRelativeTrackingRefusesExplicitlyRatherThanRelaxingSchemaFive
+- LocalSourceSwitchTests.ProvenMissingOldSourceDoesNotBecomePayloadDependency
+- LocalSourceSwitchTests.SameTrackingCannotHideChangedInstalledAuthoredMetadata
+- LocalSourceSwitchTests.CanceledCaptureRetainsExactDiagnosticAndLeavesBothPayloadsUnchanged
+
+Most native placement and local-source failures report the Linux cross-mount
+refusal. The filesystem-root test reports `open directory entry 'tmp' failed:
+Invalid cross-device link`. The remaining failures are the same assertion
+failures observed in the PR run. Full class logs are retained outside the repo
+under /var/tmp/skillview-cleanup-ux/pr77-baseline/.

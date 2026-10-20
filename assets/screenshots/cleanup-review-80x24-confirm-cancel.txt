@@ -1,0 +1,24 @@
+┌┤Cleanup — 2 candidate(s)├────────────────────────────────────────────────────┐
+│Spa┏┥Review cleanup removal┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓    │
+│─┬─┃Review 1 cleanup item(s)                                             ┃   ▲│
+│ │K┃                                                                     ┃   ░│
+│─┼─┃Cancel keeps all files. Deletion has no automatic undo.              ┃   ░│
+│☑│b┃                                                                     ┃   ░│
+│☐│e┃• Broken link: 1                                                     ┃.  █│
+│   ┃                                                                     ┃   █│
+│   ┃Broken link                                                          ┃   █│
+│   ┃                                                                     ┃   █│
+│   ┃Location: /var/tmp/skillview-cleanup-ux/skills/broken-link           ┃   █│
+│   ┃                                                                     ┃   █│
+│   ┃Changes: Removes only this link. Target files stay.                  ┃m  █│
+│   ┃                                                                     ┃   █│
+│   ┃Affected agent: unknown · Custom · /var/tmp/skillview-cleanup-ux     ┃   █│
+│   ┃                                                                     ┃   █│
+│   ┃                                                                     ┃kil█│
+│   ┃                                                                     ┃   █│
+│   ┃Tab Focus · PgDn Scroll · F2 Details                                 ┃   █│
+│   ┃                ⟦► Cancel ◄⟧▖  ⟦ Remove ⟧▖                           ┃   ▼│
+│   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛    │
+│   2 candidate(s)                                                             │
+│ Select  Space │ Review  Enter │ More  F2 │ Ignore  i │ Export  x │ Back  Esc │
+└──────────────────────────────────────────────────────────────────────────────┘

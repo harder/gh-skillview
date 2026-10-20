@@ -6,10 +6,9 @@ namespace SkillView.Inventory;
 
 /// Classifies `InstalledSkill` records into cleanup candidate types.
 /// Runs purely over an already-captured `InventorySnapshot` plus the list of
-/// scan roots that produced it; does not hit the filesystem for anything the
-/// scanner already observed, with the single exception of the "empty-dir"
-/// check on scan-root children that the scanner omits (they never become
-/// `InstalledSkill` records in the first place).
+/// scan roots that produced it, with read-only empty-directory checks on
+/// immediate scan-root children. Empty children may already be captured as
+/// MissingSkillMd observations. Removal still requires fresh native validation.
 public static class CleanupClassifier
 {
     public enum CandidateKind
@@ -84,9 +83,11 @@ public static class CleanupClassifier
         InventorySnapshot snapshot,
         IReadOnlyList<ScanRoot> scanRoots,
         Options? options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<string, string?>? inspectEntry = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        inspectEntry ??= OwnershipPath.EntryAddress;
         options ??= new Options();
         var result = ImmutableArray.CreateBuilder<Candidate>();
 
@@ -241,15 +242,46 @@ public static class CleanupClassifier
                 group[0], ReviewOnly: true));
         }
 
-        // Empty directories inside scan roots — not in `snapshot.Skills`
-        // because the scanner already filtered them (no SKILL.md). Walk each
-        // scan root, enumerate children, flag empty dirs that aren't already
-        // an `InstalledSkill`.
+        // The scanner can retain empty children as MissingSkillMd observations.
+        // Reclassify only verified empty, ordinary directories; all other
+        // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var skill in snapshot.Skills)
+        var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
+        var entryKeys = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var entryCoverageIncomplete = false;
+        string? EntryKey(string path)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            knownResolved.Add(PathIdentity.NormalizeKey(skill.ResolvedPath));
+            var original = PathIdentity.NormalizeKey(path);
+            if (entryKeys.TryGetValue(original, out var cached)) return cached;
+            string? address = null;
+            try { address = inspectEntry(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
+            if (address is null) entryCoverageIncomplete = true;
+            return entryKeys[original] = address is null ? null : PathIdentity.NormalizeKey(address);
+        }
+        Dictionary<string, InstalledSkill[]>? emptyRecords = null;
+        Dictionary<string, Candidate[]>? relatedFindings = null;
+        void EnsureEmptyIndexes()
+        {
+            if (emptyRecords is not null) return;
+            // These native lookups are unnecessary unless an empty child exists.
+            emptyRecords = snapshot.Skills.Select(skill => (Skill: skill, Key: EntryKey(skill.ResolvedPath)))
+                .Where(entry => entry.Key is not null).GroupBy(entry => entry.Key!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Select(entry => entry.Skill).ToArray(), StringComparer.Ordinal);
+            // Inspect every earlier finding before granting any empty-directory
+            // action. Failed addresses may alias any child, so cannot be ignored.
+            relatedFindings = result.Select(candidate => (Candidate: candidate, Key: EntryKey(candidate.Path)))
+                .Where(entry => entry.Key is not null && entry.Candidate.Kind != CandidateKind.Malformed)
+                .GroupBy(entry => entry.Key!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Select(entry => entry.Candidate).ToArray(), StringComparer.Ordinal);
+            foreach (var skill in snapshot.Skills)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
+                    || (skill.Ignored && !options.IncludeIgnored))
+                    if (EntryKey(skill.ResolvedPath) is { } key) knownResolved.Add(key);
+            }
         }
 
         foreach (var root in scanRoots)
@@ -274,19 +306,28 @@ public static class CleanupClassifier
 
                     var child = children.Current;
                     if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
-                    var resolved = PathResolver.Resolve(child);
-                    if (resolved is null) continue;
-                    if (knownResolved.Contains(PathIdentity.NormalizeKey(resolved))) continue;
+                    // An empty link target is not permission to delete the target.
+                    if (PathResolver.IsSymlink(child)) continue;
                     bool empty;
-                    try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
+                    try { empty = !Directory.EnumerateFileSystemEntries(child).Any(); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
                     if (empty)
                     {
+                        // One unreadable/transient child must not abort other
+                        // observations. Cancellation remains a separate outcome.
+                        string? resolved;
+                        try { resolved = inspectEntry(child); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { continue; }
+                        if (resolved is null) continue;
+                        EnsureEmptyIndexes();
+                        var key = PathIdentity.NormalizeKey(resolved);
+                        if (knownResolved.Contains(key) || emptyPaths.Contains(key)) continue;
                         var leaf = Path.GetFileName(child);
-                        var observation = new InstalledSkill
+                        emptyRecords!.TryGetValue(key, out var recorded);
+                        var observation = recorded?.FirstOrDefault() ?? new InstalledSkill
                         {
                             Name = leaf,
-                            ResolvedPath = resolved,
+                            ResolvedPath = child,
                             ScanRoot = root.Path,
                             Scope = root.Scope,
                             Agents = [new("unknown", child, PathResolver.IsSymlink(child), DiscoveryRoot: root.Path)],
@@ -297,28 +338,66 @@ public static class CleanupClassifier
                             IsSymlinked = false,
                             InstalledAt = null
                         };
-                        var protectedOwner = snapshot.IsPartial || snapshot.OwnershipRecords.Any(record => record.Describes(observation));
+                        var protectedOwner = snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
+                            || snapshot.OwnershipRecords.Any(record => record.Describes(observation))
+                            || recorded?.Any(skill => skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
+                                || !skill.MetadataConflicts.IsEmpty || skill.Provenance != Provenance.FsScan
+                                || skill.SourceIdentity.Provider != "unknown" || skill.ObservedSubject?.ExposureCoverageComplete == false) == true;
+                        var hasConsumers = recorded?.Any(skill => skill.Agents.Any(agent => IsOtherExposure(agent, resolved))) == true;
+                        relatedFindings!.TryGetValue(key, out var findings);
+                        // A name alone cannot make an empty, otherwise unowned
+                        // directory unsafe. Actual conflicting context still can.
+                        var contextConflict = findings?.Any(finding => finding.Kind != CandidateKind.NameCollision) == true;
+                        emptyPaths.Add(key);
+                        var reason = $"empty directory under scan root '{root.Path}'";
+                        if (protectedOwner) reason += "; installation records or incomplete discovery require review";
+                        if (hasConsumers) reason += "; other consumer exposures require review; removing the directory could break their links";
+                        if (entryCoverageIncomplete) reason += "; native address lookup was incomplete; ownership and consumer matching require review";
+                        if (findings is not null) reason += "; " + string.Join("; ", findings.Select(finding => finding.Reason).Distinct());
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
-                            resolved,
-                            $"empty directory under scan root '{root.Path}'",
-                            Skill: null, ReviewOnly: protectedOwner));
+                            child,
+                            reason,
+                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || contextConflict || entryCoverageIncomplete));
                     }
                 }
             }
         }
 
-        return result.Select(candidate =>
+        // Reclassification produces one row per path, retaining every earlier
+        // review requirement. Selection order must never choose removal authority.
+        return result.Where(candidate => emptyPaths.Count == 0 || candidate.Kind == CandidateKind.EmptyDirectory
+            || EntryKey(candidate.Path) is not { } key || !emptyPaths.Contains(key)).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var impact = candidate.Skill is { } skill
-                ? OperationImpact.Payload(OperationSubject.From(skill), "cleanup")
+                ? OperationImpact.Payload(candidate.Kind == CandidateKind.EmptyDirectory
+                    ? SkillIdentityObserver.Capture(skill, snapshot.CapturedAt,
+                        !snapshot.IsPartial && snapshot.ConfiguredRootsComplete && skill.ObservedSubject?.ExposureCoverageComplete != false,
+                        cancellationToken, snapshot.ManagedRegions)
+                    : OperationSubject.From(skill), "cleanup")
                 : SkillIdentityObserver.CaptureEntry(candidate.Path, "cleanup", snapshot.CapturedAt, cancellationToken);
             if (candidate.Kind is CandidateKind.BrokenSharedMapping or CandidateKind.BrokenSymlink
                 && candidate.Skill is { } linked && linked.Agents.FirstOrDefault(agent => agent.IsSymlink && PathIdentity.Equals(agent.Path, candidate.Path)) is { } membership)
                 impact = OperationImpact.Link(OperationSubject.From(linked), membership);
             return candidate with { Impact = impact };
         }).ToImmutableArray();
+    }
+
+    private static bool IsOtherExposure(AgentMembership agent, string resolved)
+    {
+        if (agent.IsSymlink) return true;
+        if (PathIdentity.Equals(agent.Path, resolved)) return false;
+        try
+        {
+            // Resolve ancestor aliases without following the final entry. An
+            // incoming link is still a separate exposure, even to this target.
+            var entry = OwnershipPath.EntryAddress(agent.Path);
+            var canonical = OwnershipPath.EntryAddress(resolved);
+            return entry is null || canonical is null || !PathIdentity.Equals(entry, canonical);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { return true; }
     }
 
     private static bool WasCovered(InventorySnapshot snapshot, InstalledSkill skill)
