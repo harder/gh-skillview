@@ -65,6 +65,7 @@ public sealed class MaintenanceQueueTests
         var entry = queue.Entries.First(item => item.Issue == "NameCollision");
         var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken);
         Assert.Contains("Same name, multiple copies", summary);
+        Assert.Contains("Compare copies", summary);
         Assert.Contains("automatic cleanup is unavailable", summary);
         Assert.Contains("Deletion has no automatic undo", summary);
         Assert.DoesNotContain("Saved updates", summary);

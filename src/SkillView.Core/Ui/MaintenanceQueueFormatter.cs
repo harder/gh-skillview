@@ -54,7 +54,9 @@ internal static class MaintenanceQueueFormatter
     {
         yield return ("Skill", entry.Title);
         yield return ("Why", DescribeReason(entry));
-        yield return ("Next", entry.Cleanup is null
+        yield return ("Next", entry.Issue is "NameCollision" or "Duplicate"
+            ? "Compare copies, then review an update/version or cleanup for one location; automatic cleanup is unavailable for this conflict."
+            : entry.Cleanup is null
             ? "Check for updates."
             : entry.Cleanup.ReviewOnly ? "Inspect this issue; automatic cleanup is unavailable."
             : "Review cleanup.");
@@ -125,7 +127,9 @@ internal static class MaintenanceQueueFormatter
         var text = new StringBuilder("## Selected maintenance observation\n\n").Append(rendered.Text);
         text.AppendLine($"\nFields omitted from this bounded preview: {rendered.OmittedFields}. Exact fields are omitted whole, never shortened into selectors.");
         text.AppendLine($"For full evidence, make a fresh capture with **queue --install-id {entry.Subject.InstallationId} --json** (retain the same global workspace/profile/scan-root options).");
-        text.AppendLine(entry.Cleanup is null
+        text.AppendLine(entry.Issue is "NameCollision" or "Duplicate"
+            ? "**Enter:** inspect related physical copies, compare two explicitly, then choose an exact installation for existing update/version or cleanup review."
+            : entry.Cleanup is null
             ? "**Enter:** select this exact installation in Updates. **Dry-run** checks availability; **c** compares installed content with one saved candidate and opens its plan review. Explicit retention approval enables apply; the result verifies disk locations. Neither runs on entry."
             : "**Enter:** refresh and review only this exact cleanup issue. Review is required before any action.");
         text.AppendLine("**r:** refresh disk inventory only. Update availability and active sessions remain unknown. The queue is observation, not mutation approval.");
