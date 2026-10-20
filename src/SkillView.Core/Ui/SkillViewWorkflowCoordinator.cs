@@ -284,13 +284,26 @@ internal sealed class SkillViewWorkflowCoordinator
             snapshot.ProtectedRoots.ToArray(), snapshot.Skills, ownershipRunner: _services.Runner,
             captureInventory: token => CaptureInventoryAsync(report, token));
         screen.Show();
-        if (screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
-            || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved)
+        var changed = screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
+            || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved;
+        var status = $"Cleanup: removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders; ignored {screen.IgnoredCount}."
+            + (screen.CancellationObserved ? " Some operations were canceled." : "");
+        if (changed)
         {
-            _services.ListAdapter.Invalidate();
-            _refreshActiveTab();
+            try
+            {
+                _services.ListAdapter.Invalidate();
+                // This callback requests a refresh; it cannot prove completion.
+                _refreshActiveTab();
+                status += " Inventory refresh requested.";
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _services.Logger.Error("cleanup.refresh", ex.ToString());
+                status += " Inventory refresh failed; refresh manually.";
+            }
         }
-        _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
+        _setStatus(status);
     }
 
     internal static bool MatchesCleanupSelection(CleanupClassifier.Candidate candidate,

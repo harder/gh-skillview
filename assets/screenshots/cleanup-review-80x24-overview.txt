@@ -1,0 +1,24 @@
+┌┤Cleanup — 2 candidate(s)├────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                         │
+│─┬───────────┬────────────┬─────────────── Broken link                       ▲│
+│ │Kind       │Name        │Path                                              █│
+│─┼───────────┼────────────┼─────────────── Why: This link's target could not █│
+│☐│broken-link│broken-link │…/skillview-cle be found.                         █│
+│☐│empty-dir  │empty-candi…│…/skillview-cle                                   █│
+│                                           Next: Space selects; Enter        █│
+│                                           reviews removal.                  █│
+│                                                                             █│
+│                                           Changes: Removes only this link.  █│
+│                                           Target files stay.                █│
+│                                                                             █│
+│                                           Undo: Deletion has no automatic   █│
+│                                           undo.                             █│
+│                                                                             █│
+│                                           Affected agent: unknown · Custom  ░│
+│                                           · /var/tmp/skillview-cleanup-ux   ░│
+│                                                                             ░│
+│                                           Location:                         ▼│
+│                                                                              │
+│   2 candidate(s)                                                             │
+│ Select  Space │ Review  Enter │ More  F2 │ Ignore  i │ Export  x │ Back  Esc │
+└──────────────────────────────────────────────────────────────────────────────┘

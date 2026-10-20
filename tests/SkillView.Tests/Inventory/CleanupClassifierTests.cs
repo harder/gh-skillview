@@ -161,6 +161,233 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
+    public void Classify_RealScannerEmptyObservationBecomesEmptyDirectoryWithoutDroppingSafetyLimits()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "empty-observed")).FullName;
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var scanner = new LocalSkillScanner(new SkillView.Logging.Logger());
+        var observed = Assert.Single(scanner.Scan(roots));
+        Assert.Equal(ValidityState.MissingSkillMd, observed.Validity);
+        var snapshot = Snapshot(false, observed);
+        var candidate = Assert.Single(CleanupClassifier.Classify(snapshot, roots));
+        Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, candidate.Kind);
+        Assert.False(candidate.ReviewOnly);
+        Assert.Same(observed, candidate.Skill);
+        Assert.Equal(empty, candidate.Path);
+
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = _tempRoot, Selector = "empty-observed" };
+        foreach (var protectedSnapshot in new[]
+        {
+            snapshot with { Diagnostics = new ScanDiagnostics { InaccessiblePaths = ["unreadable"] } },
+            snapshot with { ConfiguredRootsComplete = false },
+            snapshot with { Skills = [observed with { ObservedSubject = OperationSubject.From(observed) }] },
+            snapshot with { OwnershipRecords = [claim] },
+            snapshot with { Skills = [observed with { OwnershipClaims = [claim] }] }
+        })
+        {
+            var review = Assert.Single(CleanupClassifier.Classify(protectedSnapshot, roots));
+            Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, review.Kind);
+            Assert.True(review.ReviewOnly);
+            if (!protectedSnapshot.ConfiguredRootsComplete || protectedSnapshot.Skills[0].ObservedSubject?.ExposureCoverageComplete == false)
+                Assert.False(review.Impact!.ExposureCoverageComplete);
+        }
+
+        File.WriteAllText(Path.Combine(empty, "keep.txt"), "keep");
+        Assert.Equal(CleanupClassifier.CandidateKind.Malformed,
+            Assert.Single(CleanupClassifier.Classify(snapshot, roots)).Kind);
+    }
+
+    [Fact]
+    public void Classify_EmptyDirectoryWithConsumerExposuresRequiresReview()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "shared-empty")).FullName;
+        var direct = new AgentMembership("universal", empty, false);
+        var observation = Skill("shared-empty", empty, ValidityState.MissingSkillMd) with { Agents = [direct] };
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        Assert.False(Assert.Single(CleanupClassifier.Classify(Snapshot(false, observation), roots)).ReviewOnly);
+
+        foreach (var isSymlink in new[] { false, true })
+        {
+            var consumer = new AgentMembership("claude", Path.Combine(_tempRoot, "other-context", "shared-empty"), isSymlink);
+            var candidate = Assert.Single(CleanupClassifier.Classify(
+                Snapshot(false, observation with { Agents = [direct, consumer] }), roots));
+            Assert.True(candidate.ReviewOnly);
+            Assert.Contains("consumer exposures", candidate.Reason);
+            Assert.Equal(2, candidate.Impact!.AffectedExposures.Length);
+            Assert.True(Directory.Exists(empty));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Classify_AncestorAliasDoesNotInventAnAdditionalConsumer(bool recordUsesAlias)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix ancestor-alias fixture requires symlink support."); return; }
+        var realRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "actual")).FullName;
+        var empty = Directory.CreateDirectory(Path.Combine(realRoot, "empty")).FullName;
+        var alias = Path.Combine(_tempRoot, "root-alias");
+        Directory.CreateSymbolicLink(alias, realRoot);
+        var recordedPath = recordUsesAlias ? Path.Combine(alias, "empty") : empty;
+        var observation = Skill("empty", recordedPath, ValidityState.MissingSkillMd) with
+        { Agents = [new("claude", Path.Combine(alias, "empty"), false)] };
+        var candidate = Assert.Single(CleanupClassifier.Classify(Snapshot(false, observation), [new(alias, Scope.User, null)]));
+        Assert.False(candidate.ReviewOnly);
+        Assert.Equal(Path.Combine(alias, "empty"), candidate.Path);
+        Assert.Equal(recordedPath, candidate.Skill!.ResolvedPath);
+        // A final-entry link remains a distinct consumer, even under an alias.
+        var linked = observation with { Agents = [new("claude", Path.Combine(alias, "empty"), true)] };
+        Assert.True(Assert.Single(CleanupClassifier.Classify(Snapshot(false, linked), [new(alias, Scope.User, null)])).ReviewOnly);
+    }
+
+    [Fact]
+    public void Classify_EmptyNameCollisionsRemainOneEligibleRowPerPath()
+    {
+        var firstRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
+        var secondRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
+        var first = Directory.CreateDirectory(Path.Combine(firstRoot, "foo")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(secondRoot, "foo")).FullName;
+        var snapshot = Snapshot(false, Skill("foo", first, ValidityState.MissingSkillMd), Skill("foo", second, ValidityState.MissingSkillMd));
+        var candidates = CleanupClassifier.Classify(snapshot,
+            [new(firstRoot, Scope.User, null), new(secondRoot, Scope.User, null), new(firstRoot, Scope.User, null)]);
+        Assert.Equal(2, candidates.Length);
+        Assert.All(candidates, candidate =>
+        {
+            Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, candidate.Kind);
+            Assert.False(candidate.ReviewOnly);
+            Assert.Contains("share name 'foo'", candidate.Reason);
+        });
+        foreach (var ordered in new[] { candidates, candidates.Reverse().ToImmutableArray() })
+            Assert.All(CleanupClassifier.DeduplicateByPath(ordered, TestContext.Current.CancellationToken).Unique, candidate => Assert.False(candidate.ReviewOnly));
+    }
+
+    [Fact]
+    public void Classify_EntryInspectionFailurePreservesOtherCandidates()
+    {
+        var bad = Directory.CreateDirectory(Path.Combine(_tempRoot, "bad")).FullName;
+        var good = Directory.CreateDirectory(Path.Combine(_tempRoot, "good")).FullName;
+        var snapshot = Snapshot(false, Skill("bad", bad, ValidityState.MissingSkillMd), Skill("good", good, ValidityState.MissingSkillMd));
+        var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken, path => path == bad ? throw new IOException("fixture observation failure") : OwnershipPath.EntryAddress(path));
+        Assert.Contains(candidates, candidate => candidate.Path == bad && candidate.Kind == CleanupClassifier.CandidateKind.Malformed && candidate.ReviewOnly);
+        var surviving = Assert.Single(candidates, candidate => candidate.Path == good && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.True(surviving.ReviewOnly);
+        Assert.Contains("native address lookup was incomplete", surviving.Reason);
+    }
+
+    [Theory]
+    [InlineData("owner", "io")]
+    [InlineData("owner", "access")]
+    [InlineData("owner", "null")]
+    [InlineData("consumer", "io")]
+    [InlineData("consumer", "access")]
+    [InlineData("consumer", "null")]
+    [InlineData("ignored", "io")]
+    [InlineData("ignored", "access")]
+    [InlineData("ignored", "null")]
+    [InlineData("symlinked", "io")]
+    [InlineData("symlinked", "access")]
+    [InlineData("symlinked", "null")]
+    public void Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(string protection, string failure)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix ancestor-alias fixture requires symlink support."); return; }
+        var realRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "actual")).FullName;
+        var empty = Directory.CreateDirectory(Path.Combine(realRoot, "empty")).FullName;
+        var alias = Path.Combine(_tempRoot, "root-alias");
+        Directory.CreateSymbolicLink(alias, realRoot);
+        var recordedPath = Path.Combine(alias, "empty");
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = alias, Selector = "empty" };
+        var observation = Skill("empty", recordedPath, ValidityState.MissingSkillMd,
+            ignored: protection == "ignored", symlinked: protection == "symlinked") with
+        {
+            OwnershipClaims = protection == "owner" ? [claim] : [],
+            Agents = protection == "consumer" ? [new("claude", Path.Combine(_tempRoot, "consumer", "empty"), true)] : []
+        };
+        var candidates = CleanupClassifier.ClassifyWithCancellation(Snapshot(false, observation),
+            [new(realRoot, Scope.User, null)], null, TestContext.Current.CancellationToken,
+            path => path != recordedPath ? OwnershipPath.EntryAddress(path) : failure switch
+            {
+                "io" => throw new IOException("fixture transient record lookup failure"),
+                "access" => throw new UnauthorizedAccessException("fixture denied record lookup"),
+                _ => null
+            });
+        var candidate = Assert.Single(candidates, item => item.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.Equal(empty, candidate.Path);
+        Assert.True(candidate.ReviewOnly);
+        Assert.Contains("native address lookup was incomplete", candidate.Reason);
+        Assert.DoesNotContain(candidates, item => !item.ReviewOnly);
+        Assert.True(Directory.Exists(empty));
+    }
+
+    [Fact]
+    public void Classify_RecordedAddressLookupCancellationPropagates()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "empty")).FullName;
+        var lookups = 0;
+        Assert.Throws<OperationCanceledException>(() => CleanupClassifier.ClassifyWithCancellation(
+            Snapshot(false, Skill("empty", empty, ValidityState.MissingSkillMd)), [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken,
+            path => ++lookups == 1 ? OwnershipPath.EntryAddress(path) : throw new OperationCanceledException()));
+    }
+
+    [Fact]
+    public void Classify_NonemptyInventoryDoesNotResolveEntryKeys()
+    {
+        var paths = new[] { "first", "second" }.Select(name => Directory.CreateDirectory(Path.Combine(_tempRoot, name)).FullName).ToArray();
+        foreach (var path in paths) File.WriteAllText(Path.Combine(path, "SKILL.md"), "payload");
+        var snapshot = Snapshot(false, paths.Select(path => Skill("same-name", path)).ToArray());
+        var calls = 0;
+        var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(_tempRoot, Scope.User, null)], null,
+            TestContext.Current.CancellationToken, _ => { calls++; throw new IOException("entry lookup must stay lazy"); });
+        Assert.Equal(2, candidates.Length);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void Classify_EmptyDirectoryMergesMetadataAndSharedMappingReviewReasons()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "conflicted")).FullName;
+        var first = Skill("first", empty, ValidityState.MissingSkillMd) with { MetadataConflicts = ["source disagreement"] };
+        var second = Skill("second", empty, ValidityState.MissingSkillMd);
+        var candidate = Assert.Single(CleanupClassifier.Classify(Snapshot(false, first, second), [new(_tempRoot, Scope.User, null)]));
+        Assert.True(candidate.ReviewOnly);
+        Assert.Contains("source disagreement", candidate.Reason);
+        Assert.Contains("conflicting names", candidate.Reason);
+    }
+
+    [Theory]
+    [InlineData(Provenance.CliList, null)]
+    [InlineData(Provenance.Both, null)]
+    [InlineData(Provenance.FsScan, "https://github.com/owner/repo")]
+    public void Classify_TrackedEmptyDirectoryRetainsProtectionAndNativeObservation(Provenance provenance, string? upstream)
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "tracked-empty")).FullName;
+        var observation = Skill("tracked-empty", empty, ValidityState.MissingSkillMd, provenance) with
+        { FrontMatter = new SkillFrontMatter { Upstream = upstream } };
+        var snapshot = Snapshot(false, observation);
+        var candidate = Assert.Single(CleanupClassifier.Classify(snapshot, [new(_tempRoot, Scope.User, null)]));
+        Assert.True(candidate.ReviewOnly);
+        Assert.Equal(snapshot.CapturedAt, candidate.Impact!.Subject.CapturedAt);
+        Assert.NotEqual("Native object was not recorded.", candidate.Impact.Subject.NativeObject.Diagnostic);
+        Assert.Equal(observation.SourceIdentity, candidate.Impact.Subject.Source);
+    }
+
+    [Fact]
+    public void Classify_EmptySymlinkTargetDoesNotBecomeEmptyDirectoryRemoval()
+    {
+        var target = Directory.CreateDirectory(Path.Combine(_tempRoot, "container", "target")).FullName;
+        var link = Path.Combine(_tempRoot, "empty-link");
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix empty-link observation; Windows native link proofs run separately."); return; }
+        Directory.CreateSymbolicLink(link, target);
+        var observation = Skill("empty-link", path: target, validity: ValidityState.MissingSkillMd, symlinked: true);
+        var candidates = CleanupClassifier.Classify(Snapshot(false, observation), [new(_tempRoot, Scope.User, null)]);
+        Assert.DoesNotContain(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.True(Directory.Exists(target));
+    }
+
+    [Fact]
     public void MissingPayloadOwnerRecordsAndOwnedBrokenLinksRequireReview()
     {
         var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "demo")).FullName;

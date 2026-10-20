@@ -105,18 +105,22 @@ public sealed class TerminalEscapeSanitizerTests
         Assert.DoesNotContain("bad", detail);
     }
 
-    [Fact]
-    public void RenderCleanupDetail_StripsEscapeSequences_FromCandidateMetadata()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RenderCleanupDetail_StripsEscapeSequences_FromSummaryAndTechnicalMetadata(bool showDetails)
     {
         var detail = CleanupScreen.RenderDetail(new CleanupClassifier.Candidate(
-            CleanupClassifier.CandidateKind.Malformed,
+            CleanupClassifier.CandidateKind.SourceOrphaned,
             "/skills/demo\x1b]0;bad\x07",
             "reason\x1b]8;;https://example.test\x07text",
-            Skill: null));
+            Skill: null), showDetails);
 
         Assert.DoesNotContain('\x1b', detail);
         Assert.DoesNotContain('\x07', detail);
-        Assert.Contains("| Field | Value |", detail);
+        Assert.DoesNotContain("| Field | Value |", detail);
+        Assert.Contains(showDetails ? "## Technical details" : "## Installation needs review", detail);
+        Assert.Contains("/skills/demo", detail);
         Assert.Contains("reasontext", detail);
         Assert.DoesNotContain("bad", detail);
     }
