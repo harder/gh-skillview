@@ -56,3 +56,39 @@ and [current ref after rescan](../../assets/screenshots/version-selection-80x24-
 
 This is focused local verification. The full unit suite and Native AOT publishes
 were not run locally; hosted CI status must be checked on the published PR head.
+
+## PR #78 review follow-up
+
+The 2026-10-20 static review was checked against the implementation. Saved reviews
+now use neutral version-update wording because an ordinary latest-release update
+can also resolve to a tag. Only a live explicit tag request is described as a
+one-time tag choice; shared guidance replaces drifting CLI/coordinator copies.
+No new saved field or schema was introduced just to retain a presentation label.
+
+An explicit tag's HTTP 404 names the tag and repository, while acknowledging that
+GitHub can also return 404 for inaccessible resources. Other HTTP errors keep
+their original classification, and subprocess diagnostics remain available.
+Idle terminal outcomes clear the tag-choice header. Refresh requests during the
+chooser retain the latest subject and reload after either accept or cancel;
+the captured choice is discarded and the user must choose again from refreshed
+inventory. Deactivation likewise cannot prepare the old row. Surrounding pasted
+whitespace is trimmed in the modal; CLI and source-boundary validation stays exact.
+
+The encoded-slash concern did not reproduce: read-only GitHub API requests to
+`repos/golang/tools/git/ref/tags/gopls%2Fv0.20.0` and its literal-slash equivalent
+both returned HTTP 200, `refs/tags/gopls/v0.20.0`, and commit
+`2e31135b736b96cd609904370c71563ce5447826`. Existing lightweight/annotated nested-tag
+tests remain. Repeated validation guards are intentional entry-point checks that
+all call the same validator; they reject bad input before discovery/staging and
+also protect direct resolver callers. No separate validation rule was added.
+
+The terminal captures above predate this wording adjustment. Focused renderer,
+modal, resolver and Updates lifecycle regressions cover the review changes;
+they do not claim a repeat of the full PTY walkthrough.
+
+After the fixes, 136 focused tests passed: resolver 52, tag workflow 12, tag
+modal 7, reviewed Updates tab 34, Updates tab 13, update renderer 6, update CLI
+11 and source-review CLI 1. Integration smoke tests passed 9/9. Release test/App
+and integration builds had zero warnings/errors; scoped formatting and whitespace
+checks passed. These are overlapping follow-up runs, not an addition to the
+original unique-test count. Hosted checks still need the final published head.

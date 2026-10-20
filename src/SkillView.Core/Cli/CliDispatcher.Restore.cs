@@ -118,7 +118,7 @@ public static partial class CliDispatcher
                         {
                             w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                             w.WriteString("status", "unchanged"); w.WriteString("reason", current.Message);
-                            if (tag is not null) w.WriteString("versionSelection", "One-time tag choice; future ordinary updates follow latest. No pin is created.");
+                            if (tag is not null) w.WriteString("versionSelection", VersionUpdateGuidance.ExplicitTagChoice);
                             w.WriteBoolean("partial", current.CleanupWarning is not null);
                             w.WriteBoolean("succeeded", current.CleanupWarning is null); w.WriteNull("operation");
                             w.WritePropertyName("unchanged"); JsonSerializer.Serialize(w, current, ReplacementJsonContext.Default.ReplacementUnchanged);
@@ -127,7 +127,7 @@ public static partial class CliDispatcher
                         });
                         else Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"unchanged  {current.Path}\n{current.Message}\n{current.CleanupWarning}"
                             + (current.LocalSource is { } source ? $"\nLocal source: {source.Status}: {source.Message}" : "")));
-                        if (!json && tag is not null) Console.WriteLine("One-time tag choice; future ordinary updates follow latest. No pin is created.");
+                        if (!json && tag is not null) Console.WriteLine(VersionUpdateGuidance.ExplicitTagChoice);
                         if (!json) WriteImpactText(frozenImpact);
                         return current.CleanupWarning is null ? ExitCodes.Success : ExitCodes.UserError;
                     }
@@ -156,7 +156,7 @@ public static partial class CliDispatcher
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
                 w.WriteString("status", result.Canceled ? "canceled" : result.Succeeded ? result.Status : result.MutationObserved ? "partial" : "refused");
                 w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
-                if (tag is not null) w.WriteString("versionSelection", "One-time tag choice; all consumers share the change. Future ordinary updates follow latest. No pin is created.");
+                if (tag is not null) w.WriteString("versionSelection", VersionUpdateGuidance.ExplicitTagChoice);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
                 WritePlanReference(w, result);
                 w.WriteString("diskVerification", result.Succeeded
@@ -178,8 +178,10 @@ public static partial class CliDispatcher
             if (!json && result.Revision is { } revision)
             {
                 Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"Source ref: {revision.Source.Ref}\nCommit: {revision.Source.Commit}\nGit tree: {revision.Source.Tree}"));
-                if (revision.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal) && !revision.DesiredMetadata.Pinned)
-                    Console.WriteLine("One-time tag choice; all consumers share the change. Future ordinary updates follow latest. No pin is created.");
+                if (tag is not null) Console.WriteLine(VersionUpdateGuidance.ExplicitTagChoice);
+                else if (revision.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal)
+                    && !revision.DesiredMetadata.Pinned && revision.DesiredMetadata.PinnedRef is null)
+                    Console.WriteLine(VersionUpdateGuidance.UnpinnedUpdate);
             }
             if (!json) Console.WriteLine(SourceReviewScreen.RenderText(result));
             if (!json && result.LocalImport is not null) Console.WriteLine(LocalReimportScreen.RenderText(result));

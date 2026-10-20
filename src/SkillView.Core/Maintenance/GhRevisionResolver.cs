@@ -118,7 +118,12 @@ internal sealed class GhRevisionResolver
             {
                 if (string.IsNullOrWhiteSpace(name) || name.Length > 1024 || name.Any(char.IsControl))
                     throw new IOException("Source ref is invalid.");
-                var body = await Get($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                var response = await request($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token).ConfigureAwait(false);
+                if (response.Status == 404 && selectedTag is not null)
+                    throw new GhSourceRequestException($"Tag '{selectedTag}' was not found or is inaccessible in {repo} (HTTP 404); check the tag and repository access. No fallback or payload change was admitted.", response.StdOut, response.StdErr);
+                RequireSuccess(response);
+                var body = response.Body;
                 using var refDocument = JsonDocument.Parse(body);
                 if (refDocument.RootElement.GetProperty("ref").GetString() != "refs/" + kind + "/" + name)
                     throw new IOException("Source reference response disagrees with the selected ref.");

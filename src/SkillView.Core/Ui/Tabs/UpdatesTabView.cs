@@ -237,9 +237,15 @@ internal sealed partial class UpdatesTabView : FrameView
 
     internal Task LoadAsync() => LoadForSubjectAsync(_drillInSubject);
 
-    internal async Task LoadForSubjectAsync(OperationSubject? selected)
+    internal async Task LoadForSubjectAsync(OperationSubject? selected, bool afterVersionChoice = false)
     {
-        if (_choosingVersion || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_choosingVersion)
+        {
+            _versionReloadPending = true;
+            _versionReloadSubject = selected;
+            return;
+        }
+        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -268,6 +274,8 @@ internal sealed partial class UpdatesTabView : FrameView
 
                 if (selected is null) Populate(snapshot);
                 else PopulateSelected(snapshot, selected);
+                if (afterVersionChoice && _skills.Count > 0)
+                    _status.Text = " inventory refreshed; select the installation and choose its version again";
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -351,6 +359,7 @@ internal sealed partial class UpdatesTabView : FrameView
     internal void ChooseVersionForTests() => ChooseVersion();
     internal Button ChooseVersionButtonForTests => _chooseVersionButton;
     internal string StatusTextForTests => _status.Text.ToString();
+    internal string TableLabelForTests => _tableLabel.Text.ToString();
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
     internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
     internal Task RunForTestsAsync(bool dryRun, bool batchOnly) => RunAsync(dryRun, batchOnly);
@@ -543,6 +552,8 @@ internal sealed partial class UpdatesTabView : FrameView
     internal void CancelPendingWork()
     {
         CancelPendingLoad();
+        _versionReloadPending = false;
+        _versionReloadSubject = null;
         _operationCancellations.Cancel();
         _review = null;
         ResetLocalReview();

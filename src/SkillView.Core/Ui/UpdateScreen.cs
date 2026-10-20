@@ -1,4 +1,5 @@
 using SkillView.Gh.Models;
+using SkillView.Maintenance;
 
 namespace SkillView.Ui;
 
@@ -90,7 +91,7 @@ public static class UpdateScreen
             Field("Affected recorded agents", agents.Length == 0 ? "none recorded; inspect exposure evidence below"
                 : string.Join(", ", agents.Take(4).Select(agent => TuiHelpers.Truncate(agent, 24))));
             Field("Local changes", tagRevision.LocalChanges.Length.ToString());
-            sb.AppendLine("Apply retains original, including local edits, for undo. One-time choice; later ordinary Update follows latest.");
+            sb.AppendLine("Apply retains original, including local edits, for undo. " + VersionUpdateGuidance.FutureUpdates);
             if (previousRef != TuiHelpers.Truncate(previousRef, 64) || tagRevision.Source.Ref != TuiHelpers.Truncate(tagRevision.Source.Ref, 64)
                 || agents.Length > 4 || agents.Take(4).Any(agent => agent != TuiHelpers.Truncate(agent, 24)))
                 sb.AppendLine("Summary shortened; complete refs and affected consumer evidence remain below.");

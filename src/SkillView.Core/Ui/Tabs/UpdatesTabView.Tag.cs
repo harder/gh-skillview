@@ -5,6 +5,9 @@ namespace SkillView.Ui.Tabs;
 
 internal sealed partial class UpdatesTabView
 {
+    private bool _versionReloadPending;
+    private OperationSubject? _versionReloadSubject;
+
     private void ChooseVersion()
     {
         if (_choosingVersion || _lifetimeToken.IsCancellationRequested || _operationCancellations.HasActive
@@ -15,10 +18,21 @@ internal sealed partial class UpdatesTabView
         if (selected.Pinned)
         { _status.Text = " pin retained; plan and apply a separate unpin review before choosing a tag"; return; }
         string? tag;
+        var loadGeneration = Interlocked.Read(ref _loadGeneration);
         _choosingVersion = true;
         try { tag = _chooseTag(selected); }
         finally { _choosingVersion = false; }
-        if (_lifetimeToken.IsCancellationRequested) return;
+        if (_lifetimeToken.IsCancellationRequested || loadGeneration != Interlocked.Read(ref _loadGeneration)) return;
+        if (_versionReloadPending)
+        {
+            var subject = _versionReloadSubject;
+            _versionReloadPending = false;
+            _versionReloadSubject = null;
+            // The modal may run a nested UI loop. A refresh during that loop
+            // invalidates its captured row: reload first and require a new choice.
+            _runTask(() => LoadForSubjectAsync(subject, afterVersionChoice: true), "updates.reload-after-version-choice");
+            return;
+        }
         if (tag is null) { _status.Text = " version selection canceled; no candidate prepared"; return; }
         if (string.IsNullOrWhiteSpace(tag)) { _status.Text = " enter one Git tag; no candidate prepared"; return; }
         var hidden = _hiddenBox.Value == Terminal.Gui.Views.CheckState.Checked;

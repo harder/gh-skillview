@@ -211,7 +211,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             Outcomes = outcomes.ToImmutable(),
             SavedPlan = prepared,
             Notices = options.Tag is not null
-                ? [new("version-selection", "One-time version choice. All consumers of this physical installation are affected. A later ordinary Update follows latest; no pin is created.")]
+                ? [new("version-selection", VersionUpdateGuidance.ExplicitTagChoice)]
                 : options.Force ? [new("review", "--force does not approve replacement or local-change disposition. Apply the saved plan with explicit retain-original approval.")] : []
         });
     }

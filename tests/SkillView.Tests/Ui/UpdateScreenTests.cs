@@ -33,6 +33,8 @@ public sealed class UpdateScreenTests
         Assert.Contains("**Local changes:** `1`", summary);
         Assert.Contains("Apply retains original, including local edits, for undo", summary);
         Assert.Contains("later ordinary Update follows latest", summary);
+        Assert.Contains("no pin is created", summary);
+        Assert.DoesNotContain("One-time", body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Summary shortened", summary); Assert.DoesNotContain(longAgent, summary);
         Assert.True(state < body.IndexOf("**Plan ID:**", StringComparison.Ordinal));
         Assert.True(state < body.IndexOf("### Frozen source changes", StringComparison.Ordinal));

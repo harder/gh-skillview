@@ -80,10 +80,11 @@ public sealed partial class ReviewedUpdatesTabTests
         Action? changed = null, Func<Action, Task>? dispatch = null,
         Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? local = null,
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpin = null,
-        Func<InstalledSkill, string?>? chooseTag = null) => new(
+        Func<InstalledSkill, string?>? chooseTag = null,
+        Func<CancellationToken, Task<InventorySnapshot>>? snapshotLoader = null) => new(
             dispatch ?? (action => { action(); return Task.CompletedTask; }),
             (operation, _) => operation().GetAwaiter().GetResult(),
-            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() }),
+            snapshotLoader ?? (_ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() })),
             prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin, chooseTag: chooseTag);
 
     [Theory]

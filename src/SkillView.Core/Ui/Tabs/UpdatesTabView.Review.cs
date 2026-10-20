@@ -158,6 +158,7 @@ internal sealed partial class UpdatesTabView
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
                     : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)} · {_queue.Count} remaining"
                     : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {_queue.Count} remaining · Next / skip continues";
+                if (_review is null && _queue.Count == 0) _queueOptions = null;
                 SetBusy(false);
                 // Ownership remains held until the queued callback returns.
                 ownership.Dispose();
@@ -173,6 +174,7 @@ internal sealed partial class UpdatesTabView
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                 _status.Text = $" operation failed: {TuiHelpers.ErrorSnippet(ex.Message)}; inspect saved evidence";
+                if (_review is null && _queue.Count == 0) _queueOptions = null;
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);

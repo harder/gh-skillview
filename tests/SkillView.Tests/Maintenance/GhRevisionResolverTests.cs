@@ -80,8 +80,18 @@ public sealed class GhRevisionResolverTests
     public async Task ExplicitTagFailureNeverFallsBack(int status)
     {
         const string endpoint = "repos/harder/fixture/git/ref/tags/missing";
-        responses[endpoint] = new(status, "{}");
-        await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "", "missing", Token));
+        responses[endpoint] = new(status, "{}") { StdOut = "source response", StdErr = "remote diagnostic" };
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "", "missing", Token));
+        Assert.Contains($"HTTP {status}", error.Message);
+        Assert.Equal("source response", error.StdOut);
+        Assert.Equal("remote diagnostic", error.StdErr);
+        if (status == 404)
+        {
+            Assert.Contains("Tag 'missing'", error.Message);
+            Assert.Contains("harder/fixture", error.Message);
+            Assert.Contains("inaccessible", error.Message);
+        }
+        else Assert.DoesNotContain("was not found", error.Message);
         Assert.Equal([endpoint], calls);
     }
 

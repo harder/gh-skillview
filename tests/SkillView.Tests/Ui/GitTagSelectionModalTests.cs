@@ -15,7 +15,9 @@ public sealed class GitTagSelectionModalTests
     [InlineData(80, 24, true)]
     [InlineData(80, 24, false)]
     [InlineData(120, 36, true)]
-    public async Task ActualModalRoutingPreservesTypedShortcutCharactersAndFitsSmallTerminal(int width, int height, bool accept)
+    [InlineData(80, 24, true, " ")]
+    [InlineData(80, 24, true, "\n")]
+    public async Task ActualModalRoutingPreservesTypedShortcutCharactersAndFitsSmallTerminal(int width, int height, bool accept, string pastedSuffix = "")
     {
         var timedOut = false; var interacted = false; string? result = null;
         const string chosen = "uUpacd/release-1";
@@ -31,6 +33,7 @@ public sealed class GitTagSelectionModalTests
                 input.SetFocus(); Assert.True(input.HasFocus);
                 foreach (var character in chosen) app.Keyboard.RaiseKeyDownEvent(new Key(character));
                 Assert.Equal(chosen, input.Text.ToString());
+                if (pastedSuffix.Length > 0) input.Text = " " + chosen + pastedSuffix;
                 var notes = dialog.SubViews.OfType<Label>().ToArray();
                 Assert.Contains(notes, note => note.Text.Contains("later ordinary Update follows latest", StringComparison.Ordinal));
                 Assert.Contains(notes, note => note.Text.Contains("sharing this physical installation", StringComparison.Ordinal));

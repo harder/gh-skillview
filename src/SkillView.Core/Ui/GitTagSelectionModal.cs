@@ -49,7 +49,7 @@ internal static class GitTagSelectionModal
         {
             args.Handled = true;
             if (lifetimeToken.IsCancellationRequested || selected.Pinned) return;
-            var value = tag.Text.ToString();
+            var value = tag.Text.ToString().Trim();
             try { GhRevisionResolver.ValidateTag(value); }
             catch (IOException)
             { status.Text = "Enter a valid Git tag (for example v1.2.3)."; tag.SetFocus(); return; }
