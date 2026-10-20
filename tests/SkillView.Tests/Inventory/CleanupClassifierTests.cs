@@ -219,19 +219,22 @@ public class CleanupClassifierTests : IDisposable
         }
     }
 
-    [Fact]
-    public void Classify_AncestorAliasDoesNotInventAnAdditionalConsumer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Classify_AncestorAliasDoesNotInventAnAdditionalConsumer(bool recordUsesAlias)
     {
         if (OperatingSystem.IsWindows()) { Assert.Skip("Unix ancestor-alias fixture requires symlink support."); return; }
         var realRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "actual")).FullName;
         var empty = Directory.CreateDirectory(Path.Combine(realRoot, "empty")).FullName;
         var alias = Path.Combine(_tempRoot, "root-alias");
         Directory.CreateSymbolicLink(alias, realRoot);
-        var observation = Skill("empty", empty, ValidityState.MissingSkillMd) with
+        var recordedPath = recordUsesAlias ? Path.Combine(alias, "empty") : empty;
+        var observation = Skill("empty", recordedPath, ValidityState.MissingSkillMd) with
         { Agents = [new("claude", Path.Combine(alias, "empty"), false)] };
         var candidate = Assert.Single(CleanupClassifier.Classify(Snapshot(false, observation), [new(alias, Scope.User, null)]));
         Assert.False(candidate.ReviewOnly);
-        Assert.Equal(empty, candidate.Path);
+        Assert.Equal(recordedPath, candidate.Path);
         // A final-entry link remains a distinct consumer, even under an alias.
         var linked = observation with { Agents = [new("claude", Path.Combine(alias, "empty"), true)] };
         Assert.True(Assert.Single(CleanupClassifier.Classify(Snapshot(false, linked), [new(alias, Scope.User, null)])).ReviewOnly);

@@ -245,17 +245,30 @@ public static class CleanupClassifier
         // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
         var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
+        var entryKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        string EntryKey(string path)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var original = PathIdentity.NormalizeKey(path);
+            if (entryKeys.TryGetValue(original, out var cached)) return cached;
+            string? address = null;
+            try { address = OwnershipPath.EntryAddress(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
+            return entryKeys[original] = address is null ? original : PathIdentity.NormalizeKey(address);
+        }
+        var emptyRecords = snapshot.Skills.GroupBy(skill => EntryKey(skill.ResolvedPath), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
         // MissingSkillMd is superseded by the verified-empty observation below.
         // Retain every other finding, including future actionable findings.
         var reviewReasons = result.Where(candidate => candidate.Kind != CandidateKind.Malformed)
-            .GroupBy(candidate => PathIdentity.NormalizeKey(candidate.Path), StringComparer.Ordinal)
+            .GroupBy(candidate => EntryKey(candidate.Path), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => string.Join("; ", group.Select(candidate => candidate.Reason).Distinct()), StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
                 || (skill.Ignored && !options.IncludeIgnored))
-                knownResolved.Add(PathIdentity.NormalizeKey(skill.ResolvedPath));
+                knownResolved.Add(EntryKey(skill.ResolvedPath));
         }
 
         foreach (var root in scanRoots)
@@ -294,11 +307,11 @@ public static class CleanupClassifier
                     if (empty)
                     {
                         var leaf = Path.GetFileName(child);
-                        byResolved.TryGetValue(key, out var recorded);
+                        emptyRecords.TryGetValue(key, out var recorded);
                         var observation = recorded?.FirstOrDefault() ?? new InstalledSkill
                         {
                             Name = leaf,
-                            ResolvedPath = resolved,
+                            ResolvedPath = child,
                             ScanRoot = root.Path,
                             Scope = root.Scope,
                             Agents = [new("unknown", child, PathResolver.IsSymlink(child), DiscoveryRoot: root.Path)],
@@ -323,7 +336,7 @@ public static class CleanupClassifier
                         if (reviewReason is not null) reason += "; " + reviewReason;
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
-                            resolved,
+                            observation.ResolvedPath,
                             reason,
                             Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || reviewReason is not null));
                     }
@@ -334,7 +347,7 @@ public static class CleanupClassifier
         // Reclassification produces one row per path, retaining every earlier
         // review requirement. Selection order must never choose removal authority.
         return result.Where(candidate => candidate.Kind == CandidateKind.EmptyDirectory
-            || !emptyPaths.Contains(PathIdentity.NormalizeKey(candidate.Path))).Select(candidate =>
+            || !emptyPaths.Contains(EntryKey(candidate.Path))).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var impact = candidate.Skill is { } skill
