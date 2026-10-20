@@ -21,6 +21,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Classify CI change scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      full_proof: ${{ steps.classify.outputs.full_proof }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # A PR merge checkout includes both comparison parents. Never fetch
+          # event-supplied revisions separately; missing history runs full CI.
+          fetch-depth: 2
+      - name: Classify changed paths (uncertainty runs full proof)
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node .github/scripts/ci-change-scope.js --base "$BASE_SHA" --head "$HEAD_SHA"
+
   workflow-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,6 +51,10 @@ jobs:
         run: node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js
       - name: Test Homebrew formula renderer
         run: python3 -m unittest discover -s .github/scripts -p test_homebrew_formula.py
+      - name: Test CI scope and native input contracts
+        run: |
+          node --test .github/scripts/ci-change-scope.test.js
+          python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
       - name: Test frozen native-plan fixture contracts
         run: python3 -m unittest discover -s agent_docs/evidence -p 'test_old_native_*.py'
 
@@ -58,8 +81,9 @@ jobs:
         run: node --check site/app.js
 
   test:
+    needs: scope
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped tests' || 'test' }} (${{ matrix.os }})
-    if: inputs.verification != 'windows-metadata'
+    if: always() && inputs.verification != 'windows-metadata' && (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false')
     strategy:
       fail-fast: false
       matrix:
@@ -128,12 +152,15 @@ jobs:
         if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          overwrite: true
           name: linux-live-link-evidence
           path: dist/linux-live-link/**
           if-no-files-found: error
           retention-days: 14
 
   windows-metadata:
+    needs: scope
+    if: always() && (inputs.verification == 'windows-metadata' || needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false')
     name: Windows metadata (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -179,18 +206,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          overwrite: true
           name: windows-metadata-evidence-${{ matrix.os }}
           path: dist/windows-metadata-tests.log
           if-no-files-found: error
           retention-days: 14
 
-  aot-smoke:
-    if: inputs.verification != 'windows-metadata'
-    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
+  aot-build:
+    needs: scope
+    if: always() && inputs.verification != 'windows-metadata' && (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false')
+    name: Build native proof inputs (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
-    # Both product hosts plus four historical native producers and restart
-    # proofs run sequentially; retain a bounded budget for the expanded suite.
-    timeout-minutes: 180
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -234,88 +261,22 @@ jobs:
             -c Release -r ${{ matrix.rid }} \
             -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
             -o dist/ext
-      - name: Build exact previous native host for saved-plan compatibility
-        shell: bash
-        run: |
-          set -euo pipefail
-          baseline_sha=0dba59be59776e6e654123aa1ce1e5496074763e
-          baseline_path="$RUNNER_TEMP/skillview-unpin-baseline"
-          git fetch --no-tags origin "$baseline_sha"
-          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
-          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
-            -c Release -r ${{ matrix.rid }} \
-            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
-            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
-            -o "$baseline_path/dist/app"
-          printf 'SKILLVIEW_LEGACY_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
-      - name: Build exact standalone-unpin native host for schema4 compatibility
-        shell: bash
-        run: |
-          set -euo pipefail
-          baseline_sha=c919199a6861b9aaf9301e31c4b2945e098da799
-          baseline_path="$RUNNER_TEMP/skillview-local-reimport-baseline"
-          git fetch --no-tags origin "$baseline_sha"
-          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
-          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
-            -c Release -r ${{ matrix.rid }} \
-            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
-            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
-            -o "$baseline_path/dist/app"
-          printf 'SKILLVIEW_UNPIN_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
-      - name: Build exact local-reimport native host for schema5 compatibility
-        shell: bash
-        run: |
-          set -euo pipefail
-          baseline_sha="$(python - <<'PY'
-          import ast
-          from pathlib import Path
-          tree = ast.parse(Path('agent_docs/evidence/prove-old-native-reimport.py').read_text())
-          values = [ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
-                    and any(isinstance(target, ast.Name) and target.id == 'BASELINE' for target in node.targets)]
-          assert len(values) == 1 and isinstance(values[0], str) and len(values[0]) == 40, 'Corrected merged schema5 baseline is not frozen'
-          assert all(character in '0123456789abcdef' for character in values[0]), 'Corrected merged schema5 baseline is not frozen'
-          print(values[0])
-          PY
-          )"
-          baseline_path="$RUNNER_TEMP/skillview-source-switch-baseline"
-          git fetch --no-tags origin "$baseline_sha"
-          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
-          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
-            -c Release -r ${{ matrix.rid }} \
-            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
-            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
-            -o "$baseline_path/dist/app"
-          printf 'SKILLVIEW_REIMPORT_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
-      - name: Build exact pre-review source-switch native host for schema6 compatibility
-        shell: bash
-        run: |
-          set -euo pipefail
-          baseline_sha="$(python - <<'PY'
-          import ast
-          from pathlib import Path
-          tree = ast.parse(Path('agent_docs/evidence/prove-old-native-reimport.py').read_text())
-          values = [ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
-                    and any(isinstance(target, ast.Name) and target.id == 'SOURCE_SWITCH_BASELINE' for target in node.targets)]
-          assert len(values) == 1 and isinstance(values[0], str) and len(values[0]) == 40, 'Merged pre-review schema6 baseline is not frozen'
-          assert all(character in '0123456789abcdef' for character in values[0]), 'Merged pre-review schema6 baseline is not frozen'
-          print(values[0])
-          PY
-          )"
-          baseline_path="$RUNNER_TEMP/skillview-pre-review-source-switch-baseline"
-          git fetch --no-tags origin "$baseline_sha"
-          git -c core.autocrlf=false -c core.eol=lf worktree add --detach "$baseline_path" "$baseline_sha"
-          dotnet publish "$baseline_path/src/SkillView.App/SkillView.App.csproj" \
-            -c Release -r ${{ matrix.rid }} \
-            -p:PublishAot=true -p:StripSymbols=true -p:RestoreLockedMode=true \
-            -warnaserror:IL2026 -warnaserror:IL3050 -warnaserror:IL3053 \
-            -o "$baseline_path/dist/app"
-          printf 'SKILLVIEW_SOURCE_SWITCH_CHECKOUT=%s\n' "$baseline_path" >> "$GITHUB_ENV"
+      - name: Bind exact frozen native source, SDK, locks and publish recipe
+        id: native-baselines
+        run: python .github/scripts/native_proof_inputs.py plan --rid '${{ matrix.rid }}'
+      - name: Cache verified frozen producer binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-native/baselines
+          key: ${{ steps.native-baselines.outputs.cache-key }}
+      - name: Build missing frozen producers and verify every source receipt and binary
+        run: python .github/scripts/native_proof_inputs.py prepare --rid '${{ matrix.rid }}'
       - name: Prepare checksum-verified minimum and recorded current gh proof hosts
         shell: bash
         run: |
           set -euo pipefail
-          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.97.0 --rid '${{ matrix.rid }}' --output "$RUNNER_TEMP/skillview-proof-gh-minimum"
-          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output "$RUNNER_TEMP/skillview-proof-gh-current"
+          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.97.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-minimum"
+          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-current"
       - name: Smoke-test native binaries
         shell: bash
         run: |
@@ -324,24 +285,131 @@ jobs:
           test -s 'dist/ext/gh-skillview${{ matrix.ext }}'
           'dist/app/skillview${{ matrix.ext }}' --version
           'dist/ext/gh-skillview${{ matrix.ext }}' --version
+      - name: Build disposable maintenance process-death proof host
+        shell: bash
+        run: dotnet build tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj --configuration Release -p:RestoreLockedMode=true
+      - name: Package this commit's native proof inputs (preserve executable modes)
+        run: python .github/scripts/native_proof_inputs.py pack --rid '${{ matrix.rid }}'
+      - name: Retain native proof inputs for independent shards
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: native-proof-inputs-${{ matrix.rid }}
+          path: .ci-native/native-proof-inputs.tar
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
+      - name: Retain frozen source and recipe receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: native-build-receipts-${{ matrix.rid }}
+          path: |
+            .ci-native/baseline-plan.json
+            .ci-native/baselines/*/source-receipt.json
+            .ci-native/native-inputs-manifest.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  aot-proof:
+    needs: [scope, aot-build]
+    if: always() && inputs.verification != 'windows-metadata' && (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false') && needs.aot-build.result == 'success'
+    name: Native proof (${{ matrix.rid }}, ${{ matrix.shard }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      # Keep the original four-runner/API ceiling; schedule expensive Windows families first.
+      max-parallel: 4
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            ext: .exe
+            shard: owners
+          - rid: win-arm64
+            os: windows-11-arm
+            ext: .exe
+            shard: owners
+          - rid: win-x64
+            os: windows-latest
+            ext: .exe
+            shard: sources
+          - rid: win-arm64
+            os: windows-11-arm
+            ext: .exe
+            shard: sources
+          - rid: win-x64
+            os: windows-latest
+            ext: .exe
+            shard: inspection-unpin
+          - rid: win-arm64
+            os: windows-11-arm
+            ext: .exe
+            shard: inspection-unpin
+          - rid: osx-arm64
+            os: macos-15
+            ext: ''
+            shard: owners
+          - rid: osx-arm64
+            os: macos-15
+            ext: ''
+            shard: sources
+          - rid: osx-arm64
+            os: macos-15
+            ext: ''
+            shard: inspection-unpin
+          - rid: linux-x64
+            os: ubuntu-latest
+            ext: ''
+            shard: sources
+          - rid: linux-x64
+            os: ubuntu-latest
+            ext: ''
+            shard: inspection-unpin
+          - rid: linux-x64
+            os: ubuntu-latest
+            ext: ''
+            shard: owners
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Download this run's native proof inputs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-proof-inputs-${{ matrix.rid }}
+          path: .ci-native
+      - name: Verify transferred inputs and stage exact historical source checkouts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/native_proof_inputs.py unpack --rid '${{ matrix.rid }}'
+          python .github/scripts/native_proof_inputs.py stage --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}'
       - name: Prove explicit static package checks preserve payloads without running scripts
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
           python agent_docs/evidence/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
       - name: Prove explicit authoring dry-runs preserve authored and Git files
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           set -euo pipefail
           proof_gh_name='gh${{ matrix.ext }}'
           python agent_docs/evidence/prove-authoring-validation.py --app 'dist/app/skillview${{ matrix.ext }}' \
-            --gh "$RUNNER_TEMP/skillview-proof-gh-minimum/$proof_gh_name" \
-            --gh "$RUNNER_TEMP/skillview-proof-gh-current/$proof_gh_name" --output dist/authoring-app-proof
+            --gh ".ci-native/gh-minimum/$proof_gh_name" \
+            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-app-proof
           python agent_docs/evidence/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
-            --gh "$RUNNER_TEMP/skillview-proof-gh-minimum/$proof_gh_name" \
-            --gh "$RUNNER_TEMP/skillview-proof-gh-current/$proof_gh_name" --output dist/authoring-extension-proof
+            --gh ".ci-native/gh-minimum/$proof_gh_name" \
+            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-extension-proof
       - name: Prove explicit offline evaluation against a real local Docker runtime
-        if: runner.os == 'Linux'
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         shell: bash
         run: |
           set -euo pipefail
@@ -356,6 +424,7 @@ jobs:
           python3 agent_docs/evidence/prove-isolated-evaluation.py --app dist/ext/gh-skillview \
             --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-extension-proof
       - name: Verify repository API access and retain response evidence
+        if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -374,12 +443,14 @@ jobs:
           assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
           PYREF
       - name: Prove contextual agent loading without starting AI clients
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
           python agent_docs/evidence/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
           python agent_docs/evidence/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
       - name: Prove external cleanup suppression without payload mutations
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -387,50 +458,58 @@ jobs:
           python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/suppression-app-proof.json
           python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/suppression-extension-proof.json
       - name: Prove native backup evidence and unchanged installed copies
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/backup-app-proof.json
           python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/backup-extension-proof.json
       - name: Inspect metadata with openat2 denied; retain removal refusal
-        if: runner.os == 'Linux'
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         run: python3 agent_docs/evidence/prove-metadata-without-openat2.py --app dist/app/skillview
       - name: Refuse linked-worktree and broken Git metadata removals
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/gitfile-app-proof.json
           python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/gitfile-extension-proof.json
       - name: Inspect native object evidence without changing installed skills
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/object-app-proof.json
           python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/object-extension-proof.json
       - name: Prove shared inventory scope and agent filters without network access
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-inventory-filter.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-filter-app-proof.json
           python agent_docs/evidence/prove-inventory-filter.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-filter-extension-proof.json
       - name: Prove denied scan roots stay diagnostic and cannot authorize cleanup
-        if: runner.os != 'Windows'
+        if: matrix.shard == 'inspection-unpin' && (runner.os != 'Windows')
         shell: bash
         run: |
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
           python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
       - name: Prove managed and built-in discovery preserves read-only resources
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
           python agent_docs/evidence/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
       - name: Prove physical installation identities and frozen operation subjects
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-installation-identities.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/identities-app-proof.json
           python agent_docs/evidence/prove-installation-identities.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/identities-extension-proof.json
       - name: Prove standalone quarantine and undo using native hosts
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
           python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json
       - name: Prove actual gh tracking metadata round trips through native hosts
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -438,6 +517,7 @@ jobs:
           python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/tracking-app-proof.json
           python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/tracking-extension-proof.json
       - name: Prove update outcomes, same-tree repairs and no-op object preservation
+        if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -445,16 +525,15 @@ jobs:
           python agent_docs/evidence/prove-update-outcomes.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/update-outcomes-app-proof.json
           python agent_docs/evidence/prove-update-outcomes.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/update-outcomes-extension-proof.json
       - name: Prove recorded restoration and undo with real gh and native hosts
+        if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/replacement-app-proof.json
           python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/replacement-extension-proof.json
-      - name: Build disposable maintenance process-death proof host
-        shell: bash
-        run: dotnet build tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj --configuration Release -p:RestoreLockedMode=true
       - name: Prove immutable revision updates with native hosts
+        if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -462,6 +541,7 @@ jobs:
           python agent_docs/evidence/prove-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/revision-app-proof.json
           python agent_docs/evidence/prove-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/revision-extension-proof.json
       - name: Prove shared owner updates and torn-registry repair after process death
+        if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -470,7 +550,7 @@ jobs:
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
       - name: Prove reviewed shared-owner merges and restart repair
-        if: runner.os != 'Linux'
+        if: matrix.shard == 'owners' && (runner.os != 'Linux')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -480,13 +560,14 @@ jobs:
           python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
           python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
       - name: Prove standalone unpin without source access on both native hosts
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
-          proof_gh_minimum="$RUNNER_TEMP/skillview-proof-gh-minimum/gh${{ matrix.ext }}"
+          proof_gh_current=".ci-native/gh-current/gh${{ matrix.ext }}"
+          proof_gh_minimum=".ci-native/gh-minimum/gh${{ matrix.ext }}"
           prove_unpin() {
             if [ "$RUNNER_OS" = Linux ]; then
               python agent_docs/evidence/prove-shared-revision-update.py --unpin-only --expect-metadata-refusal CAP_SYS_ADMIN "$@"
@@ -497,11 +578,12 @@ jobs:
           prove_unpin --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-app-proof.json
           prove_unpin --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-extension-proof.json
       - name: Prove captured local reimport and restart recovery on both native hosts
+        if: matrix.shard == 'sources'
         shell: bash
         run: |
           set -euo pipefail
-          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
-          proof_gh_minimum="$RUNNER_TEMP/skillview-proof-gh-minimum/gh${{ matrix.ext }}"
+          proof_gh_current=".ci-native/gh-current/gh${{ matrix.ext }}"
+          proof_gh_minimum=".ci-native/gh-minimum/gh${{ matrix.ext }}"
           prove_reimport() {
             if [ '${{ matrix.rid }}' = linux-x64 ]; then
               python agent_docs/evidence/prove-local-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
@@ -521,7 +603,7 @@ jobs:
           prove_old_unpin --old-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-unpin-app-proof.json
           prove_old_unpin --old-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-unpin-extension-proof.json
       - name: Prove privileged Linux local reimport on private tmpfs
-        if: matrix.rid == 'linux-x64'
+        if: matrix.shard == 'sources' && (matrix.rid == 'linux-x64')
         shell: bash
         run: |
           set -euo pipefail
@@ -531,16 +613,17 @@ jobs:
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
             python3 agent_docs/evidence/run-local-merge-disk-full-docker.py --local-reimport \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
-              --gh "$RUNNER_TEMP/skillview-proof-gh-current/gh" --extra-gh "$RUNNER_TEMP/skillview-proof-gh-minimum/gh" \
+              --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/local-reimport-privileged-$proof_name-proof" --platform linux/amd64
           done
       - name: Prove local source switching and actual schema5/6 recovery on both native hosts
+        if: matrix.shard == 'sources'
         shell: bash
         run: |
           set -euo pipefail
-          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
-          proof_gh_minimum="$RUNNER_TEMP/skillview-proof-gh-minimum/gh${{ matrix.ext }}"
+          proof_gh_current=".ci-native/gh-current/gh${{ matrix.ext }}"
+          proof_gh_minimum=".ci-native/gh-minimum/gh${{ matrix.ext }}"
           if [ '${{ matrix.rid }}' = linux-x64 ]; then
             source_switch_tmp="$(sudo mktemp -d /skillview-source-switch-refusal.XXXXXXXX)"
             sudo chown "$(id -u):$(id -g)" "$source_switch_tmp"
@@ -573,7 +656,7 @@ jobs:
           prove_legacy --legacy-schema 6 --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-source-switch-app-proof.json
           prove_legacy --legacy-schema 6 --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-source-switch-extension-proof.json
       - name: Prove privileged Linux source switching on the private container root
-        if: matrix.rid == 'linux-x64'
+        if: matrix.shard == 'sources' && (matrix.rid == 'linux-x64')
         shell: bash
         run: |
           set -euo pipefail
@@ -583,13 +666,13 @@ jobs:
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
             python3 agent_docs/evidence/run-local-source-switch-docker.py \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
-              --gh "$RUNNER_TEMP/skillview-proof-gh-current/gh" --extra-gh "$RUNNER_TEMP/skillview-proof-gh-minimum/gh" \
+              --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_REIMPORT_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_REIMPORT_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --source-switch-legacy-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview" --source-switch-legacy-checkout "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT" \
               --output "dist/local-source-switch-privileged-$proof_name-proof" --platform linux/amd64
           done
       - name: Capture source-switch proof inputs
-        if: always()
+        if: matrix.shard == 'sources' && (always())
         shell: bash
         run: |
           set -euo pipefail
@@ -598,12 +681,13 @@ jobs:
             agent_docs/evidence/prove-local-reimport.py agent_docs/evidence/source_review_proof.py agent_docs/evidence/run-local-source-switch-docker.py \
             tests/SkillView.MaintenanceProof/Program.cs dist/source-switch-proof-inputs/
       - name: Prove actual previous native saved plans survive the new schema boundary
+        if: matrix.shard == 'sources'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          proof_gh_current="$RUNNER_TEMP/skillview-proof-gh-current/gh${{ matrix.ext }}"
+          proof_gh_current=".ci-native/gh-current/gh${{ matrix.ext }}"
           prove_legacy() {
             if [ "$RUNNER_OS" = Linux ]; then
               python agent_docs/evidence/prove-old-native-plans.py --expect-schema3-metadata-refusal CAP_SYS_ADMIN "$@"
@@ -614,7 +698,7 @@ jobs:
           prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-app-proof.json
           prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-extension-proof.json
       - name: Prove privileged Linux unpin and native schema compatibility on private tmpfs
-        if: runner.os == 'Linux'
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -626,11 +710,12 @@ jobs:
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
             python3 agent_docs/evidence/run-local-merge-disk-full-docker.py --unpin-only \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
-              --gh "$RUNNER_TEMP/skillview-proof-gh-current/gh" --extra-gh "$RUNNER_TEMP/skillview-proof-gh-minimum/gh" \
+              --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/unpin-privileged-$proof_name-proof" --platform linux/amd64
           done
       - name: Prove reviewed local dispositions and frozen resolutions
+        if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -647,7 +732,7 @@ jobs:
           prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
           prove_local_merge --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/local-merge-extension-proof.json
       - name: Prove merged payload restart recovery at every directory move
-        if: runner.os != 'Linux'
+        if: matrix.shard == 'inspection-unpin' && (runner.os != 'Linux')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -660,7 +745,7 @@ jobs:
               --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
           done
       - name: Prove real disk-full recovery on isolated bounded tmpfs
-        if: runner.os == 'Linux'
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -675,7 +760,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: native-maintenance-evidence-${{ matrix.rid }}
+          overwrite: true
+          name: native-maintenance-evidence-${{ matrix.rid }}-${{ matrix.shard }}
           path: |
             dist/*-proof.json
             dist/evaluation-*-proof/**
@@ -691,3 +777,67 @@ jobs:
             dist/source-switch-proof-inputs/**
           if-no-files-found: warn
           retention-days: 14
+      - name: Record completed proof family for aggregate gating
+        run: python .github/scripts/native_proof_inputs.py completion --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}'
+      - name: Retain this run's proof completion
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: native-proof-completion-${{ matrix.rid }}-${{ matrix.shard }}
+          path: dist/proof-completion/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  aot-smoke:
+    # Preserve existing per-RID check names, including failed/canceled/missing dependencies.
+    needs: [scope, aot-build, aot-proof]
+    if: always() && inputs.verification != 'windows-metadata'
+    name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped ' || '' }}AOT publish smoke (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, osx-arm64, win-x64, win-arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Gather native verification evidence (including partial failures)
+        if: (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false') && needs.aot-proof.result != 'skipped'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: native-maintenance-evidence-${{ matrix.rid }}-*
+          path: dist/native-evidence
+          merge-multiple: true
+      - name: Retain combined native verification evidence under its existing name
+        if: always() && (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false') && needs.aot-proof.result != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: native-maintenance-evidence-${{ matrix.rid }}
+          path: dist/native-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Gather completed proof families
+        if: (needs.scope.result != 'success' || needs.scope.outputs.full_proof != 'false') && needs.aot-build.result == 'success' && needs.aot-proof.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: native-proof-completion-${{ matrix.rid }}-*
+          path: dist/proof-completion
+          merge-multiple: true
+      - name: Require every native build and proof family
+        if: always()
+        env:
+          FULL_PROOF: ${{ needs.scope.outputs.full_proof }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          BUILD_RESULT: ${{ needs.aot-build.result }}
+          PROOF_RESULT: ${{ needs.aot-proof.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$FULL_PROOF" == false && "$SCOPE_RESULT" == success ]]; then
+            echo 'Only positively classified user documentation/site/media changed; native proof is unnecessary.'
+            exit 0
+          fi
+          test "$BUILD_RESULT" = success
+          test "$PROOF_RESULT" = success
+          python3 .github/scripts/native_proof_inputs.py verify-completions --rid '${{ matrix.rid }}'
