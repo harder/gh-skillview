@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 8                                  │
+│Selected physical copy · F2 Details                                           │
+│Selected installation                                                         │
+│                                                                              │
+│• Skill: demo                                                                 │
+│• Location: /var/tmp/skillview-update-review-ux/pty/skills/demo               │
+│• Recorded ref: refs/tags/v2.0                                                │
+│• Authored version: 2.0                                                       │
+│• Used by: universal, unknown                                                 │
+│• Source: https://github.com/fixture/repo                                     │
+│• Pin: no pin recorded                                                        │
+│                                                                              │
+│Check updates checks availability. Review update prepares one saved           │
+│candidate. Choose version... requests a Git tag. Nothing is applied on entry. │
+│☐ Unpin with update  ☐ Include hidden directories                             │
+│   exact installation selected · availability unknown · Check updates or      │
+│⟦ Details (F2) ⟧                                                              │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                 │
+│F2 Details · Tab Move focus · Esc Back                                        │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

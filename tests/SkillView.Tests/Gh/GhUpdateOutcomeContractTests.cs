@@ -94,6 +94,7 @@ public sealed class GhUpdateOutcomeContractTests
         Assert.Equal("refused", Assert.Single(refused.Outcomes).Status);
         Assert.Contains("404", refused.StdOut);
         Assert.Contains("404", refused.StdErr);
+        view.ToggleDetailsForTests();
         Assert.Contains("changed", view.PreviewTextForTests);
         Assert.Contains(applied.SavedPlan!.Id, view.PreviewTextForTests);
         Assert.Contains(applied.SavedPlan.PlanPath, view.PreviewTextForTests);

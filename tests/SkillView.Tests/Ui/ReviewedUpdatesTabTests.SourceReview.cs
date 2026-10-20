@@ -16,6 +16,7 @@ public sealed partial class ReviewedUpdatesTabTests
         using var view = View([target], (_, _, _) => Task.FromResult(Result(review)), (saved, _, _) =>
         { received = saved; return Task.FromResult(Result(saved with { Status = "installed" }, true)); });
         await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked; await view.RunForTestsAsync(false, false);
+        view.ToggleDetailsForTests();
         Assert.Contains(review.SourceReview.Fingerprint, view.PreviewTextForTests);
         Assert.Contains("not-reviewed", view.PreviewTextForTests);
         view.RetainBoxForTests.Value = CheckState.Checked;

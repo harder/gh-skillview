@@ -153,7 +153,7 @@ internal sealed partial class UpdatesTabView
                 {
                     var preserved = response.Plan ?? throw new InvalidOperationException("Preserve returned no verified result.");
                     SaveOutcomes([new(preserved.Subject.InstallationId, preserved.OriginalPath, "preserved", null, null, [], 0, [], preserved.Message)]);
-                    _preview.Text = UpdateScreen.RenderPlan(preserved);
+                    ShowPlanPreview(preserved, awaitingReview: false);
                     _review = null;
                     ResetLocalReview();
                     _status.Text = " installed payload preserved; no maintenance preference recorded · Next / skip continues";
@@ -171,13 +171,14 @@ internal sealed partial class UpdatesTabView
                     ResetLocalReview();
                     _review = merged;
                     _localReviewStarted = true;
-                    _preview.Text = UpdateScreen.RenderPlan(merged);
+                    ShowPlanPreview(merged, awaitingReview: true);
                     _status.Text = " merged candidate verified; review exact result, approve retention, then Apply reviewed merge";
                 }
                 else throw new InvalidOperationException("The local update action returned no review.");
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
+                if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

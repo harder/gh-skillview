@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 8                                  │
+│Refresh inventory before another review · F2 Details                          │
+│Update result                                                                ▲│
+│                                                                             █│
+│• Outcome: changed                                                           █│
+│• Skill: demo                                                                █│
+│• Location: /var/tmp/skillview-update-review-ux/pty/skills/demo              █│
+│• Affected consumers: universal, unknown                                     ░│
+│• Ref change: refs/tags/v2.0 → refs/tags/v1.0                                ░│
+│• Change: Replace this copy with the saved candidate; retain the original,   ░│
+│  including local edits, for undo.                                           ░│
+│• Authored version: 2.0 → 1.0                                                ░│
+│• Local changes: 2                                                           ░│
+│• Local change: SKILL.md                                                     ░│
+│• Local change: extra.txt                                                    ░│
+│• Shared files: Every consumer of this physical installation is affected.    ▼│
+│   changed · no remaining items · Refresh inventory before another review     │
+│⟦ Refresh inventory ⟧  ⟦ Details (F2) ⟧                                       │
+│F2 Details · Tab Move focus · Esc Back                                        │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

@@ -119,15 +119,32 @@ native CI jobs encountered GitHub installation rate limits. The user explicitly
 deferred the remaining native checks and merged it. This is not a completed
 native-platform or release proof.
 
-The next approved bounded task is **Copies and versions** in the Changes TUI,
-in [PR #79](https://github.com/harder/gh-skillview/pull/79)
-(`codex/copies-comparison-ux`): show related physical installations and recorded
-consumers, compare two explicitly with the existing read-only comparison engine,
-then hand the selected exact location to existing update/version or cleanup
-review. Keep this as a small navigation and presentation change. Automatic
-consolidation, exposure detach, new approval policy and new mutation machinery
-remain deferred. Validation is recorded in
+**Copies and versions** merged in [PR #79](https://github.com/harder/gh-skillview/pull/79)
+as `96ddf90a329562f8c6adcbd4d4a200243511445d`. It shows related physical
+installations and recorded consumers, compares two explicitly with the existing
+read-only engine, and hands the selected exact location to existing update/version
+or cleanup review. Local validation passed 54 focused and 9 integration tests,
+with actual keyboard checks at 80×24. Validation limits are recorded in
 [evidence/copies-comparison-ux.md](evidence/copies-comparison-ux.md).
+
+The next bounded task, authorized after PR #79 merged, is **Updates review UX**
+on `codex/update-review-ux`. The Copies walkthrough exposed crowded footer rows
+and little room to read a selected installation at 80×24. Give the selected-copy
+and saved-review views a full-width summary, show controls when applicable, and
+keep existing technical evidence behind F2. Verify that independent source and
+retention approvals, selected-tag targeting, local-change review and batch
+continuation still work. Reuse the current saved updates and recovery machinery;
+do not add schemas, persistent approvals or mutation operations. The bounded
+finish is useful narrow-terminal review/apply navigation, focused verification
+and a reviewable PR. Automatic consolidation, exposure detach and the broader
+PR #73 policy remain deferred.
+
+Implementation and local validation are recorded in
+[evidence/update-review-ux.md](evidence/update-review-ux.md). The terminal Apply
+walkthrough also exposed stale post-write version context; starting another
+review now requires an explicit fresh inventory capture while preserving the
+previous result for inspection. This uses existing inventory and saved-update
+contracts rather than introducing another lifecycle.
 
 ## Maintenance guidance
 

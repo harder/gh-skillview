@@ -35,7 +35,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var controls = view.SubViews.Where(child => child.Visible && child is Button or CheckBox).ToArray();
         foreach (var control in controls)
             Assert.DoesNotContain(controls, other => !ReferenceEquals(control, other) && control.Frame.IntersectsWith(other.Frame));
-        Assert.NotEqual(view.DryRunButtonForTests.Frame.Y, view.ApplyButtonForTests.Frame.Y);
+        Assert.False(view.DryRunButtonForTests.Visible && view.ApplyButtonForTests.Visible);
     }
 
     private static InstalledSkill Target(string name, string root = "/skills") => new()
@@ -53,7 +53,7 @@ public sealed partial class ReviewedUpdatesTabTests
         InstalledAt = null
     };
 
-    private static ReplacementResult Review(InstalledSkill target) => new(new(target.Name == "first" ? '1' : 'a', 32), "planned", true, false, false,
+    internal static ReplacementResult Review(InstalledSkill target) => new(new(target.Name == "first" ? '1' : 'a', 32), "planned", true, false, false,
         target.ResolvedPath, "/state/original", "/state/candidate", "/state/displaced", new('b', 64), new('c', 64),
         ["SKILL.md", "script.sh"], "Review before apply", new(target.InstallationId, target.Name, target.Scope,
             target.Agents, target.FrontMatter, []), "/state/" + target.Name + "/plan.json", 448, 493,
@@ -112,6 +112,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.False(view.ApplyButtonForTests.Enabled);
         await view.ApplyReviewForTestsAsync();
         Assert.Equal(new[] { "prepare" }, calls);
+        view.ToggleDetailsForTests();
         var preview = view.PreviewTextForTests;
         Assert.Contains(review.Id, preview); Assert.Contains(review.PlanFingerprint, preview);
         Assert.Contains("extra.txt", preview); Assert.Contains("refs/heads/main", preview);
@@ -208,6 +209,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Contains("recovery-required", view.PreviewTextForTests);
         Assert.Contains(firstReview.Id, view.PreviewTextForTests);
         Assert.Contains(firstReview.PlanPath, view.PreviewTextForTests);
+        view.ToggleDetailsForTests();
         Assert.Contains(Review(second).PlanPath, view.PreviewTextForTests);
     }
 
@@ -252,6 +254,7 @@ public sealed partial class ReviewedUpdatesTabTests
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync();
         await view.NextReviewForTestsAsync();
+        view.ToggleDetailsForTests();
         foreach (var text in new[] { "First update completed", "First update warning", "First notice remains visible",
             "Second preparation output", "Second remote diagnostic", "First payload verified", "Second remote failed" })
             Assert.Contains(text, view.PreviewTextForTests);
@@ -274,9 +277,11 @@ public sealed partial class ReviewedUpdatesTabTests
         await view.LoadAsync(); view.SelectRowForTests(0); view.UpdateCurrentRowForTests();
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync();
+        view.ToggleDetailsForTests();
         Assert.Contains("applied first", view.PreviewTextForTests);
         await view.NextReviewForTestsAsync();
         view.SelectRowForTests(1); view.UpdateCurrentRowForTests();
+        view.ToggleDetailsForTests();
         Assert.Contains("prepared second", view.PreviewTextForTests);
         Assert.DoesNotContain("prepared first", view.PreviewTextForTests);
         Assert.DoesNotContain("applied first", view.PreviewTextForTests);

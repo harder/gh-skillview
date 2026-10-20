@@ -16,7 +16,7 @@ internal sealed partial class UpdatesTabView
 
     private void ChooseVersion()
     {
-        if (_choosingVersion || _lifetimeToken.IsCancellationRequested || _operationCancellations.HasActive
+        if (_choosingVersion || _inventoryNeedsRefresh || _lifetimeToken.IsCancellationRequested || _operationCancellations.HasActive
             || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation first"; return; }
