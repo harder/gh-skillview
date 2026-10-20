@@ -10,6 +10,11 @@ and file modes. Missing commits, failed/bounded/malformed captures and empty
 diffs require full verification. Workflow lint, its helper tests and site checks
 retain their existing coverage.
 
+Scope classification uses only the event checkout and its two-level history;
+it never fetches event-supplied revisions separately. A PR merge checkout includes
+both comparison parents. Pushes with older unavailable base commits simply run
+full verification.
+
 Each RID's `aot-build` job publishes the current standalone app and extension
 sequentially, builds the complete maintenance proof host, and prepares both
 checksum-verified gh versions. Only frozen historical producer binaries and

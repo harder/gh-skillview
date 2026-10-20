@@ -105,6 +105,24 @@ function repository(t) {
   return { cwd, run, git, write, commit };
 }
 
+test('shallow merge checkout contains PR comparison parents and missing older history runs full proof', t => {
+  const repo = repository(t);
+  repo.write('README.md', 'initial');
+  const ancestor = repo.commit();
+  repo.git('checkout', '-b', 'feature');
+  repo.write('docs/usage.md', 'feature docs');
+  const head = repo.commit();
+  repo.git('checkout', 'main');
+  repo.write('README.md', 'base docs');
+  const base = repo.commit();
+  repo.git('merge', '--no-ff', '--no-edit', 'feature');
+  const shallow = join(repo.cwd, 'shallow');
+  repo.git('clone', '--depth=2', '--no-local', '--', repo.cwd, shallow);
+  const inspection = { cwd: shallow, run: repo.run };
+  assert.equal(scope.determineScope(base, head, inspection).fullProof, false);
+  assert.equal(scope.determineScope(ancestor, head, inspection).fullProof, true);
+});
+
 test('real Git diffs preserve unusual filenames and inspect both sides of renames', t => {
   const repo = repository(t);
   repo.write('docs/a file\nwith tabs\t.md', 'original');

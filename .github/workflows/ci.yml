@@ -29,15 +29,10 @@ jobs:
       full_proof: ${{ steps.classify.outputs.full_proof }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Fetch exact comparison commits
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        shell: bash
-        run: |
-          if [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA" || true
-          fi
+        with:
+          # A PR merge checkout includes both comparison parents. Never fetch
+          # event-supplied revisions separately; missing history runs full CI.
+          fetch-depth: 2
       - name: Classify changed paths (uncertainty runs full proof)
         id: classify
         env:
