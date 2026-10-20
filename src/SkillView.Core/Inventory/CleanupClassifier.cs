@@ -6,10 +6,9 @@ namespace SkillView.Inventory;
 
 /// Classifies `InstalledSkill` records into cleanup candidate types.
 /// Runs purely over an already-captured `InventorySnapshot` plus the list of
-/// scan roots that produced it; does not hit the filesystem for anything the
-/// scanner already observed, with the single exception of the "empty-dir"
-/// check on scan-root children that the scanner omits (they never become
-/// `InstalledSkill` records in the first place).
+/// scan roots that produced it, with read-only empty-directory checks on
+/// immediate scan-root children. Empty children may already be captured as
+/// MissingSkillMd observations. Removal still requires fresh native validation.
 public static class CleanupClassifier
 {
     public enum CandidateKind
@@ -241,15 +240,17 @@ public static class CleanupClassifier
                 group[0], ReviewOnly: true));
         }
 
-        // Empty directories inside scan roots — not in `snapshot.Skills`
-        // because the scanner already filtered them (no SKILL.md). Walk each
-        // scan root, enumerate children, flag empty dirs that aren't already
-        // an `InstalledSkill`.
+        // The scanner can retain empty children as MissingSkillMd observations.
+        // Reclassify only verified empty, ordinary directories; all other
+        // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
+        var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            knownResolved.Add(PathIdentity.NormalizeKey(skill.ResolvedPath));
+            if (skill.Validity != ValidityState.MissingSkillMd || skill.IsSymlinked
+                || (skill.Ignored && !options.IncludeIgnored))
+                knownResolved.Add(PathIdentity.NormalizeKey(skill.ResolvedPath));
         }
 
         foreach (var root in scanRoots)
@@ -274,16 +275,20 @@ public static class CleanupClassifier
 
                     var child = children.Current;
                     if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
+                    // An empty link target is not permission to delete the target.
+                    if (PathResolver.IsSymlink(child)) continue;
                     var resolved = PathResolver.Resolve(child);
                     if (resolved is null) continue;
-                    if (knownResolved.Contains(PathIdentity.NormalizeKey(resolved))) continue;
+                    var key = PathIdentity.NormalizeKey(resolved);
+                    if (knownResolved.Contains(key)) continue;
                     bool empty;
                     try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
                     if (empty)
                     {
                         var leaf = Path.GetFileName(child);
-                        var observation = new InstalledSkill
+                        byResolved.TryGetValue(key, out var recorded);
+                        var observation = recorded?.FirstOrDefault() ?? new InstalledSkill
                         {
                             Name = leaf,
                             ResolvedPath = resolved,
@@ -297,18 +302,22 @@ public static class CleanupClassifier
                             IsSymlinked = false,
                             InstalledAt = null
                         };
-                        var protectedOwner = snapshot.IsPartial || snapshot.OwnershipRecords.Any(record => record.Describes(observation));
+                        var protectedOwner = snapshot.IsPartial || snapshot.OwnershipRecords.Any(record => record.Describes(observation))
+                            || recorded?.Any(skill => skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
+                                || !skill.MetadataConflicts.IsEmpty) == true;
+                        emptyPaths.Add(key);
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
                             resolved,
                             $"empty directory under scan root '{root.Path}'",
-                            Skill: null, ReviewOnly: protectedOwner));
+                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner));
                     }
                 }
             }
         }
 
-        return result.Select(candidate =>
+        return result.Where(candidate => candidate.Kind != CandidateKind.Malformed
+            || !emptyPaths.Contains(PathIdentity.NormalizeKey(candidate.Path))).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var impact = candidate.Skill is { } skill

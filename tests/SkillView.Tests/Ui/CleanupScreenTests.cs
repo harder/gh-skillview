@@ -21,7 +21,7 @@ public sealed class CleanupScreenTests
         var impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup");
         var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "review", skill, true)
         { Impact = impact };
-        var text = CleanupScreen.BuildRemoveConfirmationText([candidate]);
+        var text = CleanupScreen.BuildRemoveConfirmationText([candidate], showDetails: true);
         Assert.Contains(impact.Subject.InstallationId, text);
         Assert.Contains("context-one", text); Assert.Contains("context-two", text);
         var screen = CreateScreen([candidate], []);
@@ -541,7 +541,7 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
-    public void RenderDetail_UsesStructuredMarkdownSections()
+    public void RenderDetail_DefaultExplainsActionAndKeepsTechnicalEvidenceBehindDetails()
     {
         var candidate = new CleanupClassifier.Candidate(
             CleanupClassifier.CandidateKind.Duplicate,
@@ -549,15 +549,51 @@ public sealed class CleanupScreenTests
             "duplicate install",
             Skill("demo", "/skills/demo"));
 
-        var detail = CleanupScreen.RenderDetail(candidate);
-
-        Assert.Contains("## Selected", detail);
-        Assert.Contains("| Field | Value |", detail);
-        Assert.Contains("| Kind | **Duplicate** |", detail);
-        Assert.Contains("| Path | `` /skills/demo`copy `` |", detail);
-        Assert.Contains("| Reason | duplicate install |", detail);
+        candidate = candidate with { Impact = OperationImpact.Payload(OperationSubject.From(candidate.Skill!), "cleanup") };
+        var summary = CleanupScreen.RenderDetail(candidate);
+        Assert.Contains("## Multiple copies", summary);
+        Assert.Contains("Deletion has no automatic undo.", summary);
+        Assert.Contains("`` /skills/demo`copy ``", summary);
+        Assert.DoesNotContain("| Field |", summary);
+        Assert.DoesNotContain(candidate.Impact.Subject.InstallationId, summary);
+        var detail = CleanupScreen.RenderDetail(candidate, showDetails: true);
+        Assert.Contains("## Technical details", detail);
+        Assert.Contains("duplicate install", detail);
+        Assert.Contains(candidate.Impact.Subject.InstallationId, detail);
         Assert.Contains("## Skill", detail);
         Assert.Contains("## Summary", detail);
+    }
+
+    [Fact]
+    public void RenderDetail_ExplainsEmptyAndLinkOnlyRemovalAndReviewOnlyRefusals()
+    {
+        var empty = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory, "/skills/empty", "empty", null);
+        var link = empty with { Kind = CleanupClassifier.CandidateKind.BrokenSymlink, Path = "/skills/link" };
+        Assert.Contains("only if it is still empty", CleanupScreen.RenderDetail(empty));
+        Assert.Contains("Removes only this link. Target files stay.", CleanupScreen.RenderDetail(link));
+        var reviewOnly = link with { ReviewOnly = true };
+        Assert.Contains("automatic removal is unavailable", CleanupScreen.RenderDetail(reviewOnly));
+        Assert.Contains("Inspection changes nothing.", CleanupScreen.RenderDetail(reviewOnly));
+    }
+
+    [Fact]
+    public void ConfirmationSummaryRetainsAgentsAndPathsWithoutNativeIds()
+    {
+        var skill = Skill("shared", "/skills/shared") with
+        {
+            Agents = [new("codex", "/agent/one", false, Scope.User, Context: "work-one", Profile: "one"),
+                new("claude", "/agent/two", false, Scope.Project, Context: "work-two", Profile: "two")]
+        };
+        var impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup");
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "compare", skill, true)
+        { Impact = impact };
+        var text = CleanupScreen.BuildRemoveConfirmationText([candidate]);
+        Assert.Contains("/skills/shared", text);
+        Assert.Contains("codex", text); Assert.Contains("claude", text);
+        Assert.Contains("work-one", text); Assert.Contains("work-two", text);
+        Assert.Contains("automatic removal is unavailable", text);
+        Assert.DoesNotContain(impact.Subject.InstallationId, text);
+        Assert.DoesNotContain("| Field |", text);
     }
 
     [Fact]
@@ -574,8 +610,13 @@ public sealed class CleanupScreenTests
             },
             shortcut =>
             {
-                Assert.Equal("r", shortcut.Title);
-                Assert.Equal("Remove", shortcut.HelpText);
+                Assert.Equal("Enter", shortcut.Title);
+                Assert.Equal("Review", shortcut.HelpText);
+            },
+            shortcut =>
+            {
+                Assert.Equal("F2", shortcut.Title);
+                Assert.Equal("More", shortcut.HelpText);
             },
             shortcut =>
             {
@@ -597,7 +638,9 @@ public sealed class CleanupScreenTests
     [Fact]
     public void BuildHeaderText_UsesShortSelectionHint()
     {
-        Assert.Equal("Select with Space.", CleanupScreen.BuildHeaderTextForTests());
+        Assert.Contains("Space Select", CleanupScreen.BuildHeaderTextForTests());
+        Assert.Contains("Enter Review", CleanupScreen.BuildHeaderTextForTests());
+        Assert.Contains("F2 Details", CleanupScreen.BuildHeaderTextForTests());
     }
 
     [Fact]
@@ -622,9 +665,9 @@ public sealed class CleanupScreenTests
 
         var text = CleanupScreen.BuildRemoveConfirmationText(candidates);
 
-        Assert.Contains("Remove 3 cleanup candidate(s)?", text);
-        Assert.Contains("- duplicate: 2", text);
-        Assert.Contains("- broken-link: 1", text);
+        Assert.Contains("Review 3 cleanup item(s)", text);
+        Assert.Contains("- Multiple copies: 2", text);
+        Assert.Contains("- Broken link: 1", text);
         Assert.Contains("/tmp/a", text);
         Assert.Contains("/tmp/c", text);
     }

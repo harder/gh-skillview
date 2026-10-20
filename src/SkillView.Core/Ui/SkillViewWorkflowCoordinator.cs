@@ -284,13 +284,17 @@ internal sealed class SkillViewWorkflowCoordinator
             snapshot.ProtectedRoots.ToArray(), snapshot.Skills, ownershipRunner: _services.Runner,
             captureInventory: token => CaptureInventoryAsync(report, token));
         screen.Show();
-        if (screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
-            || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved)
+        var changed = screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
+            || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved;
+        if (changed)
         {
             _services.ListAdapter.Invalidate();
             _refreshActiveTab();
         }
-        _setStatus($"cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}");
+        _setStatus((screen.LastReport?.IsCanceled == true
+            ? $"Cleanup canceled; removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders."
+            : $"Cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}.")
+            + (changed ? " Refreshing inventory." : ""));
     }
 
     internal static bool MatchesCleanupSelection(CleanupClassifier.Candidate candidate,

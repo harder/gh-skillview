@@ -161,6 +161,53 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
+    public void Classify_RealScannerEmptyObservationBecomesEmptyDirectoryWithoutDroppingSafetyLimits()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "empty-observed")).FullName;
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        var scanner = new LocalSkillScanner(new SkillView.Logging.Logger());
+        var observed = Assert.Single(scanner.Scan(roots));
+        Assert.Equal(ValidityState.MissingSkillMd, observed.Validity);
+        var snapshot = Snapshot(false, observed);
+        var candidate = Assert.Single(CleanupClassifier.Classify(snapshot, roots));
+        Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, candidate.Kind);
+        Assert.False(candidate.ReviewOnly);
+        Assert.Same(observed, candidate.Skill);
+        Assert.Equal(empty, candidate.Path);
+
+        var claim = new SkillPackage("owner/repo", "github", null, null, null)
+        { InstallationRoot = _tempRoot, Selector = "empty-observed" };
+        foreach (var protectedSnapshot in new[]
+        {
+            snapshot with { Diagnostics = new ScanDiagnostics { InaccessiblePaths = ["unreadable"] } },
+            snapshot with { OwnershipRecords = [claim] },
+            snapshot with { Skills = [observed with { OwnershipClaims = [claim] }] }
+        })
+        {
+            var review = Assert.Single(CleanupClassifier.Classify(protectedSnapshot, roots));
+            Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, review.Kind);
+            Assert.True(review.ReviewOnly);
+        }
+
+        File.WriteAllText(Path.Combine(empty, "keep.txt"), "keep");
+        Assert.Equal(CleanupClassifier.CandidateKind.Malformed,
+            Assert.Single(CleanupClassifier.Classify(snapshot, roots)).Kind);
+    }
+
+    [Fact]
+    public void Classify_EmptySymlinkTargetDoesNotBecomeEmptyDirectoryRemoval()
+    {
+        var target = Directory.CreateDirectory(Path.Combine(_tempRoot, "container", "target")).FullName;
+        var link = Path.Combine(_tempRoot, "empty-link");
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix empty-link observation; Windows native link proofs run separately."); return; }
+        Directory.CreateSymbolicLink(link, target);
+        var observation = Skill("empty-link", path: target, validity: ValidityState.MissingSkillMd, symlinked: true);
+        var candidates = CleanupClassifier.Classify(Snapshot(false, observation), [new(_tempRoot, Scope.User, null)]);
+        Assert.DoesNotContain(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+        Assert.True(Directory.Exists(target));
+    }
+
+    [Fact]
     public void MissingPayloadOwnerRecordsAndOwnedBrokenLinksRequireReview()
     {
         var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "demo")).FullName;

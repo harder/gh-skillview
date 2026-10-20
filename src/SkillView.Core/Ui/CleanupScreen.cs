@@ -41,7 +41,7 @@ public sealed class CleanupScreen
     private readonly ImmutableArray<CleanupClassifier.Candidate> _candidates;
     private readonly IReadOnlyList<ScanRoot> _scanRoots;
     private readonly IReadOnlyList<InstalledSkill> _allSkills;
-    private readonly Func<string, int> _confirmBatchRemoval;
+    private readonly Func<IReadOnlyList<CleanupClassifier.Candidate>, int> _confirmBatchRemoval;
     private readonly SkillView.Subprocess.ProcessRunner? _ownershipRunner;
     private readonly Func<CancellationToken, Task<InventorySnapshot>>? _captureInventory;
 
@@ -69,7 +69,9 @@ public sealed class CleanupScreen
         _candidates = candidates;
         _scanRoots = scanRoots;
         _allSkills = allSkills;
-        _confirmBatchRemoval = confirmBatchRemoval ?? ConfirmBatchRemoval;
+        _confirmBatchRemoval = confirmBatchRemoval is null
+            ? ConfirmBatchRemoval
+            : selected => confirmBatchRemoval(BuildRemoveConfirmationText(selected));
         _ownershipRunner = ownershipRunner;
         _captureInventory = captureInventory;
     }
@@ -80,6 +82,7 @@ public sealed class CleanupScreen
     {
         RemoveService.RemoveProgress? lastProgress = null;
         var closeAfterCancellation = 0;
+        var showDetails = false;
 
         using var window = new Window
         {
@@ -97,6 +100,8 @@ public sealed class CleanupScreen
         {
             X = 0,
             Y = 0,
+            Width = Dim.Fill(),
+            Height = 1,
             Text = BuildHeaderText(),
         };
 
@@ -177,7 +182,7 @@ public sealed class CleanupScreen
         table.ValueChanged += (_, _) =>
         {
             var i = table.GetSelectedRow();
-            if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i]);
+            if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
         };
 
         var status = new Label
@@ -229,7 +234,7 @@ public sealed class CleanupScreen
                     spinner.Visible = false;
                     operation.Release();
                     status.Text = summary.Confirmed
-                        ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}"
+                        ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}. Esc returns."
                         : " cleanup removal canceled";
                     if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
                 });
@@ -272,32 +277,48 @@ public sealed class CleanupScreen
             }
         }
 
+        void ReviewSelection()
+        {
+            if (Busy()) return;
+            var selectedRows = wrapper.CheckedRows
+                .Where(index => index >= 0 && index < _candidates.Length)
+                .ToHashSet();
+            if (selectedRows.Count == 0)
+            {
+                status.Text = " Select a row with Space, then press Enter to review.";
+                return;
+            }
+            if (_confirmBatchRemoval(selectedRows.Select(index => _candidates[index]).ToImmutableArray()) != 1)
+            { status.Text = " Review canceled; nothing removed."; return; }
+            spinner.Visible = true;
+            spinner.AutoSpin = true;
+            lastProgress = null;
+            status.Text = " removing…  Esc cancels";
+            operation.TryStart(token => Task.Run(() => RunRemovalAsync(selectedRows, token)));
+        }
+
+        table.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.KeyCode != KeyCode.Enter) return;
+            key.Handled = true;
+            ReviewSelection();
+        };
         window.KeyDown += (_, key) =>
         {
+            if (key.Handled) return;
             var r = key.AsRune.Value;
-            if (r == 'r' || r == 'R')
+            if (key.KeyCode == KeyCode.F2)
             {
                 key.Handled = true;
-                if (Busy())
-                {
-                    return;
-                }
-
-                var selectedRows = wrapper.CheckedRows
-                    .Where(index => index >= 0 && index < _candidates.Length)
-                    .ToHashSet();
-                if (selectedRows.Count == 0)
-                {
-                    status.Text = " no cleanup candidates selected";
-                    return;
-                }
-                if (_confirmBatchRemoval(BuildRemoveConfirmationText(selectedRows.Select(index => _candidates[index]).ToImmutableArray())) != 1)
-                { status.Text = " cleanup removal canceled"; return; }
-                spinner.Visible = true;
-                spinner.AutoSpin = true;
-                lastProgress = null;
-                status.Text = " removing…  Esc cancels";
-                operation.TryStart(token => Task.Run(() => RunRemovalAsync(selectedRows, token)));
+                showDetails = !showDetails;
+                var i = table.GetSelectedRow();
+                if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
+                header.Text = BuildHeaderText().Replace("F2 Details", showDetails ? "F2 Summary" : "F2 Details", StringComparison.Ordinal);
+            }
+            else if (key.KeyCode == KeyCode.Enter || r == 'r' || r == 'R')
+            {
+                key.Handled = true;
+                ReviewSelection();
             }
             else if ((r == 'i' || r == 'I') && !Busy())
             {
@@ -425,7 +446,7 @@ public sealed class CleanupScreen
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
         }
 
-        var response = confirmationGranted ? 1 : _confirmBatchRemoval(BuildRemoveConfirmationText(selected));
+        var response = confirmationGranted ? 1 : _confirmBatchRemoval(selected);
         if (response != 1)
         {
             return new RemovalSummary(Removed: 0, Failed: 0, Confirmed: false);
@@ -521,24 +542,25 @@ public sealed class CleanupScreen
             : $" removing… {progress.TargetsProcessed} target(s), {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
 
     internal static string BuildRemoveConfirmationText(
-        IReadOnlyList<CleanupClassifier.Candidate> selected)
+        IReadOnlyList<CleanupClassifier.Candidate> selected, bool showDetails = false)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Remove {selected.Count} cleanup candidate(s)?");
+        sb.AppendLine($"Review {selected.Count} cleanup item(s)");
+        sb.AppendLine();
+        sb.AppendLine("Cancel keeps all files. Deletion has no automatic undo.");
         sb.AppendLine();
         foreach (var group in selected
                      .GroupBy(candidate => candidate.Kind)
                      .OrderBy(group => group.Key.ToString(), StringComparer.Ordinal))
         {
-            sb.AppendLine($"- {TuiHelpers.ShortKind(group.Key)}: {group.Count()}");
+            sb.AppendLine($"- {CleanupReviewFormatter.Issue(group.First())}: {group.Count()}");
         }
 
         sb.AppendLine();
-        sb.AppendLine("Paths:");
         foreach (var candidate in selected)
         {
-            sb.AppendLine($"- {MarkdownTableFormatter.FormatCodeSpan(candidate.Path)}");
-            if (candidate.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
+            CleanupReviewFormatter.AppendConfirmation(sb, candidate);
+            if (showDetails && candidate.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString().TrimEnd()) ?? "";
     }
@@ -576,16 +598,15 @@ public sealed class CleanupScreen
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
-    internal static string RenderDetail(CleanupClassifier.Candidate c)
+    internal static string RenderDetail(CleanupClassifier.Candidate c, bool showDetails = false)
     {
+        if (!showDetails) return TerminalEscapeSanitizer.Sanitize(CleanupReviewFormatter.Render(c)) ?? string.Empty;
         var sb = new StringBuilder();
-        sb.AppendLine("## Selected");
+        sb.AppendLine("## Technical details");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Kind | **{MarkdownTableFormatter.FormatTableCell(c.Kind.ToString())}** |");
-        sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(c.Path)} |");
-        sb.AppendLine($"| Reason | {MarkdownTableFormatter.FormatTableCell(c.Reason)} |");
+        sb.AppendLine(MaintenanceQueueFormatter.RenderFields(
+            [("Kind", c.Kind.ToString()), ("Path", c.Path), ("Reason", c.Reason)],
+            CancellationToken.None, MaintenanceQueueFormatter.MaxDetailCharacters).Text);
         if (c.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
         if (c.Skill is { } s)
         {
@@ -604,13 +625,14 @@ public sealed class CleanupScreen
     private static Shortcut[] BuildShortcuts() =>
     [
         new Shortcut { Title = "Space", HelpText = "Select" },
-        new Shortcut { Title = "r", HelpText = "Remove" },
+        new Shortcut { Title = "Enter", HelpText = "Review" },
+        new Shortcut { Title = "F2", HelpText = "More" },
         new Shortcut { Title = "i", HelpText = "Ignore" },
         new Shortcut { Title = "x", HelpText = "Export" },
-        new Shortcut { Key = Key.Esc, Title = "Esc", HelpText = "Back" },
+        new Shortcut { Title = "Esc", HelpText = "Back" },
     ];
 
-    private static string BuildHeaderText() => "Select with Space.";
+    private static string BuildHeaderText() => "Space Select · Enter Review · F2 Details · Tab Scroll";
 
     private static RemoveValidator.RemoveValidation RefuseUnsupportedCandidate(CleanupClassifier.Candidate candidate) =>
         new(
@@ -627,25 +649,36 @@ public sealed class CleanupScreen
         public int Path;
     }
 
-    private int ConfirmBatchRemoval(string message)
+    private int ConfirmBatchRemoval(IReadOnlyList<CleanupClassifier.Candidate> selected)
     {
         var response = 0;
-        using var dialog = new Dialog { Title = "Confirm cleanup removal", Width = Dim.Percent(90), Height = Dim.Percent(90) };
+        var showDetails = false;
+        using var dialog = new Dialog { Title = "Review cleanup removal", Width = Dim.Percent(90), Height = Dim.Percent(90) };
         var review = new Markdown
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(2),
-            Text = message,
+            Height = Dim.Fill(3),
+            Text = BuildRemoveConfirmationText(selected),
             ViewportSettings = ViewportSettingsFlags.HasVerticalScrollBar
         };
         TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
+        var hints = new Label { X = 0, Y = Pos.AnchorEnd(2), Width = Dim.Fill(), Height = 1, Text = "Tab Focus · PgDn Scroll · F2 Details" };
         var cancel = new Button { Text = "Cancel", X = Pos.Center() - 12, Y = Pos.AnchorEnd(1), IsDefault = true };
-        var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1) };
+        var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1), Enabled = selected.Any(candidate => !candidate.ReviewOnly) };
         cancel.Accepting += (_, args) => { args.Handled = true; _app.RequestStop(); };
         remove.Accepting += (_, args) => { args.Handled = true; response = 1; _app.RequestStop(); };
-        dialog.Add(review, cancel, remove);
+        dialog.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.KeyCode != KeyCode.F2) return;
+            key.Handled = true;
+            showDetails = !showDetails;
+            review.Text = BuildRemoveConfirmationText(selected, showDetails);
+            hints.Text = showDetails ? "Tab Focus · PgDn Scroll · F2 Summary" : "Tab Focus · PgDn Scroll · F2 Details";
+        };
+        dialog.Add(review, hints, cancel, remove);
+        cancel.SetFocus();
         _app.Run(dialog);
         return response;
     }

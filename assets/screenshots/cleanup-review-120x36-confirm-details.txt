@@ -1,0 +1,36 @@
+┌┤Cleanup — 2 candidate(s)├────────────────────────────────────────────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                                                                 │
+│─┬───┏┥Review cleanup removal┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓      │
+│ │Kin┃Review 1 cleanup item(s)                                                                                 ┃      │
+│─┼───┃                                                                                                         ┃      │
+│☑│bro┃Cancel keeps all files. Deletion has no automatic undo.                                                  ┃      │
+│☐│emp┃                                                                                                         ┃      │
+│     ┃• Broken link: 1                                                                                         ┃      │
+│     ┃                                                                                                         ┃tay.  │
+│     ┃Broken link                                                                                              ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃Location: /var/tmp/skillview-cleanup-ux/skills/broken-link                                               ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃Changes: Removes only this link. Target files stay.                                                      ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃Affected agent: unknown · Custom · /var/tmp/skillview-cleanup-ux                                         ┃      │
+│     ┃                                                                                                         ┃k     │
+│     ┃Installation address ID: 305eef4adb2dcf8301f4ac7c2d270c653552e16176186a7cb2d0b05bbcb68f13                ┃      │
+│     ┃Materialization: broken-link Captured: 2026-10-20T02:46:53.3065535+00:00 Native observation: unknown     ┃      │
+│     ┃Exposure coverage: complete within captured configured roots; other unscanned contexts and active        ┃      │
+│     ┃sessions are unknown Affected exposure: unknown: /var/tmp/skillview-cleanup-ux/skills/broken-link;       ┃      │
+│     ┃scope=Custom; profile=unknown; context=/var/tmp/skillview-cleanup-ux;                                    ┃      │
+│     ┃discovery=/var/tmp/skillview-cleanup-ux/skills; agent version=unknown Active session: unknown;           ┃      │
+│     ┃filesystem verification observes disk only Reload for unknown: unknown: No verified reload rule for this ┃      │
+│     ┃agent and delivery type. Consult the client's documentation; disk and owner observations do not          ┃      │
+│     ┃establish a loaded version. Reload source: unavailable: provider/delivery-specific reload contract not   ┃      │
+│     ┃verified                                                                                                 ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃                                                                                                         ┃      │
+│     ┃Tab Focus · PgDn Scroll · F2 Summary                                                                     ┃      │
+│     ┃                                  ⟦► Cancel ◄⟧▖  ⟦ Remove ⟧▖                                             ┃      │
+│     ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛      │
+│   2 candidate(s)                                                                                                     │
+│ Select  Space │ Review  Enter │ More  F2 │ Ignore  i │ Export  x │ Back  Esc │ Select  Ctrl+A │ Copy  Ctrl+C         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
