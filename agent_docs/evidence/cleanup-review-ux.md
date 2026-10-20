@@ -1,6 +1,6 @@
 # Cleanup review UX verification
 
-Verified on Linux ARM64 with .NET SDK 10.0.402 using the built app and a private scan root, HOME, state directory, CWD, and local `gh` stub. The fixture contained a dangling symlink, a literally empty directory, and one unrelated valid skill.
+Initial verification at `13671f7` used Linux ARM64 with .NET SDK 10.0.402, the built app and a private scan root, HOME, state directory, CWD, and local `gh` stub. The fixture contained a dangling symlink, a literally empty directory, and one unrelated valid skill. The review follow-up below records the latest validation.
 
 At 80×24, Cleanup listed the broken link and empty directory as separate candidates. The summary states what each action removes, warns that deletion has no automatic undo, and leaves the complete Location available by focusing the detail pane with Tab and scrolling with PgDn. F2 toggles the technical details. At 120×36, the full empty-directory Location was visible in the confirmation view. Cancel was initially focused and Enter returned without mutation. After reviewing one selected item, one Tab focused Remove and Enter applied only that item.
 
@@ -8,6 +8,14 @@ The PTY walkthrough removed the dangling link and the empty directory in separat
 
 A deterministic UI test pauses removal before the second empty directory, sends Esc, then releases the worker. It verifies the dialog drains before closing and retains the first completed removal for refresh. This covers cancellation timing deterministically; the PTY walkthrough did not attempt a timing-sensitive cancellation against a fast local operation.
 
-Validation on the final source: `CleanupClassifierTests` 19/19, `CleanupScreenTests` 26/26, `CleanupSuppressionScreenTests` 6/6, and integration smoke tests 9/9 passed. The Release app and test/integration builds succeeded; scoped `dotnet format --verify-no-changes` and `git diff --check` passed. Logs are retained under `/var/tmp/skillview-cleanup-ux/evidence/`.
+Initial validation at `13671f7`: `CleanupClassifierTests` 19/19, `CleanupScreenTests` 26/26, `CleanupSuppressionScreenTests` 6/6, and integration smoke tests 9/9 passed. The Release app and test/integration builds succeeded; scoped `dotnet format --verify-no-changes` and `git diff --check` passed. Logs are retained under `/var/tmp/skillview-cleanup-ux/evidence/`.
 
 Captures: [80×24 overview](../../assets/screenshots/cleanup-review-80x24-overview.txt), [80×24 scrolled Location](../../assets/screenshots/cleanup-review-80x24-location-scroll.txt), [80×24 confirmation with Cancel focused](../../assets/screenshots/cleanup-review-80x24-confirm-cancel.txt), and [120×36 confirmation details](../../assets/screenshots/cleanup-review-120x36-confirm-details.txt).
+
+## 2026-10-20 PR review follow-up
+
+The reviewer fixes preserve the physical-path deduplication and ownership guards, add explicit incoming-exposure protection, and keep review-only conflict reasons attached to the same physical candidate. Confirmation now uses the displayed issue label consistently. Keyboard routing opens review only from the candidate list; footer actions share their click and keyboard delegates, and review-only rows show a fixed refusal explanation while Remove stays disabled. Cancellation status accumulates across attempts, and refresh status is reported only after the refresh callback returns.
+
+The updated Release app and test projects built with zero warnings or errors. Focused tests passed: CleanupClassifier 25/25, CleanupScreen 27/27, CleanupSuppression 9/9, TerminalEscapeSanitizer 9/9, and SkillViewWorkflowCoordinator 2/2 (72/72 total). Integration tests passed 9/9. The single full unit-suite run completed 2,554 tests: 2,508 passed, 32 skipped, and 14 failed outside the changed test classes. Failures were in NativePlacement (7), RemoveValidator (1), GhSharedLockGuard (1), GhInstallOwnership (1), and LocalSourceSwitch (4); most reported Linux mount-boundary errors, with the remaining failures reporting assertion mismatches. These results are retained in `/var/tmp/skillview-cleanup-ux/final-full-managed.log`; no baseline attribution is made.
+
+Scoped formatting verification and `git diff --check` passed. The earlier PTY captures document the initial keyboard walkthrough; they predate the review follow-up footer spacing fix. The updated 80-column footer width is covered by `CleanupSuppressionScreenTests`, including the all-actions-within-width assertion. No additional PTY mutation or removal was run during this follow-up.

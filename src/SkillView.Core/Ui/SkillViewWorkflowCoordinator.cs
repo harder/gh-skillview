@@ -286,15 +286,24 @@ internal sealed class SkillViewWorkflowCoordinator
         screen.Show();
         var changed = screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
             || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved;
+        var status = $"Cleanup: removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders; ignored {screen.IgnoredCount}."
+            + (screen.CancellationObserved ? " Some operations were canceled." : "");
         if (changed)
         {
-            _services.ListAdapter.Invalidate();
-            _refreshActiveTab();
+            try
+            {
+                _services.ListAdapter.Invalidate();
+                // This callback requests a refresh; it cannot prove completion.
+                _refreshActiveTab();
+                status += " Inventory refresh requested.";
+            }
+            catch (Exception ex)
+            {
+                _services.Logger.Error("cleanup.refresh", ex.ToString());
+                status += " Inventory refresh failed; refresh manually.";
+            }
         }
-        _setStatus((screen.LastReport?.IsCanceled == true
-            ? $"Cleanup canceled; removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders."
-            : $"Cleanup: removed {screen.RemovedCount}, ignored {screen.IgnoredCount}.")
-            + (changed ? " Refreshing inventory." : ""));
+        _setStatus(status);
     }
 
     internal static bool MatchesCleanupSelection(CleanupClassifier.Candidate candidate,

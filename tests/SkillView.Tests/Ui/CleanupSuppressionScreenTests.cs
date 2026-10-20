@@ -66,6 +66,113 @@ public sealed class CleanupSuppressionScreenTests
         Assert.True(confirmed); Assert.Equal(1, reviews); Assert.False(timedOut);
     }
 
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public async Task FooterActionsShareKeyboardBehaviorAndEnterOnlyReviewsFromTheList(int width, int height)
+    {
+        var reviews = 0; var sent = false; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(width, height);
+            Window? window = null; var logger = new Logger(); var skill = Fixture();
+            var screen = new CleanupScreen(app, new RemoveService(logger), logger,
+                [new(CleanupClassifier.CandidateKind.BrokenSymlink, skill.ResolvedPath, "missing", skill)], [], [skill],
+                confirmBatchRemoval: _ => { reviews++; return 0; });
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (window is null || sent) return true;
+                sent = true;
+                var table = window.SubViews.OfType<TableView>().Single();
+                var detail = window.SubViews.OfType<Markdown>().Single();
+                var bar = window.SubViews.OfType<StatusBar>().Single();
+                var shortcuts = bar.SubViews.OfType<Shortcut>().ToArray();
+                Assert.Equal(6, shortcuts.Length);
+                Assert.All(shortcuts, shortcut => Assert.True(shortcut.Frame.X + shortcut.Frame.Width <= bar.Viewport.Width,
+                    $"Footer action {shortcut.HelpText} is clipped at {width} columns."));
+                table.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                detail.SetFocus(); Assert.True(detail.HasFocus);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                Assert.Equal(0, reviews); // Enter in the reading pane never opens removal review.
+                shortcuts[1].InvokeCommand(Command.Accept);
+                Assert.Equal(1, reviews); // Deliberate footer acceptance does.
+                shortcuts[2].InvokeCommand(Command.Accept);
+                Assert.Contains("## Technical details", detail.Text.ToString());
+                Assert.Equal("Summary", shortcuts[2].HelpText);
+                detail.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.F2));
+                Assert.DoesNotContain("## Technical details", detail.Text.ToString());
+                Assert.Equal("Details", shortcuts[2].HelpText);
+                shortcuts[0].InvokeCommand(Command.Activate); // Uncheck through the clickable footer action.
+                table.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                Assert.Equal(1, reviews);
+                shortcuts[0].InvokeCommand(Command.Accept); // Select again through its accepting path.
+                table.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                Assert.Equal(2, reviews); // One Enter dispatches exactly one review.
+                detail.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.R));
+                Assert.Equal(3, reviews); // The explicit review alias remains available.
+                shortcuts[3].InvokeCommand(Command.Accept);
+                Assert.Contains("fresh inventory unavailable", window.SubViews.OfType<Label>().Single(
+                    label => label.Text.ToString().Contains("fresh inventory unavailable", StringComparison.Ordinal)).Text.ToString());
+                shortcuts[5].InvokeCommand(Command.Accept);
+                return false;
+            });
+            screen.Show(ready => window = ready);
+            Assert.Null(screen.LastReport); Assert.Equal(0, screen.RemovedCount);
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.False(timedOut); Assert.Equal(3, reviews);
+    }
+
+    [Fact]
+    public async Task ReviewOnlyConfirmationKeepsItsRefusalVisibleOutsideTheScrolledDetails()
+    {
+        var opened = false; var sent = false; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+            Window? window = null; var logger = new Logger(); var skill = Fixture();
+            var screen = new CleanupScreen(app, new RemoveService(logger), logger,
+                [new(CleanupClassifier.CandidateKind.EmptyDirectory, skill.ResolvedPath,
+                    "Other consumers use this directory. " + new string('x', 1000), skill, true)], [], [skill]);
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (window is null || sent) return true;
+                sent = true;
+                window.SubViews.OfType<TableView>().Single().SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                return false;
+            });
+            app.AddTimeout(TimeSpan.FromMilliseconds(15), () =>
+            {
+                if (opened || app.TopRunnableView is not Dialog dialog) return true;
+                opened = true;
+                var review = dialog.SubViews.OfType<Markdown>().Single();
+                var explanation = dialog.SubViews.OfType<Label>().Single(label => label.Text.ToString().StartsWith("Removal unavailable", StringComparison.Ordinal));
+                Assert.False(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Remove").Enabled);
+                Assert.True(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").HasFocus);
+                Assert.True(explanation.Frame.Width >= explanation.Text.ToString().Length);
+                Assert.True(explanation.Frame.Y >= review.Frame.Y + review.Frame.Height);
+                Assert.True(explanation.Frame.Y < dialog.Viewport.Height);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.F2));
+                Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Text.ToString().Contains("F2 Summary", StringComparison.Ordinal));
+                Assert.True(explanation.Visible);
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); // Cancel remains the default.
+                return false;
+            });
+            screen.Show(ready => window = ready);
+            Assert.Null(screen.LastReport); Assert.Equal(0, screen.RemovedCount);
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(opened); Assert.False(timedOut);
+    }
+
     [Fact]
     public async Task RealConfirmationTabsFromCancelToRemoveAndEnterAppliesOnlyAfterReview()
     {
@@ -169,6 +276,7 @@ public sealed class CleanupSuppressionScreenTests
                 screen.Show(ready => window = ready);
                 Assert.Equal(1, Volatile.Read(ref drained));
                 Assert.True(screen.LastReport!.IsCanceled);
+                Assert.True(screen.CancellationObserved);
                 Assert.Equal(1, screen.RemovedCount);
                 Assert.Equal(1, screen.RemovedDirectoryCount); // Coordinator must refresh after partial cancellation.
                 Assert.Single(Directory.EnumerateDirectories(root.FullName));
@@ -211,6 +319,7 @@ public sealed class CleanupSuppressionScreenTests
             });
             screen.Show(ready => window = ready);
             Assert.Equal(1, Volatile.Read(ref drained)); Assert.False(screen.PreferenceMutationObserved); Assert.Equal(0, screen.IgnoredCount);
+            Assert.True(screen.CancellationObserved);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.Equal(1, started); Assert.True(canceled); Assert.False(timedOut);
     }

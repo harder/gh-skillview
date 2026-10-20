@@ -335,6 +335,7 @@ public sealed class CleanupScreenTests
                 await Assert.ThrowsAsync<InvalidOperationException>(() => screen.RemoveSelectedAsync([0, 1], cancellation.Token, attemptState: state));
             Assert.Equal(1, screen.LastReport!.TargetsSkipped);
             Assert.Equal(cancel, screen.LastReport.IsCanceled);
+            Assert.Equal(cancel, screen.CancellationObserved);
             Assert.Equal(cancel ? 0 : 1, screen.LastReport.ErrorCount);
             Assert.Equal(1, screen.LastReport.FilesDeleted);
             Assert.Equal(1, screen.RemovedFileCount);
@@ -369,6 +370,11 @@ public sealed class CleanupScreenTests
             Assert.Equal(repairMetadata ? 3 : 2, screen.RemovedFileCount);
             Assert.Equal(1, screen.RemovedDirectoryCount);
             Assert.False(Directory.Exists(directory));
+            Assert.Equal(cancel, screen.CancellationObserved); // Later success cannot erase cancellation.
+            using var laterCancellation = new CancellationTokenSource();
+            laterCancellation.Cancel();
+            await Assert.ThrowsAsync<OperationCanceledException>(() => screen.RemoveSelectedAsync([0, 1], laterCancellation.Token));
+            Assert.True(screen.CancellationObserved); // Cancellation after success is retained too.
         }
         finally { root.Delete(true); }
     }
@@ -616,7 +622,7 @@ public sealed class CleanupScreenTests
             shortcut =>
             {
                 Assert.Equal("F2", shortcut.Title);
-                Assert.Equal("More", shortcut.HelpText);
+                Assert.Equal("Details", shortcut.HelpText);
             },
             shortcut =>
             {
@@ -641,6 +647,23 @@ public sealed class CleanupScreenTests
         Assert.Contains("Space Select", CleanupScreen.BuildHeaderTextForTests());
         Assert.Contains("Enter Review", CleanupScreen.BuildHeaderTextForTests());
         Assert.Contains("F2 Details", CleanupScreen.BuildHeaderTextForTests());
+    }
+
+    [Fact]
+    public void ConfirmationGroupsKindsWithTheSameFriendlyIssueTogether()
+    {
+        var candidates = new[]
+        {
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Duplicate, "/one", "duplicate", null, true),
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, "/two", "collision", null, true),
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.HiddenNestedResidue, "/three", "hidden", null, true),
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, "/four", "source", null, true)
+        };
+        var text = CleanupScreen.BuildRemoveConfirmationText(candidates);
+        Assert.Contains("- Multiple copies: 2", text);
+        Assert.Contains("- Installation needs review: 2", text);
+        Assert.DoesNotContain("- Multiple copies: 1", text);
+        Assert.DoesNotContain("- Installation needs review: 1", text);
     }
 
     [Fact]

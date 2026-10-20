@@ -44,6 +44,8 @@ internal static class CleanupReviewFormatter
         // overview omits a long field. These labels never become selectors.
         Field(text, "Location", candidate.Path);
         Field(text, "Changes", Effect(candidate));
+        if (candidate.ReviewOnly && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
+            Field(text, "Review needed", candidate.Reason);
         foreach (var (label, value) in AgentFields(candidate)) Field(text, label, value);
     }
 
@@ -58,6 +60,8 @@ internal static class CleanupReviewFormatter
             CleanupClassifier.CandidateKind.Untracked => "Not listed by gh; another installer may own it.",
             _ => candidate.Reason
         });
+        if (candidate.ReviewOnly && candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory)
+            yield return ("Review needed", candidate.Reason);
         yield return ("Next", candidate.ReviewOnly
             ? "Inspect the details and compare or repair this copy."
             : "Space selects; Enter reviews removal.");

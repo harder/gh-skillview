@@ -180,6 +180,8 @@ public class CleanupClassifierTests : IDisposable
         foreach (var protectedSnapshot in new[]
         {
             snapshot with { Diagnostics = new ScanDiagnostics { InaccessiblePaths = ["unreadable"] } },
+            snapshot with { ConfiguredRootsComplete = false },
+            snapshot with { Skills = [observed with { ObservedSubject = OperationSubject.From(observed) }] },
             snapshot with { OwnershipRecords = [claim] },
             snapshot with { Skills = [observed with { OwnershipClaims = [claim] }] }
         })
@@ -187,11 +189,84 @@ public class CleanupClassifierTests : IDisposable
             var review = Assert.Single(CleanupClassifier.Classify(protectedSnapshot, roots));
             Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, review.Kind);
             Assert.True(review.ReviewOnly);
+            if (!protectedSnapshot.ConfiguredRootsComplete || protectedSnapshot.Skills[0].ObservedSubject?.ExposureCoverageComplete == false)
+                Assert.False(review.Impact!.ExposureCoverageComplete);
         }
 
         File.WriteAllText(Path.Combine(empty, "keep.txt"), "keep");
         Assert.Equal(CleanupClassifier.CandidateKind.Malformed,
             Assert.Single(CleanupClassifier.Classify(snapshot, roots)).Kind);
+    }
+
+    [Fact]
+    public void Classify_EmptyDirectoryWithConsumerExposuresRequiresReview()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "shared-empty")).FullName;
+        var direct = new AgentMembership("universal", empty, false);
+        var observation = Skill("shared-empty", empty, ValidityState.MissingSkillMd) with { Agents = [direct] };
+        var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
+        Assert.False(Assert.Single(CleanupClassifier.Classify(Snapshot(false, observation), roots)).ReviewOnly);
+
+        foreach (var isSymlink in new[] { false, true })
+        {
+            var consumer = new AgentMembership("claude", Path.Combine(_tempRoot, "other-context", "shared-empty"), isSymlink);
+            var candidate = Assert.Single(CleanupClassifier.Classify(
+                Snapshot(false, observation with { Agents = [direct, consumer] }), roots));
+            Assert.True(candidate.ReviewOnly);
+            Assert.Contains("consumer exposures", candidate.Reason);
+            Assert.Equal(2, candidate.Impact!.AffectedExposures.Length);
+            Assert.True(Directory.Exists(empty));
+        }
+    }
+
+    [Fact]
+    public void Classify_EmptyNameCollisionsRemainOneReviewOnlyRowPerPath()
+    {
+        var firstRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "first")).FullName;
+        var secondRoot = Directory.CreateDirectory(Path.Combine(_tempRoot, "second")).FullName;
+        var first = Directory.CreateDirectory(Path.Combine(firstRoot, "foo")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(secondRoot, "foo")).FullName;
+        var snapshot = Snapshot(false, Skill("foo", first, ValidityState.MissingSkillMd), Skill("foo", second, ValidityState.MissingSkillMd));
+        var candidates = CleanupClassifier.Classify(snapshot,
+            [new(firstRoot, Scope.User, null), new(secondRoot, Scope.User, null), new(firstRoot, Scope.User, null)]);
+        Assert.Equal(2, candidates.Length);
+        Assert.All(candidates, candidate =>
+        {
+            Assert.Equal(CleanupClassifier.CandidateKind.EmptyDirectory, candidate.Kind);
+            Assert.True(candidate.ReviewOnly);
+            Assert.Contains("share name 'foo'", candidate.Reason);
+        });
+        foreach (var ordered in new[] { candidates, candidates.Reverse().ToImmutableArray() })
+            Assert.All(CleanupClassifier.DeduplicateByPath(ordered, TestContext.Current.CancellationToken).Unique, candidate => Assert.True(candidate.ReviewOnly));
+    }
+
+    [Fact]
+    public void Classify_EmptyDirectoryMergesMetadataAndSharedMappingReviewReasons()
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "conflicted")).FullName;
+        var first = Skill("first", empty, ValidityState.MissingSkillMd) with { MetadataConflicts = ["source disagreement"] };
+        var second = Skill("second", empty, ValidityState.MissingSkillMd);
+        var candidate = Assert.Single(CleanupClassifier.Classify(Snapshot(false, first, second), [new(_tempRoot, Scope.User, null)]));
+        Assert.True(candidate.ReviewOnly);
+        Assert.Contains("source disagreement", candidate.Reason);
+        Assert.Contains("conflicting names", candidate.Reason);
+    }
+
+    [Theory]
+    [InlineData(Provenance.CliList, null)]
+    [InlineData(Provenance.Both, null)]
+    [InlineData(Provenance.FsScan, "https://github.com/owner/repo")]
+    public void Classify_TrackedEmptyDirectoryRetainsProtectionAndNativeObservation(Provenance provenance, string? upstream)
+    {
+        var empty = Directory.CreateDirectory(Path.Combine(_tempRoot, "tracked-empty")).FullName;
+        var observation = Skill("tracked-empty", empty, ValidityState.MissingSkillMd, provenance) with
+        { FrontMatter = new SkillFrontMatter { Upstream = upstream } };
+        var snapshot = Snapshot(false, observation);
+        var candidate = Assert.Single(CleanupClassifier.Classify(snapshot, [new(_tempRoot, Scope.User, null)]));
+        Assert.True(candidate.ReviewOnly);
+        Assert.Equal(snapshot.CapturedAt, candidate.Impact!.Subject.CapturedAt);
+        Assert.NotEqual("Native object was not recorded.", candidate.Impact.Subject.NativeObject.Diagnostic);
+        Assert.Equal(observation.SourceIdentity, candidate.Impact.Subject.Source);
     }
 
     [Fact]

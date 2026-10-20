@@ -50,6 +50,7 @@ public sealed class CleanupScreen
     public int RemovedDirectoryCount { get; private set; }
     public int IgnoredCount { get; private set; }
     public bool PreferenceMutationObserved { get; private set; }
+    public bool CancellationObserved { get; private set; }
     public RemoveService.BatchRemoveReport? LastReport { get; private set; }
 
     public CleanupScreen(
@@ -202,9 +203,15 @@ public sealed class CleanupScreen
             AutoSpin = false,
         };
 
-        var statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-            BuildShortcuts(),
-            includeOpenLink: false));
+        var shortcuts = BuildShortcuts();
+        var statusBar = new StatusBar(shortcuts);
+        // StatusBar sets shortcut alignment (and resets child margins) when
+        // adding items. Compact them afterward, keeping a gap before each key.
+        foreach (var shortcut in shortcuts)
+        {
+            if (shortcut.CommandView?.Margin is { } commandMargin) commandMargin.Thickness = new(0);
+            if (shortcut.HelpView.Margin is { } helpMargin) helpMargin.Thickness = new(0, 0, 1, 0);
+        }
 
         TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
             window, header, table, detail, spinner, status, statusBar);
@@ -297,78 +304,120 @@ public sealed class CleanupScreen
             operation.TryStart(token => Task.Run(() => RunRemovalAsync(selectedRows, token)));
         }
 
-        table.KeyDown += (_, key) =>
+        void ToggleSelection()
         {
-            if (key.Handled || key.KeyCode != KeyCode.Enter) return;
-            key.Handled = true;
-            ReviewSelection();
-        };
+            if (Busy()) return;
+            var index = table.GetSelectedRow();
+            if (index < 0 || index >= _candidates.Length) return;
+            if (!wrapper.CheckedRows.Remove(index)) wrapper.CheckedRows.Add(index);
+            table.Update();
+        }
+
+        void ToggleDetails()
+        {
+            showDetails = !showDetails;
+            var i = table.GetSelectedRow();
+            if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
+            var action = showDetails ? "Summary" : "Details";
+            shortcuts[2].HelpText = action;
+            header.Text = BuildHeaderText().Replace("F2 Details", $"F2 {action}", StringComparison.Ordinal);
+        }
+
+        void IgnoreSelection()
+        {
+            if (Busy()) return;
+            var selected = wrapper.CheckedRows.Where(index => index >= 0 && index < _candidates.Length)
+                .Select(index => _candidates[index]).ToArray();
+            if (selected.Length == 0) { status.Text = " no cleanup candidates selected"; return; }
+            if (_captureInventory is null || _ownershipRunner is null)
+            { status.Text = " fresh inventory unavailable; no preferences changed"; return; }
+            spinner.Visible = true; spinner.AutoSpin = true;
+            status.Text = " suppressing cleanup suggestions for selected physical installs across consumer contexts… Esc cancels";
+            operation.TryStart(token => Task.Run(async () =>
+            {
+                string text;
+                try
+                {
+                    var result = await CleanupSuppressionWorkflow.SetAsync(selected,
+                        CleanupSuppressionStore.For(_ownershipRunner), _captureInventory,
+                        () => PreferenceMutationObserved = true, () => IgnoredCount++, token).ConfigureAwait(false);
+                    foreach (var error in result.Errors) _logger.Error("cleanup.ignore", error);
+                    CancellationObserved |= result.Canceled;
+                    text = $" ignored {result.Changed}, skipped {result.Skipped}, failed {result.Failed}" + (result.Canceled ? "; canceled" : "")
+                        + (result.Errors.Length > 0 ? " — see logs" : "");
+                }
+                catch (Exception ex) { _logger.Error("cleanup.ignore", ex.Message); text = " preference update failed — see logs"; }
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    spinner.AutoSpin = false; spinner.Visible = false; status.Text = text;
+                    operation.Release();
+                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
+                });
+            }));
+        }
+
+        void Export()
+        {
+            if (!Busy()) DoExport(status);
+        }
+
+        void Close()
+        {
+            if (Busy())
+            {
+                Interlocked.Exchange(ref closeAfterCancellation, 1);
+                operation.Cancel();
+                status.Text = " canceling cleanup operation…";
+                return;
+            }
+            readyToClose = true;
+            _app.RequestStop();
+        }
+
+        Action[] actions = [ToggleSelection, ReviewSelection, ToggleDetails, IgnoreSelection, Export, Close];
+        for (var i = 0; i < shortcuts.Length; i++)
+        {
+            var action = actions[i];
+            shortcuts[i].Action = action;
+            shortcuts[i].Accepting += (_, args) => { args.Handled = true; action(); };
+        }
+        // The window owns keyboard routing, including contextual Enter/Space.
+        // Footer labels do not install competing global bindings; their actions
+        // remain available to mouse and explicit command activation.
+
         window.KeyDown += (_, key) =>
         {
             if (key.Handled) return;
             var r = key.AsRune.Value;
-            if (key.KeyCode == KeyCode.F2)
-            {
-                key.Handled = true;
-                showDetails = !showDetails;
-                var i = table.GetSelectedRow();
-                if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
-                header.Text = BuildHeaderText().Replace("F2 Details", showDetails ? "F2 Summary" : "F2 Details", StringComparison.Ordinal);
-            }
-            else if (key.KeyCode == KeyCode.Enter || r == 'r' || r == 'R')
+            if (key.KeyCode == KeyCode.Enter && table.HasFocus)
             {
                 key.Handled = true;
                 ReviewSelection();
             }
-            else if ((r == 'i' || r == 'I') && !Busy())
+            else if (key.KeyCode == KeyCode.F2)
             {
                 key.Handled = true;
-                var selected = wrapper.CheckedRows.Where(index => index >= 0 && index < _candidates.Length)
-                    .Select(index => _candidates[index]).ToArray();
-                if (selected.Length == 0) { status.Text = " no cleanup candidates selected"; return; }
-                if (_captureInventory is null || _ownershipRunner is null)
-                { status.Text = " fresh inventory unavailable; no preferences changed"; return; }
-                spinner.Visible = true; spinner.AutoSpin = true;
-                status.Text = " suppressing cleanup suggestions for selected physical installs across consumer contexts… Esc cancels";
-                operation.TryStart(token => Task.Run(async () =>
-                {
-                    string text;
-                    try
-                    {
-                        var result = await CleanupSuppressionWorkflow.SetAsync(selected,
-                            CleanupSuppressionStore.For(_ownershipRunner), _captureInventory,
-                            () => PreferenceMutationObserved = true, () => IgnoredCount++, token).ConfigureAwait(false);
-                        foreach (var error in result.Errors) _logger.Error("cleanup.ignore", error);
-                        text = $" ignored {result.Changed}, skipped {result.Skipped}, failed {result.Failed}" + (result.Canceled ? "; canceled" : "")
-                            + (result.Errors.Length > 0 ? " — see logs" : "");
-                    }
-                    catch (Exception ex) { _logger.Error("cleanup.ignore", ex.Message); text = " preference update failed — see logs"; }
-                    operation.InvokeTerminalIfActive(() =>
-                    {
-                        spinner.AutoSpin = false; spinner.Visible = false; status.Text = text;
-                        operation.Release();
-                        if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
-                    });
-                }));
+                ToggleDetails();
             }
-            else if ((r == 'x' || r == 'X') && !Busy())
+            else if (r == 'r' || r == 'R')
             {
-                DoExport(status);
                 key.Handled = true;
+                ReviewSelection();
+            }
+            else if (r == 'i' || r == 'I')
+            {
+                key.Handled = true;
+                IgnoreSelection();
+            }
+            else if (r == 'x' || r == 'X')
+            {
+                key.Handled = true;
+                Export();
             }
             else if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (Busy())
-                {
-                    Interlocked.Exchange(ref closeAfterCancellation, 1);
-                    operation.Cancel();
-                    status.Text = " canceling cleanup operation…";
-                    return;
-                }
-
-                readyToClose = true;
-                _app.RequestStop();
+                Close();
             }
         };
         window.IsRunningChanging += (_, args) =>
@@ -426,6 +475,7 @@ public sealed class CleanupScreen
         {
             if (LastReport is { } report)
             {
+                CancellationObserved |= report.IsCanceled;
                 RemovedCount += report.TargetsDeleted;
                 RemovedFileCount += report.FilesDeleted;
                 RemovedDirectoryCount += report.DirectoriesDeleted;
@@ -550,10 +600,10 @@ public sealed class CleanupScreen
         sb.AppendLine("Cancel keeps all files. Deletion has no automatic undo.");
         sb.AppendLine();
         foreach (var group in selected
-                     .GroupBy(candidate => candidate.Kind)
-                     .OrderBy(group => group.Key.ToString(), StringComparer.Ordinal))
+                     .GroupBy(CleanupReviewFormatter.Issue)
+                     .OrderBy(group => group.Key, StringComparer.Ordinal))
         {
-            sb.AppendLine($"- {CleanupReviewFormatter.Issue(group.First())}: {group.Count()}");
+            sb.AppendLine($"- {group.Key}: {group.Count()}");
         }
 
         sb.AppendLine();
@@ -626,7 +676,7 @@ public sealed class CleanupScreen
     [
         new Shortcut { Title = "Space", HelpText = "Select" },
         new Shortcut { Title = "Enter", HelpText = "Review" },
-        new Shortcut { Title = "F2", HelpText = "More" },
+        new Shortcut { Title = "F2", HelpText = "Details" },
         new Shortcut { Title = "i", HelpText = "Ignore" },
         new Shortcut { Title = "x", HelpText = "Export" },
         new Shortcut { Title = "Esc", HelpText = "Back" },
@@ -659,14 +709,23 @@ public sealed class CleanupScreen
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(3),
+            Height = Dim.Fill(4),
             Text = BuildRemoveConfirmationText(selected),
             ViewportSettings = ViewportSettingsFlags.HasVerticalScrollBar
         };
         TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
+        var canRemove = selected.Any(candidate => !candidate.ReviewOnly);
+        var explanation = new Label
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(3),
+            Width = Dim.Fill(),
+            Height = 1,
+            Text = canRemove ? "Deletion has no automatic undo." : "Removal unavailable: inspect or repair these items first."
+        };
         var hints = new Label { X = 0, Y = Pos.AnchorEnd(2), Width = Dim.Fill(), Height = 1, Text = "Tab Focus · PgDn Scroll · F2 Details" };
         var cancel = new Button { Text = "Cancel", X = Pos.Center() - 12, Y = Pos.AnchorEnd(1), IsDefault = true };
-        var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1), Enabled = selected.Any(candidate => !candidate.ReviewOnly) };
+        var remove = new Button { Text = "Remove", X = Pos.Center() + 2, Y = Pos.AnchorEnd(1), Enabled = canRemove };
         cancel.Accepting += (_, args) => { args.Handled = true; _app.RequestStop(); };
         remove.Accepting += (_, args) => { args.Handled = true; response = 1; _app.RequestStop(); };
         dialog.KeyDown += (_, key) =>
@@ -677,7 +736,7 @@ public sealed class CleanupScreen
             review.Text = BuildRemoveConfirmationText(selected, showDetails);
             hints.Text = showDetails ? "Tab Focus · PgDn Scroll · F2 Summary" : "Tab Focus · PgDn Scroll · F2 Details";
         };
-        dialog.Add(review, hints, cancel, remove);
+        dialog.Add(review, explanation, hints, cancel, remove);
         cancel.SetFocus();
         _app.Run(dialog);
         return response;

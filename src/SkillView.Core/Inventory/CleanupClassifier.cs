@@ -245,6 +245,9 @@ public static class CleanupClassifier
         // observed skill directories retain their existing review requirement.
         var knownResolved = new HashSet<string>(StringComparer.Ordinal);
         var emptyPaths = new HashSet<string>(StringComparer.Ordinal);
+        var reviewReasons = result.Where(candidate => candidate.ReviewOnly && candidate.Kind != CandidateKind.Malformed)
+            .GroupBy(candidate => PathIdentity.NormalizeKey(candidate.Path), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => string.Join("; ", group.Select(candidate => candidate.Reason).Distinct()), StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -280,7 +283,7 @@ public static class CleanupClassifier
                     var resolved = PathResolver.Resolve(child);
                     if (resolved is null) continue;
                     var key = PathIdentity.NormalizeKey(resolved);
-                    if (knownResolved.Contains(key)) continue;
+                    if (knownResolved.Contains(key) || emptyPaths.Contains(key)) continue;
                     bool empty;
                     try { empty = !Directory.EnumerateFileSystemEntries(resolved).Any(); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
@@ -302,26 +305,41 @@ public static class CleanupClassifier
                             IsSymlinked = false,
                             InstalledAt = null
                         };
-                        var protectedOwner = snapshot.IsPartial || snapshot.OwnershipRecords.Any(record => record.Describes(observation))
+                        var protectedOwner = snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
+                            || snapshot.OwnershipRecords.Any(record => record.Describes(observation))
                             || recorded?.Any(skill => skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
-                                || !skill.MetadataConflicts.IsEmpty) == true;
+                                || !skill.MetadataConflicts.IsEmpty || skill.Provenance != Provenance.FsScan
+                                || skill.SourceIdentity.Provider != "unknown" || skill.ObservedSubject?.ExposureCoverageComplete == false) == true;
+                        var hasConsumers = recorded?.Any(skill => skill.Agents.Any(agent => agent.IsSymlink
+                            || !PathIdentity.Equals(agent.Path, resolved))) == true;
+                        reviewReasons.TryGetValue(key, out var reviewReason);
                         emptyPaths.Add(key);
+                        var reason = $"empty directory under scan root '{root.Path}'";
+                        if (protectedOwner) reason += "; installation records or incomplete discovery require review";
+                        if (hasConsumers) reason += "; other consumer exposures require review; removing the directory could break their links";
+                        if (reviewReason is not null) reason += "; " + reviewReason;
                         result.Add(new Candidate(
                             CandidateKind.EmptyDirectory,
                             resolved,
-                            $"empty directory under scan root '{root.Path}'",
-                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner));
+                            reason,
+                            Skill: recorded?.FirstOrDefault(), ReviewOnly: protectedOwner || hasConsumers || reviewReason is not null));
                     }
                 }
             }
         }
 
-        return result.Where(candidate => candidate.Kind != CandidateKind.Malformed
+        // Reclassification produces one row per path, retaining every earlier
+        // review requirement. Selection order must never choose removal authority.
+        return result.Where(candidate => candidate.Kind == CandidateKind.EmptyDirectory
             || !emptyPaths.Contains(PathIdentity.NormalizeKey(candidate.Path))).Select(candidate =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var impact = candidate.Skill is { } skill
-                ? OperationImpact.Payload(OperationSubject.From(skill), "cleanup")
+                ? OperationImpact.Payload(candidate.Kind == CandidateKind.EmptyDirectory
+                    ? SkillIdentityObserver.Capture(skill, snapshot.CapturedAt,
+                        !snapshot.IsPartial && snapshot.ConfiguredRootsComplete && skill.ObservedSubject?.ExposureCoverageComplete != false,
+                        cancellationToken, snapshot.ManagedRegions)
+                    : OperationSubject.From(skill), "cleanup")
                 : SkillIdentityObserver.CaptureEntry(candidate.Path, "cleanup", snapshot.CapturedAt, cancellationToken);
             if (candidate.Kind is CandidateKind.BrokenSharedMapping or CandidateKind.BrokenSymlink
                 && candidate.Skill is { } linked && linked.Agents.FirstOrDefault(agent => agent.IsSymlink && PathIdentity.Equals(agent.Path, candidate.Path)) is { } membership)
