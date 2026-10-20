@@ -218,6 +218,16 @@ public sealed class MaintenanceQueueTests
     }
 
     [Fact]
+    public void UnresolvedConfiguredRootsMarkTheQueuePartialEvenWithSuccessfulProviders()
+    {
+        var snapshot = InventorySnapshot.Empty with { ConfiguredRootsComplete = false };
+        Assert.False(snapshot.IsPartial);
+        var queue = MaintenanceQueueBuilder.Build(snapshot, TestContext.Current.CancellationToken);
+        Assert.True(queue.Partial);
+        Assert.Contains("Configured-root discovery is incomplete.", queue.Diagnostics);
+    }
+
+    [Fact]
     public void ExactRouting_RefusesMissingOrAmbiguousIdsAndDoesNotFallBackToNames()
     {
         var skill = Skill("/skills/one", "https://github.com/one/repo");

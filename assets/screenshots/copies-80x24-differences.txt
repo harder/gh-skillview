@@ -6,7 +6,7 @@
 │─┃…/identical/demo│Custom│refs/tags/v2.0│—  │universal, unknown            ┃ █│
 │C┃…/older/demo    │Custom│refs/tags/v1.0│—  │universal, unknown            ┃ █│
 │C┃…/other/demo    │Custom│unknown       │—  │universal, unknown            ┃ █│
-│C┃Source: Same recorded source and skill subpath.                         ▲┃ █│
+│C┃Source relationship: Same recorded source and skill subpath.            ▲┃ █│
 │C┃Revision: Different recorded revisions; neither is assumed newer or     █┃ █│
 │R┃preferred.                                                              █┃ █│
 │R┃Files: Different payload files.                                         █┃ █│

@@ -17,6 +17,7 @@ public sealed record MaintenanceQueueEntry(string Id, string Issue, string Title
     public string DisablementState => "not-assessed";
     public string MigrationState => "not-assessed";
     internal CleanupClassifier.Candidate? Cleanup { get; init; }
+    internal bool IsCopyReview => Issue is "NameCollision" or "Duplicate";
 }
 
 public sealed record MaintenanceQueue(DateTimeOffset CapturedAt, bool Partial,
@@ -58,8 +59,9 @@ public static class MaintenanceQueueBuilder
         var diagnostics = snapshot.Diagnostics.InaccessiblePaths.Select(path => "Incomplete discovery: " + path)
             .Concat(snapshot.Providers.Where(provider => !provider.Succeeded)
                 .Select(provider => provider.Provider + ": " + (provider.Error ?? "capture failed")))
+            .Concat(snapshot.ConfiguredRootsComplete ? [] : new[] { "Configured-root discovery is incomplete." })
             .Concat(snapshot.PreferenceDiagnostics).ToImmutableArray();
-        return new(snapshot.CapturedAt, snapshot.IsPartial, diagnostics,
+        return new(snapshot.CapturedAt, snapshot.IsPartial || !snapshot.ConfiguredRootsComplete, diagnostics,
             entries.DistinctBy(entry => entry.Id).OrderBy(entry => entry.Issue, StringComparer.Ordinal)
                 .ThenBy(entry => entry.Subject.Path, StringComparer.Ordinal).ToImmutableArray());
     }

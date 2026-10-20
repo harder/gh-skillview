@@ -246,7 +246,7 @@ internal sealed class SkillViewWorkflowCoordinator
         }, "discover");
     }
 
-    public void ShowCleanupScreen(OperationSubject? selected = null)
+    public void ShowCleanupScreen()
     {
         var app = _getApp();
         if (app is null) return;
@@ -256,22 +256,24 @@ internal sealed class SkillViewWorkflowCoordinator
             var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
             var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
             var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, cancellationToken);
-            if (selected is not null) candidates = FilterCleanupForInstallation(candidates, selected);
             await _invokeAsync(() =>
             {
                 if (cancellationToken.IsCancellationRequested) return;
                 _clearBusy();
-                if (selected is not null && (SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected) is null || candidates.IsEmpty))
-                { _setStatus("No current cleanup finding for that exact installation — refresh Changes."); return; }
                 ShowCleanupReview(app, report, snapshot, candidates);
             }, cancellationToken).ConfigureAwait(false);
         }, "cleanup");
     }
 
     internal static ImmutableArray<CleanupClassifier.Candidate> FilterCleanupForInstallation(
-        ImmutableArray<CleanupClassifier.Candidate> candidates, OperationSubject selected) =>
-        candidates.Where(candidate => candidate.Impact?.Subject.InstallationId == selected.InstallationId
-            && PathIdentity.Equals(candidate.Impact.Subject.Path, selected.Path)).ToImmutableArray();
+        ImmutableArray<CleanupClassifier.Candidate> candidates, OperationSubject selected, string issue)
+    {
+        var matches = candidates.Where(candidate => candidate.Kind.ToString() == issue
+            && PathIdentity.Equals(candidate.Path, selected.Path)
+            && candidate.Impact?.Subject.InstallationId == selected.InstallationId
+            && PathIdentity.Equals(candidate.Impact.Subject.Path, selected.Path)).Take(2).ToImmutableArray();
+        return matches.Length == 1 ? matches : [];
+    }
 
     internal async Task ShowCopiesAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
         ChangesSelectionGate.Lease request, Action<OperationSubject> activateUpdates, CancellationToken lifetimeToken)
@@ -281,6 +283,16 @@ internal sealed class SkillViewWorkflowCoordinator
         var snapshot = await CaptureInventoryAsync(report, request.Token).ConfigureAwait(false);
         var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected.Subject);
         var group = target is null ? null : CopiesPresentation.Build(snapshot, target, request.Token);
+        if (group is { Copies.Length: > 0 })
+        {
+            var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, request.Token);
+            group = group with
+            {
+                CleanupCandidates = group.Copies.Select(skill => (Id: skill.InstallationId,
+                        Matches: FilterCleanupForInstallation(candidates, OperationSubject.From(skill), selected.Issue)))
+                    .Where(row => row.Matches.Length == 1).ToImmutableDictionary(row => row.Id, row => row.Matches[0])
+            };
+        }
         await _invokeAsync(() =>
         {
             if (!request.TryEnterDispatch() || lifetimeToken.IsCancellationRequested) return;
@@ -288,10 +300,12 @@ internal sealed class SkillViewWorkflowCoordinator
             { _setStatus("Selected installation is missing or ambiguous — refresh Changes."); return; }
             var choice = CopiesScreen.Show(app, _services.Logger, group,
                 (left, right, token) => new SkillView.Maintenance.SkillComparisonService().CompareAsync(left, right, token,
-                    inventoryComplete: !snapshot.IsPartial), lifetimeToken);
+                    inventoryComplete: !group.Partial), lifetimeToken);
             if (choice is null || lifetimeToken.IsCancellationRequested) return;
             if (choice.Action == CopiesAction.Update) activateUpdates(choice.Subject);
-            else ShowCleanupScreen(choice.Subject);
+            else if (SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, choice.Subject) is not null
+                && group.CleanupCandidates.TryGetValue(choice.Subject.InstallationId, out var candidate))
+                ShowCleanupReview(app, report, snapshot, [candidate]);
         }, request.Token).ConfigureAwait(false);
     }
 

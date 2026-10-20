@@ -48,20 +48,29 @@ internal static class CopiesScreen
         var closeRequested = false;
         var readyToClose = false;
         InstalledSkill Selected() => group.Copies[Math.Clamp(table.GetSelectedRow(), 0, group.Copies.Length - 1)];
+        void EnableActions()
+        {
+            compareButton.Enabled = Selected().InstallationId != reference.InstallationId;
+            update.Enabled = CopiesPresentation.UpdateUnavailableReason(Selected()) is null;
+            cleanup.Enabled = CopiesPresentation.CleanupUnavailableReason(group, Selected()) is null;
+        }
         void Refresh()
         {
             referenceLabel.Text = "Reference: " + Safe(TuiHelpers.ShortenPath(reference.ResolvedPath, 2) + " · " + (reference.Revision.RepositoryRef ?? "ref unknown"), 68);
             detail.Text = CopiesPresentation.Render(group, reference, Selected());
             detail.CaretOffset = 0;
-            compareButton.Enabled = Selected().InstallationId != reference.InstallationId;
-            status.Text = "Select a copy. Compare reads local files; actions open review.";
+            EnableActions();
+            status.Text = CopiesPresentation.UpdateUnavailableReason(Selected())
+                ?? CopiesPresentation.CleanupUnavailableReason(group, Selected())
+                ?? "Select a copy. Compare reads local files; actions open review.";
         }
         void Finish()
         {
             operation.Release();
             if (closeRequested || lifetimeToken.IsCancellationRequested) { readyToClose = true; app.RequestStop(); return; }
-            table.Enabled = setReference.Enabled = update.Enabled = cleanup.Enabled = true;
-            compareButton.Enabled = Selected().InstallationId != reference.InstallationId;
+            table.Enabled = setReference.Enabled = true;
+            EnableActions();
+            table.SetFocus();
         }
         void RequestClose()
         {
@@ -72,6 +81,8 @@ internal static class CopiesScreen
         void Choose(CopiesAction action)
         {
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None || lifetimeToken.IsCancellationRequested) return;
+            if (action == CopiesAction.Update && CopiesPresentation.UpdateUnavailableReason(Selected()) is not null
+                || action == CopiesAction.Cleanup && CopiesPresentation.CleanupUnavailableReason(group, Selected()) is not null) return;
             choice = new(action, OperationSubject.From(Selected()));
             RequestClose();
         }
@@ -84,14 +95,12 @@ internal static class CopiesScreen
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None || lifetimeToken.IsCancellationRequested) return;
             var left = reference; var right = Selected();
             if (left.InstallationId == right.InstallationId) return;
-            table.Enabled = setReference.Enabled = compareButton.Enabled = update.Enabled = cleanup.Enabled = false;
-            status.Text = "Comparing local files… Close cancels.";
-            operation.TryStart(async token =>
+            if (!operation.TryStart(async token =>
             {
-                using var cancellation = new CancellationSource(token, lifetimeToken, CancellationCallbackReporter.For(logger, "copies.compare"));
-                var ownedToken = cancellation.Token;
                 try
                 {
+                    using var cancellation = new CancellationSource(token, lifetimeToken, CancellationCallbackReporter.For(logger, "copies.compare"));
+                    var ownedToken = cancellation.Token;
                     var result = await compare(left, right, ownedToken).ConfigureAwait(false);
                     ownedToken.ThrowIfCancellationRequested();
                     var rendered = CopiesPresentation.Render(group, left, right, result);
@@ -102,19 +111,23 @@ internal static class CopiesScreen
                         {
                             detail.Text = rendered;
                             detail.CaretOffset = 0;
-                            status.Text = result.Complete ? "Comparison complete. Review a change for the selected copy, or close." : "Comparison incomplete. Inspect the notices; nothing changed.";
+                            status.Text = !result.Complete ? "Comparison incomplete. Inspect the notices; nothing changed."
+                                : group.Partial ? "Local files compared; discovery is partial. Inspect notices."
+                                : "Comparison complete. Review a change for the selected copy, or close.";
                         }
                         Finish();
                     });
                 }
-                catch (OperationCanceledException) when (ownedToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (token.IsCancellationRequested || lifetimeToken.IsCancellationRequested)
                 { operation.InvokeTerminalIfActive(() => { if (!lifetimeToken.IsCancellationRequested) status.Text = "Comparison canceled."; Finish(); }); }
                 catch (Exception ex)
                 {
                     logger.Error("copies.compare", ex.ToString());
-                    operation.InvokeTerminalIfActive(() => { if (!lifetimeToken.IsCancellationRequested) status.Text = "Comparison unavailable: " + TuiHelpers.ErrorSnippet(ex.Message); Finish(); });
+                    operation.InvokeTerminalIfActive(() => { if (!lifetimeToken.IsCancellationRequested) status.Text = "Comparison unavailable: " + Safe(TuiHelpers.ErrorSnippet(ex.Message), 60); Finish(); });
                 }
-            });
+            })) return;
+            table.Enabled = setReference.Enabled = compareButton.Enabled = update.Enabled = cleanup.Enabled = false;
+            status.Text = "Comparing local files… Close cancels.";
         };
         update.Accepting += (_, args) => { args.Handled = true; Choose(CopiesAction.Update); };
         cleanup.Accepting += (_, args) => { args.Handled = true; Choose(CopiesAction.Cleanup); };

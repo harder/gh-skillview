@@ -1,10 +1,16 @@
 using System.Text;
+using System.Collections.Immutable;
+using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Maintenance;
 
 namespace SkillView.Ui;
 
-internal sealed record CopiesGroup(InstalledSkill[] Copies, int Omitted, int Ambiguous, bool Partial);
+internal sealed record CopiesGroup(InstalledSkill[] Copies, int Omitted, int Ambiguous, bool Partial)
+{
+    internal ImmutableDictionary<string, CleanupClassifier.Candidate> CleanupCandidates { get; init; }
+        = ImmutableDictionary<string, CleanupClassifier.Candidate>.Empty;
+}
 
 internal static class CopiesPresentation
 {
@@ -14,23 +20,40 @@ internal static class CopiesPresentation
     {
         token.ThrowIfCancellationRequested();
         var source = selected.SourceIdentity.Key;
-        var related = new List<InstalledSkill>();
+        var selectedId = selected.InstallationId;
+        var related = new List<(InstalledSkill Skill, string Id)>();
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
         {
             token.ThrowIfCancellationRequested();
+            var id = skill.InstallationId;
+            counts[id] = counts.GetValueOrDefault(id) + 1;
             if (skill.Name.Equals(selected.Name, StringComparison.OrdinalIgnoreCase)
-                || source is not null && skill.SourceIdentity.Key == source) related.Add(skill);
+                || source is not null && skill.SourceIdentity.Key == source) related.Add((skill, id));
         }
-        var groups = related.GroupBy(skill => skill.InstallationId).ToArray();
-        var copies = groups.Where(group => group.Count() == 1).Select(group => group.Single())
-            .OrderByDescending(skill => skill.InstallationId == selected.InstallationId)
-            .ThenBy(skill => skill.ResolvedPath, StringComparer.Ordinal).ToArray();
+        var groups = related.GroupBy(row => row.Id).ToArray();
+        var ambiguous = groups.Count(group => counts[group.Key] != 1);
+        var partial = snapshot.IsPartial || !snapshot.ConfiguredRootsComplete;
+        // Never replace a missing/ambiguous reference with a same-name sibling.
+        var selectedCount = counts.GetValueOrDefault(selectedId);
+        if (selectedCount != 1 || !groups.Any(group => group.Key == selectedId))
+            return new([], 0, selectedCount > 1 ? Math.Max(1, ambiguous) : ambiguous, partial);
+        var copies = groups.Where(group => counts[group.Key] == 1).Select(group => group.Single())
+            .OrderByDescending(row => row.Id == selectedId)
+            .ThenBy(row => row.Skill.ResolvedPath, StringComparer.Ordinal).Select(row => row.Skill).ToArray();
         return new(copies.Take(MaxCopies).ToArray(), Math.Max(0, copies.Length - MaxCopies),
-            groups.Count(group => group.Count() != 1), snapshot.IsPartial);
+            ambiguous, partial);
     }
 
     internal static string Consumers(InstalledSkill skill) => skill.Agents.IsEmpty ? "none recorded"
         : string.Join(", ", skill.Agents.Select(agent => agent.AgentId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+
+    internal static string? UpdateUnavailableReason(InstalledSkill skill) =>
+        skill.AllOwnershipClaims.Any(owner => owner.InstallationMode == "managed-read-only")
+            ? "Managed copy: use its owning tool to update it." : null;
+
+    internal static string? CleanupUnavailableReason(CopiesGroup group, InstalledSkill skill) =>
+        group.CleanupCandidates.ContainsKey(skill.InstallationId) ? null : "No unambiguous matching cleanup issue at this location.";
 
     internal static string Render(CopiesGroup group, InstalledSkill reference, InstalledSkill selected,
         SkillComparisonResult? comparison = null)
@@ -47,7 +70,7 @@ internal static class CopiesPresentation
         }
         if (comparison is not null)
         {
-            Line("Source", Source(comparison.SourceRelationship));
+            Line("Source relationship", Source(comparison.SourceRelationship));
             Line("Revision", Revision(comparison.RevisionRelationship));
             Line("Files", comparison.PayloadRelationship switch
             {
@@ -65,7 +88,7 @@ internal static class CopiesPresentation
         }
         else if (selected.InstallationId != reference.InstallationId)
         {
-            Line("Source", Source(SkillComparisonService.SourceRelationship(reference, selected)));
+            Line("Source relationship", Source(SkillComparisonService.SourceRelationship(reference, selected)));
             Line("Revision", Revision(SkillComparisonService.RevisionRelationship(reference, selected)));
             text.AppendLine("Select Compare to inspect local files. No preferred version is inferred.");
         }
@@ -77,9 +100,11 @@ internal static class CopiesPresentation
         Line("Recorded ref", selected.Revision.RepositoryRef);
         Line("Authored version", selected.FrontMatter.Version);
         Line("Pin", selected.Revision.PinnedRef ?? (selected.Pinned ? "pinned; ref unknown" : "no pin recorded"));
-        Line("Source", selected.SourceIdentity.Origin);
+        Line("Recorded source", selected.SourceIdentity.Origin);
         Line("Skill subpath", selected.SourceIdentity.Subpath is "" ? "repository root" : selected.SourceIdentity.Subpath);
         Line("Reference location", reference.ResolvedPath);
+        if (UpdateUnavailableReason(selected) is { } updateReason) Line("Update unavailable", updateReason);
+        if (CleanupUnavailableReason(group, selected) is { } cleanupReason) Line("Cleanup unavailable", cleanupReason);
         if (group.Partial) text.AppendLine("Partial discovery: other installations or consumers may exist.");
         if (group.Omitted > 0) Line("Additional copies not shown", group.Omitted.ToString());
         if (group.Ambiguous > 0) Line("Ambiguous installation addresses excluded", group.Ambiguous.ToString());

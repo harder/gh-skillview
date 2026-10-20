@@ -27,6 +27,10 @@ public sealed class CopiesPresentationTests
         new(left.InstallationId, right.InstallationId, "same-source", "different-recorded-revisions", "different-contexts", "different-payloads",
             "left", "right", ["SKILL.md"], 1, true, false, "Review differences", []);
 
+    internal static CleanupClassifier.Candidate Collision(InstalledSkill skill) =>
+        new(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "copies", skill, true)
+        { Impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup") };
+
     [Fact]
     public void RelatedCopiesRetainSeparateOriginsAndGroupKnownSourceWithoutTreatingSharedConsumersAsCopies()
     {
@@ -67,6 +71,28 @@ public sealed class CopiesPresentationTests
     }
 
     [Fact]
+    public void AmbiguousOrMissingSelectedCopyRefusesInsteadOfSubstitutingASibling()
+    {
+        var selected = Copy("/selected"); var sibling = Copy("/sibling");
+        var ambiguous = CopiesPresentation.Build(InventorySnapshot.Empty with { Skills = [selected, selected, sibling] }, selected, TestContext.Current.CancellationToken);
+        Assert.Empty(ambiguous.Copies); Assert.Equal(1, ambiguous.Ambiguous);
+        var differentMetadata = selected with { Name = "other", FrontMatter = SkillFrontMatter.Empty };
+        Assert.Empty(CopiesPresentation.Build(InventorySnapshot.Empty with { Skills = [selected, differentMetadata, sibling] }, selected, TestContext.Current.CancellationToken).Copies);
+        Assert.Empty(CopiesPresentation.Build(InventorySnapshot.Empty with { Skills = [sibling] }, selected, TestContext.Current.CancellationToken).Copies);
+    }
+
+    [Fact]
+    public void UnresolvedConfiguredRootsRemainPartialWithoutProviderFailures()
+    {
+        var selected = Copy("/selected");
+        var snapshot = InventorySnapshot.Empty with { Skills = [selected], ConfiguredRootsComplete = false };
+        Assert.False(snapshot.IsPartial);
+        var group = CopiesPresentation.Build(snapshot, selected, TestContext.Current.CancellationToken);
+        Assert.True(group.Partial);
+        Assert.Contains("Partial discovery", CopiesPresentation.Render(group, selected, selected));
+    }
+
+    [Fact]
     public void UnknownProvenanceIncompleteComparisonAndUntrustedFieldsRemainExplicitAndBounded()
     {
         var left = Copy("/left") with { FrontMatter = SkillFrontMatter.Empty };
@@ -83,14 +109,18 @@ public sealed class CopiesPresentationTests
     }
 
     [Fact]
-    public void CleanupHandoffFiltersByExactPhysicalIdAndPathEvenForSameName()
+    public void CleanupHandoffRequiresExactlyOneMatchingIssueCandidateAndSubjectAddress()
     {
         var selected = Copy("/one"); var other = Copy("/two");
-        CleanupClassifier.Candidate Candidate(InstalledSkill skill) => new(CleanupClassifier.CandidateKind.NameCollision, skill.ResolvedPath, "copies", skill, true)
-        { Impact = OperationImpact.Payload(OperationSubject.From(skill), "cleanup") };
-        var candidate = Candidate(selected);
-        var result = SkillViewWorkflowCoordinator.FilterCleanupForInstallation([Candidate(other), candidate], OperationSubject.From(selected));
+        var candidate = Collision(selected);
+        var subject = OperationSubject.From(selected);
+        var wrongKind = candidate with { Kind = CleanupClassifier.CandidateKind.EmptyDirectory, ReviewOnly = false };
+        var wrongPath = candidate with { Path = "/exposure/link" };
+        var result = SkillViewWorkflowCoordinator.FilterCleanupForInstallation([Collision(other), wrongKind, wrongPath, candidate], subject, "NameCollision");
         Assert.Same(candidate, Assert.Single(result));
-        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate], OperationSubject.From(selected) with { Path = "/replacement" }));
+        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate], subject with { Path = "/replacement" }, "NameCollision"));
+        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([wrongKind, wrongPath], subject, "NameCollision"));
+        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate, candidate], subject, "NameCollision"));
+        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate], subject, "Duplicate"));
     }
 }

@@ -120,7 +120,8 @@ deferred the remaining native checks and merged it. This is not a completed
 native-platform or release proof.
 
 The next approved bounded task is **Copies and versions** in the Changes TUI,
-on `codex/copies-comparison-ux`: show related physical installations and recorded
+in [PR #79](https://github.com/harder/gh-skillview/pull/79)
+(`codex/copies-comparison-ux`): show related physical installations and recorded
 consumers, compare two explicitly with the existing read-only comparison engine,
 then hand the selected exact location to existing update/version or cleanup
 review. Keep this as a small navigation and presentation change. Automatic

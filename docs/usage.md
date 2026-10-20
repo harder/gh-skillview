@@ -110,7 +110,9 @@ The original selection is the reference. Select another row and press
 the pair. This does not check upstream availability or infer which version is
 best. **Update / version...** selects that exact location in the existing Updates
 workspace, where **Choose version...** offers a Git tag. **Cleanup review...**
-refreshes cleanup findings for that location; name conflicts remain review-only.
+opens the matching captured issue at that location; name conflicts remain
+review-only. Actions without an applicable finding, and updates to managed
+read-only copies, are disabled with an explanation in the details.
 Opening either review changes no skill files. The list shows at most 128 copies;
 comparison summaries show at most 12 changed paths and report omissions.
 

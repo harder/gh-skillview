@@ -9,7 +9,9 @@ mutation operation. Base: `4276809d4e186b0501a2cd7fd6fbf746eb7a4c49`.
 
 - One row represents one reconciled physical installation, retaining all recorded
   consumers. Matching names and known source/subpath identities find related
-  rows; ambiguous addresses are excluded visibly. The list caps at 128 copies.
+  rows; ambiguous addresses are excluded visibly. An ambiguous original
+  selection refuses the view rather than selecting a sibling. The list caps
+  at 128 copies.
 - Selected-copy details retain location, scope, source/subpath, recorded ref,
   authored version and pin. Unknown provenance and partial discovery stay
   explicit. Rows and headers abbreviate paths for display only; actions retain
@@ -19,9 +21,12 @@ mutation operation. Base: `4276809d4e186b0501a2cd7fd6fbf746eb7a4c49`.
   be newer or preferred. File-byte equality does not establish metadata equality.
   The summary bounds fields/text, changed paths (12) and diagnostics (8), with
   visible omissions; existing CLI comparison retains fuller evidence.
-- Update/version review selects exactly one installation. Cleanup recaptures
-  inventory and filters findings by both physical ID and complete path. Missing
-  or ambiguous installations refuse handoff. Existing mutation validators and
+- Update/version review selects exactly one installation. Cleanup keeps the
+  captured snapshot inside the same owned Changes dispatch and requires exactly
+  one finding with the matching issue kind, candidate path, physical ID and
+  subject path. Missing or ambiguous installations refuse handoff. Unavailable
+  actions are disabled with reasons, including updates to managed read-only
+  copies. Existing mutation validators and
   review requirements remain authoritative; name conflicts stay review-only.
 - Comparison owns its worker through queued UI completion. Close/Esc cancels
   and drains the operation before disposing the dialog. Detail-editor Tab and
@@ -36,7 +41,7 @@ unknown/partial results, ambiguity, bounds, exact cleanup filtering, actual
 keyboard selection/Tab/Enter and modal cancellation. Modal keyboard/layout
 coverage uses both 80×24 and 120×36 and verifies controls fit without overlapping.
 
-Final local results: **49 focused tests and 9 integration tests passed**. Release
+Final local results: **54 focused tests and 9 integration tests passed**. Release
 builds of the test project and App passed with zero warnings/errors. Full-solution
 `dotnet format SkillView.sln --no-restore --verify-no-changes` and whitespace
 checks passed. No dependency or lock-file changes are included.
@@ -80,3 +85,29 @@ This proves bounded local comparison and review navigation. It does not add
 automatic consolidation, source adoption, exposure detach or persistent revision
 approvals. Native mutation behavior and live `gh` compatibility were not
 re-proven by this UI walkthrough. PR #78's deferred native checks remain deferred.
+
+## PR #79 review follow-up
+
+The [first review](https://github.com/harder/gh-skillview/pull/79#issuecomment-6301740153)
+led to exact issue/path matching and a single owned cleanup dispatch using the
+captured snapshot. Buttons now explain unavailable actions before closing the
+dialog, including managed read-only updates. Comparison changes controls only
+after successful worker admission and restores actual table focus on completion
+or failure. Unresolved configured roots mark both Copies and the main Changes
+queue partial. A shared internal copy-review predicate keeps routing and guidance
+aligned, and source relationship/origin have distinct labels.
+
+The similar-issue check also covered ambiguous IDs with different metadata,
+duplicate cleanup findings, raw control characters in failure diagnostics, and
+failure during comparison cancellation-source construction. Diagnostics are
+sanitized; worker initialization is inside the error-completion boundary. Other
+modal start sites retain synchronous ownership guards; this follow-up does not
+rewrite their lifecycles.
+
+An additional real 80×24 PTY run confirmed Down selects another row immediately
+after comparison. Cleanup opened only `other/demo`'s matching review-only issue;
+the stub call count stayed **62 → 62** across that handoff, confirming no second
+`gh` inventory capture. Review captures/transcript are private under
+`/var/tmp/skillview-copies-ux/pty/evidence/*review1*`. The 63 passing local tests
+include regressions for exact candidate matching, ambiguity, incomplete configured
+roots, disabled actions, restored focus and sanitized failure recovery.

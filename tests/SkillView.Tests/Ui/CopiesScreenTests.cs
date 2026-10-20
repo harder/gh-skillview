@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Logging;
 using SkillView.Maintenance;
 using SkillView.Ui;
@@ -56,16 +57,84 @@ public sealed class CopiesScreenTests
                 var text = dialog.SubViews.OfType<Editor>().Single().Text.ToString();
                 if (!text.Contains("Differing files: 1", StringComparison.Ordinal)) return true;
                 Assert.Contains("Different recorded revisions", text); Assert.Contains("Changed: SKILL.md", text);
+                Assert.True(table.HasFocus);
                 compared = true;
                 var actionButton = dialog.SubViews.OfType<Button>().Single(button => button.Text == actionLabel);
                 actionButton.SetFocus(); Assert.True(actionButton.HasFocus); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); return false;
             });
-            choice = CopiesScreen.Show(app, new Logger(), new([first, second], 0, 0, false), (left, right, _) =>
+            var group = new CopiesGroup([first, second], 0, 0, false)
+            { CleanupCandidates = ImmutableDictionary<string, SkillView.Inventory.CleanupClassifier.Candidate>.Empty.Add(second.InstallationId, CopiesPresentationTests.Collision(second)) };
+            choice = CopiesScreen.Show(app, new Logger(), group, (left, right, _) =>
             { calls++; Assert.Same(first, left); Assert.Same(second, right); return Task.FromResult(CopiesPresentationTests.Compared(left, right)); },
                 TestContext.Current.CancellationToken, readyForTests: value => dialog = value);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.False(timedOut); Assert.True(compared); Assert.Equal(1, calls);
         Assert.NotNull(choice); Assert.Equal(action, choice.Action.ToString()); Assert.Equal(second.InstallationId, choice.Subject.InstallationId); Assert.Equal(second.ResolvedPath, choice.Subject.Path);
+    }
+
+    [Fact]
+    public async Task ManagedAndUnrelatedRowsExplainUnavailableActionsWithoutClosing()
+    {
+        var first = CopiesPresentationTests.Copy("/first");
+        var managed = CopiesPresentationTests.Copy("/managed", "renamed") with
+        { OwnershipClaims = [new("owner", "plugin", null, null, null) { InstallationMode = "managed-read-only", ReadOnly = true }] };
+        var checkedRow = false; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+            Dialog? dialog = null;
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (dialog is null) return true;
+                var table = dialog.SubViews.OfType<TableView>().Single(); table.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorDown));
+                Assert.Equal(1, table.GetSelectedRow());
+                Assert.False(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Update / version...").Enabled);
+                Assert.False(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cleanup review...").Enabled);
+                var text = dialog.SubViews.OfType<Editor>().Single().Text.ToString();
+                Assert.Contains("Managed copy: use its owning tool", text);
+                Assert.Contains("No unambiguous matching cleanup issue", text);
+                checkedRow = true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc)); return false;
+            });
+            Assert.Null(CopiesScreen.Show(app, new Logger(), new([first, managed], 0, 0, false),
+                (_, _, _) => throw new InvalidOperationException("No implicit comparison."), TestContext.Current.CancellationToken, value => dialog = value));
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.False(timedOut); Assert.True(checkedRow);
+    }
+
+    [Fact]
+    public async Task ComparisonFailureRestoresFocusAndSanitizesTheDiagnostic()
+    {
+        var first = CopiesPresentationTests.Copy("/first"); var second = CopiesPresentationTests.Copy("/second");
+        var requested = false; var checkedFailure = false; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+            Dialog? dialog = null;
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (dialog is null) return true;
+                var table = dialog.SubViews.OfType<TableView>().Single();
+                if (!requested)
+                {
+                    table.SetSelectedRow(1); dialog.SubViews.OfType<Button>().Single(button => button.Text == "Compare").SetFocus();
+                    requested = true; app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)); return true;
+                }
+                var status = dialog.SubViews.OfType<Label>().Select(label => label.Text.ToString()).FirstOrDefault(text => text.StartsWith("Comparison unavailable:", StringComparison.Ordinal));
+                if (status is null) return true;
+                Assert.DoesNotContain('\u001b', status); Assert.DoesNotContain('\n', status);
+                Assert.True(table.Enabled); Assert.True(table.HasFocus);
+                Assert.True(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Compare").Enabled);
+                checkedFailure = true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc)); return false;
+            });
+            Assert.Null(CopiesScreen.Show(app, new Logger(), new([first, second], 0, 0, false),
+                (_, _, _) => throw new IOException("untrusted\u001b[31m\npath"), TestContext.Current.CancellationToken, value => dialog = value));
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.False(timedOut); Assert.True(checkedFailure);
     }
 
     [Fact]

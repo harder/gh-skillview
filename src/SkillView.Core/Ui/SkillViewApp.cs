@@ -538,7 +538,7 @@ public sealed class SkillViewApp
                 CancellationCallbackReporter.For(_services.Logger, "changes tab"),
             activateEntryAsync: (entry, request) =>
             {
-                if (entry.Issue is "NameCollision" or "Duplicate")
+                if (entry.IsCopyReview)
                     return _workflows.ShowCopiesAsync(entry, request, OpenUpdatesWorkspace, GetRunLifetimeToken());
                 if (entry.Cleanup is not null) return _workflows.ShowSelectedCleanupAsync(entry, request);
                 if (request.IsCurrent) OpenUpdatesWorkspace(entry.Subject);
