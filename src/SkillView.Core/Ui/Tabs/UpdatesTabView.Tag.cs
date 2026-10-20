@@ -1,5 +1,7 @@
 using SkillView.Gh;
 using SkillView.Inventory.Models;
+using SkillView.Inventory;
+using SkillView.Maintenance;
 
 namespace SkillView.Ui.Tabs;
 
@@ -19,30 +21,89 @@ internal sealed partial class UpdatesTabView
         { _status.Text = " pin retained; plan and apply a separate unpin review before choosing a tag"; return; }
         string? tag;
         var loadGeneration = Interlocked.Read(ref _loadGeneration);
+        var reload = false;
+        OperationSubject? reloadSubject = null;
+        _versionReloadPending = false;
+        _versionReloadSubject = null;
         _choosingVersion = true;
         try { tag = _chooseTag(selected); }
-        finally { _choosingVersion = false; }
-        if (_lifetimeToken.IsCancellationRequested || loadGeneration != Interlocked.Read(ref _loadGeneration)) return;
-        if (_versionReloadPending)
+        finally
         {
-            var subject = _versionReloadSubject;
+            _choosingVersion = false;
+            reload = _versionReloadPending;
+            reloadSubject = _versionReloadSubject;
             _versionReloadPending = false;
             _versionReloadSubject = null;
-            // The modal may run a nested UI loop. A refresh during that loop
-            // invalidates its captured row: reload first and require a new choice.
-            _runTask(() => LoadForSubjectAsync(subject, afterVersionChoice: true), "updates.reload-after-version-choice");
+        }
+        if (_lifetimeToken.IsCancellationRequested || loadGeneration != Interlocked.Read(ref _loadGeneration)) return;
+        var hidden = _hiddenBox.Value == Terminal.Gui.Views.CheckState.Checked;
+        if (reload)
+        {
+            _runTask(() => ReloadChosenTagAsync(selected, tag, hidden, reloadSubject, loadGeneration), "updates.reload-after-version-choice");
             return;
         }
         if (tag is null) { _status.Text = " version selection canceled; no candidate prepared"; return; }
         if (string.IsNullOrWhiteSpace(tag)) { _status.Text = " enter one Git tag; no candidate prepared"; return; }
-        var hidden = _hiddenBox.Value == Terminal.Gui.Views.CheckState.Checked;
         _runTask(() => RunChosenTagAsync(selected, tag, hidden), "updates.choose-version");
+    }
+
+    private async Task ReloadChosenTagAsync(InstalledSkill selected, string? tag, bool hidden,
+        OperationSubject? subject, long generation)
+    {
+        if (!IsCurrentLoad(generation)) return;
+        if (_choosingVersion || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive)
+        {
+            _status.Text = " version choice not prepared; finish the current review, then refresh inventory";
+            return;
+        }
+        var capture = await LoadForSubjectCoreAsync(subject).ConfigureAwait(false);
+        if (capture is not { } fresh) return; // The loader preserves failures/cancellation.
+        await _runOnUi(() =>
+        {
+            if (!IsCurrentLoad(fresh.Generation)) return;
+            if (tag is null)
+            {
+                _status.Text = " version selection canceled; inventory refreshed; no candidate prepared";
+                return;
+            }
+            var target = MaintenanceQueueBuilder.ResolveInstallation(fresh.Snapshot, OperationSubject.From(selected));
+            if (target is null || !SameVersionChoice(selected, target)
+                || subject is not null && (subject.InstallationId != selected.InstallationId || !PathIdentity.Equals(subject.Path, selected.ResolvedPath)))
+            {
+                _status.Text = " installation changed, missing or ambiguous; choose its version again";
+                return;
+            }
+            if (_choosingVersion || _loadCancellations.HasActive || _operationCancellations.HasActive || _review is not null || _queue.Count > 0)
+            {
+                _status.Text = " version choice not prepared; finish the current review, then refresh inventory";
+                return;
+            }
+            _runTask(() => RunChosenTagAsync(target, tag, hidden), "updates.choose-refreshed-version");
+        }).ConfigureAwait(false);
+    }
+
+    private static bool SameVersionChoice(InstalledSkill selected, InstalledSkill fresh)
+    {
+        // Retain input across an unchanged observation, not execution approval.
+        // The saved planner still captures fresh payload/owner evidence for review.
+        var before = selected.ObservedSubject?.NativeObject;
+        var after = fresh.ObservedSubject?.NativeObject;
+        return selected.Name == fresh.Name && selected.Scope == fresh.Scope
+            && selected.SourceIdentity == fresh.SourceIdentity && selected.Revision == fresh.Revision
+            && selected.Pinned == fresh.Pinned && selected.Validity == fresh.Validity
+            && selected.Agents.ToHashSet().SetEquals(fresh.Agents)
+            && (before is null ? after is null : after is not null
+                && (before with { CapturedAt = null }) == (after with { CapturedAt = null }));
     }
 
     private async Task RunChosenTagAsync(InstalledSkill selected, string tag, bool hidden)
     {
-        if (_lifetimeToken.IsCancellationRequested || _operationCancellations.HasActive || _loadCancellations.HasActive
-            || _review is not null || _queue.Count > 0) return;
+        if (_lifetimeToken.IsCancellationRequested) return;
+        if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0)
+        {
+            _status.Text = " version choice not prepared; finish the current operation or review, then refresh inventory";
+            return;
+        }
         var ghPath = _ghPathProvider();
         if (ghPath is null) { _status.Text = " gh unavailable; no candidate prepared"; return; }
         if (selected.Pinned) { _status.Text = " pin retained; unpin separately before choosing a tag"; return; }

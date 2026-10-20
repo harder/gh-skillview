@@ -37,8 +37,8 @@ internal static class GitTagSelectionModal
         var label = new Label { X = 0, Y = Pos.AnchorEnd(7), Text = "Git tag:" };
         var tag = new TextField { X = 10, Y = Pos.AnchorEnd(7), Width = Dim.Fill(), Height = 1, Text = "" };
         var example = new Label { X = 0, Y = Pos.AnchorEnd(6), Width = Dim.Fill(), Height = 1, Text = "Example: v1.2.3. Tags only; branches and raw commits are excluded." };
-        var future = new Label { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Height = 1, Text = "One-time choice; later ordinary Update follows latest." };
-        var consumers = new Label { X = 0, Y = Pos.AnchorEnd(4), Width = Dim.Fill(), Height = 1, Text = "Every agent sharing this physical installation is affected." };
+        var future = new Label { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Height = 1, Text = VersionUpdateGuidance.ShortTagChoice };
+        var consumers = new Label { X = 0, Y = Pos.AnchorEnd(4), Width = Dim.Fill(), Height = 1, Text = VersionUpdateGuidance.SharedConsumers };
         var pins = new Label { X = 0, Y = Pos.AnchorEnd(3), Width = Dim.Fill(), Height = 1, Text = "Pins require a separate reviewed unpin before choosing a tag." };
         var status = new Label { X = 0, Y = Pos.AnchorEnd(2), Width = Dim.Fill(), Height = 1, Text = "Enter prepares review; Esc cancels. Nothing is applied." };
         var cancel = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Cancel" };

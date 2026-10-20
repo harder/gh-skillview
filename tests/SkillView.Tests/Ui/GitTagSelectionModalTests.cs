@@ -1,4 +1,5 @@
 using SkillView.Inventory.Models;
+using SkillView.Maintenance;
 using SkillView.Ui;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
@@ -35,8 +36,8 @@ public sealed class GitTagSelectionModalTests
                 Assert.Equal(chosen, input.Text.ToString());
                 if (pastedSuffix.Length > 0) input.Text = " " + chosen + pastedSuffix;
                 var notes = dialog.SubViews.OfType<Label>().ToArray();
-                Assert.Contains(notes, note => note.Text.Contains("later ordinary Update follows latest", StringComparison.Ordinal));
-                Assert.Contains(notes, note => note.Text.Contains("sharing this physical installation", StringComparison.Ordinal));
+                Assert.Contains(notes, note => note.Text == VersionUpdateGuidance.ShortTagChoice);
+                Assert.Contains(notes, note => note.Text == VersionUpdateGuidance.SharedConsumers);
                 Assert.Contains(notes, note => note.Text.Contains("separate reviewed unpin", StringComparison.Ordinal));
                 foreach (var control in dialog.SubViews.Where(child => child is Label or TextField or Button))
                 {

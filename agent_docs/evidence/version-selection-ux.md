@@ -70,8 +70,8 @@ GitHub can also return 404 for inaccessible resources. Other HTTP errors keep
 their original classification, and subprocess diagnostics remain available.
 Idle terminal outcomes clear the tag-choice header. Refresh requests during the
 chooser retain the latest subject and reload after either accept or cancel;
-the captured choice is discarded and the user must choose again from refreshed
-inventory. Deactivation likewise cannot prepare the old row. Surrounding pasted
+the initial follow-up discarded the captured choice. The round-2 refinement below
+supersedes that behavior. Deactivation cannot prepare the old row. Surrounding pasted
 whitespace is trimmed in the modal; CLI and source-boundary validation stays exact.
 
 The encoded-slash concern did not reproduce: read-only GitHub API requests to
@@ -99,3 +99,37 @@ check can validly refuse when a shared ancestor changes. Its fixture now points
 through dot components to an existing directory with a sentinel: the assertion
 requires refusal and unchanged target bytes/link text, without imposing error
 priority or relying on a broken target. Native production checks are unchanged.
+
+## Round-2 review decisions
+
+Accepted tag input now survives a deferred refresh when the original address
+still resolves uniquely and its observed source, revision/fingerprint, pin,
+validity, consumers and native identity/generation are unchanged. Observation
+timestamps alone do not invalidate the choice. Preparation uses the fresh row;
+it still captures full saved-plan evidence and requires review before apply.
+Missing, ambiguous, changed or differently selected targets require a fresh
+choice. This check preserves user input; it does not grant mutation authority or
+claim a complete payload fingerprint when inventory has none.
+
+Reload flags are reset before opening the chooser and in its `finally`, including
+exceptions and canceled loads. Competing update/unpin entry points are blocked
+while the chooser is open. A later competing review produces an explicit refusal,
+and refresh failures retain the loader's error. Cancel reports cancellation even
+when refreshed inventory is empty; it does not tell the user to repeat a choice.
+
+The modal and live table header share concise `VersionUpdateGuidance` text, with
+the modal also using its shared-consumer line. Explicit-tag 404 context now covers
+ref, annotated-tag, commit and subpath-tree requests through one `Get` helper;
+other HTTP failures and cancellation retain their existing behavior/diagnostics.
+
+Round-2 finding 6 is an accepted presentation limit: reopened saved reviews
+describe the immutable ref/commit/tree and future update behavior truthfully,
+without asserting how the tag was selected. Persisting a new provenance field
+only to distinguish that label is outside this bounded change. Live explicit
+requests keep the tag-choice cue; no schema or saved fingerprint changed.
+
+Round-2 verification passed 155 focused tests: resolver 60, reviewed Updates 45,
+Updates tab 13, tag modal 7, renderer 6, tag workflow 12, update CLI 11 and
+source-review CLI 1. Integration tests passed 9/9. Release test/App/integration
+builds had zero warnings/errors; scoped formatting and whitespace checks passed.
+These overlap earlier runs. Hosted checks must still pass on the final head.

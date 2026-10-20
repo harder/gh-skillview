@@ -66,6 +66,8 @@ internal sealed class GhRevisionResolver
             || path.Length > 0 && path.Split('/').Any(part => part is "" or "." or ".." or ".git"
                 || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
             throw new IOException("The recorded source subpath is unsupported.");
+        var tagNotFoundMessage = selectedTag is null ? null
+            : $"Could not resolve tag '{selectedTag}' in {repo}: requested source object was not found or inaccessible (HTTP 404). No fallback or payload change was admitted.";
         try
         {
             string reference;
@@ -93,13 +95,13 @@ internal sealed class GhRevisionResolver
                     commit = await ResolveRef("tags", tag).ConfigureAwait(false);
                 }
             }
-            var commitBody = await Get($"repos/{repo}/git/commits/{commit}", token).ConfigureAwait(false);
+            var commitBody = await Get($"repos/{repo}/git/commits/{commit}", token, tagNotFoundMessage).ConfigureAwait(false);
             using var document = JsonDocument.Parse(commitBody);
             if (document.RootElement.GetProperty("sha").GetString() != commit) throw new IOException("Resolved commit identity disagrees.");
             var tree = FullId(document.RootElement.GetProperty("tree").GetProperty("sha").GetString());
             foreach (var component in path.Length == 0 ? [] : path.Split('/'))
             {
-                using var listing = JsonDocument.Parse(await Get($"repos/{repo}/git/trees/{tree}", token).ConfigureAwait(false));
+                using var listing = JsonDocument.Parse(await Get($"repos/{repo}/git/trees/{tree}", token, tagNotFoundMessage).ConfigureAwait(false));
                 var root = listing.RootElement;
                 if (root.GetProperty("sha").GetString() != tree || root.GetProperty("truncated").GetBoolean())
                     throw new IOException("Source subpath tree coverage is incomplete.");
@@ -118,12 +120,7 @@ internal sealed class GhRevisionResolver
             {
                 if (string.IsNullOrWhiteSpace(name) || name.Length > 1024 || name.Any(char.IsControl))
                     throw new IOException("Source ref is invalid.");
-                token.ThrowIfCancellationRequested();
-                var response = await request($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token).ConfigureAwait(false);
-                if (response.Status == 404 && selectedTag is not null)
-                    throw new GhSourceRequestException($"Tag '{selectedTag}' was not found or is inaccessible in {repo} (HTTP 404); check the tag and repository access. No fallback or payload change was admitted.", response.StdOut, response.StdErr);
-                RequireSuccess(response);
-                var body = response.Body;
+                var body = await Get($"repos/{repo}/git/ref/{kind}/{Uri.EscapeDataString(name)}", token, tagNotFoundMessage).ConfigureAwait(false);
                 using var refDocument = JsonDocument.Parse(body);
                 if (refDocument.RootElement.GetProperty("ref").GetString() != "refs/" + kind + "/" + name)
                     throw new IOException("Source reference response disagrees with the selected ref.");
@@ -134,7 +131,7 @@ internal sealed class GhRevisionResolver
                     if (value.GetProperty("type").GetString() == "commit") return sha;
                     if (kind != "tags" || value.GetProperty("type").GetString() != "tag")
                         throw new IOException("Source ref does not resolve to a commit.");
-                    using var tag = JsonDocument.Parse(await Get($"repos/{repo}/git/tags/{sha}", token).ConfigureAwait(false));
+                    using var tag = JsonDocument.Parse(await Get($"repos/{repo}/git/tags/{sha}", token, tagNotFoundMessage).ConfigureAwait(false));
                     if (tag.RootElement.GetProperty("sha").GetString() != sha) throw new IOException("Annotated tag identity disagrees.");
                     value = tag.RootElement.GetProperty("object").Clone();
                 }
@@ -145,10 +142,12 @@ internal sealed class GhRevisionResolver
         { throw new IOException("Source revision response is malformed or unsupported.", ex); }
     }
 
-    private async Task<string> Get(string endpoint, CancellationToken token)
+    private async Task<string> Get(string endpoint, CancellationToken token, string? notFoundMessage = null)
     {
         token.ThrowIfCancellationRequested();
         var response = await request(endpoint, token).ConfigureAwait(false);
+        if (response.Status == 404 && notFoundMessage is not null)
+            throw new GhSourceRequestException(notFoundMessage, response.StdOut, response.StdErr);
         RequireSuccess(response);
         return response.Body;
     }

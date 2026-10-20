@@ -87,12 +87,70 @@ public sealed class GhRevisionResolverTests
         Assert.Equal("remote diagnostic", error.StdErr);
         if (status == 404)
         {
-            Assert.Contains("Tag 'missing'", error.Message);
+            Assert.Contains("tag 'missing'", error.Message);
             Assert.Contains("harder/fixture", error.Message);
             Assert.Contains("inaccessible", error.Message);
         }
         else Assert.DoesNotContain("was not found", error.Message);
         Assert.Equal([endpoint], calls);
+    }
+
+    [Theory]
+    [InlineData("annotated", 404)]
+    [InlineData("commit", 404)]
+    [InlineData("tree", 404)]
+    [InlineData("commit", 401)]
+    [InlineData("commit", 403)]
+    [InlineData("commit", 429)]
+    [InlineData("commit", 500)]
+    public async Task ExplicitTagObjectFailuresKeepTagContextOnlyFor404AndRetainDiagnostics(string stage, int status)
+    {
+        const string refEndpoint = "repos/harder/fixture/git/ref/tags/v2";
+        var failedEndpoint = stage switch
+        {
+            "annotated" => $"repos/harder/fixture/git/tags/{Tag}",
+            "commit" => $"repos/harder/fixture/git/commits/{Commit}",
+            _ => $"repos/harder/fixture/git/trees/{SkillsTree}"
+        };
+        if (stage == "annotated") responses[refEndpoint] = new(200, Ref("tags/v2", Tag, "tag"));
+        responses[failedEndpoint] = new(status, "{}") { StdOut = "actual HTTP source response", StdErr = "actual gh diagnostic" };
+
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "skills/demo", "v2", Token));
+
+        Assert.Contains($"HTTP {status}", error.Message);
+        Assert.Equal("actual HTTP source response", error.StdOut); Assert.Equal("actual gh diagnostic", error.StdErr);
+        if (status == 404)
+        {
+            Assert.Contains("Could not resolve tag 'v2' in harder/fixture", error.Message);
+            Assert.Contains("requested source object was not found or inaccessible", error.Message);
+        }
+        else
+        {
+            Assert.Contains("Source request failed", error.Message);
+            Assert.DoesNotContain("not found", error.Message);
+        }
+        Assert.Equal(refEndpoint, calls[0]); Assert.Equal(failedEndpoint, calls[^1]);
+        Assert.DoesNotContain(callsLatest, calls); Assert.DoesNotContain("repos/harder/fixture", calls);
+    }
+
+    [Fact]
+    public async Task ExplicitTagCancellationDuringCommitLookupPropagatesWithoutFallback()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failedEndpoint = $"repos/harder/fixture/git/commits/{Commit}";
+        var resolver = new GhRevisionResolver((endpoint, token) =>
+        {
+            calls.Add(endpoint);
+            if (endpoint == failedEndpoint)
+            {
+                cancellation.Cancel();
+                return Task.FromCanceled<GhApiPayload>(token);
+            }
+            return Task.FromResult(responses[endpoint]);
+        });
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resolver.ResolveTagAsync(Repository, "skills/demo", "v2", cancellation.Token));
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Equal(new[] { "repos/harder/fixture/git/ref/tags/v2", failedEndpoint }, calls);
     }
 
     [Theory]

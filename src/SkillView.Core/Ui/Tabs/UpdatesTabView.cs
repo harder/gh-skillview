@@ -237,15 +237,17 @@ internal sealed partial class UpdatesTabView : FrameView
 
     internal Task LoadAsync() => LoadForSubjectAsync(_drillInSubject);
 
-    internal async Task LoadForSubjectAsync(OperationSubject? selected, bool afterVersionChoice = false)
+    internal Task LoadForSubjectAsync(OperationSubject? selected) => LoadForSubjectCoreAsync(selected);
+
+    private async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectCoreAsync(OperationSubject? selected)
     {
         if (_choosingVersion)
         {
             _versionReloadPending = true;
             _versionReloadSubject = selected;
-            return;
+            return null;
         }
-        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return null;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -265,6 +267,7 @@ internal sealed partial class UpdatesTabView : FrameView
         try
         {
             var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
+            var published = false;
             await _runOnUi(() =>
             {
                 if (!IsCurrentLoad(loadGeneration))
@@ -274,9 +277,9 @@ internal sealed partial class UpdatesTabView : FrameView
 
                 if (selected is null) Populate(snapshot);
                 else PopulateSelected(snapshot, selected);
-                if (afterVersionChoice && _skills.Count > 0)
-                    _status.Text = " inventory refreshed; select the installation and choose its version again";
+                published = true;
             }).ConfigureAwait(false);
+            return published ? (snapshot, loadGeneration) : null;
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
         {
@@ -295,6 +298,7 @@ internal sealed partial class UpdatesTabView : FrameView
                 SetBusy(false);
             }).ConfigureAwait(false);
         }
+        return null;
     }
 
     private void Populate(InventorySnapshot snapshot)
@@ -464,7 +468,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void UpdateCurrentRow()
     {
-        if (_wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_choosingVersion || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count)
         {
@@ -479,7 +483,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
+        if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -527,7 +531,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunUnpinAsync()
     {
-        if (_unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
+        if (_choosingVersion || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
             || _review is not null || _queue.Count > 0) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation to unpin"; return; }
@@ -542,6 +546,8 @@ internal sealed partial class UpdatesTabView : FrameView
     internal void CancelPendingLoad()
     {
         Interlocked.Increment(ref _loadGeneration);
+        _versionReloadPending = false;
+        _versionReloadSubject = null;
         _loadCancellations.Cancel();
         if (!_operationCancellations.HasActive)
         {
@@ -552,8 +558,6 @@ internal sealed partial class UpdatesTabView : FrameView
     internal void CancelPendingWork()
     {
         CancelPendingLoad();
-        _versionReloadPending = false;
-        _versionReloadSubject = null;
         _operationCancellations.Cancel();
         _review = null;
         ResetLocalReview();
@@ -579,7 +583,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _unpinOnlyButton.Enabled = enabled && _unpinRunner is not null;
         _chooseVersionButton.Enabled = enabled && !_lifetimeToken.IsCancellationRequested;
         _tableLabel.Text = _queueOptions?.Tag is not null
-            ? "One-time tag choice · later ordinary Update follows latest"
+            ? VersionUpdateGuidance.ShortTagChoice
             : "Space marks · c compare/plan row · u review · U marked · p unpin";
         _allBox.Enabled = enabled;
         _hiddenBox.Enabled = enabled;
