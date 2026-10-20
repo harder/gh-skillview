@@ -8,6 +8,13 @@ completed features. Finish a bounded item only when its remaining work is clear
 and proportionate. The status and priority judgments below are provisional where
 evidence is incomplete.
 
+The current project goal is to help users find skills, understand their physical
+installations and affected agents, diagnose installation/version/duplicate issues,
+and apply understandable repairs through existing safe operations. Excellent
+terminal UX is part of that goal. This ledger supersedes the former all-21
+completion objective and older handoff instructions to finish every audit item.
+The deferred table is context for future decisions, not a completion backlog.
+
 ## Snapshot and how to read it
 
 - Inventory date: 2026-10-19. The original inspected checkout is
@@ -84,27 +91,29 @@ broader acceptance or portability proof is unfinished.
 
 ## Next bounded priority
 
-PR #72's install safeguards and PR #75's Changes summaries are merged. PR #76's
-CI runtime improvements are also merged; these do not expand product scope.
-
-The current bounded change is Cleanup review UX on
-`codex/cleanup-review-ux`, based on `a9703a75273bdc9f3f0c2b5851bd224ccfcdc3e2`.
-It replaces default technical tables/IDs with a plain issue, action, affected-agent
-and recovery summary; F2 keeps technical evidence available. Private keyboard
-walkthroughs at 80×24 and 120×36 verified Review → Apply → Rescan for a broken
-link and an empty directory while retaining an unchanged healthy skill. Testing
-also exposed and fixed empty directories being mislabeled as malformed skills;
-owner, partial-coverage and symlink protections remain in force. Native validators
+PR #72's install safeguards, PR #75's Changes summaries and PR #76's CI runtime
+improvements are merged. PR #77's Cleanup review UX merged on 2026-10-20 as
+`2a736402f6dfa9cbbdeda88c94940ff930691e03`. It replaces default technical
+tables/IDs with a plain issue, action, affected-agent and recovery summary;
+F2 keeps technical evidence available. Private keyboard walkthroughs at 80×24
+and 120×36 verified Review → Apply → Rescan for a broken link and an empty
+directory while retaining an unchanged healthy skill. Testing also exposed and
+fixed empty directories being mislabeled as malformed skills; owner,
+partial-coverage and symlink protections remain in force. Native validators
 and removal authority are unchanged. A deterministic UI test verifies Esc drains
-in-flight removal and retains partial-mutation counts. See
-`agent_docs/evidence/cleanup-review-ux.md` for verification and its limits. This
-branch is pending PR review; these statements do not claim merged or released
-availability.
+in-flight removal and retains partial-mutation counts. Managed/native CI passed
+on the reviewed head. See `agent_docs/evidence/cleanup-review-ux.md` for validation
+and its limits. Merged availability does not claim release availability.
 
-After that, consider selecting a version for one specific installed copy through
-the existing update flow. First establish a small implementation boundary from
-the useful parts of PR #73. Its broader persistent approval/approved-restore
-policy remains deferred; this is not approval to resume the whole PR.
+The user authorized a bounded comparison of PR #73 with the existing update flow
+on 2026-10-20. The result is [version-selection-scope.md](version-selection-scope.md).
+It recommends choosing a Git tag for one installed copy through existing saved
+update review/apply, with all shared consumers visible. It does not authorize
+resuming PR #73 wholesale. The user subsequently approved the documented tag-only
+implementation on 2026-10-20. Persistent approval and approved-restore policy,
+raw commits and new pin behavior remain deferred. The bounded finish point is
+the documented CLI/TUI flow, focused verification and a reviewable PR. That
+implementation is now in PR #78, pending review and CI on its combined head.
 
 ## Maintenance guidance
 

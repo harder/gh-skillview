@@ -2322,7 +2322,7 @@ public static partial class CliDispatcher
             | `compare` | Compare complete payloads and recorded source/revision facts for two exact installations. Performs no remote check or mutation. | `--path`, `--other-path`, `--json` |
             | `backup` | Capture bounded payload evidence outside installed skills. Does not replace a payload or grant restore authority. | `--path` or `--install-id`, `--json` |
             | `restore-plan` | Stage the recorded immutable Git tree and save an exact replacement plan. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |
-            | `update-plan` | Resolve and stage an immutable newer revision, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--unpin`, `--allow-hidden-dirs`, `--json` |
+            | `update-plan` | Stage an immutable latest revision or chosen Git tag, retaining a recorded base and local-change review. | `--path` or `--install-id`, `--tag TAG` (unpin separately), `--unpin`, `--allow-hidden-dirs`, `--json` |
             | `source-switch-plan` | Review an ownerless local installation switching to a different existing durable ordinary local source. | exactly one `--path` or `--install-id`, `--new-source <absolute directory>`, `--json` |
             | `source-switch-inspect`, `source-switch-apply`, `source-switch-recover`, `source-switch-undo` | Inspect or execute schema6; exact original retained; frozen recovery after retain. | `--id`, `--expect`, `--yes`, `--disposition replace-local-source-retain-original`, `--json` |
             | `reimport-plan` | Save a baseline-less replacement from the same recorded local source; retain the exact installed original. | `--path` or `--install-id`, `--allow-hidden-dirs`, `--json` |

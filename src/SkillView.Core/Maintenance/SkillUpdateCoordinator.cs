@@ -23,6 +23,8 @@ public sealed class SkillUpdateCoordinator(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (options.Tag is not null)
+            return UpdateResult.Failure(options.DryRun, 2, "Tag selection requires saved update preparation, not the low-level gh update adapter.", []);
         if (options.Targets is not { Count: > 0 } targets || targets.Count > MaxTargets)
             return UpdateResult.Failure(options.DryRun, 2,
                 $"Select 1–{MaxTargets} exact physical installations before updating.", []);

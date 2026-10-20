@@ -49,7 +49,8 @@ public sealed class GhSkillUpdateService
         bool ConfirmApply = true,
         IReadOnlyList<InstalledSkill>? Targets = null,
         IReadOnlyDictionary<string, string>? ProcessEnvironment = null,
-        bool AllowHiddenDirectories = false);
+        bool AllowHiddenDirectories = false,
+        string? Tag = null);
 
     public async Task<UpdateResult> UpdateAsync(
         string ghPath,
@@ -57,6 +58,8 @@ public sealed class GhSkillUpdateService
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
+        if (options.Tag is not null)
+            return UpdateResult.Failure(options.DryRun, 2, "Tag selection requires a saved update plan; it cannot use gh skill update directly.", []);
         var args = BuildArgs(options);
         if (!options.DryRun)
         {

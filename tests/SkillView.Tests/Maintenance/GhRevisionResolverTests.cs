@@ -56,6 +56,129 @@ public sealed class GhRevisionResolverTests
     private const string callsLatest = "repos/harder/fixture/releases/latest";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExplicitNestedTagNeverQueriesLatestAndFreezesImmutableObjects(bool annotated)
+    {
+        const string endpoint = "repos/harder/fixture/git/ref/tags/release%2Fv1";
+        responses[endpoint] = new(200, Ref("tags/release/v1", annotated ? Tag : Commit, annotated ? "tag" : "commit"));
+        if (annotated) responses[$"repos/harder/fixture/git/tags/{Tag}"] = new(200,
+            "{\"sha\":\"" + Tag + "\",\"object\":{\"sha\":\"" + Commit + "\",\"type\":\"commit\"}}");
+        var result = await Resolver().ResolveTagAsync(Repository, "skills/demo/SKILL.md", "release/v1", Token);
+        Assert.Equal(new(Repository, "refs/tags/release/v1", Commit, SkillTree, "skills/demo"), result);
+        Assert.Equal(endpoint, calls[0]);
+        Assert.DoesNotContain(callsLatest, calls);
+        Assert.DoesNotContain("repos/harder/fixture", calls);
+    }
+
+    [Theory]
+    [InlineData(404)]
+    [InlineData(401)]
+    [InlineData(403)]
+    [InlineData(429)]
+    [InlineData(500)]
+    public async Task ExplicitTagFailureNeverFallsBack(int status)
+    {
+        const string endpoint = "repos/harder/fixture/git/ref/tags/missing";
+        responses[endpoint] = new(status, "{}") { StdOut = "source response", StdErr = "remote diagnostic" };
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "", "missing", Token));
+        Assert.Contains($"HTTP {status}", error.Message);
+        Assert.Equal("source response", error.StdOut);
+        Assert.Equal("remote diagnostic", error.StdErr);
+        if (status == 404)
+        {
+            Assert.Contains("tag 'missing'", error.Message);
+            Assert.Contains("harder/fixture", error.Message);
+            Assert.Contains("inaccessible", error.Message);
+        }
+        else Assert.DoesNotContain("was not found", error.Message);
+        Assert.Equal([endpoint], calls);
+    }
+
+    [Theory]
+    [InlineData("annotated", 404)]
+    [InlineData("commit", 404)]
+    [InlineData("tree", 404)]
+    [InlineData("commit", 401)]
+    [InlineData("commit", 403)]
+    [InlineData("commit", 429)]
+    [InlineData("commit", 500)]
+    public async Task ExplicitTagObjectFailuresKeepTagContextOnlyFor404AndRetainDiagnostics(string stage, int status)
+    {
+        const string refEndpoint = "repos/harder/fixture/git/ref/tags/v2";
+        var failedEndpoint = stage switch
+        {
+            "annotated" => $"repos/harder/fixture/git/tags/{Tag}",
+            "commit" => $"repos/harder/fixture/git/commits/{Commit}",
+            _ => $"repos/harder/fixture/git/trees/{SkillsTree}"
+        };
+        if (stage == "annotated") responses[refEndpoint] = new(200, Ref("tags/v2", Tag, "tag"));
+        responses[failedEndpoint] = new(status, "{}") { StdOut = "actual HTTP source response", StdErr = "actual gh diagnostic" };
+
+        var error = await Assert.ThrowsAsync<GhSourceRequestException>(() => Resolver().ResolveTagAsync(Repository, "skills/demo", "v2", Token));
+
+        Assert.Contains($"HTTP {status}", error.Message);
+        Assert.Equal("actual HTTP source response", error.StdOut); Assert.Equal("actual gh diagnostic", error.StdErr);
+        if (status == 404)
+        {
+            Assert.Contains("Could not resolve tag 'v2' in harder/fixture", error.Message);
+            Assert.Contains("requested source object was not found or inaccessible", error.Message);
+        }
+        else
+        {
+            Assert.Contains("Source request failed", error.Message);
+            Assert.DoesNotContain("not found", error.Message);
+        }
+        Assert.Equal(refEndpoint, calls[0]); Assert.Equal(failedEndpoint, calls[^1]);
+        Assert.DoesNotContain(callsLatest, calls); Assert.DoesNotContain("repos/harder/fixture", calls);
+    }
+
+    [Fact]
+    public async Task ExplicitTagCancellationDuringCommitLookupPropagatesWithoutFallback()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failedEndpoint = $"repos/harder/fixture/git/commits/{Commit}";
+        var resolver = new GhRevisionResolver((endpoint, token) =>
+        {
+            calls.Add(endpoint);
+            if (endpoint == failedEndpoint)
+            {
+                cancellation.Cancel();
+                return Task.FromCanceled<GhApiPayload>(token);
+            }
+            return Task.FromResult(responses[endpoint]);
+        });
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resolver.ResolveTagAsync(Repository, "skills/demo", "v2", cancellation.Token));
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Equal(new[] { "repos/harder/fixture/git/ref/tags/v2", failedEndpoint }, calls);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("../main")]
+    [InlineData("a//b")]
+    [InlineData("a.lock")]
+    [InlineData("a/.hidden")]
+    [InlineData("a@{b")]
+    [InlineData("a~1")]
+    [InlineData("a b")]
+    [InlineData("a\\b")]
+    [InlineData("@")]
+    public async Task InvalidExplicitTagRefusesBeforeRequests(string tag)
+    {
+        await Assert.ThrowsAsync<IOException>(() => Resolver().ResolveTagAsync(Repository, "", tag, Token));
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public async Task ExplicitTagCancellationNeverQueriesSource()
+    {
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Resolver().ResolveTagAsync(Repository, "", "v1", new(true)));
+        Assert.Empty(calls);
+    }
+
+    [Theory]
     [InlineData(401)]
     [InlineData(403)]
     [InlineData(429)]

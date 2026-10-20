@@ -20,15 +20,29 @@ internal sealed partial class ReplacementPlanStore
         catch (IOException) { return false; }
     }
 
-    internal async Task<ReplacementPreparation> PlanLatestAsync(string ghPath, InstalledSkill target,
-        InventorySnapshot inventory, bool unpin, CancellationToken token)
+    internal Task<ReplacementPreparation> PlanLatestAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, bool unpin, CancellationToken token) =>
+        PlanRevisionAsync(ghPath, target, inventory, unpin, null, token);
+
+    internal Task<ReplacementPreparation> PlanTagAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, string tag, CancellationToken token) =>
+        PlanRevisionAsync(ghPath, target, inventory, false, tag, token);
+
+    private async Task<ReplacementPreparation> PlanRevisionAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, bool unpin, string? tag, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (tag is not null) GhRevisionResolver.ValidateTag(tag);
         ManagedSkillDiscovery.RefuseTarget(target, token, runner);
-        if (target.Pinned && !unpin) throw new IOException("Exact pin retained; updating this installation requires explicit unpin review.");
+        if (target.Pinned && !unpin) throw new IOException(tag is null
+            ? "Exact pin retained; updating this installation requires explicit unpin review."
+            : "Exact pin retained. Use the separately reviewed unpin operation before choosing a version.");
         var process = runner ?? throw new IOException("Latest update planning requires a captured process context.");
-        var source = await new GhRevisionResolver(process, ghPath).ResolveLatestAsync(
-            target.FrontMatter.Upstream ?? throw new IOException("No observed remote source."), target.FrontMatter.GithubPath, token).ConfigureAwait(false);
+        var resolver = new GhRevisionResolver(process, ghPath);
+        var repository = target.FrontMatter.Upstream ?? throw new IOException("No observed remote source.");
+        var source = tag is null
+            ? await resolver.ResolveLatestAsync(repository, target.FrontMatter.GithubPath, token).ConfigureAwait(false)
+            : await resolver.ResolveTagAsync(repository, target.FrontMatter.GithubPath, tag, token).ConfigureAwait(false);
         var desired = target.FrontMatter with
         {
             GithubTreeSha = source.Tree,

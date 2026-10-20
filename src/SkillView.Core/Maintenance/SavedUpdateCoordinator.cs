@@ -127,6 +127,14 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
         token.ThrowIfCancellationRequested();
         if (options.Targets is not { Count: > 0 and <= SkillUpdateCoordinator.MaxTargets })
             return UpdateResult.Failure(options.DryRun, 2, $"Select 1–{SkillUpdateCoordinator.MaxTargets} exact installations.", []);
+        if (options.Tag is not null)
+        {
+            if (options.Targets.Count != 1 || options.All || options.DryRun || options.Unpin)
+                return UpdateResult.Failure(options.DryRun, 2,
+                    "Choose a tag for one installation only, without All, availability dry-run or unpin. Unpin separately before choosing a version.", []);
+            try { GhRevisionResolver.ValidateTag(options.Tag); }
+            catch (IOException ex) { return UpdateResult.Failure(false, 2, ex.Message, []); }
+        }
         if (inventory.IsPartial || !inventory.ConfiguredRootsComplete)
             return UpdateResult.Failure(options.DryRun, 2,
                 "Update review requires complete inventory. Resolve provider/root diagnostics; include hidden directories when needed.", []) with
@@ -154,7 +162,11 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
                 message = "Prepare this exact installation after applying or skipping the current review; sibling directory generations may change.";
             }
             else if (target.Pinned && !options.Unpin)
-            { status = "pinned"; message = "Exact pin retained. Select unpin explicitly to review its removal."; }
+            {
+                status = "pinned"; message = options.Tag is null
+                    ? "Exact pin retained. Select unpin explicitly to review its removal."
+                    : "Exact pin retained. Use the separately reviewed unpin operation before choosing a version.";
+            }
             else if (target.FrontMatter.LocalPath is not null || string.IsNullOrWhiteSpace(target.FrontMatter.Upstream)
                 || string.IsNullOrWhiteSpace(target.TreeSha) || string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
             { status = "untracked"; message = "Verified remote provenance is required; use source adoption or local reimport."; }
@@ -162,7 +174,9 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             {
                 try
                 {
-                    var preparation = await plans.PlanLatestAsync(ghPath, target, inventory, options.Unpin, token).ConfigureAwait(false);
+                    var preparation = options.Tag is null
+                        ? await plans.PlanLatestAsync(ghPath, target, inventory, options.Unpin, token).ConfigureAwait(false)
+                        : await plans.PlanTagAsync(ghPath, target, inventory, options.Tag, token).ConfigureAwait(false);
                     prepared = preparation.Plan;
                     if (preparation.Unchanged is { } current)
                     {
@@ -196,7 +210,9 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             ErrorMessage = failed ? "Some installations could not be prepared; inspect independent outcomes." : canceled ? "Preparation canceled." : null,
             Outcomes = outcomes.ToImmutable(),
             SavedPlan = prepared,
-            Notices = options.Force ? [new("review", "--force does not approve replacement or local-change disposition. Apply the saved plan with explicit retain-original approval.")] : []
+            Notices = options.Tag is not null
+                ? [new("version-selection", VersionUpdateGuidance.ExplicitTagChoice)]
+                : options.Force ? [new("review", "--force does not approve replacement or local-change disposition. Apply the saved plan with explicit retain-original approval.")] : []
         });
     }
 
