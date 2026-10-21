@@ -1,0 +1,139 @@
+{
+  "platform": "Windows-11-10.0.26340-SP0 / Python ARM64",
+  "startedUtc": "2026-10-21T22:05:35.239919+00:00",
+  "expectedCommit": "e13495244c73fc4fd6c14d834de03692c5fd29dc",
+  "aot": false,
+  "live": true,
+  "steps": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\git-head.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.09,
+      "name": "git-head"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\git-status.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.09,
+      "name": "git-status"
+    },
+    {
+      "argv": [
+        "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+        "--version"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\sdk-version.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.15,
+      "name": "sdk-version"
+    },
+    {
+      "argv": [
+        "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+        "--info"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\sdk-info.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.33,
+      "name": "sdk-info"
+    },
+    {
+      "argv": [
+        "C:\\Program Files\\GitHub CLI\\gh.EXE",
+        "--version"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\gh-version.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.09,
+      "name": "gh-version"
+    },
+    {
+      "argv": [
+        "C:\\Program Files\\GitHub CLI\\gh.EXE",
+        "skill",
+        "--help"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\gh-skill-help.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.09,
+      "name": "gh-skill-help"
+    },
+    {
+      "argv": [
+        "git",
+        "log",
+        "--oneline",
+        "v1.0.1..HEAD"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\changes-since-release.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.11,
+      "name": "changes-since-release"
+    },
+    {
+      "argv": [
+        "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+        "restore",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--locked-mode"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\unit-restore.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 1.66,
+      "name": "unit-restore"
+    },
+    {
+      "argv": [
+        "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+        "build",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "-c",
+        "Release",
+        "--no-restore"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\unit-build.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 14.57,
+      "name": "unit-build"
+    },
+    {
+      "argv": [
+        "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "--no-restore"
+      ],
+      "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\unit-tests.log",
+      "status": "timeout",
+      "exitCode": null,
+      "seconds": 1200.32,
+      "name": "unit-tests"
+    }
+  ],
+  "commit": "e13495244c73fc4fd6c14d834de03692c5fd29dc",
+  "blocked": "Stopped after a timeout; review process cleanup before another run.",
+  "result": "failed"
+}

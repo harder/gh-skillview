@@ -1,0 +1,44 @@
+[
+  {
+    "nativeHost": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+    "gh": "gh version 2.102.0 (2026-09-30)",
+    "fixtures": [
+      {
+        "shared": false,
+        "namespaced": false,
+        "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+        "stagedNativeDirectoryPromoted": true,
+        "originalNativeDirectoryRestored": true,
+        "registryBytesUnchanged": true,
+        "unrelatedSameNameUnchanged": true,
+        "nativeProcessKillRestartAndUndoVerified": true,
+        "hiddenBuiltinCoverageObserved": true,
+        "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+      },
+      {
+        "shared": true,
+        "namespaced": false,
+        "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+        "stagedNativeDirectoryPromoted": true,
+        "originalNativeDirectoryRestored": true,
+        "registryBytesUnchanged": true,
+        "unrelatedSameNameUnchanged": true,
+        "nativeProcessKillRestartAndUndoVerified": true,
+        "hiddenBuiltinCoverageObserved": true,
+        "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+      },
+      {
+        "shared": false,
+        "namespaced": true,
+        "localEditsExtrasExclusionAndEmptyDirectoryRestored": true,
+        "stagedNativeDirectoryPromoted": true,
+        "originalNativeDirectoryRestored": true,
+        "registryBytesUnchanged": true,
+        "unrelatedSameNameUnchanged": true,
+        "nativeProcessKillRestartAndUndoVerified": true,
+        "hiddenBuiltinCoverageObserved": true,
+        "pinnedRef": "33789149b9def6b66ddf247438a79fac94e22074"
+      }
+    ]
+  }
+]

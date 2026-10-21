@@ -1,0 +1,38 @@
+[
+  {
+    "argv": [
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+      "test",
+      "--project",
+      "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--filter-query",
+      "/*/SkillView.Tests.Inventory/NativeExposureLinkTests/TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\reproduce-native-link.log",
+    "status": "failed",
+    "exitCode": 2,
+    "seconds": 1.78
+  },
+  {
+    "argv": [
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+      "test",
+      "--project",
+      "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--filter-query",
+      "/*/SkillView.Tests.Ui/RemoveConfirmModalTests/CanRunCompact_TrueForSimpleSingleSkillEval"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\reproduce-repository-marker-control.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.34
+  }
+]

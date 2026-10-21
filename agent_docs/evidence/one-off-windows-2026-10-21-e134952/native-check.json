@@ -1,0 +1,47 @@
+[
+  {
+    "argv": [
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+      "publish",
+      "src/SkillView.App/SkillView.App.csproj",
+      "-c",
+      "Release",
+      "-r",
+      "win-arm64",
+      "-p:PublishAot=true",
+      "-p:StripSymbols=true",
+      "-p:RestoreLockedMode=true",
+      "-o",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app",
+      "-warnaserror:IL2026",
+      "-warnaserror:IL3050",
+      "-warnaserror:IL3053"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-publish.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 51.32,
+    "name": "app"
+  },
+  {
+    "argv": [
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+      "publish",
+      "src/SkillView.GhExtension/SkillView.GhExtension.csproj",
+      "-c",
+      "Release",
+      "-r",
+      "win-arm64",
+      "-p:PublishAot=true",
+      "-p:StripSymbols=true",
+      "-p:RestoreLockedMode=true",
+      "-o",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-publish.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 38.52,
+    "name": "extension"
+  }
+]

@@ -1,0 +1,22 @@
+Results: C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021
+git-head: starting
+git-head: passed (0.09s)
+git-status: starting
+git-status: passed (0.09s)
+sdk-version: starting
+sdk-version: passed (0.15s)
+sdk-info: starting
+sdk-info: passed (0.33s)
+gh-version: starting
+gh-version: passed (0.09s)
+gh-skill-help: starting
+gh-skill-help: passed (0.09s)
+changes-since-release: starting
+changes-since-release: passed (0.11s)
+unit-restore: starting
+unit-restore: passed (1.66s)
+unit-build: starting
+unit-build: passed (14.57s)
+unit-tests: starting
+unit-tests: timeout (1200.32s)
+Result: failed; report: C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\REPORT.md

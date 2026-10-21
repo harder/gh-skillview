@@ -1,0 +1,579 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixAliasParentChurnRestartsTheOriginalLexicalWalk
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixNamedChildOrAliasReplacementRefusesWithoutRestart(alias: True, beforeOpenedChildCheck: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixNamedChildOrAliasReplacementRefusesWithoutRestart(alias: False, beforeOpenedChildCheck: True)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixNamedChildOrAliasReplacementRefusesWithoutRestart(alias: False, beforeOpenedChildCheck: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixInitialCaptureRestartsFromFreshRootAfterParentNamespaceChanges(missing: True)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixInitialCaptureRestartsFromFreshRootAfterParentNamespaceChanges(missing: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixNamedChildGenerationChangeRestartsInitialCapture(beforeOpenedChildCheck: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixNamedChildGenerationChangeRestartsInitialCapture(beforeOpenedChildCheck: True)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixContinuousNamedChildGenerationChurnIsBounded(beforeOpenedChildCheck: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixContinuousNamedChildGenerationChurnIsBounded(beforeOpenedChildCheck: True)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixContinuousParentChurnIsBoundedAndCancellationStopsRestart(cancel: False)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativePlacementTests.UnixContinuousParentChurnIsBoundedAndCancellationStopsRestart(cancel: True)
+  Unix relative placement capture requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Subprocess.ProcessRunnerTests.RunAsync_IsolatedContextDoesNotInheritParentOrConfiguredCredentials
+  The fixed /usr/bin/env fixture requires Linux.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: "payload") (1s 012ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 427a0e5b14d8479580c4660310ab2dbd at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-bv1wpdvl.pel\state\427a0e5b14d8479580c4660310ab2dbd. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(String change) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:319
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: "archive") (1s 249ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 59079614c72c4b978a33486457d60840 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-tpavkmb1.gyr\state\59079614c72c4b978a33486457d60840. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(String change) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:319
+    at InvokeStub_StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+skipped SkillView.Tests.Authoring.AuthoringValidationRuntimeTests.ExplicitOfflineProofUsesBothFixedGhVersionsAndPreservesAuthoredBytes
+  Opt in with private authoring proof tools/evidence paths; normal tests never launch publish dry-run.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: "candidate") (996ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 31601373655e4a60a61f4d66db367800 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-3jty5s5x.yxv\state\31601373655e4a60a61f4d66db367800. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(String change) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:319
+    at InvokeStub_StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.FailedCreateStillCleansUpBecauseDaemonMayHaveAcceptedIt
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: "exposure") (993ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 6ff151bd06734824a33320ab28835126 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-awksent3.wws\state\6ff151bd06734824a33320ab28835126. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(String change) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:319
+    at InvokeStub_StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.UncertainContainerCleanupCannotBecomeCompletedSuccess
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.UntrustedOutputTruncationIsRetainedExplicitly
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.UnexpectedImageHealthcheckRefusesBeforeStartAndCleansContainer
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.PrivateInputMutationAfterCreateRefusesBeforeStart
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.ChangedCreatedIsolationRefusesBeforeStartAndCleansContainer
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.CancelAfterCreateAlwaysRequestsIndependentContainerAndNativeInputCleanup
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.FailedRuntimeStartIsAnHonestRefusalAndDoesNotTryPullOrCreate
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Evaluation.IsolatedEvaluationTests.FakeCompletedEvaluationBindsActualFactsWithoutInventingQualityVerdicts
+  Requires Linux native staging/cleanup; injected Docker boundary only.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: False) (359ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: True) (244ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: False, ancestorAlias: False) (242ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: True, suffix: "///")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: False, suffix: "///")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: True, suffix: "/")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: False, suffix: "/")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed (232ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:427
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "inner-parent") (265ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "junction-before-parent") (399ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "inner-dot") (268ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.ExactInstalledClonePreservesLocalContentModesAndOriginalNativeUndo (963ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 1d52c6cb768741799ade0f02f359dad6 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-on4lgtps.og3\state\1d52c6cb768741799ade0f02f359dad6. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.ExactInstalledClonePreservesLocalContentModesAndOriginalNativeUndo() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:253
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-junction-no-dot") (480ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "leading-dot") (294ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "missing-before-parent") (272ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "relative-junction-no-dot") (617ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: "restore-moved") (1s 014ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 27cbd4af55444bdca46f17b2f81835d2 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-mrcp1y2o.vaq\state\27cbd4af55444bdca46f17b2f81835d2. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(String stop) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:289
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-dot") (296ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-parent") (276ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "leading-parent") (276ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: "retain-moved") (1s 016ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for dc7d74d64ef74ea68695a4f30b129362 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-c110vhvb.xzp\state\dc7d74d64ef74ea68695a4f30b129362. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(String stop) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:289
+    at InvokeStub_StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: True, suffix: "///")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: False, suffix: "/")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: False, suffix: "///")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: True, suffix: "/")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: "displace-moved") (958ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for e70299a7583945c9a4ff7ad9f516adbc at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-2rxjgilt.kdd\state\e70299a7583945c9a4ff7ad9f516adbc. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(String stop) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:289
+    at InvokeStub_StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry (272ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:390
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration (200ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:445
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: "install-moved") (1s 139ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for acc819acf65e46d982e73526361754cc at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-unpin-4rugfxle.sw2\state\acc819acf65e46d982e73526361754cc. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.Plan(ReplacementPlanStore store) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:47
+    at SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(String stop) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\StandaloneUnpinTests.cs:289
+    at InvokeStub_StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "owner", failure: "io")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "symlinked", failure: "io")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "ignored", failure: "null")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "consumer", failure: "io")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "consumer", failure: "access")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "owner", failure: "access")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "consumer", failure: "null")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "ignored", failure: "io")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "owner", failure: "null")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "symlinked", failure: "access")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "ignored", failure: "access")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_FailedRecordedAliasLookupCannotAuthorizeEmptyDirectory(protection: "symlinked", failure: "null")
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_EmptySymlinkTargetDoesNotBecomeEmptyDirectoryRemoval
+  Unix empty-link observation; Windows native link proofs run separately.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_AncestorAliasDoesNotInventAnAdditionalConsumer(recordUsesAlias: False)
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.CleanupClassifierTests.Classify_AncestorAliasDoesNotInventAnAdditionalConsumer(recordUsesAlias: True)
+  Unix ancestor-alias fixture requires symlink support.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "dispose")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "abandon")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "partial-init")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "evidence-mismatch")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "command-failure")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "foreign-finalizer")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "canceled-command")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "absolute")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "idle")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests.NativeOwnerSubprocessReleasesOnlyItsOwnDescriptors(scenario: "retained-dispose")
+  Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.SourceUpdateReviewTests.NativeLinkRawArchiveCorruptionStillCannotAcquireSourceReceipt
+  Unix link-mode hash domain; Windows link metadata has a separate contract.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.LinkedOrNondirectoryDestinationCannotProveVacancy(link: True)
+  Unprivileged symbolic-link fixture requires POSIX.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.SourceUpdateReviewTests.NativeLinkReviewRetainsFullArchiveModesAndHistoricalPlanEvidence(candidateHasLink: False)
+  Unix link-mode hash domain; Windows link metadata has a separate contract.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.SourceUpdateReviewTests.NativeLinkReviewRetainsFullArchiveModesAndHistoricalPlanEvidence(candidateHasLink: True)
+  Unix link-mode hash domain; Windows link metadata has a separate contract.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.PublicCliSeparatesRequestedForceFromEffectiveFreshInstallAndExactRefusal(occupied: False)
+  Real CLI probe shell fixture requires POSIX.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.PublicCliSeparatesRequestedForceFromEffectiveFreshInstallAndExactRefusal(occupied: True)
+  Real CLI probe shell fixture requires POSIX.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.VacantDestinationStillDispatchesTrustedFreshInstall(exists: False, force: True, all: False)
+  Actual shell child marker requires POSIX; native guard refusals are portable.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.VacantDestinationStillDispatchesTrustedFreshInstall(exists: True, force: True, all: False)
+  Actual shell child marker requires POSIX; native guard refusals are portable.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.VacantDestinationStillDispatchesTrustedFreshInstall(exists: False, force: True, all: True)
+  Actual shell child marker requires POSIX; native guard refusals are portable.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ForceInstallDispositionTests.VacantDestinationStillDispatchesTrustedFreshInstall(exists: False, force: False, all: False)
+  Actual shell child marker requires POSIX; native guard refusals are portable.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.UndoReconciliationAndCancellationRetainActualRestorationEvidence(mode: "deadline")
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.UndoReconciliationAndCancellationRetainActualRestorationEvidence(mode: "partial")
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.UndoReconciliationAndCancellationRetainActualRestorationEvidence(mode: "cancel-after")
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.UndoReconciliationAndCancellationRetainActualRestorationEvidence(mode: "io")
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.UndoReconciliationAndCancellationRetainActualRestorationEvidence(mode: "already-canceled")
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.ProductUndoRefusesChangedInstalledContentWithoutOverwritingIt(afterInspection: False)
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.ProductUndoRefusesChangedInstalledContentWithoutOverwritingIt(afterInspection: True)
+  POSIX gh protocol fixture.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.TagUpdateWorkflowTests.ChosenTagUsesSavedReviewAndApplyUndoWithoutResolvingAgain
+  POSIX gh protocol fixture; shared saved-update native contracts cover Windows publication.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Cli.CliDispatcherCleanupTests.CliApplyThroughAliasedRootHandlesCanonicalAndLexicalRecords(canonicalRecord: True)
+  Unix alias fixture and native removal required.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Cli.CliDispatcherCleanupTests.CliApplyThroughAliasedRootHandlesCanonicalAndLexicalRecords(canonicalRecord: False)
+  Unix alias fixture and native removal required.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ReplacementLocalReviewTests.MergedPlanPreservesLocalExtrasRootPrivacyAndRealSourceBaselineThenUndoesExactly(side: "source")
+  Merged native metadata publication currently requires macOS evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ReplacementLocalReviewTests.MergedPlanPreservesLocalExtrasRootPrivacyAndRealSourceBaselineThenUndoesExactly(side: "installed")
+  Merged native metadata publication currently requires macOS evidence.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Maintenance.ReplacementLocalReviewTests.CanceledLegacyFinalizeAfterInstalledArchiveRetriesIntoFreshReviewedAttempt
+  Full native merge metadata publication proof requires supported host coverage.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinPreservesRawEntryFieldsFreshOtherOwnerBytesEveryExposureAndExactUndo (491ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for de225668421b4728839c0820c1f7a2ef at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-humr3j4l.bgf\state\de225668421b4728839c0820c1f7a2ef. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinPreservesRawEntryFieldsFreshOtherOwnerBytesEveryExposureAndExactUndo() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:49
+    at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsChangedSelectedOwnerBeforeAnyPayloadMove (462ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for a6d18b91c9344049bdc8aa27ca512842 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-f3cipa0x.isb\state\a6d18b91c9344049bdc8aa27ca512842. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsChangedSelectedOwnerBeforeAnyPayloadMove() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:75
+    at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsSemanticallyEquivalentSelectedEntryReformatBeforeApplyAndUndo (503ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for e0f17355dde741b5823256df5db0ca0f at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-agmib22a.44a\state\e0f17355dde741b5823256df5db0ca0f. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsSemanticallyEquivalentSelectedEntryReformatBeforeApplyAndUndo() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:85
+    at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: False) (483ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for fb6a2fb251524cf789ddfd967613fc1a at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-0g0fz31x.czx\state\fb6a2fb251524cf789ddfd967613fc1a. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: False) (483ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 56b0914a11f4439aab4e0bb63d0b910e at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-3nmnjosm.qgy\state\56b0914a11f4439aab4e0bb63d0b910e. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: True) (479ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for e7f72f7cf65143cdb90378bde9eccfa4 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-cryulidh.tmp\state\e7f72f7cf65143cdb90378bde9eccfa4. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: True) (462ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 29a2bccae323420592a4050709e00d01 at C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\tmp\skillview-shared-revision-lh3q33n3.cii\state\29a2bccae323420592a4050709e00d01. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+SUCCESS: The process with PID 9580 (child process of PID 1020) has been terminated.
+SUCCESS: The process with PID 1020 (child process of PID 34704) has been terminated.

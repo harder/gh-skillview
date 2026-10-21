@@ -1,0 +1,7 @@
+  Determining projects to restore...
+  Restored C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.GhExtension\SkillView.GhExtension.csproj (in 386 ms).
+  1 of 2 projects are up-to-date for restore.
+  SkillView.Core -> C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\bin\Release\net10.0\win-arm64\SkillView.Core.dll
+  SkillView.GhExtension -> C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.GhExtension\bin\Release\net10.0\win-arm64\gh-skillview.dll
+  Generating native code
+  SkillView.GhExtension -> C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\native-extension\

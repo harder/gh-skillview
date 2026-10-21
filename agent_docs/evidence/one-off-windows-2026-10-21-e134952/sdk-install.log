@@ -1,0 +1,8 @@
+dotnet-install: Downloaded file https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-arm64.zip size is 291070603 bytes.
+dotnet-install: Either downloaded or local package size can not be measured. One of them may be corrupted.
+dotnet-install: Extracting the archive.
+dotnet-install: Binaries of dotnet can be found in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\
+dotnet-install: Note that the script does not ensure your Windows version is supported during the installation.
+dotnet-install: To check the list of supported versions, go to https://learn.microsoft.com/dotnet/core/install/windows#supported-versions
+dotnet-install: Installed version is 10.0.402
+dotnet-install: Installation finished

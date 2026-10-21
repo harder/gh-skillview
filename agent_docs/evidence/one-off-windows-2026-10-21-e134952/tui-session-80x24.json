@@ -1,0 +1,12 @@
+{
+  "app": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+  "pid": 20980,
+  "wrapperPid": 32688,
+  "columns": 80,
+  "rows": 24,
+  "home": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-private-tui\\home",
+  "state": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-private-tui\\state",
+  "cwd": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-private-tui\\work",
+  "kind": "win-arm64 AOT",
+  "startedUtc": "2026-10-21T22:26:46.365648+00:00"
+}

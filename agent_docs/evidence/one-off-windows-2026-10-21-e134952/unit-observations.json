@@ -1,0 +1,41 @@
+{
+  "completed": false,
+  "observedFailedCases": 32,
+  "groups": {
+    "SeSecurityPrivilege": 32
+  },
+  "failedCases": [
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: \"payload\") (1s 012ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: \"archive\") (1s 249ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: \"candidate\") (996ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.StalePayloadCandidateExposureAndArchiveRefuseBeforeMoves(change: \"exposure\") (993ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: False) (359ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: True) (244ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: False, ancestorAlias: False) (242ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed (232ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"inner-parent\") (265ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"junction-before-parent\") (399ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"inner-dot\") (268ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.ExactInstalledClonePreservesLocalContentModesAndOriginalNativeUndo (963ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"absolute-junction-no-dot\") (480ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"leading-dot\") (294ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"missing-before-parent\") (272ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"relative-junction-no-dot\") (617ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: \"restore-moved\") (1s 014ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"absolute-dot\") (296ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"absolute-parent\") (276ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: \"leading-parent\") (276ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: \"retain-moved\") (1s 016ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: \"displace-moved\") (958ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry (272ms)",
+    "SkillView.Tests.Inventory.NativeExposureLinkTests.SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration (200ms)",
+    "SkillView.Tests.Maintenance.StandaloneUnpinTests.EveryPayloadMoveBoundaryRecoversAndRestoresExactOriginal(stop: \"install-moved\") (1s 139ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinPreservesRawEntryFieldsFreshOtherOwnerBytesEveryExposureAndExactUndo (491ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsChangedSelectedOwnerBeforeAnyPayloadMove (462ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinRejectsSemanticallyEquivalentSelectedEntryReformatBeforeApplyAndUndo (503ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: False) (483ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: False) (483ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: True) (479ms)",
+    "SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: True) (462ms)"
+  ]
+}

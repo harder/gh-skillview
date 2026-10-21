@@ -1,0 +1,151 @@
+e134952 Report blocked fixture coverage and interrupted commands
+1ad2bda Add one-off cross-platform acceptance test kit
+0fe73d0 Merge pull request #85 from harder/codex/macos-placement-fix
+f50f824 Handle child ctime churn during initial placement capture
+c3bb0e3 Correct macOS placement failure evidence
+18ed814 Restart initial Unix placement capture after parent churn
+1017293 Merge pull request #83 from harder/codex/merged-main-usability
+6face9b Remove superseded usability evidence claim
+cc85b2b Require deletion warnings on removable queue rows
+ab4bbb7 Merge pull request #82 from harder/codex/native-guard-triage
+116ea25 Refine guard diagnostics after review
+0504ba4 Clarify recovery guidance for inspection-only issues
+221e38a Diagnose shared-owner admission guard timeouts
+33207ae Merge pull request #81 from harder/codex/update-undo-ux
+d3199ab Address undo review outcomes and batch eligibility
+e28110e Add reviewed undo from update results
+8e0e41d Merge pull request #80 from harder/codex/update-review-ux
+3c8bf73 Address update review navigation feedback
+feee399 Clarify update reviews and refresh post-apply context
+96ddf90 Merge pull request #79 from harder/codex/copies-comparison-ux
+223367f Fix copy review targeting and keyboard recovery
+220e349 Add related-copy comparisons to Changes
+4276809 Merge pull request #78 from harder/codex/version-selection-scope
+e3446c6 Preserve Updates selection through version-choice refreshes
+8aec398 Preserve tagged version choices across inventory refreshes
+f7b2873 Make placement refusal test independent of error ordering
+50c7f6e Address tagged-version review findings
+8747356 Merge remote-tracking branch 'origin/main' into codex/version-selection-scope
+2a73640 Merge pull request #77 from harder/codex/cleanup-review-ux
+a30b4e5 Choose tagged versions through saved update review
+3fa0c28 Define focused SkillView goal and bounded version-selection scope
+233ab76 Refuse empty cleanup when native address matching is incomplete
+2433b60 Fix cleanup review bounds and empty-directory eligibility
+31ee0a4 Match aliased cleanup observations consistently
+e155cdb Handle cleanup aliases and ambiguous Ignore batches
+4b79f22 Address Cleanup review safety and interaction findings
+13671f7 Improve Cleanup review and empty-directory classification
+a9703a7 Merge pull request #74 from harder/dependabot/github_actions/github-maintained-e40781d787
+cfb5f0d Merge pull request #76 from harder/codex/ci-runtime-optimization
+5474620 Inspect CI scope without fetching event-supplied revisions
+fecf223 Merge pull request #75 from harder/codex/issue-summary-ux
+7af450a Parallelize native CI proofs and reuse verified historical builds
+8917431 Make interrupted cleanup retry fixture independent of entry order
+2b4e6e0 Fix narrow-terminal maintenance summaries after UX testing
+a97784d Explain maintenance issues before opening repair reviews
+65e0771 Merge pull request #72 from harder/codex/custom-install-directory
+12bc47c build(deps): bump the github-maintained group with 2 updates
+4e77ee5 Test force and contextual owner refusals separately
+3e3ef3a Document scoped formatter working directory
+cb9c653 Record accepted maintenance workflows and retain proof evidence
+2ad5e3c test: allow bounded Windows ANSI navigation redraw time
+7a1ab13 Preserve managed install refusal diagnoses
+45a908f Protect ownerless payloads from force install
+0e0b2c8 Merge commit 'bf3aaf05c175cb71365a0ed30e81d98f1d9df50d' into codex/pr72-current-integration
+bf3aaf0 Merge pull request #71 from harder/codex/quality-queue-current-integration
+602153c Fix reviewed source switch workflow and proof
+f12391f Require source review in actual-gh contract fixture
+dc58b03 Acknowledge each fresh shared-owner proof plan
+c07c60c Fix cross-platform maintenance review compatibility
+7cbe4b6 Fix custom-directory installs passing an invalid gh scope
+5ef7d34 Review captured skill packages and expose saved maintenance actions
+5822f81 Add local source-switch compatibility proof
+fff22df Prepare private PR70 quality-queue integration
+6836f56 Prepare actual pre-review schema6 native compatibility proofs
+cd2928a Make frozen native baseline checkouts independent of line-ending defaults
+9b7a458 Integrate maintenance queue into source review
+0e4440c Add exact-installation maintenance follow-up
+53f80cc Add exact-installation maintenance queue
+1745089 Complete source review workflow proof
+761471c Make Windows parent-churn fixture observable
+d035edc Add bounded M19 runtime proof harnesses
+0e88af1 Normalize authoring environment initializer formatting
+9eeeda6 Add explicitly reviewed offline evaluation runner
+ad80504 Add explicit repository authoring dry-run validation
+33b91e7 Require frozen source review before saved updates
+edd3e7d Add bounded package quality assessments
+47fd170 Correct old native reimport witness and CI coverage
+5170da4 Retry Windows placement capture on parent churn
+65fc012 Fix platform fixtures and schema-five proof admission
+7f30496 Reject ambiguous source tracking before private staging
+da754fe Add saved local source switching
+0fe868e Merge pull request #69 from harder/codex/target-backed-link-retention
+ee4b4fe Fix no-follow target admission and native link fixtures
+19c9a4c Fix Windows held-parent relative target opens
+9824c2a Record merged-base link retention validation
+2320fd4 Own Linux link retention on a dedicated native thread
+3be6305 Add target-backed native exposure link retention primitive
+4649d75 Merge pull request #68 from harder/codex/local-reimport
+b5fff2c Fix native tracking and canonical archive verification
+49f482c Fix local reimport catalog and candidate validation
+7d90f86 Record final package-check validation and merge
+e62961f Correct Actions token diagnostic interpretation
+a1b73c9 Record parser-fix integration verification for local reimport
+f75029f Record combined checker and local reimport verification
+06b17e5 Add reviewed ownerless local reimport with retained originals
+6b288f1 Merge pull request #67 from harder/codex/static-package-check
+8677be9 Verify Actions tokens through repository API access
+2da52ab Exclude unsupported Markdown before package reference checks
+7657c26 Record standalone unpin native verification and merge
+df73613 Add bounded offline package checks and reliable modal ownership
+ab23a7b Merge pull request #66 from harder/codex/standalone-unpin
+c919199 Bind proof harness gh paths to actual Windows executable files
+4130a3f Keep old schema one proof fixtures within their native owner contract
+5ad2c4e Fix native unpin evidence comparison and macOS proof downloads
+b8ab8fa Add saved standalone unpin plans and native recovery proofs
+2fc9782 Record verified batch 15 merge and final native evidence
+0dba59b Merge pull request #65 from harder/codex/reviewed-local-dispositions
+81e403d Document supported Windows merges and isolated WSL verification
+67cf417 Record verified batch 15 platform and handoff evidence
+e3d8e47 Verify shared local merges and bounded disk-full recovery
+2743253 Preserve authored frontmatter when installer tracking is empty
+176b905 Read full Windows security descriptors through the held native object
+07b3a42 Diagnose native Windows security queries and fix macOS proof shell
+b5c2792 Fix exclusive Windows archive reads and tighten native proof diagnostics
+a68992f WIP: preserve reviewed Windows metadata and prove merge recovery
+8704029 WIP: select verified Linux open flags for ARM64 and x64
+e4b021c Record interim local-disposition and terminal workflow evidence
+5bf3592 WIP: review local update dispositions in the Updates workspace
+9f384da WIP: freeze reviewed resolution files before merge approval
+a628b82 WIP: persist reviewed local merge plans with native metadata
+b7edb22 WIP: retain and materialize reviewed local payload drafts
+76dd6f8 docs: record final external suppression acceptance evidence
+80921f4 Merge pull request #64 from harder/codex/external-maintenance-preferences
+81072ed Contain preference setup failures and refuse uncertain ownership
+38c2177 Revalidate owner-only source metadata before suppression
+0082f9e Store cleanup suppression outside installed skill payloads
+6233f6a Merge pull request #63 from harder/codex/effective-agent-loading
+bedba13 fix: report slash invocation disabled by Claude visibility
+9dbffa6 fix: preserve provider framing and invalid path uncertainty
+789d6f5 fix: align native skill roots and legacy role permissions
+9882e6b fix: complete contextual loading discovery and review regressions
+390cea7 feat: explain effective skill loading by agent context
+714ada4 Record accepted M11 evidence and reviewed effective-loading design
+351224b Preserve physical installation identity and maintenance impact evidence (#61)
+d840595 Discover managed skills and preserve read-only ownership (#59)
+9c4df91 fix: preserve independent update outcomes and current installations (#58)
+16258ff Verify actual gh metadata and bounded YAML contracts (#56)
+daac6fc Reject incomplete inventory captures and verify provider coverage outcomes (#55)
+8029b4f Preserve shared inventory observations when filtering by scope and agent (#54)
+6578005 Add reviewed, recoverable skill updates (#53)
+178476f Add recoverable recorded-revision restoration with saved plans (#52)
+8b2ebb0 Finish standalone skill quarantine and undo (#51)
+af80737 Retain native object evidence for maintenance snapshots (#50)
+cf578f7 Protect Git worktrees and metadata links from removal (#49)
+5a0db7c Verify retained backup evidence and interrupted capture history (#48)
+f6b34db Prevent Unix payload descriptors from leaking into child execs (#47)
+4c4e5c6 Capture private durable skill backup evidence (#46)
+34844d5 Discover skill namespaces, workspaces and named agent profiles (#45)
+a50e7b2 Compare full skill payloads and protect contextual owner records (#44)
+b4b2c80 Protect exact skill updates and retain verified outcomes (#43)
+a072124 Reconcile skill inventory and protect uncertain cleanup (batch 1) (#42)

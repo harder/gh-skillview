@@ -1,0 +1,47 @@
+{
+  "entries": [
+    {
+      "path": "first\\gh-skill",
+      "id": 9851624186900130,
+      "sha256": null,
+      "link": null
+    },
+    {
+      "path": "first\\gh-skill\\SKILL.md",
+      "id": 5629499536240349,
+      "sha256": "999b974b43617cb011b6d812e80b964150e653e95f7f652e9ea69c9ee076cd1e",
+      "link": null
+    },
+    {
+      "path": "second\\gh-skill",
+      "id": 3940649675978446,
+      "sha256": null,
+      "link": null
+    },
+    {
+      "path": "second\\gh-skill\\SKILL.md",
+      "id": 3659174699267136,
+      "sha256": "8f0a7bdd7abe3caaf4d29315a39bf40e082a1090224315def767d604c37d0e9b",
+      "link": null
+    },
+    {
+      "path": "third\\broken-link",
+      "id": 6473924466372991,
+      "sha256": null,
+      "link": "\\\\?\\C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-private-tui\\work\\missing-target"
+    },
+    {
+      "path": "third\\empty-leftover",
+      "id": 3377699722556772,
+      "sha256": null,
+      "link": null
+    },
+    {
+      "path": "third\\shared-gh-skill",
+      "id": 5348024559530283,
+      "sha256": null,
+      "link": "\\\\?\\C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-private-tui\\work\\first\\gh-skill"
+    }
+  ],
+  "registrySha256": "37a7c299d6a8ebbda88c84581a917042d138c068a72cf7d2a103b5d442544d8d"
+}

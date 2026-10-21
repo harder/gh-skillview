@@ -1,0 +1,292 @@
+[
+  {
+    "argv": [
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--version"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-version.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.19,
+    "name": "native-app-version"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-static-package-check.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-static-package-check.json"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-static-package-check.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 9.44,
+    "name": "native-app-static-package-check"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-native-object-evidence.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-native-object-evidence.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-native-object-evidence.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.85,
+    "name": "native-app-native-object-evidence"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-gitfile-protection.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-gitfile-protection.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-gitfile-protection.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 4.01,
+    "name": "native-app-gitfile-protection"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-inventory-filter.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-inventory-filter.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-inventory-filter.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 16.8,
+    "name": "native-app-inventory-filter"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-managed-discovery.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-managed-discovery.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-managed-discovery.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 9.21,
+    "name": "native-app-managed-discovery"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-quarantine-undo.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-quarantine-undo.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-quarantine-undo.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 25.55,
+    "name": "native-app-quarantine-undo"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-revision-update.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-revision-update.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-revision-update.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 123.48,
+    "name": "native-app-revision-update"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-recorded-replacement.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-recorded-replacement.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app-recorded-replacement.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 172.62,
+    "name": "native-app-recorded-replacement"
+  },
+  {
+    "argv": [
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--version"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-version.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.3,
+    "name": "native-extension-version"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-static-package-check.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-static-package-check.json"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-static-package-check.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 8.06,
+    "name": "native-extension-static-package-check"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-native-object-evidence.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-native-object-evidence.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-native-object-evidence.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.52,
+    "name": "native-extension-native-object-evidence"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-gitfile-protection.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-gitfile-protection.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-gitfile-protection.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 3.35,
+    "name": "native-extension-gitfile-protection"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-inventory-filter.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-inventory-filter.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-inventory-filter.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 13.62,
+    "name": "native-extension-inventory-filter"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-managed-discovery.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-managed-discovery.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-managed-discovery.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 7.84,
+    "name": "native-extension-managed-discovery"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-quarantine-undo.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-quarantine-undo.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-quarantine-undo.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 18.39,
+    "name": "native-extension-quarantine-undo"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-revision-update.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-revision-update.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-revision-update.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 114.58,
+    "name": "native-extension-revision-update"
+  },
+  {
+    "argv": [
+      "C:\\Python313\\python.exe",
+      "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\checkout\\agent_docs\\evidence\\prove-recorded-replacement.py",
+      "--app",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+      "--output",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-recorded-replacement.json",
+      "--gh",
+      "C:\\Program Files\\GitHub CLI\\gh.EXE"
+    ],
+    "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension-recorded-replacement.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 182.56,
+    "name": "native-extension-recorded-replacement"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "pythonExecutable": "C:\\Python313\\python.exe",
+  "pointerBits": 64,
+  "peMachines": {
+    "C:\\Program Files\\GitHub CLI\\gh.EXE": "0xaa64",
+    "C:\\Program Files\\Git\\cmd\\git.EXE": "0x8664",
+    "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe": "0xaa64",
+    "C:\\Python313\\python.exe": "0x8664"
+  }
+}

@@ -1,0 +1,36 @@
+Results: C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\results
+git-head: starting
+git-head: passed (0.16s)
+git-status: starting
+git-status: passed (0.36s)
+sdk-version: starting
+sdk-version: passed (0.46s)
+sdk-info: starting
+sdk-info: passed (0.47s)
+gh-version: starting
+gh-version: passed (0.13s)
+gh-skill-help: starting
+gh-skill-help: passed (0.12s)
+changes-since-release: starting
+changes-since-release: passed (0.12s)
+unit-restore: starting
+unit-restore: passed (19.54s)
+unit-build: starting
+unit-build: passed (47.89s)
+unit-tests: starting
+unit-tests: failed (88.07s)
+integration-restore: starting
+integration-restore: passed (1.8s)
+integration-build: starting
+integration-build: passed (2.54s)
+integration-tests: starting
+integration-tests: passed (8.57s)
+app-restore: starting
+app-restore: failed (1.22s)
+app-proofs: not-run (Product restore/build failed)
+extension-restore: starting
+extension-restore: failed (1.29s)
+extension-proofs: not-run (Product restore/build failed)
+source-status-after: starting
+source-status-after: passed (0.15s)
+Result: failed; report: C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\results\REPORT.md

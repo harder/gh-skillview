@@ -1,0 +1,429 @@
+{
+  "testedCommit": "e13495244c73fc4fd6c14d834de03692c5fd29dc",
+  "platform": "native Windows 11 ARM64",
+  "files": [
+    {
+      "name": ".gitattributes",
+      "bytes": 107,
+      "sha256": "c50cf448becfc3bc6f0da6a98f860bf8cfbb1d2f74fce3755fd7f26ed4d2b382"
+    },
+    {
+      "name": "AGENT-REPORT.md",
+      "bytes": 16976,
+      "sha256": "142efb30db5bbd27fc895b92420778efd81ad13e414cfa8851c7b5980fe6e08d"
+    },
+    {
+      "name": "architectures.json",
+      "bytes": 361,
+      "sha256": "65d6d85990ba2869d9233f0da13ae19d7799d9f29b273f9cd6f26b54c17f3513"
+    },
+    {
+      "name": "changes-since-release.log",
+      "bytes": 9931,
+      "sha256": "e169918cfda4b115a4ebf84d5baa110b10ddb40719098f8b40aa7acced9b0733"
+    },
+    {
+      "name": "gh-skill-help.log",
+      "bytes": 1384,
+      "sha256": "6ef4d9fb2183c032e8914cc3f0f6aa3174ee64785d7ee4cc8a9a4b8df0c304b3"
+    },
+    {
+      "name": "gh-version.log",
+      "bytes": 81,
+      "sha256": "a679442459bed23fdc13efb977dec3b17c3c923d8d48abc0d8e522182250955f"
+    },
+    {
+      "name": "git-head.log",
+      "bytes": 41,
+      "sha256": "f97b55b67421aa6910504dee841ad0ad197408dd9614d07f76b5d718566cbbd3"
+    },
+    {
+      "name": "git-status.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "initial-app-restore.log",
+      "bytes": 1506,
+      "sha256": "637081a3715f073efe455728b2ef5fdd31ebbac61b1acd0476bab10240e8ff57"
+    },
+    {
+      "name": "initial-extension-restore.log",
+      "bytes": 1554,
+      "sha256": "9d2c552f2542d98bfb2c5c74e5b94d2337d1fac2d2a30c73a6f243d80f0e4e47"
+    },
+    {
+      "name": "initial-git-status.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "initial-integration-tests.log",
+      "bytes": 487,
+      "sha256": "4012501ca8199c53315b7fbd45c9cc518ee174508cf790a4cb6beb1757348cc0"
+    },
+    {
+      "name": "initial-report.json",
+      "bytes": 7326,
+      "sha256": "5e980746e4adba6f037bf096c7e4fb78ab02b0fe510a4df827d80eeee6a07cae"
+    },
+    {
+      "name": "initial-REPORT.md",
+      "bytes": 1304,
+      "sha256": "90604836a503560a6376775f1c55209ad1618a5f229b27c0abaf9634bd3c35d8"
+    },
+    {
+      "name": "initial-source-status-after.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "initial-unit-tests.log",
+      "bytes": 487452,
+      "sha256": "154a6f3653d949eaa3d639548b757ed679019657322674d43b682bcc850e9e7f"
+    },
+    {
+      "name": "machine.json",
+      "bytes": 4460,
+      "sha256": "bd9cd28ae8712dbf313bdc8930d4642b4f65ac4aad820704323e7f47b88bc58a"
+    },
+    {
+      "name": "native-app-gitfile-protection.json",
+      "bytes": 511,
+      "sha256": "9873f20e48fda79607d67d9be004f48148ee5e1dfde7c694f63c26041c493a45"
+    },
+    {
+      "name": "native-app-gitfile-protection.log",
+      "bytes": 513,
+      "sha256": "47dbd11a12d5482871bab3ca2998151d6809e62a6712a1008390bd7498360960"
+    },
+    {
+      "name": "native-app-inventory-filter.json",
+      "bytes": 3183,
+      "sha256": "db345d1f2332a433ee9867dd8d2513fca3623e2aad1ac1d598c40d8bb0563a47"
+    },
+    {
+      "name": "native-app-inventory-filter.log",
+      "bytes": 3183,
+      "sha256": "db345d1f2332a433ee9867dd8d2513fca3623e2aad1ac1d598c40d8bb0563a47"
+    },
+    {
+      "name": "native-app-managed-discovery.json",
+      "bytes": 1259,
+      "sha256": "017e365185a343e2472004dbc4c918b0643b916b36a1efc4c340c1f8d066ae64"
+    },
+    {
+      "name": "native-app-managed-discovery.log",
+      "bytes": 1259,
+      "sha256": "017e365185a343e2472004dbc4c918b0643b916b36a1efc4c340c1f8d066ae64"
+    },
+    {
+      "name": "native-app-native-object-evidence.json",
+      "bytes": 568,
+      "sha256": "171e205887bfec32507cc452543c6c793c3b0ed9424a47de83ff19e2555e1670"
+    },
+    {
+      "name": "native-app-native-object-evidence.log",
+      "bytes": 570,
+      "sha256": "ec4f7463d33b60ecfbba1b8a5954094bdaacedf72cb3bd2c7037a44d220a8e70"
+    },
+    {
+      "name": "native-app-publish.log",
+      "bytes": 745,
+      "sha256": "c74410e1aefef972f846796e585c0ff9335f697e30084ebf68a6a6f6709b94a6"
+    },
+    {
+      "name": "native-app-quarantine-undo.json",
+      "bytes": 1037,
+      "sha256": "f414c0e7f7e3165c5cbbc829f510705b839ee04772d1f8f23f9f369b8d9c63f3"
+    },
+    {
+      "name": "native-app-quarantine-undo.log",
+      "bytes": 1039,
+      "sha256": "542e631752d021848de052ccb82840cbaf4cb2b60b706b59b712627be62e5486"
+    },
+    {
+      "name": "native-app-recorded-replacement.json",
+      "bytes": 1699,
+      "sha256": "787c51a104f8b6c7a3a2425f343c16d2dfc32308872014d5f40365fcf193729c"
+    },
+    {
+      "name": "native-app-recorded-replacement.log",
+      "bytes": 53613,
+      "sha256": "1f9e0ac71b235849d942ff296ff4e20d187ae6750a76ea58513af9b2663cf061"
+    },
+    {
+      "name": "native-app-revision-update.json",
+      "bytes": 1701,
+      "sha256": "a5d38e46b113879c5dd13aba880b7768c887f40cf9fc2af238c4fb21f862ae49"
+    },
+    {
+      "name": "native-app-revision-update.log",
+      "bytes": 34587,
+      "sha256": "dc29dac041b73d0241548c963e83f9dca6b091e43a0001a916cbd02ef4b7732f"
+    },
+    {
+      "name": "native-app-static-package-check.json",
+      "bytes": 10811,
+      "sha256": "66f642a56bccf0d614f19c6dbb9806ac272e116ef955094dddfbb03a7ce4670d"
+    },
+    {
+      "name": "native-app-static-package-check.log",
+      "bytes": 102,
+      "sha256": "33f5e4cfa98531383c68d71d4aafeaf2172423e1865c44275825cf4e307ff359"
+    },
+    {
+      "name": "native-app-version.log",
+      "bytes": 40,
+      "sha256": "d2bf39362fa84fe06d631f2e9d1a47df98de8766dfc560bffd26af7698b9ee87"
+    },
+    {
+      "name": "native-check.json",
+      "bytes": 1443,
+      "sha256": "9d2ba8e49217914361ca20724a9a87861616eee3156594456c2aeb5cf0dd8850"
+    },
+    {
+      "name": "native-extension-gitfile-protection.json",
+      "bytes": 520,
+      "sha256": "daa601eb617740fb717363077b9cc94a5995944664e7a789abca5482dfba1c89"
+    },
+    {
+      "name": "native-extension-gitfile-protection.log",
+      "bytes": 522,
+      "sha256": "29d2201026d3bf2ad82ede04d2a311c2f54046d8fe83691f2ce00002a78bc698"
+    },
+    {
+      "name": "native-extension-inventory-filter.json",
+      "bytes": 3192,
+      "sha256": "26f4e12fde3c0780b6f39ed9e1da1c66c3ecf033a49060f90cd304e3a04b39a8"
+    },
+    {
+      "name": "native-extension-inventory-filter.log",
+      "bytes": 3192,
+      "sha256": "26f4e12fde3c0780b6f39ed9e1da1c66c3ecf033a49060f90cd304e3a04b39a8"
+    },
+    {
+      "name": "native-extension-managed-discovery.json",
+      "bytes": 1268,
+      "sha256": "4d99b33a4bf8db45fcce98b3447c32e3a5b3fa64c6a7fe5e1ccd53ee0ccced2b"
+    },
+    {
+      "name": "native-extension-managed-discovery.log",
+      "bytes": 1268,
+      "sha256": "4d99b33a4bf8db45fcce98b3447c32e3a5b3fa64c6a7fe5e1ccd53ee0ccced2b"
+    },
+    {
+      "name": "native-extension-native-object-evidence.json",
+      "bytes": 577,
+      "sha256": "ec1d8206022758e105faf50cb84a2b8064afa74fd3d02934db789ab60e632179"
+    },
+    {
+      "name": "native-extension-native-object-evidence.log",
+      "bytes": 579,
+      "sha256": "40e0887132c46ff1644b0d9d006065983592e6b31e090e024a12f4f3028450b0"
+    },
+    {
+      "name": "native-extension-publish.log",
+      "bytes": 704,
+      "sha256": "6607286ba8fa3a312be705e5cc351d2ef1cece802a10c61c074de2633c9a897a"
+    },
+    {
+      "name": "native-extension-quarantine-undo.json",
+      "bytes": 1046,
+      "sha256": "d52bd16f64603b7ddf705f86a3849f88003d9b6fefc249ebccb691c72f3f9dca"
+    },
+    {
+      "name": "native-extension-quarantine-undo.log",
+      "bytes": 1048,
+      "sha256": "bee46f00cb5d9401eea004df4f444fc226b44b0a19da3cf3ddc9c20fe6884b80"
+    },
+    {
+      "name": "native-extension-recorded-replacement.json",
+      "bytes": 1708,
+      "sha256": "82958a072ffc09d5c57a217a5dff5e34f6904bb007c5a36c5d2087a20d14c95b"
+    },
+    {
+      "name": "native-extension-recorded-replacement.log",
+      "bytes": 53622,
+      "sha256": "669a926424a568975ab8626a43bd4ede589212cea19a48d675b57b96f1bd56ee"
+    },
+    {
+      "name": "native-extension-revision-update.json",
+      "bytes": 1710,
+      "sha256": "09d061d984985b90f215ab397d3c29988b76f271edf75cb5fedb7eb28260e11a"
+    },
+    {
+      "name": "native-extension-revision-update.log",
+      "bytes": 34596,
+      "sha256": "c193c30b4ecc79b9f35bcaa6053d73df313d7da244b098e09bc444b981563740"
+    },
+    {
+      "name": "native-extension-static-package-check.json",
+      "bytes": 10811,
+      "sha256": "ea9a04006333c9b7be5f054dbc8e881ea1e2f1a27b2a963efcc04ce9e211b8f0"
+    },
+    {
+      "name": "native-extension-static-package-check.log",
+      "bytes": 108,
+      "sha256": "24fb2d25dd042b043c17499429089dc0c91ae97641de6ceda335aa7cac6fbf8e"
+    },
+    {
+      "name": "native-extension-version.log",
+      "bytes": 43,
+      "sha256": "f76a4fbad16a031e105fd813b6275c49aa4856793e34a91f924c82e8f4a88e9b"
+    },
+    {
+      "name": "native-proofs-console.log",
+      "bytes": 714,
+      "sha256": "4e581b8fcad71ef2368807245c33e820b19b070a1908a91677785366a6036843"
+    },
+    {
+      "name": "native-proofs.json",
+      "bytes": 13016,
+      "sha256": "9e858426bb5e104caa56e84b20ae9e3de598967253260e873a457030cf831c3d"
+    },
+    {
+      "name": "python-smoke.log",
+      "bytes": 1439,
+      "sha256": "9e638843565765e791a5bc1b02821e280ee1cfdafa6178168b3a038c7cd11f05"
+    },
+    {
+      "name": "report.json",
+      "bytes": 4189,
+      "sha256": "32b84e9f5a85ac0e9d6044e076245fcedd9990cc52c52effb83bcb1855a20117"
+    },
+    {
+      "name": "REPORT.md",
+      "bytes": 909,
+      "sha256": "060f6456725d7907560640ce8a9375e519253f784132d87858045757555319de"
+    },
+    {
+      "name": "reproduce-native-link.log",
+      "bytes": 4677,
+      "sha256": "82bc24e17c4e8420b9110cb02c5f18ce86cc7c50b4393de7373216a2c351d28b"
+    },
+    {
+      "name": "reproduce-repository-marker-control.log",
+      "bytes": 437,
+      "sha256": "dd2406aa17f5810aab850ab5737c3853ec870e50467594449d8a81b4e1f52c6b"
+    },
+    {
+      "name": "reproduction.json",
+      "bytes": 1257,
+      "sha256": "d08e0c2e6480c42591e5ff883a7320de2ab1e1fddd7dceaa0a353d4336ec8b66"
+    },
+    {
+      "name": "runner-console.log",
+      "bytes": 1203,
+      "sha256": "4936aa8291c528c0bd9985af78c7fdee9d9dd98a5b2263b944511b11a6635660"
+    },
+    {
+      "name": "runner-corrected-console.log",
+      "bytes": 704,
+      "sha256": "fdfab472a9fb9044399ffb53987d523d8a3f9dfe0814a1f488c083c27b1df945"
+    },
+    {
+      "name": "sdk-info.log",
+      "bytes": 3726,
+      "sha256": "1324d05d56a2e44fc6d069f1d48e8224127d61b97abefc4e487595dbdcaf0fc0"
+    },
+    {
+      "name": "sdk-install.log",
+      "bytes": 757,
+      "sha256": "99105d0e7082152caaa2c5a02b55958949c61d7e66e5f548468866ab8b174cdc"
+    },
+    {
+      "name": "sdk-version.log",
+      "bytes": 10,
+      "sha256": "6d5ab2a4ef35ceec908f01287257f530b0c0d68f0e84326df2ebcea641f9134b"
+    },
+    {
+      "name": "skip-reasons.json",
+      "bytes": 1365,
+      "sha256": "43d0153aafd9097a46f12405b86ef83390c3ae64b9a86cd66275120e7c8b3ac7"
+    },
+    {
+      "name": "source-final-head.log",
+      "bytes": 41,
+      "sha256": "f97b55b67421aa6910504dee841ad0ad197408dd9614d07f76b5d718566cbbd3"
+    },
+    {
+      "name": "source-final-status.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "terminal-automation.json",
+      "bytes": 407,
+      "sha256": "b89e96444a65d2e25d2bba82a3e8ad78ada2d298d7749c3852e4f663b434dde3"
+    },
+    {
+      "name": "tui-after.json",
+      "bytes": 1335,
+      "sha256": "22d6b370a57937e30c5c09e3e1f90655f5f8f4d4fe0b390d80fa35e0df0f43bb"
+    },
+    {
+      "name": "tui-before.json",
+      "bytes": 1335,
+      "sha256": "22d6b370a57937e30c5c09e3e1f90655f5f8f4d4fe0b390d80fa35e0df0f43bb"
+    },
+    {
+      "name": "tui-links.json",
+      "bytes": 486,
+      "sha256": "0cb3655105a461830d28ba936fbec8ebc4b16e7d137423960239342556c17d48"
+    },
+    {
+      "name": "tui-process-cleanup.log",
+      "bytes": 435,
+      "sha256": "e747a81aaec1cb9baf9e7684a81b68f44a2b89c1f779aa821f145765fa9c07fe"
+    },
+    {
+      "name": "tui-session-80x24.json",
+      "bytes": 548,
+      "sha256": "38a783f8b66593c53894acc80ad36bdd2700394c8a6251701efdff8167de0ef4"
+    },
+    {
+      "name": "tui-session.json",
+      "bytes": 548,
+      "sha256": "38a783f8b66593c53894acc80ad36bdd2700394c8a6251701efdff8167de0ef4"
+    },
+    {
+      "name": "tui-setup.json",
+      "bytes": 1925,
+      "sha256": "1bf4e55b2a904cd3a2ac534f55967290487cd75b13a7de4a1655b05bf5062eb9"
+    },
+    {
+      "name": "tui-startup.log",
+      "bytes": 5354,
+      "sha256": "84a95c1f90de4ed2c4479e19dc7eb6da28ce2068a5aef998848d110164d05326"
+    },
+    {
+      "name": "unit-build.log",
+      "bytes": 387,
+      "sha256": "e0c5fdb4abcefad74145af9a7424d813d418452b37f464e2b7e391915b70ecb3"
+    },
+    {
+      "name": "unit-observations.json",
+      "bytes": 5184,
+      "sha256": "a88d5dffc58a172f45de1e7c1065094c8e3a626f1541a7193f40b804fc8191c5"
+    },
+    {
+      "name": "unit-restore.log",
+      "bytes": 316,
+      "sha256": "3b2fd80abbca33b648d6b19d3474e2c9dd446b97adcf634c09ff0b63fddb7b06"
+    },
+    {
+      "name": "unit-tests.log",
+      "bytes": 100579,
+      "sha256": "980f7bc81eea140cde7cdd1ed32f2424aad69d972a481411f4917dc0a8b945d3"
+    }
+  ],
+  "excluded": [
+    "private homes/config/state",
+    "retained payloads and archives",
+    "SDK and binaries",
+    "package caches",
+    "machine-specific collection utilities"
+  ],
+  "screenCaptures": 0
+}

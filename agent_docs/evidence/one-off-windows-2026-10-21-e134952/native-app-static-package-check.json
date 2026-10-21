@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 1,
+  "packageCheckSchemaVersion": 2,
+  "appSha256": "f5e1955e5208f3fbe620da31214f2a05b9245650d45d268be1849c8b8bfe41a0",
+  "httpProxiesBlocked": true,
+  "githubCredentialsRemoved": true,
+  "rows": [
+    {
+      "scenario": "intact",
+      "exitCode": 0,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "4120f2c73335a2310eb0d9a429799b9ae4edddbc390018f9fb2986ec58b7e062"
+    },
+    {
+      "scenario": "missing-reference",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "findings",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "92537cff65941262978a754d352dafdf3aa11622ec3317f44f66932e8c33a24c"
+    },
+    {
+      "scenario": "case-mismatch",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "findings",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "b3fa165ca75e4205dca986a840c5e3c4bb70801ca28f45d153bbbc77fa69c622"
+    },
+    {
+      "scenario": "invalid-metadata",
+      "exitCode": 1,
+      "formatStatus": "invalid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "invalid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "09f437535decefddfa758973960c003459c9ef9a5163296eacc56af2cc264b80"
+    },
+    {
+      "scenario": "multiline-code",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "e354cef80d66525cf6410dbaa0d260dc5054e6409ef4c80d0669a4a5b4a43db9"
+    },
+    {
+      "scenario": "multiline-label",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "0fa5aa00f4315eabee36b5b6ec357124a2930cf4ca8b7473555b092466f874e4"
+    },
+    {
+      "scenario": "html-blank-line",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "1b16530d6bf16dacd362b9ee7732c80ee2dbc441f81d16b9d5cac15b254c59bd"
+    },
+    {
+      "scenario": "list-fence",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "77fbb84b7e76e3fa59058c7eba9aaad7fd89de6035221a690c6ff51b474e70a4"
+    },
+    {
+      "scenario": "character-references",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "34e92e7c87642987dbffc0b555af4de2b1306b6eefc11b1ae739204204a95752"
+    },
+    {
+      "scenario": "escaped-character-reference",
+      "exitCode": 0,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "1758f8ec9cf4375d2a2b79c09d1d70589a0deba5ee338fa7bd0169cbd288b828"
+    },
+    {
+      "scenario": "link-parent-segment",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "unknown",
+      "sourceUnchanged": true,
+      "referenceCoverage": "partial",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "7eafc3c6b8941154eba2c2bc143e3575a328f41668f8cd6ef5f7d786578727d6"
+    },
+    {
+      "scenario": "broken-anchor",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "findings",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "54d349e9a8ff2e013e5cf7b06981d6b155889f44aff56f4bcf94ca168c09d851"
+    },
+    {
+      "scenario": "anchor-case",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "findings",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "ccf9b7eb4d98e1477085df2970e6ecbb6484f50b40202263847c2ebdeeb13e93"
+    },
+    {
+      "scenario": "dependency-local-missing",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "findings",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "14e0fc72013d35a840c4058a488e605ea1a421e61ad4f80c47239d626a35519f"
+    },
+    {
+      "scenario": "declared-dependency",
+      "exitCode": 0,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "7b5342c64c3f96e8d6313134409170bacac1c5755554ee4204156ae543e4fca2"
+    },
+    {
+      "scenario": "malformed-dependency",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "partial",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "663658ebce23b39c85d3650429f89afd6c53d067210e2d667df099e875207377"
+    },
+    {
+      "scenario": "portability",
+      "exitCode": 0,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "unknown",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "c0f1b1e5ff99721ca312d328b7d98f4119d7b108b3a10515d1884850adc9a7a1"
+    },
+    {
+      "scenario": "gemini-bom",
+      "exitCode": 1,
+      "formatStatus": "valid",
+      "referenceStatus": "none-observed",
+      "sourceUnchanged": true,
+      "referenceCoverage": "limited",
+      "assessmentStates": {
+        "format": "valid",
+        "agentCompatibility": "incompatible",
+        "payloadIntact": "unknown",
+        "sourceReviewed": "not-reviewed"
+      },
+      "declarationCoverage": "limited",
+      "referencedScriptNotExecuted": true,
+      "payloadFingerprint": "10cf2099bd05105a749f95c0aca3d6d5d7da9adbae92fe86914ab29b8835ceb0"
+    }
+  ]
+}

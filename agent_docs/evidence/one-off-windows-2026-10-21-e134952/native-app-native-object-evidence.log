@@ -1,0 +1,14 @@
+[
+  {
+    "nativeHost": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-app\\skillview.exe",
+    "nativeSha256": "f5e1955e5208f3fbe620da31214f2a05b9245650d45d268be1849c8b8bfe41a0",
+    "gh": "C:\\Program Files\\GitHub CLI\\gh.EXE",
+    "sameBytesDistinctObjects": true,
+    "readOnlyObjectEvidenceStable": true,
+    "identicalContentReplacementObserved": true,
+    "unixRootModesRespected": false,
+    "metadataCoverageExplicit": true,
+    "comparisonCreatedNoMaintenanceState": true,
+    "payloadBytesUnchanged": true
+  }
+]

@@ -1,0 +1,82 @@
+.NET SDK:
+ Version:           10.0.402
+ Commit:            a8dd0577c5
+ Workload version:  10.0.400-manifests.da132f47
+ MSBuild version:   18.9.15+a8dd0577c
+
+Runtime Environment:
+ OS Name:     Windows
+ OS Version:  10.0.26340
+ OS Platform: Windows
+ RID:         win-arm64
+ Base Path:   C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk\10.0.402\
+
+.NET workloads installed:
+ [ios]
+   Installation Source: VS 18.10.12224.181
+   Manifest Version:    26.0.11017/10.0.100
+   Manifest Path:       C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.ios\26.0.11017\WorkloadManifest.json
+   Install Type:        FileBased
+
+ [wasm-tools]
+   Installation Source: VS 18.10.12224.181
+   Manifest Version:    10.0.113/10.0.100
+   Manifest Path:       C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk-manifests\10.0.100\microsoft.net.workload.mono.toolchain.current\10.0.113\WorkloadManifest.json
+   Install Type:        FileBased
+
+ [maccatalyst]
+   Installation Source: VS 18.10.12224.181
+   Manifest Version:    26.0.11017/10.0.100
+   Manifest Path:       C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.maccatalyst\26.0.11017\WorkloadManifest.json
+   Install Type:        FileBased
+
+ [maui-windows]
+   Installation Source: VS 18.10.12224.181
+   Manifest Version:    10.0.0/10.0.100
+   Manifest Path:       C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.maui\10.0.0\WorkloadManifest.json
+   Install Type:        FileBased
+
+ [android]
+   Installation Source: VS 18.10.12224.181
+   Manifest Version:    36.1.2/10.0.100
+   Manifest Path:       C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.android\36.1.2\WorkloadManifest.json
+   Install Type:        FileBased
+
+Configured to use workload sets when installing new manifests.
+No workload sets are installed. Run "dotnet workload restore" to install a workload set.
+
+Host:
+  Version:      10.0.13
+  Architecture: arm64
+  Commit:       4099f83977
+
+.NET SDKs installed:
+  10.0.402 [C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\sdk]
+
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 10.0.13 [C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\shared\Microsoft.AspNetCore.App]
+  Microsoft.NETCore.App 10.0.13 [C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.WindowsDesktop.App 10.0.13 [C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet\shared\Microsoft.WindowsDesktop.App]
+
+Other architectures found:
+  x64   [C:\Program Files\dotnet\x64]
+    registered at [HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\InstallLocation]
+  x86   [C:\Program Files (x86)\dotnet]
+    registered at [HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x86\InstallLocation]
+
+Environment variables:
+  DOTNET_CLI_HOME                          [C:\Users\kevin\AppData\Local\Temp\skillview-rc-e134952-20261021\dotnet-home]
+  DOTNET_CLI_TELEMETRY_OPTOUT              [1]
+  DOTNET_CLI_UI_LANGUAGE                   [en-US]
+  DOTNET_NOLOGO                            [1]
+  DOTNET_ROOT                              [C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\dotnet]
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]
+
+global.json file:
+  C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\global.json
+
+Learn more:
+  https://aka.ms/dotnet/info
+
+Download .NET:
+  https://aka.ms/dotnet/download

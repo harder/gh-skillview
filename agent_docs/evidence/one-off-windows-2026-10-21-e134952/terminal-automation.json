@@ -1,0 +1,14 @@
+{
+  "payloadFilesAndIdentitiesUnchanged": true,
+  "registryBytesUnchanged": true,
+  "screenCaptures": 0,
+  "inputActions": 0,
+  "supportedTargetReturned": false,
+  "intendedTerminalTitle": "SkillView RC e134952",
+  "launches": 2,
+  "size": {
+    "columns": 80,
+    "rows": 24
+  },
+  "termination": "Owned terminal and app trees force-stopped through shell tools; clean keyboard quit untested"
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "nativeHost": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-rc-e134952-20261021\\native-extension\\gh-skillview.exe",
+    "nativeSha256": "b25c50e055405550437f183146441ceea12deff73e72cc0ca7198213cc6db626",
+    "gh": "gh version 2.102.0 (2026-09-30)",
+    "builtinsAndAllCachedVersionsObserved": true,
+    "activeLoadingNotInferred": true,
+    "protectedNativeObjectsBytesModesUnchanged": true,
+    "managedMutationsRefused": true,
+    "unrelatedNamedLocalImportSucceeded": true,
+    "mutableAllSetRefused": true,
+    "networkProxiesBlocked": true,
+    "fixtures": [
+      {
+        "command": "list",
+        "exitCode": 0
+      },
+      {
+        "command": "doctor",
+        "exitCode": 0
+      },
+      {
+        "command": "remove",
+        "exitCode": 1
+      },
+      {
+        "command": "remove",
+        "exitCode": 1
+      },
+      {
+        "command": "quarantine",
+        "exitCode": 1
+      },
+      {
+        "command": "update-plan",
+        "exitCode": 1
+      },
+      {
+        "command": "install",
+        "exitCode": 10
+      },
+      {
+        "command": "install",
+        "exitCode": 10
+      },
+      {
+        "command": "install",
+        "exitCode": 0
+      }
+    ]
+  }
+]

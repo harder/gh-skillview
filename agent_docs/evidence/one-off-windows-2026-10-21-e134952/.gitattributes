@@ -1,0 +1,2 @@
+# Preserve the captured evidence bytes and manifest hashes on every platform.
+* -text whitespace=cr-at-eol

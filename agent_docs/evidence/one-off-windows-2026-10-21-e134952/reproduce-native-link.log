@@ -1,0 +1,32 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: False) (212ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: True) (109ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: False, ancestorAlias: False) (121ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64) failed with 3 error(s) (904ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 3
+  failed: 3
+  succeeded: 0
+  skipped: 0
+  duration: 1s 091ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

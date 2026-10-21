@@ -1,0 +1,20 @@
+{
+  "Unix relative placement capture requires native Unix execution.": 12,
+  "The fixed /usr/bin/env fixture requires Linux.": 1,
+  "Opt in with private authoring proof tools/evidence paths; normal tests never launch publish dry-run.": 1,
+  "Requires Linux native staging/cleanup; injected Docker boundary only.": 9,
+  "Unix raw-target trailing separators require native Unix execution.": 4,
+  "Unix no-follow target resolution requires native Unix execution.": 4,
+  "Unix ancestor-alias fixture requires symlink support.": 14,
+  "Unix empty-link observation; Windows native link proofs run separately.": 1,
+  "Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.": 10,
+  "Unix link-mode hash domain; Windows link metadata has a separate contract.": 3,
+  "Unprivileged symbolic-link fixture requires POSIX.": 1,
+  "Real CLI probe shell fixture requires POSIX.": 2,
+  "Actual shell child marker requires POSIX; native guard refusals are portable.": 4,
+  "POSIX gh protocol fixture.": 7,
+  "POSIX gh protocol fixture; shared saved-update native contracts cover Windows publication.": 1,
+  "Unix alias fixture and native removal required.": 2,
+  "Merged native metadata publication currently requires macOS evidence.": 2,
+  "Full native merge metadata publication proof requires supported host coverage.": 1
+}
