@@ -143,6 +143,176 @@ public sealed class NativePlacementTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void UnixInitialCaptureRestartsFromFreshRootAfterParentNamespaceChanges(bool missing)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Path.Combine(parent, "child");
+        if (!missing) Directory.CreateDirectory(child);
+        Assert.True(SecureRemovalBackend.TryCaptureIdentity(parent, out var before, out var error), error);
+        var attempts = new List<int>();
+        using var lease = UnixSecureRemovalBackend.OpenPlacement(child, Token, (attempt, capturedParent, name) =>
+        {
+            if (name != "child" || !PathIdentity.Equals(capturedParent, before.CanonicalPath)) return;
+            attempts.Add(attempt);
+            if (attempts.Count == 1)
+            {
+                File.WriteAllText(Path.Combine(parent, "sibling"), "changed");
+                Assert.True(SecureRemovalBackend.TryCaptureIdentity(parent, out var after, out var identityError), identityError);
+                Assert.NotEqual(before, after);
+            }
+        });
+        Assert.Equal(2, attempts.Count);
+        Assert.True(attempts[1] > attempts[0]);
+        Assert.Equal(missing ? new[] { "child" } : [], lease.Evidence.MissingSuffix);
+        lease.Revalidate(Token);
+        if (missing) Directory.CreateDirectory(child);
+        else { Directory.Move(child, child + "-retained"); Directory.CreateDirectory(child); }
+        Assert.Throws<IOException>(() => lease.Revalidate(Token));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnixNamedChildGenerationChangeRestartsInitialCapture(bool beforeOpenedChildCheck)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Directory.CreateDirectory(Path.Combine(parent, "child")).FullName;
+        Assert.True(SecureRemovalBackend.TryCaptureIdentity(parent, out var before, out var error), error);
+        var attempts = new List<int>();
+        void Change(int attempt, string _, string name)
+        {
+            if (name != "parent") return;
+            attempts.Add(attempt);
+            if (attempts.Count != 1) return;
+            File.WriteAllText(Path.Combine(parent, "sibling"), "changed");
+            Assert.True(SecureRemovalBackend.TryCaptureIdentity(parent, out var after, out var identityError), identityError);
+            Assert.Equal((before.Volume, before.FileIdLow, before.FileIdHigh), (after.Volume, after.FileIdLow, after.FileIdHigh));
+            Assert.NotEqual((before.ChangeTimeSeconds, before.ChangeTimeNanoseconds), (after.ChangeTimeSeconds, after.ChangeTimeNanoseconds));
+        }
+        using var lease = UnixSecureRemovalBackend.OpenPlacement(child, Token,
+            beforeParentCheckForTests: beforeOpenedChildCheck ? null : Change,
+            beforeChildCheckForTests: beforeOpenedChildCheck ? Change : null);
+        Assert.Equal(2, attempts.Count);
+        Assert.True(attempts[1] > attempts[0]);
+        Assert.Empty(lease.Evidence.MissingSuffix);
+        lease.Revalidate(Token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnixContinuousNamedChildGenerationChurnIsBounded(bool beforeOpenedChildCheck)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Directory.CreateDirectory(Path.Combine(parent, "child")).FullName;
+        var attempts = new List<int>();
+        void Change(int attempt, string _, string name)
+        {
+            if (name != "parent") return;
+            attempts.Add(attempt);
+            File.WriteAllText(Path.Combine(parent, "sibling-" + attempt), "changed");
+        }
+        var refused = Assert.ThrowsAny<IOException>(() => UnixSecureRemovalBackend.OpenPlacement(child, Token,
+            beforeParentCheckForTests: beforeOpenedChildCheck ? null : Change,
+            beforeChildCheckForTests: beforeOpenedChildCheck ? Change : null));
+        Assert.Equal(Enumerable.Range(0, UnixSecureRemovalBackend.PlacementCaptureAttempts), attempts);
+        Assert.Contains(parent, refused.Message);
+        Assert.Contains(beforeOpenedChildCheck ? "opened child" : "named child", refused.Message);
+        Assert.Contains("ctime", refused.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnixContinuousParentChurnIsBoundedAndCancellationStopsRestart(bool cancel)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var parent = Directory.CreateDirectory(Path.Combine(temp.FullName, "parent")).FullName;
+        var child = Path.Combine(parent, "missing");
+        Assert.True(SecureRemovalBackend.TryCaptureIdentity(parent, out var initial, out var error), error);
+        using var cancellation = new CancellationTokenSource();
+        var changes = 0;
+        var attempts = new HashSet<int>();
+        void Change(int attempt, string capturedParent, string name)
+        {
+            attempts.Add(attempt);
+            if (name != "missing" || !PathIdentity.Equals(capturedParent, initial.CanonicalPath)) return;
+            File.WriteAllText(Path.Combine(parent, "sibling-" + changes++), "changed");
+            if (cancel) cancellation.Cancel();
+        }
+        if (cancel)
+        {
+            var canceled = Assert.Throws<OperationCanceledException>(() => UnixSecureRemovalBackend.OpenPlacement(child, cancellation.Token, Change));
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+            Assert.Equal(1, changes);
+        }
+        else
+        {
+            var refused = Assert.ThrowsAny<IOException>(() => UnixSecureRemovalBackend.OpenPlacement(child, Token, Change));
+            Assert.Contains("parent changed", refused.Message);
+            Assert.InRange(changes, 1, UnixSecureRemovalBackend.PlacementCaptureAttempts);
+            Assert.Equal(Enumerable.Range(0, UnixSecureRemovalBackend.PlacementCaptureAttempts), attempts.Order());
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void UnixNamedChildOrAliasReplacementRefusesWithoutRestart(bool alias, bool beforeOpenedChildCheck)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var actual = Directory.CreateDirectory(Path.Combine(temp.FullName, "actual")).FullName;
+        var selected = Path.Combine(temp.FullName, "selected");
+        if (alias) Directory.CreateSymbolicLink(selected, actual);
+        else Directory.CreateDirectory(selected);
+        var requested = alias ? Path.Combine(selected, "missing") : selected;
+        var changes = 0;
+        void Replace(int _, string __, string name)
+        {
+            if (name != "selected") return;
+            changes++;
+            Directory.Move(selected, selected + "-retained");
+            if (alias) Directory.CreateSymbolicLink(selected, actual);
+            else Directory.CreateDirectory(selected);
+        }
+        var refused = Assert.Throws<IOException>(() => UnixSecureRemovalBackend.OpenPlacement(requested, Token,
+            beforeParentCheckForTests: beforeOpenedChildCheck ? null : Replace,
+            beforeChildCheckForTests: beforeOpenedChildCheck ? Replace : null));
+        Assert.Contains("changed", refused.Message);
+        Assert.Contains(selected, refused.Message);
+        Assert.Contains("inode", refused.Message);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void UnixAliasParentChurnRestartsTheOriginalLexicalWalk()
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var actual = Directory.CreateDirectory(Path.Combine(temp.FullName, "actual")).FullName;
+        var alias = Path.Combine(temp.FullName, "alias");
+        Directory.CreateSymbolicLink(alias, actual);
+        var requested = Path.Combine(alias, "missing");
+        var attempts = new List<int>();
+        using var lease = UnixSecureRemovalBackend.OpenPlacement(requested, Token, (attempt, _, name) =>
+        {
+            if (name != "alias") return;
+            attempts.Add(attempt);
+            if (attempts.Count == 1) File.WriteAllText(Path.Combine(temp.FullName, "sibling"), "changed");
+        });
+        Assert.Equal(2, attempts.Count);
+        Assert.True(attempts[1] > attempts[0]);
+        Assert.Equal(requested, lease.Evidence.Path);
+        Assert.Equal(new[] { "missing" }, lease.Evidence.MissingSuffix);
+        lease.Revalidate(Token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void WindowsInitialCaptureRestartsFromFreshRootAfterParentNamespaceChanges(bool missing)
     {
         if (!OperatingSystem.IsWindows()) { Assert.Skip("Windows held-parent generation checks require native Windows execution."); return; }
