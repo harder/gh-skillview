@@ -63,7 +63,9 @@ internal static class MaintenanceQueueFormatter
         yield return ("Changes", DescribeEffect(entry));
         yield return ("Undo", entry.Cleanup is null
             ? "Saved updates keep the original for undo."
-            : "Deletion has no automatic undo.");
+            : entry.Cleanup.ReviewOnly
+                ? "No change to undo; this issue opens review only."
+                : "Deletion has no automatic undo.");
         var impact = entry.Cleanup?.Impact;
         var exposures = impact?.AffectedExposures ?? entry.Subject.Exposures;
         var agents = new HashSet<(string?, Scope?, string?)>();
