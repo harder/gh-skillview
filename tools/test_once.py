@@ -25,6 +25,8 @@ PROJECTS = {
 OFFLINE = ('static-package-check', 'native-object-evidence', 'gitfile-protection',
            'inventory-filter', 'managed-discovery', 'quarantine-undo')
 LIVE = ('revision-update', 'recorded-replacement')
+LINK_PROOFS = {'static-package-check', 'gitfile-protection', 'inventory-filter',
+               'quarantine-undo', 'recorded-replacement'}
 RELEASE_RIDS = {'win-x64', 'win-arm64', 'linux-x64', 'osx-arm64'}
 
 
@@ -76,6 +78,20 @@ def stop_tree(process, log):
     process.wait(timeout=10)
 
 
+def symlink_limitation(output):
+    """Probe fixture setup rights, independently of SkillView's behavior."""
+    try:
+        with tempfile.TemporaryDirectory(prefix='symlink-probe-', dir=output) as temporary:
+            root = Path(temporary)
+            (root / 'file').write_text('fixture', encoding='utf-8')
+            (root / 'directory').mkdir()
+            (root / 'file-link').symlink_to(root / 'file')
+            (root / 'directory-link').symlink_to(root / 'directory', target_is_directory=True)
+        return None
+    except OSError as error:
+        return 'Fixture symlink creation unavailable: ' + str(error)
+
+
 def execute(argv, *, cwd, env, log, timeout):
     started = time.monotonic()
     result = dict(argv=[str(value) for value in argv], log=str(log), status='failed', exitCode=None)
@@ -89,6 +105,9 @@ def execute(argv, *, cwd, env, log, timeout):
                 result['status'] = 'passed' if result['exitCode'] == 0 else 'failed'
             except subprocess.TimeoutExpired:
                 result['status'] = 'timeout'
+                stop_tree(process, stream)
+            except KeyboardInterrupt:
+                result['status'] = 'interrupted'
                 stop_tree(process, stream)
             except BaseException:
                 stop_tree(process, stream)
@@ -107,7 +126,9 @@ def write_report(output, report):
             'These are command outcomes. Read test logs for test counts and skips.', '']
     for step in report['steps']:
         rows.append(f"- {step['name']}: **{step['status']}** — {Path(step['log']).name if step.get('log') else step.get('reason', '')}")
-    rows.extend(['', 'Real terminal walkthrough and actual-installation inspection: not run by this script.',
+    if report.get('blocked'):
+        rows.extend(['', 'Stopped: ' + report['blocked']])
+    rows.extend(['', 'Real terminal walkthrough: not run by this script.',
                  'Use docs/one-off-testing-agent.md to finish the agent-led report.'])
     (output / 'REPORT.md').write_text('\n'.join(rows) + '\n', encoding='utf-8')
 
@@ -142,10 +163,13 @@ def main(argv=None):
         print(f"{name}: {step['status']} ({step['seconds']}s)", flush=True)
         if step['status'] == 'timeout':
             raise RuntimeError('Stopped after a timeout; review process cleanup before another run.')
+        if step['status'] == 'interrupted':
+            raise RuntimeError('Interrupted; remaining steps were not completed.')
         return step['status'] == 'passed'
 
     def not_run(name, reason):
         report['steps'].append(dict(name=name, status='not-run', reason=reason))
+        print(f'{name}: not-run ({reason})', flush=True)
 
     try:
         if not run('git-head', ['git', 'rev-parse', 'HEAD'], 30):
@@ -196,8 +220,12 @@ def main(argv=None):
             else:
                 not_run(name + '-proofs', 'Product restore/build failed')
         report['hosts'] = {name: str(binary) for name, binary in hosts.items()}
+        link_reason = symlink_limitation(output) if os.name == 'nt' else None
         for name, binary in hosts.items():
             for proof in OFFLINE:
+                if link_reason and proof in LINK_PROOFS:
+                    not_run(name + '-' + proof, link_reason)
+                    continue
                 command = [sys.executable, str(ROOT / 'agent_docs/evidence' / ('prove-' + proof + '.py')),
                            '--app', str(binary), '--output', str(output / f'{name}-{proof}.json')]
                 if proof != 'static-package-check':
@@ -214,6 +242,9 @@ def main(argv=None):
                 live_env = dict(env, GH_TOKEN=token)
                 for name, binary in hosts.items():
                     for proof in LIVE:
+                        if link_reason and proof in LINK_PROOFS:
+                            not_run(name + '-' + proof, link_reason)
+                            continue
                         run(name + '-' + proof, [sys.executable, str(ROOT / 'agent_docs/evidence' / ('prove-' + proof + '.py')),
                             '--app', str(binary), '--gh', gh, '--output', str(output / f'{name}-{proof}.json')], child_env=live_env)
             else:

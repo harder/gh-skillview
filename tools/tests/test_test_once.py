@@ -55,6 +55,26 @@ class TestOnceTests(unittest.TestCase):
             self.assertEqual(9, result['exitCode'])
             self.assertIn('diagnostic', (root / 'command.log').read_text())
 
+    def test_fixture_symlink_refusal_is_an_explicit_limitation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(Path, 'symlink_to', side_effect=OSError('fixture permission denied')):
+                reason = runner.symlink_limitation(root)
+            self.assertIn('fixture permission denied', reason)
+            self.assertEqual([], list(root.iterdir()))
+            self.assertIn('recorded-replacement', runner.LINK_PROOFS)
+            self.assertNotIn('revision-update', runner.LINK_PROOFS)
+
+    def test_interruption_keeps_a_step_result_after_owned_tree_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(runner.subprocess, 'Popen') as start, patch.object(runner, 'stop_tree') as stop:
+                start.return_value.wait.side_effect = KeyboardInterrupt
+                result = runner.execute(['fixture-command'], cwd=root, env={}, log=root / 'interrupt.log', timeout=30)
+                stop.assert_called_once()
+            self.assertEqual('interrupted', result['status'])
+            self.assertEqual(['fixture-command'], result['argv'])
+
     def test_timeout_stops_the_owned_descendant_before_it_writes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

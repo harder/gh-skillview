@@ -60,7 +60,9 @@ coverage stated plainly. Keep credentials and private fixture homes out of uploa
 
 Prerequisites are Git, Python 3.9+, the exact .NET SDK from `global.json`, and
 `gh` 2.97.0+. Existing GitHub authentication enables the remote proofs. Agents
-should check what is already installed before suggesting installation commands.
+should check what is already installed before installing anything. Missing
+prerequisites may be installed from official sources into user-owned locations
+when the session permits; lengthy native-toolchain setup can be reported instead.
 The checked-out commit must be clean, including untracked files.
 
 On WSL/macOS, from the dedicated checkout:
@@ -99,6 +101,10 @@ Git/agent overrides. Mutating proof scripts create their own fixture working
 directories. Builds use the dedicated checkout and the ordinary NuGet cache.
 The runner does not scan or modify your actual installed skills. The agent task
 adds real terminal testing; command success alone does not complete acceptance.
+On Windows, a private file/directory symlink probe identifies missing fixture
+permissions. Affected CLI proofs are marked not run, making coverage partial;
+unrelated checks still run. Test-suite failures remain failures to investigate,
+including missing security-metadata privileges; the kit does not waive them.
 
 Results default to a unique temp directory outside the checkout (`/var/tmp` on
 Linux). `--output PATH` chooses a new directory instead. The runner prints its

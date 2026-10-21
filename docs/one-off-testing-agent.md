@@ -13,8 +13,11 @@ weaken tests, change lock files, merge PRs, or establish recurring automation.
    dirty source. Do not stash, reset or clean someone else's work.
 2. Check Git, Python 3.9+, gh >=2.97.0 and the exact SDK in `global.json`.
    Record OS, filesystem, terminal and architecture. If a prerequisite is
-   missing, report the exact installation step needed; do not spend the session
-   upgrading the machine or changing project dependencies.
+   missing, install only those prerequisites from official sources into user-owned
+   locations when your session permits. Use a private SDK installation rather
+   than changing the machine's default SDK. If setup requires administrator access
+   or a lengthy native-toolchain installation, report the exact commands needed
+   and continue independent checks. Keep project dependencies unchanged.
 3. Run the Python smoke tests, then `tools/test_once.py --expect-commit SHA
    --live` with the appropriate Python command. Add `--dotnet PATH` if needed.
    Add `--aot` only if the native build toolchain is already available for a
@@ -31,6 +34,10 @@ most 30 minutes on the terminal checks below and 15 minutes reproducing new
 failures. Stop investigating a failure after one focused reproduction unless
 the next check is necessary to distinguish a fixture error from a product bug.
 Do not wait for CI or another reviewer to finish this local report.
+Avoid broad code reviews or reading the whole repository. Read only the guides
+and failure-specific code needed for this pass. Use an inexpensive model for
+command execution and log collection if available, reserving stronger models
+for diagnosis. Do not create a swarm of review agents or repeatedly poll CI.
 
 ## Drive the actual terminal
 
@@ -80,11 +87,6 @@ host; it creates private fixtures. Report the exact shortcut/disposition tested.
 Do not rerun every variant automatically. On Windows, if symlink privileges or
 security-metadata visibility are unavailable, record the refusal and missing
 coverage; do not elevate or bypass guards to manufacture a pass.
-
-Optionally inspect actual installed skills read-only after fixture testing,
-with the user's permission if that was not part of the platform prompt. Do not
-include personal paths/content in shared reports without redaction. This is not
-required to complete the fixture acceptance pass.
 
 ## Return a useful report
 
