@@ -90,7 +90,7 @@ source/ref/tree, recorded owners and consumers. Cleanup issues reopen only that
 issue at that physical address after a fresh inventory capture. Installation
 review opens Updates with only that exact installation selected, clearing prior
 batch and `--all` choices. A missing or ambiguous ID refuses the hand-off instead
-of choosing a same-name sibling. Press **Dry-run** explicitly to check update
+of choosing a same-name sibling. Press **Check updates** explicitly to check update
 availability; **c** compares installed content with one immutable saved candidate
 and opens its plan review (**u** also prepares review). Entry into the
 workspace performs neither action. Refresh keeps an exact Updates selection.
@@ -115,6 +115,32 @@ review-only. Actions without an applicable finding, and updates to managed
 read-only copies, are disabled with an explanation in the details.
 Opening either review changes no skill files. The list shows at most 128 copies;
 comparison summaries show at most 12 changed paths and report omissions.
+
+In Updates, the selected-copy and saved-review summaries use the full reading
+width. **Review update** prepares one immutable candidate; it does not apply it.
+The summary explains the target, revision, affected consumers, local changes and
+retained original. Press **F2** or **Details (F2)** for the existing fingerprints,
+frozen source diffs, complete diagnostics and recovery evidence; F2 returns to
+the summary. Switching views changes neither the candidate nor its approvals.
+In the general Updates list, an availability check returns focus to the control
+that started it, so table navigation and marking can continue. The button
+mnemonics are **Alt+C** for Check updates and **Alt+R** for Review update.
+
+Review controls appear when applicable. Source review and retention remain
+separate declarations: inspect the frozen source changes and omissions in Details,
+then check the source declaration and retention approval before applying. Unpin
+reviews change only the verified pin. Local-change review remains available
+through **Preserve installed**, **Review local** and **Build merge** as applicable;
+building a merge requires fresh approval of its exact result. **Next / skip**
+continues a batch one installation at a time, preserving earlier outcomes and
+diagnostics in Details. A completed disk operation does not prove that an agent
+reloaded the skill.
+
+After an attempted write, the result and Details stay available. Press
+**Refresh inventory** before starting another review or choosing another version;
+this captures the installed ref again at the selected location. A failed refresh
+can be retried without granting another approval or selecting a same-name copy.
+This also applies when you skip the final batch item after an earlier write.
 
 Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin

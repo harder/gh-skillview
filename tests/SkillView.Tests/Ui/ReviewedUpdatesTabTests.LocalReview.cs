@@ -58,6 +58,8 @@ public sealed partial class ReviewedUpdatesTabTests
         await view.LocalActionForTestsAsync(LocalUpdateAction.Build);
         Assert.False(view.LocalPanelVisibleForTests); Assert.False(view.ApplyButtonForTests.Enabled);
         Assert.Equal(CheckState.UnChecked, view.RetainBoxForTests.Value);
+        Assert.Contains("Apply the reviewed local merge", view.PreviewTextForTests);
+        view.ToggleDetailsForTests();
         Assert.Contains("merge-reviewed", view.PreviewTextForTests);
         Assert.Equal(new[] { LocalUpdateAction.Review, LocalUpdateAction.Choose, LocalUpdateAction.Build }, actions);
         view.RetainBoxForTests.Value = CheckState.Checked;

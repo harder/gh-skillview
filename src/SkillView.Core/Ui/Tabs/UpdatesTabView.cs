@@ -20,10 +20,8 @@ namespace SkillView.Ui.Tabs;
 ///   a     — mark / unmark all visible
 ///   u     — prepare a review for the current physical installation
 ///   U     — queue a separate review for every marked row
-/// Plus the existing Dry-run / Update / Cancel buttons.
-///
-/// Renders RenderResult markdown into the right pane using the existing
-/// static helper on UpdateScreen so the 3 UpdateScreenTests stay green.
+/// Check updates reports availability; Review update prepares a saved review.
+/// F2 switches between a summary and existing technical/recovery evidence.
 internal sealed partial class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
@@ -121,7 +119,7 @@ internal sealed partial class UpdatesTabView : FrameView
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(9),
-            Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
+            Text = "## Updates\n\n_Loading inventory… press **Check updates** once loaded to check availability._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
 
@@ -141,7 +139,7 @@ internal sealed partial class UpdatesTabView : FrameView
         {
             X = 10,
             Y = Pos.AnchorEnd(5),
-            Text = "_unpin",
+            Text = "_Unpin with update",
         };
 
         _status = new Label
@@ -164,13 +162,13 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _dryRunButton = new SingleRowButton
         {
-            Text = "_Dry-run",
+            Text = "_Check updates",
             X = 0,
             Y = Pos.AnchorEnd(3),
         };
         _updateButton = new SingleRowButton
         {
-            Text = "_Update",
+            Text = "_Review update",
             X = Pos.Right(_dryRunButton) + 2,
             Y = Pos.AnchorEnd(3),
             IsDefault = true,
@@ -190,6 +188,10 @@ internal sealed partial class UpdatesTabView : FrameView
             Y = Pos.AnchorEnd(3)
         };
         _chooseVersionButton.Accepting += (_, args) => { args.Handled = true; ChooseVersion(); };
+
+        _detailsButton = new SingleRowButton { Text = "Details (F2)", X = 0, Y = Pos.AnchorEnd(3) };
+        _reviewHint = new Label { Text = "F2 Details · Tab Move focus · Esc Back", X = 0, Y = Pos.AnchorEnd(1), Width = Dim.Fill(), Height = 1 };
+        _detailsButton.Accepting += (_, args) => { args.Handled = true; TogglePreviewDetails(); };
 
         InitializeReviewControls();
         InitializeLocalReviewControls();
@@ -216,22 +218,32 @@ internal sealed partial class UpdatesTabView : FrameView
             new Shortcut { Title = "a",     HelpText = "Mark all" },
             new Shortcut { Title = "u",     HelpText = "Review row" },
             new Shortcut { Title = "U",     HelpText = "Review marked" },
-            new Shortcut { Title = "d",     HelpText = "Dry-run" },
+            new Shortcut { Title = "d",     HelpText = "Check updates" },
             new Shortcut { Title = "p",     HelpText = "Unpin row" },
+            new Shortcut { Key = Key.F2, Title = "F2", HelpText = "Details" },
             new Shortcut { Key = Key.Esc,   Title = "Esc", HelpText = "Back" },
         ], includeOpenLink: false));
 
         TuiHelpers.ApplyScheme(SchemeNames.Base,
             this, _tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _statusBar);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar);
 
         KeyDown += OnKeyDown;
 
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
+            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
+        _table.ValueChanged += (_, _) =>
+        {
+            if (!_loadCancellations.HasActive && !_operationCancellations.HasActive) ShowSelectedPreview();
+            // Row movement only changes the summary and pin-only action.
+            // Reflow the footer only when that action's visibility changes.
+            if (!_reviewPresentationReady || _unpinOnlyButton.Visible != ShowUnpinOnlyAction()) RefreshPresentation();
+        };
+        _reviewPresentationReady = true;
+        RefreshPresentation();
         Disposing += (_, _) => CancelPendingWork();
     }
 
@@ -251,6 +263,7 @@ internal sealed partial class UpdatesTabView : FrameView
             return null;
         }
         if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return null;
+        _singleInstallationView = selected is not null;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
@@ -263,9 +276,10 @@ internal sealed partial class UpdatesTabView : FrameView
             _table.Table = null;
             _allBox.Value = CheckState.UnChecked;
             _unpinBox.Value = CheckState.UnChecked;
-            _preview.Text = "## Selected installation\n\nCapturing fresh inventory for this exact installation.";
+            ShowPreview("## Selected installation\n\nCapturing fresh inventory for this exact installation.", "");
         }
         SetBusy(true);
+        SetOperationControlsEnabled(false);
         _status.Text = " loading inventory…";
         try
         {
@@ -278,6 +292,7 @@ internal sealed partial class UpdatesTabView : FrameView
                     return;
                 }
 
+                _inventoryNeedsRefresh = false;
                 if (selected is null) Populate(snapshot);
                 else PopulateSelected(snapshot, selected);
                 published = true;
@@ -299,6 +314,8 @@ internal sealed partial class UpdatesTabView : FrameView
 
                 _status.Text = $" inventory load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
                 SetBusy(false);
+                loadCancellation.Dispose();
+                SetOperationControlsEnabled(true);
             }).ConfigureAwait(false);
         }
         return null;
@@ -324,9 +341,11 @@ internal sealed partial class UpdatesTabView : FrameView
         nameStyle.MinWidth = 8;
         RecomputeColumnWidths();
         _status.Text = $" {_skills.Count} installed skill(s) — Space to toggle, U to review marked";
-        _preview.Text = "## Updates\n\n_Press **Dry-run** to preview, or mark rows and **U** to review each installation._";
-        _table.SetFocus();
+        ShowPreview("## Updates\n\nCheck updates for availability, or mark rows and review each installation.", "");
+        ShowSelectedPreview();
         SetBusy(false);
+        SetOperationControlsEnabled(true);
+        (_table.Visible ? (View)_table : _preview).SetFocus();
     }
 
     private void PopulateSelected(InventorySnapshot snapshot, OperationSubject selected)
@@ -341,14 +360,13 @@ internal sealed partial class UpdatesTabView : FrameView
         if (target is null)
         {
             _status.Text = " selected installation is missing or ambiguous — refresh Changes";
-            _preview.Text = "## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Changes and refresh disk inventory.";
+            ShowPreview("## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Changes and refresh disk inventory.", "");
             return;
         }
         _table.SetSelectedRow(0);
         _wrapper?.CheckedRows.Add(0);
-        _status.Text = " exact installation selected · availability unknown · Dry-run checks; c compares/plans";
-        _preview.Text = "## Selected installation\n\n" + InstalledScreen.RenderDetail(target)
-            + "\n\nUpdate availability is unknown until **Dry-run**. Runtime session state is unknown. **c** compares installed content with one saved candidate and opens its plan review for this installation. Inspect the comparison and approve retention before apply; its result verifies disk, not session activation.";
+        _status.Text = " exact installation selected · availability unknown · Check updates or Review update";
+        ShowSelectedPreview();
     }
 
 
@@ -408,6 +426,14 @@ internal sealed partial class UpdatesTabView : FrameView
         // Local-review file paths and table navigation belong to their controls.
         // Whole-screen printable shortcuts must not consume typed filenames.
         if (_localPanel.Visible) return;
+        if (key.KeyCode == KeyCode.F2)
+        {
+            key.Handled = true;
+            TogglePreviewDetails();
+            return;
+        }
+        // Alt mnemonics and application Ctrl bindings own modified keys.
+        if (key.IsAlt || key.IsCtrl) return;
 
         var rune = key.AsRune.Value;
         if (rune == 'a')
@@ -472,7 +498,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void UpdateCurrentRow()
     {
-        if (_choosingVersion || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_choosingVersion || _inventoryNeedsRefresh || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count)
         {
@@ -487,7 +513,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
+        if (_choosingVersion || _inventoryNeedsRefresh || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -507,7 +533,7 @@ internal sealed partial class UpdatesTabView : FrameView
         if (targets.Count == 0)
         {
             _status.Text = dryRun
-                ? " pick at least one skill or enable --all to dry-run"
+                ? " mark at least one skill or enable All to Check updates"
                 : " pick at least one skill (Space to mark) or enable --all";
             return;
         }
@@ -535,7 +561,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunUnpinAsync()
     {
-        if (_choosingVersion || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
+        if (_choosingVersion || _inventoryNeedsRefresh || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
             || _review is not null || _queue.Count > 0) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation to unpin"; return; }
@@ -577,11 +603,12 @@ internal sealed partial class UpdatesTabView : FrameView
     {
         _spinner.Visible = busy;
         _spinner.AutoSpin = busy;
+        RefreshPresentation();
     }
 
     private void SetOperationControlsEnabled(bool enabled)
     {
-        enabled = enabled && _review is null && _queue.Count == 0;
+        enabled = enabled && !_inventoryNeedsRefresh && _review is null && _queue.Count == 0;
         _dryRunButton.Enabled = enabled;
         _updateButton.Enabled = enabled;
         _unpinOnlyButton.Enabled = enabled && _unpinRunner is not null;

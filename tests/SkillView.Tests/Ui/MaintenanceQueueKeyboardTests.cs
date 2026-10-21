@@ -81,12 +81,17 @@ public sealed class MaintenanceQueueKeyboardTests
         try
         {
             var table = view.SubViews.OfType<TableView>().Single();
-            table.SetFocus(); Assert.True(table.HasFocus);
+            var preview = view.SubViews.OfType<Markdown>().Single();
+            Assert.False(table.Visible); Assert.True(preview.HasFocus);
             app.Keyboard.RaiseKeyDownEvent(new Key('c'));
             Assert.Equal(new[] { "compare-plan" }, calls);
+            Assert.Contains("Review this change", view.PreviewTextForTests);
+            Assert.Contains(selected.ResolvedPath, view.PreviewTextForTests);
+            app.Keyboard.RaiseKeyDownEvent(Key.F2);
             Assert.Contains("Installed → saved candidate comparison", view.PreviewTextForTests);
             Assert.Contains(new string('1', 64), view.PreviewTextForTests);
             Assert.Contains(new string('2', 64), view.PreviewTextForTests);
+            app.Keyboard.RaiseKeyDownEvent(Key.F2);
             Assert.False(view.ApplyButtonForTests.Enabled);
             await view.ApplyReviewForTestsAsync();
             Assert.Single(calls);
@@ -108,6 +113,7 @@ public sealed class MaintenanceQueueKeyboardTests
             app.Keyboard.RaiseKeyDownEvent(Key.Enter);
             Assert.Equal(new[] { "compare-plan", "apply" }, calls);
             Assert.Contains("installed", view.PreviewTextForTests);
+            app.Keyboard.RaiseKeyDownEvent(Key.F2);
             Assert.Contains("Active session", view.PreviewTextForTests);
             Assert.Contains("unknown", view.PreviewTextForTests);
             Assert.False(view.ApplyButtonForTests.Enabled);

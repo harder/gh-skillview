@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 8                                  │
+│One-time tag choice · no pin · ordinary Update follows latest                 │
+│Review this change                                                           ▲│
+│                                                                             █│
+│• Skill: demo                                                                █│
+│• Location: /var/tmp/skillview-update-review-ux/pty/skills/demo              █│
+│• Affected consumers: universal, unknown                                     ░│
+│• Ref change: refs/tags/v2.0 → refs/tags/v1.0                                ░│
+│• Change: Replace this copy with the saved candidate; retain the original,   ░│
+│  including local edits, for undo.                                           ░│
+│• Authored version: 2.0 → 1.0                                                ░│
+│• Local changes: 2                                                           ░│
+│• Local change: SKILL.md                                                     ▼│
+│⟦ Preserve installed ⟧ ⟦ Review local ⟧                                       │
+│☐ I reviewed F2 source changes/omissions (no safety/authenticity claim)       │
+│☐ Retain original, including local edits; apply this reviewed plan            │
+│   review required · 0 remaining · choose preserve, local review, or approve  │
+│⟦ Replace reviewed ⟧  ⟦ Next / skip ⟧  ⟦ Details (F2) ⟧                       │
+│F2 Details · Tab Move focus · Esc Back                                        │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

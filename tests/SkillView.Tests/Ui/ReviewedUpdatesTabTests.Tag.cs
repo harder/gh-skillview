@@ -39,6 +39,8 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Same(current, Assert.Single(request.Targets!));
         Assert.Equal("v1.2.3", request.Tag); Assert.False(request.All); Assert.False(request.DryRun); Assert.False(request.Unpin);
         Assert.Equal(CheckState.Checked, view.AllBoxForTests.Value); Assert.Equal(CheckState.Checked, view.UnpinBoxForTests.Value);
+        Assert.Contains("later ordinary Update follows latest", view.PreviewTextForTests, StringComparison.OrdinalIgnoreCase);
+        view.ToggleDetailsForTests();
         Assert.Contains("refs/tags/v1.2.3", view.PreviewTextForTests);
         Assert.Contains(new string('d', 40), view.PreviewTextForTests);
         Assert.Contains("claude", view.PreviewTextForTests); Assert.Contains("codex", view.PreviewTextForTests);
@@ -53,8 +55,9 @@ public sealed partial class ReviewedUpdatesTabTests
         view.SelectRowForTests(0); view.ChooseVersionForTests(); Assert.Equal(1, choices);
         await view.ApplyReviewForTestsAsync();
         Assert.NotNull(applied); Assert.Equal(review.PlanFingerprint, applied.PlanFingerprint); Assert.True(applied.AcknowledgeSourceReview);
-        Assert.Contains("Space marks", view.TableLabelForTests);
+        Assert.Contains("Refresh inventory", view.TableLabelForTests);
         await view.NextReviewForTestsAsync();
+        view.MarkRowForTests(0);
         await view.RunForTestsAsync(true, true);
         var ordinary = prepared[1];
         Assert.Null(ordinary.Tag); Assert.Same(marked, Assert.Single(ordinary.Targets!));
@@ -246,7 +249,7 @@ public sealed partial class ReviewedUpdatesTabTests
         await reload();
         Assert.Equal(1, prepares); Assert.Equal(1, loads);
         Assert.Contains("finish the current review", view.StatusTextForTests);
-        Assert.Contains("Saved update review", view.PreviewTextForTests);
+        Assert.Contains("Review this change", view.PreviewTextForTests);
     }
 
     [Fact]

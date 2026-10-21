@@ -130,7 +130,7 @@ internal static class MaintenanceQueueFormatter
         text.AppendLine(entry.IsCopyReview
             ? "**Enter:** inspect related physical copies, compare two explicitly, then choose an exact installation for existing update/version or cleanup review."
             : entry.Cleanup is null
-            ? "**Enter:** select this exact installation in Updates. **Dry-run** checks availability; **c** compares installed content with one saved candidate and opens its plan review. Explicit retention approval enables apply; the result verifies disk locations. Neither runs on entry."
+            ? "**Enter:** select this exact installation in Updates. **Check updates** checks availability; **Review update** (or **c**) prepares one saved candidate and opens its plan review. Explicit retention approval enables apply; the result verifies disk locations. Neither runs on entry."
             : "**Enter:** refresh and review only this exact cleanup issue. Review is required before any action.");
         text.AppendLine("**r:** refresh disk inventory only. Update availability and active sessions remain unknown. The queue is observation, not mutation approval.");
         return text.ToString();

@@ -28,7 +28,7 @@ internal sealed partial class UpdatesTabView
         {
             X = 0,
             Y = Pos.AnchorEnd(8),
-            Text = "I reviewed frozen source changes and omissions (no authenticity/safety claim)",
+            Text = "I reviewed F2 source changes/omissions (no safety/authenticity claim)",
             Enabled = false
         };
         _sourceReviewBox.ValueChanged += (_, _) => RefreshReviewControls();
@@ -79,8 +79,10 @@ internal sealed partial class UpdatesTabView
         _retainBox.Text = _review?.PinPolicy is not null
             ? "Retain original; clear only pin policy for all affected consumers"
             : "Retain original, including local edits; apply this reviewed plan";
-        _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0);
+        _nextButton.Text = _inventoryNeedsRefresh && _review is null && _queue.Count == 0 ? "Refresh inventory" : "Next / skip";
+        _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh);
         RefreshLocalReviewControls(idle);
+        RefreshPresentation();
     }
 
     private async Task PrepareNextAsync()
@@ -107,6 +109,8 @@ internal sealed partial class UpdatesTabView
     private Task SkipAndPrepareNextAsync()
     {
         if (_operationCancellations.HasActive || _loadCancellations.HasActive) return Task.CompletedTask;
+        if (_inventoryNeedsRefresh && _review is null && _queue.Count == 0)
+            return LoadForSubjectAsync(_drillInSubject);
         if (_review is { } review)
         {
             SaveOutcomes([new(review.Subject.InstallationId, review.OriginalPath, "skipped", null, null, [], 0, [],
@@ -118,7 +122,9 @@ internal sealed partial class UpdatesTabView
         ResetLocalReview();
         if (_queue.Count > 0) return PrepareNextAsync();
         _queueOptions = null;
-        _status.Text = " review queue complete; saved plans remain available for inspection";
+        var next = _inventoryNeedsRefresh ? "Refresh inventory before another review." : "Choose an installation for another review.";
+        _status.Text = " review queue complete; " + next;
+        ShowPreview("## Review queue complete\n\nSaved evidence remains available in F2 Details. " + next, _technicalPreview);
         SetOperationControlsEnabled(true);
         return Task.CompletedTask;
     }
@@ -129,6 +135,7 @@ internal sealed partial class UpdatesTabView
         if (ownership is null) return;
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
+        var initiatingFocus = SubViews.FirstOrDefault(view => view.HasFocus);
         SetBusy(true);
         SetOperationControlsEnabled(false);
         _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…"
@@ -144,6 +151,7 @@ internal sealed partial class UpdatesTabView
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                 if (!dryRun)
                 {
+                    _inventoryNeedsRefresh |= result.MutationAttempted;
                     SaveOutcomes(result.Outcomes);
                     _review = applying ? null : result.SavedPlan;
                     ResetLocalReview();
@@ -151,18 +159,25 @@ internal sealed partial class UpdatesTabView
                     _sourceReviewBox.Value = CheckState.UnChecked;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
                 }
-                _preview.Text = UpdateScreen.RenderResult(result, dryRun, false, [], unpinOnly);
+                ShowResultPreview(result, dryRun, unpinOnly);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"
                     : _review?.PinPolicy is not null ? " pin-only review required · inspect all consumers, approve retention, then Apply unpin only"
                     : _review is not null ? $" review required · {_queue.Count} remaining · choose preserve, local review, or approve Replace reviewed"
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
                     : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)} · {_queue.Count} remaining"
-                    : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {_queue.Count} remaining · Next / skip continues";
+                    : _queue.Count > 0 ? $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {_queue.Count} remaining · Next / skip continues"
+                    : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · no remaining items · {(_inventoryNeedsRefresh ? "Refresh inventory before another review" : "F2 Details for outcome")}";
                 if (_review is null && _queue.Count == 0) _queueOptions = null;
                 SetBusy(false);
                 // Ownership remains held until the queued callback returns.
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
+                if (dryRun && _table.Visible)
+                {
+                    if (initiatingFocus is { Visible: true, Enabled: true, CanFocus: true }) initiatingFocus.SetFocus();
+                    else _table.SetFocus();
+                }
+                else if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

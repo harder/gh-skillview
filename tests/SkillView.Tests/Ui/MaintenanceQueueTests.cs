@@ -57,6 +57,17 @@ public sealed class MaintenanceQueueTests
     }
 
     [Fact]
+    public void UpdateEvidenceNamesTheCurrentAvailabilityAndReviewActions()
+    {
+        var entry = Assert.Single(MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
+        { Skills = [Skill("/skills/one", "https://github.com/one/repo")] }, TestContext.Current.CancellationToken).Entries);
+        var evidence = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
+        Assert.Contains("**Check updates** checks availability", evidence);
+        Assert.Contains("**Review update** (or **c**)", evidence);
+        Assert.DoesNotContain("Dry-run", evidence);
+    }
+
+    [Fact]
     public void CollisionSummary_RequiresReviewAndDoesNotPromiseReversibleDeletion()
     {
         var queue = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with

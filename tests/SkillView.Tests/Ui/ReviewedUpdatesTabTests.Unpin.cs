@@ -43,6 +43,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Equal("Apply unpin only", view.ApplyButtonForTests.Text.ToString());
         Assert.False(view.ApplyButtonForTests.Enabled);
         Assert.Contains("unpin-only", view.PreviewTextForTests);
+        view.ToggleDetailsForTests();
         Assert.Contains(plan.PlanFingerprint, view.PreviewTextForTests);
         Assert.Contains("claude", view.PreviewTextForTests); Assert.Contains("codex", view.PreviewTextForTests);
         Assert.Contains("new active object IDs and timestamps", view.PreviewTextForTests);
