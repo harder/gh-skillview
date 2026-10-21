@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import time
 
@@ -35,6 +36,14 @@ def make_output(requested):
     candidate = requested.expanduser().resolve() if requested else base.resolve()
     if candidate == ROOT or ROOT in candidate.parents:
         raise ValueError('Results must be outside the checkout, including through directory aliases')
+    # Product containment protects every .git marker, including invalid gitfiles,
+    # empty directories and dangling links that git rev-parse would ignore.
+    for ancestor in (candidate, *candidate.parents):
+        try:
+            (ancestor / '.git').lstat()
+        except FileNotFoundError:
+            continue
+        raise ValueError(f'Results/fixtures would be beneath a .git marker at {ancestor}; choose another --output')
     if requested:
         candidate.mkdir(parents=True, exist_ok=False)
         return candidate
@@ -140,6 +149,7 @@ def main(argv=None):
     parser.add_argument('--dotnet', default='dotnet', help='Exact SDK host path if it is not on PATH')
     parser.add_argument('--live', action='store_true', help='Also run actual-gh remote update/restore/undo proofs in private fixtures')
     parser.add_argument('--aot', action='store_true', help='Publish both native hosts sequentially; requires an installed native toolchain')
+    parser.add_argument('--diagnostic-tests', action='store_true', help='Log long-running tests and MTP diagnostics for a bounded failure investigation')
     args = parser.parse_args(argv)
     if not re.fullmatch('[0-9a-fA-F]{40}', args.expect_commit):
         parser.error('--expect-commit requires a full commit SHA')
@@ -148,9 +158,10 @@ def main(argv=None):
     except (ValueError, OSError) as error:
         parser.error(str(error))
     env = isolated_environment(os.environ, output)
-    report = dict(platform=f'{platform.platform()} / Python {platform.machine()}',
+    report = dict(platform=f'{platform.platform()} / Python build {sysconfig.get_platform()}',
                   startedUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  expectedCommit=args.expect_commit.lower(), aot=args.aot, live=args.live, steps=[])
+                  expectedCommit=args.expect_commit.lower(), aot=args.aot, live=args.live,
+                  diagnosticTests=args.diagnostic_tests, steps=[])
     print(f'Results: {output}', flush=True)
 
     def run(name, command, timeout=1200, child_env=None):
@@ -197,7 +208,9 @@ def main(argv=None):
             if ready[name]:
                 ready[name] = run(name + '-build', [args.dotnet, 'build', project, '-c', 'Release', '--no-restore'])
             if ready[name]:
-                run(name + '-tests', [args.dotnet, 'test', '--project', project, '-c', 'Release', '--no-build', '--no-restore'])
+                diagnostic = ['--long-running', '60', '--xunit-diagnostics', 'on', '--progress', 'on',
+                              '--diagnostic', '--diagnostic-output-directory', str(output / (name + '-diagnostics'))] if args.diagnostic_tests else []
+                run(name + '-tests', [args.dotnet, 'test', '--project', project, '-c', 'Release', '--no-build', '--no-restore', *diagnostic])
             else:
                 not_run(name + '-tests', 'Restore/build failed')
         rid_match = re.search(r'^\s*RID:\s*(\S+)', (output / 'sdk-info.log').read_text(), re.MULTILINE)
@@ -209,12 +222,21 @@ def main(argv=None):
         for name in ('app', 'extension'):
             project = PROJECTS[name]
             flags = ['-r', rid] if args.aot else ['-p:SelfContained=false', '-p:UseDefaultPublishRuntimeIdentifier=false']
-            restored = run(name + '-restore', [args.dotnet, 'restore', project, '--locked-mode', *flags])
             destination = output / name if args.aot else ROOT / Path(project).parent / 'bin/Release/net10.0'
             binary = destination / (('skillview' if name == 'app' else 'gh-skillview') + suffix)
-            command = [args.dotnet, 'publish' if args.aot else 'build', project, '-c', 'Release', '--no-restore', *flags]
             if args.aot:
-                command.extend(['--self-contained', 'true', '-o', str(destination)])
+                # Match CI: publish restores with RuntimeIdentifier while keeping
+                # the four-RID RuntimeIdentifiers set in the committed locks.
+                # `dotnet restore -r` overrides that set and causes NU1004.
+                restored = True
+                command = [args.dotnet, 'publish', project, '-c', 'Release', *flags,
+                           '-p:PublishAot=true', '-p:StripSymbols=true', '-p:RestoreLockedMode=true',
+                           '-o', str(destination)]
+                if name == 'app':
+                    command.extend(['-warnaserror:IL2026', '-warnaserror:IL3050', '-warnaserror:IL3053'])
+            else:
+                restored = run(name + '-restore', [args.dotnet, 'restore', project, '--locked-mode', *flags])
+                command = [args.dotnet, 'build', project, '-c', 'Release', '--no-restore', *flags]
             if restored and run(name + '-build', command) and run(name + '-version', [str(binary), '--version'], 60):
                 hosts[name] = binary
             else:

@@ -1,0 +1,13 @@
+Native Windows follow-up, 2026-10-21
+
+Candidate: 574c1ca6f2b589edca9c82389cdada97982fb8eb
+
+Locked MSBuild Restore for App and GhExtension with RuntimeIdentifier=win-arm64 and RestoreLockedMode=true both exited 0. The Linux lockfile changes from the earlier unsupported-host experiment were restored; no lockfile diff remains.
+
+The bounded full native unit run finished in 163.1 seconds: 2,583 passed, 63 failed, 79 skipped (2,725 total), exit 2. It emitted no 60-second long-running event; the longest completed test was 34.778 seconds. No owned dotnet/python process remained afterward. Failures predominantly report Access denied opening relative entry 'demo' and fixture teardown UnauthorizedAccessException.
+
+A fresh 3-case NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata run failed all three cases at WindowsSecureRemovalBackend.OpenEntryAt opening 'demo' with Access denied. Get-Acl on the resulting demo fixture showed the current user as owner, protected DACL, and only SYSTEM and BUILTIN\Administrators FullControl entries; the effective user had no allow entry. Parent exposures had inherited SYSTEM, Administrators, and OWNER RIGHTS FullControl. This is evidence of a DACL access restriction in the focused fixture, distinct from the earlier explicit SeSecurityPrivilege/SACL refusal. It does not establish a product defect or explain every full-run failure.
+
+The updated one-off runner's native Windows Python smoke suite ran 10 tests: all 10 passed, including the directory-alias containment test.
+
+Raw MTP diagnostics, private homes/state, and privilege SID details are intentionally not copied here. Detailed raw logs remain in the isolated Windows TEMP result folders.

@@ -1,0 +1,52 @@
+{
+  "candidateCommit": "574c1ca6f2b589edca9c82389cdada97982fb8eb",
+  "lockedRestore": {
+    "appWinArm64": 0,
+    "ghExtensionWinArm64": 0,
+    "runtimeIdentifier": "win-arm64",
+    "lockedMode": true
+  },
+  "fullNativeWindowsRun": {
+    "durationSeconds": 163.1,
+    "total": 2725,
+    "passed": 2583,
+    "failed": 63,
+    "skipped": 79,
+    "longRunningThresholdSeconds": 60,
+    "longRunningEvents": 0,
+    "longestCompletedTestSeconds": 34.778,
+    "residualOwnedDotnetOrPythonProcesses": 0
+  },
+  "focusedNativeWindowsRun": {
+    "filter": "SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata",
+    "total": 3,
+    "passed": 0,
+    "failed": 3,
+    "skipped": 0,
+    "failure": "WindowsSecureRemovalBackend.OpenEntryAt failed opening relative entry 'demo': Access is denied; fixture cleanup also reported UnauthorizedAccessException.",
+    "fixtureDacl": {
+      "owner": "current user (verified locally)",
+      "protected": true,
+      "allowEntries": [
+        "NT AUTHORITY\\SYSTEM: FullControl",
+        "BUILTIN\\Administrators: FullControl"
+      ],
+      "effectiveUserAllowEntry": false
+    },
+    "parentExposureDirectory": {
+      "owner": "current user (verified locally)",
+      "protected": false,
+      "entries": [
+        "NT AUTHORITY\\SYSTEM: FullControl (inherited)",
+        "BUILTIN\\Administrators: FullControl (inherited)",
+        "OWNER RIGHTS: FullControl (inherited)"
+      ]
+    }
+  },
+  "interpretation": "The isolated focused failure is associated with a protected fixture DACL that does not grant the effective user access; this differs from the earlier explicit SACL privilege refusal. It does not establish a product defect or prove that all full-suite failures share this cause.",
+  "nativeWindowsPythonKit": {
+    "total": 10,
+    "passed": 10,
+    "skipped": 0
+  }
+}

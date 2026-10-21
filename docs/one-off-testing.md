@@ -64,6 +64,10 @@ should check what is already installed before installing anything. Missing
 prerequisites may be installed from official sources into user-owned locations
 when the session permits; lengthy native-toolchain setup can be reported instead.
 The checked-out commit must be clean, including untracked files.
+The output/temp fixture location must also be outside **every** ancestor `.git`
+marker. Even an empty `.git` directory, invalid gitfile or dangling marker link
+changes product containment policy. The runner rejects such locations before
+creating fixtures; choose another `--output` without removing the marker.
 
 On WSL/macOS, from the dedicated checkout:
 
@@ -86,6 +90,8 @@ native compiler/linker prerequisites are already installed. AOT publishes the
 two products sequentially and tests those binaries instead of managed hosts.
 Without it, report native AOT coverage as not run. Supported release RIDs are
 Windows x64/ARM64, Linux x64 and macOS ARM64; other hosts can run managed checks.
+Native publish uses CI's locked restore recipe; do not run a separate
+`dotnet restore -r RID`, which overrides the four-RID set in the committed locks.
 
 The runner performs locked restores, Release builds, the full unit and integration
 suites, and existing CLI proofs for package inspection, native identity,
@@ -113,6 +119,16 @@ Exit status 0 means requested commands passed, 1 means a command failed, and 2
 means blocked or partial coverage. Test skips still need to be read in the logs.
 Each command has a timeout; after a timeout the run stops for cleanup inspection.
 Run one kit instance per checkout to avoid shared build outputs racing.
+For a timeout investigation, add `--diagnostic-tests`: xUnit reports tests taking
+over 60 seconds, and MTP writes diagnostic files beneath the result directory.
+This adds evidence, without extending the command timeout or changing assertions.
+
+The kit requests positive native link metadata proof, as CI does. On Windows,
+complete SACL metadata needs an already assigned `SeSecurityPrivilege`; symlink
+creation rights alone do not supply it. A restricted test process can therefore
+fail those positive assertions while separate CLI workflows pass. Keep those
+failures visible, retain the exact refusal and investigate them separately; do
+not elevate, disable metadata guards or treat CLI success as a full-suite pass.
 
 Bring back the three `AGENT-REPORT.md` files, command reports and relevant logs
 or screen captures. Do not upload entire result directories: they also hold
