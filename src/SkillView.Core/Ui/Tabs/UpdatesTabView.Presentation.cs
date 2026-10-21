@@ -54,7 +54,7 @@ internal sealed partial class UpdatesTabView
 
     private void ShowSelectedPreview()
     {
-        if (_review is not null || _queue.Count > 0 || _choosingVersion || _inventoryNeedsRefresh) return;
+        if (_undoReview is not null || _review is not null || _queue.Count > 0 || _choosingVersion || _inventoryNeedsRefresh) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) return;
         var target = _skills[row];
@@ -66,7 +66,8 @@ internal sealed partial class UpdatesTabView
     private void RefreshPresentation()
     {
         if (!_reviewPresentationReady) return;
-        var reviewing = _review is not null || _queue.Count > 0 || _inventoryNeedsRefresh;
+        var undoing = _undoReview is not null;
+        var reviewing = undoing || _review is not null || _queue.Count > 0 || _inventoryNeedsRefresh;
         var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
         var localActions = _review is { PinPolicy: null } && _localReviewRunner is not null;
         var editing = _localPanel.Visible;
@@ -75,7 +76,8 @@ internal sealed partial class UpdatesTabView
         _statusBar.Visible = !reviewing && !_singleInstallationView;
         _reviewHint.Visible = !_statusBar.Visible;
         if (_queueOptions?.Tag is null)
-            _tableLabel.Text = _inventoryNeedsRefresh && _review is null && _queue.Count == 0
+            _tableLabel.Text = undoing ? "Review undo · F2 Details"
+                : _inventoryNeedsRefresh && _review is null && _queue.Count == 0
                 ? "Refresh inventory before another review · F2 Details"
                 : reviewing ? "Review saved change · F2 Details"
                 : _singleInstallationView ? "Selected physical copy · F2 Details"
@@ -94,7 +96,10 @@ internal sealed partial class UpdatesTabView
         _unpinOnlyButton.Visible = ShowUnpinOnlyAction();
         _sourceReviewBox.Visible = applicable && _review?.SourceReview is not null;
         _retainBox.Visible = _applyButton.Visible = applicable;
-        _nextButton.Visible = reviewing;
+        _nextButton.Visible = reviewing && !undoing;
+        _undoButton.Visible = !undoing && _undoResult is not null && _review is null && _queue.Count == 0
+            && _inspectUndoRunner is not null && _undoRunner is not null;
+        _confirmUndoButton.Visible = _cancelUndoButton.Visible = _undoApproval.Visible = undoing;
         _preserveButton.Visible = _localReviewButton.Visible = localActions;
         _buildMergeButton.Visible = localActions && _localReview is not null;
         _detailsButton.Visible = !editing;
@@ -111,12 +116,20 @@ internal sealed partial class UpdatesTabView
         _detailsButton.Y = Pos.AnchorEnd(reviewing ? 2 : 3);
         _detailsButton.X = reviewing ? Pos.Right(_nextButton) + 2
             : _unpinOnlyButton.Visible ? Pos.Right(_unpinOnlyButton) + 2 : 0;
+        _undoButton.X = Pos.Right(_detailsButton) + 2;
+        _undoButton.Y = _confirmUndoButton.Y = _cancelUndoButton.Y = Pos.AnchorEnd(2);
+        _confirmUndoButton.X = 0;
+        _cancelUndoButton.X = Pos.Right(_confirmUndoButton) + 2;
+        _undoApproval.X = 0;
+        _undoApproval.Y = Pos.AnchorEnd(4);
+        if (undoing) _detailsButton.X = Pos.Right(_cancelUndoButton) + 2;
         _status.Y = _spinner.Y = Pos.AnchorEnd(reviewing ? 3 : 4);
 
         var footer = 5;
         if (reviewing)
         {
             var row = 4;
+            if (_undoApproval.Visible) row++;
             if (_retainBox.Visible) _retainBox.Y = Pos.AnchorEnd(row++);
             if (_sourceReviewBox.Visible) _sourceReviewBox.Y = Pos.AnchorEnd(row++);
             if (localActions)

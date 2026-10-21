@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 8                                  │
+│Review undo · F2 Details                                                      │
+│Undo this update?                                                             │
+│                                                                              │
+│• Skill: demo                                                                 │
+│• Location: /var/tmp/skillview-update-undo-ux/pty/skills/demo                 │
+│• Affected consumers: universal, unknown                                      │
+│• Restore ref: refs/tags/v2.0                                                 │
+│• Restore authored version: 2.0                                               │
+│• Current disk state: installed                                               │
+│                                                                              │
+│Restore the exact retained original, including its local edits and extras.    │
+│Every consumer of this physical installation is affected. Changes since the   │
+│update refuse undo. Cancel leaves installed files unchanged. Agent reload     │
+│state remains unknown.                                                        │
+│☐ Restore the retained original for every shown consumer                      │
+│   inspect the restoration and all consumers; approve before Undo update      │
+│⟦ Undo update ⟧  ⟦ Cancel undo ⟧  ⟦ Details (F2) ⟧                            │
+│F2 Details · Tab Move focus · Esc Back                                        │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

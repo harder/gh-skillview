@@ -198,6 +198,14 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   parent/root generations change. Keep the next preparation after prior apply
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
+  Result-view undo uses `SavedUpdateCoordinator.InspectUndo` and `UndoAsync`:
+  inspect the exact successful revision update, bind its current observation
+  `ReviewFingerprint`, then require separate restoration approval. Never reuse
+  the immutable apply `PlanFingerprint` as undo approval. Every undo attempt
+  closes the UI approval; reconciliation must survive canceled UI delivery.
+  Evaluate undo eligibility from the current apply result, retaining aggregate
+  batch diagnostics separately. Distinguish native restoration from incomplete
+  post-attempt inventory verification; neither implies the other failed.
 
 - One-time version choice uses the existing schema-2 saved update path for an
   exact Git tag and one physical installation. Never fall back to latest or

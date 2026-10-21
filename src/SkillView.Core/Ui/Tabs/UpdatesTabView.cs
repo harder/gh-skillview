@@ -72,13 +72,17 @@ internal sealed partial class UpdatesTabView : FrameView
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null,
         Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? localReviewRunner = null,
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null,
-        Func<InstalledSkill, string?>? chooseTag = null)
+        Func<InstalledSkill, string?>? chooseTag = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? inspectUndoRunner = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? undoRunner = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _updateRunner = updateRunner;
         _unpinRunner = unpinRunner;
+        _inspectUndoRunner = inspectUndoRunner;
+        _undoRunner = undoRunner;
         _applyRunner = applyRunner;
         _localReviewRunner = localReviewRunner;
         _ghPathProvider = ghPathProvider;
@@ -195,6 +199,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
         InitializeReviewControls();
         InitializeLocalReviewControls();
+        InitializeUndoControls();
 
         _dryRunButton.Accepting += (_, ev) =>
         {
@@ -235,6 +240,7 @@ internal sealed partial class UpdatesTabView : FrameView
             _allBox, _hiddenBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
+        Add(_undoButton, _undoApproval, _confirmUndoButton, _cancelUndoButton);
         _table.ValueChanged += (_, _) =>
         {
             if (!_loadCancellations.HasActive && !_operationCancellations.HasActive) ShowSelectedPreview();
@@ -262,7 +268,8 @@ internal sealed partial class UpdatesTabView : FrameView
             _versionReloadSubject = selected;
             return null;
         }
-        if (_review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return null;
+        if (_review is not null || _undoReview is not null || _queue.Count > 0 || _operationCancellations.HasActive) return null;
+        ClearUndo();
         _singleInstallationView = selected is not null;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
@@ -419,6 +426,7 @@ internal sealed partial class UpdatesTabView : FrameView
         if (key.KeyCode == KeyCode.Esc)
         {
             key.Handled = true;
+            if (_undoReview is not null && !_operationCancellations.HasActive) { CancelUndoReview(); return; }
             _onLeaveTab();
             return;
         }
@@ -498,7 +506,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void UpdateCurrentRow()
     {
-        if (_choosingVersion || _inventoryNeedsRefresh || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
+        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count)
         {
@@ -513,7 +521,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunAsync(bool dryRun, bool batchOnly)
     {
-        if (_choosingVersion || _inventoryNeedsRefresh || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
+        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
         var ghPath = _ghPathProvider();
         if (ghPath is null)
         {
@@ -561,7 +569,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private async Task RunUnpinAsync()
     {
-        if (_choosingVersion || _inventoryNeedsRefresh || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
+        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
             || _review is not null || _queue.Count > 0) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation to unpin"; return; }
@@ -590,6 +598,7 @@ internal sealed partial class UpdatesTabView : FrameView
         CancelPendingLoad();
         _operationCancellations.Cancel();
         _review = null;
+        ClearUndo();
         ResetLocalReview();
         _queue.Clear();
         _queueOptions = null;
@@ -608,7 +617,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void SetOperationControlsEnabled(bool enabled)
     {
-        enabled = enabled && !_inventoryNeedsRefresh && _review is null && _queue.Count == 0;
+        enabled = enabled && _undoReview is null && !_inventoryNeedsRefresh && _review is null && _queue.Count == 0;
         _dryRunButton.Enabled = enabled;
         _updateButton.Enabled = enabled;
         _unpinOnlyButton.Enabled = enabled && _unpinRunner is not null;

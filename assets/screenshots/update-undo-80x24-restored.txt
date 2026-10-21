@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 8                                  │
+│Refresh inventory before another review · F2 Details                          │
+│Original restored                                                            ▲│
+│                                                                             █│
+│• Outcome: restored                                                          █│
+│• Skill: demo                                                                █│
+│• Location: /var/tmp/skillview-update-undo-ux/pty/skills/demo                █│
+│• Affected consumers: universal, unknown                                     █│
+│• Restore ref: refs/tags/v2.0                                                █│
+│• Restore authored version: 2.0                                              █│
+│• Current disk state: restored                                               █│
+│• Notice: Payload and native continuity verified. Retained directories remain█│
+│  available; agent session state is unknown. Saved plan                      ░│
+│  a2a495987c7e49fc81456845cf518c23; manifest:                                ░│
+│  /var/tmp/skillview-update-undo-ux/pty/state/maintenance/SkillView/replaceme░│
+│  ts/a2a495987c7e49fc81456845cf518c23/plan.json. Inspect with update-inspect ▼│
+│   original restored; Refresh inventory to inspect current installed          │
+│⟦ Refresh inventory ⟧  ⟦ Details (F2) ⟧                                       │
+│F2 Details · Tab Move focus · Esc Back                                        │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

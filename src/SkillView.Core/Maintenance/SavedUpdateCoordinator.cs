@@ -10,7 +10,7 @@ namespace SkillView.Maintenance;
 
 /// Product update admission. Availability is disposable; preparation retains one
 /// exact candidate; applying never resolves the remote source again.
-internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
+internal sealed partial class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
     internal Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,
@@ -272,29 +272,7 @@ internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
             // Admission to Apply is conservative: validation may refuse without
             // moving. Invalidation/reconciliation must survive view cancellation.
             if (attempted)
-            {
-                catalog.Invalidate();
-                using var deadline = new CancellationSource(TimeSpan.FromSeconds(10),
-                    CancellationCallbackReporter.For(logger, "saved update reconciliation"));
-                try
-                {
-                    var snapshot = await reconcile(deadline.Token).ConfigureAwait(false);
-                    if (snapshot.IsPartial || !snapshot.ConfiguredRootsComplete)
-                        throw new IOException("Post-attempt inventory is partial; saved per-target evidence is retained.");
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
-                {
-                    result = result with
-                    {
-                        ReconciliationPartial = true,
-                        Succeeded = false,
-                        ExitCode = result.Cancelled ? 130 : 2,
-                        ErrorMessage = $"{result.ErrorMessage} Post-attempt inventory reconciliation failed: {ex.Message}".Trim(),
-                        Notices = result.Notices.Add(new("reconciliation", ex.Message))
-                    };
-                    logger.Warn("update.reconciliation", $"Plan {review.Id}: {ex.Message}");
-                }
-            }
+                result = await ReconcileAfterAttemptAsync(result, review, reconcile, undo: false).ConfigureAwait(false);
         }
         if (token.IsCancellationRequested)
             result = result with { Cancelled = true, Succeeded = false, ExitCode = 130 };
