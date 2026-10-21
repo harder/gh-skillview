@@ -8,7 +8,7 @@ namespace SkillView.Inventory;
 internal sealed partial class UnixSecureRemovalBackend
 {
     internal const int PlacementCaptureAttempts = 4;
-    private sealed class PlacementParentChangedException(string message) : IOException(message);
+    private sealed class PlacementGenerationChangedException(string message) : IOException(message);
 
     private sealed class PlacementBudget
     {
@@ -18,7 +18,8 @@ internal sealed partial class UnixSecureRemovalBackend
     }
 
     internal static NativePlacementLease OpenPlacement(string path, CancellationToken token,
-        Action<int, string, string>? beforeParentCheckForTests = null)
+        Action<int, string, string>? beforeParentCheckForTests = null,
+        Action<int, string, string>? beforeChildCheckForTests = null)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -26,9 +27,10 @@ internal sealed partial class UnixSecureRemovalBackend
             try
             {
                 return OpenPlacementCore(path, new PlacementBudget(), token, beforeParentCheckForTests is null ? null
-                    : (parent, name) => beforeParentCheckForTests(attempt, parent, name));
+                    : (parent, name) => beforeParentCheckForTests(attempt, parent, name), beforeChildCheckForTests is null ? null
+                    : (parent, name) => beforeChildCheckForTests(attempt, parent, name));
             }
-            catch (PlacementParentChangedException)
+            catch (PlacementGenerationChangedException)
             {
                 // No evidence escaped this attempt. Dispose all anchors and
                 // repeat the entire lexical walk, including alias expansion.
@@ -40,7 +42,7 @@ internal sealed partial class UnixSecureRemovalBackend
     }
 
     private static NativePlacementLease OpenPlacementCore(string path, PlacementBudget budget, CancellationToken token,
-        Action<string, string>? beforeParentCheck)
+        Action<string, string>? beforeParentCheck, Action<string, string>? beforeChildCheck)
     {
         var full = Path.GetFullPath(path);
         if (Encoding.UTF8.GetByteCount(full) > 32 * 1024) throw new IOException("Placement path bound exceeded.");
@@ -60,7 +62,7 @@ internal sealed partial class UnixSecureRemovalBackend
                     if (error != 2) throw new IOException("Source placement is unknown: " + new Win32Exception(error).Message);
                     beforeParentCheck?.Invoke(ReadFinalPath(current), parts[index]);
                     token.ThrowIfCancellationRequested();
-                    if (!Matches(before, ReadStat(current, buffer.Pointer))) throw new PlacementParentChangedException("Placement parent changed during missing observation.");
+                    RequireStable(before, ReadStat(current, buffer.Pointer), index, "parent");
                     return Finish(parts.Skip(index).ToImmutableArray());
                 }
                 var named = ParseStat(buffer.Pointer);
@@ -83,7 +85,7 @@ internal sealed partial class UnixSecureRemovalBackend
                     var targetPath = Path.IsPathFullyQualified(target) ? target : Path.Combine(ReadFinalPath(current), target);
                     var remaining = parts.Skip(index + 1).ToArray();
                     var expanded = remaining.Aggregate(targetPath, Path.Combine);
-                    NativePlacementLease? resolved = OpenPlacementCore(expanded, budget, token, beforeParentCheck);
+                    NativePlacementLease? resolved = OpenPlacementCore(expanded, budget, token, beforeParentCheck, beforeChildCheck);
                     try
                     {
                         // If missingness began inside targetPath, its suffix
@@ -94,12 +96,14 @@ internal sealed partial class UnixSecureRemovalBackend
                             throw new IOException("Placement ancestor link target is missing; broken aliases are not absence evidence.");
                         beforeParentCheck?.Invoke(ReadFinalPath(current), parts[index]);
                         token.ThrowIfCancellationRequested();
-                        var parentChanged = !Matches(before, ReadStat(current, buffer.Pointer));
-                        if (!TryReadStatAt(current, parts[index], buffer.Pointer, out var after, out _) || !Matches(named, after)
-                            || !raw.AsSpan().SequenceEqual(LinkBytes(current, parts[index], budget, token)))
-                            throw new IOException("Placement ancestor link changed during target resolution.");
-                        if (parentChanged || !Matches(before, ReadStat(current, buffer.Pointer)))
-                            throw new PlacementParentChangedException("Placement ancestor parent changed during target resolution.");
+                        var parentAfter = ReadStat(current, buffer.Pointer);
+                        if (!TryReadStatAt(current, parts[index], buffer.Pointer, out var after, out _))
+                            throw Changed(index, "alias", "entry unavailable");
+                        if (!Matches(named, after)) throw Changed(index, "alias", IdentityDifference(named, after) ?? "ctime");
+                        if (!raw.AsSpan().SequenceEqual(LinkBytes(current, parts[index], budget, token)))
+                            throw Changed(index, "alias", "link target");
+                        RequireStable(before, parentAfter, index, "parent");
+                        RequireStable(before, ReadStat(current, buffer.Pointer), index, "parent");
                         var addressed = resolved.AtLexicalAddress(path);
                         resolved = null;
                         return addressed;
@@ -110,19 +114,50 @@ internal sealed partial class UnixSecureRemovalBackend
                     : OpenDirectoryAt(current, parts[index], false, followFinalComponent: false);
                 try
                 {
-                    if (!Matches(named, ReadStat(next, buffer.Pointer))) throw new IOException("Placement opened child differs from its named native observation.");
+                    beforeChildCheck?.Invoke(ReadFinalPath(current), parts[index]);
+                    token.ThrowIfCancellationRequested();
+                    var opened = ReadStat(next, buffer.Pointer);
+                    RequireIdentity(named, opened, index, "opened child");
                     beforeParentCheck?.Invoke(ReadFinalPath(current), parts[index]);
                     token.ThrowIfCancellationRequested();
-                    var parentChanged = !Matches(before, ReadStat(current, buffer.Pointer));
-                    if (!TryReadStatAt(current, parts[index], buffer.Pointer, out var after, out _) || !Matches(named, after))
-                        throw new IOException("Source placement changed during relative observation.");
-                    if (parentChanged || !Matches(before, ReadStat(current, buffer.Pointer)))
-                        throw new PlacementParentChangedException("Source placement parent changed during relative observation.");
+                    var parentAfter = ReadStat(current, buffer.Pointer);
+                    if (!TryReadStatAt(current, parts[index], buffer.Pointer, out var after, out _))
+                        throw Changed(index, "named child", "entry unavailable");
+                    // Refuse a replacement before classifying any ctime-only
+                    // change, including a moved opened child with a new name peer.
+                    RequireIdentity(named, after, index, "named child");
+                    RequireIdentity(before, parentAfter, index, "parent");
+                    RequireStable(named, opened, index, "opened child");
+                    RequireStable(named, after, index, "named child");
+                    RequireStable(before, parentAfter, index, "parent");
+                    RequireStable(before, ReadStat(current, buffer.Pointer), index, "parent");
                     current.Dispose(); current = next; next = null!;
                 }
                 finally { next?.Dispose(); }
             }
             return Finish([]);
+
+            string? IdentityDifference(NativeStat expected, NativeStat actual) =>
+                expected.Device != actual.Device ? "device" : expected.Inode != actual.Inode ? "inode"
+                : expected.FileType != actual.FileType ? "type" : null;
+
+            IOException Changed(int index, string role, string field, bool restart = false)
+            {
+                var component = Path.Combine(Path.GetPathRoot(full)!, Path.Combine(parts.Take(index + 1).ToArray()));
+                var message = $"Source placement {role} changed during relative observation at '{component}' ({field}).";
+                return restart ? new PlacementGenerationChangedException(message) : new IOException(message);
+            }
+
+            void RequireIdentity(NativeStat expected, NativeStat actual, int index, string role)
+            {
+                if (IdentityDifference(expected, actual) is { } field) throw Changed(index, role, field);
+            }
+
+            void RequireStable(NativeStat expected, NativeStat actual, int index, string role)
+            {
+                RequireIdentity(expected, actual, index, role);
+                if (!Matches(expected, actual)) throw Changed(index, role, "ctime", restart: true);
+            }
 
             NativePlacementLease Finish(ImmutableArray<string> suffix)
             {
