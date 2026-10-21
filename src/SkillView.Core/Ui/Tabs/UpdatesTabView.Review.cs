@@ -138,6 +138,8 @@ internal sealed partial class UpdatesTabView
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
         var initiatingFocus = SubViews.FirstOrDefault(view => view.HasFocus);
+        var capturedReview = applying ? _review : null;
+        var invalidated = false;
         SetBusy(true);
         SetOperationControlsEnabled(false);
         _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…"
@@ -147,7 +149,7 @@ internal sealed partial class UpdatesTabView
             var result = await operation(token).ConfigureAwait(false);
             // This callback is only cache notification. Production reconciliation
             // belongs to the workflow and runs even if this UI dispatch is canceled.
-            if (result.MutationAttempted) _onUpdateApplied();
+            if (result.MutationAttempted) { _onUpdateApplied(); invalidated = true; }
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
@@ -159,8 +161,9 @@ internal sealed partial class UpdatesTabView
                     ResetLocalReview();
                     _retainBox.Value = CheckState.UnChecked;
                     _sourceReviewBox.Value = CheckState.UnChecked;
+                    var itemResult = result;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
-                    RememberUndo(result, applying);
+                    RememberUndo(itemResult, result, applying);
                 }
                 ShowResultPreview(result, dryRun, unpinOnly);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"
@@ -188,9 +191,25 @@ internal sealed partial class UpdatesTabView
         catch (Exception ex)
         {
             _logger.Error("update.tab", ex.Message);
+            if (applying && !invalidated) _onUpdateApplied();
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
+                if (applying)
+                {
+                    _inventoryNeedsRefresh = true;
+                    _review = null;
+                    _retainBox.Value = _sourceReviewBox.Value = CheckState.UnChecked;
+                    var failure = UpdateResult.Failure(false, 2, ex.Message, []) with
+                    {
+                        SavedPlan = capturedReview,
+                        MutationAttempted = true,
+                        Outcomes = capturedReview is null ? [] : [new(capturedReview.Subject.InstallationId, capturedReview.OriginalPath,
+                            "recovery-required", null, null, [], 0, [], "Unexpected apply failure; inspect the saved plan before recovery.")]
+                    };
+                    SaveOutcomes(failure.Outcomes);
+                    ShowResultPreview(_queueResults.Append(failure) with { Outcomes = _queueOutcomes.ToImmutableArray() }, false, unpinOnly);
+                }
                 _status.Text = $" operation failed: {TuiHelpers.ErrorSnippet(ex.Message)}; inspect saved evidence";
                 if (_review is null && _queue.Count == 0) _queueOptions = null;
                 SetBusy(false);

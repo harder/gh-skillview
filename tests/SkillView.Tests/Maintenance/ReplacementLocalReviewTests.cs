@@ -102,7 +102,7 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
     [InlineData("source")]
     public async Task MergedPlanPreservesLocalExtrasRootPrivacyAndRealSourceBaselineThenUndoesExactly(string side)
     {
-        if (!OperatingSystem.IsMacOS()) return; // Other platforms must prove complete native metadata first.
+        if (!OperatingSystem.IsMacOS()) { Assert.Skip("Merged native metadata publication currently requires macOS evidence."); return; }
         var before = PayloadSnapshot.Capture(Payload, Token);
         var plan = await Plan();
         var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
@@ -132,9 +132,15 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
         var metadata = Assert.Single(Inventory().Skills).FrontMatter;
         Assert.Equal(NewTree, metadata.GithubTreeSha); Assert.Equal("refs/tags/v2", metadata.GithubRef);
         Assert.Contains(side == "installed" ? "Installed instructions" : "Source instructions", File.ReadAllText(Path.Combine(Payload, "SKILL.md")));
-        var inspection = Store().Inspect(plan.Id, Inventory(), Token);
-        var undone = Store().Recover(plan.Id, inspection.ReviewFingerprint, Inventory(), true, Token);
-        Assert.True(undone.Succeeded, undone.Message); Assert.Equal("restored", undone.Status);
+        var logger = new Logger();
+        var runner = new ProcessRunner(logger, environment: new Dictionary<string, string>
+        { ["HOME"] = temporary.FullName, ["USERPROFILE"] = temporary.FullName }, defaultWorkingDirectory: temporary.FullName);
+        var catalog = new SkillView.Gh.GhSkillListAdapter(runner, logger);
+        var availability = new SkillUpdateCoordinator(new(runner, logger), new(runner, logger), catalog, logger, runner);
+        var coordinator = new SavedUpdateCoordinator(Store(), availability, catalog, logger);
+        var inspection = coordinator.InspectUndo(applied, Inventory(), Token);
+        var undone = await coordinator.UndoAsync(inspection, Inventory(), _ => Task.FromResult(Inventory()), Token);
+        Assert.True(undone.Succeeded, undone.ErrorMessage); Assert.Equal("restored", undone.SavedPlan!.Status);
         var restored = PayloadSnapshot.Capture(Payload, Token);
         Assert.Equal(before.Fingerprint, restored.Fingerprint);
         Assert.Equal(before.Objects, restored.Objects);

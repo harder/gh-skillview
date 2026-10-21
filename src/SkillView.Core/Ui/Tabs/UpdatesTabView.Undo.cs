@@ -37,12 +37,14 @@ internal sealed partial class UpdatesTabView
         _undoApproval.Value = CheckState.UnChecked;
     }
 
-    private void RememberUndo(UpdateResult result, bool applying)
+    private void RememberUndo(UpdateResult result, UpdateResult displayResult, bool applying)
     {
         if (!applying || !result.Succeeded || result.Cancelled || result.ReconciliationPartial
             || !result.MutationAttempted || result.SavedPlan is not { Succeeded: true, Canceled: false, Status: "installed", MutationObserved: true } plan
             || !SavedUpdateCoordinator.IsRevisionUpdate(plan)) return;
-        _undoResult = result;
+        // Eligibility belongs to this apply. Keep earlier queue diagnostics in
+        // the result restored when the user cancels undo review.
+        _undoResult = displayResult with { SavedPlan = plan };
         _undoHidden = _queueOptions?.AllowHiddenDirectories ?? false;
     }
 
@@ -79,6 +81,7 @@ internal sealed partial class UpdatesTabView
         var token = ownership.Token;
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var inspected = _undoReview;
+        var invalidated = false;
         _undoApproval.Value = CheckState.UnChecked;
         SetBusy(true);
         SetOperationControlsEnabled(false);
@@ -88,9 +91,7 @@ internal sealed partial class UpdatesTabView
             if (!execute)
             {
                 var review = await _inspectUndoRunner(applied, _undoHidden, token).ConfigureAwait(false);
-                SavedUpdateCoordinator.RequireSameUndoPlan(applied, review);
-                if (!review.Succeeded || review.Canceled || review.Status != "installed")
-                    throw new IOException("The update is no longer installed unchanged; no undo was authorized.");
+                SavedUpdateCoordinator.RequireUndoInspection(applied, review);
                 await _runOnUi(() =>
                 {
                     if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
@@ -106,7 +107,7 @@ internal sealed partial class UpdatesTabView
             else
             {
                 var result = await _undoRunner(inspected!, _undoHidden, token).ConfigureAwait(false);
-                if (result.MutationAttempted) _onUpdateApplied();
+                if (result.MutationAttempted) { _onUpdateApplied(); invalidated = true; }
                 await _runOnUi(() =>
                 {
                     if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
@@ -114,6 +115,8 @@ internal sealed partial class UpdatesTabView
                     ClearUndo(); // Every attempt closes this approval, including a refusal.
                     ShowPreview(UpdateUndoPresentation.Result(result), "## Undo result\n\n" + UpdateScreen.RenderResult(result, false, false, []));
                     _status.Text = result.Cancelled ? " undo canceled; inspect saved evidence before recovery"
+                        : UpdateUndoPresentation.RestoredWithIncompleteInventory(result) ? " original restored; verification incomplete — Refresh inventory"
+                        : result.ReconciliationPartial ? " undo needs review; verification incomplete — Refresh inventory and inspect Details"
                         : result.Succeeded ? " original restored; Refresh inventory to inspect current installed metadata"
                         : " undo failed/refused; inspect F2 Details before recovery";
                     SetBusy(false);
@@ -128,13 +131,16 @@ internal sealed partial class UpdatesTabView
         catch (Exception ex)
         {
             _logger.Error("update.undo", ex.ToString());
+            if (execute && !invalidated) _onUpdateApplied();
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                 _undoReview = null;
-                if (execute) ClearUndo();
-                ShowPreview(UpdateUndoPresentation.Refusal(applied, ex.Message), _technicalPreview);
-                _status.Text = $" undo {(execute ? "failed" : "inspection refused")}: {TuiHelpers.ErrorSnippet(ex.Message)}; inspect saved evidence";
+                if (execute) { _inventoryNeedsRefresh = true; ClearUndo(); }
+                ShowPreview(UpdateUndoPresentation.Refusal(applied, ex.Message, execute),
+                    UpdateUndoPresentation.FailureDetails(inspected ?? applied, ex.Message));
+                _status.Text = execute ? " undo needs review; a write may have started — Refresh inventory and inspect F2 Details"
+                    : $" undo inspection refused: {TuiHelpers.ErrorSnippet(ex.Message)}; inspect F2 Details";
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);

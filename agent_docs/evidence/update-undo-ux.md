@@ -89,3 +89,40 @@ Representative captures:
 
 - [Undo review](../../assets/screenshots/update-undo-80x24-review.txt)
 - [Original restored](../../assets/screenshots/update-undo-80x24-restored.txt)
+
+## PR #81 review follow-up
+
+The [first review](https://github.com/harder/gh-skillview/pull/81#issuecomment-6307605013)
+identified two result-handling defects. A completed native restore with incomplete
+inventory verification now says "Original restored; verification incomplete" and
+directs Refresh. An unproven restore does not claim restoration. Undo eligibility
+uses the current apply result, so earlier batch failures no longer hide a later
+clean update's Undo. Canceling undo review preserves aggregate diagnostics.
+
+Unexpected execute exceptions conservatively invalidate inventory, close approval
+and require Refresh. The similar apply exception path now does the same while
+retaining prior batch diagnostics. F2 includes the current failure reason, saved
+ID and manifest alongside captured evidence. Consumer lists explicitly say
+"Recorded consumers" and use ordinal ordering. Apply/undo share reconciliation
+and summary rendering; UI/coordinator inspection checks share one validator.
+
+New tests cover mixed batch outcomes, partial verification with and without proven
+restoration, unexpected apply/undo errors, fresh sanitized failure details and
+negative unpin/local-reimport/canceled/partial eligibility. Native workflow tests
+verify that already-canceled undo leaves the candidate unchanged. Cancellation
+after restoration retains restored evidence and independent reconciliation.
+Partial, I/O-failed and synthetic-timeout captures retain native restored evidence
+while reporting incomplete verification.
+
+The existing schema-3 merged-plan native test now uses `InspectUndo` and
+`UndoAsync`, retaining exact original bytes/object checks. Its two cases explicitly
+skip outside macOS; runtime proof still requires macOS CI. This does not expand
+native platform support.
+
+Local validation: **645 distinct tests passed** (588 UI, 19 update workflow,
+29 standalone-unpin and 9 integration); two macOS-only cases skipped. Release
+test/App builds completed with zero warnings/errors; format verification and
+`git diff --check` passed. Logs are under
+`/var/tmp/skillview-update-undo-ux/review1-validation/`.
+The PTY captures above predate the recorded-consumer wording change. This review
+round used automated tests; native CI was not rerun locally.

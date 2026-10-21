@@ -122,7 +122,9 @@ public sealed class TagUpdateWorkflowTests : IDisposable
         var requests = File.ReadAllBytes(Calls);
         // No executable remains: apply and undo must consume only the saved evidence.
         File.Delete(Gh);
-        var applied = services.SavedUpdatePlans.Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        var applyResult = await services.SavedUpdates.ApplyAsync(plan, "retain-original", Inventory(), _ => Task.FromResult(Inventory()), Token);
+        Assert.True(applyResult.Succeeded, applyResult.ErrorMessage);
+        var applied = Assert.IsType<ReplacementResult>(applyResult.SavedPlan);
         Assert.True(applied.Succeeded, applied.Message);
         Assert.Equal(selectedTree, Target(Inventory()).TreeSha);
         Assert.False(Target(Inventory()).Pinned);
@@ -137,6 +139,47 @@ public sealed class TagUpdateWorkflowTests : IDisposable
         Assert.True(undone.MutationAttempted); Assert.Equal(1, reconciliations);
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
         Assert.Equal(requests, File.ReadAllBytes(Calls));
+    }
+
+    [Theory]
+    [InlineData("partial")]
+    [InlineData("io")]
+    [InlineData("deadline")]
+    [InlineData("cancel-after")]
+    [InlineData("already-canceled")]
+    public async Task UndoReconciliationAndCancellationRetainActualRestorationEvidence(string mode)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("POSIX gh protocol fixture."); return; }
+        var before = PayloadSnapshot.Capture(Payload, Token).Fingerprint;
+        var inventory = Inventory();
+        var preparation = await services.SavedUpdates.PrepareAsync(Gh, new(Targets: [Target(inventory)], Tag: "older"), inventory, Token);
+        var plan = Assert.IsType<ReplacementResult>(preparation.SavedPlan);
+        services.SavedUpdatePlans.AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, plan.SourceReview!.Fingerprint, Inventory(), Token);
+        var applied = services.SavedUpdatePlans.Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        var review = services.SavedUpdates.InspectUndo(applied, Inventory(), Token);
+        var installed = PayloadSnapshot.Capture(Payload, Token).Fingerprint;
+        using var cancellation = new CancellationTokenSource();
+        if (mode == "already-canceled") cancellation.Cancel();
+        var reconciliations = 0;
+        var result = await services.SavedUpdates.UndoAsync(review, Inventory(), reconcileToken =>
+        {
+            reconciliations++; Assert.False(reconcileToken.IsCancellationRequested);
+            if (mode == "cancel-after") cancellation.Cancel();
+            return mode switch
+            {
+                "partial" => Task.FromResult(Inventory() with { ConfiguredRootsComplete = false }),
+                "io" => throw new IOException("Synthetic inventory failure"),
+                "deadline" => throw new OperationCanceledException("Synthetic reconciliation timeout"),
+                _ => Task.FromResult(Inventory())
+            };
+        }, cancellation.Token);
+        Assert.Equal(mode == "already-canceled" ? installed : before, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
+        Assert.Equal(mode != "already-canceled", result.MutationAttempted);
+        Assert.Equal(mode == "already-canceled" ? 0 : 1, reconciliations);
+        Assert.Equal(mode is "partial" or "io" or "deadline", result.ReconciliationPartial);
+        Assert.Equal(mode is "cancel-after" or "already-canceled", result.Cancelled);
+        Assert.False(result.Succeeded);
+        if (mode != "already-canceled") Assert.Equal("restored", result.SavedPlan!.Status);
     }
 
     [Theory]

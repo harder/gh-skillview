@@ -26,10 +26,15 @@ internal sealed partial class SavedUpdateCoordinator
         if (!IsRevisionUpdate(applied) || !applied.Succeeded || applied.Canceled || applied.Status != "installed" || !applied.MutationObserved)
             throw new IOException("Undo here requires a successfully installed saved revision update.");
         var inspected = plans.Inspect(applied.Id, inventory, token, "update-revision");
-        RequireSameUndoPlan(applied, inspected);
-        if (inspected.Status != "installed")
-            throw new IOException("This saved update is no longer installed unchanged. Inspect its saved evidence before recovery.");
+        RequireUndoInspection(applied, inspected);
         return inspected;
+    }
+
+    internal static void RequireUndoInspection(ReplacementResult applied, ReplacementResult inspected)
+    {
+        RequireSameUndoPlan(applied, inspected);
+        if (!inspected.Succeeded || inspected.Canceled || inspected.Status != "installed")
+            throw new IOException("This saved update is no longer installed unchanged. Inspect its saved evidence before recovery.");
     }
 
     internal async Task<UpdateResult> UndoAsync(ReplacementResult review, InventorySnapshot inventory,
@@ -80,32 +85,38 @@ internal sealed partial class SavedUpdateCoordinator
         finally
         {
             if (attempted)
-            {
-                catalog.Invalidate();
-                using var deadline = new CancellationSource(TimeSpan.FromSeconds(10),
-                    CancellationCallbackReporter.For(logger, "saved update undo reconciliation"));
-                try
-                {
-                    var snapshot = await reconcile(deadline.Token).ConfigureAwait(false);
-                    if (snapshot.IsPartial || !snapshot.ConfiguredRootsComplete)
-                        throw new IOException("Post-undo inventory is partial; saved evidence remains authoritative.");
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
-                {
-                    result = result with
-                    {
-                        ReconciliationPartial = true,
-                        Succeeded = false,
-                        ExitCode = result.Cancelled ? 130 : 2,
-                        ErrorMessage = $"{result.ErrorMessage} Post-undo inventory reconciliation failed: {ex.Message}".Trim(),
-                        Notices = result.Notices.Add(new("reconciliation", ex.Message))
-                    };
-                    logger.Warn("update.undo.reconciliation", $"Plan {review.Id}: {ex.Message}");
-                }
-            }
+                result = await ReconcileAfterAttemptAsync(result, review, reconcile, undo: true).ConfigureAwait(false);
         }
         if (token.IsCancellationRequested) result = result with { Cancelled = true, Succeeded = false, ExitCode = 130 };
         logger.Info("update.undo", $"Plan {review.Id}: {result.SavedPlan?.Status}; attempted={attempted}; exit {result.ExitCode}. Manifest: {review.PlanPath}");
         return result with { MutationAttempted = attempted };
+    }
+
+    private async Task<UpdateResult> ReconcileAfterAttemptAsync(UpdateResult result, ReplacementResult review,
+        Func<CancellationToken, Task<InventorySnapshot>> reconcile, bool undo)
+    {
+        catalog.Invalidate();
+        var operation = undo ? "saved update undo reconciliation" : "saved update reconciliation";
+        var prefix = undo ? "Post-undo" : "Post-attempt";
+        using var deadline = new CancellationSource(TimeSpan.FromSeconds(10), CancellationCallbackReporter.For(logger, operation));
+        try
+        {
+            var snapshot = await reconcile(deadline.Token).ConfigureAwait(false);
+            if (snapshot.IsPartial || !snapshot.ConfiguredRootsComplete)
+                throw new IOException(prefix + " inventory is partial; saved evidence remains authoritative.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            result = result with
+            {
+                ReconciliationPartial = true,
+                Succeeded = false,
+                ExitCode = result.Cancelled ? 130 : 2,
+                ErrorMessage = $"{result.ErrorMessage} {prefix} inventory reconciliation failed: {ex.Message}".Trim(),
+                Notices = result.Notices.Add(new("reconciliation", ex.Message))
+            };
+            logger.Warn(undo ? "update.undo.reconciliation" : "update.reconciliation", $"Plan {review.Id}: {ex.Message}");
+        }
+        return result;
     }
 }

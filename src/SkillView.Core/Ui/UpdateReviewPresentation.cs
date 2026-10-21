@@ -124,9 +124,9 @@ internal static class UpdateReviewPresentation
         if (result.Outcomes.Length > 8) yield return ("More outcomes", (result.Outcomes.Length - 8).ToString());
     }
 
-    private static string Render(string heading, IEnumerable<(string, string?)> fields, string guidance)
+    internal static string Render(string heading, IEnumerable<(string, string?)> fields, string guidance, int fieldBudget = MaxCharacters - 1024)
     {
-        var rendered = MaintenanceQueueFormatter.RenderFields(fields, CancellationToken.None, MaxCharacters - 1024);
+        var rendered = MaintenanceQueueFormatter.RenderFields(fields, CancellationToken.None, fieldBudget);
         var compact = string.Join("\n", rendered.Text.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Select(field => "- " + field));
         return "## " + heading + "\n\n" + compact + "\n\n" + guidance
             + (rendered.OmittedFields > 0 ? $"\n\n{rendered.OmittedFields} fields omitted from this bounded summary; inspect F2 Details and saved evidence." : "");

@@ -157,6 +157,11 @@ refresh, leave, start another review or attempt undo. Saved inspection/recovery
 commands remain available separately. Failed/partial updates and standalone unpin
 use their existing explicit recovery paths.
 
+Earlier batch failures remain in Details and do not hide Undo for a later clean
+update. If undo restores the original but inventory verification is incomplete,
+the result says **Original restored; verification incomplete**. Refresh inventory
+to resolve that uncertainty before considering another operation.
+
 Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin
 review, and disablement/migration are not assessed by this queue. Disk inventory
