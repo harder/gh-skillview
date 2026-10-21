@@ -17,6 +17,14 @@ The deferred table is context for future decisions, not a completion backlog.
 
 ## Snapshot and how to read it
 
+- 2026-10-21 update: PR #81 merged at `33207ae`. The result-view Undo shortcut
+  is available for a clean, verified revision update. A bounded real 80×24
+  [terminal pass](evidence/merged-main-usability-80x24.md) revisited Changes,
+  copies, version selection and cleanup on that merge; the prior
+  [Undo evidence](evidence/update-undo-ux.md) covers native Apply → Undo.
+  The dated 2026-10-19 inventory and older PR states below are retained as
+  historical snapshots, not current status assertions.
+
 - Inventory date: 2026-10-19. The original inspected checkout is
   `/home/kevin/code/gh-skillview`, branch `codex/standalone-unpin`, HEAD
   `c919199a6861b9aaf9301e31c4b2945e098da799`, which is older than
@@ -142,16 +150,22 @@ review now requires an explicit fresh inventory capture while preserving the
 previous result for inspection. This uses existing inventory and saved-update
 contracts rather than introducing another lifecycle.
 
-The user authorized the next bounded task: **Undo this update from the TUI**,
-on `codex/update-undo-ux`. A successful revision-update result offers a fresh
-inspection, readable original/consumer summary and separate restoration approval.
-Reuse the saved plan's current observation fingerprint, native undo and inventory
-reconciliation. Verify Apply → Undo → Refresh at 80×24, plus refusal after an
-intervening edit. This adds no history manager, recovery operation, schema or
-native mutation authority. Partial-update recovery, standalone unpin undo,
-persistent approvals and exposure detachment are outside this slice.
-Implementation and verification are recorded in
-[evidence/update-undo-ux.md](evidence/update-undo-ux.md).
+**Undo this update from the TUI** merged in [PR #81](https://github.com/harder/gh-skillview/pull/81)
+as `33207ae`. A successful, verified revision-update result offers fresh
+inspection, the original version and recorded consumers, and a separate
+restoration approval. The native saved-plan Undo and inventory reconciliation
+remain authoritative. The 80×24 Apply → Undo → Refresh and intervening-edit
+refusal are recorded in [evidence/update-undo-ux.md](evidence/update-undo-ux.md).
+Partial-update recovery, standalone unpin undo, persistent approvals and
+exposure detachment remain outside this slice.
+
+The 2026-10-21 [merged-main usability pass](evidence/merged-main-usability-80x24.md)
+found one presentation defect: a review-only copy conflict described deletion
+as its Undo consequence even though the path only opens inspection. That line
+now says no change needs undo. Real deletion rows retain their no-automatic-undo
+warning. Compare, exact version selection and broken-link cleanup review reached
+their specialist screens and canceled without changing payloads. Keep broader
+maintenance expansion deferred until a reproducible user obstacle warrants it.
 
 ## Maintenance guidance
 

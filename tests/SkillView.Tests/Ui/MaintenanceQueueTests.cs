@@ -68,7 +68,7 @@ public sealed class MaintenanceQueueTests
     }
 
     [Fact]
-    public void CollisionSummary_RequiresReviewAndDoesNotPromiseReversibleDeletion()
+    public void CollisionSummary_RequiresReviewAndDoesNotImplyDeletion()
     {
         var queue = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
         { Skills = [Skill("/skills/one", "https://github.com/one/repo"), Skill("/skills/two", "https://github.com/two/repo")] },
@@ -78,7 +78,8 @@ public sealed class MaintenanceQueueTests
         Assert.Contains("Same name, multiple copies", summary);
         Assert.Contains("Compare copies", summary);
         Assert.Contains("automatic cleanup is unavailable", summary);
-        Assert.Contains("Deletion has no automatic undo", summary);
+        Assert.Contains("No change to undo; this issue opens review only", summary);
+        Assert.DoesNotContain("Deletion has no automatic undo", summary);
         Assert.DoesNotContain("Saved updates", summary);
         var evidence = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
         Assert.Contains(entry.Subject.InstallationId, evidence);
@@ -95,6 +96,7 @@ public sealed class MaintenanceQueueTests
             skill.ResolvedPath, "empty directory", null);
         var empty = MaintenanceQueueFormatter.Render(entry with { Cleanup = cleanup }, TestContext.Current.CancellationToken);
         Assert.Contains("removes this directory only while it is empty", empty);
+        Assert.Contains("Deletion has no automatic undo", empty);
 
         var impact = OperationImpact.Link(entry.Subject, skill.Agents[1]);
         var linked = MaintenanceQueueFormatter.Render(entry with
@@ -103,12 +105,14 @@ public sealed class MaintenanceQueueTests
         }, TestContext.Current.CancellationToken);
         Assert.Contains("removes only this link", linked);
         Assert.Contains("Target files stay", linked);
+        Assert.Contains("Deletion has no automatic undo", linked);
         Assert.Contains("codex", linked);
         Assert.DoesNotContain("claude", linked);
 
         var review = MaintenanceQueueFormatter.Render(entry with
         { Cleanup = cleanup with { ReviewOnly = true } }, TestContext.Current.CancellationToken);
         Assert.Contains("Inspection only", review);
+        Assert.Contains("No change to undo; this issue opens review only", review);
         Assert.DoesNotContain("If confirmed, removes", review);
     }
 

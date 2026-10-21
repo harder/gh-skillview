@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes  Maintenance observations · 10                                 │
+│───────────┬──────────────────────    Same name, multiple copies             ▲│
+│Kind       │Title                                                            █│
+│───────────┼──────────────────────    Skill: demo                            █│
+│Link       │lost · broken                                                    █│
+│Copies     │demo · identical          Why: Other copies use this name;       █│
+│Copies     │demo · older              sources or versions may differ.        █│
+│Copies     │demo · other                                                     █│
+│Copies     │demo · skills             Next: Compare copies, then review an   █│
+│Review     │lost · broken             update/version or cleanup for one      █│
+│Review     │demo · identical          location; automatic cleanup is         █│
+│Review     │demo · older              unavailable for this conflict.         ░│
+│Review     │demo · other                                                     ░│
+│Review     │demo · skills             Changes: Inspection only; no automatic ░│
+│                                      removal.                               ░│
+│                                                                             ░│
+│                                      Undo: No change to undo; this issue    ░│
+│                                      opens review only.                     ▼│
+│   10 observations · Enter Review · F2 Details · r Refresh                    │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘
