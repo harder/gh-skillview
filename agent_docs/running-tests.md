@@ -98,6 +98,12 @@ translates LF on Windows. Keep a positive disposable-workspace admission control
 alongside linked HOME/state refusals, so an invalid marker cannot make negative
 containment checks appear to pass. Drain host stderr with stdout and report an
 early exit before waiting for a checkpoint timeout.
+The shared-owner proof gives each admission guard a 60-second subprocess deadline, including
+managed host startup and positive-control inventory. It logs the case and elapsed
+time; a timeout fails with bounded captured output and never counts as a refusal
+or triggers an automatic retry. Proof-host stderr marks startup and inventory
+capture phases. Windows descendant-held pipes may delay subprocess cleanup;
+the deadline does not bound that inherited-pipe drain.
 
 The cross-platform `agent_docs/evidence/prove-inventory-filter.py` proof runs
 eleven actual CLI scope/agent queries against one physical payload exposed by

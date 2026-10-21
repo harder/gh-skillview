@@ -114,6 +114,30 @@ def prepare_windows_fixture_owner(path):
     return True
 
 
+def run_guard_host(arguments, *, env, cwd, case, timeout=60):
+    # Managed startup and the positive control's inventory capture both count
+    # against this deadline. Never retry a guard or treat timeout as refusal.
+    started = time.monotonic()
+    print(f'Disposable guard {case}: starting (deadline {timeout}s)', flush=True)
+    try:
+        result = subprocess.run(arguments, env=env, cwd=cwd,
+                                capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        def captured(value):
+            if isinstance(value, bytes):
+                value = value[-4096:].decode('utf-8', errors='replace')
+            # Escape before applying the final display bound: control bytes
+            # can expand to several characters in repr().
+            return repr((value or '')[-4096:])[-4096:]
+        raise RuntimeError(
+            f'Disposable guard {case} timed out after {timeout}s; no refusal was proved. '
+            f'Captured stdout (escaped tail, at most 4096 characters): {captured(error.stdout)}; '
+            f'stderr (escaped tail, at most 4096 characters): {captured(error.stderr)}') from error
+    print(f'Disposable guard {case}: exited {result.returncode} after '
+          f'{time.monotonic() - started:.1f}s', flush=True)
+    return result
+
+
 def prove_guard():
     with tempfile.TemporaryDirectory(prefix='skillview-proof-guard-') as temporary:
         base = Path(temporary).resolve()
@@ -132,9 +156,9 @@ def prove_guard():
             state = root / ('state-link' if linked == 'state' else 'state')
             env.update(HOME=str(home), USERPROFILE=str(home), SKILLVIEW_STATE_HOME=str(state),
                        DOTNET_CLI_HOME=str(root / 'dotnet-home'))
-            result = subprocess.run([str(host), str(root), str(args.gh[-1].resolve()), '0' * 32,
+            result = run_guard_host([str(host), str(root), str(args.gh[-1].resolve()), '0' * 32,
                                      '0' * 64, apply_action, 'registry-truncated'], env=env, cwd=root,
-                                    capture_output=True, text=True, timeout=20)
+                                    case='positive-control' if linked is None else 'linked-' + linked)
             assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
             if linked is None:
                 assert 'maintenance-proof:' in result.stderr and 'marked disposable' not in result.stderr, result.stderr

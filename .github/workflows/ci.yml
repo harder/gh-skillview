@@ -55,8 +55,8 @@ jobs:
         run: |
           node --test .github/scripts/ci-change-scope.test.js
           python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
-      - name: Test frozen native-plan fixture contracts
-        run: python3 -m unittest discover -s agent_docs/evidence -p 'test_old_native_*.py'
+      - name: Test native proof fixture contracts
+        run: python3 -m unittest discover -s agent_docs/evidence -p 'test_*.py'
 
   dependency-review:
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
