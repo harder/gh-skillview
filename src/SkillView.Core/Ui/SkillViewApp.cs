@@ -500,6 +500,8 @@ public sealed class SkillViewApp
             applyRunner: (review, hidden, token) => _workflows.ApplyReviewedUpdateAsync(review, hidden, token),
             localReviewRunner: (request, hidden, token) => _workflows.ReviewLocalUpdateAsync(request, hidden, token),
             unpinRunner: (target, hidden, token) => _workflows.PrepareUnpinAsync(target, hidden, token),
+            inspectUndoRunner: (applied, hidden, token) => _workflows.InspectUpdateUndoAsync(applied, hidden, token),
+            undoRunner: (review, hidden, token) => _workflows.UndoReviewedUpdateAsync(review, hidden, token),
             lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,

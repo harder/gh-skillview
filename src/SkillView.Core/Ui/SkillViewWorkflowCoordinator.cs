@@ -728,6 +728,22 @@ internal sealed class SkillViewWorkflowCoordinator
             reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
     }
 
+    internal async Task<SkillView.Maintenance.ReplacementResult> InspectUpdateUndoAsync(
+        SkillView.Maintenance.ReplacementResult applied, bool allowHidden, CancellationToken token)
+    {
+        var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);
+        return await Task.Run(() => _services.SavedUpdates.InspectUndo(applied, inventory, token), token).ConfigureAwait(false);
+    }
+
+    internal async Task<SkillView.Gh.Models.UpdateResult> UndoReviewedUpdateAsync(
+        SkillView.Maintenance.ReplacementResult review, bool allowHidden, CancellationToken token)
+    {
+        var ghPath = _getGhPath();
+        var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
+        return await Task.Run(() => _services.SavedUpdates.UndoAsync(review, inventory,
+            reconciliation => CaptureUpdateInventoryAsync(ghPath, allowHidden, reconciliation), token), token).ConfigureAwait(false);
+    }
+
     internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUnpinAsync(InstalledSkill selected, bool allowHidden, CancellationToken token)
     {
         var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);

@@ -128,10 +128,43 @@ public sealed class TagUpdateWorkflowTests : IDisposable
         Assert.False(Target(Inventory()).Pinned);
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(plan.RetainedPath, Token).Fingerprint);
         Assert.Equal(other, File.ReadAllBytes(Path.Combine(Other, "demo", "SKILL.md")));
-        var inspection = services.SavedUpdatePlans.Inspect(plan.Id, Inventory(), Token);
-        Assert.True(services.SavedUpdatePlans.Recover(plan.Id, inspection.ReviewFingerprint, Inventory(), true, Token).Succeeded);
+        var inspection = services.SavedUpdates.InspectUndo(applied, Inventory(), Token);
+        var reconciliations = 0;
+        var undone = await services.SavedUpdates.UndoAsync(inspection, Inventory(), _ =>
+        { reconciliations++; return Task.FromResult(Inventory()); }, Token);
+        Assert.True(undone.Succeeded, undone.ErrorMessage);
+        Assert.Equal("restored", undone.SavedPlan!.Status);
+        Assert.True(undone.MutationAttempted); Assert.Equal(1, reconciliations);
         Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
         Assert.Equal(requests, File.ReadAllBytes(Calls));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProductUndoRefusesChangedInstalledContentWithoutOverwritingIt(bool afterInspection)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("POSIX gh protocol fixture."); return; }
+        var inventory = Inventory();
+        var prepared = await services.SavedUpdates.PrepareAsync(Gh, new(Targets: [Target(inventory)], Tag: "older"), inventory, Token);
+        var plan = Assert.IsType<ReplacementResult>(prepared.SavedPlan);
+        services.SavedUpdatePlans.AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, plan.SourceReview!.Fingerprint, Inventory(), Token);
+        var applied = services.SavedUpdatePlans.Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        Assert.True(applied.Succeeded, applied.Message);
+        var original = PayloadSnapshot.Capture(plan.RetainedPath, Token).Fingerprint;
+        var peer = File.ReadAllBytes(Path.Combine(Other, "demo", "SKILL.md"));
+        var inspection = afterInspection ? services.SavedUpdates.InspectUndo(applied, Inventory(), Token) : null;
+        File.AppendAllText(Path.Combine(Payload, "SKILL.md"), "New edit after apply\n");
+        var changed = PayloadSnapshot.Capture(Payload, Token).Fingerprint;
+        if (inspection is null) Assert.Throws<IOException>(() => services.SavedUpdates.InspectUndo(applied, Inventory(), Token));
+        else
+        {
+            var result = await services.SavedUpdates.UndoAsync(inspection, Inventory(), _ => Task.FromResult(Inventory()), Token);
+            Assert.False(result.Succeeded); Assert.True(result.MutationAttempted);
+        }
+        Assert.Equal(changed, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
+        Assert.Equal(original, PayloadSnapshot.Capture(plan.RetainedPath, Token).Fingerprint);
+        Assert.Equal(peer, File.ReadAllBytes(Path.Combine(Other, "demo", "SKILL.md")));
     }
 
     [Theory]

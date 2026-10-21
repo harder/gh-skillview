@@ -10,7 +10,7 @@ namespace SkillView.Maintenance;
 
 /// Product update admission. Availability is disposable; preparation retains one
 /// exact candidate; applying never resolves the remote source again.
-internal sealed class SavedUpdateCoordinator(ReplacementPlanStore plans,
+internal sealed partial class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
     internal Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,

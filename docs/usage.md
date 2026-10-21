@@ -142,6 +142,21 @@ this captures the installed ref again at the selected location. A failed refresh
 can be retried without granting another approval or selecting a same-name copy.
 This also applies when you skip the final batch item after an earlier write.
 
+After a successful revision update, **Undo this update...** opens a fresh
+inspection of that saved update. Review the exact location, affected consumers
+and original version to restore; F2 shows the inspection fingerprint and saved
+evidence. Check the separate restoration approval, then press **Undo update**.
+Cancel changes no installed files. Undo refuses if the installed payload, native
+objects or required owner evidence changed after the inspection.
+
+Undo restores the retained original, including its earlier local edits and
+extras, for every consumer sharing that physical installation. Refresh inventory
+afterward to inspect the restored metadata; agent reload remains unverified.
+This shortcut belongs to the current successful update result and ends when you
+refresh, leave, start another review or attempt undo. Saved inspection/recovery
+commands remain available separately. Failed/partial updates and standalone unpin
+use their existing explicit recovery paths.
+
 Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin
 review, and disablement/migration are not assessed by this queue. Disk inventory

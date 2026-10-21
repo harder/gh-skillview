@@ -82,6 +82,7 @@ internal sealed partial class UpdatesTabView
         _nextButton.Text = _inventoryNeedsRefresh && _review is null && _queue.Count == 0 ? "Refresh inventory" : "Next / skip";
         _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh);
         RefreshLocalReviewControls(idle);
+        RefreshUndoControls(idle);
         RefreshPresentation();
     }
 
@@ -108,7 +109,7 @@ internal sealed partial class UpdatesTabView
 
     private Task SkipAndPrepareNextAsync()
     {
-        if (_operationCancellations.HasActive || _loadCancellations.HasActive) return Task.CompletedTask;
+        if (_undoReview is not null || _operationCancellations.HasActive || _loadCancellations.HasActive) return Task.CompletedTask;
         if (_inventoryNeedsRefresh && _review is null && _queue.Count == 0)
             return LoadForSubjectAsync(_drillInSubject);
         if (_review is { } review)
@@ -133,6 +134,7 @@ internal sealed partial class UpdatesTabView
     {
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
+        if (!applying) ClearUndo();
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
         var initiatingFocus = SubViews.FirstOrDefault(view => view.HasFocus);
@@ -158,6 +160,7 @@ internal sealed partial class UpdatesTabView
                     _retainBox.Value = CheckState.UnChecked;
                     _sourceReviewBox.Value = CheckState.UnChecked;
                     result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
+                    RememberUndo(result, applying);
                 }
                 ShowResultPreview(result, dryRun, unpinOnly);
                 _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"

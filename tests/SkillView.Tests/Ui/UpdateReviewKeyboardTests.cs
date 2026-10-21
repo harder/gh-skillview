@@ -16,6 +16,60 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class UpdateReviewKeyboardTests
 {
+    [Fact]
+    public async Task ActualKeyboardReviewsCancelsAndApprovesUndoWithoutReusingApplyApproval()
+    {
+        var target = CopiesPresentationTests.Copy("/skills/demo");
+        var plan = ReviewedUpdatesTabTests.Review(target);
+        var applied = plan with { Status = "installed", MutationObserved = true };
+        var inspected = applied with { MutationObserved = false, ReviewFingerprint = new('f', 64) };
+        var inspections = 0; var undos = 0; var leaves = 0; var captures = 0;
+        using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+        using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+        using var view = new UpdatesTabView(action => { action(); return Task.CompletedTask; },
+            (work, _) => work().GetAwaiter().GetResult(), _ =>
+            { captures++; return Task.FromResult(InventorySnapshot.Empty with { Skills = [target] }); },
+            (_, _, _) => Task.FromResult(Result(plan)), () => "/gh", new Logger(), () => leaves++, () => { },
+            applyRunner: (_, _, _) => Task.FromResult(Result(applied) with { MutationAttempted = true }),
+            inspectUndoRunner: (_, _, _) => { inspections++; return Task.FromResult(inspected); },
+            undoRunner: (saved, _, _) =>
+            {
+                Assert.Same(inspected, saved); undos++;
+                return Task.FromResult(Result(saved with { Status = "restored", MutationObserved = true }) with { MutationAttempted = true });
+            })
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        var session = app.Begin(window) ?? throw new InvalidOperationException("The test window did not start.");
+        try
+        {
+            await view.LoadForSubjectAsync(OperationSubject.From(target)); Press(new Key('u'));
+            view.RetainBoxForTests.SetFocus(); Press(Key.Space);
+            view.ApplyButtonForTests.SetFocus(); Press(Key.Enter);
+            Assert.True(view.UndoButtonForTests.Visible); Assert.Equal(0, undos);
+            Inspect(); Assert.Equal(1, inspections);
+            Press(Key.F2); Assert.Contains(inspected.ReviewFingerprint, view.PreviewTextForTests); Press(Key.F2);
+            Assert.False(view.ConfirmUndoButtonForTests.Enabled);
+            Press(Key.Esc); Assert.Equal(0, leaves); Assert.Equal(0, undos);
+            window.Layout(new(80, 24));
+            Assert.InRange(view.UndoButtonForTests.Frame.Left, 0, 79);
+            Assert.InRange(view.UndoButtonForTests.Frame.Right, 1, 80);
+            Assert.True(view.UndoButtonForTests.Frame.Width > 0);
+            Inspect(); Assert.Equal(2, inspections); Assert.False(view.ConfirmUndoButtonForTests.Enabled);
+            Press(Key.Tab); Assert.True(view.DetailsButtonForTests.HasFocus);
+            Press(Key.Tab); Assert.True(view.UndoApprovalForTests.HasFocus); Press(Key.Space);
+            Assert.True(view.ConfirmUndoButtonForTests.Enabled);
+            Press(Key.Tab); Assert.True(view.ConfirmUndoButtonForTests.HasFocus); Press(Key.Enter);
+            Assert.Equal(1, undos); Assert.Contains("Original restored", view.PreviewTextForTests);
+            var refresh = view.SubViews.OfType<Button>().Single(button => button.Text == "Refresh inventory");
+            refresh.SetFocus(); Press(Key.Enter); Assert.Equal(2, captures);
+            Assert.Equal(target.InstallationId, view.SelectedInstallationForTests);
+        }
+        finally { app.End(session); }
+
+        void Inspect() { view.UndoButtonForTests.SetFocus(); Assert.True(view.UndoButtonForTests.HasFocus); Press(Key.Enter); }
+        void Press(Key key) { app.Keyboard.RaiseKeyDownEvent(key); window.Draw(new DrawContext()); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

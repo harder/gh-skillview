@@ -82,6 +82,7 @@ internal static class UpdateReviewPresentation
 
     private static IEnumerable<(string, string?)> ResultFields(UpdateResult result, bool awaitingReview)
     {
+        string? latestNotice = null;
         if (result.ReconciliationPartial) yield return ("Disk verification", "Incomplete; refresh inventory and inspect details before continuing.");
         if (result.MutationAttempted && !result.Succeeded) yield return ("Recovery", "A write may have started. Inspect saved recovery evidence in F2 Details.");
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage)) yield return ("Reason", result.ErrorMessage);
@@ -92,11 +93,12 @@ internal static class UpdateReviewPresentation
             if (latest is not null)
             {
                 if (result.SavedPlan?.OriginalPath != latest.Path) yield return ("Location", latest.Path);
-                if (latest.Message is not null) yield return ("Notice", latest.Message);
+                latestNotice = latest.Message;
             }
         }
         if (result.SavedPlan is { } plan)
             foreach (var field in PlanFields(plan)) yield return field;
+        if (latestNotice is not null) yield return ("Notice", latestNotice);
         foreach (var field in OutcomeFields(result, awaitingReview)) yield return field;
         foreach (var entry in result.Entries.Take(8))
             yield return (entry.Name, entry.Status + (entry.FromVersion is null && entry.ToVersion is null ? ""

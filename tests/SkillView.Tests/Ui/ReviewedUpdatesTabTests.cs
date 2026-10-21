@@ -82,11 +82,14 @@ public sealed partial class ReviewedUpdatesTabTests
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpin = null,
         Func<InstalledSkill, string?>? chooseTag = null,
         Func<CancellationToken, Task<InventorySnapshot>>? snapshotLoader = null,
-        Action<Func<Task>, string>? runTask = null) => new(
+        Action<Func<Task>, string>? runTask = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? inspectUndo = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? undo = null) => new(
             dispatch ?? (action => { action(); return Task.CompletedTask; }),
             runTask ?? ((operation, _) => operation().GetAwaiter().GetResult()),
             snapshotLoader ?? (_ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() })),
-            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin, chooseTag: chooseTag);
+            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin, chooseTag: chooseTag,
+            inspectUndoRunner: inspectUndo, undoRunner: undo);
 
     [Theory]
     [InlineData(false)]

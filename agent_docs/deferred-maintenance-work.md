@@ -127,17 +127,13 @@ or cleanup review. Local validation passed 54 focused and 9 integration tests,
 with actual keyboard checks at 80×24. Validation limits are recorded in
 [evidence/copies-comparison-ux.md](evidence/copies-comparison-ux.md).
 
-The next bounded task, authorized after PR #79 merged, is **Updates review UX**
-on `codex/update-review-ux`. The Copies walkthrough exposed crowded footer rows
-and little room to read a selected installation at 80×24. Give the selected-copy
-and saved-review views a full-width summary, show controls when applicable, and
-keep existing technical evidence behind F2. Verify that independent source and
-retention approvals, selected-tag targeting, local-change review and batch
-continuation still work. Reuse the current saved updates and recovery machinery;
-do not add schemas, persistent approvals or mutation operations. The bounded
-finish is useful narrow-terminal review/apply navigation, focused verification
-and a reviewable PR. Automatic consolidation, exposure detach and the broader
-PR #73 policy remain deferred.
+**Updates review UX** merged in [PR #80](https://github.com/harder/gh-skillview/pull/80)
+as `8e0e41d13250eba0aef1d0a2cdb766c7eb719470`. Selected-copy and saved-review
+views now use full-width summaries, contextual controls and F2 technical evidence.
+Independent source and retention approvals, selected-tag targeting, local-change
+review and batch continuation reuse the current saved-update machinery. No schema
+or mutation operation was added. Automatic consolidation, exposure detach and
+the broader PR #73 policy remain deferred.
 
 Implementation and local validation are recorded in
 [evidence/update-review-ux.md](evidence/update-review-ux.md). The terminal Apply
@@ -145,6 +141,17 @@ walkthrough also exposed stale post-write version context; starting another
 review now requires an explicit fresh inventory capture while preserving the
 previous result for inspection. This uses existing inventory and saved-update
 contracts rather than introducing another lifecycle.
+
+The user authorized the next bounded task: **Undo this update from the TUI**,
+on `codex/update-undo-ux`. A successful revision-update result offers a fresh
+inspection, readable original/consumer summary and separate restoration approval.
+Reuse the saved plan's current observation fingerprint, native undo and inventory
+reconciliation. Verify Apply → Undo → Refresh at 80×24, plus refusal after an
+intervening edit. This adds no history manager, recovery operation, schema or
+native mutation authority. Partial-update recovery, standalone unpin undo,
+persistent approvals and exposure detachment are outside this slice.
+Implementation and verification are recorded in
+[evidence/update-undo-ux.md](evidence/update-undo-ux.md).
 
 ## Maintenance guidance
 
