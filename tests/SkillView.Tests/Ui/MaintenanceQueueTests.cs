@@ -96,6 +96,7 @@ public sealed class MaintenanceQueueTests
             skill.ResolvedPath, "empty directory", null);
         var empty = MaintenanceQueueFormatter.Render(entry with { Cleanup = cleanup }, TestContext.Current.CancellationToken);
         Assert.Contains("removes this directory only while it is empty", empty);
+        Assert.Contains("Deletion has no automatic undo", empty);
 
         var impact = OperationImpact.Link(entry.Subject, skill.Agents[1]);
         var linked = MaintenanceQueueFormatter.Render(entry with
@@ -104,6 +105,7 @@ public sealed class MaintenanceQueueTests
         }, TestContext.Current.CancellationToken);
         Assert.Contains("removes only this link", linked);
         Assert.Contains("Target files stay", linked);
+        Assert.Contains("Deletion has no automatic undo", linked);
         Assert.Contains("codex", linked);
         Assert.DoesNotContain("claude", linked);
 
