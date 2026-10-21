@@ -9,8 +9,9 @@ On [PR #82's macOS test job](https://github.com/harder/gh-skillview/actions/runs
 `CopiedSourceRelativeTrackingRefusesExplicitlyRatherThanRelaxingSchemaFive`
 received the early `Source placement changed during relative observation`
 IOException instead of its expected copied-tracking diagnostic. A later PR #83
-run failed `CanceledCaptureRetainsExactDiagnosticAndLeavesBothPayloadsUnchanged`
-at the same placement check before its cancellation checkpoint.
+run failed `NativePlacementTests.AliasedAncestorsResolveAndBrokenOrFinalLinksCannotMasqueradeAsMissing(relative: True)`
+because the alias-ancestor capture received the same early refusal instead of
+resolving the existing alias and retaining the missing suffix.
 
 Unix placement walks from the filesystem root, including macOS `/var` alias
 expansion. Every parent is bracketed by full native identity/generation checks.
