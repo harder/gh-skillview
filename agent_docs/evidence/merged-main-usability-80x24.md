@@ -45,15 +45,13 @@ summary wording. Native Windows/macOS behavior, live upstream compatibility,
 agent-session reload and release availability remain outside this pass.
 
 Focused `MaintenanceQueueTests` passed 17/17, integration tests passed 9/9,
-and the Release App build had zero warnings or errors. The review-only and
-removable-row assertions keep the deletion warning on real removal routes.
+and the Release App build had zero warnings or errors.
 
 ## PR review follow-up
 
 The review correctly found that the initial tests asserted only the removable
-rows' Changes text; the claim above about guarding their deletion warning was
-premature. The empty-directory and link-only cases now each explicitly require
-"Deletion has no automatic undo", alongside the review-only case's distinct
+rows' Changes text. The empty-directory and link-only cases now each explicitly
+require "Deletion has no automatic undo", alongside the review-only case's distinct
 guidance. This follow-up changes tests, not the product wording or behavior.
 The targeted mutation replacing that warning now fails at the new assertion as
 intended; the original formatter was restored and byte-compared afterward.
