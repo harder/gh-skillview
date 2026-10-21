@@ -13,6 +13,7 @@ try
         return ExposureLifetimeProof.Run(args[1]);
     if (args.Length == 2 && args[0] == "--exposure-link-roundtrip")
         return ExposureLinkProof.Run(args[1]);
+    Console.Error.WriteLine("maintenance-proof phase: started");
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
     if (!checkDiskFullRoot && args.Length != 6)
         throw new ArgumentException("root gh id fingerprint apply|apply-merged|apply-unpin|apply-reimport|apply-source-switch|undo|undo-unpin|undo-reimport|undo-source-switch|repair|repair-unpin [disk-full:]checkpoint; or --check-disk-full-root root");
@@ -44,8 +45,10 @@ try
     var logger = new Logger();
     using var lifetime = new CancellationSource(TimeSpan.FromMinutes(3), CancellationCallbackReporter.For(logger, "Process-death proof"));
     var services = TuiServices.Build(logger, workingDirectory: root);
+    Console.Error.WriteLine("maintenance-proof phase: inventory-started");
     var inventory = await services.InventoryService.CaptureAsync(args[1],
         new(ScanRoots: [Path.Combine(root, "custom")], AllowHiddenDirs: true), lifetime.Token);
+    Console.Error.WriteLine("maintenance-proof phase: inventory-completed");
     var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(MaintenanceBackupStore.ResolveRoot(services.Runner))!, "replacements"),
         logger, Checkpoint, services.Runner);
     var result = args[4] == "recover-source-switch-reviewed"

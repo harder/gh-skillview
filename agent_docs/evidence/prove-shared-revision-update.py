@@ -125,12 +125,14 @@ def run_guard_host(arguments, *, env, cwd, case, timeout=60):
     except subprocess.TimeoutExpired as error:
         def captured(value):
             if isinstance(value, bytes):
-                value = value.decode('utf-8', errors='replace')
-            return (value or '')[-4096:]
+                value = value[-4096:].decode('utf-8', errors='replace')
+            # Escape before applying the final display bound: control bytes
+            # can expand to several characters in repr().
+            return repr((value or '')[-4096:])[-4096:]
         raise RuntimeError(
             f'Disposable guard {case} timed out after {timeout}s; no refusal was proved. '
-            f'Captured stdout (last 4096 characters): {captured(error.stdout)!r}; '
-            f'stderr: {captured(error.stderr)!r}') from error
+            f'Captured stdout (escaped tail, at most 4096 characters): {captured(error.stdout)}; '
+            f'stderr (escaped tail, at most 4096 characters): {captured(error.stderr)}') from error
     print(f'Disposable guard {case}: exited {result.returncode} after '
           f'{time.monotonic() - started:.1f}s', flush=True)
     return result

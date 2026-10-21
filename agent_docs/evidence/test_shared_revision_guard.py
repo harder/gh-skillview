@@ -35,7 +35,8 @@ class SharedRevisionGuardTests(unittest.TestCase):
 
     def test_timeout_fails_without_retry_and_preserves_bounded_diagnostics(self):
         for stdout, stderr in ((None, None), ('early output', 'native diagnostic'),
-                               (b'x' * 5000 + b'last output', b'bad utf8: \xff')):
+                               (b'x' * 5000 + b'last output', b'bad utf8: \xff'),
+                               ('\x1b\r\n\x00' * 4096 + 'early output', '\x00' * 4096 + 'native diagnostic')):
             with self.subTest(stdout_type=type(stdout).__name__):
                 failure = subprocess.TimeoutExpired(['proof-host'], 60, output=stdout, stderr=stderr)
                 with patch('subprocess.run', side_effect=failure) as run, \
@@ -46,6 +47,10 @@ class SharedRevisionGuardTests(unittest.TestCase):
                 self.assertIs(raised.exception.__cause__, failure)
                 message = str(raised.exception)
                 self.assertLess(len(message), 8500)
+                self.assertNotIn('\x1b', message)
+                self.assertNotIn('\x00', message)
+                self.assertNotIn('\r', message)
+                self.assertNotIn('\n', message)
                 if stdout:
                     self.assertIn('early output' if isinstance(stdout, str) else 'last output', message)
                 if stderr:
