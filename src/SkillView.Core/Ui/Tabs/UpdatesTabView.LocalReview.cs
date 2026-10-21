@@ -178,7 +178,8 @@ internal sealed partial class UpdatesTabView
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
-                if (_preview.Visible) _preview.SetFocus();
+                if (_table.Visible) _table.SetFocus();
+                else if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

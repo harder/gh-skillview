@@ -85,16 +85,19 @@ internal static class UpdateReviewPresentation
         if (result.ReconciliationPartial) yield return ("Disk verification", "Incomplete; refresh inventory and inspect details before continuing.");
         if (result.MutationAttempted && !result.Succeeded) yield return ("Recovery", "A write may have started. Inspect saved recovery evidence in F2 Details.");
         if (!string.IsNullOrWhiteSpace(result.ErrorMessage)) yield return ("Reason", result.ErrorMessage);
-        if (!awaitingReview) yield return ("Outcome", result.Outcomes.LastOrDefault()?.Status ?? result.SavedPlan?.Status ?? (result.Succeeded ? "complete; inspect observations below" : "failed or refused"));
+        if (!awaitingReview)
+        {
+            var latest = result.Outcomes.LastOrDefault();
+            yield return ("Outcome", latest?.Status ?? result.SavedPlan?.Status ?? (result.Succeeded ? "complete; inspect observations below" : "failed or refused"));
+            if (latest is not null)
+            {
+                if (result.SavedPlan?.OriginalPath != latest.Path) yield return ("Location", latest.Path);
+                if (latest.Message is not null) yield return ("Notice", latest.Message);
+            }
+        }
         if (result.SavedPlan is { } plan)
             foreach (var field in PlanFields(plan)) yield return field;
-        foreach (var outcome in result.Outcomes.Take(8))
-        {
-            yield return ("Location", outcome.Path);
-            yield return ("Outcome", outcome.Status);
-            if (outcome.Message is not null) yield return ("Notice", outcome.Message);
-        }
-        if (result.Outcomes.Length > 8) yield return ("More outcomes", (result.Outcomes.Length - 8).ToString());
+        foreach (var field in OutcomeFields(result, awaitingReview)) yield return field;
         foreach (var entry in result.Entries.Take(8))
             yield return (entry.Name, entry.Status + (entry.FromVersion is null && entry.ToVersion is null ? ""
                 : " · " + (entry.FromVersion ?? "unknown") + " → " + (entry.ToVersion ?? "unknown")));
@@ -103,6 +106,20 @@ internal static class UpdateReviewPresentation
             yield return ("Observation", "No structured installation outcome was returned; inspect the full output in F2 Details.");
         if (result.Notices.Length > 0 || !string.IsNullOrWhiteSpace(result.StdErr))
             yield return ("Diagnostics", "Notices are available in F2 Details.");
+    }
+
+    private static IEnumerable<(string, string?)> OutcomeFields(UpdateResult result, bool awaitingReview)
+    {
+        // The newest result is already above the plan. Keep the plan and its
+        // recovery guidance ahead of bounded earlier batch outcomes.
+        var remaining = awaitingReview ? result.Outcomes.Length : Math.Max(0, result.Outcomes.Length - 1);
+        foreach (var outcome in result.Outcomes.Take(Math.Min(awaitingReview ? 8 : 7, remaining)))
+        {
+            yield return ("Location", outcome.Path);
+            yield return ("Outcome", outcome.Status);
+            if (outcome.Message is not null) yield return ("Notice", outcome.Message);
+        }
+        if (result.Outcomes.Length > 8) yield return ("More outcomes", (result.Outcomes.Length - 8).ToString());
     }
 
     private static string Render(string heading, IEnumerable<(string, string?)> fields, string guidance)

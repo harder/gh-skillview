@@ -16,6 +16,50 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class UpdateReviewKeyboardTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AvailabilityCheckRetainsInitiatingFocusAndTableNavigation(bool mnemonic)
+    {
+        var first = CopiesPresentationTests.Copy("/skills/first");
+        var second = CopiesPresentationTests.Copy("/skills/second");
+        var checks = 0;
+        using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+        using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+        using var view = new UpdatesTabView(action => { action(); return Task.CompletedTask; },
+            (work, _) => work().GetAwaiter().GetResult(), _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) =>
+            {
+                Assert.True(options.DryRun); checks++;
+                return Task.FromResult(Result(ReviewedUpdatesTabTests.Review(first)) with { DryRun = true, SavedPlan = null });
+            }, () => "/gh", new Logger(), () => { }, () => { })
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        var session = app.Begin(window) ?? throw new InvalidOperationException("The test window did not start.");
+        try
+        {
+            await view.LoadAsync(); view.MarkRowForTests(0);
+            var table = view.SubViews.OfType<TableView>().Single();
+            Assert.True(table.HasFocus);
+            Assert.Equal("_Check updates", view.DryRunButtonForTests.Text.ToString());
+            Assert.Equal("_Unpin with update", view.UnpinBoxForTests.Text.ToString());
+            Press(mnemonic ? new Key('c').WithAlt : new Key('d'));
+            Assert.Equal(1, checks);
+            Assert.False(view.ShowingTechnicalForTests);
+            if (mnemonic) Assert.True(view.DryRunButtonForTests.HasFocus);
+            else
+            {
+                Assert.True(table.HasFocus);
+                Press(Key.CursorDown); Assert.Equal(second.InstallationId, view.SelectedInstallationForTests);
+                Press(Key.Space);
+                Assert.Contains(1, ((CheckBoxTableSourceWrapperByIndex)table.Table!).CheckedRows);
+            }
+        }
+        finally { app.End(session); }
+
+        void Press(Key key) { app.Keyboard.RaiseKeyDownEvent(key); window.Draw(new DrawContext()); }
+    }
+
     [Fact]
     public async Task RealKeyboardReadsDetailsThenApprovesSourceAndRetentionForTheSamePlan()
     {
@@ -46,8 +90,8 @@ public sealed class UpdateReviewKeyboardTests
             Assert.True(preview.HasFocus);
             Press(Key.F2); Assert.True(view.ShowingTechnicalForTests);
             Press(Key.F2); Assert.False(view.ShowingTechnicalForTests);
-            var review = view.SubViews.OfType<Button>().Single(button => button.Text == "Review update");
-            review.SetFocus(); Assert.True(review.HasFocus); Press(Key.Enter);
+            Assert.Contains(view.SubViews.OfType<Button>(), button => button.Text == "_Review update");
+            Press(new Key('r').WithAlt);
             Assert.Equal(1, prepares); Assert.Equal(0, applies);
             Assert.False(view.ApplyButtonForTests.Enabled);
             Press(Key.F2); Assert.True(view.ShowingTechnicalForTests);

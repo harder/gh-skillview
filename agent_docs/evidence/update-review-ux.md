@@ -61,3 +61,54 @@ This is local UI and isolated Linux mutation evidence. It does not prove native
 Windows/macOS behavior, live upstream compatibility, agent-session reload or
 release availability. PR #78's deferred native checks remain deferred. Persistent
 revision approvals, automatic consolidation and exposure detach remain deferred.
+
+## PR #80 review follow-up
+
+The [first review](https://github.com/harder/gh-skillview/pull/80#issuecomment-6304100364)
+identified stale availability labels, lost mnemonics, misleading final-skip
+guidance after an earlier write, and unwanted focus changes after availability
+checks. The follow-up aligns Changes/loading/footer guidance with Check updates
+and Review update, restores Alt+C/Alt+R and Alt+U for the unpin checkbox, and
+keeps modified keys out of the plain-character shortcut handler. Availability
+checks restore initiating focus; preserving installed content returns to the
+table when it is visible. Final skip now explains the required inventory refresh
+while keeping saved evidence available.
+
+The summary emits the latest outcome once, retains its notice, then gives the
+current plan and recovery guidance priority over bounded earlier batch outcomes.
+Source review again states the safety/authenticity caveat on the checkbox.
+Opening F2 is intentionally not an approval gate: the existing explicit user
+declaration remains the contract, and merely opening a pane cannot establish
+that its contents were reviewed.
+
+The similar-issue check covered modified-key routing, preserve completion,
+pending-refresh evidence, row-dependent pin actions and older keyboard tests.
+Table navigation now reflows the footer only when pin-action visibility changes;
+initial layout uses an explicit ready flag. Regression coverage includes final
+skip with and without an attempted write, renamed Changes guidance, actual
+availability/mnemonic focus and continued table marking, and bounded batch
+outcomes without repeated statuses. The two managed-CI keyboard failures were
+outdated assumptions about the now-hidden drill-in table and technical-first
+preview; their exact-target, comparison and independent-approval assertions now
+run through the summary and F2 views.
+
+Existing native owner/inspection CI failures sampled during review were GitHub
+installation API HTTP 403 rate limits. No native jobs were retried for this UI
+follow-up; these failures do not constitute native-platform verification.
+
+Review-fix validation: **87 focused tests and 9 integration tests passed**.
+Release test/App builds had zero warnings/errors; full-solution format verification
+and whitespace checks passed. A single broader local unit run reported 2,640
+passed, 32 skipped and 13 failed (2,685 total). All 13 failed cases reproduced
+with the same signatures in a separate detached worktree at pre-fix head
+`feee3998fc16e4d9d900d268ab53d2c778568de6`: native placement/source-switch/root
+scan cases rejected the host's `/tmp` mount boundary, and shared-selector/owner
+guard assertions also failed unchanged. They remain unresolved baseline failures,
+outside this UI follow-up. Logs and exact baseline filters are private under
+`/var/tmp/skillview-update-review-ux/review1/validation/`.
+
+An additional 80×24 PTY run used actual Alt+R, F2, ordinary-review skip and
+selected-tag prepare/skip. The source-review caveat fits beside its checkbox;
+no approvals were granted and no apply was requested. All six fixture payload
+hashes remained baseline-identical. The saved-review capture above is refreshed
+from this run; prior apply/result captures retain the earlier native walkthrough.

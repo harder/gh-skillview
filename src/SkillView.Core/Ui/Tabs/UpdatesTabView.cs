@@ -20,10 +20,8 @@ namespace SkillView.Ui.Tabs;
 ///   a     — mark / unmark all visible
 ///   u     — prepare a review for the current physical installation
 ///   U     — queue a separate review for every marked row
-/// Plus the existing Dry-run / Update / Cancel buttons.
-///
-/// Renders RenderResult markdown into the right pane using the existing
-/// static helper on UpdateScreen so the 3 UpdateScreenTests stay green.
+/// Check updates reports availability; Review update prepares a saved review.
+/// F2 switches between a summary and existing technical/recovery evidence.
 internal sealed partial class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
@@ -121,7 +119,7 @@ internal sealed partial class UpdatesTabView : FrameView
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(9),
-            Text = "## Updates\n\n_Loading inventory… press **Dry-run** once loaded to preview pending updates._",
+            Text = "## Updates\n\n_Loading inventory… press **Check updates** once loaded to check availability._",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
 
@@ -141,7 +139,7 @@ internal sealed partial class UpdatesTabView : FrameView
         {
             X = 10,
             Y = Pos.AnchorEnd(5),
-            Text = "_unpin",
+            Text = "_Unpin with update",
         };
 
         _status = new Label
@@ -164,13 +162,13 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _dryRunButton = new SingleRowButton
         {
-            Text = "_Dry-run",
+            Text = "_Check updates",
             X = 0,
             Y = Pos.AnchorEnd(3),
         };
         _updateButton = new SingleRowButton
         {
-            Text = "_Update",
+            Text = "_Review update",
             X = Pos.Right(_dryRunButton) + 2,
             Y = Pos.AnchorEnd(3),
             IsDefault = true,
@@ -193,10 +191,7 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _detailsButton = new SingleRowButton { Text = "Details (F2)", X = 0, Y = Pos.AnchorEnd(3) };
         _reviewHint = new Label { Text = "F2 Details · Tab Move focus · Esc Back", X = 0, Y = Pos.AnchorEnd(1), Width = Dim.Fill(), Height = 1 };
-        _unpinBox.Text = "Unpin with update";
         _detailsButton.Accepting += (_, args) => { args.Handled = true; TogglePreviewDetails(); };
-        _dryRunButton.Text = "Check updates";
-        _updateButton.Text = "Review update";
 
         InitializeReviewControls();
         InitializeLocalReviewControls();
@@ -223,7 +218,7 @@ internal sealed partial class UpdatesTabView : FrameView
             new Shortcut { Title = "a",     HelpText = "Mark all" },
             new Shortcut { Title = "u",     HelpText = "Review row" },
             new Shortcut { Title = "U",     HelpText = "Review marked" },
-            new Shortcut { Title = "d",     HelpText = "Dry-run" },
+            new Shortcut { Title = "d",     HelpText = "Check updates" },
             new Shortcut { Title = "p",     HelpText = "Unpin row" },
             new Shortcut { Key = Key.F2, Title = "F2", HelpText = "Details" },
             new Shortcut { Key = Key.Esc,   Title = "Esc", HelpText = "Back" },
@@ -243,8 +238,11 @@ internal sealed partial class UpdatesTabView : FrameView
         _table.ValueChanged += (_, _) =>
         {
             if (!_loadCancellations.HasActive && !_operationCancellations.HasActive) ShowSelectedPreview();
-            RefreshPresentation();
+            // Row movement only changes the summary and pin-only action.
+            // Reflow the footer only when that action's visibility changes.
+            if (!_reviewPresentationReady || _unpinOnlyButton.Visible != ShowUnpinOnlyAction()) RefreshPresentation();
         };
+        _reviewPresentationReady = true;
         RefreshPresentation();
         Disposing += (_, _) => CancelPendingWork();
     }
@@ -434,6 +432,8 @@ internal sealed partial class UpdatesTabView : FrameView
             TogglePreviewDetails();
             return;
         }
+        // Alt mnemonics and application Ctrl bindings own modified keys.
+        if (key.IsAlt || key.IsCtrl) return;
 
         var rune = key.AsRune.Value;
         if (rune == 'a')
@@ -533,7 +533,7 @@ internal sealed partial class UpdatesTabView : FrameView
         if (targets.Count == 0)
         {
             _status.Text = dryRun
-                ? " pick at least one skill or enable --all to dry-run"
+                ? " mark at least one skill or enable All to Check updates"
                 : " pick at least one skill (Space to mark) or enable --all";
             return;
         }

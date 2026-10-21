@@ -28,7 +28,7 @@ internal sealed partial class UpdatesTabView
         {
             X = 0,
             Y = Pos.AnchorEnd(8),
-            Text = "I reviewed source changes and omissions in F2 Details",
+            Text = "I reviewed F2 source changes/omissions (no safety/authenticity claim)",
             Enabled = false
         };
         _sourceReviewBox.ValueChanged += (_, _) => RefreshReviewControls();
@@ -122,8 +122,9 @@ internal sealed partial class UpdatesTabView
         ResetLocalReview();
         if (_queue.Count > 0) return PrepareNextAsync();
         _queueOptions = null;
-        _status.Text = " review queue complete; saved plans remain available for inspection";
-        ShowPreview("## Review queue complete\n\nSaved evidence remains available in F2 Details. Choose an installation for another review.", _technicalPreview);
+        var next = _inventoryNeedsRefresh ? "Refresh inventory before another review." : "Choose an installation for another review.";
+        _status.Text = " review queue complete; " + next;
+        ShowPreview("## Review queue complete\n\nSaved evidence remains available in F2 Details. " + next, _technicalPreview);
         SetOperationControlsEnabled(true);
         return Task.CompletedTask;
     }
@@ -134,6 +135,7 @@ internal sealed partial class UpdatesTabView
         if (ownership is null) return;
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
+        var initiatingFocus = SubViews.FirstOrDefault(view => view.HasFocus);
         SetBusy(true);
         SetOperationControlsEnabled(false);
         _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…"
@@ -170,7 +172,12 @@ internal sealed partial class UpdatesTabView
                 // Ownership remains held until the queued callback returns.
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
-                if (_preview.Visible) _preview.SetFocus();
+                if (dryRun && _table.Visible)
+                {
+                    if (initiatingFocus is { Visible: true, Enabled: true, CanFocus: true }) initiatingFocus.SetFocus();
+                    else _table.SetFocus();
+                }
+                else if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

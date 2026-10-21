@@ -102,6 +102,82 @@ public sealed partial class ReviewedUpdatesTabTests
     }
 
     [Fact]
+    public async Task SelectionReflowsPinOnlyControlsWhenPinStateChanges()
+    {
+        var target = Target("ordinary"); var pinned = Target("pinned") with { FrontMatter = SkillFrontMatter.Empty with { Pinned = true } };
+        using var view = View([target, pinned], (_, _, _) => throw new InvalidOperationException("No implicit prepare"),
+            (_, _, _) => throw new InvalidOperationException("No implicit apply"),
+            unpin: (_, _, _) => throw new InvalidOperationException("No implicit unpin"));
+        await view.LoadAsync();
+        Assert.False(view.UnpinOnlyButtonForTests.Visible);
+        view.SelectRowForTests(1);
+        Assert.True(view.UnpinOnlyButtonForTests.Visible); Assert.Contains("pinned", view.PreviewTextForTests);
+        view.SelectRowForTests(0);
+        Assert.False(view.UnpinOnlyButtonForTests.Visible); Assert.Contains("ordinary", view.PreviewTextForTests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FinalSkipExplainsWhetherInventoryRefreshIsRequired(bool attemptedWrite)
+    {
+        var first = Target("first"); var second = Target("second"); var captures = 0;
+        using var view = View([first, second], (_, options, _) => Task.FromResult(Result(Review(Assert.Single(options.Targets!)))),
+            (plan, _, _) => Task.FromResult(Result(plan with { Status = "installed" }, attempted: attemptedWrite)),
+            snapshotLoader: _ => { captures++; return Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }); });
+        await view.LoadAsync(); view.MarkRowForTests(0); view.MarkRowForTests(1);
+        await view.RunForTestsAsync(false, true);
+        view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
+        await view.NextReviewForTestsAsync(); // Prepare the second captured target.
+        await view.NextReviewForTestsAsync(); // Skip the final review.
+        var table = view.SubViews.OfType<TableView>().Single();
+        Assert.Equal(!attemptedWrite, table.Visible);
+        Assert.Equal(!attemptedWrite, view.ChooseVersionButtonForTests.Visible);
+        if (attemptedWrite)
+        {
+            Assert.Contains("Refresh inventory before another review", view.PreviewTextForTests);
+            Assert.Contains("Refresh inventory before another review", view.StatusTextForTests);
+            Assert.DoesNotContain("Choose an installation", view.PreviewTextForTests);
+            view.ToggleDetailsForTests();
+            Assert.Contains(Review(second).PlanPath, view.PreviewTextForTests);
+            await view.NextReviewForTestsAsync();
+            Assert.Equal(2, captures); Assert.True(view.ChooseVersionButtonForTests.Visible);
+        }
+        else
+        {
+            Assert.Contains("Choose an installation", view.PreviewTextForTests);
+            Assert.Equal(1, captures);
+        }
+    }
+
+    [Fact]
+    public void AppliedSummaryShowsEachOutcomeOnceAndKeepsItsNoticeAndRecovery()
+    {
+        var target = Target("demo"); var plan = Review(target) with { Status = "installed" };
+        var result = Result(plan, attempted: true) with
+        { Outcomes = [new(target.InstallationId, target.ResolvedPath, "changed", null, null, [], 0, [], "verified files")] };
+        var summary = UpdateReviewPresentation.Result(result, false, false);
+        Assert.Single(summary.Split('\n'), line => line.StartsWith("- **`Outcome`:**", StringComparison.Ordinal));
+        Assert.Single(summary.Split('\n'), line => line.StartsWith("- **`Location`:**", StringComparison.Ordinal));
+        Assert.Contains("changed", summary); Assert.Contains("verified files", summary); Assert.Contains("Undo", summary);
+        Assert.True(summary.IndexOf("Outcome", StringComparison.Ordinal) < summary.IndexOf("Local changes", StringComparison.Ordinal));
+        result = result with { Outcomes = result.Outcomes.Add(new("peer", "/other/demo", "refused", null, null, [], 0, [], "peer notice")) };
+        summary = UpdateReviewPresentation.Result(result, false, false);
+        Assert.Equal(2, summary.Split('\n').Count(line => line.StartsWith("- **`Outcome`:**", StringComparison.Ordinal)));
+        Assert.Contains("/other/demo", summary); Assert.Contains("peer notice", summary);
+        result = result with
+        {
+            Outcomes = System.Collections.Immutable.ImmutableArray.CreateRange(Enumerable.Range(0, 10)
+            .Select(index => new InstallationUpdateOutcome(index.ToString(), "/copies/" + index, "status" + index, null, null, [], 0, [], "notice" + index)))
+        };
+        summary = UpdateReviewPresentation.Result(result, false, false);
+        Assert.Equal(8, summary.Split('\n').Count(line => line.StartsWith("- **`Outcome`:**", StringComparison.Ordinal)));
+        Assert.Contains("status9", summary); Assert.Contains("notice9", summary);
+        Assert.Contains("**`More outcomes`:** `2`", summary);
+        Assert.True(summary.IndexOf("Undo", StringComparison.Ordinal) < summary.IndexOf("status0", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SummaryBoundsAuthoredTextAndDoesNotInferAvailabilityFromEmptyOutput()
     {
         var target = Target("demo") with { Name = "untrusted\n## pretend\u001b[31m", ResolvedPath = new('x', 20_000) };

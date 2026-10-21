@@ -122,6 +122,9 @@ The summary explains the target, revision, affected consumers, local changes and
 retained original. Press **F2** or **Details (F2)** for the existing fingerprints,
 frozen source diffs, complete diagnostics and recovery evidence; F2 returns to
 the summary. Switching views changes neither the candidate nor its approvals.
+In the general Updates list, an availability check returns focus to the control
+that started it, so table navigation and marking can continue. The button
+mnemonics are **Alt+C** for Check updates and **Alt+R** for Review update.
 
 Review controls appear when applicable. Source review and retention remain
 separate declarations: inspect the frozen source changes and omissions in Details,
@@ -137,6 +140,7 @@ After an attempted write, the result and Details stay available. Press
 **Refresh inventory** before starting another review or choosing another version;
 this captures the installed ref again at the selected location. A failed refresh
 can be retried without granting another approval or selecting a same-name copy.
+This also applies when you skip the final batch item after an earlier write.
 
 Cleanup suppression, agent disablement, pinning and migration remain separate:
 suppressed installations still appear for inspection, pins require explicit unpin

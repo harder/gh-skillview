@@ -14,6 +14,16 @@ internal sealed partial class UpdatesTabView
     private bool _showTechnical;
     private bool _singleInstallationView;
     private bool _inventoryNeedsRefresh;
+    private bool _reviewPresentationReady;
+
+    private bool ShowUnpinOnlyAction()
+    {
+        if (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh || _unpinRunner is null) return false;
+        var row = _table.GetSelectedRow();
+        var selected = row >= 0 && row < _skills.Count ? _skills[row] : null;
+        return selected is not null && (selected.Pinned || selected.Revision.PinnedRef is not null
+            || selected.AllOwnershipClaims.Any(owner => owner.PinnedRef is not null));
+    }
 
     private void ShowPreview(string summary, string technical)
     {
@@ -44,7 +54,7 @@ internal sealed partial class UpdatesTabView
 
     private void ShowSelectedPreview()
     {
-        if (_review is not null || _queue.Count > 0 || _choosingVersion) return;
+        if (_review is not null || _queue.Count > 0 || _choosingVersion || _inventoryNeedsRefresh) return;
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) return;
         var target = _skills[row];
@@ -55,7 +65,7 @@ internal sealed partial class UpdatesTabView
     // RefreshReviewControls and the existing saved-update coordinator.
     private void RefreshPresentation()
     {
-        if (_localPanel is null || _detailsButton is null || _statusBar is null) return;
+        if (!_reviewPresentationReady) return;
         var reviewing = _review is not null || _queue.Count > 0 || _inventoryNeedsRefresh;
         var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
         var localActions = _review is { PinPolicy: null } && _localReviewRunner is not null;
@@ -81,11 +91,7 @@ internal sealed partial class UpdatesTabView
         _unpinBox.X = _allBox.Visible ? 10 : 0;
         _hiddenBox.X = Pos.Right(_unpinBox) + 2;
         _dryRunButton.Visible = _updateButton.Visible = _chooseVersionButton.Visible = !reviewing;
-        var selectedRow = _table.GetSelectedRow();
-        var selected = selectedRow >= 0 && selectedRow < _skills.Count ? _skills[selectedRow] : null;
-        var pinned = selected is not null && (selected.Pinned || selected.Revision.PinnedRef is not null
-            || selected.AllOwnershipClaims.Any(owner => owner.PinnedRef is not null));
-        _unpinOnlyButton.Visible = !reviewing && _unpinRunner is not null && pinned;
+        _unpinOnlyButton.Visible = ShowUnpinOnlyAction();
         _sourceReviewBox.Visible = applicable && _review?.SourceReview is not null;
         _retainBox.Visible = _applyButton.Visible = applicable;
         _nextButton.Visible = reviewing;

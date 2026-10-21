@@ -14,7 +14,7 @@
 │• Local changes: 2                                                           ░│
 │• Local change: SKILL.md                                                     ▼│
 │⟦ Preserve installed ⟧ ⟦ Review local ⟧                                       │
-│☐ I reviewed source changes and omissions in F2 Details                       │
+│☐ I reviewed F2 source changes/omissions (no safety/authenticity claim)       │
 │☐ Retain original, including local edits; apply this reviewed plan            │
 │   review required · 0 remaining · choose preserve, local review, or approve  │
 │⟦ Replace reviewed ⟧  ⟦ Next / skip ⟧  ⟦ Details (F2) ⟧                       │
