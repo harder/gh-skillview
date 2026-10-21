@@ -38,11 +38,14 @@ removed by the reviewed replacement; the exact original native objects remain
 retained for undo. New active IDs/timestamps are disclosed.
 
 Before any private writes or gh work, the old address receives a separate native
-placement observation. Windows initial placement capture may restart a maximum
-of four complete walks from the volume root when a held parent's generation
+placement observation. Windows and Unix initial placement capture may restart a maximum
+of four complete walks from the volume/filesystem root when a held parent's generation
 changes during that unfinished read-only observation. Every failed attempt
 releases its handles; no child/evidence is reused and every retry checks
-cancellation. Alias, type and policy refusals are not retryable. A completed
+cancellation. Unix attempts also receive fresh component/link budgets; recursive
+alias expansion stays within that attempt and restarts at the original lexical
+address after parent churn. Named-child/alias identity, type and policy refusals
+are not retryable. A completed
 lease still requires exact fresh-address/anchor comparison; this is not a retry
 of stale approval or a mutation. Shared system-temp ancestor churn in parallel
 tests must not be mistaken for cancellation reaching the payload checkpoint.
