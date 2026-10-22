@@ -10,7 +10,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 
 | Tab / view | What it does | How to open |
 |---|---|---|
-| **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Default landing view. | `1`, click the pill, or `←/→` to cycle |
+| **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Opens when no skills are installed. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
 | **Changes** △ | Maintenance observations grouped by issue and physical installation, including cleanup review and unchecked installations. Enter opens the exact selected target. | `3`, `u`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
@@ -23,11 +23,15 @@ The TUI is organized around three primary tabs in a persistent top header — **
 
 Each tab preserves its own state (filter text, selection, sort, marks) when you switch away and back.
 
+Startup checks the local inventory. If skills are found before you start
+interacting, it opens Installed and focuses the list. Otherwise it keeps the
+current view. From a list, press `/` to focus the Discover search box.
+
 ### Find and install a skill
 
 The main "discover and inspect" loop:
 
-1. Type a search query, and optionally press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
+1. Focus the Discover search box (press `/` from a list), then type a search query. Leave the field and press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
 2. Browse results in the left table; selection drives the detail pane on the right.
 3. Press `S` to cycle a sort (stars ↓ → name ↑ → name ↓ → repo ↑ → off). The active sort column's header shows the direction.
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.

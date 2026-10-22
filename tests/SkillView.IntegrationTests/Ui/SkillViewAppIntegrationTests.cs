@@ -13,6 +13,42 @@ namespace SkillView.IntegrationTests.Ui;
 
 public sealed class SkillViewAppIntegrationTests
 {
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 40)]
+    public async Task RunAsync_DiscoverStartupTypingReachesQueryWithoutFocusShortcut(int width, int height)
+    {
+        SkillViewApp? skillview = null;
+        var checkedInput = false;
+        var options = new AppOptions(
+            InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []);
+        skillview = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), options, () =>
+        {
+            var terminal = Application.Create().Init("ansi");
+            terminal.Driver!.SetScreenSize(width, height);
+            terminal.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+            {
+                Assert.Equal(SkillViewTab.Discover, skillview!.ActiveTabForTests);
+                Assert.True(skillview.QueryFieldForTests!.HasFocus, "Discover should initially focus the query input.");
+                foreach (var character in "focusprobe") terminal.Keyboard.RaiseKeyDownEvent(new Key(character));
+                Assert.Equal("focusprobe", skillview.QueryFieldForTests.Text);
+                Assert.Equal(SkillViewTab.Discover, skillview.ActiveTabForTests);
+                Assert.True(skillview.UserInteractedSinceLaunchForTests);
+                checkedInput = true;
+                terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Q | KeyCode.CtrlMask));
+                return false;
+            });
+            return terminal;
+        }, probeOnRun: false);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var exitCode = await skillview.RunAsync(deadline.Token);
+
+        Assert.True(checkedInput);
+        Assert.False(deadline.IsCancellationRequested);
+        Assert.Equal(ExitCodes.Success, exitCode);
+    }
+
     [Fact]
     public async Task RunAsync_AnsiInstalledList_HandlesRepeatedArrowsBeyondBothEnds()
     {

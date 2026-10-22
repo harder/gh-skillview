@@ -109,12 +109,24 @@ immediately.
 
 ## Key PTY lessons from this repo
 
-### 1. Startup focus is in the query field
+### 1. Wait for startup inventory before judging focus
 
-At startup, plain letters go into the query field. If you want single-letter
-global shortcuts like `d`, `u`, `c`, or `I`, first send `Esc`. `Ctrl+Q` is the
-unconditional quit path and works without leaving the field; plain `q` quits
-only when a top-level read-only view has focus.
+Startup initially paints Discover. When the first inventory contains skills,
+SkillView can automatically open Installed, unless the user has already
+interacted. The first Discover frame and its initial `ready` status do not prove
+that startup inventory has finished. Wait for the environment/inventory result
+and inspect the active view before sending keys.
+
+With an empty inventory, Discover starts with query focus. From the Installed list,
+press `/` to open Discover and focus its query. Typing `f` while the Installed
+list has focus opens its filter; that shortcut is consumed rather than inserted.
+Do not interpret the remaining filter text as a lost Discover query without
+checking which view had focus when the key arrived.
+
+In the Discover query, printable keys enter text. To use single-letter global
+shortcuts like `d`, `u`, `c`, or `I`, first leave the field. `Ctrl+Q` is the
+unconditional quit path and works without leaving it; plain `q` quits only when
+a top-level read-only view has focus.
 
 In a baseline headless PTY, Terminal.Gui can hold a bare Esc byte and combine
 it with the next key as Alt+key, even after a delay. Use Tab to leave the query
@@ -136,8 +148,8 @@ Screen text can mislead because:
 - result tables truncate repo names
 - old frames remain in the PTY buffer
 
-For startup smoke detection, wait for the `Search:` field rather than relying
-on a transient status message.
+For Discover readiness, wait for the `Search:` field after explicitly entering
+Discover. Startup may legitimately settle on Installed instead.
 
 ### 3. Modal screens need unique wait conditions
 
