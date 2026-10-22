@@ -1,0 +1,4 @@
+Git discovery output: '/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535\n'
+Length: 68 characters
+Test stream limit: 64 characters
+Inference: the test truncates Git root discovery before reaching gh listing. Refusal is conservative; not evidence of overwrite.

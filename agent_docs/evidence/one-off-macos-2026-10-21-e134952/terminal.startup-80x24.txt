@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                               │
+│╭┤Search Results├────────────────────────────╮┌┤Details├─────────────────────┐│
+││Search:                                     ││Select a skill to preview.    ││
+││                                            ││                              ││
+││                                            ││                              ││
+││─┬────┬─────────────────────────────────────││                              ││
+││★│Name│Repo                                 ││                              ││
+││─┼────┼─────────────────────────────────────││Enter a query and press Enter ││
+││                                            ││to search.                    ││
+││                                            ││                              ││
+││                                            ││Press f to edit filters.      ││
+││                                            ││Press ? for help and all keys.││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││[f] Filters    [?] Help       ││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   ready — press / to search or F1 for he… ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

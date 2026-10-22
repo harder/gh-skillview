@@ -1,0 +1,288 @@
+18:10:06.345 Info  [startup] SkillView invocation=Standalone dispatch=Tui
+18:10:06.349 Debug [startup] TUI boot time 4ms
+18:10:06.430 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh --version
+18:10:06.581 Debug [subprocess] exit=0 dur=151ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:06.581 Info  [env] gh 2.102.0 at /opt/homebrew/Cellar/gh/2.102.0/bin/gh meets minimum 2.97.0
+18:10:06.581 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh auth status
+18:10:07.323 Debug [subprocess] exit=0 dur=741ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:07.323 Info  [auth] authenticated to github.com as harder
+18:10:07.323 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill --help
+18:10:07.464 Debug [subprocess] exit=0 dur=141ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:07.465 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:10:07.465 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:10:07.495 Debug [subprocess] exit=128 dur=31ms /usr/bin/git
+18:10:07.554 Info  [inventory] scan roots resolved: 1
+18:10:07.563 Info  [inventory] filesystem scan found 2 skill(s) in 9ms
+18:10:07.594 Debug [subprocess] exit=0 dur=129ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:07.594 Info  [inventory] gh skill list returned 2 record(s)
+18:10:07.594 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:10:07.695 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:22.811 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill search gh-skill --json description,namespace,path,repo,skillName,stars
+18:10:26.354 Debug [subprocess] exit=0 dur=3543ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:28.558 Info  [search] results loaded: count=15 rawCount=15 tableFocus=True queryFocus=False
+18:10:38.942 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill search gh-skill --json description,namespace,path,repo,skillName,stars
+18:10:41.017 Debug [subprocess] exit=0 dur=2075ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:41.305 Info  [search] results loaded: count=15 rawCount=15 tableFocus=True queryFocus=False
+18:10:53.308 Info  [preview] Accepted → calling PreviewSelectedAsync
+18:10:53.308 Debug [preview] PreviewSelectedAsync entered: table=True results=15 ghPath=True
+18:10:53.308 Debug [preview] picked: repo=diegosouzapw/awesome-omni-skill skill=gh-skill
+18:10:53.308 Info  [preview] loading diegosouzapw/awesome-omni-skill/gh-skill…
+18:10:53.308 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill preview diegosouzapw/awesome-omni-skill gh-skill
+18:10:57.556 Debug [subprocess] exit=0 dur=4248ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:10:57.556 Debug [preview] PreviewAsync returned: succeeded=True exit=0 bodyLen=23243
+18:11:10.446 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:11:10.446 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:11:10.453 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:11:10.453 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:11:10.503 Debug [subprocess] exit=128 dur=49ms /usr/bin/git
+18:11:10.515 Info  [inventory] scan roots resolved: 1
+18:11:10.528 Info  [inventory] filesystem scan found 2 skill(s) in 13ms
+18:11:10.647 Debug [subprocess] exit=0 dur=194ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:11:10.647 Info  [inventory] gh skill list returned 2 record(s)
+18:11:10.647 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:11:10.751 Debug [subprocess] exit=0 dur=104ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:11:39.137 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:11:39.138 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:11:39.185 Debug [subprocess] exit=128 dur=47ms /usr/bin/git
+18:11:39.199 Info  [inventory] scan roots resolved: 1
+18:11:39.209 Info  [inventory] filesystem scan found 2 skill(s) in 9ms
+18:11:39.297 Debug [subprocess] exit=0 dur=159ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:11:39.297 Info  [inventory] gh skill list returned 2 record(s)
+18:11:39.297 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:11:39.413 Debug [subprocess] exit=0 dur=116ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:14.460 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:12:14.460 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:12:14.568 Debug [subprocess] exit=128 dur=108ms /usr/bin/git
+18:12:14.587 Info  [inventory] scan roots resolved: 1
+18:12:14.600 Info  [inventory] filesystem scan found 2 skill(s) in 12ms
+18:12:14.645 Debug [subprocess] exit=0 dur=185ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:14.646 Info  [inventory] gh skill list returned 2 record(s)
+18:12:14.646 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:12:14.768 Debug [subprocess] exit=0 dur=122ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:32.884 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:12:32.884 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:12:32.918 Debug [subprocess] exit=128 dur=34ms /usr/bin/git
+18:12:32.929 Info  [inventory] scan roots resolved: 1
+18:12:32.940 Info  [inventory] filesystem scan found 2 skill(s) in 10ms
+18:12:33.027 Debug [subprocess] exit=0 dur=143ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:33.027 Info  [inventory] gh skill list returned 2 record(s)
+18:12:33.027 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:12:33.135 Debug [subprocess] exit=0 dur=108ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:36.872 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:12:36.872 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:12:36.908 Debug [subprocess] exit=128 dur=36ms /usr/bin/git
+18:12:36.919 Info  [inventory] scan roots resolved: 1
+18:12:36.928 Info  [inventory] filesystem scan found 2 skill(s) in 9ms
+18:12:37.013 Debug [subprocess] exit=0 dur=141ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:37.013 Info  [inventory] gh skill list returned 2 record(s)
+18:12:37.013 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:12:37.125 Debug [subprocess] exit=0 dur=112ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:37.136 Info  [update.apply] Plan 1a0dd80d7dca4322a7bbb692184047d8: installed; exit 0; attempted=True; reconciliationPartial=False. Manifest: /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replacements/1a0dd80d7dca4322a7bbb692184047d8/plan.json
+18:12:47.776 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:12:47.776 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:12:47.808 Debug [subprocess] exit=128 dur=32ms /usr/bin/git
+18:12:47.821 Info  [inventory] scan roots resolved: 3
+18:12:47.884 Info  [inventory] filesystem scan found 5 skill(s) in 63ms
+18:12:47.916 Debug [subprocess] exit=0 dur=141ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:47.916 Info  [inventory] gh skill list returned 3 record(s)
+18:12:47.917 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:12:48.028 Debug [subprocess] exit=0 dur=112ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:48.028 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:12:48.133 Debug [subprocess] exit=0 dur=104ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:12:48.133 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:12:48.233 Debug [subprocess] exit=0 dur=100ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:22.446 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:13:22.446 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:13:22.490 Debug [subprocess] exit=128 dur=44ms /usr/bin/git
+18:13:22.504 Info  [inventory] scan roots resolved: 3
+18:13:22.560 Info  [inventory] filesystem scan found 5 skill(s) in 55ms
+18:13:22.597 Debug [subprocess] exit=0 dur=151ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:22.597 Info  [inventory] gh skill list returned 3 record(s)
+18:13:22.597 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:13:22.706 Debug [subprocess] exit=0 dur=109ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:22.707 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:13:22.809 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:22.809 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:13:22.908 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:22.956 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/ref/tags/v2.102.0
+18:13:23.445 Debug [subprocess] exit=0 dur=489ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:23.445 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/commits/fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd
+18:13:23.907 Debug [subprocess] exit=0 dur=462ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:23.907 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/trees/a83338918c5283e049302d35e04ae8a01585c950
+18:13:24.438 Debug [subprocess] exit=0 dur=531ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:24.439 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/trees/2f3ae1d0d6786143a59bcc6b013d8e04f259746b
+18:13:24.969 Debug [subprocess] exit=0 dur=530ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:25.546 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com -- repos/cli/cli/git/trees/a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b?recursive=1
+18:13:26.050 Debug [subprocess] exit=0 dur=504ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:26.051 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com --jq .content -- repos/cli/cli/git/blobs/e0db2feaed494bf8f634ee9f386838ab413421e7
+18:13:26.601 Debug [subprocess] exit=0 dur=549ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:26.851 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com -- repos/cli/cli/git/trees/344b0386c6247af40b29df273965105047e329fb?recursive=1
+18:13:27.342 Debug [subprocess] exit=0 dur=491ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:27.342 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com --jq .content -- repos/cli/cli/git/blobs/59f58d325d9772e2b221ce223146d007baffe1d9
+18:13:27.896 Debug [subprocess] exit=0 dur=553ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:37.721 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:13:37.721 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:13:37.764 Debug [subprocess] exit=128 dur=42ms /usr/bin/git
+18:13:37.778 Info  [inventory] scan roots resolved: 3
+18:13:37.831 Info  [inventory] filesystem scan found 5 skill(s) in 52ms
+18:13:37.869 Debug [subprocess] exit=0 dur=147ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:37.869 Info  [inventory] gh skill list returned 3 record(s)
+18:13:37.869 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:13:37.983 Debug [subprocess] exit=0 dur=114ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:37.983 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:13:38.084 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:38.085 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:13:38.184 Debug [subprocess] exit=0 dur=100ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:38.232 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/ref/tags/v2.102.0
+18:13:38.689 Debug [subprocess] exit=0 dur=456ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:38.689 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/commits/fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd
+18:13:39.209 Debug [subprocess] exit=0 dur=521ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:39.210 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/trees/a83338918c5283e049302d35e04ae8a01585c950
+18:13:39.724 Debug [subprocess] exit=0 dur=515ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:39.725 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --include --hostname github.com -- repos/cli/cli/git/trees/2f3ae1d0d6786143a59bcc6b013d8e04f259746b
+18:13:40.236 Debug [subprocess] exit=0 dur=511ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:40.850 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com -- repos/cli/cli/git/trees/a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b?recursive=1
+18:13:41.297 Debug [subprocess] exit=0 dur=447ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:41.298 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com --jq .content -- repos/cli/cli/git/blobs/e0db2feaed494bf8f634ee9f386838ab413421e7
+18:13:41.805 Debug [subprocess] exit=0 dur=507ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:42.065 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com -- repos/cli/cli/git/trees/344b0386c6247af40b29df273965105047e329fb?recursive=1
+18:13:42.583 Debug [subprocess] exit=0 dur=518ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:13:42.583 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh api --hostname github.com --jq .content -- repos/cli/cli/git/blobs/59f58d325d9772e2b221ce223146d007baffe1d9
+18:13:43.114 Debug [subprocess] exit=0 dur=531ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:30.293 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:30.293 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:14:30.334 Debug [subprocess] exit=128 dur=40ms /usr/bin/git
+18:14:30.348 Info  [inventory] scan roots resolved: 3
+18:14:30.398 Info  [inventory] filesystem scan found 5 skill(s) in 50ms
+18:14:30.441 Debug [subprocess] exit=0 dur=148ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:30.441 Info  [inventory] gh skill list returned 3 record(s)
+18:14:30.441 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:14:30.553 Debug [subprocess] exit=0 dur=112ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:30.553 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:14:30.655 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:30.656 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:14:30.755 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:35.170 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:14:35.170 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:35.205 Debug [subprocess] exit=128 dur=35ms /usr/bin/git
+18:14:35.215 Info  [inventory] scan roots resolved: 3
+18:14:35.267 Info  [inventory] filesystem scan found 5 skill(s) in 51ms
+18:14:35.308 Debug [subprocess] exit=0 dur=138ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:35.308 Info  [inventory] gh skill list returned 3 record(s)
+18:14:35.308 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:14:35.426 Debug [subprocess] exit=0 dur=118ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:35.426 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:14:35.530 Debug [subprocess] exit=0 dur=104ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:35.530 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:14:35.629 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:35.667 Info  [update.apply] Plan 1a417670e7624123a288e2ed8aca0a85: installed; exit 0; attempted=True; reconciliationPartial=False. Manifest: /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replacements/1a417670e7624123a288e2ed8aca0a85/plan.json
+18:14:44.560 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:44.560 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:14:44.600 Debug [subprocess] exit=128 dur=40ms /usr/bin/git
+18:14:44.614 Info  [inventory] scan roots resolved: 3
+18:14:44.667 Info  [inventory] filesystem scan found 5 skill(s) in 52ms
+18:14:44.701 Debug [subprocess] exit=0 dur=141ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:44.701 Info  [inventory] gh skill list returned 3 record(s)
+18:14:44.701 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:14:44.812 Debug [subprocess] exit=0 dur=111ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:44.812 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:14:44.914 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:44.915 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:14:45.017 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:46.387 Debug [update.undo] Undo review canceled; retryVisible=True; retryEnabled=True.
+18:14:46.476 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:46.514 Debug [subprocess] exit=128 dur=38ms /usr/bin/git
+18:14:46.526 Info  [inventory] scan roots resolved: 3
+18:14:46.578 Info  [inventory] filesystem scan found 5 skill(s) in 52ms
+18:14:46.579 Info  [inventory] gh skill list returned 3 record(s)
+18:14:49.469 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:49.506 Debug [subprocess] exit=128 dur=36ms /usr/bin/git
+18:14:49.519 Info  [inventory] scan roots resolved: 3
+18:14:49.568 Info  [inventory] filesystem scan found 5 skill(s) in 49ms
+18:14:49.568 Info  [inventory] gh skill list returned 3 record(s)
+18:14:53.943 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:14:53.943 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:14:53.990 Debug [subprocess] exit=128 dur=47ms /usr/bin/git
+18:14:54.006 Info  [inventory] scan roots resolved: 3
+18:14:54.059 Info  [inventory] filesystem scan found 5 skill(s) in 53ms
+18:14:54.096 Debug [subprocess] exit=0 dur=153ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:54.097 Info  [inventory] gh skill list returned 3 record(s)
+18:14:54.097 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:14:54.210 Debug [subprocess] exit=0 dur=113ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:54.210 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:14:54.310 Debug [subprocess] exit=0 dur=101ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:54.311 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:14:54.411 Debug [subprocess] exit=0 dur=100ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:14:54.447 Info  [update.undo] Plan 1a417670e7624123a288e2ed8aca0a85: restored; attempted=True; exit 0. Manifest: /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replacements/1a417670e7624123a288e2ed8aca0a85/plan.json
+18:16:18.071 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:16:18.071 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:16:18.109 Debug [subprocess] exit=128 dur=38ms /usr/bin/git
+18:16:18.122 Info  [inventory] scan roots resolved: 3
+18:16:18.189 Info  [inventory] filesystem scan found 5 skill(s) in 66ms
+18:16:18.216 Debug [subprocess] exit=0 dur=145ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:18.216 Info  [inventory] gh skill list returned 3 record(s)
+18:16:18.216 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:16:18.326 Debug [subprocess] exit=0 dur=109ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:18.326 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:16:18.428 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:18.428 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:16:18.527 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:18.956 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:16:19.008 Debug [subprocess] exit=128 dur=51ms /usr/bin/git
+18:16:19.020 Info  [inventory] scan roots resolved: 3
+18:16:19.071 Info  [inventory] filesystem scan found 5 skill(s) in 50ms
+18:16:19.071 Info  [inventory] gh skill list returned 3 record(s)
+18:16:33.532 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:16:33.532 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:16:33.572 Debug [subprocess] exit=128 dur=40ms /usr/bin/git
+18:16:33.574 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:16:33.590 Info  [inventory] scan roots resolved: 3
+18:16:33.603 Debug [subprocess] exit=128 dur=29ms /usr/bin/git
+18:16:33.616 Info  [inventory] scan roots resolved: 3
+18:16:33.676 Info  [inventory] filesystem scan found 5 skill(s) in 86ms
+18:16:33.677 Debug [subprocess] exit=0 dur=145ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:33.677 Info  [inventory] gh skill list returned 3 record(s)
+18:16:33.677 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:16:33.695 Info  [inventory] filesystem scan found 5 skill(s) in 78ms
+18:16:33.695 Info  [inventory] gh skill list returned 3 record(s)
+18:16:33.775 Debug [subprocess] exit=0 dur=97ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:33.775 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:16:33.874 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:16:33.874 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:16:33.975 Debug [subprocess] exit=0 dur=100ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:18:46.221 Info  [remove] unlinked /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/broken-leftover
+18:18:46.258 Info  [remove] removed /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/empty-leftover: 0 file(s), 1 dir(s)
+18:19:00.554 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:19:00.554 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:19:00.586 Debug [subprocess] exit=128 dur=32ms /usr/bin/git
+18:19:00.596 Info  [inventory] scan roots resolved: 3
+18:19:00.643 Info  [inventory] filesystem scan found 3 skill(s) in 46ms
+18:19:00.702 Debug [subprocess] exit=0 dur=148ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:19:00.702 Info  [inventory] gh skill list returned 3 record(s)
+18:19:00.702 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:19:00.806 Debug [subprocess] exit=0 dur=104ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:19:00.806 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:19:00.912 Debug [subprocess] exit=0 dur=106ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:19:00.912 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:19:01.011 Debug [subprocess] exit=0 dur=99ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:19:23.637 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill search skill-creator --json description,namespace,path,repo,skillName,stars
+18:19:28.913 Debug [subprocess] exit=0 dur=5276ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:19:39.203 Info  [search] results loaded: count=3 rawCount=3 tableFocus=True queryFocus=False
+18:20:00.034 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill install -- composio-community/awesome-codex-skills
+18:20:03.093 Debug [subprocess] exit=0 dur=3059ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:20:03.093 Info  [gh.skill.install.list] composio-community/awesome-codex-skills → 48 skill(s) discovered
+18:20:03.150 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill install --agent universal --scope user -- composio-community/awesome-codex-skills skill-creator
+18:20:06.640 Debug [subprocess] exit=0 dur=3490ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:20:06.782 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+18:20:06.782 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+18:20:06.818 Debug [subprocess] exit=128 dur=36ms /usr/bin/git
+18:20:06.829 Info  [inventory] scan roots resolved: 3
+18:20:06.879 Info  [inventory] filesystem scan found 4 skill(s) in 50ms
+18:20:06.931 Debug [subprocess] exit=0 dur=149ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:20:06.931 Info  [inventory] gh skill list returned 4 record(s)
+18:20:06.931 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.claude/skills
+18:20:07.037 Debug [subprocess] exit=0 dur=106ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:20:07.037 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills
+18:20:07.141 Debug [subprocess] exit=0 dur=104ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh
+18:20:07.142 Debug [subprocess] exec: /opt/homebrew/Cellar/gh/2.102.0/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.codex/skills
+18:20:07.241 Debug [subprocess] exit=0 dur=100ms /opt/homebrew/Cellar/gh/2.102.0/bin/gh

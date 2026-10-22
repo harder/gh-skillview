@@ -1,0 +1,12 @@
+[
+  {
+    "nativeHost": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+    "nativeSha256": "6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476",
+    "gh": "/opt/homebrew/bin/gh",
+    "actualLinkedWorktreeRefused": true,
+    "trackedPayloadAndGitfileUnchanged": true,
+    "worktreeStillUsableAndClean": true,
+    "brokenGitLinkRefusedWithoutFollowing": true,
+    "zeroDeletionAndNoDuplicatedRuntimeErrors": true
+  }
+]

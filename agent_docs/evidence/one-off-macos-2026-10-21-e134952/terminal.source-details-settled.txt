@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│One-time tag choice · no pin · ordinary Update follows latest                                                         │
+│Update results                                                                                                       ▲│
+│                                                                                                                     █│
+│Saved update review                                                                                                  █│
+│Version: 33789149b9def6b66ddf247438a79fac94e22074 -> refs/tags/v2.102.0 Affected recorded agents: universal, codex,  ░│
+│cline, warp Local changes: 2 Apply retains original, including local edits, for undo. A later ordinary Update        ░│
+│follows latest; no pin is created.                                                                                   ░│
+│                                                                                                                     ░│
+│State: planned Installation:                                                                                         ░│
+│/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-ski░│
+│ll Installation ID: 36fe8162ab658af829fa51b6abf81279f64eaa7eac5a24c248d8e568871e7d88 Plan ID:                        ░│
+│1a417670e7624123a288e2ed8aca0a85 Plan fingerprint: 2239853b8333c745ffc1f6f2b9d1b39b91f68892c984dc8d73fa1702e0d2fbef  ░│
+│Manifest:                                                                                                            ░│
+│• Local change: user-extra                                                                                           █│
+│• Shared files: Every consumer of this physical installation is affected.                                            █│
+│• Changed paths: 2                                                                                                   █│
+│• Changed: SKILL.md                                                                                                  █│
+│• Changed: user-extra                                                                                                █│
+│• State: planned                                                                                                     █│
+│• Source review: Inspect frozen source changes and omissions in F2 Details before declaring review. This supplies no █│
+│  authenticity or safety assurance.                                                                                  █│
+│• Undo: The exact original is retained for explicit recovery/undo. Running-agent reload state is unknown.            █│
+│• Location:                                                                                                          █│
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-s░│
+│  ill                                                                                                                ░│
+│• Outcome: review-required                                                                                           ░│
+│• Notice: Exact candidate saved; installed payload unchanged. Review the manifest and explicitly retain the original ░│
+│  before apply.                                                                                                      ▼│
+│⟦ Preserve installed ⟧ ⟦ Review local ⟧                                                                               │
+│☐ I reviewed F2 source changes/omissions (no safety/authenticity claim)                                               │
+│☐ Retain original, including local edits; apply this reviewed plan                                                    │
+│   review required · 0 remaining · choose preserve, local review, or approve Replace reviewed                         │
+│⟦ Replace reviewed ⟧  ⟦ Next / skip ⟧  ⟦ Details (F2) ⟧                                                               │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

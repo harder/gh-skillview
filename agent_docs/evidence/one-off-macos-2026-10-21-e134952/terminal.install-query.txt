@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                                                                       │
+│╭┤Search Results (15)├───────────────────────────────────────────────╮┌┤Details├─────────────────────────────────────┐│
+││Search: ?                                                           ││• Name: gh-skill                              ││
+││                                                                    ││• Repo: diegosouzapw/awesome-omni-skill       ││
+││                                                                    ││• Stars: ★ 64                                 ││
+││───┬────────────────────────────┬───────────────────────────────────││• Path: skills/tools/gh-skill/SKILL.md        ││
+││★  │Name                        │Repo                               ││• Namespace: tools                            ││
+││───┼────────────────────────────┼───────────────────────────────────││                                              ││
+││64 │gh-skill                    │diegosouzapw/awesome-omni-skill    ││                                              ││
+││4  │gh-skill                    │Cogni-AI-OU/cogni-ai-agent-skil…   ││Manage GitHub Projects (V2), Issues, and      ││
+││0  │gh-skill                    │CHINGBOH/code-analysis-suite       ││Boards. View project boards, create/move      ││
+││0  │gh-skill                    │Cogni-AI-OU/cogni-ai-agentic-co…   ││issues, comment, and track status via CLI.    ││
+││0  │gh-skill                    │Noumena-Network/gh                 ││Use when you need to interact with GitHub     ││
+││686│testing-gh-skills           │majiayu000/claude-skill-registry   ││Projects.                                     ││
+││686│testing-gh-skills           │majiayu000/claude-skill-registry   ││                                              ││
+││686│testing-gh-skills-aaddrick-…│majiayu000/claude-skill-registry   ││ ──────────────────────────────────────────── ││
+││686│testing-gh-skills-aaddrick-…│majiayu000/claude-skill-registry   ││                                              ││
+││686│pptx-mattnigh-skills-collec…│majiayu000/claude-skill-registry   ││Selected:                                     ││
+││686│collection-mattnigh-skills-…│majiayu000/claude-skill-registry   ││diegosouzapw/awesome-omni-skill/gh-skill      ││
+││686│nextjs-mattnigh-skills-coll…│majiayu000/claude-skill-registry   ││                                              ││
+││686│notes-mattnigh-skills-colle…│majiayu000/claude-skill-registry   ││Select a skill to preview.                    ││
+││686│executive-mattnigh-skills-c…│majiayu000/claude-skill-registry   ││                                              ││
+││686│nextjs-mattnigh-skills-coll…│majiayu000/claude-skill-registry   ││Press Enter, →, p, or v to load the selected  ││
+││                                                                    ││SKILL.md.                                     ││
+││                                                                    ││                                              ││
+││                                                                    ││                    ord; version=unknown     ░ │
+│                                                                       Delivery:                                    ░ │
+│                                                                       5f76964c936f451f83ea7b93beecaf05c6bc986bd3851░ │
+│                                                                       8c2c1132db289009dbf Affected exposure:       ░ │
+│                                                                       universal:                                   ░ │
+│                                                                       /private/var/folders/f_/4f2gwv6x5qzflv1rg915_░ │
+│                                                                       c740000gp/T/skillview-acceptance-tui-ypfnvige░ │
+│                                                                       /home/.agents/skills/gh-skill; scope=User;   ░ │
+│                                                                       profile=unknown;                             ▼ │
+│   3 skill(s) · 3 location(s) · 1 package(s) · sort package · merged inventory                                        │
+│                                                                                                                      │
+│ Agents UNI CDX CLN WAR      gh 2.102.0 — press '/' to search, 'd' for Doctor   G:Scope  x:Remove  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

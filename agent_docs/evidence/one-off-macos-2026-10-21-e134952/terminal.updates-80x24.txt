@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                │
+│Space marks · c compare/plan row · u review · U marked · p unpin              │
+│                                    Updates                                   │
+│                                                                              │
+│                                    Loading inventory… press Check updates    │
+│                                    once loaded to check availability.        │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│☐ all     ☐ Unpin with update  ☐ Include hidden directories                   │
+│⠙  loading inventory…                                                         │
+│⟦ Details (F2) ⟧                                                              │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                 │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check update│
+│                                                                              │
+│                   preview loaded     c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

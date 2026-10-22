@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                                                                       │
+│╭┤Search Results (3)├────────────────────────────────────────────────╮┌┤Details├─────────────────────────────────────┐│
+││Search: skill-creator                                               ││• Name: skill-creator                         ││
+││                                                                    ││• Repo:                                       ││
+││                                                                    ││  composio-community/awesome-codex-skills     ││
+││─────┬─────────────┬────────────────────────────────────────────────││• Stars: ★ 16983                              ││
+││★    │Name         │Repo                                            ││• Path: skill-creator/SKILL.md                ││
+││─────┼─────────────┼────────────────────────────────────────────────││                                              ││
+││16983│skill-creator│composio-community/awesome-codex-skil…          ││Guide for creating effective skills. This     ││
+││376  │skill-creator│JetBrains/skills                                ││skill should be used when users want to       ││
+││293  │skill-creator│zrt-ai-lab/opencode-skills                      ││create a new skill                            ││
+││                                                                    ││(or update an existing skill) that extends    ││
+││                                                                    ││Codex's capabilities with specialized         ││
+││                                                                    ││knowledge, workflows, or tool integrations.   ││
+││                                                                    ││                                              ││
+││                                                                    ││ ──────────────────────────────────────────── ││
+││                                                                    ││                                              ││
+││                                                                    ││Selected:                                     ││
+││                                                                    ││composio-community/awesome-codex-skills/skill-││
+││                                                                    ││creator                                       ││
+││                                                                    ││                                              ││
+││                                                                    ││Select a skill to pr  ┃ew.                    ││
+││                      ┃ ⠦  installing composio-community/awesome-codex-skills…              ┃                       ││
+││                      ┃                                                                     ┃ to load the selected  ││
+││                      ┃     ⟦► Install ◄⟦ Advanced… ⟧▖  ⟦ Cancel ⟧▖                         ┃                       ││
+││                      ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                       ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││                                              ││
+││                                                                    ││[Enter] Preview    [i] Install    [o] Open    ││
+│╰────────────────────────────────────────────────────────────────────╯└──────────────────────────────────────────────┘│
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor          1/2/3:Tabs  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

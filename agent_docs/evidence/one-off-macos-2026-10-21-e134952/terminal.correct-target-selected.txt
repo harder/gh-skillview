@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Space marks · c compare/plan row · u review · U marked · p unpin                                                      │
+│─┬───────────────┬────────┬────────────────────────── Selected installation                                           │
+│ │Name           │Scope   │Flags                                                                                      │
+│─┼───────────────┼────────┼────────────────────────── • Skill: gh-skill                                               │
+│☐│broken-leftover│User    │-s                         • Location:                                                     │
+│☐│empty-leftover │User    │--                           /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skill│
+│☐│gh-skill       │User    │-s                           view-acceptance-tui-ypfnvige/home/.agents/skills/gh-skill     │
+│☐│gh-skill       │User    │--                         • Recorded ref: 33789149b9def6b66ddf247438a79fac94e22074        │
+│☐│unrelated-skill│User    │--                         • Authored version: unknown                                     │
+│                                                      • Used by: cline, codex, universal, warp                        │
+│                                                      • Source: https://github.com/cli/cli                            │
+│                                                      • Pin: no pin recorded                                          │
+│                                                                                                                      │
+│                                                      Check updates checks availability. Review update prepares one   │
+│                                                      saved candidate. Choose version... requests a Git tag. Nothing  │
+│                                                      is applied on entry.                                            │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ all     ☐ Unpin with update  ☑ Include hidden directories                                                           │
+│   version selection canceled; no candidate prepared                                                                  │
+│⟦ Details (F2) ⟧                                                                                                      │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                                                         │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check updates  d │ Unpin row  p │ F2  Details  F2 │ │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

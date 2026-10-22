@@ -1,0 +1,314 @@
+[
+  {
+    "argv": [
+      "file",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-architecture.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.01,
+    "name": "app-architecture"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--version"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-version.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.76,
+    "name": "app-version"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-static-package-check.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-static-package-check.json"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-static-package-check.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 4.43,
+    "name": "app-static-package-check"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-native-object-evidence.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-native-object-evidence.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-native-object-evidence.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.47,
+    "name": "app-native-object-evidence"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-gitfile-protection.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-gitfile-protection.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-gitfile-protection.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.73,
+    "name": "app-gitfile-protection"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-inventory-filter.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-inventory-filter.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-inventory-filter.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 11.61,
+    "name": "app-inventory-filter"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-managed-discovery.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-managed-discovery.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-managed-discovery.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 7.66,
+    "name": "app-managed-discovery"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-quarantine-undo.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-quarantine-undo.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-quarantine-undo.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 10.72,
+    "name": "app-quarantine-undo"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-revision-update.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-revision-update.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-revision-update.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 62.58,
+    "name": "app-revision-update"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-recorded-replacement.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-recorded-replacement.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-recorded-replacement.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 86.43,
+    "name": "app-recorded-replacement"
+  },
+  {
+    "argv": [
+      "file",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-architecture.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.01,
+    "name": "extension-architecture"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--version"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-version.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.79,
+    "name": "extension-version"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-static-package-check.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-static-package-check.json"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-static-package-check.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 4.25,
+    "name": "extension-static-package-check"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-native-object-evidence.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-native-object-evidence.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-native-object-evidence.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.49,
+    "name": "extension-native-object-evidence"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-gitfile-protection.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-gitfile-protection.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-gitfile-protection.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.79,
+    "name": "extension-gitfile-protection"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-inventory-filter.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-inventory-filter.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-inventory-filter.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 11.65,
+    "name": "extension-inventory-filter"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-managed-discovery.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-managed-discovery.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-managed-discovery.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 7.9,
+    "name": "extension-managed-discovery"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-quarantine-undo.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-quarantine-undo.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-quarantine-undo.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 10.83,
+    "name": "extension-quarantine-undo"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-revision-update.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-revision-update.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-revision-update.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 63.82,
+    "name": "extension-revision-update"
+  },
+  {
+    "argv": [
+      "/opt/homebrew/opt/python@3.15/bin/python3.15",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/agent_docs/evidence/prove-recorded-replacement.py",
+      "--app",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+      "--output",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-recorded-replacement.json",
+      "--gh",
+      "/opt/homebrew/bin/gh"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-recorded-replacement.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 86.3,
+    "name": "extension-recorded-replacement"
+  }
+]

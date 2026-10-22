@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Installed skills                                                              │
+│Filter:                                        name · path · agent · package  │
+│Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV    │
+│review · E loading · K check · R local reimport                               │
+│────────────┬───┬──────────────────┬─────┬──── gh-skill                     ▲ │
+│Name        │Loc│Package           │State│Agen                              █ │
+│────────────┼───┼──────────────────┼─────┼──── Summary                      ░ │
+│gh-skill    │USR│cli/cli           │OK   │UNI                               ░ │
+│unrelated-s…│USR│                  │OK   │UNI  • Path:                      ░ │
+│                                                 /private/var/folders/f_/4f2░ │
+│                                                 wv6x5qzflv1rg915_c740000gp/░ │
+│                                                 /skillview-acceptance-tui-y░ │
+│                                                 fnvige/home/.agents/skills/░ │
+│                                                 h-skill                    ░ │
+│                                                                            ░ │
+│                                               Installation address ID:     ░ │
+│                                               36fe8162ab658af829fa51b6abf81░ │
+│                                               79f64eaa7eac5a24c248d8e568871▼ │
+│   2 skill(s) · 1 location(s) · 1 package(s) · sort location · merged         │
+│                                                                              │
+│ Agents UNI CDX CLN WAR gh 2.102.0 — press '/' to search, 'd' …    Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

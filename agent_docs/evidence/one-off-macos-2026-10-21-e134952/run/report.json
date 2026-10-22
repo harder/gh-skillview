@@ -1,0 +1,236 @@
+{
+  "platform": "macOS-26.7.1-arm64-arm-64bit-Mach-O / Python arm64",
+  "startedUtc": "2026-10-21T22:57:37.372630+00:00",
+  "expectedCommit": "e13495244c73fc4fd6c14d834de03692c5fd29dc",
+  "aot": true,
+  "live": true,
+  "steps": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/git-head.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.15,
+      "name": "git-head"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/git-status.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.09,
+      "name": "git-status"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "--version"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/sdk-version.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.72,
+      "name": "sdk-version"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "--info"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/sdk-info.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.14,
+      "name": "sdk-info"
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/gh",
+        "--version"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/gh-version.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.13,
+      "name": "gh-version"
+    },
+    {
+      "argv": [
+        "/opt/homebrew/bin/gh",
+        "skill",
+        "--help"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/gh-skill-help.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.12,
+      "name": "gh-skill-help"
+    },
+    {
+      "argv": [
+        "git",
+        "log",
+        "--oneline",
+        "v1.0.1..HEAD"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/changes-since-release.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.03,
+      "name": "changes-since-release"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "restore",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "--locked-mode"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/unit-restore.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 1.71,
+      "name": "unit-restore"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "build",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "-c",
+        "Release",
+        "--no-restore"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/unit-build.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 19.56,
+      "name": "unit-build"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.Tests/SkillView.Tests.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "--no-restore"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/unit-tests.log",
+      "status": "failed",
+      "exitCode": 2,
+      "seconds": 227.18,
+      "name": "unit-tests"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "restore",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "--locked-mode"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/integration-restore.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.99,
+      "name": "integration-restore"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "build",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "-c",
+        "Release",
+        "--no-restore"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/integration-build.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 1.0,
+      "name": "integration-build"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "test",
+        "--project",
+        "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "--no-restore"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/integration-tests.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 3.69,
+      "name": "integration-tests"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "restore",
+        "src/SkillView.App/SkillView.App.csproj",
+        "--locked-mode",
+        "-r",
+        "osx-arm64"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/app-restore.log",
+      "status": "failed",
+      "exitCode": 1,
+      "seconds": 0.65,
+      "name": "app-restore"
+    },
+    {
+      "name": "app-proofs",
+      "status": "not-run",
+      "reason": "Product restore/build failed"
+    },
+    {
+      "argv": [
+        "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+        "restore",
+        "src/SkillView.GhExtension/SkillView.GhExtension.csproj",
+        "--locked-mode",
+        "-r",
+        "osx-arm64"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/extension-restore.log",
+      "status": "failed",
+      "exitCode": 1,
+      "seconds": 0.63,
+      "name": "extension-restore"
+    },
+    {
+      "name": "extension-proofs",
+      "status": "not-run",
+      "reason": "Product restore/build failed"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/source-status-after.log",
+      "status": "passed",
+      "exitCode": 0,
+      "seconds": 0.04,
+      "name": "source-status-after"
+    }
+  ],
+  "commit": "e13495244c73fc4fd6c14d834de03692c5fd29dc",
+  "hosts": {},
+  "result": "failed"
+}

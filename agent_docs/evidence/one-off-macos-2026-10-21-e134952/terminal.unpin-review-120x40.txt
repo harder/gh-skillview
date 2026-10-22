@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Review saved change · F2 Details                                                                                      │
+│Review this change                                                                                                    │
+│                                                                                                                      │
+│• Skill: gh-skill                                                                                                     │
+│• Location:                                                                                                           │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-sk│
+│  ill                                                                                                                 │
+│• Affected consumers: cline, codex, universal, warp                                                                   │
+│• Change: Clear the verified pin; keep instructions, extras and source revision.                                      │
+│• Shared files: Every consumer of this physical installation is affected.                                             │
+│• Changed paths: 1                                                                                                    │
+│• Changed: SKILL.md                                                                                                   │
+│• State: planned                                                                                                      │
+│• Undo: The exact original is retained for explicit recovery/undo. Running-agent reload state is unknown.             │
+│• Location:                                                                                                           │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-sk│
+│  ill                                                                                                                 │
+│• Outcome: review-required                                                                                            │
+│• Notice: Pin-only candidate saved. Review all affected consumers and approve retention before applying. Saved plan   │
+│  1a0dd80d7dca4322a7bbb692184047d8; manifest:                                                                         │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replaceme│
+│  nts/1a0dd80d7dca4322a7bbb692184047d8/plan.json. Inspect with unpin-inspect --id 1a0dd80d7dca4322a7bbb692184047d8    │
+│  before recovery or undo.                                                                                            │
+│                                                                                                                      │
+│Review every affected consumer, approve retention of the original, then apply the unpin-only change.                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ Retain original; clear only pin policy for all affected consumers                                                   │
+│   pin-only review required · inspect all consumers, approve retention, then Apply unpin only                         │
+│⟦ Apply unpin only ⟧  ⟦ Next / skip ⟧  ⟦ Details (F2) ⟧                                                               │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

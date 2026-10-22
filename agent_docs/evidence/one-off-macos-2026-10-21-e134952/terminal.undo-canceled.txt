@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Refresh inventory before another review · F2 Details                                                                  │
+│Update result                                                                                                        ▲│
+│                                                                                                                     █│
+│• Outcome: changed                                                                                                   █│
+│• Skill: gh-skill                                                                                                    █│
+│• Location:                                                                                                          █│
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-s█│
+│  ill                                                                                                                █│
+│• Affected consumers: cline, codex, universal, warp                                                                  █│
+│• Ref change: 33789149b9def6b66ddf247438a79fac94e22074 → refs/tags/v2.102.0                                          █│
+│• Change: Replace this copy with the saved candidate; retain the original, including local edits, for undo.          █│
+│• Authored version: unknown → unknown                                                                                █│
+│• Local changes: 2                                                                                                   █│
+│• Local change: SKILL.md                                                                                             █│
+│• Local change: user-extra                                                                                           █│
+│• Shared files: Every consumer of this physical installation is affected.                                            █│
+│• Changed paths: 2                                                                                                   █│
+│• Changed: SKILL.md                                                                                                  █│
+│• Changed: user-extra                                                                                                █│
+│• State: installed                                                                                                   █│
+│• Source review: Inspect frozen source changes and omissions in F2 Details before declaring review. This supplies no █│
+│  authenticity or safety assurance.                                                                                  █│
+│• Undo: The exact original is retained for explicit recovery/undo. Running-agent reload state is unknown.            █│
+│• Notice: Payload and native continuity verified. Retained directories remain available; agent session state is      █│
+│  unknown. Saved plan 1a417670e7624123a288e2ed8aca0a85; manifest:                                                    █│
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replacem█│
+│  nts/1a417670e7624123a288e2ed8aca0a85/plan.json. Inspect with update-inspect --id 1a417670e7624123a288e2ed8aca0a85  █│
+│  before recovery or undo.                                                                                           █│
+│• Diagnostics: Notices are available in F2 Details.                                                                  █│
+│                                                                                                                     ░│
+│Inspect the recorded outcome. F2 Details retains saved-plan and recovery evidence. A later ordinary Update follows   ▼│
+│   undo canceled; installed files unchanged; review undo again or Refresh inventory                                   │
+│⟦ Refresh inventory ⟧  ⟦ Details (F2) ⟧  ⟦ Undo this update... ⟧                                                      │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

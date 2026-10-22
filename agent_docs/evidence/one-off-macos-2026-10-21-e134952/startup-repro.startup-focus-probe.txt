@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Installed skills  filter: ocusprobe                                           │
+│Filter: ocusprobe                              name · path · agent · package  │
+│Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV    │
+│review · E loading · K check · R local reimport                               │
+│────┬───┬───────┬─────┬──────┐                 (no matches)                   │
+│Name│Loc│Package│State│Agents│                                                │
+│────┼───┼───────┼─────┼──────┤                                                │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│   0 of 2 skill(s) · 1 location(s) · 1 package(s) · sort package · merged     │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

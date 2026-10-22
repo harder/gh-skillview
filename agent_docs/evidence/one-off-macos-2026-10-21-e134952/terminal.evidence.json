@@ -1,0 +1,29 @@
+{
+  "fixture": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige",
+  "sizes": [
+    "80x24",
+    "120x40"
+  ],
+  "tag": "v2.102.0",
+  "planId": "1a417670e7624123a288e2ed8aca0a85",
+  "revision": {
+    "source": {
+      "repository": "https://github.com/cli/cli",
+      "ref": "refs/tags/v2.102.0",
+      "commit": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+      "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+      "subpath": "skills/gh-skill"
+    }
+  },
+  "applyNativeManifestMatched": true,
+  "undoPayloadAndRegistryRestored": true,
+  "peerUnchanged": true,
+  "unrelatedUnchanged": true,
+  "sharedLinkUnchanged": true,
+  "cleanup": {
+    "removed": 2,
+    "skipped": 1,
+    "failed": 0
+  },
+  "installedSha256": "2d1961bd4dbd5e3f69d27d1a7ef7b21e353da18c363db9d53b616cf88ef91fc6"
+}

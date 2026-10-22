@@ -1,0 +1,40 @@
+┌┤Cleanup — 4 candidate(s)├────────────────────────────────────────────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                                                                 │
+│─┬───────────┬───────────────┬────────────────────────────────── Broken link                                          │
+│ │Kind       │Name           │Path                                                                                    │
+│─┼───────────┼───────────────┼────────────────────────────────── Location:                                            │
+│☐│broken-link│broken-leftover│…/.agents/skills/broken-leftov…    /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│☐│compare    │gh-skill       │…/.agents/skills/gh-skill          p/T/skillview-acceptance-tui-ypfnvige/home/.agents/sk│
+│☐│compare    │gh-skill       │…/.claude/skills/gh-skill          ills/broken-leftover                                 │
+│☐│empty-dir  │empty-leftover │…/.agents/skills/empty-leftover                                                         │
+│                                                                 Why: This link's target could not be found.          │
+│                                                                                                                      │
+│                                                                 Next: Space selects; Enter reviews removal.          │
+│                                                                                                                      │
+│                                                                 Changes: Removes only this link. Target files stay.  │
+│                                                                                                                      │
+│                                                                 Undo: Deletion has no automatic undo.                │
+│                                                                                                                      │
+│                                                                 Affected agent: universal · User ·                   │
+│                                                                 /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│                                                                 p/T/skillview-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Opening review changes nothing.                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   4 candidate(s)                                                                                                     │
+│Select Space│Review Enter│Details F2│Ignore i│Export x│Back Esc                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

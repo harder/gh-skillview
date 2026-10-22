@@ -1,0 +1,18 @@
+Running tests from /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/bin/Release/net10.0/SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.GhSharedLockGuardTests.NamespacedAliasesAndTruncatedListingCannotBypassCollisionGuard(requested: null, truncate: True) (171ms)
+  from /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/bin/Release/net10.0/SkillView.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "Git project-root discovery is incomplete; no desti"···
+  Not found: "truncated"
+    at SkillView.Tests.Maintenance.GhSharedLockGuardTests.NamespacedAliasesAndTruncatedListingCannotBypassCollisionGuard(String requested, Boolean truncate) in /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/Maintenance/GhSharedLockGuardTests.cs:128
+    --- End of stack trace from previous location ---
+/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/bin/Release/net10.0/SkillView.Tests.dll (net10.0|arm64) failed with 1 error(s) (1s 893ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 4
+  failed: 1
+  succeeded: 3
+  skipped: 0
+  duration: 2s 066ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

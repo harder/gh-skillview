@@ -1,0 +1,49 @@
+.NET SDK:
+ Version:           10.0.402
+ Commit:            a8dd0577c5
+ Workload version:  10.0.400-manifests.da132f47
+ MSBuild version:   18.9.15+a8dd0577c
+
+Runtime Environment:
+ OS Name:     Mac OS X
+ OS Version:  26.7
+ OS Platform: Darwin
+ RID:         osx-arm64
+ Base Path:   /Users/kharder/source/rc-tests/sdk-10.0.402-arm64/sdk/10.0.402/
+
+.NET workloads installed:
+There are no installed workloads to display.
+Configured to use workload sets when installing new manifests.
+No workload sets are installed. Run "dotnet workload restore" to install a workload set.
+
+Host:
+  Version:      10.0.13
+  Architecture: arm64
+  Commit:       4099f83977
+
+.NET SDKs installed:
+  10.0.402 [/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/sdk]
+
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 10.0.13 [/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/shared/Microsoft.AspNetCore.App]
+  Microsoft.NETCore.App 10.0.13 [/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/shared/Microsoft.NETCore.App]
+
+Other architectures found:
+  None
+
+Environment variables:
+  DOTNET_CLI_HOME                          [/Users/kharder/source/rc-tests/acceptance-e134952-macos/run/dotnet-home]
+  DOTNET_CLI_TELEMETRY_OPTOUT              [1]
+  DOTNET_CLI_UI_LANGUAGE                   [en-US]
+  DOTNET_NOLOGO                            [1]
+  DOTNET_ROOT                              [/Users/kharder/source/rc-tests/sdk-10.0.402-arm64]
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE        [1]
+
+global.json file:
+  /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/global.json
+
+Learn more:
+  https://aka.ms/dotnet/info
+
+Download .NET:
+  https://aka.ms/dotnet/download

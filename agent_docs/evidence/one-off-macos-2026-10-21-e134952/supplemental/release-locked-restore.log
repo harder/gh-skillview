@@ -1,0 +1,7 @@
+  Determining projects to restore...
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj (in 626 ms).
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/src/SkillView.Core/SkillView.Core.csproj (in 626 ms).
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/src/SkillView.GhExtension/SkillView.GhExtension.csproj (in 626 ms).
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/src/SkillView.App/SkillView.App.csproj (in 626 ms).
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj (in 640 ms).
+  Restored /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/SkillView.Tests.csproj (in 640 ms).

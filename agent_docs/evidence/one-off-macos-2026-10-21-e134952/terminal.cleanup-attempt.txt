@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Space marks · c compare/plan row · u review · U marked · p unpin                                                      │
+│─┬───────────────┬────────┬────────────────────────── Selected installation                                           │
+│ │Name           │Scope   │Flags                                                                                      │
+│─┼───────────────┼────────┼────────────────────────── • Skill: broken-leftover                                        │
+│☑│broken-leftover│User    │-s                         • Location:                                                     │
+│☐│empty-leftover │User    │--                           /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skill│
+│☐│gh-skill       │User    │-s                           view-acceptance-tui-ypfnvige/home/.agents/skills/broken-leftov│
+│☐│gh-skill       │User    │--                           er                                                            │
+│☐│unrelated-skill│User    │--                         • Recorded ref: unknown                                         │
+│                                                      • Authored version: unknown                                     │
+│                                                      • Used by: universal                                            │
+│                                                      • Source: unknown                                               │
+│                                                      • Pin: no pin recorded                                          │
+│                                                                                                                      │
+│                                                      Check updates checks availability. Review update prepares one   │
+│                                                      saved candidate. Choose version... requests a Git tag. Nothing  │
+│                                                      is applied on entry.                                            │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ all     ☐ Unpin with update  ☑ Include hidden directories                                                           │
+│   5 installed skill(s) — Space to toggle, U to review marked                                                         │
+│⟦ Details (F2) ⟧                                                                                                      │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                                                         │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check updates  d │ Unpin row  p │ F2  Details  F2 │ │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

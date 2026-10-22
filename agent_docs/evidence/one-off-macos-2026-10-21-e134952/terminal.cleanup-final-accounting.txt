@@ -1,0 +1,40 @@
+┌┤Cleanup — 4 candidate(s)├────────────────────────────────────────────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                                                                 │
+│─┬───────────┬───────────────┬────────────────────────────────── Multiple copies                                      │
+│ │Kind       │Name           │Path                                                                                    │
+│─┼───────────┼───────────────┼────────────────────────────────── Location:                                            │
+│☑│broken-link│broken-leftover│…/.agents/skills/broken-leftov…    /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│☑│compare    │gh-skill       │…/.agents/skills/gh-skill          p/T/skillview-acceptance-tui-ypfnvige/home/.agents/sk│
+│☐│compare    │gh-skill       │…/.claude/skills/gh-skill          ills/gh-skill                                        │
+│☑│empty-dir  │empty-leftover │…/.agents/skills/empty-leftover                                                         │
+│                                                                 Why: Other copies use this name; compare their       │
+│                                                                 sources and versions.                                │
+│                                                                                                                      │
+│                                                                 Next: Inspect the details and compare or repair this │
+│                                                                 copy.                                                │
+│                                                                                                                      │
+│                                                                 Changes: Inspection only; automatic removal is       │
+│                                                                 unavailable.                                         │
+│                                                                                                                      │
+│                                                                 Undo: Inspection changes nothing.                    │
+│                                                                                                                      │
+│                                                                 Affected agent: universal · User ·                   │
+│                                                                 /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│                                                                 p/T/skillview-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Affected agent: codex · User ·                       │
+│                                                                 /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│                                                                 p/T/skillview-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Affected agent: codex · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: cline · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: warp · User                          │
+│                                                                                                                      │
+│                                                                 Opening review changes nothing.                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   removed 2, skipped 1, failed 0. Esc returns.                                                                       │
+│Select Space│Review Enter│Details F2│Ignore i│Export x│Back Esc                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

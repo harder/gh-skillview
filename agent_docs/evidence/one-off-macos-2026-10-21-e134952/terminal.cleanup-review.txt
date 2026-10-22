@@ -1,0 +1,40 @@
+┌┤Cleanup — 4 candidate(s)├────────────────────────────────────────────────────────────────────────────────────────────┐
+│Space Select · Enter Review · F2 Details · Tab Scroll                                                                 │
+│─┬───┏┥Review cleanup removal┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓      │
+│ │Kin┃Review 3 cleanup item(s)                                                                                ▲┃      │
+│─┼───┃                                                                                                        █┃      │
+│☑│bro┃Cancel keeps all files. Deletion has no automatic undo.                                                 █┃40000g│
+│☑│com┃                                                                                                        █┃nts/sk│
+│☐│com┃• Broken link: 1                                                                                        █┃      │
+│☑│emp┃• Empty directory: 1                                                                                    █┃      │
+│     ┃• Multiple copies: 1                                                                                    █┃      │
+│     ┃                                                                                                        ░┃      │
+│     ┃Issue: Broken link                                                                                      ░┃      │
+│     ┃                                                                                                        ░┃ this │
+│     ┃Location:                                                                                               ░┃      │
+│     ┃/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/░┃      │
+│     ┃skills/broken-leftover                                                                                  ░┃      │
+│     ┃                                                                                                        ░┃      │
+│     ┃Changes: Removes only this link. Target files stay.                                                     ░┃      │
+│     ┃                                                                                                        ░┃      │
+│     ┃Affected agent: universal                                                                               ░┃      │
+│     ┃                                                                                                        ░┃      │
+│     ┃Affected location:                                                                                      ░┃40000g│
+│     ┃/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/░┃      │
+│     ┃skills/broken-leftover                                                                                  ░┃      │
+│     ┃                                                                                                        ░┃      │
+│     ┃Affected scope: User                                                                                    ░┃40000g│
+│     ┃                                                                     iew-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Affected agent: codex · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: cline · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: warp · User                          │
+│                                                                                                                      │
+│                                                                 Opening review changes nothing.                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   4 candidate(s)                                                                                                     │
+│Select Space│Review Enter│Details F2│Ignore i│Export x│Back Esc                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

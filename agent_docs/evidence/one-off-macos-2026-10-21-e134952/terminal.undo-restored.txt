@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Refresh inventory before another review · F2 Details                                                                  │
+│Original restored                                                                                                     │
+│                                                                                                                      │
+│• Outcome: restored                                                                                                   │
+│• Location:                                                                                                           │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-sk│
+│  ill                                                                                                                 │
+│• Recorded consumers: cline, codex, universal, warp                                                                   │
+│• Restore ref: 33789149b9def6b66ddf247438a79fac94e22074                                                               │
+│• Restore authored version: unknown                                                                                   │
+│• Current disk state: installed                                                                                       │
+│                                                                                                                      │
+│Restore the exact retained original, including its local edits and extras. Every consumer of this physical            │
+│installation is affected. Changes since the update refuse undo. Cancel leaves installed files unchanged. Agent reload │
+│state remains unknown.                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ Restore the retained original for every shown consumer                                                              │
+│⠧  undoing the reviewed update…                                                                                       │
+│⟦ Undo update ⟧  ⟦ Cancel undo ⟧  ⟦ Details (F2) ⟧                                                                    │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

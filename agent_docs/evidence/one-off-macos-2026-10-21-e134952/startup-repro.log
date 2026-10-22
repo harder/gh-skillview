@@ -1,0 +1,52 @@
+PRIVATE_FIXTURE=/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-vze71ric
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                               │
+│╭┤Search Results├────────────────────────────╮┌┤Details├─────────────────────┐│
+││Search:                                     ││Select a skill to preview.    ││
+││                                            ││                              ││
+││                                            ││                              ││
+││─┬────┬─────────────────────────────────────││                              ││
+││★│Name│Repo                                 ││                              ││
+││─┼────┼─────────────────────────────────────││Enter a query and press Enter ││
+││                                            ││to search.                    ││
+││                                            ││                              ││
+││                                            ││Press f to edit filters.      ││
+││                                            ││Press ? for help and all keys.││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││                              ││
+││                                            ││[f] Filters    [?] Help       ││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   ready — press / to search or F1 for he… ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Installed skills  filter: ocusprobe                                           │
+│Filter: ocusprobe                              name · path · agent · package  │
+│Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV    │
+│review · E loading · K check · R local reimport                               │
+│────┬───┬───────┬─────┬──────┐                 (no matches)                   │
+│Name│Loc│Package│State│Agents│                                                │
+│────┼───┼───────┼─────┼──────┤                                                │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│   0 of 2 skill(s) · 1 location(s) · 1 package(s) · sort package · merged     │
+│                                                                              │
+│                   gh 2.102.0 — press '/' to search, 'd' … ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘
+STARTUP_QUERY_FOCUS=False
+CTRL_Q_EXIT=0
+TUI_EXIT=0

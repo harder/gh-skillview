@@ -1,0 +1,8 @@
+  SkillView.Core -> /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/src/SkillView.Core/bin/Release/net10.0/SkillView.Core.dll
+  SkillView.IntegrationTests -> /Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.IntegrationTests/bin/Release/net10.0/SkillView.IntegrationTests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.85

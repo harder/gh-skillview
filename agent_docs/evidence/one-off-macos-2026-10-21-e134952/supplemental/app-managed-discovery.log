@@ -1,0 +1,52 @@
+[
+  {
+    "nativeHost": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+    "nativeSha256": "6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476",
+    "gh": "gh version 2.102.0 (2026-09-30)",
+    "builtinsAndAllCachedVersionsObserved": true,
+    "activeLoadingNotInferred": true,
+    "protectedNativeObjectsBytesModesUnchanged": true,
+    "managedMutationsRefused": true,
+    "unrelatedNamedLocalImportSucceeded": true,
+    "mutableAllSetRefused": true,
+    "networkProxiesBlocked": true,
+    "fixtures": [
+      {
+        "command": "list",
+        "exitCode": 0
+      },
+      {
+        "command": "doctor",
+        "exitCode": 0
+      },
+      {
+        "command": "remove",
+        "exitCode": 1
+      },
+      {
+        "command": "remove",
+        "exitCode": 1
+      },
+      {
+        "command": "quarantine",
+        "exitCode": 1
+      },
+      {
+        "command": "update-plan",
+        "exitCode": 1
+      },
+      {
+        "command": "install",
+        "exitCode": 10
+      },
+      {
+        "command": "install",
+        "exitCode": 10
+      },
+      {
+        "command": "install",
+        "exitCode": 0
+      }
+    ]
+  }
+]

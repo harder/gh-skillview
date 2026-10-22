@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                │
+│Space marks · c compare/plan row · u review · U marked · p unpin              │
+│─┬───────────────┬────────┬──────── Selected installation                    ▲│
+│ │Name           │Scope   │Flags                                             █│
+│─┼───────────────┼────────┼──────── • Skill: gh-skill                        █│
+│☐│gh-skill       │User    │p-       • Location:                              █│
+│☐│unrelated-skill│User    │--         /private/var/folders/f_/4f2gwv6x5qzflv1█│
+│                                      g915_c740000gp/T/skillview-acceptance-t█│
+│                                      i-ypfnvige/home/.agents/skills/gh-skill█│
+│                                    • Recorded ref:                          ░│
+│                                      33789149b9def6b66ddf247438a79fac94e2207░│
+│                                    • Authored version: unknown              ░│
+│                                    • Used by: cline, codex, universal, warp ░│
+│                                    • Source: https://github.com/cli/cli     ▼│
+│☐ all     ☐ Unpin with update  ☐ Include hidden directories                   │
+│   2 installed skill(s) — Space to toggle, U to review marked                 │
+│⟦ Plan unpin only ⟧  ⟦ Details (F2) ⟧                                         │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                 │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check update│
+│                                                                              │
+│                   preview loaded     c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

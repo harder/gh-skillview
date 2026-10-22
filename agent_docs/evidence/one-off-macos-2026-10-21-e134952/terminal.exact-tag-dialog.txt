@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│   ┏┥Choose version┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓s   │
+│Rev┃Installation: gh-skill                                                                                       ┃    │
+│Spa┃                                                                                                             ┃    │
+│─┬─┃Location:                                                                                                    ┃    │
+│ │N┃/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skill┃    │
+│─┼─┃s/gh-skill                                                                                                   ┃    │
+│☐│b┃                                                                                                             ┃    │
+│☐│e┃Repository: https://github.com/cli/cli                                                                       ┃kill│
+│☐│g┃                                                                                                             ┃    │
+│☐│g┃Current ref: 33789149b9def6b66ddf247438a79fac94e22074                                                        ┃    │
+│☐│u┃                                                                                                             ┃    │
+│   ┃Skill subpath: skills/gh-skill                                                                               ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃e   │
+│   ┃                                                                                                             ┃ng  │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃Git tag:                                                                                                     ┃    │
+│   ┃Example: v1.2.3. Tags only; branches and raw commits are excluded.                                           ┃    │
+│   ┃One-time tag choice · no pin · ordinary Update follows latest                                                ┃    │
+│☐ a┃All consumers of this physical installation are affected.                                                    ┃    │
+│   ┃Pins require a separate reviewed unpin before choosing a tag.                                                ┃    │
+│⟦ D┃Enter prepares review; Esc cancels. Nothing is applied.                                                      ┃    │
+│⟦ C┃⟦ Cancel ⟧  ⟦► Prepare tag ◄⟧                                                                                ┃    │
+│ To┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛2 │ │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

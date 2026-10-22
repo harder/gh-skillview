@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Installed skills                                                                                                      │
+│Filter:                                                                name · path · agent · package                  │
+│Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check · R local     │
+│reimport                                                                                                              │
+│───────────────────────┬───┬────────────────────────────┬─────┬─────┐  gh-skill                                     ▲ │
+│Name                   │Loc│Package                     │State│Agen…│                                               █ │
+│───────────────────────┼───┼────────────────────────────┼─────┼─────┤  Summary                                      █ │
+│gh-skill               │USR│cli/cli                     │SYM  │UNI …│                                               █ │
+│broken-leftover        │USR│                            │REV  │UNI  │  • Path:                                      █ │
+│empty-leftover         │USR│                            │REV  │UNI  │    /private/var/folders/f_/4f2gwv6x5qzflv1rg91█ │
+│gh-skill               │USR│                            │OK   │CLD  │    5_c740000gp/T/skillview-acceptance-tui-ypfn░ │
+│unrelated-skill        │USR│                            │OK   │UNI …│    vige/home/.agents/skills/gh-skill          ░ │
+│                                                                                                                    ░ │
+│                                                                       Installation address ID:                     ░ │
+│                                                                       36fe8162ab658af8                               │
+│                                                                                                                      │
+│                                                                 Undo: Inspection changes nothing.                    │
+│                                                                                                                      │
+│                                                                 Affected agent: universal · User ·                   │
+│                                                                 /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│                                                                 p/T/skillview-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Affected agent: codex · User ·                       │
+│                                                                 /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000g│
+│                                                                 p/T/skillview-acceptance-tui-ypfnvige/home           │
+│                                                                                                                      │
+│                                                                 Affected agent: codex · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: cline · User                         │
+│                                                                                                                      │
+│                                                                 Affected agent: warp · User                          │
+│                                                                                                                      │
+│                                                                 Opening review changes nothing.                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   removed 2, skipped 1, failed 0. Esc returns.                                                                       │
+│Select Space│Review Enter│Details F2│Ignore i│Export x│Back Esc                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

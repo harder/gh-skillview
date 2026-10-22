@@ -1,0 +1,44 @@
+[
+  {
+    "host": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension/gh-skillview",
+    "gh": "gh version 2.102.0 (2026-09-30)",
+    "fixtures": [
+      {
+        "namespaced": false,
+        "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+        "approvedRevision": {
+          "repository": "https://github.com/cli/cli",
+          "ref": "refs/tags/v2.103.0",
+          "commit": "7948e8056e45ac3c729b829e0eafe2d0797a95c6",
+          "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+          "subpath": "skills/gh-skill"
+        },
+        "explicitUnpinVerified": true,
+        "localChangesReviewedAndOriginalRestored": true,
+        "approvedNativeStagePromoted": true,
+        "originalNativeDirectoryRestored": true,
+        "registryBytesUnchanged": true,
+        "unrelatedSameNameUnchanged": true,
+        "processKillRestartRecoveryAndUndo": true
+      },
+      {
+        "namespaced": true,
+        "oldCommit": "33789149b9def6b66ddf247438a79fac94e22074",
+        "approvedRevision": {
+          "repository": "https://github.com/cli/cli",
+          "ref": "refs/tags/v2.103.0",
+          "commit": "7948e8056e45ac3c729b829e0eafe2d0797a95c6",
+          "tree": "a209a7ed2e72622b245a6bcb2dc2711a2ea5fb6b",
+          "subpath": "skills/gh-skill"
+        },
+        "explicitUnpinVerified": true,
+        "localChangesReviewedAndOriginalRestored": true,
+        "approvedNativeStagePromoted": true,
+        "originalNativeDirectoryRestored": true,
+        "registryBytesUnchanged": true,
+        "unrelatedSameNameUnchanged": true,
+        "processKillRestartRecoveryAndUndo": true
+      }
+    ]
+  }
+]

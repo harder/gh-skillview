@@ -1,0 +1,103 @@
+[
+  {
+    "nativeHost": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+    "nativeSha256": "6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476",
+    "gh": "gh version 2.102.0 (2026-09-30)",
+    "onePhysicalInstallation": true,
+    "directLinkAncestorAndProfileExposuresRetained": true,
+    "oppositeScopeAgentCombinationsExcluded": true,
+    "allConsumerObservationsRetained": true,
+    "installedNativeObjectsAndBytesUnchanged": true,
+    "networkProxiesBlocked": true,
+    "fixtures": [
+      {
+        "scope": null,
+        "agent": null,
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "user",
+        "agent": "codex",
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "project",
+        "agent": "claude",
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "project",
+        "agent": "claude-code",
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "user",
+        "agent": "claude-code",
+        "expectedRows": 0,
+        "actualRows": 0,
+        "exitCode": 20,
+        "selectedInstallationId": null
+      },
+      {
+        "scope": "project",
+        "agent": "codex",
+        "expectedRows": 0,
+        "actualRows": 0,
+        "exitCode": 20,
+        "selectedInstallationId": null
+      },
+      {
+        "scope": "user",
+        "agent": null,
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": null,
+        "agent": "codex",
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": null,
+        "agent": "claude",
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "custom",
+        "agent": null,
+        "expectedRows": 1,
+        "actualRows": 1,
+        "exitCode": 0,
+        "selectedInstallationId": "81b456cd4e455eb14259417fdb9574dc5f3341993df143d24fa2f86ae707f8ce"
+      },
+      {
+        "scope": "custom",
+        "agent": "codex",
+        "expectedRows": 0,
+        "actualRows": 0,
+        "exitCode": 20,
+        "selectedInstallationId": null
+      }
+    ]
+  }
+]

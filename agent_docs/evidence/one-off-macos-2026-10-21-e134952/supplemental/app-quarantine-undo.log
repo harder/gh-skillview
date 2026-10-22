@@ -1,0 +1,25 @@
+[
+  {
+    "nativeHost": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+    "nativeSha256": "6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476",
+    "gh": "/opt/homebrew/bin/gh",
+    "previewReadOnly": true,
+    "staleReviewRefusedBeforeState": true,
+    "originalDirectoryIdentityRetained": true,
+    "payloadBytesModesLinksAndEmptyDirectoriesPreserved": true,
+    "undoPreviewReadOnly": true,
+    "undoRestoredOriginalDirectory": true,
+    "repeatedUndoVerifiedNoOp": true,
+    "occupiedRestorePathPreserved": true,
+    "undoFailurePreservesRequestedOperation": true,
+    "completeJournalHistory": true,
+    "securityIsolationClaimed": false,
+    "archiveExtractionUsed": false,
+    "subtreeQuarantineConsumerRefused": true,
+    "danglingUndoDestinationRefused": true,
+    "subtreeUndoConsumerRefused": true,
+    "outwardNestedRootRefused": true,
+    "emptyNestedRootRefused": true,
+    "outwardTrailingRootRefused": true
+  }
+]

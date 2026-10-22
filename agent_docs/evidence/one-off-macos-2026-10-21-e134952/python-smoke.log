@@ -1,0 +1,16 @@
+test_command_failure_keeps_exit_status_and_log (test_test_once.TestOnceTests.test_command_failure_keeps_exit_status_and_log) ... ok
+test_environment_is_private_and_parent_is_unchanged (test_test_once.TestOnceTests.test_environment_is_private_and_parent_is_unchanged) ... ok
+test_fixture_symlink_refusal_is_an_explicit_limitation (test_test_once.TestOnceTests.test_fixture_symlink_refusal_is_an_explicit_limitation) ... ok
+test_interruption_keeps_a_step_result_after_owned_tree_cleanup (test_test_once.TestOnceTests.test_interruption_keeps_a_step_result_after_owned_tree_cleanup) ... ok
+test_results_cannot_write_through_an_alias_into_the_checkout (test_test_once.TestOnceTests.test_results_cannot_write_through_an_alias_into_the_checkout) ... ok
+test_timeout_stops_the_owned_descendant_before_it_writes (test_test_once.TestOnceTests.test_timeout_stops_the_owned_descendant_before_it_writes) ... ok
+test_wrong_commit_blocks_before_sdk_or_product_commands (test_test_once.TestOnceTests.test_wrong_commit_blocks_before_sdk_or_product_commands) ... Results: /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/tmphavktjgo/results
+git-head: starting
+git-head: passed (0.39s)
+Result: blocked; report: /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/tmphavktjgo/results/REPORT.md
+ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.474s
+
+OK

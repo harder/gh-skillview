@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Refresh inventory before another review · F2 Details                                                                  │
+│Update result                                                                                                         │
+│                                                                                                                      │
+│• Outcome: changed                                                                                                    │
+│• Skill: gh-skill                                                                                                     │
+│• Location:                                                                                                           │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-sk│
+│  ill                                                                                                                 │
+│• Affected consumers: cline, codex, universal, warp                                                                   │
+│• Change: Clear the verified pin; keep instructions, extras and source revision.                                      │
+│• Shared files: Every consumer of this physical installation is affected.                                             │
+│• Changed paths: 1                                                                                                    │
+│• Changed: SKILL.md                                                                                                   │
+│• State: installed                                                                                                    │
+│• Undo: The exact original is retained for explicit recovery/undo. Running-agent reload state is unknown.             │
+│• Notice: Payload and native continuity verified. Retained directories remain available; agent session state is       │
+│  unknown. Saved plan 1a0dd80d7dca4322a7bbb692184047d8; manifest:                                                     │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replaceme│
+│  nts/1a0dd80d7dca4322a7bbb692184047d8/plan.json. Inspect with unpin-inspect --id 1a0dd80d7dca4322a7bbb692184047d8    │
+│  before recovery or undo.                                                                                            │
+│                                                                                                                      │
+│Inspect the recorded outcome. F2 Details retains saved-plan and recovery evidence.                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   changed · no remaining items · Refresh inventory before another review                                             │
+│⟦ Refresh inventory ⟧  ⟦ Details (F2) ⟧                                                                               │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,99 @@
+Python 3.15.0 (main, Oct  9 2026, 11:16:41) [Clang 21.0.0 (clang-2100.3.34.2)]
+Process architecture: arm64
+TERM=dumb
+
+$ sw_vers
+ProductName:		macOS
+ProductVersion:		26.7.1
+BuildVersion:		25G241
+
+$ uname -a
+Darwin R57TTQ0QQQ 25.6.0 Darwin Kernel Version 25.6.0: Tue Aug 18 17:49:13 PDT 2026; root:xnu-12377.161.15.700.19~2/RELEASE_ARM64_T6000 arm64
+
+$ sysctl -n hw.model hw.machine hw.optional.arm64 sysctl.proc_translated
+MacBookPro18,2
+arm64
+1
+0
+
+$ system_profiler SPHardwareDataType
+2026-10-21 17:56:48.564 system_profiler[60913:6570348] hw.cpufamily: 0x1b588bb3
+Hardware:
+
+    Hardware Overview:
+
+      Model Name: MacBook Pro
+      Model Identifier: MacBookPro18,2
+      Model Number: Z14X000GDLL/A
+      Chip: Apple M1 Max
+      Total Number of Cores: 10 (8 Performance and 2 Efficiency)
+      Memory: 64 GB
+      System Firmware Version: 20457.1.29
+      OS Loader Version: 18000.161.10.701.1
+      Activation Lock Status: Enabled
+
+
+$ diskutil info /System/Volumes/Data
+   Device Identifier:         disk3s1
+   Device Node:               /dev/disk3s1
+   Whole:                     No
+   Part of Whole:             disk3
+
+   Volume Name:               Macintosh HD - Data
+   Mounted:                   Yes
+   Mount Point:               /System/Volumes/Data
+
+   Partition Type:            41504653-0000-11AA-AA11-00306543ECAC
+   File System Personality:   APFS
+   Type (Bundle):             apfs
+   Name (User Visible):       APFS
+   Owners:                    Enabled
+
+   OS Can Be Installed:       Yes
+   Booter Disk:               disk3s4
+   Recovery Disk:             disk3s5
+   Media Type:                Generic
+   Protocol:                  Apple Fabric
+   SMART Status:              Verified
+
+   Disk Size:                 994.7 GB (994662584320 Bytes) (exactly 1942700360 512-Byte-Units)
+   Device Block Size:         4096 Bytes
+
+   Volume Used Space:         583.5 GB (583462883328 Bytes) (exactly 1139575944 512-Byte-Units)
+   Container Total Space:     994.7 GB (994662584320 Bytes) (exactly 1942700360 512-Byte-Units)
+   Container Free Space:      389.3 GB (389328834560 Bytes) (exactly 760407880 512-Byte-Units)
+   Allocation Block Size:     4096 Bytes
+
+   Media OS Use Only:         No
+   Media Read-Only:           No
+   Volume Read-Only:          No
+
+   Device Location:           Internal
+   Removable Media:           Fixed
+
+   Solid State:               Yes
+   Hardware AES Support:      Yes
+
+   This disk is an APFS Volume.  APFS Information:
+   APFS Container:            disk3
+   APFS Physical Store:       disk0s2
+   FileVault:                 Yes
+   Sealed:                    No
+   Locked:                    No
+
+
+$ git --version
+git version 2.54.0 (Apple Git-157)
+
+$ gh --version
+gh version 2.102.0 (2026-09-30)
+https://github.com/cli/cli/releases/tag/v2.102.0
+
+$ file /opt/homebrew/opt/python@3.15/bin/python3.15
+/opt/homebrew/opt/python@3.15/bin/python3.15: Mach-O 64-bit executable arm64
+
+$ clang --version
+Apple clang version 21.0.0 (clang-2100.3.34.2)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin

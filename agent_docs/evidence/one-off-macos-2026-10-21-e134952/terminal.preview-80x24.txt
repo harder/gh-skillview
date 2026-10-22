@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                               │
+│╭┤Search Results (15)├───────────────────────╮┌┤Details├─────────────────────┐│
+││Search: gh-skill                            ││• Name: gh-skill             ▲││
+││                                            ││• Repo:                      █││
+││                                            ││  diegosouzapw/awesome-omni-s█││
+││───┬────────────────────────────┬───────────││  ill                        █││
+││★  │Name                        │Repo       ││• Stars: ★ 64                ░││
+││───┼────────────────────────────┼───────────││• Path:                      ░││
+││64 │gh-skill                    │diegosouzap││  skills/tools/gh-skill/SKILL▼││
+││4  │gh-skill                    │Cogni-AI-OU││Manage GitHub Projects (V2), ▲││
+││0  │gh-skill                    │CHINGBOH/co││Issues, and Boards. View     █││
+││0  │gh-skill                    │Cogni-AI-OU││project boards, create/move  █││
+││0  │gh-skill                    │Noumena-Net││issues, comment, and track   █││
+││686│testing-gh-skills           │majiayu000/││status via CLI. Use when you ░││
+││686│testing-gh-skills           │majiayu000/││need to interact with GitHub ░││
+││686│testing-gh-skills-aaddrick-…│majiayu000/││Projects.                    ░││
+││686│testing-gh-skills-aaddrick-…│majiayu000/││                             ▼││
+││686│pptx-mattnigh-skills-collec…│majiayu000/││[Enter] Preview    [i] Install││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   ⠋ searching gh-skill…       1/2/3:Tabs  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,36 @@
+Results: /Users/kharder/source/rc-tests/acceptance-e134952-macos/run
+git-head: starting
+git-head: passed (0.15s)
+git-status: starting
+git-status: passed (0.09s)
+sdk-version: starting
+sdk-version: passed (0.72s)
+sdk-info: starting
+sdk-info: passed (0.14s)
+gh-version: starting
+gh-version: passed (0.13s)
+gh-skill-help: starting
+gh-skill-help: passed (0.12s)
+changes-since-release: starting
+changes-since-release: passed (0.03s)
+unit-restore: starting
+unit-restore: passed (1.71s)
+unit-build: starting
+unit-build: passed (19.56s)
+unit-tests: starting
+unit-tests: failed (227.18s)
+integration-restore: starting
+integration-restore: passed (0.99s)
+integration-build: starting
+integration-build: passed (1.0s)
+integration-tests: starting
+integration-tests: passed (3.69s)
+app-restore: starting
+app-restore: failed (0.65s)
+app-proofs: not-run (Product restore/build failed)
+extension-restore: starting
+extension-restore: failed (0.63s)
+extension-proofs: not-run (Product restore/build failed)
+source-status-after: starting
+source-status-after: passed (0.04s)
+Result: failed; report: /Users/kharder/source/rc-tests/acceptance-e134952-macos/run/REPORT.md

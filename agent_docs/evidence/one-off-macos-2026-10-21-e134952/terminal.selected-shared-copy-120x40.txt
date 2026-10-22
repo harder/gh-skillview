@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│   ┏┥Choose version┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓s   │
+│Rev┃Installation: broken-leftover                                                                                ┃    │
+│Spa┃                                                                                                             ┃    │
+│─┬─┃Location:                                                                                                    ┃    │
+│ │N┃/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skill┃    │
+│─┼─┃s/broken-leftover                                                                                            ┃    │
+│☐│b┃                                                                                                             ┃    │
+│☐│e┃Repository: unknown                                                                                          ┃kill│
+│☐│g┃                                                                                                             ┃ftov│
+│☐│g┃Current ref: unknown                                                                                         ┃    │
+│☐│u┃                                                                                                             ┃    │
+│   ┃Skill subpath: unknown                                                                                       ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃e   │
+│   ┃                                                                                                             ┃ng  │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│   ┃                                                                                                             ┃    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ all     ☐ Unpin with update  ☑ Include hidden directories                                                           │
+│   5 installed skill(s) — Space to toggle, U to review marked                                                         │
+│⟦ Details (F2) ⟧                                                                                                      │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                                                         │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check updates  d │ Unpin row  p │ F2  Details  F2 │ │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

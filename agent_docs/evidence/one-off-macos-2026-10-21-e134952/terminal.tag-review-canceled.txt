@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Space marks · c compare/plan row · u review · U marked · p unpin                                                      │
+│─┬───────────────┬────────┬────────────────────────── Review queue complete                                           │
+│ │Name           │Scope   │Flags                                                                                      │
+│─┼───────────────┼────────┼────────────────────────── Saved evidence remains available in F2 Details. Choose an       │
+│☐│broken-leftover│User    │-s                         installation for another review.                                │
+│☐│empty-leftover │User    │--                                                                                         │
+│☐│gh-skill       │User    │-s                                                                                         │
+│☐│gh-skill       │User    │--                                                                                         │
+│☐│unrelated-skill│User    │--                                                                                         │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│☐ all     ☐ Unpin with update  ☑ Include hidden directories                                                           │
+│   review queue complete; Choose an installation for another review.                                                  │
+│⟦ Details (F2) ⟧                                                                                                      │
+│⟦ Check updates ⟧  ⟦► Review update ◄⟧  ⟦ Choose version... ⟧                                                         │
+│ Toggle  Space │ Mark all  a │ Review row  u │ Review marked  U │ Check updates  d │ Unpin row  p │ F2  Details  F2 │ │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

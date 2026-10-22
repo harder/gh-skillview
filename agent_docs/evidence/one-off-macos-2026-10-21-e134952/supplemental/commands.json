@@ -1,0 +1,75 @@
+[
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "test",
+      "--project",
+      "/Users/kharder/source/rc-tests/gh-skillview-e134952-20261021-175535/tests/SkillView.Tests/SkillView.Tests.csproj",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--filter-query",
+      "/*/SkillView.Tests.Maintenance/GhSharedLockGuardTests/NamespacedAliasesAndTruncatedListingCannotBypassCollisionGuard"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/collision-focused-reproduction.log",
+    "status": "failed",
+    "exitCode": 2,
+    "seconds": 2.96,
+    "name": "collision-focused-reproduction"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "restore",
+      "--locked-mode"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/release-locked-restore.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.58,
+    "name": "release-locked-restore"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "publish",
+      "src/SkillView.App/SkillView.App.csproj",
+      "-c",
+      "Release",
+      "-r",
+      "osx-arm64",
+      "--self-contained",
+      "true",
+      "--no-restore",
+      "-o",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app-aot-publish.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 33.79,
+    "name": "app-aot-publish"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "publish",
+      "src/SkillView.GhExtension/SkillView.GhExtension.csproj",
+      "-c",
+      "Release",
+      "-r",
+      "osx-arm64",
+      "--self-contained",
+      "true",
+      "--no-restore",
+      "-o",
+      "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension"
+    ],
+    "log": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/extension-aot-publish.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 22.98,
+    "name": "extension-aot-publish"
+  }
+]

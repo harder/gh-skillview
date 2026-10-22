@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover sk┏┥ SkillView keys ┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓            │
+│╭┤Search Re┃ Primary                                          ▲  ┃───────────┐│
+││Search: ? ┃                                                  █  ┃          ▲││
+││          ┃ • ↑ / ↓ — move selection                         █  ┃          █││
+││          ┃ • Enter — preview the selected search result or  █  ┃ome-omni-s█││
+││───┬──────┃   open the selected change item                  ░  ┃          █││
+││★  │Name  ┃ • f — filters in Discover · filter box in        ░  ┃          ░││
+││───┼──────┃   Installed                                      ░  ┃          ░││
+││64 │gh-ski┃ • 1 / 2 / 3 or ← / → — switch tabs               ░  ┃kill/SKILL▼││
+││4  │gh-ski┃ • ? or F1 — show this help                       ░  ┃l         ▲││
+││0  │gh-ski┃                                                  ░  ┃          █││
+││0  │gh-ski┃ Discover                                         ░  ┃ a        ░││
+││0  │gh-ski┃                                                  ░  ┃rapper    ░││
+││686│testin┃ • / — focus the Discover query box               ░  ┃hQL API,  ░││
+││686│testin┃ • i — install selected via compact confirm       ▼  ┃          ░││
+││686│testin┃                                                     ┃b         ░││
+││686│testin┃                    ⟦► Close ◄⟧▖                     ┃ues       ▼││
+││686│pptx-m┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛[i] Install││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   preview loaded   f:Filters  1/2/3:Tabs  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

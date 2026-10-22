@@ -1,0 +1,9 @@
+9: Requires Linux native staging/cleanup; injected Docker boundary only.
+1: Opt in with private authoring proof tools/evidence paths; normal tests never launch publish dry-run.
+1: Windows held-parent raw-target regression requires actual Windows execution.
+4: Windows held-parent generation checks require native Windows execution.
+1: The fixed /usr/bin/env fixture requires Linux.
+10: Windows native raw-target/follow parity requires actual Windows execution.
+10: Opt-in native owner subprocess proof was not requested; no cleanup/table-isolation evidence.
+
+Opt-in gh contracts, authoring runtime and PTY tests can also return early; successful test totals do not prove execution of those bodies.

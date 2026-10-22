@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover sk┏┥ SkillView keys ┝━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓            │
+│╭┤Search Re┃ Primary                                          ▲  ┃───────────┐│
+││Search: ? ┃                                                  █  ┃          ▲││
+││          ┃ • ↑ / ↓ — move selection                         █  ┃          █││
+││          ┃ • Enter — preview the selected search result or  █  ┃ome-omni-s█││
+││───┬──────┃   open the selected change item                  ░  ┃          █││
+││★  │Name  ┃ • f — filters in Discover · filter box in        ░  ┃          ░││
+││───┼──────┃   Installed                                      ░  ┃          ░││
+││64 │gh-ski┃ • 1 / 2 / 3 or ← / → — switch tabs               ░  ┃kill/SKILL▼││
+││4  │gh-ski┃ • ? or F1 — show this help                       ░  ┃cts (V2), ▲││
+││0  │gh-ski┃                                                  ░  ┃ View     █││
+││0  │gh-ski┃ Discover                                         ░  ┃ate/move  █││
+││0  │gh-ski┃                                                  ░  ┃d track   ░││
+││686│testin┃ • / — focus the Discover query box               ░  ┃ when you ░││
+││686│testin┃ • i — install selected via compact confirm       ▼  ┃th GitHub ░││
+││686│testin┃                                                     ┃          ░││
+││686│testin┃                    ⟦► Close ◄⟧▖                     ┃          ▼││
+││686│pptx-m┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛[i] Install││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   ⠴ preview diegosouzapw/awesome-omni-sk… ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

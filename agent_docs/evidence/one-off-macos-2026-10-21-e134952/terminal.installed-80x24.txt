@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Discover skills                                                               │
+│╭┤Search Results (15)├───────────────────────╮┌┤Details├─────────────────────┐│
+││Search: ?                                   ││• Name: gh-skill             ▲││
+││                                            ││• Repo:                      █││
+││                                            ││  diegosouzapw/awesome-omni-s█││
+││───┬────────────────────────────┬───────────││  kill                       █││
+││★  │Name                        │Repo       ││• Stars: ★ 64                ░││
+││───┼────────────────────────────┼───────────││• Path:                      ░││
+││64 │gh-skill                    │diegosouzap││  skills/tools/gh-skill/SKILL▼││
+││4  │gh-skill                    │Cogni-AI-OU││GitHub Project Skill         ▲││
+││0  │gh-skill                    │CHINGBOH/co││                             █││
+││0  │gh-skill                    │Cogni-AI-OU││This skill provides a        ░││
+││0  │gh-skill                    │Noumena-Net││comprehensive CLI wrapper    ░││
+││686│testing-gh-skills           │majiayu000/││for the GitHub GraphQL API,  ░││
+││686│testing-gh-skills           │majiayu000/││enabling efficient           ░││
+││686│testing-gh-skills-aaddrick-…│majiayu000/││management of GitHub         ░││
+││686│testing-gh-skills-aaddrick-…│majiayu000/││Projects V2 and Issues       ▼││
+││686│pptx-mattnigh-skills-collec…│majiayu000/││[Enter] Preview    [i] Install││
+│╰────────────────────────────────────────────╯└──────────────────────────────┘│
+│                                                                              │
+│                   preview loaded   f:Filters  1/2/3:Tabs  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘

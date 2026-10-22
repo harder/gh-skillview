@@ -1,0 +1,40 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                           ◇ Discover     ▣ Installed     △ Changes   │
+│Review changes                                                                                                        │
+│Refresh inventory before another review · F2 Details                                                                  │
+│Original restored                                                                                                     │
+│                                                                                                                      │
+│• Outcome: restored                                                                                                   │
+│• Skill: gh-skill                                                                                                     │
+│• Location:                                                                                                           │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/home/.agents/skills/gh-sk│
+│  ill                                                                                                                 │
+│• Recorded consumers: cline, codex, universal, warp                                                                   │
+│• Restore ref: 33789149b9def6b66ddf247438a79fac94e22074                                                               │
+│• Restore authored version: unknown                                                                                   │
+│• Current disk state: restored                                                                                        │
+│• Notice: Payload and native continuity verified. Retained directories remain available; agent session state is       │
+│  unknown. Saved plan 1a417670e7624123a288e2ed8aca0a85; manifest:                                                     │
+│  /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-acceptance-tui-ypfnvige/state/SkillView/replaceme│
+│  nts/1a417670e7624123a288e2ed8aca0a85/plan.json. Inspect with update-inspect --id 1a417670e7624123a288e2ed8aca0a85   │
+│  before recovery or undo.                                                                                            │
+│                                                                                                                      │
+│Inspect the outcome and saved evidence in F2 Details. Refresh inventory before another review. Agent reload state     │
+│remains unknown.                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│   original restored; Refresh inventory to inspect current installed metadata                                         │
+│⟦ Refresh inventory ⟧  ⟦ Details (F2) ⟧                                                                               │
+│F2 Details · Tab Move focus · Esc Back                                                                                │
+│                                                                                                                      │
+│                             gh 2.102.0 — press '/' to search, 'd' for Doctor c:Cleanup  d:Doctor  ?:Help  Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
