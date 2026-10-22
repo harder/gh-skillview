@@ -67,7 +67,7 @@ Prioritize these user journeys, in this order:
 
 | Journey | Evidence to collect |
 | --- | --- |
-| Start, browse, search, preview | Startup finishes; query input retains focus; Tab, shortcuts, help and quit work; paths and instructions are understandable at 80×24. Search failure has a clear explanation when offline. |
+| Start, browse, search, preview | Wait for startup inventory to finish. An empty fixture stays in Discover with query focus; an existing inventory can open Installed. From the Installed list, press `/` to open Discover and focus its query. Verify the whole typed query, Tab, shortcuts, help and quit at 80×24. Search failure has a clear explanation when offline. |
 | Install and inspect copies | Install into the fixture using actual gh; inspect two independent copies with differing content and, where supported, a shared link. Explain which physical copy and consumers are selected. Refresh preserves correct scope/workspace context. |
 | Review a version/update | Use Updates, review a specific existing tag, cancel first, then approve retention and apply one target. Check exact source/version and local-change messaging, queue/focus behavior, and that independent peers stay unchanged. A pinned fixture must remain protected until separately reviewed unpin. |
 | Undo | Inspect the saved operation, cancel, then approve the exact reviewed Undo and verify the original. If time permits, edit after inspection and confirm stale approval refuses. Check refresh and retry guidance. |
