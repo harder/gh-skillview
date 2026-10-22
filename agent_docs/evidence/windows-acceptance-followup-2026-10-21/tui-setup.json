@@ -1,0 +1,34 @@
+[
+  {
+    "argv": [
+      "gh",
+      "skill",
+      "install",
+      "--dir",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\private-terminal\\work\\first",
+      "--pin=33789149b9def6b66ddf247438a79fac94e22074",
+      "--",
+      "cli/cli",
+      "skills/gh-skill"
+    ],
+    "exitCode": 0,
+    "stdout": "\u00e2\u0153\u201c Installed gh-skill (from cli/cli@33789149b9def6b66ddf247438a79fac94e22074) in first\n",
+    "stderr": "Using ref 33789149b9def6b66ddf247438a79fac94e22074 (33789149)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  gh-skill/\n  \u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview cli/cli gh-skill@33789149b9def6b66ddf247438a79fac94e22074\n\n"
+  },
+  {
+    "argv": [
+      "gh",
+      "skill",
+      "install",
+      "--dir",
+      "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\private-terminal\\work\\second",
+      "--pin=33789149b9def6b66ddf247438a79fac94e22074",
+      "--",
+      "cli/cli",
+      "skills/gh-skill"
+    ],
+    "exitCode": 0,
+    "stdout": "\u00e2\u0153\u201c Installed gh-skill (from cli/cli@33789149b9def6b66ddf247438a79fac94e22074) in second\n",
+    "stderr": "Using ref 33789149b9def6b66ddf247438a79fac94e22074 (33789149)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  gh-skill/\n  \u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview cli/cli gh-skill@33789149b9def6b66ddf247438a79fac94e22074\n\n"
+  }
+]

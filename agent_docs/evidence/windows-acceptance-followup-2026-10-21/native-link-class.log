@@ -1,0 +1,147 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: False) (166ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: True, ancestorAlias: True) (70ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(relative: False, ancestorAlias: False) (73ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Boolean relative, Boolean ancestorAlias) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:32
+    at InvokeStub_NativeExposureLinkTests.TargetBackedRoundTripRetainsExactNativeLinkOrExplicitlyRefusesUnsupportedMetadata(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: True, suffix: "///")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: False, suffix: "///")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: True, suffix: "/")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixOrdinaryTargetTrailingSeparatorsPreserveExactRawBytesThroughRoundTrip(absolute: False, suffix: "/")
+  Unix raw-target trailing separators require native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed (64ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.AForeignPrivateSlotEntryIsNeverOverwrittenOrFollowed() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:427
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "inner-parent") (66ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "junction-before-parent") (155ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "inner-dot") (89ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-junction-no-dot") (131ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "leading-dot") (66ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "missing-before-parent") (69ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "relative-junction-no-dot") (132ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-dot") (70ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "absolute-parent") (70ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(spelling: "leading-parent") (62ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(String spelling) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:133
+    at InvokeStub_NativeExposureLinkTests.WindowsRawWitnessMatchesNativeFollowAcrossDotAndReparseSpellings(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: True, suffix: "///")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: False, suffix: "/")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: False, suffix: "///")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+skipped SkillView.Tests.Inventory.NativeExposureLinkTests.UnixTrailingSeparatorsCannotFollowAnIndirectFinalTarget(absolute: True, suffix: "/")
+  Unix no-follow target resolution requires native Unix execution.
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry (67ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RestoreCollisionRetainsTheOriginalLinkAndNeverOverwritesForeignEntry() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:390
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed SkillView.Tests.Inventory.NativeExposureLinkTests.SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration (50ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Native proof requires complete supported link metadata: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.RequirePositiveProofMetadata(NativeExposureLinkLease lease) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:761
+    at SkillView.Tests.Inventory.NativeExposureLinkTests.SharedTargetAndExposureParentRefusesRatherThanRefreshingTargetGeneration() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Inventory\NativeExposureLinkTests.cs:445
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64) failed with 16 error(s) (2s 559ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 48
+  failed: 16
+  succeeded: 24
+  skipped: 8
+  duration: 2s 698ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

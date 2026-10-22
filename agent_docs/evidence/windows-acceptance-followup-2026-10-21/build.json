@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+    "build",
+    "tests/SkillView.Tests/SkillView.Tests.csproj",
+    "-c",
+    "Release",
+    "--no-restore"
+  ],
+  "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\build.log",
+  "status": "passed",
+  "exitCode": 0,
+  "seconds": 2.26
+}

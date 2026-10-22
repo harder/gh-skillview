@@ -1,0 +1,9 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64) passed (426ms)
+
+Test run summary: Passed!
+  total: 3
+  failed: 0
+  succeeded: 3
+  skipped: 0
+  duration: 897ms

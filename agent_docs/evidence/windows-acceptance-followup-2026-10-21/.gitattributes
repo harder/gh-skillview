@@ -1,0 +1,2 @@
+# Keep captured Windows evidence bytes and manifest hashes stable.
+* -text whitespace=cr-at-eol

@@ -1,0 +1,29 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(kind: "file") (21ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Owner setup removed no-follow fixture access: 5
+    at SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(String kind) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\WindowsPayloadMetadataTests.cs:243
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+failed SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(kind: "directory") (2ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Owner setup removed no-follow fixture access: 5
+    at SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(String kind) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\WindowsPayloadMetadataTests.cs:243
+    at InvokeStub_WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+failed SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(kind: "link") (2ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Owner setup removed no-follow fixture access: 5
+    at SkillView.Tests.Maintenance.WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(String kind) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\WindowsPayloadMetadataTests.cs:243
+    at InvokeStub_WindowsPayloadMetadataTests.AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64) failed with 3 error(s) (400ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 3
+  failed: 3
+  succeeded: 0
+  skipped: 0
+  duration: 840ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

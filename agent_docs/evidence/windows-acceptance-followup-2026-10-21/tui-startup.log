@@ -1,0 +1,50 @@
+20:37:00.675 Info  [startup] SkillView invocation=Standalone dispatch=Tui
+20:37:00.686 Debug [startup] TUI boot time 11ms
+20:37:00.733 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe --version
+20:37:00.840 Debug [subprocess] exit=0 dur=107ms C:\Program Files\GitHub CLI\gh.exe
+20:37:00.840 Info  [env] gh 2.102.0 at C:\Program Files\GitHub CLI\gh.exe meets minimum 2.97.0
+20:37:00.841 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe auth status
+20:37:01.572 Debug [subprocess] exit=0 dur=731ms C:\Program Files\GitHub CLI\gh.exe
+20:37:01.573 Info  [auth] authenticated to github.com as harder
+20:37:01.573 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill --help
+20:37:01.673 Debug [subprocess] exit=0 dur=100ms C:\Program Files\GitHub CLI\gh.exe
+20:37:01.673 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+20:37:01.681 Debug [subprocess] exec: C:\Program Files\Git\cmd\git.EXE rev-parse --show-toplevel
+20:37:01.779 Debug [subprocess] exit=128 dur=97ms C:\Program Files\Git\cmd\git.EXE
+20:37:01.784 Info  [inventory] scan roots resolved: 4
+20:37:01.855 Debug [subprocess] exit=0 dur=182ms C:\Program Files\GitHub CLI\gh.exe
+20:37:02.028 Info  [inventory] filesystem scan found 4 skill(s) in 243ms
+20:37:02.028 Info  [inventory] gh skill list returned 0 record(s)
+20:37:02.028 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\first
+20:37:02.125 Debug [subprocess] exit=0 dur=97ms C:\Program Files\GitHub CLI\gh.exe
+20:37:02.125 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\second
+20:37:02.212 Debug [subprocess] exit=0 dur=87ms C:\Program Files\GitHub CLI\gh.exe
+20:37:02.212 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\third
+20:37:02.302 Debug [subprocess] exit=0 dur=90ms C:\Program Files\GitHub CLI\gh.exe
+20:37:02.302 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\fourth
+20:37:02.395 Debug [subprocess] exit=0 dur=92ms C:\Program Files\GitHub CLI\gh.exe
+20:37:39.097 Info  [startup] SkillView invocation=Standalone dispatch=Tui
+20:37:39.099 Debug [startup] TUI boot time 2ms
+20:37:39.123 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe --version
+20:37:39.220 Debug [subprocess] exit=0 dur=97ms C:\Program Files\GitHub CLI\gh.exe
+20:37:39.220 Info  [env] gh 2.102.0 at C:\Program Files\GitHub CLI\gh.exe meets minimum 2.97.0
+20:37:39.220 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe auth status
+20:37:39.970 Debug [subprocess] exit=0 dur=749ms C:\Program Files\GitHub CLI\gh.exe
+20:37:39.970 Info  [auth] authenticated to github.com as harder
+20:37:39.970 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill --help
+20:37:40.062 Debug [subprocess] exit=0 dur=92ms C:\Program Files\GitHub CLI\gh.exe
+20:37:40.063 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+20:37:40.072 Debug [subprocess] exec: C:\Program Files\Git\cmd\git.EXE rev-parse --show-toplevel
+20:37:40.159 Debug [subprocess] exit=128 dur=87ms C:\Program Files\Git\cmd\git.EXE
+20:37:40.163 Info  [inventory] scan roots resolved: 4
+20:37:40.216 Debug [subprocess] exit=0 dur=153ms C:\Program Files\GitHub CLI\gh.exe
+20:37:40.365 Info  [inventory] filesystem scan found 4 skill(s) in 202ms
+20:37:40.366 Info  [inventory] gh skill list returned 0 record(s)
+20:37:40.366 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\first
+20:37:40.450 Debug [subprocess] exit=0 dur=84ms C:\Program Files\GitHub CLI\gh.exe
+20:37:40.450 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\second
+20:37:40.530 Debug [subprocess] exit=0 dur=80ms C:\Program Files\GitHub CLI\gh.exe
+20:37:40.531 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\third
+20:37:40.613 Debug [subprocess] exit=0 dur=82ms C:\Program Files\GitHub CLI\gh.exe
+20:37:40.613 Debug [subprocess] exec: C:\Program Files\GitHub CLI\gh.exe skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-terminal\work\fourth
+20:37:40.697 Debug [subprocess] exit=0 dur=84ms C:\Program Files\GitHub CLI\gh.exe

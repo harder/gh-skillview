@@ -1,0 +1,7 @@
+  Determining projects to restore...
+  Restored C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\SkillView.Core.csproj (in 354 ms).
+  Restored C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.App\SkillView.App.csproj (in 354 ms).
+  SkillView.Core -> C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\bin\Release\net10.0\win-arm64\SkillView.Core.dll
+  SkillView.App -> C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.App\bin\Release\net10.0\win-arm64\skillview.dll
+  Generating native code
+  SkillView.App -> C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\native-app\

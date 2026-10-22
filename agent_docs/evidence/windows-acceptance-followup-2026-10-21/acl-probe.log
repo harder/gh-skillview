@@ -1,0 +1,114 @@
+[
+  {
+    "parentPolicy": "inherited",
+    "ownerSetupError": 0,
+    "before": {
+      "parent": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "target": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "link": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      }
+    },
+    "after": {
+      "parent": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "target": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "link": {
+        "sddl": "O:CURRENT_USERD:AI(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;0x1301bf;;;OTHER_ACCOUNT)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;CURRENT_USER)(A;ID;FA;;;SANDBOX_CAPABILITY)(A;OICIIOID;GA;;;SANDBOX_CAPABILITY)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      }
+    }
+  },
+  {
+    "parentPolicy": "owner-rights",
+    "ownerSetupError": 0,
+    "before": {
+      "parent": {
+        "sddl": "O:CURRENT_USERD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "target": {
+        "sddl": "O:CURRENT_USERD:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "link": {
+        "sddl": "O:CURRENT_USERD:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      }
+    },
+    "after": {
+      "parent": {
+        "sddl": "O:CURRENT_USERD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "target": {
+        "sddl": "O:CURRENT_USERD:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 0,
+          "delete": 0,
+          "writeOwner": 0
+        }
+      },
+      "link": {
+        "sddl": "O:CURRENT_USERD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;IO;FA;;;OW)",
+        "accessErrors": {
+          "readAttributes": 5,
+          "delete": 5,
+          "writeOwner": 5
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,177 @@
+{
+  "baseCommit": "99409ee9220736854dfaf3b8aa6ecc7c69ec8252",
+  "startedUtc": "2026-10-22T01:25:28Z",
+  "recordedUtc": "2026-10-22T01:47:09.694382+00:00",
+  "python": {
+    "version": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "win-amd64",
+    "executable": "C:\\Python313\\python.exe"
+  },
+  "windows": "Windows-11-10.0.26340-SP0",
+  "sdk": "10.0.402 ARM64, existing private SDK",
+  "tests": [
+    {
+      "name": "baseline-focused",
+      "counts": {
+        "total": 3,
+        "failed": 3,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 3,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "owner-regression-before",
+      "counts": {
+        "total": 3,
+        "failed": 3,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 3
+    },
+    {
+      "name": "owner-regression-after",
+      "counts": {
+        "total": 3,
+        "failed": 0,
+        "succeeded": 3,
+        "skipped": 0
+      },
+      "status": "passed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "final-owner-regression",
+      "counts": {
+        "total": 3,
+        "failed": 0,
+        "succeeded": 3,
+        "skipped": 0
+      },
+      "status": "passed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "focused-after",
+      "counts": {
+        "total": 3,
+        "failed": 3,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 3,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "owner-rights-focused",
+      "counts": {
+        "total": 3,
+        "failed": 3,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 3,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "refusal-contract",
+      "counts": {
+        "total": 3,
+        "failed": 0,
+        "succeeded": 3,
+        "skipped": 0
+      },
+      "status": "passed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "native-link-class",
+      "counts": {
+        "total": 48,
+        "failed": 16,
+        "succeeded": 24,
+        "skipped": 8
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 16,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "metadata-class",
+      "counts": {
+        "total": 21,
+        "failed": 0,
+        "succeeded": 21,
+        "skipped": 0
+      },
+      "status": "passed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "standalone-unpin-class",
+      "counts": {
+        "total": 29,
+        "failed": 9,
+        "succeeded": 20,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 9,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "shared-unpin-focused",
+      "counts": {
+        "total": 4,
+        "failed": 4,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 4,
+      "accessDeniedFailures": 0
+    },
+    {
+      "name": "final-owner-regression-before",
+      "counts": {
+        "total": 3,
+        "failed": 3,
+        "succeeded": 0,
+        "skipped": 0
+      },
+      "status": "failed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 3
+    },
+    {
+      "name": "final-owner-regression-after",
+      "counts": {
+        "total": 3,
+        "failed": 0,
+        "succeeded": 3,
+        "skipped": 0
+      },
+      "status": "passed",
+      "securityPrivilegeFailures": 0,
+      "accessDeniedFailures": 0
+    }
+  ],
+  "fullSuiteRun": false,
+  "sixteenPassingCliProofsRepeated": false,
+  "productionGuardsChanged": false,
+  "positiveProofAssertionsChanged": false,
+  "elevated": false,
+  "systemSecurityPolicyChanged": false,
+  "elapsedCollectionMinutes": 21.7
+}

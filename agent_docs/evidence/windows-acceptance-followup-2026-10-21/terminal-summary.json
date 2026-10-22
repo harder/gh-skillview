@@ -1,0 +1,21 @@
+{
+  "stable": {
+    "version": "1.25.2733.0 ARM64",
+    "columns": 80,
+    "rows": 24,
+    "targetableWindows": 0
+  },
+  "preview": {
+    "version": "1.26.2734.0 ARM64",
+    "columns": 80,
+    "rows": 24,
+    "targetableWindows": 0
+  },
+  "screenshots": 0,
+  "inputActions": 0,
+  "tuiMutations": 0,
+  "payloadsAndNativeIdentitiesUnchanged": true,
+  "registryBytesUnchanged": true,
+  "allJourneys": "blocked after process startup; no supported input/capture target",
+  "cleanup": "Owned app/wrapper processes stopped. Pre-existing Terminal Preview server preserved; an exited-session tab may need manual closing."
+}

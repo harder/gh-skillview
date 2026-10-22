@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "C:\\Users\\kevin\\Documents\\Codex\\skillview-rc-20261021-5ab74870\\dotnet\\dotnet.exe",
+    "restore",
+    "tests/SkillView.Tests/SkillView.Tests.csproj",
+    "--locked-mode"
+  ],
+  "log": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\restore.log",
+  "status": "passed",
+  "exitCode": 0,
+  "seconds": 3.07
+}

@@ -974,6 +974,9 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   unchanged saved object back to SetAccessControl can write nothing. Restore
   parent then payload then file after inheritance propagation, and avoid changing
   the source owner when testing read-only backup permissions.
+  Fixture owner normalization must inspect the no-follow object and skip an
+  already-current-user owner. Redundant owner-only `SetSecurityInfo` can strip
+  inherited OWNER RIGHTS access; retain file/directory/link regression coverage.
 
 - Every Unix descriptor duplication must atomically retain close-on-exec through
   `F_DUPFD_CLOEXEC`; never use plain `dup` followed by `F_SETFD`. Darwin ARM64

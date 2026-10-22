@@ -202,11 +202,79 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
         Assert.Equal(new byte[] { 1, 2, 3 }, bytes.ToArray());
     }
 
+    [Theory]
+    [InlineData("file")]
+    [InlineData("directory")]
+    [InlineData("link")]
+    public void AlreadyOwnedFixtureKeepsInheritedOwnerRightsAndNoFollowAccess(string kind)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var identity = WindowsIdentity.GetCurrent();
+        var parent = Directory.CreateDirectory(Path.Combine(temporary.FullName, "owner-rights"));
+        var access = new DirectorySecurity();
+        access.SetAccessRuleProtection(true, false);
+        foreach (var sid in new[] { new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), new SecurityIdentifier("S-1-3-4") })
+            access.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        var path = Path.Combine(parent.FullName, "fixture");
+        if (kind == "file") File.WriteAllText(path, "fixture");
+        else if (kind == "directory") Directory.CreateDirectory(path);
+        else Directory.CreateSymbolicLink(path, Directory.CreateDirectory(Path.Combine(parent.FullName, "target")).FullName);
+        // Normalize elevated runners' Administrators ownership while ordinary
+        // inheritance still applies, then install the OWNER RIGHTS scenario.
+        SetFixtureOwner(path);
+        parent.SetAccessControl(access);
+
+        // Keep a no-follow handle and the original DACL alive for cleanup even
+        // when the regression removes access from the named fixture.
+        using var held = Native.CreateFileW(path, 0x00060000, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+        Assert.False(held.IsInvalid);
+        Assert.Equal(0u, Native.GetSecurityInfo(held, 1, 5, out _, out _, out var dacl, out _, out var descriptor));
+        try
+        {
+            var bytes = new byte[Native.GetSecurityDescriptorLength(descriptor)];
+            Marshal.Copy(descriptor, bytes, 0, bytes.Length);
+            var before = new RawSecurityDescriptor(bytes, 0);
+            Assert.Equal(identity.User, before.Owner);
+            Assert.Contains("OW", before.GetSddlForm(AccessControlSections.Access));
+            SetFixtureOwner(path);
+            using var readable = Native.CreateFileW(path, 0x00020080, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+            Assert.False(readable.IsInvalid, "Owner setup removed no-follow fixture access: " + Marshal.GetLastPInvokeError());
+            Assert.Equal(0u, Native.GetSecurityInfo(readable, 1, 5, out _, out _, out _, out _, out var afterDescriptor));
+            try
+            {
+                var after = new byte[Native.GetSecurityDescriptorLength(afterDescriptor)];
+                Marshal.Copy(afterDescriptor, after, 0, after.Length);
+                Assert.Equal(bytes, after);
+            }
+            finally { Native.LocalFree(afterDescriptor); }
+        }
+        finally
+        {
+            try { Assert.Equal(0u, Native.SetSecurityInfo(held, 1, 4, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero)); }
+            finally { Native.LocalFree(descriptor); }
+        }
+    }
+
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     internal static void SetFixtureOwner(string path)
     {
         using var identity = WindowsIdentity.GetCurrent();
         var sid = identity.User!;
+        // A redundant owner write can discard inherited OWNER RIGHTS access
+        // on Windows. Inspect the link/object itself and leave an already
+        // current-user-owned fixture's security descriptor untouched.
+        using (var observation = Native.CreateFileW(path, 0x00020000, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero))
+        {
+            Assert.False(observation.IsInvalid);
+            Assert.Equal(0u, Native.GetSecurityInfo(observation, 1, 1, out var owner, out _, out _, out _, out var descriptor));
+            try
+            {
+                if (sid.Equals(new SecurityIdentifier(owner))) return;
+            }
+            finally { Native.LocalFree(descriptor); }
+        }
         var bytes = new byte[sid.BinaryLength]; sid.GetBinaryForm(bytes, 0);
         using var handle = Native.CreateFileW(path, 0x00080000, 7, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
         Assert.False(handle.IsInvalid);
@@ -247,5 +315,8 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
         [DllImport("advapi32.dll")] internal static extern uint SetSecurityInfo(SafeFileHandle handle, int type, uint information, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+        [DllImport("advapi32.dll")] internal static extern uint GetSecurityInfo(SafeFileHandle handle, int type, uint information, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
+        [DllImport("advapi32.dll")] internal static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
+        [DllImport("kernel32.dll")] internal static extern IntPtr LocalFree(IntPtr memory);
     }
 }

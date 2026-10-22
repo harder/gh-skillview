@@ -1,0 +1,4 @@
+{
+  "command": "dotnet format SkillView.sln --no-restore --include <absolute WindowsPayloadMetadataTests.cs> --verify-no-changes --verbosity normal",
+  "exitCode": 0
+}

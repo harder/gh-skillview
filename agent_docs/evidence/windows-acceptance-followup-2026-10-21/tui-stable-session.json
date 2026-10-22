@@ -1,0 +1,12 @@
+{
+  "app": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\native-app\\skillview.exe",
+  "pid": 4864,
+  "wrapperPid": 3256,
+  "columns": 80,
+  "rows": 24,
+  "home": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\private-terminal\\home",
+  "state": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\private-terminal\\state",
+  "cwd": "C:\\Users\\kevin\\AppData\\Local\\Temp\\skillview-windows-followup-20261021\\private-terminal\\work",
+  "kind": "win-arm64 AOT",
+  "startedUtc": "2026-10-22T01:37:00.597132+00:00"
+}

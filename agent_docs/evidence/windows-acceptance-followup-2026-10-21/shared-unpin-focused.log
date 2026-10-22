@@ -1,0 +1,67 @@
+Running tests from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: False) (559ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 34c9c56ee8a34337bcabdd557b4ff85f at C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-shared-unpin-focused\tmp\skillview-shared-revision-hgncabzd.1si\state\34c9c56ee8a34337bcabdd557b4ff85f. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: False) (423ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 970b80a4d4674875852d58a618da4589 at C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-shared-unpin-focused\tmp\skillview-shared-revision-x5m14xzd.mln\state\970b80a4d4674875852d58a618da4589. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: True, compensation: True) (423ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 5e56258b6dfa4611bdeda558340d4722 at C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-shared-unpin-focused\tmp\skillview-shared-revision-utfr0wj1.mvu\state\5e56258b6dfa4611bdeda558340d4722. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+failed SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(undo: False, compensation: True) (373ms)
+  from C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.IO.IOException : Standalone unpin planning refused. Private evidence retained for 647fe136d6464b928f075a87e0646502 at C:\Users\kevin\AppData\Local\Temp\skillview-windows-followup-20261021\private-shared-unpin-focused\tmp\skillview-shared-revision-zfkfocdr.fzh\state\647fe136d6464b928f075a87e0646502. Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+  ---- System.IO.IOException : Native metadata cannot be preserved for /: Complete SACL visibility requires SeSecurityPrivilege: Not all privileges or groups referenced are assigned to the caller.
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:148
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.UnpinPlan() in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:24
+    at SkillView.Tests.Maintenance.SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Boolean undo, Boolean compensation) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\Maintenance\SharedReplacementRevisionTests.Unpin.cs:113
+    at InvokeStub_SharedReplacementRevisionTests.SharedUnpinTornForwardUndoAndCompensationUseExplicitRepairThenRestart(Object, Span`1)
+    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+    ----- Inner Stack Trace -----
+    at SkillView.Maintenance.PayloadMetadataReview.Require(PayloadNativeMetadata metadata, String path) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:157
+    at SkillView.Maintenance.PayloadMetadataReview..ctor(CapturedPayloadArchive installed, PayloadMetadataAuthority authority) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:99
+    at SkillView.Maintenance.PayloadMetadataReview.PreserveInstalled(CapturedPayloadArchive installed, Reader reader, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\PayloadMetadataReview.cs:115
+    at SkillView.Maintenance.ReplacementPlanStore.PlanUnpin(InstalledSkill target, InventorySnapshot inventory, CancellationToken token) in C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\src\SkillView.Core\Maintenance\ReplacementPlanStore.Unpin.cs:114
+C:\Users\kevin\Documents\Codex\skillview-rc-20261021-5ab74870\checkout\tests\SkillView.Tests\bin\Release\net10.0\SkillView.Tests.dll (net10.0|arm64) failed with 4 error(s) (2s 154ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 4
+  failed: 4
+  succeeded: 0
+  skipped: 0
+  duration: 2s 302ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)
