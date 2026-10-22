@@ -1,0 +1,96 @@
+[
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "restore",
+      "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "--locked-mode"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/unit-restore.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.86,
+    "name": "unit-restore"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "build",
+      "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "-c",
+      "Release",
+      "--no-restore"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/unit-build.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 18.49,
+    "name": "unit-build"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "restore",
+      "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+      "--locked-mode"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/integration-restore.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 0.83,
+    "name": "integration-restore"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "build",
+      "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+      "-c",
+      "Release",
+      "--no-restore"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/integration-build.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.06,
+    "name": "integration-build"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "test",
+      "--project",
+      "tests/SkillView.Tests/SkillView.Tests.csproj",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--filter-query",
+      "/*/SkillView.Tests.Maintenance/GhSharedLockGuardTests/NamespacedAliasesAndTruncatedListingCannotBypassCollisionGuard"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/collision-tests.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 3.11,
+    "name": "collision-tests"
+  },
+  {
+    "argv": [
+      "/Users/kharder/source/rc-tests/sdk-10.0.402-arm64/dotnet",
+      "test",
+      "--project",
+      "tests/SkillView.IntegrationTests/SkillView.IntegrationTests.csproj",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--filter-query",
+      "/*/SkillView.IntegrationTests.Ui/SkillViewAppIntegrationTests/RunAsync_DiscoverStartupTypingReachesQueryWithoutFocusShortcut"
+    ],
+    "log": "/Users/kharder/source/rc-tests/macos-confirmation-99409ee/startup-typing-tests.log",
+    "status": "passed",
+    "exitCode": 0,
+    "seconds": 1.62,
+    "name": "startup-typing-tests"
+  }
+]

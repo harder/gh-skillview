@@ -1,0 +1,27 @@
+{
+  "case": "empty",
+  "fixture": "/private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-focused-empty-q9op6y6m",
+  "binary": "/Users/kharder/source/rc-tests/acceptance-e134952-macos/supplemental/app/skillview",
+  "binarySha256": "6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476",
+  "size": "80x24",
+  "terminal": "POSIX PTY xterm-256color; inherited repository probe/ANSI helper",
+  "actions": [
+    {
+      "phase": "settled-before-input",
+      "seconds": 3.058,
+      "transcriptBytes": 8225,
+      "activeView": "Discover"
+    },
+    {
+      "phase": "after-typing",
+      "seconds": 5.145,
+      "transcriptBytes": 10052,
+      "activeView": "Discover"
+    }
+  ],
+  "status": "passed",
+  "startupInventorySettled": true,
+  "entireQueryInDiscover": true,
+  "exitCode": 0,
+  "processStopped": true
+}

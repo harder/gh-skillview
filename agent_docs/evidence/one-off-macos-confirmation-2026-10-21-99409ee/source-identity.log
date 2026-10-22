@@ -1,0 +1,3 @@
+git diff --quiet e134952 99409ee -- src
+exit=0; no product-source changes between original native AOT build commit and confirmation base.
+Native binary SHA256: 6cad7a2bb4849f62b610b7b40309e2c24893e65844b806013238880144abb476

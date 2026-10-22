@@ -1,0 +1,17 @@
+20:26:59.314 Info  [startup] SkillView invocation=Standalone dispatch=Tui
+20:26:59.318 Debug [startup] TUI boot time 4ms
+20:26:59.401 Debug [subprocess] exec: /opt/homebrew/bin/gh --version
+20:26:59.512 Debug [subprocess] exit=0 dur=110ms /opt/homebrew/bin/gh
+20:26:59.512 Info  [env] gh 2.102.0 at /opt/homebrew/bin/gh meets minimum 2.97.0
+20:26:59.512 Debug [subprocess] exec: /opt/homebrew/bin/gh auth status
+20:26:59.618 Debug [subprocess] exit=1 dur=107ms /opt/homebrew/bin/gh
+20:26:59.618 Info  [auth] no active gh authentication
+20:26:59.618 Debug [subprocess] exec: /opt/homebrew/bin/gh skill --help
+20:26:59.721 Debug [subprocess] exit=0 dur=103ms /opt/homebrew/bin/gh
+20:26:59.722 Debug [subprocess] exec: /opt/homebrew/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+20:26:59.722 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+20:26:59.871 Debug [subprocess] exit=128 dur=149ms /usr/bin/git
+20:26:59.930 Info  [inventory] scan roots resolved: 0
+20:26:59.931 Info  [inventory] filesystem scan found 0 skill(s) in 0ms
+20:26:59.964 Debug [subprocess] exit=0 dur=243ms /opt/homebrew/bin/gh
+20:26:59.964 Info  [inventory] gh skill list returned 0 record(s)

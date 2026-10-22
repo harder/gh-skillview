@@ -1,0 +1,19 @@
+20:27:04.434 Info  [startup] SkillView invocation=Standalone dispatch=Tui
+20:27:04.438 Debug [startup] TUI boot time 3ms
+20:27:04.504 Debug [subprocess] exec: /opt/homebrew/bin/gh --version
+20:27:04.607 Debug [subprocess] exit=0 dur=103ms /opt/homebrew/bin/gh
+20:27:04.607 Info  [env] gh 2.102.0 at /opt/homebrew/bin/gh meets minimum 2.97.0
+20:27:04.607 Debug [subprocess] exec: /opt/homebrew/bin/gh auth status
+20:27:04.714 Debug [subprocess] exit=1 dur=107ms /opt/homebrew/bin/gh
+20:27:04.714 Info  [auth] no active gh authentication
+20:27:04.714 Debug [subprocess] exec: /opt/homebrew/bin/gh skill --help
+20:27:04.816 Debug [subprocess] exit=0 dur=102ms /opt/homebrew/bin/gh
+20:27:04.816 Debug [subprocess] exec: /opt/homebrew/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version
+20:27:04.817 Debug [subprocess] exec: /usr/bin/git rev-parse --show-toplevel
+20:27:04.969 Debug [subprocess] exit=128 dur=152ms /usr/bin/git
+20:27:04.982 Info  [inventory] scan roots resolved: 1
+20:27:04.996 Info  [inventory] filesystem scan found 1 skill(s) in 13ms
+20:27:05.053 Debug [subprocess] exit=0 dur=237ms /opt/homebrew/bin/gh
+20:27:05.053 Info  [inventory] gh skill list returned 1 record(s)
+20:27:05.053 Debug [subprocess] exec: /opt/homebrew/bin/gh skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir /private/var/folders/f_/4f2gwv6x5qzflv1rg915_c740000gp/T/skillview-focused-populated-44to_ck3/home/.agents/skills
+20:27:05.161 Debug [subprocess] exit=0 dur=107ms /opt/homebrew/bin/gh

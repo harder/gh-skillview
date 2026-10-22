@@ -1,0 +1,24 @@
+┌┤SkillView — skillview├───────────────────────────────────────────────────────┐
+│                                   ◇ Discover     ▣ Installed     △ Changes   │
+│Installed skills                                                              │
+│Filter:                                        name · path · agent · package  │
+│Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV    │
+│review · E loading · K check · R local reimport                               │
+│───────────────────────────┬───┬─────┬─────┐   focus-fixture                ▲ │
+│Name                       │Loc│State│Agen…│                                █ │
+│───────────────────────────┼───┼─────┼─────┤   Summary                      ░ │
+│focus-fixture              │USR│OK   │UNI …│                                ░ │
+│                                               • Path:                      ░ │
+│                                                 /private/var/folders/f_/4f2░ │
+│                                                 wv6x5qzflv1rg915_c740000gp/░ │
+│                                                 /skillview-focused-populate░ │
+│                                                 -44to_ck3/home/.agents/skil░ │
+│                                                 s/focus-fixture            ░ │
+│                                                                            ░ │
+│                                               Installation address ID:     ░ │
+│                                               a8ec9ba9398f0aa95fbb00ac7ec34░ │
+│                                               997b6cdc9f094c2de904a6511c112▼ │
+│   1 skill(s) · 1 location(s) · sort name · merged inventory                  │
+│                                                                              │
+│ Agents UNI CDX CLN WAR gh 2.102.0 — press '/' to search, 'd' …    Ctrl+Q:Quit│
+└──────────────────────────────────────────────────────────────────────────────┘
