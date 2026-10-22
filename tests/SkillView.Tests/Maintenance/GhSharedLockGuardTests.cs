@@ -120,8 +120,20 @@ public sealed class GhSharedLockGuardTests
             File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             var marker = Path.Combine(home.FullName, "mutated");
             var logger = new Logger();
+            // The small output budget targets gh listing, not a possibly long
+            // checkout path returned by ambient Git project-root discovery.
+            var privateGit = Path.Combine(home.FullName, ".git");
             var runner = new ProcessRunner(logger, maxCapturedCharsPerStream: truncate ? 64 : 4096,
-                environment: new Dictionary<string, string> { ["HOME"] = home.FullName, ["SKILLVIEW_TEST_MUTATION"] = marker });
+                environment: new Dictionary<string, string>
+                {
+                    ["HOME"] = home.FullName,
+                    ["USERPROFILE"] = home.FullName,
+                    ["GIT_DIR"] = privateGit,
+                    ["GIT_WORK_TREE"] = home.FullName,
+                    ["GIT_COMMON_DIR"] = privateGit,
+                    ["GIT_CONFIG_COUNT"] = "0",
+                    ["SKILLVIEW_TEST_MUTATION"] = marker
+                }, defaultWorkingDirectory: home.FullName);
             var result = await new GhSkillInstallService(runner, logger).InstallAsync(fake, "different/repo", requested,
                 new(All: requested is null), TestContext.Current.CancellationToken);
             Assert.False(result.Succeeded);
