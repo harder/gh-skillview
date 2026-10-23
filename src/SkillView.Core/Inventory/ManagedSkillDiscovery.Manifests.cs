@@ -78,15 +78,15 @@ internal sealed partial class ManagedSkillDiscovery
                 }
                 if (payloadBoundaries is null) Root(candidate, region, context);
                 else foreach (var boundary in payloadBoundaries)
-                {
-                    token.ThrowIfCancellationRequested();
-                    var physicalBoundary = OwnershipPath.CanonicalCandidate(boundary.Path)
-                        ?? throw new IOException("Explicit plugin payload boundary is unobserved.");
-                    if (PathIdentity.IsInside(canonicalCandidate, physicalBoundary)) Root(candidate, region, context);
-                    else if (PathIdentity.IsInside(physicalBoundary, canonicalCandidate)
-                        && !Exists(Path.Combine(candidate, LocalSkillScanner.SkillFileName)))
-                        Root(boundary.Path, region, boundary);
-                }
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var physicalBoundary = OwnershipPath.CanonicalCandidate(boundary.Path)
+                            ?? throw new IOException("Explicit plugin payload boundary is unobserved.");
+                        if (PathIdentity.IsInside(canonicalCandidate, physicalBoundary)) Root(candidate, region, context);
+                        else if (PathIdentity.IsInside(physicalBoundary, canonicalCandidate)
+                            && !Exists(Path.Combine(candidate, LocalSkillScanner.SkillFileName)))
+                            Root(boundary.Path, region, boundary);
+                    }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             { Incomplete(path, ex.Message); }

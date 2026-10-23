@@ -972,6 +972,12 @@ public static partial class CliDispatcher
             return ExitCodes.InvalidUsage;
         }
 
+        if (!string.IsNullOrEmpty(parsed.Version) && string.IsNullOrEmpty(parsed.SkillName))
+        {
+            Console.Error.WriteLine("skillview: preview --version requires a skill selector");
+            return ExitCodes.InvalidUsage;
+        }
+
         var report = await services.EnvironmentProbe.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!report.GhFound || !report.GhMeetsMinimum || !report.GhSkillAvailable)
         {
@@ -1023,12 +1029,12 @@ public static partial class CliDispatcher
         if (positional.Count > 0) repo = positional[0];
         if (positional.Count > 1) skill = positional[1];
         // Allow `owner/repo@ref` shorthand in the first positional.
-        if (repo is not null && version is null)
+        if (repo is not null)
         {
             var at = repo.LastIndexOf('@');
             if (at > 0 && at < repo.Length - 1)
             {
-                version = repo[(at + 1)..];
+                version ??= repo[(at + 1)..];
                 repo = repo[..at];
             }
         }

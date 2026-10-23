@@ -554,6 +554,17 @@ public class CliDispatcherErrorTests : IDisposable
 
     // --- preview parser edge cases ---------------------------------------
 
+    [Theory]
+    [InlineData("owner/repo", "--version", "v2.0.0")]
+    [InlineData("owner/repo@v2.0.0")]
+    public async Task VersionedPreviewRequiresSkillSelector(params string[] arguments)
+    {
+        var (code, _, stderr) = await RunCliAsync("skillview", ["preview", .. arguments]);
+
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.Contains("requires a skill selector", stderr);
+    }
+
     [Fact]
     public void ParsePreviewArgs_RepoAtRef()
     {
@@ -566,6 +577,7 @@ public class CliDispatcherErrorTests : IDisposable
     public void ParsePreviewArgs_ExplicitVersionOverridesAtRef()
     {
         var args = CliDispatcher.ParsePreviewArgs(new[] { "owner/repo@v1.0", "--version", "v3.0" });
+        Assert.Equal("owner/repo", args.Repo);
         Assert.Equal("v3.0", args.Version);
     }
 

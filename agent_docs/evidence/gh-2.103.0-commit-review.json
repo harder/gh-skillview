@@ -1,0 +1,3019 @@
+{
+  "scope": {
+    "repository": "cli/cli",
+    "base": "v2.102.0",
+    "baseSha": "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+    "latest": "v2.103.0",
+    "headSha": "7948e8056e45ac3c729b829e0eafe2d0797a95c6",
+    "releasePublishedAt": "2026-10-21T15:33:31Z",
+    "totalCommits": 243,
+    "uniqueCommits": 243,
+    "pages": [
+      100,
+      100,
+      43
+    ],
+    "patchRelease": {
+      "tag": "v2.102.1",
+      "commits": [
+        "823af25b5f3974ac77717cdb5a9ae66e4ee96b03",
+        "89d7dcec017194af1d6f8853176b2dae9c1da762"
+      ],
+      "changedFiles": [
+        "go.mod",
+        "go.sum"
+      ]
+    }
+  },
+  "method": "Retrieved all comparison pages and every individual commit. Reviewed commit subjects and changed-file lists, then relevant skill/authentication/extension diffs and final source. Historical merge imports were compared against baseline blobs; final skill subtree identities were compared independently. Categories identify review areas, not runtime compatibility verdicts.",
+  "unchangedSkillTrees": [
+    {
+      "path": "internal/skills",
+      "base": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "head": "ebe70235f23e47faac50c7e7c0f64ab877cea084"
+    },
+    {
+      "path": "pkg/cmd/skills",
+      "base": "39560bf716d38e83c18a9704a76831c9374934ab",
+      "head": "39560bf716d38e83c18a9704a76831c9374934ab"
+    }
+  ],
+  "historicalMerge": {
+    "sha": "a6435ab5c852bd86dc2d7d5f5367dc5f65930627",
+    "searchImplementationBlob": "ae32dd45a84984c46fbaeac869aa8596c716bc5b",
+    "searchTestBlob": "8f2fe51f0597c366504ffd54e1737035295307da",
+    "bothAlreadyInBaseline": true
+  },
+  "assets": [
+    {
+      "version": "2.97.0",
+      "sha256": "sha256:73ea440ecad9c9e284429997ee6f93577bc6f7bc6fba357ef62c53ad8fb641a5",
+      "url": "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_arm64.tar.gz"
+    },
+    {
+      "version": "2.102.0",
+      "sha256": "sha256:7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484",
+      "url": "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_arm64.tar.gz"
+    },
+    {
+      "version": "2.102.1",
+      "sha256": "sha256:5019b3cc6e8a03bb4d88600f8dbda2add8e6407705c159b0c63151036e77a1af",
+      "url": "https://github.com/cli/cli/releases/download/v2.102.1/gh_2.102.1_linux_arm64.tar.gz"
+    },
+    {
+      "version": "2.103.0",
+      "sha256": "sha256:7f322df34e624d14f5ec0c4acb121fd6dfa14392fdbbd1066aa8e0a05ac3721e",
+      "url": "https://github.com/cli/cli/releases/download/v2.103.0/gh_2.103.0_linux_arm64.tar.gz"
+    }
+  ],
+  "verification": {
+    "host": "Ubuntu 26.04 Linux ARM64",
+    "sdk": "10.0.113",
+    "runtime": "10.0.13",
+    "build": {
+      "passed": true,
+      "warnings": 0,
+      "errors": 0,
+      "selfContained": false
+    },
+    "format": {
+      "passed": true
+    },
+    "tests": {
+      "passed": 1996,
+      "failed": 0,
+      "skipped": 0,
+      "note": "Default full suite; opt-in contracts also executed separately with SKILLVIEW_CONTRACT_TESTS=true."
+    },
+    "contracts": [
+      {
+        "gh": "2.97.0",
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "gh": "2.102.1",
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "gh": "2.103.0",
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "helpComparison": {
+      "versions": [
+        "2.97.0",
+        "2.102.0",
+        "2.102.1",
+        "2.103.0"
+      ],
+      "commands": [
+        "skill",
+        "skill search",
+        "skill preview",
+        "skill install",
+        "skill update",
+        "skill list"
+      ],
+      "identical": true,
+      "agents": 48,
+      "exactCatalogMatch": true
+    },
+    "limitations": [
+      "Linux ARM64 checks only; no new Windows/macOS/AOT run.",
+      "Expiring credential output tested with source-derived fixtures; actual OAuth credential rotation was not forced."
+    ],
+    "commands": {
+      "build": "dotnet build --no-restore -p:SelfContained=false",
+      "format": "dotnet format SkillView.sln --no-restore --verify-no-changes",
+      "suite": "TMPDIR=/var/tmp dotnet test --no-build --no-restore -p:SelfContained=false",
+      "contracts": "PATH=<verified-gh-bin>:$PATH TMPDIR=/var/tmp SKILLVIEW_CONTRACT_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --no-build --no-restore --filter-trait Category=Contract"
+    },
+    "smoke": {
+      "doctor": {
+        "version": "2.103.0",
+        "baselineOk": true,
+        "loggedIn": true
+      },
+      "search": {
+        "query": "gh",
+        "owner": "cli",
+        "results": 2
+      },
+      "preview": {
+        "repo": "cli/cli",
+        "skill": "skills/gh-skill",
+        "version": "v2.103.0",
+        "markdownCharacters": 8160
+      },
+      "extension": {
+        "invocation": "GhExtension",
+        "version": "2.103.0",
+        "correctInvokingHost": true,
+        "olderGhOnPath": true
+      }
+    },
+    "discoveredDefect": {
+      "command": "skillview preview cli/cli skills/gh-skill --version v2.103.0 --json",
+      "before": {
+        "exitCode": 10,
+        "message": "Repository suffix cli/cli@v2.103.0 was treated as part of the repository name and produced HTTP 404."
+      },
+      "after": {
+        "exitCode": 0,
+        "argumentShape": "gh skill preview -- cli/cli skills/gh-skill@v2.103.0"
+      },
+      "regression": "Live previews of skills/gh at v2.102.0 and v2.103.0 distinguish content using the refresh_expired marker."
+    },
+    "initialCheckCorrections": [
+      "The first live preview contract expected an auth-login command that is absent from the upstream skill; it was corrected to use the actual refresh_expired content marker.",
+      "The extension fixture was corrected to use gh extension install . and the built apphost. The final check verifies GhExtension invocation and the exact GH_PATH."
+    ]
+  },
+  "commits": [
+    {
+      "sha": "49d1506dbc67ecbd8f43103208d6566c5858a7aa",
+      "subject": "build(deps): bump go-gh and oauth for refreshable credentials",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "d55e1d4685e4fb5c3123c168c10b600c8cd8c84d",
+      "subject": "fix(gh): introduce gh.Credential and switch auth storage interface to it",
+      "reviewArea": "authentication-integration",
+      "files": [
+        ".gitignore",
+        "internal/gh/gh.go"
+      ]
+    },
+    {
+      "sha": "bb793c5db983a099bbc55e12b87043676258a3e3",
+      "subject": "fix(config): migrate auth storage layer and callers to gh.Credential",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "internal/attachments/client_test.go",
+        "internal/authflow/flow.go",
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go",
+        "internal/ghcmd/cmd.go",
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/shared/capi.go",
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go",
+        "pkg/cmd/auth/logout/logout_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/writeable.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/config/get/get.go"
+      ]
+    },
+    {
+      "sha": "2761962e6aefc7436f2cf947958bead70e60cb87",
+      "subject": "fix(flock): add blocking lock acquisition with timeout",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/flock/flock.go",
+        "internal/flock/flock_test.go"
+      ]
+    },
+    {
+      "sha": "543ced087c7ef3a7069ebfb09f065df38240b137",
+      "subject": "Remove CLAUDE.md in favor of AGENTS.md",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "CLAUDE.md"
+      ]
+    },
+    {
+      "sha": "2f195d6788434d355990f3439d22da009040be17",
+      "subject": "Resolve --attach references against the body file's directory",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "internal/attachments/attach.go",
+        "internal/attachments/attach_test.go",
+        "internal/attachments/doc.go",
+        "internal/attachments/references.go",
+        "internal/attachments/references_fixture_test.go",
+        "internal/attachments/references_test.go",
+        "internal/attachments/test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/comment/comment_test.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/comment/comment_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable.go",
+        "pkg/cmd/pr/shared/commentable_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "c07e1dd05400d1df17e79f5cbf42669e211741ad",
+      "subject": "Attach one set of files to several Markdown documents",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/attachments/attach.go",
+        "internal/attachments/attach_test.go",
+        "internal/attachments/doc.go"
+      ]
+    },
+    {
+      "sha": "01f9dd397519808881e0b41728f6d6ee7ab19bd5",
+      "subject": "Add issue artifact API client",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/client/types_test.go"
+      ]
+    },
+    {
+      "sha": "160715502db6aa37ce280d0c3b960f0042f42d31",
+      "subject": "Add gh issue artifact list",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/issue.go"
+      ]
+    },
+    {
+      "sha": "d6eac5cdb4956a58d79acfbfb89edbb9ed77ca72",
+      "subject": "Add issue artifact Get to the API client",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/client/types_test.go"
+      ]
+    },
+    {
+      "sha": "2a4a25dadf541059b5a5c4cbda9e063a63d3b619",
+      "subject": "Add gh issue artifact view",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "63200abe505bd3b78ac94461884cceb838413675",
+      "subject": "Add issue artifact Delete to the API client",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go"
+      ]
+    },
+    {
+      "sha": "ea2fd6b15178c33ea3acf8ac6c50ecdce472f1f9",
+      "subject": "Add gh issue artifact delete",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go"
+      ]
+    },
+    {
+      "sha": "64da12d3e28eb28d8474a375dbdfec63f8715c95",
+      "subject": "Move artifact version lookup to the shared package",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go"
+      ]
+    },
+    {
+      "sha": "7d61f95304508abe038a49355fdd98d8dab74105",
+      "subject": "Add gh issue artifact download",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go"
+      ]
+    },
+    {
+      "sha": "636297fb9b2e96fe8aaf1bb19e42c5124e4c05a2",
+      "subject": "Add issue artifact Create to the API client",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go"
+      ]
+    },
+    {
+      "sha": "817a1a91e46738ae442ff69e7c36248f276aca0a",
+      "subject": "Export the --attach <file>#<text> parsing",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/attachments/flags.go",
+        "internal/attachments/flags_test.go"
+      ]
+    },
+    {
+      "sha": "10d9dd67a1492d4d99f085e0cb1be7fc337f0d8d",
+      "subject": "Add gh issue artifact create",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/issue.go"
+      ]
+    },
+    {
+      "sha": "ea4e1b57a35b0b66c6bb37dc2c6516d4badaa9da",
+      "subject": "Add issue artifact Update to the API client",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go"
+      ]
+    },
+    {
+      "sha": "f43525d7f7a0655fa034bd3403f1d880074dcc0d",
+      "subject": "Move the artifact --attach uploader to the shared package",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go"
+      ]
+    },
+    {
+      "sha": "740b05942657170a840cc8bee293f63e07fe9a0b",
+      "subject": "Add gh issue artifact edit",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go"
+      ]
+    },
+    {
+      "sha": "92561b6aad6988bf6e98d5ffe2bdf1425b9c74c1",
+      "subject": "Document gh issue artifact in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "a6435ab5c852bd86dc2d7d5f5367dc5f65930627",
+      "subject": "Merge trunk into babakks/refresh-token-a-foundation",
+      "reviewArea": "merge-imports-existing-baseline-skill-search-fix",
+      "files": [
+        ".github/ISSUE_TEMPLATE/bug_report.md",
+        ".github/ISSUE_TEMPLATE/config.yml",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/SECURITY.md",
+        ".github/skills/cli-exercise/.gitignore",
+        ".github/skills/cli-exercise/SKILL.md",
+        ".github/skills/cli-exercise/internal/cli-exercise-evidence/SKILL.md",
+        ".github/skills/cli-exercise/internal/cli-exercise-exact/SKILL.md",
+        ".github/skills/cli-exercise/internal/cli-exercise-explore/SKILL.md",
+        ".github/skills/cli-exercise/internal/cli-exercise-preflight/SKILL.md",
+        ".github/skills/cli-exercise/internal/cli-exercise-run/SKILL.md",
+        ".github/skills/cli-exercise/references/controllers.md",
+        ".github/skills/cli-exercise/references/examples.md",
+        ".github/skills/cli-exercise/references/maintenance.md",
+        ".github/skills/cli-exercise/references/prerequisites.md",
+        ".github/skills/cli-exercise/references/recording-sessions.md",
+        ".github/skills/cli-exercise/references/run-contract.md",
+        ".github/skills/cli-exercise/references/runtime-interface.md",
+        ".github/skills/cli-exercise/scripts/package-lock.json",
+        ".github/skills/cli-exercise/scripts/package.json",
+        ".github/skills/cli-exercise/scripts/terminal.mjs",
+        ".github/skills/cli-exercise/tests/skill-evaluations.json",
+        ".github/skills/cli-exercise/tool/go.mod",
+        ".github/skills/cli-exercise/tool/go.sum",
+        ".github/skills/cli-exercise/tool/internal/cliutil/environment.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/environment_test.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/files.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/io.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/io_test.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/process_other.go",
+        ".github/skills/cli-exercise/tool/internal/cliutil/process_unix.go",
+        ".github/skills/cli-exercise/tool/internal/engine/actions.go",
+        ".github/skills/cli-exercise/tool/internal/engine/actions_test.go",
+        ".github/skills/cli-exercise/tool/internal/engine/assertions.go",
+        ".github/skills/cli-exercise/tool/internal/engine/assertions_test.go",
+        ".github/skills/cli-exercise/tool/internal/engine/contract.go",
+        ".github/skills/cli-exercise/tool/internal/engine/options.go",
+        ".github/skills/cli-exercise/tool/internal/engine/runtime.go",
+        ".github/skills/cli-exercise/tool/internal/engine/runtime_test.go",
+        ".github/skills/cli-exercise/tool/internal/engine/screen.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/evidence_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/fonts_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/inspection.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/main.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/model.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/overview.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/presentation_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/raster.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/render.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_inspection.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_inspection_native_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_inspection_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_media.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_media_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_model.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_order.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_order_test.go",
+        ".github/skills/cli-exercise/tool/internal/evidence/session_test.go",
+        ".github/skills/cli-exercise/tool/internal/execution/cli.go",
+        ".github/skills/cli-exercise/tool/internal/execution/cli_test.go",
+        ".github/skills/cli-exercise/tool/internal/execution/fixture_test.go",
+        ".github/skills/cli-exercise/tool/internal/fontutil/font.go",
+        ".github/skills/cli-exercise/tool/internal/fontutil/font_test.go",
+        ".github/skills/cli-exercise/tool/internal/preflight/check.go",
+        ".github/skills/cli-exercise/tool/internal/preflight/main.go",
+        ".github/skills/cli-exercise/tool/internal/preflight/preflight_test.go",
+        ".github/skills/cli-exercise/tool/internal/preflight/probe.go",
+        ".github/skills/cli-exercise/tool/internal/preflight/probe_test.go",
+        ".github/skills/cli-exercise/tool/internal/recording/models.go",
+        ".github/skills/cli-exercise/tool/internal/recording/models_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/adapter.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/adapter_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/cleanup_other_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/cleanup_unix_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/fixture_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/output_unix_test.go",
+        ".github/skills/cli-exercise/tool/internal/terminal/session.go",
+        ".github/skills/cli-exercise/tool/main.go",
+        ".github/skills/cli-exercise/tool/main_test.go",
+        ".github/skills/cli-exercise/tool/skill_test.go",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/govulncheck.yml",
+        "README.md",
+        "acceptance/testdata/repo/repo-set-default-network.txtar",
+        "go.mod",
+        "go.sum",
+        "internal/attachments/client.go",
+        "internal/attachments/client_test.go",
+        "internal/safepaths/absolute.go",
+        "internal/safepaths/link_other.go",
+        "internal/safepaths/link_windows.go",
+        "internal/safepaths/link_windows_test.go",
+        "internal/safepaths/open_nonblock_other.go",
+        "internal/safepaths/open_nonblock_unix.go",
+        "internal/safepaths/root.go",
+        "internal/safepaths/root_mode_unix_test.go",
+        "internal/safepaths/root_race_test.go",
+        "internal/safepaths/root_special_unix_test.go",
+        "internal/safepaths/root_test.go",
+        "internal/safepaths/root_validation_test.go",
+        "internal/zip/fixtures/myproject.zip",
+        "internal/zip/zip.go",
+        "internal/zip/zip_test.go",
+        "pkg/cmd/attestation/download/download_test.go",
+        "pkg/cmd/attestation/download/metadata.go",
+        "pkg/cmd/attestation/download/metadata_mode_unix_test.go",
+        "pkg/cmd/attestation/verification/extensions.go",
+        "pkg/cmd/attestation/verification/extensions_test.go",
+        "pkg/cmd/attestation/verify/policy.go",
+        "pkg/cmd/attestation/verify/policy_test.go",
+        "pkg/cmd/copilot/copilot.go",
+        "pkg/cmd/copilot/copilot_test.go",
+        "pkg/cmd/project/item-list/item_list.go",
+        "pkg/cmd/release/download/download.go",
+        "pkg/cmd/release/download/download_test.go",
+        "pkg/cmd/repo/read-file/read_file.go",
+        "pkg/cmd/repo/read-file/read_file_test.go",
+        "pkg/cmd/repo/setdefault/setdefault.go",
+        "pkg/cmd/repo/setdefault/setdefault_test.go",
+        "pkg/cmd/run/download/download.go",
+        "pkg/cmd/run/download/download_test.go",
+        "pkg/cmd/run/download/fixtures/myproject.zip",
+        "pkg/cmd/run/download/http.go",
+        "pkg/cmd/run/download/http_test.go",
+        "pkg/cmd/search/issues/issues.go",
+        "pkg/cmd/search/prs/prs.go",
+        "pkg/cmd/skills/search/search.go",
+        "pkg/cmd/skills/search/search_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "2d3d20f04058f7b598e41c237105cb85c585c24b",
+      "subject": "Bump go-runewidth to v0.0.30 for faster startup",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "6fc1c29d5477bfe71da7af290eb481c0df7811f1",
+      "subject": "Merge pull request #14577 from cli/williammartin-profile-startup-cost",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "221e12681ec03ed17ebf473d354d5d66797b5bc5",
+      "subject": "Add a shared result line for unchanged artifacts",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go"
+      ]
+    },
+    {
+      "sha": "63166b82ce150653ae761525abe33df0417f708f",
+      "subject": "Add gh issue artifact edit --restore-version",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go"
+      ]
+    },
+    {
+      "sha": "5f85ec828f6d2fe28d81ba71a61b8a2181edfb6a",
+      "subject": "Document gh issue artifact edit --restore-version in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "7e47f88bae69f491d43e70e41092a9aa9898aaeb",
+      "subject": "docs: recommend nix-shell and declarative config for Nix/NixOS",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "docs/install_linux.md"
+      ]
+    },
+    {
+      "sha": "17142e08db2e300b37e6da1ddcfb651eb6d9c587",
+      "subject": "Merge pull request #14592 from reginaldalfret/docs/nix-installation-nix-shell",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "docs/install_linux.md"
+      ]
+    },
+    {
+      "sha": "e37cb1ba2dbc310450499b336ab4ab88032426c0",
+      "subject": "Add accessibility statement",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/ACCESSIBILITY.md"
+      ]
+    },
+    {
+      "sha": "c13693ec6a1aa50e3405e0a7399207c6e5ff7cff",
+      "subject": "Initial plan",
+      "reviewArea": "empty-or-tree-identical-merge",
+      "files": []
+    },
+    {
+      "sha": "ba07f601e021d4c160bfb33b01565db5701eb926",
+      "subject": "Document mutually exclusive issue view output modes",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "7da1aa616daf08786a66f0fda6e2bd41c4a7faeb",
+      "subject": "Clarify pull request view comment output modes",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "996be976cad960a726aabb94be67dfc7e31e317b",
+      "subject": "Merge pull request #14616 from cli/copilot/gh-skill-document-issue-view",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "731e9b50e46abbc19c3f78ae0631ada7c773feac",
+      "subject": "Avoid spawning git for each extension at startup",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        "pkg/cmd/root/extension.go",
+        "pkg/extensions/official.go",
+        "pkg/extensions/official_test.go"
+      ]
+    },
+    {
+      "sha": "31d9601e292365301cb5d66c73b4e12334895be1",
+      "subject": "Merge pull request #14583 from cli/bagtoad/add-accessibility-md",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/ACCESSIBILITY.md"
+      ]
+    },
+    {
+      "sha": "2c7ec97fddb8da331803e18e8c33395a3b6537ee",
+      "subject": "Merge pull request #14578 from cli/williammartin-extension-browse-bubbletea",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "internal/build/build.go",
+        "pkg/cmd/extension/browse/browse.go",
+        "pkg/cmd/extension/browse/browse_test.go",
+        "pkg/cmd/extension/browse/model.go",
+        "pkg/cmd/extension/browse/model_test.go",
+        "pkg/cmd/extension/command.go"
+      ]
+    },
+    {
+      "sha": "8301b14b43548414a94f8657475e4104c1d1896b",
+      "subject": "Bump shell-quote to 1.11.0 in cli-exercise skill",
+      "reviewArea": "upstream-repository-tooling",
+      "files": [
+        ".github/skills/cli-exercise/scripts/package-lock.json"
+      ]
+    },
+    {
+      "sha": "8db3c3107a174c51de4758f53d5b27911650931b",
+      "subject": "Merge pull request #14625 from cli/williammartin-bump-shell-quote",
+      "reviewArea": "upstream-repository-tooling",
+      "files": [
+        ".github/skills/cli-exercise/scripts/package-lock.json"
+      ]
+    },
+    {
+      "sha": "8817625ba7c265b0b00867aca01237184c96ea2b",
+      "subject": "Test isRelativePath with Windows drive paths",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/attachments/references_test.go"
+      ]
+    },
+    {
+      "sha": "c7c38472a725010e96e0ba28a48b78d60d07efcf",
+      "subject": "Add cmdutil.ReadMarkdownBodyFile",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmdutil/file_input.go",
+        "pkg/cmdutil/file_input_test.go"
+      ]
+    },
+    {
+      "sha": "0d1d62eacad41203ed19178be1b95bc32c1d1481",
+      "subject": "Scope DocumentResult.Err to the document's own attachments",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/attachments/attach.go"
+      ]
+    },
+    {
+      "sha": "b6cb86775d89b67f572cc1e4b6e06682cee8add8",
+      "subject": "Preallocate the failures in UploadAndAttachDocuments",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/attachments/attach.go"
+      ]
+    },
+    {
+      "sha": "50f6124b5d0063ffc8c967ffb3712e5100fbfc2c",
+      "subject": "Test artifact list and view JSON fields with jsonfieldstest",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "c4055d1f0f56740b6a5949bca2d4db2f1441f941",
+      "subject": "Document how artifact list finds the last page",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go"
+      ]
+    },
+    {
+      "sha": "d3c13784070b345e866ff23ece44b9d5ae4dca34",
+      "subject": "Format --limit as code in artifact list help",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/list/list.go"
+      ]
+    },
+    {
+      "sha": "7129683381b534a78c97acf7ac0a75b75c94fa03",
+      "subject": "Remove exportTime from artifact JSON export",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/types.go"
+      ]
+    },
+    {
+      "sha": "38787d7aafc92a6e261393de8c6ef752539f9615",
+      "subject": "Show usage for invalid artifact command arguments",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "32c8ada6459296340673d2aa6dd2572e2de55c81",
+      "subject": "Say which version artifact view shows by default",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/view/view.go"
+      ]
+    },
+    {
+      "sha": "01d01a44f94a10b5689d187f89d0b350fbc30115",
+      "subject": "Report artifact delete results like other gh delete commands",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "cde6bc91b4ce993674198f8e2b035daa657100ad",
+      "subject": "Refuse repeated artifact numbers in delete and download",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go"
+      ]
+    },
+    {
+      "sha": "577b3b86b970ebe20656d7553c1f90e4d1be0b8f",
+      "subject": "Stub artifact deletes with the responses a delete can get",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_test.go"
+      ]
+    },
+    {
+      "sha": "36eb08f891769ae0aa72924c81a1a1ce79c97f1e",
+      "subject": "Reword artifact delete help without naming gh",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/delete/delete.go"
+      ]
+    },
+    {
+      "sha": "6ea10e3fa9998797e9ccea325272b9d9c02e0993",
+      "subject": "Name the lookup failure check in artifact delete",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/delete/delete.go"
+      ]
+    },
+    {
+      "sha": "b637d4c558f4eddcb30e1600307bb2df8943dbd7",
+      "subject": "Leave validation checks to CI in bump-go script (#14631)",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/scripts/bump-go.sh"
+      ]
+    },
+    {
+      "sha": "de177626187339ecf12f0b0c51cd4c09299f6505",
+      "subject": "Bump Go to 1.27.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/golangci-lint-version",
+        "go.mod"
+      ]
+    },
+    {
+      "sha": "a45729e87739152888e3d4ab708c18721dc2d028",
+      "subject": "Avoid spawning git for each extension at startup (#14620)",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        "pkg/cmd/root/extension.go",
+        "pkg/extensions/official.go",
+        "pkg/extensions/official_test.go"
+      ]
+    },
+    {
+      "sha": "31778eb069e08d3a4087a1693cda6d9c9ef4aa09",
+      "subject": "Bump golang.org/x/net to v0.60.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "581392e6aea8df94b1fde390d920a4b0d99c12a2",
+      "subject": "Merge pull request #14632 from cli/bump-go-1.27.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/golangci-lint-version",
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "d53524f2af3c2d3e92630cee775806466596edce",
+      "subject": "chore(deps): bump golang.org/x/sync from 0.23.0 to 0.24.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "424f38df651e0b178d752073859af7ee1d3d02c3",
+      "subject": "chore(deps): bump github.com/mattn/go-colorable from 0.1.15 to 0.1.16",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "afbc62c9cdf7bb15c8aab1c6198cd6531108d44b",
+      "subject": "Merge pull request #14633 from cli/dependabot/go_modules/golang.org/x/sync-0.24.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "ec5b512045db67e5a2a4ff4a1b02660b2fb24390",
+      "subject": "Merge pull request #14634 from cli/dependabot/go_modules/github.com/mattn/go-colorable-0.1.16",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "f7f2583e9c6cc8a6dd41acef04c25ce85e80a6d3",
+      "subject": "Mention --dir in artifact download help",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download.go"
+      ]
+    },
+    {
+      "sha": "2f638908e3b3434495ea3170244edd2afc24f957",
+      "subject": "Refuse a blank --dir in artifact download",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go"
+      ]
+    },
+    {
+      "sha": "d2fd24bbb4d4e88801b256882a12ca8d2f5862a5",
+      "subject": "Simplify the failure tracking in artifact download",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download.go"
+      ]
+    },
+    {
+      "sha": "9175cdca666eaa04ffc435fdd977edb91587945d",
+      "subject": "Fix the unclean background colors of gh-search-code",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/search/code/code.go"
+      ]
+    },
+    {
+      "sha": "de784b80f41bce9575656e09b29e17191b870507",
+      "subject": "Merge pull request #14474 from jarrensj/remove-claude-md",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "CLAUDE.md"
+      ]
+    },
+    {
+      "sha": "f81606a981261ca70a2846d48a5d9d216e9634a7",
+      "subject": "Reset search code highlight only when open",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/search/code/code.go",
+        "pkg/cmd/search/code/code_test.go"
+      ]
+    },
+    {
+      "sha": "54a671d9a8f8c7a785c132d6f6a25375dc96acc1",
+      "subject": "Merge pull request #14648 from A4-Tacks/end-search-bg",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/search/code/code.go",
+        "pkg/cmd/search/code/code_test.go"
+      ]
+    },
+    {
+      "sha": "94c5a6fa2781cb8d6391e032c1943aa98c5d64f7",
+      "subject": "Clarify --repo and --owner checks for attestation bundles",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/attestation/verify/verify.go"
+      ]
+    },
+    {
+      "sha": "b9c0f5d29ac6ad5ec9974b38f8a73207fa5a3701",
+      "subject": "chore(deps): bump the codeql-actions group with 3 updates",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ]
+    },
+    {
+      "sha": "35c88986a749c8d9ba38141113563939b3e2ddde",
+      "subject": "chore(deps): bump charm.land/bubbletea/v2 from 2.0.10 to 2.1.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "c78fffd4490db243256d7ac629a7373375e64c63",
+      "subject": "chore(deps): bump golang.org/x/crypto from 0.57.0 to 0.58.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "d6b82b12e67d108b7c82d76d943a3a47814acbc1",
+      "subject": "Merge pull request #14650 from cli/bdehamer-attestation-verify-bundle-help",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/attestation/verify/verify.go"
+      ]
+    },
+    {
+      "sha": "8676746b8c6e036b7c2677794a0bb34e0aeb7f68",
+      "subject": "Explain the kept extension in artifact download file names",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download.go"
+      ]
+    },
+    {
+      "sha": "febd360b3449ef354efc8a46a9ea863eaef0e3f7",
+      "subject": "Refuse a symlink at artifact download's --output path",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go"
+      ]
+    },
+    {
+      "sha": "034fa35439456a14530780c46e85afc255427dd9",
+      "subject": "Test artifact download into an existing --dir",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/download/download_test.go"
+      ]
+    },
+    {
+      "sha": "aa344787583ccb3722199cf192a55b26b1a423c9",
+      "subject": "Remove the artifact shared package comment",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/shared/shared.go"
+      ]
+    },
+    {
+      "sha": "13c1c3304dde8fff86225441a8ecf6cd88a6a38c",
+      "subject": "Build artifact request bodies from ad hoc structs",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_test.go"
+      ]
+    },
+    {
+      "sha": "cbf759f375c8449f43d30a8f2217f149a6e65e32",
+      "subject": "Rename the --body source kind in artifact create",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go"
+      ]
+    },
+    {
+      "sha": "358ae9c0c5e57f01ea62554c5682b1b525cd7a97",
+      "subject": "Reword artifact create help without naming gh",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go"
+      ]
+    },
+    {
+      "sha": "d91d73a2214b37895815a1abbbc39c1ddbbef563",
+      "subject": "Reword artifact create and edit examples",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/edit/edit.go"
+      ]
+    },
+    {
+      "sha": "c97f2dbe99a6f16e0ef024492fa7da3e50db1463",
+      "subject": "Drop the add alias from artifact create",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "766f037efa0b8dab2a5500a289f43440c184a85e",
+      "subject": "Format flag names as code in artifact command errors",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "f6dbeb2815c087acdeb3452a0bc3eb64ea31e4fd",
+      "subject": "Say when artifact create needs --name",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go"
+      ]
+    },
+    {
+      "sha": "752564d1254f5bb56bb5e0ca12ec57e2fffeca1a",
+      "subject": "Explain two checks in artifact create's validation",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go"
+      ]
+    },
+    {
+      "sha": "7694b6b536896353316175c8d8d1dcc69a51aa39",
+      "subject": "Show usage for a blank artifact name after #",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go"
+      ]
+    },
+    {
+      "sha": "2694da1fefc712107b1db77346e2ca8d1f74790b",
+      "subject": "Name the step that failed in artifact create and edit errors",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go"
+      ]
+    },
+    {
+      "sha": "a4e66b5de19282ea54eee7803bb58095d9c096a4",
+      "subject": "Say how to give a link artifact new content",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go"
+      ]
+    },
+    {
+      "sha": "7949486f8d71d2affada068e7662eb597b054aac",
+      "subject": "List every piped artifact view field in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "f86c7c885354c8ee4688a5032676913f130e1379",
+      "subject": "Say that artifact view's --version, --json and --web exclude each other",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "97171cb91d10b13e0fde128f2492ac222d7d18f8",
+      "subject": "Don't promise an order for artifact versions in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "49efcc2240b0424d31dc2077cc3c5e22dba6a2b3",
+      "subject": "Say that artifact create's body flags replace file and URL arguments",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "d463411d598e219aad660eb7326d5a449aa2edc5",
+      "subject": "Say that artifact create's --name can't go with a #<name> suffix",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "1a792b77733cbb0a52ca20084d19b5a0bd3d6597",
+      "subject": "Document partial saves and safe retries in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "e04bc0145a89bb85472ac53fa26cedc9f64a326f",
+      "subject": "Allow attachments only on generic and plan artifacts",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go"
+      ]
+    },
+    {
+      "sha": "379161aa4b74db281dfef89202234915410de5c3",
+      "subject": "Show issue artifact URLs in list and view",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/client/types_test.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "3756d3f694808a035c64bec14ab6175f97562c89",
+      "subject": "Accept artifact URLs in issue artifact commands",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go",
+        "pkg/cmdutil/args.go",
+        "pkg/cmdutil/args_test.go"
+      ]
+    },
+    {
+      "sha": "ea5512228b30fe38b68b18232acc4dc8f29acd3a",
+      "subject": "Document issue artifact URLs in the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "efe3c7630da3296a9435293c1a7b0e5358a022e0",
+      "subject": "Fix Go vendoring in Dependabot triage; bump gh-aw",
+      "reviewArea": "upstream-repository-tooling",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/skills/agentic-workflows/SKILL.md",
+        ".github/workflows/agentics-maintenance.yml",
+        ".github/workflows/copilot-setup-steps.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/dependabot-triage.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md"
+      ]
+    },
+    {
+      "sha": "1ea48c825275ff2eb8e31e27777f043ab4fde6c8",
+      "subject": "Keep v3.3.0 label for create-github-app-token pin",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md"
+      ]
+    },
+    {
+      "sha": "e2590dd0f1a0ada394c7d6322594dc87d9408813",
+      "subject": "Merge pull request #14682 from cli/williammartin-fix-dependabot-triage-go-version",
+      "reviewArea": "upstream-repository-tooling",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/skills/agentic-workflows/SKILL.md",
+        ".github/workflows/agentics-maintenance.yml",
+        ".github/workflows/copilot-setup-steps.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/dependabot-triage.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md"
+      ]
+    },
+    {
+      "sha": "68ce8508dbc647f0cfec0f169268cd8a872eaa63",
+      "subject": "chore(deps): bump actions/upload-artifact from 7.0.1 to 7.0.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "9affe938f1eb200c11261da9c519802cf817f4fa",
+      "subject": "chore(deps): bump actions/download-artifact from 8.0.1 to 8.0.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "b33eaba16f4eeddd00bee122cb1d29df8ecbdd9d",
+      "subject": "Merge pull request #14660 from cli/dependabot/go_modules/golang.org/x/crypto-0.58.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "29cc9e1604a1c44f70dc34ab0c21874c7288b5ad",
+      "subject": "Merge pull request #14656 from cli/dependabot/github_actions/actions/upload-artifact-7.0.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "7641f129fb90055a9ada83a241ed36bf9713cf64",
+      "subject": "Merge pull request #14655 from cli/dependabot/github_actions/actions/download-artifact-8.0.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "d742735c68f07e538a0ec17f432db7eff9bab38c",
+      "subject": "Merge pull request #14654 from cli/dependabot/github_actions/codeql-actions-307b189a33",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ]
+    },
+    {
+      "sha": "2c153f50dad5bc14d49fa0813b2c35fb0fd05103",
+      "subject": "Merge pull request #14657 from cli/dependabot/go_modules/charm.land/bubbletea/v2-2.1.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "250db2a79e1a2b8879cb3bf986d9fc71185396de",
+      "subject": "chore(deps): bump google.golang.org/grpc from 1.83.2 to 1.84.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "ff67d7622da2503223b8437e8cfaa39e1f6bf0e2",
+      "subject": "Merge pull request #14485 from cli/dependabot/go_modules/google.golang.org/grpc-1.84.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "38c8ba5c519762ab01c0fc60c1b4c9f4535f8a0b",
+      "subject": "chore(deps): bump github.com/cli/go-gh/v2 from 2.16.1 to 2.16.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "fe6725c66d9b9289e716fb6c941161ed87c3aeb4",
+      "subject": "chore(deps): bump actions/setup-node from 7.0.0 to 7.1.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "98da056e92a33c4def7c23f8ad68256cc65fbc59",
+      "subject": "Merge pull request #14696 from cli/dependabot/go_modules/github.com/cli/go-gh/v2-2.16.2",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "819f972eff771d5ec433c8d03c369cc43f1eab49",
+      "subject": "Merge pull request #14697 from cli/dependabot/github_actions/actions/setup-node-7.1.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "45250aec8ba977669c62384bacaaed290c2460ad",
+      "subject": "chore(deps): bump github.com/klauspost/compress from 1.20.1 to 1.20.3",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "d73d3d8537642bc9195760aa1c1bd1ba996edd0e",
+      "subject": "chore(deps): bump actions/create-github-app-token from 3.2.0 to 3.3.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/acceptance.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "26034fa194e3cd39b99acabbde54ed6c843d491d",
+      "subject": "chore(deps): bump goreleaser/goreleaser-action from 7.2.3 to 7.3.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/deployment.yml"
+      ]
+    },
+    {
+      "sha": "e523cb7f38a0d654f581a1d4b355470c8f56ed54",
+      "subject": "Merge pull request #14707 from cli/dependabot/github_actions/goreleaser/goreleaser-action-7.3.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/deployment.yml"
+      ]
+    },
+    {
+      "sha": "982d09f66295f253d8cf7f0b1fd3f10f77d00e59",
+      "subject": "Merge pull request #14705 from cli/dependabot/go_modules/github.com/klauspost/compress-1.20.3",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "1b0eb4096d53d0c8c35f76cf2aad62529083d93d",
+      "subject": "Restore generated workflow locks",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ]
+    },
+    {
+      "sha": "59e9f78eacdf2554f8534d166808c3e9b8c7ebcb",
+      "subject": "Merge pull request #14706 from cli/dependabot/github_actions/actions/create-github-app-token-3.3.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/acceptance.yml",
+        ".github/workflows/deployment.yml"
+      ]
+    },
+    {
+      "sha": "3d7967df5a94052b0554898ffa02526f0f90b8c9",
+      "subject": "Merge pull request #14678 from cli/bagtoad/artifact-urls",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "internal/attachments/attach.go",
+        "internal/attachments/attach_test.go",
+        "internal/attachments/doc.go",
+        "internal/attachments/flags.go",
+        "internal/attachments/flags_test.go",
+        "internal/attachments/references.go",
+        "internal/attachments/references_fixture_test.go",
+        "internal/attachments/references_test.go",
+        "internal/attachments/test.go",
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/client/types_test.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/comment/comment_test.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/issue/issue.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/comment/comment_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable.go",
+        "pkg/cmd/pr/shared/commentable_test.go",
+        "pkg/cmdutil/args.go",
+        "pkg/cmdutil/args_test.go",
+        "pkg/cmdutil/file_input.go",
+        "pkg/cmdutil/file_input_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "4fc08acb5451ab831c8f0a179fb966a6c29eb529",
+      "subject": "Support HTML documents in issue artifact commands",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "6cfbe26f7ff3aadadc8f534f8b82559b949fc538",
+      "subject": "Create HTML documents from .html files",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go"
+      ]
+    },
+    {
+      "sha": "4536b2180ef7444227b41d4b37b80ffe80912655",
+      "subject": "Clarify --comments behavior when piped in view commands",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/discussion/view/view.go",
+        "pkg/cmd/issue/view/view.go",
+        "pkg/cmd/pr/view/view.go"
+      ]
+    },
+    {
+      "sha": "8ea0faaa3d4c7aaaf1378db20a2b238013270a00",
+      "subject": "Clarify PR comments output",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/pr/view/view.go"
+      ]
+    },
+    {
+      "sha": "b758ce35643e64cfe4d61bc58b6009c4088e5e0c",
+      "subject": "Merge pull request #14714 from arsalanyavari/14692-clarify-comments-help",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/discussion/view/view.go",
+        "pkg/cmd/issue/view/view.go",
+        "pkg/cmd/pr/view/view.go"
+      ]
+    },
+    {
+      "sha": "f3e2147f249b228e8a2cbca68c47fc6ef99d3747",
+      "subject": "Fix help text that references nonexistent flags",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/ruleset/view/view.go",
+        "pkg/cmd/search/issues/issues.go",
+        "pkg/cmd/search/prs/prs.go"
+      ]
+    },
+    {
+      "sha": "4537a92f3352c8c4c1fd1b8febba1596059fc9e0",
+      "subject": "Add HTML documents to the gh skill",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "40784251452bad4bd40c165de21c302db88e8a39",
+      "subject": "Merge pull request #14720 from cli/bagtoad/artifact-html",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "9e1e1c929f882fd93e1c67ea520a4529352aab9a",
+      "subject": "Clarify release creation atomicity and immutability",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/release/create/create.go"
+      ]
+    },
+    {
+      "sha": "fa92838bef95fe4a29c1587693885d5e9bdb6cf1",
+      "subject": "Merge pull request #14722 from cli/bdehamer-release-create-atomicity-help",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/release/create/create.go"
+      ]
+    },
+    {
+      "sha": "b1c8c0ae5aec75ec8caf6e537071efc15d274f45",
+      "subject": "Merge pull request #14750 from cli/williammartin-investigate-dependabot-aic",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/scripts/dependabot-triage.sh",
+        ".github/workflows/dependabot-triage-schedule.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/dependabot-triage.md",
+        ".github/workflows/shared/dependabot-triage-security.md"
+      ]
+    },
+    {
+      "sha": "5b0cc54248a3d069b96147188d13cd2f1e976176",
+      "subject": "chore(deps): bump the codeql-actions group with 3 updates (#14751)",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ]
+    },
+    {
+      "sha": "ed40e856ffecd31286733876c613a2d3745e12bd",
+      "subject": "Merge pull request #14719 from cli/bagtoad/fix-help-text-flag-references",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/ruleset/view/view.go",
+        "pkg/cmd/search/issues/issues.go",
+        "pkg/cmd/search/prs/prs.go"
+      ]
+    },
+    {
+      "sha": "5cfe30624ffccf88c319f1e6528a033657b00c99",
+      "subject": "Bump Go to 1.27.3 (#14767)",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/golangci-lint-version",
+        "go.mod"
+      ]
+    },
+    {
+      "sha": "389b60d0b6df69299ccdd36f9a757fe7cf7f5b6a",
+      "subject": "Update glamour to v2",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "pkg/cmd/agent-task/shared/testdata/log-1-want.txt",
+        "pkg/cmd/agent-task/shared/testdata/log-2-want.txt",
+        "pkg/cmd/extension/browse/model.go",
+        "pkg/cmd/status/status.go",
+        "pkg/cmd/status/status_test.go",
+        "pkg/markdown/markdown.go"
+      ]
+    },
+    {
+      "sha": "350fa040f8a13c272a552ae8926dffc38a5a94bf",
+      "subject": "Add specific test for link wrapping",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/pr/view/view_test.go"
+      ]
+    },
+    {
+      "sha": "823af25b5f3974ac77717cdb5a9ae66e4ee96b03",
+      "subject": "Bump Go to 1.27.3",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod"
+      ]
+    },
+    {
+      "sha": "89d7dcec017194af1d6f8853176b2dae9c1da762",
+      "subject": "Bump golang.org/x/net to v0.60.0",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "985fbb2990e0abe2835b0725ea19b3a844244ce2",
+      "subject": "Merge v2.102.1 release branch into trunk",
+      "reviewArea": "empty-or-tree-identical-merge",
+      "files": []
+    },
+    {
+      "sha": "ad27e286ab6eb101f192176defdfea7475e2a267",
+      "subject": "Merge pull request #14770 from cli/bagtoad/merge-v2.102.1",
+      "reviewArea": "empty-or-tree-identical-merge",
+      "files": []
+    },
+    {
+      "sha": "401854ece831e121c046e94566c7f5195fc559f6",
+      "subject": "chore(deps): bump github.com/gabriel-vasile/mimetype from 1.4.15 to 1.4.16 (#14766)",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "1531837d8578fecd64eb8050d44a3665d85f9219",
+      "subject": "Merge pull request #14148 from heaths/issue3718",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "pkg/cmd/agent-task/shared/testdata/log-1-want.txt",
+        "pkg/cmd/agent-task/shared/testdata/log-2-want.txt",
+        "pkg/cmd/extension/browse/model.go",
+        "pkg/cmd/pr/view/view_test.go",
+        "pkg/cmd/status/status.go",
+        "pkg/cmd/status/status_test.go",
+        "pkg/markdown/markdown.go"
+      ]
+    },
+    {
+      "sha": "07c63c05e44d151560e29ca0f16b4d573057e128",
+      "subject": "Merge trunk into babakks/refresh-token-a-foundation",
+      "reviewArea": "extension-or-command-startup",
+      "files": [
+        ".github/ACCESSIBILITY.md",
+        ".github/aw/actions-lock.json",
+        ".github/golangci-lint-version",
+        ".github/scripts/dependabot-triage.sh",
+        ".github/skills/agentic-workflows/SKILL.md",
+        ".github/skills/cli-exercise/scripts/package-lock.json",
+        ".github/workflows/acceptance.yml",
+        ".github/workflows/agentics-maintenance.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/copilot-setup-steps.yml",
+        ".github/workflows/dependabot-triage-schedule.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/dependabot-triage.md",
+        ".github/workflows/deployment.yml",
+        ".github/workflows/govulncheck.yml",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        ".github/workflows/scripts/bump-go.sh",
+        ".github/workflows/shared/dependabot-triage-security.md",
+        "CLAUDE.md",
+        "docs/install_linux.md",
+        "go.mod",
+        "go.sum",
+        "internal/attachments/attach.go",
+        "internal/attachments/attach_test.go",
+        "internal/attachments/doc.go",
+        "internal/attachments/flags.go",
+        "internal/attachments/flags_test.go",
+        "internal/attachments/references.go",
+        "internal/attachments/references_fixture_test.go",
+        "internal/attachments/references_test.go",
+        "internal/attachments/test.go",
+        "internal/build/build.go",
+        "pkg/cmd/agent-task/shared/testdata/log-1-want.txt",
+        "pkg/cmd/agent-task/shared/testdata/log-2-want.txt",
+        "pkg/cmd/attestation/verify/verify.go",
+        "pkg/cmd/discussion/view/view.go",
+        "pkg/cmd/extension/browse/browse.go",
+        "pkg/cmd/extension/browse/browse_test.go",
+        "pkg/cmd/extension/browse/model.go",
+        "pkg/cmd/extension/browse/model_test.go",
+        "pkg/cmd/extension/command.go",
+        "pkg/cmd/issue/artifact/artifact.go",
+        "pkg/cmd/issue/artifact/client/client.go",
+        "pkg/cmd/issue/artifact/client/client_mock.go",
+        "pkg/cmd/issue/artifact/client/client_test.go",
+        "pkg/cmd/issue/artifact/client/types.go",
+        "pkg/cmd/issue/artifact/client/types_test.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/delete/delete.go",
+        "pkg/cmd/issue/artifact/delete/delete_test.go",
+        "pkg/cmd/issue/artifact/download/download.go",
+        "pkg/cmd/issue/artifact/download/download_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/list/list.go",
+        "pkg/cmd/issue/artifact/list/list_test.go",
+        "pkg/cmd/issue/artifact/shared/content.go",
+        "pkg/cmd/issue/artifact/shared/content_test.go",
+        "pkg/cmd/issue/artifact/shared/results.go",
+        "pkg/cmd/issue/artifact/shared/results_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/artifact/view/view.go",
+        "pkg/cmd/issue/artifact/view/view_test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/comment/comment_test.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/issue/issue.go",
+        "pkg/cmd/issue/view/view.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/comment/comment_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable.go",
+        "pkg/cmd/pr/shared/commentable_test.go",
+        "pkg/cmd/pr/view/view.go",
+        "pkg/cmd/pr/view/view_test.go",
+        "pkg/cmd/release/create/create.go",
+        "pkg/cmd/root/extension.go",
+        "pkg/cmd/ruleset/view/view.go",
+        "pkg/cmd/search/code/code.go",
+        "pkg/cmd/search/code/code_test.go",
+        "pkg/cmd/search/issues/issues.go",
+        "pkg/cmd/search/prs/prs.go",
+        "pkg/cmd/status/status.go",
+        "pkg/cmd/status/status_test.go",
+        "pkg/cmdutil/args.go",
+        "pkg/cmdutil/args_test.go",
+        "pkg/cmdutil/file_input.go",
+        "pkg/cmdutil/file_input_test.go",
+        "pkg/extensions/official.go",
+        "pkg/extensions/official_test.go",
+        "pkg/markdown/markdown.go",
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "f2ef40d80d0e0c7e02460d33d7325364129d86a1",
+      "subject": "chore(deps): drop stale cli/oauth v1.2.2 go.sum entries",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "go.sum"
+      ]
+    },
+    {
+      "sha": "ad4a6456e16c09623a0867a175a2cf83f1afc88e",
+      "subject": "Merge pull request #14450 from cli/babakks/refresh-token-a-foundation",
+      "reviewArea": "authentication-integration",
+      "files": [
+        ".gitignore",
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "go.mod",
+        "go.sum",
+        "internal/attachments/client_test.go",
+        "internal/authflow/flow.go",
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go",
+        "internal/flock/flock.go",
+        "internal/flock/flock_test.go",
+        "internal/gh/gh.go",
+        "internal/ghcmd/cmd.go",
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/shared/capi.go",
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go",
+        "pkg/cmd/auth/logout/logout_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/writeable.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/config/get/get.go"
+      ]
+    },
+    {
+      "sha": "9f48d0f777cd67e19401981af26ce8742306bdc7",
+      "subject": "fix(gh): add refreshable credential types and token refresher interface",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/gh/gh.go"
+      ]
+    },
+    {
+      "sha": "e8497912a9a87226d6fcbceeaf7f13cf854a8282",
+      "subject": "fix(gh): add generated TokenRefresher mock",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/gh/mock/token_refresher.go"
+      ]
+    },
+    {
+      "sha": "065791e50536b54e988c051070067331f1a3b785",
+      "subject": "fix(authflow): add OAuth token refresher",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "b40b3a8753512df92e6023b7cf2263187f0106a6",
+      "subject": "fix(config): add refreshable credential storage",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "eda6b8e164c546ceb608b675e6da181345ea25d5",
+      "subject": "fix(config): integrate refreshable credentials into auth config",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go",
+        "internal/config/migrate_test.go",
+        "internal/config/test.go"
+      ]
+    },
+    {
+      "sha": "e7e04a622717bff31bac3c990acfae222449fae3",
+      "subject": "fix(api): refresh expired tokens on API requests",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "internal/attachments/client_test.go"
+      ]
+    },
+    {
+      "sha": "b593e2156abaf47e9d52e7f64566e0bffe051f1a",
+      "subject": "fix(factory): wire the token refresher into the default factory",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/factory/default.go",
+        "pkg/cmd/factory/default_test.go"
+      ]
+    },
+    {
+      "sha": "4f168ce66da877f231bb30958e1e970b95885953",
+      "subject": "Merge pull request #14451 from cli/babakks/refresh-token-b-domain",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "internal/attachments/client_test.go",
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go",
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go",
+        "internal/config/migrate_test.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/config/test.go",
+        "internal/gh/gh.go",
+        "internal/gh/mock/token_refresher.go",
+        "pkg/cmd/factory/default.go",
+        "pkg/cmd/factory/default_test.go"
+      ]
+    },
+    {
+      "sha": "14050c2cc4c1909f6cc9b16b3f2c5635135afd71",
+      "subject": "fix(authflow): return an AuthResult with an optional refreshable credential",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go"
+      ]
+    },
+    {
+      "sha": "d33927fde54793f44ee5203edb43790fd0e7c9d5",
+      "subject": "fix(auth/shared): do not store refreshable credentials in external git helpers",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/gitcredentials/updater.go",
+        "pkg/cmd/auth/shared/gitcredentials/updater_test.go"
+      ]
+    },
+    {
+      "sha": "060fa973181b9e4611d39a2e4ffebb02e3c8b07f",
+      "subject": "fix(auth/shared): store refreshable credentials during login",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "ffcbcbada483bb74defca71c57b8b73a239d4914",
+      "subject": "fix(auth login): add --short-lived flag",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go"
+      ]
+    },
+    {
+      "sha": "1492e8366eadcf6a283c82def9442073d7079bd9",
+      "subject": "fix(auth refresh): preserve or acquire refreshable credentials",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "98ea0f41dad6c1e23297ab378416a164c17b7913",
+      "subject": "fix(auth gitcredential): refresh tokens and mark them non-cacheable for git",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go"
+      ]
+    },
+    {
+      "sha": "a81663f7d80d620b092dab3056778a79ff3e279c",
+      "subject": "Merge pull request #14452 from cli/babakks/refresh-token-c1-login-refresh-gitcredential",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/gitcredentials/updater.go",
+        "pkg/cmd/auth/shared/gitcredentials/updater_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "c1a3f1184049924c57501ea0c3a1c71900931b99",
+      "subject": "fix(auth token): refresh short-lived tokens before printing",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go"
+      ]
+    },
+    {
+      "sha": "b7887068cb6f883edee92181227a302e3a4fd6ae",
+      "subject": "Merge pull request #14453 from cli/babakks/refresh-token-c2-auth-token",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go"
+      ]
+    },
+    {
+      "sha": "ea4f442b3e229cd6d6f3d536a4138894d5cde95c",
+      "subject": "fix(auth status): show and refresh short-lived token details",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "bd0b0e085fac756c1f521ade256a2cbeb9346398",
+      "subject": "Merge pull request #14454 from cli/babakks/refresh-token-c3-auth-status",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "9b2838de9670e70e18b5cdb3efb6339829974f89",
+      "subject": "fix(agent-task/capi): refresh short-lived tokens per CAPI request",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/agent-task/capi/client.go",
+        "pkg/cmd/agent-task/capi/job_test.go",
+        "pkg/cmd/agent-task/capi/sessions_test.go",
+        "pkg/cmd/agent-task/shared/capi.go"
+      ]
+    },
+    {
+      "sha": "d8474903cf4f3456713d3bf0508bdc8c5a61c8c1",
+      "subject": "Merge pull request #14455 from cli/babakks/refresh-token-c4-agent-task-capi",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/agent-task/capi/client.go",
+        "pkg/cmd/agent-task/capi/job_test.go",
+        "pkg/cmd/agent-task/capi/sessions_test.go",
+        "pkg/cmd/agent-task/shared/capi.go"
+      ]
+    },
+    {
+      "sha": "e2985e7f009f7669cd063b1443d8c511fc327b5c",
+      "subject": "test: add guided end-to-end verification script for refreshable tokens",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-e2e.sh"
+      ]
+    },
+    {
+      "sha": "c9d988a6f9c4d06936f01b38ea18e833ad11e039",
+      "subject": "test: add git credential helper end-to-end verification script",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "316e7a80fba9ba68b45cb55e0ade5ab707a54cbd",
+      "subject": "Merge pull request #14456 from cli/babakks/refresh-token-e2e",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "7fea69a1fd0805face4164402826e309bce65ed4",
+      "subject": "fix(api): keep public HTTP client token config backward compatible",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/client_test.go",
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "api/request_test.go",
+        "internal/attachments/client_test.go",
+        "internal/authflow/flow.go",
+        "internal/gh/gh.go",
+        "pkg/auth/credential.go",
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/factory/default.go"
+      ]
+    },
+    {
+      "sha": "7715b6e9cbba1110120cb9a183700c3636e932b5",
+      "subject": "test(config): pin intentional active-token lookup behavior",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go"
+      ]
+    },
+    {
+      "sha": "165affa72a7af4bb7bdf856188d92c828e7e1ab8",
+      "subject": "fix(config): purge refreshable record on non-refreshable login",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "bf41ffd2b7259facb75275fa939ea829049e8300",
+      "subject": "fix(config): align TokenForUser precedence with setActiveCredential",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "cae209fb9c9a5285894d58e4f9546f95940cd386",
+      "subject": "fix(auth refresh): avoid printing short-lived downgrade warning twice",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go"
+      ]
+    },
+    {
+      "sha": "1fb36c1e957c384f8622c3c594c78cc22172c7b6",
+      "subject": "fix(auth refresh): preserve scopes when refreshing an expired refreshable token",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "2eb947df329e7ee38495832f25ca835f881dc0b5",
+      "subject": "fix(auth/shared): offer to set up gh when a non-gh helper meets a refreshable token",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go"
+      ]
+    },
+    {
+      "sha": "00ca7f0ce7501ee6dadab155a6c88bac952cf43e",
+      "subject": "fix(auth/shared): force web flow for short-lived interactive login",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "a5b82df18b30f3ef1f18d8d8e2b9b2b4b58719de",
+      "subject": "fix(auth/shared): clarify warning when declining gh helper setup",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go"
+      ]
+    },
+    {
+      "sha": "d3bea60de51b7671e1c4ab52f93d535f04417243",
+      "subject": "refactor(authflow): extract authResultFromToken for test coverage",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "6c0796608ef518b5a9f409ac3bb4b468261b15ee",
+      "subject": "refactor(auth/token): drop redundant RefreshStatusDone check under --secure-storage",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/token/token.go"
+      ]
+    },
+    {
+      "sha": "604120a8cf26b4c94044553f285f8a9faf2ef321",
+      "subject": "fix(auth/token): restore legacy unkeyed keyring lookup when --user is omitted",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go"
+      ]
+    },
+    {
+      "sha": "93ab2cf49821b16f0880aca846882828932439ab",
+      "subject": "fix(auth/status): handle rejected refresh token without an empty-token request",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "f371c42a6ef2be8227100435643ee011b23c4ba0",
+      "subject": "test(agent-task/capi): assert per-request token refresh in CAPI transport",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/agent-task/capi/client_test.go"
+      ]
+    },
+    {
+      "sha": "503cfce894d473c4a077a0af370899892ac7c4f2",
+      "subject": "fix(agent-task): accept plaintext refreshable OAuth credentials",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/agent_task_test.go"
+      ]
+    },
+    {
+      "sha": "9de874fb6d1669c7d3557b50927f1e7f3fefa13e",
+      "subject": "docs(script): clarify refreshable-token e2e scripts",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "30d91b2ea1e5729dba0aa2bf0316dcc0d10f1311",
+      "subject": "fix(script): declare authtype capability in gitcredential e2e on git 2.46+",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "85883f6e13a44c48a4dd158dc8a55179ff02a5a6",
+      "subject": "fix(config): run logout under the shared refresh lock",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "a5d9d3c3f54d849031927e27f4c4f087005e1562",
+      "subject": "fix(config): skip destructive refresh cleanup when the lock is unavailable",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "797e08975c86eeb5ce4b1a4b835be1bf0285cfd8",
+      "subject": "fix(config): don't fail refresh when the config dir can't be created",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "ec871e9184eb1712f5c3a0ba08f74fd5cd591df0",
+      "subject": "docs(script): prompt reviewer to confirm git auth during gitcredential e2e login",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "2a46e0ad88bcbfd5c22d5c0dcf483ba8305f1414",
+      "subject": "chore: fix formatting",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/client_test.go"
+      ]
+    },
+    {
+      "sha": "153adc66eef2af5fe51715ea7f571f3514c50bec",
+      "subject": "fix(config): run login under the shared refresh lock",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "4a289a9e19cac88013626378185f8debb690a59c",
+      "subject": "Merge pull request #14663 from cli/babakks/refresh-token-review-fixes",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/client_test.go",
+        "api/http_client.go",
+        "api/http_client_test.go",
+        "api/request_test.go",
+        "internal/attachments/client_test.go",
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go",
+        "internal/config/auth_config_test.go",
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/gh/gh.go",
+        "pkg/auth/credential.go",
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/agent_task_test.go",
+        "pkg/cmd/agent-task/capi/client_test.go",
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go",
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go",
+        "pkg/cmd/factory/default.go",
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "ee01699da75a7d174739f0b4168dff536fbde026",
+      "subject": "refactor(auth): rename --short-lived flag to --expiring",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/http_client.go",
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/capi/client.go",
+        "pkg/cmd/agent-task/shared/capi.go",
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go",
+        "pkg/cmd/auth/token/token.go",
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "e62e84ca88f79e8cb1b26a07fe358687ca28a865",
+      "subject": "Merge pull request #14665 from cli/babakks/refresh-token-rename-flag-to-expiring",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "api/http_client.go",
+        "internal/authflow/flow.go",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "pkg/cmd/agent-task/agent_task.go",
+        "pkg/cmd/agent-task/capi/client.go",
+        "pkg/cmd/agent-task/shared/capi.go",
+        "pkg/cmd/auth/gitcredential/helper.go",
+        "pkg/cmd/auth/gitcredential/helper_test.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go",
+        "pkg/cmd/auth/token/token.go",
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "00334d5e81fdd7b3de5cc942e6fb44376812925a",
+      "subject": "refactor(auth): make --expiring a tri-state *bool flag",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "6897f68d238cc1ccfc0f1a849207071b8d3fbdbb",
+      "subject": "feat(auth): add prefer_expiring_credentials config option",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/test.go",
+        "internal/gh/gh.go",
+        "internal/gh/mock/config.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/config/list/list_test.go"
+      ]
+    },
+    {
+      "sha": "56682b6faff1646a02246f0ed3ce56f8bcc78c18",
+      "subject": "Merge pull request #14672 from cli/babakks/refresh-token-prefer-expiring-config",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/test.go",
+        "internal/gh/gh.go",
+        "internal/gh/mock/config.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/config/list/list_test.go"
+      ]
+    },
+    {
+      "sha": "46c342f57d879d22f16e9e8048e05f1f9d1b0898",
+      "subject": "feat(auth): prompt for gh as git credential helper on expiring login",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "5f278b0b29350ee8ae222b74e097873c0300d80c",
+      "subject": "feat(auth): rework login and refresh telemetry",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/auth.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/shared/telemetry.go",
+        "pkg/cmd/auth/shared/telemetry_test.go",
+        "pkg/cmd/root/root.go"
+      ]
+    },
+    {
+      "sha": "e1100dca6430c6e0908bfbfd700d16861a99118e",
+      "subject": "feat(auth/shared): report an error category for unreadable credential helpers",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/telemetry.go"
+      ]
+    },
+    {
+      "sha": "04528169484c82dfa6f6358a08945b7e3743e70b",
+      "subject": "refactor(auth/shared): record only expiring cred-helper cancellations",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/shared/telemetry.go",
+        "pkg/cmd/auth/shared/telemetry_test.go"
+      ]
+    },
+    {
+      "sha": "abf0e0c25ae01573738adc9e9c59407b857f49b0",
+      "subject": "Merge pull request #14673 from cli/babakks/refresh-token-telemetry",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/auth.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/git_credential.go",
+        "pkg/cmd/auth/shared/git_credential_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/shared/telemetry.go",
+        "pkg/cmd/auth/shared/telemetry_test.go",
+        "pkg/cmd/root/root.go"
+      ]
+    },
+    {
+      "sha": "738838edbae525fbfeb7ffcd94bc69380d2a8ba5",
+      "subject": "docs(config): clarify the refresh lock godoc",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go"
+      ]
+    },
+    {
+      "sha": "ef8bf0c6901614eff2f24d25665958e07d874353",
+      "subject": "refactor(config): rename prefer_expiring_credentials to expiring_credentials",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/test.go",
+        "internal/gh/gh.go",
+        "internal/gh/mock/config.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/config/list/list_test.go"
+      ]
+    },
+    {
+      "sha": "521c944291a54c9b261b5010c79f1c64b192de9f",
+      "subject": "fix(auth/refresh): refine the expiring-token downgrade warning",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "ff4e9aad56293352a7de74595f18c6599a6e5c73",
+      "subject": "perf(config): probe the ordinary keyring before the refreshable credential",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "bd9f0721d5c318102891c6a0b8f98f8ec9c28ee4",
+      "subject": "fix(auth/shared): offer token paste when expiring is config-derived",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "3419f1e1dd04664ed508d82862761a2c993ac545",
+      "subject": "fix(auth/token): warn on stderr when printing an expiring token",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go"
+      ]
+    },
+    {
+      "sha": "fdeda38c6085813cec28cbf2a0eeb564024bdac1",
+      "subject": "fix(auth/refresh): keep the current token kind when --expiring is unset",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "127cc0d53f71602ff13a7a1b048a959adab4949e",
+      "subject": "fix(auth): record expiring_received and auth_success at the right time",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/shared/login_flow.go"
+      ]
+    },
+    {
+      "sha": "cbac639fc1607f1c2667e8a5fd7f122e5f003736",
+      "subject": "fix(config): place the refresh lock in the state directory",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "1d2e77957a914165b224b1b5c2fa4c95b6617d08",
+      "subject": "fix(config): create the refresh lock directory behind the lock seam",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "24184c85810cc332b6c3cfe9571ea852f827e1c8",
+      "subject": "fix(auth/shared): choose the auth method before acting on expiring intent",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "41ec082660becb2df999a9104eb5fdb2342e5e71",
+      "subject": "docs(config): describe expiring_credentials as a login-only preference",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go"
+      ]
+    },
+    {
+      "sha": "ac9fe18560fe045b5d60b3ba93b360e5c0939c02",
+      "subject": "test(auth): cover telemetry when storage or post-login setup fails",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/gitcredentials/fake_helper_config.go",
+        "pkg/cmd/auth/shared/login_flow_test.go"
+      ]
+    },
+    {
+      "sha": "c1134186b08547b96af43e85855ce98c210174a5",
+      "subject": "test(config): cover login when the other credential kind survives purge",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go"
+      ]
+    },
+    {
+      "sha": "6314d776e1e33d9b12679b73711e0cace56c8c2f",
+      "subject": "Merge pull request #14717 from cli/babakks/refresh-token-review-fixes-round-2",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/config/test.go",
+        "internal/gh/gh.go",
+        "internal/gh/mock/config.go",
+        "pkg/cmd/auth/login/login.go",
+        "pkg/cmd/auth/login/login_test.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go",
+        "pkg/cmd/auth/shared/gitcredentials/fake_helper_config.go",
+        "pkg/cmd/auth/shared/login_flow.go",
+        "pkg/cmd/auth/shared/login_flow_test.go",
+        "pkg/cmd/auth/token/token.go",
+        "pkg/cmd/auth/token/token_test.go",
+        "pkg/cmd/config/list/list_test.go"
+      ]
+    },
+    {
+      "sha": "5ff04428ee1190fd822c94365a12e62311612020",
+      "subject": "feat(auth/status): show relative time-to-expiry for refreshable tokens",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/text/text.go",
+        "internal/text/text_test.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "3048af154ade627e5f0ccba20c3ef6241a1cf226",
+      "subject": "fix(text): round FuzzyIn to the nearest unit instead of truncating",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/text/text.go",
+        "internal/text/text_test.go"
+      ]
+    },
+    {
+      "sha": "b931dea79dbc964ab96763ab627e0bc7ab7d9784",
+      "subject": "test(auth/status): cover an expiring token with no refresh token expiry",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "21660dd773397b6987bc0fd0bcb45080f6cc92b7",
+      "subject": "test(text): stop TestFuzzyIn when timestamp parsing fails",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/text/text_test.go"
+      ]
+    },
+    {
+      "sha": "547bf81aa5d68f6b4274abb6926c75252f254750",
+      "subject": "Merge pull request #14745 from cli/babakks/refresh-token-relative-expiry",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/text/text.go",
+        "internal/text/text_test.go",
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "30ce37dca5ca0b6311fee6bd7854e33688813627",
+      "subject": "feat(debug): add build-gated internal debug configuration",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/debug/config.go",
+        "internal/debug/config_disabled.go",
+        "internal/debug/config_disabled_test.go",
+        "internal/debug/config_enabled.go",
+        "internal/debug/config_enabled_test.go"
+      ]
+    },
+    {
+      "sha": "3a1ef45303930642f00c2fdc271cc4ae92a41889",
+      "subject": "chore: add a debug make target",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "Makefile"
+      ]
+    },
+    {
+      "sha": "f7f178ad0205f7202d65abd0233600a6a702cc75",
+      "subject": "feat(version): mark debug builds in the version output",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/version/version.go",
+        "pkg/cmd/version/version_test.go"
+      ]
+    },
+    {
+      "sha": "d00a58660e782d074eb74c790e44fbf54eb345ab",
+      "subject": "refactor: read testing overrides through internal/debug",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "internal/config/refreshable.go",
+        "pkg/cmd/factory/default.go",
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "7230c5bc5c44cf7409f054f2eb00e267b824bf9c",
+      "subject": "test(script): assert auth token warning and refresh token kind in e2e",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "script/refreshable-token-e2e.sh"
+      ]
+    },
+    {
+      "sha": "49146773c0a918c85024f325f2ce917bdccf757c",
+      "subject": "chore: rebuild bin/gh when build tags change",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        "Makefile",
+        "script/build.go"
+      ]
+    },
+    {
+      "sha": "3c69a302ae3742c7d89cd7a2296ffb1da7bd4338",
+      "subject": "refactor(debug): parse overrides in an untagged function",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "internal/debug/config.go",
+        "internal/debug/config_enabled.go",
+        "internal/debug/config_enabled_test.go",
+        "internal/debug/config_test.go"
+      ]
+    },
+    {
+      "sha": "a1d1667985a4f0129249ff5bd215c80c1644966a",
+      "subject": "ci: build the ghdebug variant on ubuntu",
+      "reviewArea": "dependencies-or-build-tooling",
+      "files": [
+        ".github/workflows/go.yml"
+      ]
+    },
+    {
+      "sha": "ae7b9715976c5508398b11dc8546e1279e10f6fc",
+      "subject": "Merge pull request #14752 from cli/babakks/refresh-token-test-env",
+      "reviewArea": "authentication-integration",
+      "files": [
+        ".github/workflows/go.yml",
+        "Makefile",
+        "internal/config/refreshable.go",
+        "internal/debug/config.go",
+        "internal/debug/config_disabled.go",
+        "internal/debug/config_disabled_test.go",
+        "internal/debug/config_enabled.go",
+        "internal/debug/config_enabled_test.go",
+        "internal/debug/config_test.go",
+        "pkg/cmd/factory/default.go",
+        "pkg/cmd/version/version.go",
+        "pkg/cmd/version/version_test.go",
+        "script/build.go",
+        "script/refreshable-token-e2e.sh",
+        "script/refreshable-token-gitcredential-e2e.sh"
+      ]
+    },
+    {
+      "sha": "fd1b1feb222dde885d00262b2c21b107c6c6e416",
+      "subject": "chore(deps): bump github.com/cli/oauth to v1.3.0",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go"
+      ]
+    },
+    {
+      "sha": "6ec1ba54542baca6cc5932582634104c83f36a28",
+      "subject": "fix(gh status): restore left column width under Lip Gloss v2",
+      "reviewArea": "other-cli-commands-or-documentation",
+      "files": [
+        "pkg/cmd/status/status.go",
+        "pkg/cmd/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "99750e1576b40a29afc3cb9e9737eef14fa2bcda",
+      "subject": "Merge pull request #14768 from cli/babakks/refresh-token-bump-deps",
+      "reviewArea": "authentication-integration",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "internal/authflow/refresh.go",
+        "internal/authflow/refresh_test.go",
+        "pkg/cmd/status/status.go",
+        "pkg/cmd/status/status_test.go"
+      ]
+    },
+    {
+      "sha": "4b20f541b1f8747b9457de9c4c98a4e8a6c951f8",
+      "subject": "docs(skills/gh): document expiring tokens",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "9871098fbf5e9128e249223e81750eb930e56f3c",
+      "subject": "Update documentation on token refresh behavior",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    },
+    {
+      "sha": "7948e8056e45ac3c729b829e0eafe2d0797a95c6",
+      "subject": "Merge pull request #14782 from cli/babakks/skill-gh-expiring-tokens",
+      "reviewArea": "upstream-skill-documentation",
+      "files": [
+        "skills/gh/SKILL.md"
+      ]
+    }
+  ]
+}

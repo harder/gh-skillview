@@ -29,6 +29,12 @@ public sealed class GhSkillPreviewService
         bool allowHiddenDirs = false,
         CancellationToken cancellationToken = default)
     {
+        if (!string.IsNullOrEmpty(version) && string.IsNullOrEmpty(skillName))
+        {
+            return PreviewResult.Failure(repo, skillName, version, 2,
+                "A skill selector is required for a versioned preview.");
+        }
+
         var args = BuildArgs(repo, skillName, version, allowHiddenDirs);
         var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
@@ -59,26 +65,20 @@ public sealed class GhSkillPreviewService
         string? version,
         bool allowHiddenDirs = false)
     {
+        if (!string.IsNullOrEmpty(version)) ArgumentException.ThrowIfNullOrEmpty(skillName);
         var args = new List<string> { "skill", "preview" };
-        if (!string.IsNullOrEmpty(version))
-        {
-            // `gh skill preview <repo>@<ref>` — versioned preview per the
-            // cli/cli manual. The suffix is concatenated onto the repo
-            // identifier, not passed as a separate flag.
-            args.Add($"{repo}@{version}");
-        }
-        else
-        {
-            args.Add(repo);
-        }
-        if (!string.IsNullOrEmpty(skillName))
-        {
-            args.Add(skillName);
-        }
-
         if (allowHiddenDirs)
         {
             args.Add("--allow-hidden-dirs");
+        }
+
+        // Search results can supply both selectors. Keep trusted flags before
+        // the option boundary; gh resolves versions on the skill, not the repo.
+        args.Add("--");
+        args.Add(repo);
+        if (!string.IsNullOrEmpty(skillName))
+        {
+            args.Add(string.IsNullOrEmpty(version) ? skillName : $"{skillName}@{version}");
         }
 
         return args;
