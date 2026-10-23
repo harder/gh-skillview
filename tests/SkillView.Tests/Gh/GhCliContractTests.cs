@@ -238,6 +238,30 @@ public class GhCliContractTests
         finally { root.Delete(recursive: true); }
     }
 
+    [Theory]
+    [InlineData("v2.102.0", false)]
+    [InlineData("v2.103.0", true)]
+    public async Task GhPreview_VersionedSelectorFetchesRequestedRevision(string version, bool expiringTokens)
+    {
+        if (!ShouldRun) return;
+        var gh = GhPath();
+        Assert.NotNull(gh);
+        var root = Directory.CreateTempSubdirectory("skillview-preview-contract-");
+        try
+        {
+            var logger = new Logger();
+            var runner = new ProcessRunner(logger, environment:
+                await AuthenticatedFixtureEnvironmentAsync(gh!, root.FullName, logger), defaultWorkingDirectory: root.FullName);
+            var preview = await new GhSkillPreviewService(runner, logger).PreviewAsync(
+                gh!, "cli/cli", "skills/gh", version, cancellationToken: TestContext.Current.CancellationToken);
+
+            Assert.True(preview.Succeeded, preview.ErrorMessage);
+            Assert.False(string.IsNullOrWhiteSpace(preview.MarkdownBody));
+            Assert.Equal(expiringTokens, preview.Body.Contains("refresh_expired", StringComparison.Ordinal));
+        }
+        finally { root.Delete(true); }
+    }
+
     [Fact]
     public async Task GhVersion_ProducesParseableOutput()
     {

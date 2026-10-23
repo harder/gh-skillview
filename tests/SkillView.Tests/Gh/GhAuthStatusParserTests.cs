@@ -36,6 +36,54 @@ public class GhAuthStatusParserTests
         Assert.Equal("github.com", status.ActiveHost);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Parses_gh_2_103_expiring_token_output(bool stderr)
+    {
+        // gh 2.103 adds refresh and expiry details after the existing login
+        // and active-account fields. Keep accepting stdout and stderr.
+        const string output = """
+            github.com
+              ✓ Logged in to github.com account monalisa (keyring)
+              - Active account: true
+              - Git operations protocol: https
+              - Token: gho_******
+              - Expiring token that gh refreshes automatically
+              - Token expires: 2026-10-23T08:00:00Z (in about 8 hours)
+              - Refresh token expires: 2027-04-21T00:00:00Z (in about 6 months)
+              - Token scopes: 'repo', 'read:org'
+            """;
+
+        var status = GhAuthStatusParser.Parse(stderr ? null : output, stderr ? output : null, 0);
+
+        Assert.True(status.LoggedIn);
+        Assert.Equal("github.com", status.ActiveHost);
+        Assert.Equal("monalisa", status.Account);
+        Assert.Equal(["github.com"], status.Hosts);
+        Assert.Equal(output, status.RawOutput);
+    }
+
+    [Fact]
+    public void Rejected_refresh_token_does_not_report_an_authenticated_account()
+    {
+        const string output = """
+            github.com
+              X Refresh token for github.com account monalisa was rejected
+              - Active account: true
+              - The stored expiring credential was removed because its refresh token is no longer valid.
+              - To re-authenticate, run: gh auth login -h github.com
+            """;
+
+        var status = GhAuthStatusParser.Parse(null, output, 1);
+
+        Assert.False(status.LoggedIn);
+        Assert.Null(status.Account);
+        Assert.Equal("github.com", status.ActiveHost);
+        Assert.Equal(["github.com"], status.Hosts);
+        Assert.Equal(output, status.RawOutput);
+    }
+
     [Fact]
     public void Handles_not_logged_in()
     {

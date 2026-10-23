@@ -39,7 +39,7 @@ public static class UpdateScreen
                     $"{MarkdownTableFormatter.FormatTableCell(outcome.Message ?? outcome.ChangedFileCount + " changed file(s)")} |");
                 if (outcome.Impact is { } impact) OperationImpactFormatter.Append(sb, impact);
                 else foreach (var exposure in outcome.Exposures)
-                    sb.AppendLine($"Affected exposure: {MarkdownTableFormatter.FormatCodeSpan(exposure)}  ");
+                        sb.AppendLine($"Affected exposure: {MarkdownTableFormatter.FormatCodeSpan(exposure)}  ");
             }
             sb.AppendLine();
         }

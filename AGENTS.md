@@ -347,12 +347,21 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   gh accepts only `project` and `user`.
   A version suffix belongs on a skill selector, never the repository name;
   use `--pin=<ref>` for an entire-repository ref, including discovery listing.
+  Preview also uses `repo skill@ref`, with trusted flags before `--` and both
+  selectors after it. A versioned preview requires a skill selector; there is
+  no repository-wide preview ref flag. Keep the two-revision live preview
+  contract so argument-builder fixtures cannot bless an invalid gh command.
 - When `gh` 2.101.0+ launches SkillView as an extension, prefer its `GH_PATH`
   environment value over PATH discovery so subprocesses use the same CLI host.
   Require `GH_EXTENSION=1` and an existing absolute path; older hosts and the
   standalone app continue to resolve through PATH.
+- GitHub CLI 2.103.0 can refresh expiring credentials during `auth status` and
+  API requests. Keep authentication delegated to gh; never cache an exported
+  access token in production or describe `auth status` as zero-write. The
+  compatibility review and complete commit ledger are in
+  `agent_docs/gh-2.103.0-compatibility.md`.
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list as of `gh` 2.102.0 (52 entries; gh 2.97.0 replaced `windsurf`
+  list verified through `gh` 2.103.0 (48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
@@ -403,6 +412,10 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
   editing source.
+  Core also explicitly services seven Terminal.Gui runtime dependency roots
+  (Markdig, Microsoft.Extensions, and System.IO.Abstractions). Review those
+  overrides together with all six lock files and the four native AOT targets;
+  see `agent_docs/dependency-refresh-2026-10.md`.
 - Terminal.Gui's modern lifecycle is now the right default for SkillView:
   use `Application.Create().Init()` to create the app instance and
   `IApplication.Dispose()` / `using` for teardown. Do not add new uses of the

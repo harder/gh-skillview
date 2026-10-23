@@ -10,7 +10,7 @@ public class GhSkillPreviewServiceTests
     {
         var args = GhSkillPreviewService.BuildArgs(
             "vercel-labs/skills", skillName: null, version: null);
-        Assert.Equal(new[] { "skill", "preview", "vercel-labs/skills" }, args);
+        Assert.Equal(new[] { "skill", "preview", "--", "vercel-labs/skills" }, args);
     }
 
     [Fact]
@@ -18,15 +18,29 @@ public class GhSkillPreviewServiceTests
     {
         var args = GhSkillPreviewService.BuildArgs(
             "vercel-labs/skills", "render-md", version: null);
-        Assert.Equal(new[] { "skill", "preview", "vercel-labs/skills", "render-md" }, args);
+        Assert.Equal(new[] { "skill", "preview", "--", "vercel-labs/skills", "render-md" }, args);
     }
 
     [Fact]
-    public void BuildArgs_VersionIsConcatenatedWithAt()
+    public void BuildArgs_VersionBelongsToSkillSelector()
     {
         var args = GhSkillPreviewService.BuildArgs(
             "owner/repo", "skill", version: "v2.0.0");
-        Assert.Equal(new[] { "skill", "preview", "owner/repo@v2.0.0", "skill" }, args);
+        Assert.Equal(new[] { "skill", "preview", "--", "owner/repo", "skill@v2.0.0" }, args);
+    }
+
+    [Fact]
+    public void BuildArgs_VersionRequiresSkillSelector()
+    {
+        Assert.Throws<ArgumentNullException>(() => GhSkillPreviewService.BuildArgs("owner/repo", null, "v2.0.0"));
+    }
+
+    [Fact]
+    public void BuildArgs_SelectorOptionsStayAfterBoundary()
+    {
+        var args = GhSkillPreviewService.BuildArgs("--help", "--allow-hidden-dirs", "-ref", allowHiddenDirs: true);
+
+        Assert.Equal(new[] { "skill", "preview", "--allow-hidden-dirs", "--", "--help", "--allow-hidden-dirs@-ref" }, args);
     }
 
     [Fact]

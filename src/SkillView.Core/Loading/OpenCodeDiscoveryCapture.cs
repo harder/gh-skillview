@@ -44,21 +44,21 @@ internal static class OpenCodeDiscoveryCapture
         if (paths is not null && (paths.Kind != "array" || paths.Items.Any(path => path.Kind != "string")))
             blockers.Add("OpenCode skills.paths must be an array of strings; native configuration decoding is unproven.");
         else foreach (var value in paths?.Items ?? [])
-        {
-            token.ThrowIfCancellationRequested();
-            var path = value.Text!;
-            if (path.Contains("{env:", StringComparison.Ordinal) || path.Contains("{file:", StringComparison.Ordinal))
-            { limits.Add("OpenCode skills.paths contains unresolved native substitution; an omitted competing root is possible."); continue; }
-            try
             {
-                // Node path.join keeps even a slash-prefixed tilde remainder
-                // beneath home; Path.Combine would discard home for ~//name.
-                var expanded = path.StartsWith("~/", StringComparison.Ordinal) ? home + Path.DirectorySeparatorChar + path[2..] : path;
-                Add(expanded.Length == 0 ? cwd : Path.GetFullPath(expanded, cwd), "configured-path", false, source: pathSource);
+                token.ThrowIfCancellationRequested();
+                var path = value.Text!;
+                if (path.Contains("{env:", StringComparison.Ordinal) || path.Contains("{file:", StringComparison.Ordinal))
+                { limits.Add("OpenCode skills.paths contains unresolved native substitution; an omitted competing root is possible."); continue; }
+                try
+                {
+                    // Node path.join keeps even a slash-prefixed tilde remainder
+                    // beneath home; Path.Combine would discard home for ~//name.
+                    var expanded = path.StartsWith("~/", StringComparison.Ordinal) ? home + Path.DirectorySeparatorChar + path[2..] : path;
+                    Add(expanded.Length == 0 ? cwd : Path.GetFullPath(expanded, cwd), "configured-path", false, source: pathSource);
+                }
+                catch (Exception error) when (error is ArgumentException or NotSupportedException or IOException)
+                { limits.Add("An OpenCode skills.paths location could not be resolved; discovery is incomplete."); }
             }
-            catch (Exception error) when (error is ArgumentException or NotSupportedException or IOException)
-            { limits.Add("An OpenCode skills.paths location could not be resolved; discovery is incomplete."); }
-        }
         if (merged.Get("skills", "urls") is { } urls)
         {
             if (urls.Kind != "array" || urls.Items.Any(url => url.Kind != "string"))

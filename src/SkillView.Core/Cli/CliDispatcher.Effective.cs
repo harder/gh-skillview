@@ -75,10 +75,10 @@ public static partial class CliDispatcher
         writer.WriteString("applicability", analysis.RuleApplicability); writer.WriteString("nativeConformance", analysis.Rules?.NativeConformance ?? "not-run");
         writer.WriteStartArray("sources");
         if (analysis.Rules is { } rules) foreach (var source in rules.Sources)
-        {
-            writer.WriteStartObject(); writer.WriteString("url", source.Url); writer.WriteString("revision", source.Revision);
-            writer.WriteString("evidence", source.Evidence); writer.WriteEndObject();
-        }
+            {
+                writer.WriteStartObject(); writer.WriteString("url", source.Url); writer.WriteString("revision", source.Revision);
+                writer.WriteString("evidence", source.Evidence); writer.WriteEndObject();
+            }
         writer.WriteEndArray(); writer.WriteEndObject();
         writer.WriteStartArray("candidates");
         foreach (var candidate in analysis.Candidates)

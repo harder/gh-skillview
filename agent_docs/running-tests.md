@@ -10,6 +10,11 @@ that SDK, commit the updated lock files alongside `global.json`, and verify
 `dotnet restore --locked-mode` before building. CI and release workflows read
 the same `global.json`.
 
+Use the serviced .NET 10.0.1xx SDK feature band so contributors can use Ubuntu's
+apt-managed SDK. SDK 10.0.113 includes runtime 10.0.13; keep the target framework
+at `net10.0`. A feature-band change still requires lock-file regeneration and
+verification of the four native release targets.
+
 A bare project path (e.g. `dotnet test tests/Foo/Foo.csproj`) no longer works —
 pass `--project <path>` explicitly, or run `dotnet test` from the repo root to
 target the whole solution.

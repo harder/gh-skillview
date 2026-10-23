@@ -251,10 +251,14 @@ skillview list --json
 skillview effective --agent gemini-cli --project /path/to/project --client-version 0.46.0 --json
 skillview search prompt --owner github
 skillview preview github/awesome-copilot documentation-writer
+skillview preview cli/cli gh --version v2.103.0
 skillview install github/awesome-copilot git-commit --agent claude-code --scope user
 skillview update --dry-run
 skillview cleanup --apply --yes
 ```
+
+For `preview`, `--version <ref>` requires a skill name or path. SkillView passes
+that revision on the skill selector, as required by `gh skill preview`.
 
 For `install`, use `--agent <id>` to choose an agent and `--scope project|user`
 to choose the destination scope. `--path <dir>` selects a custom directory and overrides scope;
