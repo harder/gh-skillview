@@ -118,6 +118,43 @@ test('release highlights keep adjacent unrelated bullets out of skill excerpts',
   assert.doesNotMatch(highlight, /repository skill content|Update auth flow/);
 });
 
+test('release highlights recognize skill installation guidance without unrelated neighboring bullets', () => {
+  const notes = "## What's Changed\n\n"
+    + '* Avoid repeating the skill installation safety warning by @tommaso-moro in https://github.com/cli/cli/pull/14784\n'
+    + '* Add a repository skill for recordings\n'
+    + '* Hint at --expiring during gh auth login';
+  const highlight = monitor.releaseHighlights(notes, 'gh');
+  assert.match(highlight, /skill installation safety warning/);
+  assert.doesNotMatch(highlight, /recordings|auth login/);
+  assert.match(monitor.releaseHighlights('* Improve skill installations', 'gh'), /skill installations/);
+});
+
+test('release highlights recognize installation forms and wrapped skill notes', () => {
+  for (const note of [
+    '* Fix skill installed path',
+    '* Fix installing a skill',
+    '* Fix skill\n  installation paths',
+    '* Fix installed paths for skills',
+    '* Fix `gh\n  skill update` drift',
+  ]) {
+    assert.doesNotMatch(monitor.releaseHighlights(note, 'gh'), /No directly relevant entry/, note);
+  }
+});
+
+test('release highlights require gh context for ambiguous non-install skill mentions', () => {
+  for (const note of [
+    '* Warn on agent skills update drift',
+    '* Show skill preview in browser tooltips',
+    '* Update repository skill content\n* Fix installation paths for packages',
+    '* Fix installed paths for skillsets',
+  ]) {
+    assert.match(monitor.releaseHighlights(note, 'gh'), /No directly relevant entry/, note);
+  }
+  for (const command of ['search', 'update', 'list', 'preview']) {
+    assert.match(monitor.releaseHighlights(`* Fix \`gh skill ${command}\` output`, 'gh'), /gh skill/);
+  }
+});
+
 test('manual reassessment accepts only labeled dependency issues with known titles', async () => {
   const github = { rest: { issues: { get: async () => ({ data: {
     title: 'GitHub CLI v2.102.0 compatibility review',

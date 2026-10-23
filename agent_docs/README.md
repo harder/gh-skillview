@@ -18,8 +18,10 @@ or release verdict.
   [source authoring validation](maintenance-authoring-validation.md),
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
-- [Version selection scope](version-selection-scope.md) and
-  [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md).
+- [Version selection scope](version-selection-scope.md).
+- [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md)
+  (authentication/extension baseline) and
+  [2.103.1 compatibility](gh-2.103.1-compatibility.md) (patch review).
 
 Detailed subsystem invariants are indexed by the short root [AGENTS.md](../AGENTS.md).
 Active native proof tools and their tests live in [tests/native](../tests/native/README.md).

@@ -56,12 +56,16 @@ function releaseHighlights(notes, kind) {
     // SkillView-relevant change.
     .flatMap(item => item.split(/(?=^\s*[-*]\s+)/m))
     .map(item => item.trim()).filter(Boolean);
-  const pattern = kind === 'gh'
-    ? /\bgh skills?\b|\bskill (?:search|install|update|list|preview)\b/i
-    : /terminal\.gui|keyboard|input|layout|scroll|render|thread|cancel|aot|trim/i;
+  // Installation notes often omit the command name or wrap/reorder words.
+  // Other bare skill operations can describe repository content or agent UI;
+  // require an explicit gh command for those. This remains a review hint.
+  const isRelevant = kind === 'gh'
+    ? item => /\bgh\s+skills?\b/i.test(item) ||
+      (/\bskills?\b/i.test(item) && /\binstall\w*\b/i.test(item))
+    : item => /terminal\.gui|keyboard|input|layout|scroll|render|thread|cancel|aot|trim/i.test(item);
   const matches = [];
   for (let index = 0; index < paragraphs.length && matches.length < 5; index++) {
-    if (!pattern.test(paragraphs[index])) continue;
+    if (!isRelevant(paragraphs[index])) continue;
     let detail = paragraphs[index];
     if (/^See https:\/\/github\.com\//.test(paragraphs[index + 1] || '')) {
       detail += `\n${paragraphs[++index]}`;
