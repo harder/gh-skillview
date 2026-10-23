@@ -91,7 +91,7 @@ flags instead.
 The solution also builds `tests/SkillView.MaintenanceProof`, a proof-only console
 host for deterministic process death at production maintenance checkpoints. It
 requires a marked disposable HOME/CWD/state root and has no shipping product
-fault flags. After building, run `agent_docs/evidence/prove-shared-revision-update.py`
+fault flags. After building, run `tests/native/prove-shared-revision-update.py`
 with `--app <built skillview> --proof-host <built SkillView.MaintenanceProof>` and
 one or more `--gh <binary>` arguments plus `--output <evidence.json>`. The parent
 kills the paused process without teardown, then uses the actual product CLI for
@@ -110,7 +110,7 @@ or triggers an automatic retry. Proof-host stderr marks startup and inventory
 capture phases. Windows descendant-held pipes may delay subprocess cleanup;
 the deadline does not bound that inherited-pipe drain.
 
-The cross-platform `agent_docs/evidence/prove-inventory-filter.py` proof runs
+The cross-platform `tests/native/prove-inventory-filter.py` proof runs
 eleven actual CLI scope/agent queries against one physical payload exposed by
 user/project links, an ancestor root alias and a named profile. It requires
 complete inventory, stable identity/consumer evidence and unchanged installed
@@ -121,7 +121,7 @@ for every RID.
 
 ### Reviewed update PTY proof (POSIX)
 
-After building, run `agent_docs/evidence/prove-reviewed-update-tui.py` with an
+After building, run `tests/native/prove-reviewed-update-tui.py` with an
 absolute `--app`, `--gh`, `--output`, and `--shortcut u`, `U`, or `button`.
 The script uses a private HOME/state/CWD and actual gh remote installation,
 answers terminal probes, and locates visible controls through a small ANSI screen
@@ -146,7 +146,7 @@ coverage, denied enumeration and missing required custom roots. Failures remain
 retryable and cannot establish absence; a valid empty result may produce only a
 review-only Untracked observation.
 
-`python agent_docs/evidence/prove-inventory-denied-root.py --app /absolute/host
+`python tests/native/prove-inventory-denied-root.py --app /absolute/host
 --output /tmp/denied-root-proof.json` additionally uses actual POSIX permission
 denial under a private HOME/CWD. Run as a non-root user on Linux or macOS. It
 restores the denied root's mode in `finally`, verifies the readable control and
@@ -166,7 +166,7 @@ SkillView.Tests.Gh.GhMetadataContractTests`; the scheduled/manual contract workf
 includes it in both minimum and current gh lanes. Default-suite discovery of
 these four cases does not substitute for running the opt-in contract.
 
-`agent_docs/evidence/prove-tracking-roundtrip.py --app /absolute/native/skillview
+`tests/native/prove-tracking-roundtrip.py --app /absolute/native/skillview
 --output /tmp/tracking-proof.json` compares native inventory with actual gh list,
 including authored local descriptions/version and distinct repository refs/pins.
 Repeat `--gh /absolute/gh` to prove multiple gh versions. CI runs both native

@@ -59,4 +59,4 @@ owner/pin evidence does not establish an already-unpinned state.
 This operation applies to the complete physical installation and displays every
 affected exposure. It does not implement per-consumer unpin/detach, durable forks,
 source switching, local reimport, other native owner adapters or preference
-recovery. Those original M08 obligations and the full acceptance audit remain open.
+recovery. Those broader workflows remain outside standalone unpin and require separate scope approval.

@@ -1,4 +1,4 @@
-// Only positively identified user documentation/site changes can omit .NET proofs.
+// Only positively identified documentation/site changes can omit .NET proofs.
 const { spawnSync } = require('node:child_process');
 const { appendFileSync } = require('node:fs');
 const { TextDecoder } = require('node:util');
@@ -11,10 +11,11 @@ const SITE_FILES = new Set([
 
 function isDocumentationPath(path) {
   // Git paths are case-sensitive and slash-separated. Never normalize unknown paths.
+  if (path === 'AGENTS.md') return true;
   if (!path || path.split('/').some(part => !part || part.startsWith('.')) || path.includes('\\')
     || /(?:^|\/)(?:AGENTS|SKILL)\.md$/.test(path)) return false;
   return path === 'README.md' || path === 'CONTRIBUTING.md' || SITE_FILES.has(path)
-    || (path.startsWith('docs/') && path.endsWith('.md'))
+    || ((path.startsWith('docs/') || path.startsWith('agent_docs/')) && path.endsWith('.md'))
     || /^assets\/screenshots\/[^/]+\.(png|txt)$/.test(path)
     || /^assets\/animations\/[^/]+\.gif$/.test(path);
 }
@@ -39,7 +40,7 @@ function classifyDiff(bytes) {
       || (status === 'M' && before === '100644' && after === '100644'))) return full('unsupported file mode');
     if (!isDocumentationPath(fields[index + 1])) return full('change outside documentation/site allowlist');
   }
-  return { fullProof: false, reason: 'only user documentation, screenshots or static site files changed' };
+  return { fullProof: false, reason: 'only documentation, screenshots or static site files changed' };
 }
 
 function determineScope(base, head, { cwd = process.cwd(), run = spawnSync } = {}) {

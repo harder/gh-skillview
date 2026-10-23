@@ -248,7 +248,7 @@ def main(argv=None):
                 if link_reason and proof in LINK_PROOFS:
                     not_run(name + '-' + proof, link_reason)
                     continue
-                command = [sys.executable, str(ROOT / 'agent_docs/evidence' / ('prove-' + proof + '.py')),
+                command = [sys.executable, str(ROOT / 'tests/native' / ('prove-' + proof + '.py')),
                            '--app', str(binary), '--output', str(output / f'{name}-{proof}.json')]
                 if proof != 'static-package-check':
                     command.extend(['--gh', gh])
@@ -267,7 +267,7 @@ def main(argv=None):
                         if link_reason and proof in LINK_PROOFS:
                             not_run(name + '-' + proof, link_reason)
                             continue
-                        run(name + '-' + proof, [sys.executable, str(ROOT / 'agent_docs/evidence' / ('prove-' + proof + '.py')),
+                        run(name + '-' + proof, [sys.executable, str(ROOT / 'tests/native' / ('prove-' + proof + '.py')),
                             '--app', str(binary), '--gh', gh, '--output', str(output / f'{name}-{proof}.json')], child_env=live_env)
             else:
                 not_run('live-proofs', 'No existing gh authentication; offline checks still ran')

@@ -1,16 +1,10 @@
-# Original M08 continuation after M12
+# External cleanup suppression
 
-Do not mark M08 complete after this first slice. Original M08 requires preserve/merge,
-fork, replace-with-backup/cancel, source and other owner transitions, external
-suppression, distinct restore/current/latest/unpin, and original acceptance proof.
+Ordinary Ignore actions write context-aware preferences outside installed payloads.
+Legacy `.skillview-ignore` markers remain read-only observations; migration or
+removal requires a separately reviewed action.
 
-First reviewable slice: external cleanup suppression preferences.
-
-Current issue: CleanupScreen.DoIgnore writes .skillview-ignore inside the selected
-payload synchronously on the UI thread. That alters manager-owned payloads and can
-make later whole-payload comparison/update report an artificial local edit.
-
-Proposed behavior:
+Current behavior:
 - Retain read-only recognition of legacy .skillview-ignore; never create/remove
   payload markers through ordinary Ignore actions. Legacy removal/migration must
   be a separately reviewed action, not a silent inventory mutation.
@@ -54,12 +48,8 @@ quota bounds, alternate HOME/SKILLVIEW_STATE_HOME, source replacement at same pa
 legacy marker remains unchanged and origin visible. Local + all platform suites,
 both native hosts/all four RIDs and independent review before merge.
 
-Then continue full M08: immutable approved-source staging and whole-payload
-three-way review; explicit preserve/merge with conflict reporting, fork/retained
-ownership policy, and source/native-owner transitions in saved recoverable plans.
-Do not alter old persisted journal schema/hash inputs without actual old-native
-compatibility tests. Preserve existing no-overwrite admission until each new
-transition/disposition is implemented and proven.
+Preserve persisted journal/schema hash compatibility and existing no-overwrite
+admission. Cleanup suppression does not authorize other maintenance transitions.
 
 Source read-through refinements:
 - InventorySnapshot.IsPartial derives from physical provider failures. Preference
@@ -75,11 +65,10 @@ Source read-through refinements:
   identity for broken links, and empty-directory identity/content preconditions.
   If a binding cannot be verified, the batch reports an explicit skip/failure;
   no checked row silently disappears from accounting.
-- Existing cleanup modal currently performs Ignore synchronously and refreshes
-  only on IgnoredCount>0; replace this ownership path so partial preference writes
-  plus cancellation still trigger a rescan and remain visible in results.
+- Partial preference writes plus cancellation must still trigger a rescan and
+  remain visible in results.
 
-Binding and UX decisions for implementation:
+Binding and UX contracts:
 - Cleanup suppression applies to one physical installation, across its displayed
   consumer exposures. Say so before a filtered view sets it. It is neither an
   agent disable switch nor a desired-update policy. New aliases of the same

@@ -34,7 +34,7 @@ container. The reusable outer wrapper stages owned tools, records their hashes,
 and creates the required mounts:
 
 ```sh
-python3 agent_docs/evidence/run-local-merge-disk-full-docker.py \
+python3 tests/native/run-local-merge-disk-full-docker.py \
   --app /owned/linux/skillview --proof-host-dir /owned/linux/proof-host \
   --gh /owned/linux/gh --output /owned/results/disk-full
 ```

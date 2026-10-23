@@ -41,4 +41,4 @@ private HOME/state/CWD and child environment, synthetic owner records only where
 explicitly stated, and local inert shell child markers. They prove service/CLI
 admission and byte preservation, not real gh/provider behavior. POSIX child
 markers and unsupported native positives carry explicit platform qualifications.
-No new manager/native runtime proof or full M08 acceptance is claimed here.
+These tests do not establish additional native-manager lifecycle support.

@@ -9,7 +9,7 @@ are applied. Empty child PATH prevents Git discovery; the test also supplies a
 no-result `GhBinaryLocator` because that locator normally reads parent PATH and
 GH_PATH independently of the child runner. Console capture uses the shared gate.
 
-The original M09 criteria remain unchanged:
+Ownership coverage must retain these distinctions:
 
 | Original clause | Fixture evidence |
 | --- | --- |
@@ -51,5 +51,5 @@ dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj \
 
 These are proof additions only. Owner-aware removal/coordinated ownership
 migration, native plugin lifecycles, final platform/native verification and the
-original M09 completion decision remain pending. Do not remove the production
-owner refusal or mark M09 complete from these fixtures.
+broader native-owner lifecycle behavior are not established by these fixtures.
+Keep the production owner refusal unless an approved transition proves authority.

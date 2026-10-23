@@ -12,8 +12,9 @@ function record(path, status = 'M', before = '100644', after = '100644') {
   return Buffer.from(`:${before} ${after} ${SHA} ${OTHER_SHA} ${status}\0${path}\0`);
 }
 
-test('only explicit user docs, media and known site paths can omit full proof', () => {
-  const paths = ['README.md', 'CONTRIBUTING.md', 'docs/usage.md', 'docs/runbooks/release-rollback.md',
+test('only explicit user/agent docs, media and known site paths can omit full proof', () => {
+  const paths = ['AGENTS.md', 'agent_docs/running-tests.md', 'agent_docs/contracts-native-filesystem.md',
+    'agent_docs/evidence/observed-proof.md', 'README.md', 'CONTRIBUTING.md', 'docs/usage.md', 'docs/runbooks/release-rollback.md',
     'docs/a file\nwith tabs\t.md', 'assets/screenshots/01-discover.png',
     'assets/screenshots/pr75-changes-80x24-after.txt', 'assets/animations/g1-discover.gif',
     'site/app.js', 'site/build.py', 'site/docs.html', 'site/styles.css', 'site/favicon.svg',
@@ -26,8 +27,10 @@ test('code, dependencies, workflows, proof inputs and all unknown paths retain f
   const paths = ['src/SkillView.Core/Foo.cs', 'tests/fixtures/README.md', 'global.json',
     'src/SkillView.Core/packages.lock.json', 'Directory.Build.props', 'SkillView.sln',
     '.github/workflows/ci.yml', '.github/scripts/ci-change-scope.js', '.github/workflows/README.md',
-    'AGENTS.md', 'agent_docs/running-tests.md', 'agent_docs/evidence/probe-linux-abi.c',
-    'agent_docs/evidence/test_old_native_contract.py', 'agent_docs/evidence/fixture.json',
+    'tests/native/probe-linux-abi.c', 'agent_docs/AGENTS.md', 'agent_docs/SKILL.md',
+    'agent_docs/.hidden.md', 'agent_docs/../source.md', 'agent_docs/proof.py', 'agent_docs/fixture.json',
+    'agent_docs/evidence/proof.sh', 'agent_docs/evidence/proof.c', 'tests/native/README.md',
+    'tests/native/test_old_native_contract.py',
     'docs/proof.py', 'docs/fixture.json', 'docs/.hidden.md', 'docs/../source.md', 'docs//file.md',
     'docs/AGENTS.md', 'site/new-proof.py', 'assets/screenshots/proof.py', 'assets/screenshots/fixture.json',
     'assets/animations/script.js', 'assets/new.png', 'README.MD', 'Docs/usage.md',
@@ -154,4 +157,35 @@ test('CLI writes a conservative GitHub output for unavailable commits', t => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(readFileSync(output, 'utf8'), 'full_proof=true\n');
   assert.match(result.stdout, /commit unavailable/);
+});
+
+test('agent prose mixed with proof inputs always retains full native verification', () => {
+  for (const input of ['tests/native/prove-revision-update.py', 'tests/native/probe-linux-abi.c',
+    'tests/native/test_old_native_reimport_witness.py', 'agent_docs/evidence/fixture.json']) {
+    const prose = Buffer.concat([record('AGENTS.md'), record('agent_docs/contracts-gh.md')]);
+    assert.equal(scope.classifyDiff(Buffer.concat([prose, record(input)])).fullProof, true, input);
+  }
+});
+
+test('agent-guide file mode changes and symlinks cannot authorize a skip', () => {
+  for (const path of ['AGENTS.md', 'agent_docs/contracts-gh.md']) {
+    assert.equal(scope.classifyDiff(record(path, 'M', '100644', '100755')).fullProof, true);
+    assert.equal(scope.classifyDiff(record(path, 'A', '000000', '120000')).fullProof, true);
+  }
+});
+
+test('real guide edits skip native builds while guide-to-test renames retain proof in either direction', t => {
+  const repo = repository(t);
+  repo.write('AGENTS.md', 'initial instructions');
+  repo.write('agent_docs/guide.md', 'initial guide');
+  const base = repo.commit();
+  repo.write('AGENTS.md', 'updated instructions');
+  repo.write('agent_docs/guide.md', 'updated guide');
+  const prose = repo.commit();
+  assert.equal(scope.determineScope(base, prose, repo).fullProof, false);
+  repo.write('tests/native/placeholder.txt', 'test root');
+  renameSync(join(repo.cwd, 'agent_docs/guide.md'), join(repo.cwd, 'tests/native/fixture.md'));
+  const fixture = repo.commit();
+  assert.equal(scope.determineScope(prose, fixture, repo).fullProof, true);
+  assert.equal(scope.determineScope(fixture, prose, repo).fullProof, true);
 });
