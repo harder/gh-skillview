@@ -55,8 +55,12 @@ The deferred table is context for future decisions, not a completion backlog.
 - The obsolete local `HANDOFF-*` copies and retired planning files were removed
   during the October 23 cleanup. They described the superseded all-21 goal.
   Current contracts and immutable historical records are indexed in
-  [README.md](README.md). Use `git worktree list` for current private-work
-  locations; dirty or unmerged worktrees and their unique evidence are retained.
+  [README.md](README.md). A follow-up review found no remaining satellite
+  checkout tied to current approved implementation. Retired local branches and
+  the four dirty source/index snapshots were archived and verified before
+  removing obsolete checkouts and branch refs. Keep `main` and open-PR branches;
+  use `git worktree list` for current locations. Private-work locators below
+  describe the dated inventory and may no longer exist.
 
 “Implemented” below means code exists at the stated locator. “Verified” is
 limited to the cited evidence. An implementation can remain useful while its

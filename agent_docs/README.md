@@ -39,5 +39,8 @@ Their original bytes remain available at the immutable pre-cleanup revision:
 - [October 16 handoff receipts](https://github.com/harder/gh-skillview/tree/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/handoff-evidence-2026-10-16).
 
 Use these records when investigating historical changes. Follow current guides
-for implementation, testing and prioritization. Local unmerged branches and
-unique failure/proof receipts were retained during cleanup.
+for implementation, testing and prioritization. Retired local work was archived
+before obsolete checkouts and branch refs were removed. Private archives retain
+unmerged commits, dirty source snapshots and merge/index evidence; they are not
+published in this repository. Current refs and worktrees do not reproduce the
+historical inventory. Unique failure/proof receipts remain available locally.
