@@ -60,9 +60,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   access token in production or describe `auth status` as zero-write. The
   compatibility review and complete commit ledger are in
   `agent_docs/gh-2.103.0-compatibility.md`.
+  The seven-commit 2.103.1 patch review and executed minimum/latest checks are
+  in `agent_docs/gh-2.103.1-compatibility.md`; install review output changes do
+  not waive SkillView source/retention approval.
 
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list verified through `gh` 2.103.0 (48 entries; gh 2.97.0 replaced `windsurf`
+  list verified through `gh` 2.103.1 (48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and

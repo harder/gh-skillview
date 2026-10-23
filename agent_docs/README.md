@@ -19,7 +19,7 @@ or release verdict.
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
 - [Version selection scope](version-selection-scope.md) and
-  [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md).
+  [GitHub CLI 2.103.1 compatibility](gh-2.103.1-compatibility.md).
 
 Detailed subsystem invariants are indexed by the short root [AGENTS.md](../AGENTS.md).
 Active native proof tools and their tests live in [tests/native](../tests/native/README.md).

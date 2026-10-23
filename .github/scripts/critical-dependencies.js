@@ -57,7 +57,7 @@ function releaseHighlights(notes, kind) {
     .flatMap(item => item.split(/(?=^\s*[-*]\s+)/m))
     .map(item => item.trim()).filter(Boolean);
   const pattern = kind === 'gh'
-    ? /\bgh skills?\b|\bskill (?:search|install|update|list|preview)\b/i
+    ? /\bgh skills?\b|\bskills? (?:search|install(?:ation)?s?|update|list|preview)\b/i
     : /terminal\.gui|keyboard|input|layout|scroll|render|thread|cancel|aot|trim/i;
   const matches = [];
   for (let index = 0; index < paragraphs.length && matches.length < 5; index++) {

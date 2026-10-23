@@ -118,6 +118,17 @@ test('release highlights keep adjacent unrelated bullets out of skill excerpts',
   assert.doesNotMatch(highlight, /repository skill content|Update auth flow/);
 });
 
+test('release highlights recognize skill installation guidance without unrelated neighboring bullets', () => {
+  const notes = "## What's Changed\n\n"
+    + '* Avoid repeating the skill installation safety warning by @tommaso-moro in https://github.com/cli/cli/pull/14784\n'
+    + '* Add a repository skill for recordings\n'
+    + '* Hint at --expiring during gh auth login';
+  const highlight = monitor.releaseHighlights(notes, 'gh');
+  assert.match(highlight, /skill installation safety warning/);
+  assert.doesNotMatch(highlight, /recordings|auth login/);
+  assert.match(monitor.releaseHighlights('* Improve skill installations', 'gh'), /skill installations/);
+});
+
 test('manual reassessment accepts only labeled dependency issues with known titles', async () => {
   const github = { rest: { issues: { get: async () => ({ data: {
     title: 'GitHub CLI v2.102.0 compatibility review',
