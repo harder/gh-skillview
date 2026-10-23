@@ -33,10 +33,23 @@ they do not claim a new interactive TTY walkthrough.
 
 The generated issue incorrectly reported no directly relevant skill note:
 `releaseHighlights` recognized “skill install” but missed “skill installation.”
-Its bounded matcher now accepts install/installation wording, including plurals,
-while keeping adjacent unrelated skill content and auth bullets out of the
-skill-specific excerpt. The exact 2.103.1 release-note regression failed before
-the change; all 21 Node monitor/assessment/scope checks pass afterward.
+Its matcher accepts explicit `gh skill` commands, including wrapped whitespace,
+or a skill mention with an `install` stem (installed/installing/installation) in
+the same note. Bare update/preview wording is ambiguous and requires gh context.
+Adjacent bullets remain separate. These are potential-review highlights; the
+matcher cannot establish semantic relevance or compatibility.
+The exact 2.103.1 release-note regression and follow-up wording/ambiguity cases
+failed before their respective fixes.
+
+The follow-up Node run passed **23 tests**: 9 in
+[critical-dependencies.test.js](../.github/scripts/critical-dependencies.test.js),
+3 in [critical-dependency-assessment.test.js](../.github/scripts/critical-dependency-assessment.test.js),
+and 11 in [ci-change-scope.test.js](../.github/scripts/ci-change-scope.test.js).
+Reproduce it with:
+
+```sh
+node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js .github/scripts/ci-change-scope.test.js
+```
 
 ## Executed verification
 
@@ -54,6 +67,11 @@ The verified official Linux ARM64 archive SHA256 values were:
 | 2.103.0 | `7f322df34e624d14f5ec0c4acb121fd6dfa14392fdbbd1066aa8e0a05ac3721e` |
 | 2.103.1 | `25b1287471a73a3cca32e5d2d2798ae26abea0243db1b9e4a8c1be506fad1bfe` |
 
+Hosted run [40025766669](https://github.com/harder/gh-skillview/actions/runs/40025766669)
+completed successfully with `head_sha`
+[`3e6b69e27b3663b2748d9ca9e1c919b46fdc895e`](https://github.com/harder/gh-skillview/commit/3e6b69e27b3663b2748d9ca9e1c919b46fdc895e),
+confirmed from the run's [API metadata](https://api.github.com/repos/harder/gh-skillview/actions/runs/40025766669).
+
 | Check | Result |
 | --- | --- |
 | Seven skill help outputs: root, search, preview, install, update, list, publish | Byte-identical across 2.97.0, 2.103.0 and 2.103.1 |
@@ -63,24 +81,15 @@ The verified official Linux ARM64 archive SHA256 values were:
 | [Hosted minimum lane](https://github.com/harder/gh-skillview/actions/runs/40025766669/job/120661456518) | Passed on merged main |
 | [Hosted latest lane, explicitly overridden to 2.103.1](https://github.com/harder/gh-skillview/actions/runs/40025766669/job/120661456774) | Passed; log confirms gh 2.103.1 and 19 successful contracts |
 | Sequential managed App/extension builds | Passed with zero warnings/errors |
-| Standalone Doctor/search, versioned preview, pinned remote install and local import | Passed against 2.103.1 |
-| Local/remote gh install warning output | One pre-install warning each; post-install review guidance retained |
-| Native extension launcher via `gh extension exec`, with 2.97.0 first on PATH | Passed; Doctor reports extension invocation and the invoking 2.103.1 `GH_PATH` |
+| Standalone Doctor/search, preview at `v2.103.1`, pinned remote install and local import | Passed against 2.103.1 |
+| Local/remote gh install warning output, captured directly from native stderr | One pre-install warning each; post-install review guidance retained. SkillView's [install JSON writer](../src/SkillView.Core/Cli/CliDispatcher.Install.cs) does not serialize the raw `StdErr` stream. |
+| Built extension apphost via `gh extension exec`, with 2.97.0 first on PATH | Passed; Doctor reports extension invocation and the invoking 2.103.1 `GH_PATH` |
 | Solution formatting verification and changed Markdown relative links | Passed |
 
 The opt-in runs explicitly set `SKILLVIEW_CONTRACT_TESTS=true`; they are not
 default-suite early returns. They cover help/JSON shapes, pinned and local
 metadata, ownership locks, exact-copy updates, retained local changes, partial
-outcomes and requested preview revisions. The hosted run is
-[40025766669](https://github.com/harder/gh-skillview/actions/runs/40025766669).
-
-Managed smoke checks additionally cover standalone Doctor/search, preview at
-`v2.103.1`, and pinned remote installation plus local imports. Changed warning
-counts were checked directly in native gh stderr because CLI install JSON omits
-that stream. A real `gh extension exec` launch reported the invoking 2.103.1 host
-through `GH_PATH` even with gh 2.97.0 first on PATH. This used the built extension
-apphost; invoking its DLL through `dotnet` instead reports standalone invocation
-because SkillView identifies invocation by executable name.
+outcomes and requested preview revisions.
 
 Windows/macOS runtime behavior and new Native AOT publishes were not exercised
 locally. Actual OAuth credential rotation and the interactive login hint were

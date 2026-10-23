@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace SkillView.Gh;
 
-// Placement contract from cli/cli v2.103.0 registry (unchanged since v2.102.0). This declares where gh
+// Placement contract from cli/cli v2.103.0 registry, checked unchanged in v2.103.1. This declares where gh
 // writes; native agent loading/enablement is a separate observation.
 internal static class GhPlacementCatalog
 {

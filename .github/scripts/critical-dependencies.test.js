@@ -129,6 +129,32 @@ test('release highlights recognize skill installation guidance without unrelated
   assert.match(monitor.releaseHighlights('* Improve skill installations', 'gh'), /skill installations/);
 });
 
+test('release highlights recognize installation forms and wrapped skill notes', () => {
+  for (const note of [
+    '* Fix skill installed path',
+    '* Fix installing a skill',
+    '* Fix skill\n  installation paths',
+    '* Fix installed paths for skills',
+    '* Fix `gh\n  skill update` drift',
+  ]) {
+    assert.doesNotMatch(monitor.releaseHighlights(note, 'gh'), /No directly relevant entry/, note);
+  }
+});
+
+test('release highlights require gh context for ambiguous non-install skill mentions', () => {
+  for (const note of [
+    '* Warn on agent skills update drift',
+    '* Show skill preview in browser tooltips',
+    '* Update repository skill content\n* Fix installation paths for packages',
+    '* Fix installed paths for skillsets',
+  ]) {
+    assert.match(monitor.releaseHighlights(note, 'gh'), /No directly relevant entry/, note);
+  }
+  for (const command of ['search', 'update', 'list', 'preview']) {
+    assert.match(monitor.releaseHighlights(`* Fix \`gh skill ${command}\` output`, 'gh'), /gh skill/);
+  }
+});
+
 test('manual reassessment accepts only labeled dependency issues with known titles', async () => {
   const github = { rest: { issues: { get: async () => ({ data: {
     title: 'GitHub CLI v2.102.0 compatibility review',
