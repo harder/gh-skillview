@@ -332,6 +332,40 @@ public sealed class SkillViewAppTests
         Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
     }
 
+    [Theory]
+    [InlineData("query", KeyCode.Enter)]
+    [InlineData("query", KeyCode.J | KeyCode.CtrlMask)]
+    [InlineData("query", KeyCode.Esc)]
+    [InlineData("owner", KeyCode.Enter)]
+    [InlineData("owner", KeyCode.J | KeyCode.CtrlMask)]
+    [InlineData("owner", KeyCode.Esc)]
+    [InlineData("agent", KeyCode.Enter)]
+    [InlineData("agent", KeyCode.J | KeyCode.CtrlMask)]
+    [InlineData("agent", KeyCode.Esc)]
+    [InlineData("limit", KeyCode.Enter)]
+    [InlineData("limit", KeyCode.J | KeyCode.CtrlMask)]
+    [InlineData("limit", KeyCode.Esc)]
+    public void DiscoverSearchFields_ConsumeSubmitAndEscapeKeys(string field, KeyCode keyCode)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        View input = field switch
+        {
+            "query" => app.QueryFieldForTests!,
+            "owner" => app.OwnerFieldForTests!,
+            "agent" => app.AgentFieldForTests!,
+            "limit" => app.LimitUpDownForTests!,
+            _ => throw new ArgumentException("Unknown search field", nameof(field)),
+        };
+        var key = new Key(keyCode);
+
+        _ = input.NewKeyDownEvent(key);
+
+        Assert.True(key.Handled);
+        Assert.True(app.UserInteractedSinceLaunchForTests);
+        Assert.Empty(app.QueryFieldForTests!.Text);
+    }
+
     [Fact]
     public void BuildUi_HidesDefaultDiscoverFilterSummary()
     {

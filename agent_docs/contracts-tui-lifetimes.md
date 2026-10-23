@@ -106,6 +106,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   callback-originated logging before ring mutation prevents both same-thread
   recursion and cross-thread, cross-logger lock cycles (A → B and B → A).
 
+- `SkillViewApp` uses feature partials for layout/navigation, discovery/preview,
+  feedback, presentation, workspace lifetimes and dispatch. Keep shared field
+  initializers and run-loop construction/teardown together in the main file;
+  moving a handler must not change initialization, subscription or shutdown order.
+  `CliDispatcher` follows the same feature-partial pattern, with routing/deadlines
+  and shared JSON output helpers in its main file.
+
 - The main TUI host path now runs through `SkillViewApp.RunAsync(ct)`, and
   `EntryPoint.RunAsync` awaits it directly. Keep external cancellation wired to
   the app lifetime so Terminal.Gui can stop the active runnable via
