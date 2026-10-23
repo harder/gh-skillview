@@ -113,7 +113,7 @@ distinct source commit, and a schema6 result proving source-free recovery; it
 cannot report a successful aggregate run after silently omitting that producer.
 Detach integration remains separate and must preserve its actual contracts.
 
-PR71 completed the [original combined M19 acceptance](evidence/maintenance-pr71-m19-m20-final.json).
+PR71 completed the [original combined M19 acceptance](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-pr71-m19-m20-final.json).
 The reviewed head passed full platform tests, minimum/latest gh contracts and all
 four native/AOT lanes before merge. Actual authoring dry-runs and Linux offline
 evaluation lifecycles are recorded separately from source-review approval. The

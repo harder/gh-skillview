@@ -2,7 +2,7 @@
 
 PR #59 merged the reviewed managed-discovery batch after source/acceptance reviews,
 all platform and native checks, and independent artifact inspection. Final-source
-results and merge attribution are in `evidence/maintenance-batch-11-final.json`.
+results and merge attribution are in [historical verification record](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-batch-11-final.json).
 The sections below retain implementation requirements and intermediate findings.
 
 ## Reproduction and source evidence

@@ -1,13 +1,10 @@
-# Batch 15 merged; remaining M08 work retained
+# Reviewed local dispositions
 
-External suppression merged in PR64. Batch 15 merged as PR65 and adds reviewed
-local dispositions, schema 3 merge plans, CLI entrypoints and owned inline TUI
-controls. Final CI and native evidence is recorded in
-`evidence/maintenance-batch-15-final.json`; the earlier consolidated record and
-October 16 handoff receipts retain their original scopes. Original M08 acceptance
-remains open. The development notes below retain detailed implementation
-boundaries and unfinished M08/M09 obligations; use the final record for completed
-cross-platform, recovery and TUI verification.
+Reviewed local dispositions, schema 3 merge plans, CLI entrypoints and owned
+inline TUI controls merged in PR #65. The [historical verification record](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-batch-15-final.json)
+records the completed platform, recovery and TUI checks. The contracts below
+remain applicable; references to original audit obligations describe historical
+scope, not an instruction to resume the retired maintenance goal.
 
 Implemented workflow boundaries:
 
@@ -66,19 +63,20 @@ is independent of the current payload location after promotion. An incomplete
 initial B/I/C capture remains retained and requires a new revision plan; it never
 restores approval of the earlier source replacement. Cross-platform acceptance
 for the implemented preserve/merge workflows and their TUI/recovery proofs is
-complete; see `evidence/maintenance-batch-15-final.json`. Resolution storage
+complete; see [historical verification record](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-batch-15-final.json). Resolution storage
 includes failed/unreferenced attempts: at most 16 archives, 256 MiB of raw bytes
 and 64 MiB of encoded manifests per plan. Bound the outer draft enumeration
 before computing that quota. Flush each archive, then the reopened draft namespace
 and operation writer/device barrier before publishing any reference in a choice
 record.
 
-Original acceptance stays unchanged. Replacement supports exact recorded
+Replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native
 objects. It admits no owner or one verified shared gh v3 owner. It already stages
 recorded base and candidate and lists local differences. Batch15 adds verified
 preserve and reviewed merge alongside retain-original replacement. Durable fork,
-source/other-owner transitions and the remaining proof matrix below remain required.
+source/other-owner transitions and the remaining proof matrix below describe
+historical scope; new work requires a concrete user need.
 
 ## Three-way review
 

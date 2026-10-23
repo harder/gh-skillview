@@ -483,11 +483,11 @@ partial coverage or an observed agent incompatibility return 1. Invalid selector
 match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
-This remains a partial implementation of [M19](../agent_docs/maintenance-audit.json).
 Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
-Opt-in isolated prompt evaluation and authoring `gh skill publish --dry-run`
-integration remain separate future work. `publish --fix`
-is never a repair action for installed payloads; no authored bytes are rewritten.
+Separate workflows support [opt-in isolated evaluations](isolated-evaluations.md)
+and [source authoring validation](#validate-a-source-repository-while-authoring),
+including `gh skill publish --dry-run`. `publish --fix` is never a repair action
+for installed payloads; no installed authored bytes are rewritten.
 
 ### Global flags
 

@@ -82,7 +82,7 @@ from installed dependencies, actual connections and effective permission grants.
 No skill scripts, agent clients, remote fetches, or automated fixes are part of
 this workflow. It does not establish authenticity, whole-agent compatibility,
 behavioral safety or source review; execution is `none`. Static checking is one
-part of the combined [original M19 acceptance](evidence/maintenance-pr71-m19-m20-final.json),
+part of the combined [original M19 acceptance](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-pr71-m19-m20-final.json),
 verified and merged in PR71. Other original maintenance findings remain open.
 
 The [saved-update source-review phase](maintenance-update-source-review.md) adds

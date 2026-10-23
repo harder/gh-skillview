@@ -52,11 +52,11 @@ The deferred table is context for future decisions, not a completion backlog.
   this host. Their existence and HEADs were observed; this does not assert that
   every worktree is clean, complete, or supported. Do not treat a private branch
   as merged product behavior. Historical `/tmp` receipts may disappear.
-- The untracked `HANDOFF-*` files in the repository are user handoffs. Preserve
-  them. They are historical records, not current release gates. The older
-  `/home/kevin/temp/skillview-batch/HANDOFF-2026-10-16.md` was found, but the
-  active `/tmp/skillview-maintenance-active-brief.md` was not found in the
-  inspected locations.
+- The obsolete local `HANDOFF-*` copies and retired planning files were removed
+  during the October 23 cleanup. They described the superseded all-21 goal.
+  Current contracts and immutable historical records are indexed in
+  [README.md](README.md). Use `git worktree list` for current private-work
+  locations; dirty or unmerged worktrees and their unique evidence are retained.
 
 “Implemented” below means code exists at the stated locator. “Verified” is
 limited to the cited evidence. An implementation can remain useful while its
@@ -82,7 +82,7 @@ broader acceptance or portability proof is unfinished.
 
 | Feature and user benefit | Code/status | UX readiness and bounded next work |
 | --- | --- | --- |
-| Detaching one physical exposure while retaining other consumers may help split shared installs. | Private worktrees `gh-skillview-exposure-detach` (`d005eee`), `gh-skillview-exposure-detach-current-integration` (`fe5a5ed`), and selected integration (`e542431`); see handoff notes. Not merged. | UX readiness unknown. Handoff reports focused checks, while native positive evidence and full acceptance remain outstanding. First establish the smallest actual user gap; do not label it nearly complete. |
+| Detaching one physical exposure while retaining other consumers may help split shared installs. | Private worktrees `gh-skillview-exposure-detach` (`d005eee`), `gh-skillview-exposure-detach-current-integration` (`fe5a5ed`), and selected integration (`e542431`); locate current work with `git worktree list`. Not merged. | UX readiness unknown. Handoff reports focused checks, while native positive evidence and full acceptance remain outstanding. First establish the smallest actual user gap; do not label it nearly complete. |
 
 ## Defer broad expansion
 

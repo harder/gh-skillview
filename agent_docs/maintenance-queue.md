@@ -91,7 +91,7 @@ for newly installed skills; it does not prove what an existing session loaded.
 Other agent/delivery combinations retain an explicit unavailable reload reason.
 Client versions/surfaces can differ; guidance does not launch or inspect a client.
 
-PR71 completed the [original M20 acceptance](evidence/maintenance-pr71-m19-m20-final.json)
+PR71 completed the [original M20 acceptance](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-pr71-m19-m20-final.json)
 after exact-head platform/native checks and merge. The queue does not retain
 availability results across a later disk refresh;
 unsupported owner transitions, disablement and migrations remain specialist/refused
