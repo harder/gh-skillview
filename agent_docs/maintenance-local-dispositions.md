@@ -73,7 +73,7 @@ record.
 Replacement supports exact recorded
 restore and selected newer GitHub revision, retaining original/displaced native
 objects. It admits no owner or one verified shared gh v3 owner. It already stages
-recorded base and candidate and lists local differences. Batch15 adds verified
+recorded base and candidate and lists local differences. The saved workflow supports
 preserve and reviewed merge alongside retain-original replacement. Durable fork,
 source/other-owner transitions and the remaining proof matrix below describe
 historical scope; new work requires a concrete user need.
@@ -106,7 +106,7 @@ Offer explicit actions:
   with explicit discarded-local-path list and affected exposures.
 - Keep fork: define ownership and future-update policy, not merely copy a badge.
   For a shared physical install, show all affected consumers. A per-consumer fork
-  requires a topology/detach plan (M13/M14), not a path-only overwrite. Native owner
+  requires a topology/detach plan, not a path-only overwrite. Native owner
   tracking and installer source fields must remain truthful. Preserve origin and
   original source evidence outside payload; never fabricate a remote tree hash for
   customized bytes. Where native gh tracking can represent the fork, stage via its
@@ -115,51 +115,40 @@ Offer explicit actions:
 - Cancel: leave live objects, preferences and owner records unchanged; private
   inspected evidence may remain with an explicit retained-state report.
 
-New generalized plan format should not silently alter old schema1/schema2 hash
+Plan formats must not silently alter old schema1/schema2 hash
 inputs. Add independently versioned disposition/source/owner transition records
 or a new schema with a demonstrated old-native compatibility boundary. Bind exact
 B/I/C payloads, original/native generations, selected path choices, final materialized
 candidate and its metadata, all affected exposures, owner before/desired entry
 images, external preferences and the review fingerprint. Revalidate at apply.
 
-## Source and ownership transitions
+## Source and ownership boundaries
 
-Source changes are explicit. Preserve upstream author versus republisher versus
-local fork versus native distributor. Stage selected source into private state
-with actual gh capabilities wherever applicable; verify exact Git tree/blob IDs or
-complete local snapshot before any consumer switch. --upstream is a source switch,
-not a routine update flag. Local imports must preserve authored bytes and record
-the actual observed source path. Restore recorded/current, move to approved latest,
-and unpin remain distinct requested purposes.
+Reviewed local merges preserve approved source C as the future comparison
+baseline while result M has its own exact evidence. They do not authorize
+per-consumer detach, durable forks, other-manager adoption or arbitrary remote
+source switches. Those workflows remain deferred under
+[project scope](deferred-maintenance-work.md).
 
-An owner adapter must declare supported schema/context and native lifecycle; don't
-write another manager's metadata using the gh editor. Preserve unrelated raw entry
-bytes/extensions and fresh independent changes. Unsupported or ambiguous owners
-stay diagnosed with concrete action guidance until an explicit native transition
-adapter is available; that is a pending original obligation, not acceptance.
-
-Combine payload, owner and external-policy state in a durable ordered journal:
-validate/retain original; promote verified candidate; publish corresponding owner
-and desired state; verify all; acknowledge completion. Enumerate every crash point
-and a recovery/undo action using retained native objects and exact review hashes.
-Never infer success from process exit alone. Keep session reload unknown unless
-actually observed. A journal must describe partially updated owner/payload state
-and refuse concurrent foreign mutations rather than blindly restore an old whole
-registry. Partial failures retain already completed changes and both streams.
+Supported [local reimport](maintenance-local-reimport.md),
+[local source switching](maintenance-local-source-switch.md) and
+[standalone unpin](maintenance-standalone-unpin.md) use their own reviewed plans,
+pin rules and native owner journals. Reuse those contracts; do not infer new
+mutation authority from the three-way path comparison.
 
 ## Proof matrix
 
 Changed tracked file, extra file, local deletion, mode/link/empty-directory change,
 unchanged upstream tree, same-name different-origin/context, pin and explicit unpin,
-shared target and per-consumer fork; nonoverlap merge, same-path and ancestor/type
+shared consumers; nonoverlap merge, same-path and ancestor/type
 conflict, source switch and local reimport. Verify review-fingerprint staleness,
 disk/cancellation/process-kill at each journal boundary, concurrent owner mutation,
 restart recovery, repeat no-op and undo restoring exact originals/extras/exclusions.
 Test actual gh minimum/current behavior, preserving observed help/runtime mismatch.
-All target platforms/native hosts plus independent review and original-criterion
-closure audit are required. M08 remains open until this entire acceptance is proven.
+Use applicable native hosts and recovery checks for supported operations. Deferred
+fork/detach/other-manager cases are not an implementation or acceptance backlog.
 
-Independent review refinements to make concrete:
+Additional invariants:
 - A merged result M records approved source C as the future comparison baseline
   and a separate exact local-delta/result fingerprint. Native recorded tree means
   source baseline, not a claim that customized M is byte-identical to C. Preserve
@@ -183,17 +172,7 @@ Independent review refinements to make concrete:
   cases; do not silently claim arbitrary metadata preservation from path algebra.
   Preserve the original root privacy/mode unless separately reviewed otherwise.
 
-- A source switch must separately choose preserve/drop/replacement pin policy; an
-  old pin string cannot be silently applied to a different repository. A fork's
-  permanent source must be durable user-owned source storage, never ephemeral
-  candidate or retained-plan directories. A manual-fork preference does not by
-  itself detach native ownership or make direct gh updates honor that policy.
 - Cross-store apply/recover/undo needs an explicit before/desired/foreign matrix
   for payload, native owner and preferences. Undo only the policy generation
   changed by this plan; preserve later independent set/clear actions. Reserve
   publication and undo capacity before displacement and document lock ordering.
-- Small coherent batches after suppression: complete reviewed three-way local
-  dispositions for current owner contexts; concrete durable fork/source switch/
-  local import/unpin-only plus required detach; native owner adapters/migration;
-  then unchanged original M08/M09 acceptance audit. Every batch delivers an
-  executable workflow and is reviewed, verified and merged before the next.

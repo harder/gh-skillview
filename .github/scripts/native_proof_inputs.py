@@ -50,7 +50,7 @@ def git(*arguments, cwd=None):
 def specs():
     result = []
     for family, script, variable, directory, environment in FAMILIES:
-        tree = ast.parse((ROOT / 'agent_docs/evidence' / script).read_text(encoding='utf-8'))
+        tree = ast.parse((ROOT / 'tests/native' / script).read_text(encoding='utf-8'))
         values = [ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
                   and any(isinstance(target, ast.Name) and target.id == variable for target in node.targets)]
         if len(values) != 1 or not isinstance(values[0], str) or len(values[0]) != 40 or any(

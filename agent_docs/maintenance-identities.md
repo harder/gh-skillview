@@ -1,16 +1,13 @@
-# Identity and operation subjects (M11, in progress)
+# Identity and operation subjects
 
-Original acceptance (verbatim): "Represent a shared user install, a pinned project copy,
-a locally edited fork and a plugin-bundled copy of the same display name without
-losing information. Every update/delete operation resolves to physical IDs and
-enumerates affected exposures." Address selectors coexist with independent native
-object observations and fresh execution validation.
-Do not bundle native manager lifecycle commands (M09/M16), loading selection
-rules (M12), migration (M13/M14) or desired state (M17).
+Represent shared user installs, pinned project copies, locally edited forks and
+plugin-bundled copies without losing source, owner or consumer information. Every
+update/delete resolves to physical IDs and enumerates affected exposures. Address
+selectors, native observations and fresh execution validation are separate facts.
 
 1. Distributor identity alongside upstream source identity.
    SkillPackage keeps observed provider, source locator, contextual registry,
-   installation/package boundary, selector and plugin/version. Introduce an
+   installation/package boundary, selector and plugin/version. Use an
    explicit identity projection based on those observed facts; unknown upstream
    remains unknown. Package version is revision evidence, not display-name identity.
    Preserve provider/context distinctions and multiple owner claims; no arbitrary
@@ -57,7 +54,7 @@ rules (M12), migration (M13/M14) or desired state (M17).
    proof that old fingerprints remain exact. Existing schema1/2 saved plans must
    inspect/recover/undo; use an actual prior native binary fixture as in PR58/59.
 
-Focused acceptance:
+Regression coverage:
 - Four physical copies of one display name: shared loose user, pinned project,
   edited local fork, managed plugin. Sources/revisions/owners/exposures stay distinct.
 - Same display/plugin names from different distributors retain separate identities;
@@ -71,90 +68,9 @@ Focused acceptance:
   original structured subject. Managed copy remains read-only.
 - Old-plan serialization hashes and actual old-native persisted restart proof.
 
-Review this design against current source before implementation. Make the batch
-small enough to close M11's original representation/impact criterion; do not add
-manager command mutation or effective-loading inference.
 
-
-## Implementation and review checkpoint
-
-The working implementation adds frozen `OperationSubject`/`OperationImpact`
-projections, read-only native identity/generation capture, separate distributor
-and delivery identities, exact CLI remove selectors, and structured affected
-contexts in update/remove/cleanup and retained-operation output. Saved subject,
-owner and journal serialization stays unchanged; transient managed-region and
-result projections are explicitly ignored.
-
-Two independent source reviews found and verified fixes for lost source conflicts,
-collapsed managed contexts, cancellation and unexpected-failure subject loss,
-plain-text output omissions, cleanup batch review/result omissions, live
-quarantine source loss, retention-location ambiguity, and ambiguous newline
-encoding of delivery roots. Independent re-review is clear. The earlier full
-suite was intentionally stopped after review changes were required; its partial
-log is not a passing verification result.
-
-Final full tests, both AOT hosts, minimum/current gh disposable proofs, actual old
-native persisted-plan restart, all platform gates and merge remain required.
-This checkpoint does not close original M11 acceptance or increase the completed
-finding count. M01/M02/M04/M05/M06/M07/M10 remain the seven completed findings.
-
-
-Final-source preparation: build passes with zero warnings/errors; maintenance
-385/385 and cleanup 18/18 tests pass. Inventory's earlier 344-case checkpoint
-is retained as intermediate evidence; the full final-source suite is next.
-The native proof now checks ambiguity diagnostics plus unchanged object/byte/mode
-fixtures, and independently reads native IDs and generation values. Native AOT,
-old-host restart and remote checks remain pending.
-
-PR #61 Copilot follow-up: logical distributor digests now retain normalized
-recorded source and URL evidence alongside the plugin label; a shared label
-cannot combine different repositories in package removal. Frozen subjects carry
-output-only materialization (`directory`, `broken-link`, or historical `unknown`),
-so unlinking a broken entry cannot claim its deleted address is a retained payload.
-Quarantine previews identify the original observed retention location. Windows
-inventory identity reads omit DELETE access; destructive capture still requires
-it. The new repository and CLI regressions failed before these fixes. A disposable
-Windows ACL regression denies target DELETE and parent DELETE_CHILD while proving
-read-only identity/generation capture leaves permissions and bytes intact; its
-platform execution remains a CI gate. Native identity proofs now include actual
-quarantine preview and broken-link cleanup output. Original M11 remains open until
-final-source checks, native proofs, review and merge complete.
-
-Final review also found the direct `update-plan` already-current branch omitted
-retention even though ordinary saved-update preparation already handled it.
-The shared frozen impact is now marked retained at the verified current path
-before JSON/text rendering. The real-gh Native AOT proof reproduced the previous
-false `payloadRetained` result; update-outcomes now asserts retention for both
-ordinary and direct no-op checks. Final-source gates restart for this correction.
-
-
-Final follow-up review corrects backup and refused-update retention for broken
-links, retains the requested undo operation on failure, and preserves cleanup
-duplicate skips plus partial mutation totals on cancellation and unexpected
-failure. Fault snapshots bypass both progress throttles; each attempt contributes
-once to lifetime mutation totals. An adapter exception after update admission now
-invalidates inventory and triggers bounded verification without claiming the
-original payload survived. Two independent source re-reviews are clear. Focused
-CLI 74/74, cleanup 24/24 and removal 40/40 tests pass; disposable debug-host proofs
-confirm broken-link retention and occupied-destination undo evidence. Full final
-suite, final AOT hosts, remote gates and merge remain required before closing M11.
-
-
-Acceptance review extended the frozen-failure contract to CLI orchestration:
-unexpected removal faults now return a failed result with the captured subject,
-exact partial totals and one additional error. Low-level removal APIs retain
-throwing behavior. Three CLI orchestration regressions failed before the fix,
-including unrelated cancellation and cleanup's second-target failure. Earlier
-1512/1512 full-suite success is retained as historical evidence; final-source
-verification must include the three added cases.
-
-The failed CLI result also publishes a guarded terminal completed update matching
-its exact counts. Unrelated cancellation is a failure in both report and progress.
-The same regressions assert these lifecycle guarantees; acceptance re-review is clear.
-
-
-Final M11 acceptance: PR #61 merged at `351224b3e058166073370caafcba225bce12d7e9`
-after all final gates passed. Full source, native artifact, old-schema restart,
-review and merge-tree evidence is recorded in `evidence/maintenance-
-batch-12-final.json`. The pending checkpoints above remain historical. M11 is
-complete; the whole 21-item goal remains active.
+`OperationSubject` and `OperationImpact` are frozen CLI/TUI projections. Keep
+identity-only observations separate from mutation authority and preserve the
+pre-attempt subject through refusal, cancellation and partial mutation. See
+[discovery](contracts-discovery.md), [native filesystem](contracts-native-filesystem.md)
+and [saved-operation](contracts-saved-operations.md) contracts.

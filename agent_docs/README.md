@@ -21,8 +21,9 @@ or release verdict.
 - [Version selection scope](version-selection-scope.md) and
   [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md).
 
-Other focused guides remain alongside these files. Executable native proof tools
-and recent compatibility and UX evidence remain in [evidence/](evidence/).
+Detailed subsystem invariants are indexed by the short root [AGENTS.md](../AGENTS.md).
+Active native proof tools and their tests live in [tests/native](../tests/native/README.md).
+Historical compatibility and UX results remain in [evidence/](evidence/).
 Saved operation plans, backup manifests, journals and recovery state are product
 data; they are not disposable development plans.
 

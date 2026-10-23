@@ -1,10 +1,13 @@
 # CI scope and native proof inputs
 
 `ci.yml` skips managed/native verification only after the scope job successfully
-classifies every changed path as user documentation, screenshots/animations or a
+classifies every changed path as user/agent documentation, screenshots/animations or a
 known static-site file. The allowlist lives in
-`.github/scripts/ci-change-scope.js`; all `agent_docs/`, workflow, dependency,
-source, test and unknown paths require full verification. Exact base/head commits
+`.github/scripts/ci-change-scope.js`. Root `AGENTS.md` and regular `.md` files
+under `docs/` and `agent_docs/` qualify. Executable modes, links, nested
+`AGENTS.md`/`SKILL.md`, hidden paths, proof inputs, workflows, dependencies,
+source, tests and unknown paths require full verification. Active native proof
+code lives in `tests/native/`; every change there retains full verification. Exact base/head commits
 and NUL-delimited raw Git records preserve unusual filenames, both rename paths
 and file modes. Missing commits, failed/bounded/malformed captures and empty
 diffs require full verification. Workflow lint, its helper tests and site checks

@@ -80,7 +80,7 @@ and effective-loading output if convenient, but do not displace the journeys
 above or install real AI clients just to test them.
 
 On WSL/macOS, the existing
-`agent_docs/evidence/prove-reviewed-update-tui.py` can automate a live reviewed
+`tests/native/prove-reviewed-update-tui.py` can automate a live reviewed
 update journey; inspect its `--help` and retain its captures. It uses POSIX PTYs
 and is not a Windows proof. Run it with a new output directory and the built
 host; it creates private fixtures. Report the exact shortcut/disposition tested.

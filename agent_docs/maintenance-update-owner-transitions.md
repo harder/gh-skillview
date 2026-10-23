@@ -1,8 +1,7 @@
-# Batch 6 remaining integration: shared owner transitions
+# Shared owner transitions
 
-This records the independently reviewed integration design after the ownerless
-saved-update and native registry-session checkpoint. It is required work within
-the current batch, not a reduction of the original 21-item objective.
+These are the current shared-update registry and recovery contracts. They apply
+to supported gh ownership; they do not authorize new manager adapters.
 
 ## Saved contracts and authority
 
@@ -89,7 +88,7 @@ durable owner marker only when no unbound raw intent, restoration or completion
 could represent a later admitted write. Unknown records still consume budget.
 All existing/schema-1 optional fields remain omitted when absent.
 
-## Required proof before merge
+## Regression coverage
 
 Exercise custom/ownerless and shared gh installs, multiple exposures, pins/unpin,
 local edits/extras, nested namespaces and identical names with unrelated owners.
@@ -98,4 +97,4 @@ foreign selected records, malformed/extended schemas, every payload/owner write
 interruption, actual process death/restart, torn-byte review, journal exhaustion,
 owner write refusal and terminal accounting. Route ordinary CLI/TUI updates
 through reviewed immutable stages, then run full platform tests, four-RID both-host
-AOT proofs and independent review/re-review before merging batch 6.
+AOT proofs for changes to these contracts.

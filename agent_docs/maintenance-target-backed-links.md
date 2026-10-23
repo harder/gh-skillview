@@ -1,8 +1,8 @@
-# Target-backed exposure link retention (primitive checkpoint)
+# Target-backed exposure link retention
 
-This slice supplies an internal native primitive, not a detach command, saved
-plan, manager adoption or claim about an agent's effective loading. Original
-M08 remains incomplete; acceptance stays at 9/21 original findings.
+This internal native primitive retains exposure links without granting detach,
+manager-adoption or effective-loading authority. Broader topology workflows
+remain deferred; see [project scope](deferred-maintenance-work.md).
 
 `NativeExposureLinkLease.Open(root, entry, targetLease, token)` binds a single
 ordinary directory symlink to an independently held skill-directory lease. Its
@@ -190,10 +190,9 @@ is replaced. A separate internal friend-proof factory selects one fixed typed
 completed-move cancellation checkpoint, then runs real publication; ordinary
 `Start` hardcodes no checkpoint. No CLI, environment value or serialized request
 selects it. These proof controls are not product switches. JIT test-host native interop evidence
-is separate from product AOT/runtime proof. Actual macOS/Windows positive
-runtime evidence and four-RID native hosts remain pending. Minimum/current gh
-mixed-layout owner/loading/update contracts and the saved detach workflow remain
-separate required work; unit/refusal results do not establish those behaviors.
+is separate from product AOT/runtime proof. Run applicable native hosts before
+claiming platform behavior. Unit/refusal results cannot establish mixed-layout
+owner/loading/update behavior or authorize a saved detach workflow.
 
 The Windows parser uses Microsoft's documented
 [REPARSE_DATA_BUFFER layout](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer)

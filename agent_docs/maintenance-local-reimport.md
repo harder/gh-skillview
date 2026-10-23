@@ -82,6 +82,6 @@ notices and child streams still describe the attempted operation. Direct recover
 and undo must show their outcome message. Bound and sanitize rendered diagnostics,
 retain full logs, and invalidate approval after failure or partial reconciliation.
 
-This is a partial M08 checkpoint. Acceptance remains 9/21; all 21 obligations
-remain tracked. Native process-death, min/current gh and prior-schema receipts
-must name their actual source and host before being claimed as complete.
+Native process-death, minimum/current gh and prior-schema receipts must name
+their actual source and host before being claimed as complete. The retired
+maintenance audit does not authorize additional implementation.

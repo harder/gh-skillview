@@ -5,7 +5,7 @@ from a different existing durable ordinary local source. It is baseline-less:
 installed I and selected C are real captures; the previous recorded address is
 placement evidence, never a historical base. All consumers remain attached to
 that physical installation. Git-managed sources, native owner transitions,
-per-consumer detachment and fork creation remain unsupported. M08 stays incomplete.
+per-consumer detachment and fork creation remain unsupported. Broader owner transitions remain deferred.
 
 Use `source-switch-plan --path <installation>` (or exactly one `--install-id`)
 with `--new-source <absolute directory>`. Global scan/workspace/profile options

@@ -1,11 +1,11 @@
-# Managed and built-in skill discovery (M10, complete)
+# Managed and built-in skill discovery
 
 PR #59 merged the reviewed managed-discovery batch after source/acceptance reviews,
 all platform and native checks, and independent artifact inspection. Final-source
 results and merge attribution are in [historical verification record](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-batch-11-final.json).
 The sections below retain implementation requirements and intermediate findings.
 
-## Reproduction and source evidence
+## Historical source evidence
 
 A disposable native fixture at the reviewed PR #58 source contains an ordinary
 user skill, a Codex built-in, and Codex/Claude plugin-cache skills. Inventory
@@ -34,7 +34,7 @@ Current primary references, checked 2026-10-15:
   the entire plugins root, rather than its `cache` child. Explicit plugin and
   read-only seed directories also need bounded observation.
 
-## Implementation requirements from separate-model design review
+## Discovery contracts
 
 Use one bounded managed-owner probe for local inventory, install admission and
 `ReplacementPlanStore.ReadOwners`. Preserve a managed-region/exclusion witness
@@ -44,15 +44,13 @@ never turn an unparsed managed region into ownerless writable space.
 Distinguish a wholly managed region from one managed payload under an ordinary
 skills root. Use canonical containment/overlap for regions and exact physical
 addresses for payloads. Protect aliases and missing descendants without blocking
-unrelated sibling installs. `GhInstallOwnershipGuard` currently reads only
-lockfiles and refuses read-only claims before selector matching; inventory-only
-integration would leave direct installs unprotected.
+unrelated sibling installs. Install ownership guards must retain managed-region evidence as well as
+lockfiles; inventory-only classification cannot protect direct installs.
 
 Managed providers need their own revalidation contract. Do not manufacture a
 lockfile path: existing validation assumes it can reread one. Capture the child
 runner's CWD and environment, retain evidence across source discovery, and probe
-again before mutation. The existing install guard's fallback to process CWD
-should become `runner.EffectiveWorkingDirectory`.
+again before mutation. Use `runner.EffectiveWorkingDirectory` for the install guard's captured context.
 
 Scan explicit single-skill folders as candidates, rather than visiting their
 resource children. Scan only recognized/default or declared skill structures;
@@ -90,8 +88,8 @@ created before managed discovery is enabled.
 - Disposable native fixtures on all four RIDs prove observable managed resources,
   zero mutation on refusal, and compatibility of pre-existing saved plans.
 
-M10 acceptance is complete. Plugin lifecycle mutations and effective-loading
-analysis remain their own original findings.
+Plugin lifecycle mutations remain separate scope. Effective-loading analysis
+uses its own [conditional policy contracts](contracts-discovery.md).
 
 ## Review corrections implemented
 
@@ -114,8 +112,8 @@ Saved replacement context hashes keep their historical configured-root contract.
 Disposable proof environments and C# staging explicitly isolate every newly read
 managed-directory override. Doctor can include inventory with `--inventory`;
 the TUI uses an already captured Installed snapshot without adding UI-thread I/O.
-Final tests, native RID proofs, persisted-plan compatibility and merge evidence
-are still required before updating the original acceptance ledger.
+Changes to these contracts require focused tests, applicable native proofs and
+persisted-plan compatibility checks.
 
 
 ## Native verification commands
@@ -154,8 +152,8 @@ retain an accessible control and refuse unsupported mutation.
 The moved-branch contract fixture nested its private agent HOME inside the
 installation destination. Move that HOME/config to a sibling of the fixture's
 skills directory, preserving the install guard and the actual update contract.
-These follow-up changes require fresh source and platform evidence; the first
-checkpoint remains attributed to the earlier source and native binaries.
+Historical checkpoints are attributed to their observed source and native
+binaries. Changes require verification against the actual current revision.
 
 
 Copilot follow-up additionally covers initial and nested cache/synced links,

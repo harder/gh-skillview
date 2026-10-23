@@ -70,7 +70,7 @@ Verification:
 - Opt-in `GhUpdateOutcomeContractTests`: actual-gh partial batch and the actual
   product saved-update workflow driven through `UpdatesTabView`. Run with the
   standard contract flag and both minimum/current gh hosts.
-- `agent_docs/evidence/prove-update-outcomes.py --app <native-host> --output
+- `tests/native/prove-update-outcomes.py --app <native-host> --output
   <proof.json>`: actual pinned/untracked/updated/current/same-tree-force-repair
   and later remote failure in a private home, CWD, state and Git context. It
   checks payload objects, bytes, modes, owner bytes, retained originals, exact

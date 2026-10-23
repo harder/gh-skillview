@@ -1,6 +1,7 @@
 # GitHub Copilot instructions
 
-Read [`../AGENTS.md`](../AGENTS.md) before reviewing or changing this repository.
+Read [`../AGENTS.md`](../AGENTS.md) and the relevant focused contracts it links
+before reviewing or changing this repository.
 It is the source of truth for project structure, supported versions, safety
 invariants, build commands, and focused guides in `agent_docs/`. Do not copy
 general project facts into this file; use the current code and `AGENTS.md` when
@@ -15,8 +16,8 @@ they disagree with an old comment, issue, or generated summary.
   ownership through cancellation, queued UI dispatch, completion, and disposal.
   A completed worker does not imply its UI completion callback has run.
 - Treat removal as a destructive security boundary. Apply the complete
-  `AGENTS.md` removal contract before suggesting a simpler path or symlink
-  implementation. Do not recommend path-recursive deletion as a fallback.
+  [native filesystem contract](../agent_docs/contracts-native-filesystem.md)
+  before suggesting a simpler path or symlink implementation. Do not recommend path-recursive deletion as a fallback.
 - Check adapters against the **minimum supported** `gh` version as well as the
   newest release. The minimum-version check replaces old per-flag capability
   probing. Flag removals, JSON schema changes, and agent selector changes need

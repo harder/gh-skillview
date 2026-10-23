@@ -56,7 +56,7 @@ jobs:
           node --test .github/scripts/ci-change-scope.test.js
           python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
       - name: Test native proof fixture contracts
-        run: python3 -m unittest discover -s agent_docs/evidence -p 'test_*.py'
+        run: python3 -m unittest discover -s tests/native -p 'test_*.py'
 
   dependency-review:
     name: ${{ inputs.verification == 'windows-metadata' && 'Diagnostics only - skipped dependency review' || 'dependency-review' }}
@@ -119,9 +119,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/linux-live-link/input
-          cp agent_docs/evidence/probe-linux-link-preservation-abi.c dist/linux-live-link/input/
-          cp agent_docs/evidence/verify-linux-link-preservation-abi.py dist/linux-live-link/input/
-          cp agent_docs/evidence/prove-linux-link-hidden-attributes.py dist/linux-live-link/input/
+          cp tests/native/probe-linux-link-preservation-abi.c dist/linux-live-link/input/
+          cp tests/native/verify-linux-link-preservation-abi.py dist/linux-live-link/input/
+          cp tests/native/prove-linux-link-hidden-attributes.py dist/linux-live-link/input/
           cp tests/SkillView.MaintenanceProof/ExposureLinkProof.cs dist/linux-live-link/input/
           cp tests/SkillView.MaintenanceProof/ExposureLifetimeProof.cs dist/linux-live-link/input/
           cp src/SkillView.Core/Inventory/LinuxExposureOwnerContext.cs dist/linux-live-link/input/
@@ -129,12 +129,12 @@ jobs:
           sha256sum dist/linux-live-link/input/* > dist/linux-live-link/input-sha256.txt
           cc --version > dist/linux-live-link/compiler.txt
           cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -Wconversion -Wsign-conversion \
-            agent_docs/evidence/probe-linux-link-preservation-abi.c -o dist/linux-live-link/probe-linux-link-abi
+            tests/native/probe-linux-link-preservation-abi.c -o dist/linux-live-link/probe-linux-link-abi
           probe_dir=$(mktemp -d "$RUNNER_TEMP/skillview-link-abi.XXXXXX")
           trap 'rmdir "$probe_dir"' EXIT
           dist/linux-live-link/probe-linux-link-abi "$probe_dir" > dist/linux-live-link/abi.json
-          python3 agent_docs/evidence/verify-linux-link-preservation-abi.py \
-            --input dist/linux-live-link/abi.json --source agent_docs/evidence/probe-linux-link-preservation-abi.c \
+          python3 tests/native/verify-linux-link-preservation-abi.py \
+            --input dist/linux-live-link/abi.json --source tests/native/probe-linux-link-preservation-abi.c \
             --architecture x64 --output dist/linux-live-link/abi-verified.json
           dotnet build tests/SkillView.MaintenanceProof/SkillView.MaintenanceProof.csproj \
             --configuration Release -p:RestoreLockedMode=true | tee dist/linux-live-link/proof-build.log
@@ -144,7 +144,7 @@ jobs:
             --filter-class SkillView.Tests.Inventory.LinuxLinkProcAuthorityTests \
             --filter-class SkillView.Tests.Inventory.LinuxExposureOwnerLifetimeTests \
             | tee dist/linux-live-link/native-tests.log
-          python3 agent_docs/evidence/prove-linux-link-hidden-attributes.py \
+          python3 tests/native/prove-linux-link-hidden-attributes.py \
             --dotnet "$(command -v dotnet)" \
             --proof tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof.dll \
             --output dist/linux-live-link/hidden-attribute-proof.json
@@ -275,8 +275,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.97.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-minimum"
-          python agent_docs/evidence/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-current"
+          python tests/native/prepare-gh-proof-tool.py --version 2.97.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-minimum"
+          python tests/native/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-current"
       - name: Smoke-test native binaries
         shell: bash
         run: |
@@ -394,18 +394,18 @@ jobs:
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
-          python agent_docs/evidence/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
+          python tests/native/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
+          python tests/native/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
       - name: Prove explicit authoring dry-runs preserve authored and Git files
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           set -euo pipefail
           proof_gh_name='gh${{ matrix.ext }}'
-          python agent_docs/evidence/prove-authoring-validation.py --app 'dist/app/skillview${{ matrix.ext }}' \
+          python tests/native/prove-authoring-validation.py --app 'dist/app/skillview${{ matrix.ext }}' \
             --gh ".ci-native/gh-minimum/$proof_gh_name" \
             --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-app-proof
-          python agent_docs/evidence/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
+          python tests/native/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
             --gh ".ci-native/gh-minimum/$proof_gh_name" \
             --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-extension-proof
       - name: Prove explicit offline evaluation against a real local Docker runtime
@@ -419,9 +419,9 @@ jobs:
           fixture_digest="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["RepoDigests"][0])')"
           fixture_id="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["Id"])')"
           docker_path="$(command -v docker)"
-          python3 agent_docs/evidence/prove-isolated-evaluation.py --app dist/app/skillview \
+          python3 tests/native/prove-isolated-evaluation.py --app dist/app/skillview \
             --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-app-proof
-          python3 agent_docs/evidence/prove-isolated-evaluation.py --app dist/ext/gh-skillview \
+          python3 tests/native/prove-isolated-evaluation.py --app dist/ext/gh-skillview \
             --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-extension-proof
       - name: Verify repository API access and retain response evidence
         if: matrix.shard == 'owners'
@@ -447,99 +447,99 @@ jobs:
         shell: bash
         run: |
           proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
-          python agent_docs/evidence/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
-          python agent_docs/evidence/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
+          python tests/native/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
+          python tests/native/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
       - name: Prove external cleanup suppression without payload mutations
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/suppression-app-proof.json
-          python agent_docs/evidence/prove-cleanup-suppression.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/suppression-extension-proof.json
+          python tests/native/prove-cleanup-suppression.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/suppression-app-proof.json
+          python tests/native/prove-cleanup-suppression.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/suppression-extension-proof.json
       - name: Prove native backup evidence and unchanged installed copies
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/backup-app-proof.json
-          python agent_docs/evidence/prove-maintenance-backup.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/backup-extension-proof.json
+          python tests/native/prove-maintenance-backup.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/backup-app-proof.json
+          python tests/native/prove-maintenance-backup.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/backup-extension-proof.json
       - name: Inspect metadata with openat2 denied; retain removal refusal
         if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
-        run: python3 agent_docs/evidence/prove-metadata-without-openat2.py --app dist/app/skillview
+        run: python3 tests/native/prove-metadata-without-openat2.py --app dist/app/skillview
       - name: Refuse linked-worktree and broken Git metadata removals
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/gitfile-app-proof.json
-          python agent_docs/evidence/prove-gitfile-protection.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/gitfile-extension-proof.json
+          python tests/native/prove-gitfile-protection.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/gitfile-app-proof.json
+          python tests/native/prove-gitfile-protection.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/gitfile-extension-proof.json
       - name: Inspect native object evidence without changing installed skills
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/object-app-proof.json
-          python agent_docs/evidence/prove-native-object-evidence.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/object-extension-proof.json
+          python tests/native/prove-native-object-evidence.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/object-app-proof.json
+          python tests/native/prove-native-object-evidence.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/object-extension-proof.json
       - name: Prove shared inventory scope and agent filters without network access
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-inventory-filter.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-filter-app-proof.json
-          python agent_docs/evidence/prove-inventory-filter.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-filter-extension-proof.json
+          python tests/native/prove-inventory-filter.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-filter-app-proof.json
+          python tests/native/prove-inventory-filter.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-filter-extension-proof.json
       - name: Prove denied scan roots stay diagnostic and cannot authorize cleanup
         if: matrix.shard == 'inspection-unpin' && (runner.os != 'Windows')
         shell: bash
         run: |
-          python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
-          python agent_docs/evidence/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
+          python tests/native/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
+          python tests/native/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
       - name: Prove managed and built-in discovery preserves read-only resources
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
-          python agent_docs/evidence/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
+          python tests/native/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
+          python tests/native/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
       - name: Prove physical installation identities and frozen operation subjects
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-installation-identities.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/identities-app-proof.json
-          python agent_docs/evidence/prove-installation-identities.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/identities-extension-proof.json
+          python tests/native/prove-installation-identities.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/identities-app-proof.json
+          python tests/native/prove-installation-identities.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/identities-extension-proof.json
       - name: Prove standalone quarantine and undo using native hosts
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
-          python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
-          python agent_docs/evidence/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json
+          python tests/native/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
+          python tests/native/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json
       - name: Prove actual gh tracking metadata round trips through native hosts
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/tracking-app-proof.json
-          python agent_docs/evidence/prove-tracking-roundtrip.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/tracking-extension-proof.json
+          python tests/native/prove-tracking-roundtrip.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/tracking-app-proof.json
+          python tests/native/prove-tracking-roundtrip.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/tracking-extension-proof.json
       - name: Prove update outcomes, same-tree repairs and no-op object preservation
         if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python agent_docs/evidence/prove-update-outcomes.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/update-outcomes-app-proof.json
-          python agent_docs/evidence/prove-update-outcomes.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/update-outcomes-extension-proof.json
+          python tests/native/prove-update-outcomes.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/update-outcomes-app-proof.json
+          python tests/native/prove-update-outcomes.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/update-outcomes-extension-proof.json
       - name: Prove recorded restoration and undo with real gh and native hosts
         if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/replacement-app-proof.json
-          python agent_docs/evidence/prove-recorded-replacement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/replacement-extension-proof.json
+          python tests/native/prove-recorded-replacement.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/replacement-app-proof.json
+          python tests/native/prove-recorded-replacement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/replacement-extension-proof.json
       - name: Prove immutable revision updates with native hosts
         if: matrix.shard == 'owners'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python agent_docs/evidence/prove-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/revision-app-proof.json
-          python agent_docs/evidence/prove-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/revision-extension-proof.json
+          python tests/native/prove-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/revision-app-proof.json
+          python tests/native/prove-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/revision-extension-proof.json
       - name: Prove shared owner updates and torn-registry repair after process death
         if: matrix.shard == 'owners'
         shell: bash
@@ -547,8 +547,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           proof_gh_path="$(command -v gh)"
-          python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
-          python agent_docs/evidence/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
+          python tests/native/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
+          python tests/native/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
       - name: Prove reviewed shared-owner merges and restart repair
         if: matrix.shard == 'owners' && (runner.os != 'Linux')
         shell: bash
@@ -557,8 +557,8 @@ jobs:
         run: |
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
-          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
-          python agent_docs/evidence/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
+          python tests/native/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
+          python tests/native/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
       - name: Prove standalone unpin without source access on both native hosts
         if: matrix.shard == 'inspection-unpin'
         shell: bash
@@ -570,9 +570,9 @@ jobs:
           proof_gh_minimum=".ci-native/gh-minimum/gh${{ matrix.ext }}"
           prove_unpin() {
             if [ "$RUNNER_OS" = Linux ]; then
-              python agent_docs/evidence/prove-shared-revision-update.py --unpin-only --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-shared-revision-update.py --unpin-only --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-shared-revision-update.py --unpin-only "$@"
+              python tests/native/prove-shared-revision-update.py --unpin-only "$@"
             fi
           }
           prove_unpin --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-app-proof.json
@@ -586,18 +586,18 @@ jobs:
           proof_gh_minimum=".ci-native/gh-minimum/gh${{ matrix.ext }}"
           prove_reimport() {
             if [ '${{ matrix.rid }}' = linux-x64 ]; then
-              python agent_docs/evidence/prove-local-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-local-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-local-reimport.py "$@"
+              python tests/native/prove-local-reimport.py "$@"
             fi
           }
           prove_reimport --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/local-reimport-app-proof.json
           prove_reimport --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/local-reimport-extension-proof.json
           prove_old_unpin() {
             if [ '${{ matrix.rid }}' = linux-x64 ]; then
-              python agent_docs/evidence/prove-old-native-unpin.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-old-native-unpin.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-old-native-unpin.py "$@"
+              python tests/native/prove-old-native-unpin.py "$@"
             fi
           }
           prove_old_unpin --old-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-unpin-app-proof.json
@@ -611,7 +611,7 @@ jobs:
             proof_name="${host%%/*}"
             proof_boundary=retain-moved
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
-            python3 agent_docs/evidence/run-local-merge-disk-full-docker.py --local-reimport \
+            python3 tests/native/run-local-merge-disk-full-docker.py --local-reimport \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
               --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
@@ -637,16 +637,16 @@ jobs:
           fi
           prove_switch() {
             if [ '${{ matrix.rid }}' = linux-x64 ]; then
-              python agent_docs/evidence/prove-local-source-switch.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-local-source-switch.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-local-source-switch.py "$@"
+              python tests/native/prove-local-source-switch.py "$@"
             fi
           }
           prove_legacy() {
             if [ '${{ matrix.rid }}' = linux-x64 ]; then
-              python agent_docs/evidence/prove-old-native-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-old-native-reimport.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-old-native-reimport.py "$@"
+              python tests/native/prove-old-native-reimport.py "$@"
             fi
           }
           prove_switch --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/local-source-switch-app-proof.json
@@ -664,7 +664,7 @@ jobs:
             proof_name="${host%%/*}"
             proof_boundary=retain-moved
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
-            python3 agent_docs/evidence/run-local-source-switch-docker.py \
+            python3 tests/native/run-local-source-switch-docker.py \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
               --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_REIMPORT_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_REIMPORT_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
@@ -677,8 +677,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/source-switch-proof-inputs
-          cp agent_docs/evidence/prove-local-source-switch.py agent_docs/evidence/prove-old-native-reimport.py \
-            agent_docs/evidence/prove-local-reimport.py agent_docs/evidence/source_review_proof.py agent_docs/evidence/run-local-source-switch-docker.py \
+          cp tests/native/prove-local-source-switch.py tests/native/prove-old-native-reimport.py \
+            tests/native/prove-local-reimport.py tests/native/source_review_proof.py tests/native/run-local-source-switch-docker.py \
             tests/SkillView.MaintenanceProof/Program.cs dist/source-switch-proof-inputs/
       - name: Prove actual previous native saved plans survive the new schema boundary
         if: matrix.shard == 'sources'
@@ -690,9 +690,9 @@ jobs:
           proof_gh_current=".ci-native/gh-current/gh${{ matrix.ext }}"
           prove_legacy() {
             if [ "$RUNNER_OS" = Linux ]; then
-              python agent_docs/evidence/prove-old-native-plans.py --expect-schema3-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-old-native-plans.py --expect-schema3-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-old-native-plans.py "$@"
+              python tests/native/prove-old-native-plans.py "$@"
             fi
           }
           prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-app-proof.json
@@ -708,7 +708,7 @@ jobs:
             proof_name="${host%%/*}"
             proof_boundary=retain-moved
             if [ "$proof_name" = ext ]; then proof_boundary=install-moved; fi
-            python3 agent_docs/evidence/run-local-merge-disk-full-docker.py --unpin-only \
+            python3 tests/native/run-local-merge-disk-full-docker.py --unpin-only \
               --app "dist/$host" --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
               --gh ".ci-native/gh-current/gh" --extra-gh ".ci-native/gh-minimum/gh" \
               --legacy-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
@@ -724,9 +724,9 @@ jobs:
           proof_gh_path="$(command -v gh)"
           prove_local_merge() {
             if [ "$RUNNER_OS" = Linux ]; then
-              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-local-merge-update.py --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python agent_docs/evidence/prove-local-merge-update.py --gh "$proof_gh_path" --resolved "$@"
+              python tests/native/prove-local-merge-update.py --gh "$proof_gh_path" --resolved "$@"
             fi
           }
           prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
@@ -740,7 +740,7 @@ jobs:
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
           for boundary in retain-moved install-moved displace-moved restore-moved; do
-            python agent_docs/evidence/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
+            python tests/native/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
               --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
               --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
           done
@@ -752,7 +752,7 @@ jobs:
         run: |
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
-          python3 agent_docs/evidence/run-local-merge-disk-full-docker.py \
+          python3 tests/native/run-local-merge-disk-full-docker.py \
             --app dist/app/skillview \
             --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
             --gh "$proof_gh_path" --output dist/disk-full-proof --platform linux/amd64
