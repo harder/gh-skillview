@@ -807,8 +807,8 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   out to matter for this repo, capture the repo-relevant part here so future
   agents do not need to rediscover it from external docs.
 
-- Skill maintenance invariants and batch evidence live in
-  `agent_docs/maintenance-implementation.md`. A name collision or absent gh
+- Current maintenance contracts and historical evidence are indexed in
+  `agent_docs/README.md`. A name collision or absent gh
   catalog entry is never sufficient removal evidence. Preserve explicit root
   coverage, authored-version versus repository-ref semantics, and all agent
   exposures when reconciling inventory. Frontmatter uses bounded YAML events;
@@ -882,7 +882,7 @@ the terminal, with both a full-screen TUI and scriptable CLI commands.
   directory and gh noninteractive confirmation separate from target selection.
   Local drift refuses replacement even with force until an explicit recoverable
   repair disposition exists. Preserve both streams and post-attempt verification
-  on failure/cancellation. See `agent_docs/maintenance-implementation.md`.
+  on failure/cancellation. See `docs/saved-updates.md`.
 - Payload snapshots read entries relative to held native roots, treating links as
   leaves and rejecting special files. Recheck all observed entries/ancestors at
   completion, including raw content rehashes: Windows can retain a file's native

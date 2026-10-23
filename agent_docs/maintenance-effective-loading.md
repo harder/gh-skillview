@@ -181,9 +181,9 @@ includes both rejected Gemini forms alongside a valid competing user skill.
 
 Final M12 acceptance: PR #63 merged at `6233f6a39105c472130e726c425da7ecf5acb632` after final-head
 verification and review. The merged tree matches `bedba13fc1c1c16449122187aa2ade8f253c1c40`.
-`evidence/maintenance-batch-13-final.json` records source hashes, all platform and
+[historical verification record](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-batch-13-final.json) records source hashes, all platform and
 actual gh contracts, both local native hosts, four-RID artifact binding, old-native
 recovery compatibility and reviewed findings. Native AI-client inventory remains
 unavailable with explicit reasons and active sessions remain unknown. Product
-fixture version labels do not claim AI-client conformance. Whole-goal acceptance
-is nine of 21, with the full remaining original audit retained.
+fixture version labels do not claim AI-client conformance. The former all-21
+maintenance goal is retired; see [current scope](deferred-maintenance-work.md).
