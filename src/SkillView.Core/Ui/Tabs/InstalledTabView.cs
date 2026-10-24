@@ -50,6 +50,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
+    private readonly TabLoadingView _loading = new("Loading installed skills…");
+    private bool _showDetails;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
     internal InventorySnapshot? CurrentSnapshot => _snapshot;
@@ -188,6 +190,8 @@ internal sealed class InstalledTabView : FrameView
             Style = new SpinnerStyle.Dots(),
         };
 
+        Add(_loading);
+
         _filterField.TextChanged += (_, _) => RefreshAll();
         _filterField.KeyDown += (_, key) =>
         {
@@ -234,6 +238,8 @@ internal sealed class InstalledTabView : FrameView
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
+        _showDetails = false;
+        _detail.Text = string.Empty;
         Interlocked.Exchange(ref _loadActive, 1);
         _idleStatusMessage = null;
         RefreshOperationStatus();
@@ -248,7 +254,13 @@ internal sealed class InstalledTabView : FrameView
                 }
 
                 Interlocked.Exchange(ref _loadActive, 0);
-                Populate(snapshot);
+                if (ReferenceEquals(_snapshot, snapshot))
+                {
+                    RefreshOperationStatus();
+                    RestoreFocus();
+                    _onStateChange?.Invoke();
+                }
+                else Populate(snapshot);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -283,6 +295,9 @@ internal sealed class InstalledTabView : FrameView
 
     private void Populate(InventorySnapshot snapshot)
     {
+        _loading.SetLoading(false);
+        _table.Visible = true;
+        _detail.Visible = true;
         _snapshot = snapshot;
         _all = snapshot.Skills;
         _packageCount = _all
@@ -600,6 +615,13 @@ internal sealed class InstalledTabView : FrameView
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        if (key.KeyCode == KeyCode.F2)
+        {
+            key.Handled = true;
+            _showDetails = !_showDetails;
+            RefreshSelectedDetail();
+            return;
+        }
         if (!_filterField.HasFocus && key.AsRune.Value == 'K' && _onPackageCheck is not null
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {
@@ -708,9 +730,9 @@ internal sealed class InstalledTabView : FrameView
             : base(rows, cols) { }
     }
 
-    private static string RenderDetail(InstalledSkill skill)
+    private string RenderDetail(InstalledSkill skill)
     {
-        return InstalledScreen.RenderDetail(skill);
+        return InstalledScreen.RenderDetail(skill, _showDetails);
     }
 
     private bool IsCurrentLoad(long loadGeneration) =>
@@ -788,6 +810,13 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshOperationStatus()
     {
+        var loading = Volatile.Read(ref _loadActive) != 0;
+        var removing = Volatile.Read(ref _removeActive) != 0;
+        _loading.SetLoading(loading && !removing);
+        var focusTarget = _lastFocusedTarget;
+        _table.Visible = !loading;
+        _detail.Visible = !loading || removing;
+        _lastFocusedTarget = focusTarget;
         if (Volatile.Read(ref _removeActive) != 0)
         {
             SetSpinnerActive(true);
@@ -809,6 +838,7 @@ internal sealed class InstalledTabView : FrameView
         RefreshSelectedDetail();
         if (_idleStatusMessage is not null)
         {
+            if (_snapshot is null) _detail.Text = "## Could not load installed skills\n\n" + TerminalEscapeSanitizer.Sanitize(_idleStatusMessage) + "\n\nLeave this tab and return to retry.";
             _footer.Text = _idleStatusMessage;
             return;
         }
@@ -818,7 +848,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshSelectedDetail()
     {
-        if (_snapshot is null || Volatile.Read(ref _removeActive) != 0)
+        if (_snapshot is null || Volatile.Read(ref _removeActive) != 0 || Volatile.Read(ref _loadActive) != 0)
         {
             return;
         }

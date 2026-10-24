@@ -13,6 +13,7 @@ logging, or subprocess adapters.
 - A `SpinnerView` must be immediately before its status label on the same row.
   The main spinner is owned by `StatusStripView`; tab and modal spinners use the
   same inline layout.
+- Discover searches and Installed/Changes inventory loads use `TabLoadingView` centered in the workspace, hiding stale tables and details until completion. Stop this indicator on success, error, supersession, and deactivation; queued completions must still pass their existing ownership checks. Installed keeps raw observation evidence behind F2.
 - Configure rendered Markdown through `TuiHelpers.ConfigureMarkdownPane`, which
   hides literal heading prefixes while retaining semantic heading styles.
 - `Ctrl+Q` is unconditional and must be handled before printable-key routing.
@@ -22,9 +23,10 @@ logging, or subprocess adapters.
   Terminal.Gui 2.5.0 lets Up/Down bubble at row boundaries or on empty tables;
   consume those endpoint keys so a held arrow cannot move focus into another
   control. Preserve Tab and normal in-list navigation, including key aliases.
-- Installed scope cycling must recapture inventory for Custom and All as well
-  as User and Project when a scoped loader is present. A previous `gh skill
-  list --scope` query may have narrowed the saved snapshot.
+- Installed scope cycling must call the scoped loader for Custom and All as
+  well as User and Project. The coordinator shares a full-context snapshot and
+  filters reconciled rows; a scope-narrowed result must never replace the shared
+  base snapshot or discard other consumers.
 
 ## Lifetime and memory rules
 
@@ -46,7 +48,19 @@ logging, or subprocess adapters.
   reveals the newest remaining operation instead of clearing the spinner
   globally. In particular, canceling an old-table preview while search remains
   active must restore the search text and spinner.
-- Installed, Changes, and Updates cancel superseded inventory loads. Pass their
+- Installed, Changes, and Updates cancel superseded display waiters and reject
+  stale queued UI publication. `DisplayInventoryCache` owns one app-lifetime
+  capture shared across these tabs and startup; a tab switch does not cancel
+  work another tab can reuse. Shutdown cancels and drains the app-owned worker.
+  It retains one completed snapshot for one minute, observes catalog invalidation
+  generations, and never supplies mutation authority. Changes reuses one queue
+  projection for the identical frozen snapshot. Fresh removal preflight, cleanup
+  review and saved-operation capture paths bypass the display cache. A completed
+  fresh full-context capture may seed display data for its generation; never
+  replace a newer observation with an older in-flight result. Mutation-triggered
+  display rescans share the flight with active-tab refresh. See
+  [inventory performance](inventory-performance.md) for the flow and measurements.
+  For independently replaceable inventory operations, pass their
   cancellation token through to inventory capture; do not add generation-only
   refreshes that leave obsolete scans running. Use `CancellationOperationSlot`
   so source replacement, cancellation, and lease disposal share one ownership

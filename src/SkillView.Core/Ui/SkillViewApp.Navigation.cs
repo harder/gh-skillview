@@ -248,6 +248,8 @@ public sealed partial class SkillViewApp
         }
         CancelPendingTabWork();
         _activeTab = tab;
+        CancelStatusAutoClear();
+        _currentStatus = _defaultStatus;
         _tabBar?.SetActiveTab(tab);
 
         // Hide every non-Discover tab by default; the requested one is then

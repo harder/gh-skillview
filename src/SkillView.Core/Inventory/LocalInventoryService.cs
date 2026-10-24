@@ -59,6 +59,15 @@ public sealed class LocalInventoryService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        var elapsed = Stopwatch.StartNew();
+        long previous = 0;
+        void Stage(string name)
+        {
+            var milliseconds = elapsed.ElapsedMilliseconds;
+            _logger.Info("inventory.timing", $"{name}: {milliseconds - previous}ms (total {milliseconds}ms)");
+            previous = milliseconds;
+        }
+
         // Local filesystem probing is synchronous by nature. Keep it off the
         // Terminal.Gui thread and make every stage cancellation-aware. Run the
         // gh inventory call concurrently so a slow disk does not add its full
@@ -99,6 +108,7 @@ public sealed class LocalInventoryService
             _logger.Info("inventory", $"gh skill list returned {ghRecords.Length} record(s)");
         }
 
+        Stage("local discovery and default catalog");
         var providers = ImmutableArray.CreateBuilder<ProviderObservation>();
         // Default gh discovery covers more agents than local seeds, but only
         // explicit --dir observations establish absence for a particular root.
@@ -108,22 +118,41 @@ public sealed class LocalInventoryService
             local.LockDiagnostics.IsEmpty ? null : string.Join("; ", local.LockDiagnostics.Take(6).Select(d => $"{d.Path}: {d.Message}"))));
         if (ghPath is not null)
         {
-            foreach (var root in local.Roots.Where(root => !root.Managed))
+            var ordinaryRoots = local.Roots.Where(root => !root.Managed).ToArray();
+            var captures = new GhSkillListAdapter.CaptureResult[ordinaryRoots.Length];
+            // Child CWD/environment are captured by the runner. Independent root
+            // probes may overlap, while reconciliation keeps root order stable.
+            await Parallel.ForEachAsync(Enumerable.Range(0, ordinaryRoots.Length), new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 4,
+                CancellationToken = cancellationToken
+            }, async (index, token) =>
+            {
+                captures[index] = await _listAdapter.CaptureAsync(ghPath, directory: ordinaryRoots[index].Path,
+                    cancellationToken: token).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+            var records = ImmutableArray.CreateBuilder<GhSkillListRecord>();
+            records.AddRange(ghRecords);
+            for (var i = 0; i < ordinaryRoots.Length; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var custom = await _listAdapter.CaptureAsync(ghPath, directory: root.Path,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                var root = ordinaryRoots[i];
+                var custom = captures[i];
                 providers.Add(new ProviderObservation("gh", custom.Succeeded, [root.Path], DateTimeOffset.UtcNow, custom.Error));
-                ghRecords = ghRecords.AddRange(custom.Records);
+                records.AddRange(custom.Records);
                 usedGhList |= custom.Succeeded;
             }
+            ghRecords = records.ToImmutable();
         }
+        Stage("root catalogs");
         var merged = MergeWithCancellation(local.Scanned, ghRecords, cancellationToken);
 
         // Enrich with package-bundle metadata from any `.skill-lock.json`
         // files reachable from the scan roots (e.g. `~/.agents/.skill-lock.json`
-        // written by `npx skills`). Free signal — best-effort.
+        // written by `npx skills`). Associate contextual claims through an address index.
+        Stage("physical reconciliation");
         merged = EnrichOwnership(merged, local.Packages, cancellationToken);
+        Stage("package matching");
         var managedFailures = new List<DiscoveryLocation>();
         merged = merged.Select(skill =>
         {
@@ -193,6 +222,7 @@ public sealed class LocalInventoryService
                 .Concat(managedRecords).ToImmutableArray(),
             OwnershipReadDiagnostics = local.LockDiagnostics,
         };
+        Stage("managed ownership");
         var observed = await Task.Run(() => snapshot.Skills.Select(skill =>
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -202,6 +232,7 @@ public sealed class LocalInventoryService
                 !snapshot.IsPartial && snapshot.ConfiguredRootsComplete, cancellationToken, snapshot.ManagedRegions)
             };
         }).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
+        Stage("native observations");
         return await Task.Run(() =>
         {
             var read = CleanupSuppressionStore.ReadFor(_contextRunner, snapshot.ProtectedRoots.Select(root => root.Path)
@@ -213,6 +244,7 @@ public sealed class LocalInventoryService
                 var suppression = CleanupSuppressionStore.Match(skill, read, cancellationToken, ref byteBudget);
                 return skill with { Ignored = suppression.Active, CleanupSuppression = suppression };
             }).ToImmutableArray();
+            Stage("cleanup preferences");
             return snapshot with { Skills = enriched, PreferenceDiagnostics = read.Diagnostic is { } message ? [message] : [] };
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -265,6 +297,7 @@ public sealed class LocalInventoryService
         var fsSw = Stopwatch.StartNew();
         var locations = new List<DiscoveryLocation>();
         var managed = ManagedSkillDiscovery.Capture(_contextRunner, roots, cancellationToken, allowHidden: options.AllowHiddenDirs);
+        _logger.Info("inventory.timing", $"managed discovery: {fsSw.ElapsedMilliseconds}ms");
         locations.AddRange(managed.Locations);
         inaccessible.AddRange(managed.Incomplete);
         var allRoots = roots.AddRange(managed.Roots);
@@ -273,6 +306,7 @@ public sealed class LocalInventoryService
             new LocalSkillScanner.Options(options.AllowHiddenDirs)
             { Managed = managed, DiscoverNestedSkillFiles = options.DiscoverNestedSkillFiles, IncludeRootSkillFiles = options.IncludeRootSkillFiles },
             cancellationToken, inaccessible, locations);
+        _logger.Info("inventory.timing", $"payload metadata scanned: {fsSw.ElapsedMilliseconds}ms cumulative");
         var lockDiagnostics = new List<LockReadDiagnostic>();
         var packages = _lockReader.LoadObservations(
             roots.Select(root => root.Path),
@@ -291,11 +325,35 @@ public sealed class LocalInventoryService
 
         if (!packages.IsEmpty)
         {
+            var paths = new InventoryPathComparison();
+            // Case-insensitive buckets are a conservative candidate index only.
+            // Verify every hit using the original contextual matching rules.
+            var names = skills.Select(skill => skill.Name).ToHashSet(StringComparer.Ordinal);
+            var index = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < packages.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (packages[i].Package.Selector is null && !names.Contains(packages[i].Name)) continue;
+                foreach (var path in packages[i].Package.CandidatePaths(packages[i].Name))
+                    foreach (var key in paths.Keys(path))
+                    {
+                        if (!index.TryGetValue(key, out var bucket)) index[key] = bucket = [];
+                        bucket.Add(i);
+                    }
+            }
             var enriched = ImmutableArray.CreateBuilder<InstalledSkill>(skills.Length);
             foreach (var skill in skills)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var claims = packages.Where(entry => (entry.Package.Selector is not null || entry.Name == skill.Name) && entry.Package.Describes(skill))
+                var candidates = new HashSet<int>();
+                foreach (var path in skill.Agents.Select(agent => agent.Path).Prepend(skill.ResolvedPath))
+                    foreach (var key in paths.Keys(path))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (index.TryGetValue(key, out var bucket)) candidates.UnionWith(bucket);
+                    }
+                var claims = candidates.Order().Select(i => packages[i])
+                    .Where(entry => (entry.Package.Selector is not null || entry.Name == skill.Name) && entry.Package.Describes(skill, paths.Same))
                     .Select(entry => entry.Package).ToImmutableArray();
                 var associated = claims.Where(package => package.Provider != "gh-vercel-global" || SharedTrackingMatches(package, skill)).ToArray();
                 var trackingConflicts = claims.Where(package => ContradictsTracking(package, skill))

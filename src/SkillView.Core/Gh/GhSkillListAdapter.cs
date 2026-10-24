@@ -93,6 +93,8 @@ public sealed class GhSkillListAdapter
         return ParseLoadResult(result.StdOut, _logger);
     }
 
+    internal long Generation => _cache.Generation;
+
     public void Invalidate() => _cache.Invalidate();
 
     /// Parses a JSON payload into `GhSkillListRecord`s. Accepts either a top-

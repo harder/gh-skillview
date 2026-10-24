@@ -59,6 +59,7 @@ public sealed partial class SkillViewApp
 
     private void DeactivateDiscoverWorkspace(bool clearBusy)
     {
+        _discoverTab?.SetLoading(false);
         Interlocked.Increment(ref _discoverGeneration);
         _searchRequests.Cancel();
         CancelCurrentPreview();
@@ -188,7 +189,7 @@ public sealed partial class SkillViewApp
     }
 
     internal Task<InventorySnapshot> CaptureStartupInventoryAsync(EnvironmentReport report, CancellationToken cancellationToken) =>
-        _workflows.CaptureInventoryAsync(report, cancellationToken);
+        _workflows.CaptureDisplayInventoryAsync(report, cancellationToken);
 
     private async Task<EnvironmentReport> GetOrProbeEnvironmentAsync(CancellationToken cancellationToken)
     {

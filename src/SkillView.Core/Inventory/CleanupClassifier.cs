@@ -89,6 +89,7 @@ public static class CleanupClassifier
         cancellationToken.ThrowIfCancellationRequested();
         inspectEntry ??= OwnershipPath.EntryAddress;
         options ??= new Options();
+        var pathComparisons = new InventoryPathComparison();
         var result = ImmutableArray.CreateBuilder<Candidate>();
 
         // Pre-index: skills keyed by resolved path, name→count for duplicates,
@@ -287,7 +288,7 @@ public static class CleanupClassifier
         foreach (var root in scanRoots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (root.Managed || snapshot.ManagedRegions.Any(region => region.ObserveCoverage(root.Path) != false)) continue;
+            if (root.Managed || snapshot.ManagedRegions.Any(region => region.ObserveCoverage(root.Path, pathComparisons) != false)) continue;
             IEnumerator<string>? children;
             try { children = Directory.EnumerateDirectories(root.Path).GetEnumerator(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
@@ -305,7 +306,7 @@ public static class CleanupClassifier
                     if (!hasNext) break;
 
                     var child = children.Current;
-                    if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child) != false)) continue;
+                    if (snapshot.ManagedRegions.Any(region => region.ObserveCoverage(child, pathComparisons) != false)) continue;
                     // An empty link target is not permission to delete the target.
                     if (PathResolver.IsSymlink(child)) continue;
                     bool empty;
@@ -339,7 +340,7 @@ public static class CleanupClassifier
                             InstalledAt = null
                         };
                         var protectedOwner = snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
-                            || snapshot.OwnershipRecords.Any(record => record.Describes(observation))
+                            || snapshot.OwnershipRecords.Any(record => record.Describes(observation, pathComparisons.Same))
                             || recorded?.Any(skill => skill.AllOwnershipClaims.Any() || !skill.OwnershipDiagnostics.IsDefaultOrEmpty
                                 || !skill.MetadataConflicts.IsEmpty || skill.Provenance != Provenance.FsScan
                                 || skill.SourceIdentity.Provider != "unknown" || skill.ObservedSubject?.ExposureCoverageComplete == false) == true;

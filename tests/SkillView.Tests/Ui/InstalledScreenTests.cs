@@ -9,6 +9,18 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledScreenTests
 {
     [Fact]
+    public void RenderDetail_KeepsRawEvidenceBehindTechnicalDetails()
+    {
+        var skill = MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/owner/repo");
+        skill = skill with { ObservedSubject = SkillView.Inventory.Models.OperationSubject.From(skill) };
+        var summary = InstalledScreen.RenderDetail(skill);
+        Assert.DoesNotContain("Installation address ID", summary);
+        Assert.DoesNotContain("Reload source", summary);
+        Assert.Contains("**F2** Technical details", summary);
+        Assert.Contains("Installation address ID", InstalledScreen.RenderDetail(skill, showDetails: true));
+    }
+
+    [Fact]
     public void BuildShortcuts_AdvertisesSearchAndFilterDistinctly()
     {
         var shortcuts = InstalledScreen.BuildShortcuts(canRemove: true, hasPackages: true);
@@ -90,10 +102,10 @@ public sealed class InstalledScreenTests
         Assert.Contains("- **Location:** User", detail);
         Assert.Contains("- **Source:** List", detail);
         Assert.Contains("- **Health:** ✅ Valid", detail);
-        Assert.Contains("- **Upstream:** [https://example.test/upstream/demo](https://example.test/upstream/demo)", detail);
+        Assert.Contains("- **Upstream:** [Open upstream](https://example.test/upstream/demo)", detail);
         Assert.Contains("## Package", detail);
         Assert.Contains("- **Package source:** `owner/repo`", detail);
-        Assert.Contains("- **Package URL:** [https://example.test/owner/repo](https://example.test/owner/repo)", detail);
+        Assert.Contains("- **Package URL:** [Open package source](https://example.test/owner/repo)", detail);
         Assert.Contains("## Description", detail);
         Assert.Contains("Example description", detail);
         Assert.Contains("## Agents", detail);
@@ -135,11 +147,11 @@ public sealed class InstalledScreenTests
         Assert.Contains("- **Path:** `` /skills/demo\\|`stable ``", detail);
         Assert.Contains("- **Version:** 1.2.3 beta", detail);
         Assert.Contains(
-            "- **Upstream:** [https://example.test/upstream\\|`demo](https://example.test/upstream%7C`demo)",
+            "- **Upstream:** [Open upstream](https://example.test/upstream%7C`demo)",
             detail);
         Assert.Contains("- **Package source:** `` owner/repo\\|`fork ``", detail);
         Assert.Contains(
-            "- **Package URL:** [https://example.test/owner/repo\\|`fork](https://example.test/owner/repo%7C`fork)",
+            "- **Package URL:** [Open package source](https://example.test/owner/repo%7C`fork)",
             detail);
         Assert.Contains($"- {TuiHelpers.AgentIcon("copilot")} **copilot** — direct", detail);
         Assert.Contains("  Path: `` /Users/test/.config/skills/demo` linked ``", detail);

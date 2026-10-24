@@ -4,6 +4,7 @@ using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using Terminal.Gui.Views;
 using Xunit;
@@ -252,10 +253,15 @@ public sealed class UpdatesTabViewTests
 
         var firstLoad = view.LoadAsync();
         await firstStarted.Task;
+        var indicator = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
+        Assert.True(indicator.Visible);
+        Assert.False(view.SubViews.Single(child => child is TableView).Visible);
         var replacementLoad = view.LoadAsync();
 
         await Task.WhenAll(firstLoad, replacementLoad);
 
+        Assert.False(indicator.Visible);
+        Assert.True(view.SubViews.Single(child => child is TableView).Visible);
         Assert.True(firstToken.IsCancellationRequested);
         Assert.Equal(["newer"], view.VisibleSkillNamesForTests);
     }

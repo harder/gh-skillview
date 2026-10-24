@@ -17,6 +17,7 @@ namespace SkillView.Ui.Tabs;
 internal sealed class ChangesTabView : FrameView
 {
     private const int KindColumnWidth = 11;
+    private readonly Action? _onRefresh;
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Action _onActivateUpdates;
@@ -31,6 +32,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly ChangesSelectionGate _selectionRequests;
     private long _selectionGeneration;
 
+    private readonly TabLoadingView _loading = new("Loading maintenance observations…");
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _status;
@@ -40,6 +42,8 @@ internal sealed class ChangesTabView : FrameView
     private int _omittedRows;
     private bool _showDetails;
     private long _loadGeneration;
+    private CachedQueue? _cachedQueue;
+    private sealed record CachedQueue(InventorySnapshot Snapshot, ChangesQueueProjection Projection, bool Partial);
     private readonly CancellationOperationSlot _loadCancellations;
 
     internal ChangesTabView(
@@ -54,8 +58,10 @@ internal sealed class ChangesTabView : FrameView
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<MaintenanceQueueEntry>? onActivateEntry = null,
         Action<Func<Task>, string>? runTask = null,
-        Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null)
+        Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
+        Action? onRefresh = null)
     {
+        _onRefresh = onRefresh;
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
         _onActivateUpdates = onActivateUpdates;
@@ -78,7 +84,7 @@ internal sealed class ChangesTabView : FrameView
         {
             X = 0,
             Y = 0,
-            Width = Dim.Percent(48),
+            Width = Dim.Percent(60),
             Height = Dim.Fill(1),
             FullRowSelect = true,
         };
@@ -128,7 +134,7 @@ internal sealed class ChangesTabView : FrameView
             _status.Text = BuildStatusText(string.Empty);
         };
 
-        Add(_table, _detail, _spinner, _status);
+        Add(_table, _detail, _spinner, _status, _loading);
         Disposing += (_, _) => CancelPendingLoad();
     }
 
@@ -139,20 +145,36 @@ internal sealed class ChangesTabView : FrameView
         var gen = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
+        _rows = Array.Empty<ChangesQueueRow>();
+        _table.Table = null;
+        _detail.Text = string.Empty;
+        _coverageDetail = string.Empty;
+        _showDetails = false;
         SetLoading(true);
         _status.Text = " loading inventory…";
 
         try
         {
             var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
-            var queue = MaintenanceQueueBuilder.Build(snapshot, loadCancellation.Token);
-            var projection = ChangesQueueBuilder.Build(queue, loadCancellation.Token);
-            var summary = (queue.Partial ? "Partial inventory · " : "")
+            var cached = Volatile.Read(ref _cachedQueue);
+            if (cached is null || !ReferenceEquals(cached.Snapshot, snapshot))
+            {
+                // A cached snapshot can complete synchronously on the UI thread.
+                // Classification still performs filesystem observations.
+                cached = await Task.Run(() =>
+                {
+                    var queue = MaintenanceQueueBuilder.Build(snapshot, loadCancellation.Token);
+                    return new CachedQueue(snapshot, ChangesQueueBuilder.Build(queue, loadCancellation.Token), queue.Partial);
+                }, loadCancellation.Token).ConfigureAwait(false);
+            }
+            var projection = cached.Projection;
+            var summary = (cached.Partial ? "Partial inventory · " : "")
                 + "update availability and sessions unknown · r refresh disk inventory";
 
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
+                _cachedQueue = cached;
                 _coverageDetail = projection.CoverageDetail;
                 _omittedRows = projection.OmittedRows;
                 if (projection.OmittedRows > 0)
@@ -173,7 +195,9 @@ internal sealed class ChangesTabView : FrameView
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
                 _status.Text = $" load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                _detail.Text = "## Could not load changes\n\nPress **r** to retry. See the status below for details.";
                 SetLoading(false);
+                _table.SetFocus();
             }).ConfigureAwait(false);
         }
     }
@@ -204,7 +228,8 @@ internal sealed class ChangesTabView : FrameView
         _table.Table = source;
 
         var style = _table.Style;
-        style.ExpandLastColumn = false;
+        style.ExpandLastColumn = true;
+        style.ShowVerticalCellLineForLastColumn = true;
         var kindStyle = style.GetOrCreateColumnStyle(0);
         kindStyle.MinWidth = KindColumnWidth;
         kindStyle.MaxWidth = KindColumnWidth;
@@ -214,6 +239,7 @@ internal sealed class ChangesTabView : FrameView
         _status.Text = BuildStatusText(summary);
         UpdateDetail(renderToken);
 
+        SetLoading(false);
         if (_rows.Count > 0)
         {
             _table.SetSelectedRow(0);
@@ -356,9 +382,9 @@ internal sealed class ChangesTabView : FrameView
         }
 
         var available = _table.Viewport.Width > 0
-            ? Math.Max(32, _table.Viewport.Width - 4)
+            ? Math.Max(1, _table.Viewport.Width - 3)
             : 48;
-        var titleWidth = Math.Max(20, available - KindColumnWidth);
+        var titleWidth = Math.Max(1, available - KindColumnWidth);
         var titleStyle = _table.Style.GetOrCreateColumnStyle(1);
         titleStyle.MinWidth = titleWidth;
         titleStyle.MaxWidth = titleWidth;
@@ -382,6 +408,7 @@ internal sealed class ChangesTabView : FrameView
         if (key.AsRune.Value == 'r' && _runTask is not null)
         {
             key.Handled = true;
+            _onRefresh?.Invoke();
             _runTask(LoadAsync, "changes.refresh-disk");
         }
     }
@@ -396,6 +423,9 @@ internal sealed class ChangesTabView : FrameView
 
     private void SetLoading(bool loading)
     {
+        _loading.SetLoading(loading);
+        _table.Visible = !loading;
+        _detail.Visible = !loading;
         _spinner.Visible = loading;
         _spinner.AutoSpin = loading;
     }

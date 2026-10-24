@@ -39,6 +39,9 @@ public sealed record SkillPackage(
 
     /// A same-name lock entry is evidence only within its installation context.
     public bool Describes(InstalledSkill skill)
+        => Describes(skill, OwnershipPath.Same);
+
+    internal bool Describes(InstalledSkill skill, Func<string, string, bool> same)
     {
         var selector = Selector ?? skill.Name;
         if (selector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
@@ -47,8 +50,21 @@ public sealed record SkillPackage(
         // directly in the selected root. Retain both observed conventions.
         var selectors = Provider == "gh-vercel-global" && selector.Contains('/')
             ? new[] { selector, selector.Split('/')[^1] } : [selector];
-        return Roots().Any(root => selectors.Any(name => OwnershipPath.Same(skill.ResolvedPath, Path.Combine(root, name))
-            || skill.Agents.Any(agent => OwnershipPath.Same(agent.Path, Path.Combine(root, name)))));
+        return Roots().Any(root => selectors.Any(name => same(skill.ResolvedPath, Path.Combine(root, name))
+            || skill.Agents.Any(agent => same(agent.Path, Path.Combine(root, name)))));
+    }
+
+    internal IEnumerable<string> CandidatePaths(string fallbackName)
+    {
+        var selector = Selector ?? fallbackName;
+        if (selector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
+            yield break;
+        foreach (var root in Roots())
+        {
+            yield return Path.Combine(root, selector);
+            if (Provider == "gh-vercel-global" && selector.Contains('/'))
+                yield return Path.Combine(root, selector.Split('/')[^1]);
+        }
     }
 
     private IEnumerable<string> Roots() => CoveredRoots.IsEmpty

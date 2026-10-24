@@ -9,9 +9,9 @@ public sealed record ManagedSkillRegion(string Path, string Provider, string Age
     public string? RegistrationPath { get; init; }
     // Read-only consumers report an unknown comparison as partial coverage.
     // Mutation admission always uses the strict Covers/IsInside predicates.
-    internal bool? ObserveCoverage(string path)
+    internal bool? ObserveCoverage(string path, InventoryPathComparison? paths = null)
     {
-        try { return Covers(path); }
+        try { return CoversObserved(path, paths); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
     }
     // Reverse containment also matters: an ordinary install root can contain a
@@ -27,16 +27,21 @@ public sealed record ManagedSkillRegion(string Path, string Provider, string Age
         return PathIdentity.IsInside(canonicalRegion, canonicalParent)
             || ObservedCanonicalPath is { } captured && PathIdentity.IsInside(captured, canonicalParent);
     }
-    internal bool Covers(string path)
+    internal bool Covers(string path) => CoversObserved(path, null);
+
+    private bool CoversObserved(string path, InventoryPathComparison? paths)
     {
-        if (PathIdentity.IsInside(path, Path)) return true;
-        if (ObservedCanonicalPath is { } captured && PathIdentity.IsInside(path, captured)) return true;
-        var region = OwnershipPath.CanonicalCandidate(Path) ?? OwnershipPath.EntryAddress(Path);
-        var candidate = OwnershipPath.CanonicalCandidate(path) ?? OwnershipPath.EntryAddress(path);
+        bool Inside(string candidate, string root) => paths is null ? PathIdentity.IsInside(candidate, root) : paths.IsInside(candidate, root);
+        string? Canonical(string value) => paths is null ? OwnershipPath.CanonicalCandidate(value) : paths.Canonical(value);
+        if (Inside(path, Path)) return true;
+        if (ObservedCanonicalPath is { } captured && Inside(path, captured)) return true;
+        string? Entry(string value) => paths is null ? OwnershipPath.EntryAddress(value) : paths.Entry(value);
+        var region = Canonical(Path) ?? Entry(Path);
+        var candidate = Canonical(path) ?? Entry(path);
         if (region is null || candidate is null)
             throw new IOException("Managed ownership address could not be inspected.");
-        return PathIdentity.IsInside(candidate, region)
-            || ObservedCanonicalPath is { } previous && PathIdentity.IsInside(candidate, previous);
+        return Inside(candidate, region)
+            || ObservedCanonicalPath is { } previous && Inside(candidate, previous);
     }
 
     internal SkillPackage Claim(InstalledSkill skill) => new(PluginId ?? Kind, "unknown", null, null, null)
