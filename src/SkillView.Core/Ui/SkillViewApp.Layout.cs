@@ -173,7 +173,7 @@ public sealed partial class SkillViewApp
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
-            // Scope cycle (`G`) pushes `--scope` down to `gh skill list`.
+            // Scope cycle (`G`) selects from the shared reconciled inventory.
             scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
@@ -225,11 +225,8 @@ public sealed partial class SkillViewApp
 
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
-            snapshotLoader: token =>
-            {
-                _services.ListAdapter.Invalidate();
-                return _workflows.CaptureInventorySnapshotAsync(token);
-            },
+            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
+            onRefresh: () => _services.ListAdapter.Invalidate(),
             onActivateUpdates: OpenUpdatesWorkspace,
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(

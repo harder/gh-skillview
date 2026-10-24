@@ -13,6 +13,15 @@ namespace SkillView.Ui.Tabs;
 /// SkillViewApp stabilise before a later phase migrates more behaviour here.
 internal sealed class DiscoverTabView : FrameView
 {
+    private readonly TabLoadingView _loading = new("Searching skills…");
+
+    internal void SetLoading(bool loading)
+    {
+        _loading.SetLoading(loading);
+        ResultsTable.Visible = !loading;
+        DetailPane.Visible = !loading;
+    }
+
     // Left pane — search controls + results table.
     internal FrameView LeftFrame { get; }
     internal TextField QueryField { get; }
@@ -114,7 +123,7 @@ internal sealed class DiscoverTabView : FrameView
             DetailPane.MetadataPane, DetailPane.PreviewPane,
             DetailPane.PreviewRawPane, DetailPane.LogPane);
 
-        Add(LeftFrame, DetailPane);
+        Add(LeftFrame, DetailPane, _loading);
     }
 
     internal static string BuildFilterSummaryForTests(

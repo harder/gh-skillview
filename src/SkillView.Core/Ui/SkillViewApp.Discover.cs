@@ -82,6 +82,14 @@ public sealed partial class SkillViewApp
         var cancellationToken = request.Token;
         try
         {
+            await InvokeAsync(() =>
+            {
+                if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
+                ReplaceSearchResults(Array.Empty<SearchResultSkill>());
+                UpdateMetadataPane();
+                SetPreviewText(TuiHelpers.PreviewHint);
+                _discoverTab?.SetLoading(true);
+            }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
                 Owner: owner,
                 Limit: limit ?? GhSkillSearchService.DefaultLimit);
@@ -105,6 +113,7 @@ public sealed partial class SkillViewApp
                     _services.Logger.Debug("search", $"dropping stale results for generation {generation}");
                     return;
                 }
+                _discoverTab?.SetLoading(false);
                 ReplaceSearchResults(filteredResults);
                 UpdateDiscoverActions();
                 _resultsTable?.SetFocus();
@@ -149,6 +158,14 @@ public sealed partial class SkillViewApp
         }
         finally
         {
+            if (IsDiscoverWorkspaceActive(discoverGeneration))
+            {
+                await InvokeAsync(() =>
+                {
+                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+                        _discoverTab?.SetLoading(false);
+                }, GetRunLifetimeToken()).ConfigureAwait(false);
+            }
             EndBusyOperation(busyOperation);
         }
     }
