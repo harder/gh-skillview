@@ -79,8 +79,9 @@ public static class InstalledScreen
         return default;
     }
 
-    internal static string RenderDetail(InstalledSkill s, bool showDetails = false)
+    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null)
     {
+        string PathLabel(string path) => showDetails ? path : DisplayPath.Abbreviate(path, homeDirectory);
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
@@ -95,7 +96,7 @@ public static class InstalledScreen
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
-        AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
+        AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(PathLabel(s.ResolvedPath)));
 
         AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeLocation(s)));
         AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeProvenance(s)));
@@ -108,7 +109,7 @@ public static class InstalledScreen
         if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));
         if (s.FrontMatter.LocalPath is { } localPath)
         {
-            AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(localPath));
+            AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(PathLabel(localPath)));
             AppendDetailItem(sb, "Local source switch", "**T** Review a different local source.");
             AppendDetailItem(sb, "Local reimport", "**R** Review changes from this source. The installed original is retained for recovery.");
         }
@@ -176,10 +177,10 @@ public static class InstalledScreen
                 sb.Append(MarkdownTableFormatter.FormatTableCell(kind));
                 sb.AppendLine();
                 sb.Append("  Path: ");
-                sb.AppendLine(MarkdownTableFormatter.FormatCodeSpan(a.Path));
+                sb.AppendLine(MarkdownTableFormatter.FormatCodeSpan(PathLabel(a.Path)));
                 if (a.Profile is { } profile) sb.AppendLine("  Profile: " + MarkdownTableFormatter.FormatTableCell(profile));
                 if (a.Scope is { } scope) sb.AppendLine("  Scope: " + scope);
-                if (a.Context is { } context) sb.AppendLine("  Context: " + MarkdownTableFormatter.FormatCodeSpan(context));
+                if (a.Context is { } context) sb.AppendLine("  Context: " + MarkdownTableFormatter.FormatCodeSpan(PathLabel(context)));
                 sb.AppendLine();
             }
         }

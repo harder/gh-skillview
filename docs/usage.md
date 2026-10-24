@@ -83,6 +83,10 @@ Installed tab:
 
 Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). The default detail pane starts with the description and a compact installation/package summary.
 
+Installed columns are **Name → State → Loc → Agents → Package**. Location and known single-agent badges use subtle color cues in the default theme; their text remains visible in every theme. Mixed-agent badges retain the normal text color. The Package column appears when the inventory includes packages. Headers stay visible while scrolling.
+
+Installed and Changes summaries shorten paths beneath your current home directory to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
+
 Inventory loads and Discover searches show a centered spinner while replacing old rows and details. Leaving a tab clears its loading indicator. Installed and Changes share a completed inventory snapshot for up to one minute; switching tabs during a scan joins that same background capture. Press **r** from a list to read disk again immediately. Maintenance actions validate current evidence before acting.
 
 Changes tab:

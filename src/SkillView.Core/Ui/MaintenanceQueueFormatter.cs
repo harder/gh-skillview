@@ -21,10 +21,10 @@ internal static class MaintenanceQueueFormatter
             + $"\nCoverage fields omitted: {rendered.OmittedFields}. Full captured diagnostics are emitted by queue --json; running it makes a fresh capture.\n";
     }
 
-    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token, bool showDetails = false)
+    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token, bool showDetails = false, string? homeDirectory = null)
     {
         if (showDetails) return RenderEvidence(entry, token);
-        var fields = RenderFields(SummaryFields(entry, token), token, MaxSummaryCharacters - 512);
+        var fields = RenderFields(SummaryFields(entry, token, homeDirectory), token, MaxSummaryCharacters - 512);
         var text = new StringBuilder($"## {DescribeIssue(entry)}\n\n").Append(fields.Text);
         if (fields.OmittedFields > 0)
             text.AppendLine("\nSome values are too long for this summary; open details to inspect them.");
@@ -50,7 +50,7 @@ internal static class MaintenanceQueueFormatter
         _ => "Installation needs review"
     };
 
-    private static IEnumerable<(string, string?)> SummaryFields(MaintenanceQueueEntry entry, CancellationToken token)
+    private static IEnumerable<(string, string?)> SummaryFields(MaintenanceQueueEntry entry, CancellationToken token, string? homeDirectory)
     {
         yield return ("Skill", entry.Title);
         yield return ("Why", DescribeReason(entry));
@@ -89,7 +89,7 @@ internal static class MaintenanceQueueFormatter
             yield return ("Other consumers", "Other recorded exposures are retained by this link-only action; see details.");
         if (entry.Pinned) yield return ("Pinned", "Routine updates leave this version pinned.");
         if (entry.CleanupSuppressed) yield return ("Cleanup", "Cleanup suggestions are suppressed for this installation.");
-        yield return ("Location", entry.Subject.Path);
+        yield return ("Location", DisplayPath.Abbreviate(entry.Subject.Path, homeDirectory));
     }
 
     private static string DescribeEffect(MaintenanceQueueEntry entry)

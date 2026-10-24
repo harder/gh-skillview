@@ -394,9 +394,10 @@ public sealed class InstalledTabViewTests
         var agentsIndex = Array.IndexOf(table.Table!.ColumnNames, "Agents");
         var agentsStyle = table.Style.GetOrCreateColumnStyle(agentsIndex);
 
+        Assert.Equal(["Name", "State", "Loc", "Agents", "Package"], table.Table.ColumnNames);
         Assert.False(table.Style.ExpandLastColumn);
-        Assert.Equal(5, agentsStyle.MinWidth);
-        Assert.Equal(5, agentsStyle.MaxWidth);
+        Assert.Equal(7, agentsStyle.MinWidth);
+        Assert.Equal(7, agentsStyle.MaxWidth);
     }
 
     [Fact]

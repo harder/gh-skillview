@@ -9,6 +9,27 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledScreenTests
 {
     [Fact]
+    public void HomePathsAreAbbreviatedInSummaryButFullPathsAndActionModelAreRetained()
+    {
+        var skill = MaintenanceQueueTests.Skill("/home/alex/skills/demo", "https://github.com/owner/repo") with
+        {
+            Agents = [new("codex", "/home/alex/skills/demo", false, Context: "/home/alex")],
+            FrontMatter = SkillFrontMatter.Empty with { LocalPath = "/home/alex/source/demo" },
+        };
+        var summary = InstalledScreen.RenderDetail(skill, homeDirectory: "/home/alex");
+        Assert.Contains("**Path:** `~/skills/demo`", summary);
+        Assert.Contains("**Local source:** `~/source/demo`", summary);
+        Assert.Contains("Path: `~/skills/demo`", summary);
+        Assert.Contains("Context: `~`", summary);
+        Assert.DoesNotContain("/home/alex", summary);
+        var technical = InstalledScreen.RenderDetail(skill, showDetails: true, homeDirectory: "/home/alex");
+        Assert.Contains("**Path:** `/home/alex/skills/demo`", technical);
+        Assert.Contains("Context: `/home/alex`", technical);
+        Assert.Equal("/home/alex/skills/demo", skill.ResolvedPath);
+        Assert.Equal("/home/alex/source/demo", skill.FrontMatter.LocalPath);
+    }
+
+    [Fact]
     public void RenderDetail_KeepsRawEvidenceBehindTechnicalDetails()
     {
         var skill = MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/owner/repo");

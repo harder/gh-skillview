@@ -21,7 +21,7 @@ internal sealed class InstalledTabView : FrameView
     private enum FocusTarget { Table, Filter }
     private const int LocationColumnWidth = 3;
     private const int StateColumnWidth = 5;
-    private const int AgentsColumnWidth = 5;
+    private const int AgentsColumnWidth = 7;
 
     /// winget-tui-style pin filter cycle for the Installed table.
     /// Maps to: All rows · only pinned · only unpinned.
@@ -65,7 +65,6 @@ internal sealed class InstalledTabView : FrameView
     private int _lastWidth = -1;
     private int _nameW = 12;
     private int _pkgW = 18;
-    private int _agentsW = 8;
     private FocusTarget _lastFocusedTarget = FocusTarget.Table;
     private long _loadGeneration;
     private readonly CancellationOperationSlot _loadCancellations;
@@ -154,6 +153,9 @@ internal sealed class InstalledTabView : FrameView
         TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.Style.ShowVerticalCellLineForLastColumn = true;
+        _table.Style.AlwaysUseNormalColorForVerticalCellLines = true;
+        _table.Style.AlwaysShowHeaders = true;
+        _table.MaxCellWidth = int.MaxValue;
         _table.HasFocusChanged += (_, _) =>
         {
             if (_table.HasFocus)
@@ -220,6 +222,11 @@ internal sealed class InstalledTabView : FrameView
             {
                 RecomputeColumnWidths();
             }
+        };
+        _table.ViewportChanged += (_, _) =>
+        {
+            if (_table.Viewport.Width > 0 && _table.Viewport.Width != _lastWidth)
+                RecomputeColumnWidths();
         };
 
         KeyDown += OnKeyDown;
@@ -420,21 +427,19 @@ internal sealed class InstalledTabView : FrameView
 
     private void BuildTableSource()
     {
+        // Let TableView truncate by terminal cell width. Pre-truncating the data
+        // loses text permanently when a resize makes a column wider.
         var columns = new Dictionary<string, Func<InstalledSkill, object>>
         {
-            ["Name"] = s => TuiHelpers.Truncate(s.Name, _nameW),
+            ["Name"] = s => s.Name,
+            ["State"] = s => SkillHealthFormatter.CompactBadge(s.Validity, s.IsSymlinked),
             ["Loc"] = s => InstalledInventoryFormatter.DescribeTableLocation(s),
+            ["Agents"] = s => InstalledInventoryFormatter.DescribeAgents(s),
         };
         if (_hasPackages)
         {
-            columns["Package"] = s => TuiHelpers.Truncate(
-                InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source),
-                _pkgW);
+            columns["Package"] = s => InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source);
         }
-        columns["State"] = s => SkillHealthFormatter.CompactBadge(s.Validity, s.IsSymlinked);
-        columns["Agents"] = s => TuiHelpers.Truncate(
-            InstalledInventoryFormatter.DescribeAgents(s),
-            _agentsW);
 
         _table.Table = new InstalledTableSource(_rows, columns);
         var style = _table.Style;
@@ -451,7 +456,19 @@ internal sealed class InstalledTabView : FrameView
                 case "Agents": cs.MinWidth = AgentsColumnWidth; cs.MaxWidth = AgentsColumnWidth; break;
             }
         }
+        ConfigureCategoryColors();
         _table.Update();
+    }
+
+    private void ConfigureCategoryColors()
+    {
+        var baseScheme = _table.GetScheme();
+        // Allocate these few schemes once per table source, never per cell draw.
+        var colors = new InstalledCategoryColors(baseScheme, TuiHelpers.CurrentTheme);
+        var locations = _rows.Select(s => colors.Location(s.Scope)).ToArray();
+        var agents = _rows.Select(s => colors.Agents(InstalledInventoryFormatter.DescribeAgents(s))).ToArray();
+        _table.Style.GetOrCreateColumnStyle(2).ColorGetter = args => locations[args.RowIndex];
+        _table.Style.GetOrCreateColumnStyle(3).ColorGetter = args => agents[args.RowIndex];
     }
 
     private void RecomputeColumnWidths()
@@ -462,18 +479,20 @@ internal sealed class InstalledTabView : FrameView
             _lastWidth > 0 ? _lastWidth : 70);
         _lastWidth = width;
 
-        var available = Math.Max(40, width - 6);
+        // Four/five columns consume one separator each (including the final
+        // border). Spending the whole viewport prevents a selected blank cell
+        // from appearing beyond the last border.
+        var available = Math.Max(2, width - (_hasPackages ? 5 : 4));
         var fixedCols = LocationColumnWidth + StateColumnWidth + AgentsColumnWidth;
-        var remaining = Math.Max(20, available - fixedCols);
-        _agentsW = AgentsColumnWidth;
+        var remaining = Math.Max(2, available - fixedCols);
         if (_hasPackages)
         {
-            _pkgW = Math.Max(18, (int)Math.Round(remaining * 0.54));
-            _nameW = Math.Max(12, remaining - _pkgW);
+            _nameW = Math.Clamp((int)Math.Round(remaining * 0.55), Math.Min(12, remaining - 1), remaining - 1);
+            _pkgW = remaining - _nameW;
         }
         else
         {
-            _nameW = Math.Max(12, remaining);
+            _nameW = remaining;
         }
         var style = _table.Style;
         for (var i = 0; i < (_table.Table?.Columns ?? 0); i++)
