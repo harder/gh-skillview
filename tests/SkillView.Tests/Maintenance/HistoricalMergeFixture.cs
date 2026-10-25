@@ -23,7 +23,9 @@ internal static class HistoricalMergeFixture
         using var draft = operation.CreateStagingDirectory("local-review", token);
         var installed = Capture("installed", plan.RootPath, plan.OriginalPath);
         var recorded = Capture("recorded", operation.CanonicalPath, Path.Combine(operation.CanonicalPath, "recorded-base"));
-        var source = Capture("source", operation.CanonicalPath, result.CandidatePath);
+        // Result paths can retain /var or another observed ancestor alias. Native
+        // relocation uses the canonical address already bound by the saved plan.
+        var source = Capture("source", operation.CanonicalPath, plan.Candidate.Identity.CanonicalPath);
         var headerHash = Write(draft, "header.json", new LocalReviewHeader(1, result.PlanFingerprint,
             recorded.Hash, installed.Hash, source.Hash), LocalReviewJsonContext.Default.LocalReviewHeader, token);
         CapturedResolutionArchive? resolution = null; string? resolutionHash = null;
@@ -105,6 +107,27 @@ internal static class HistoricalMergeFixture
         plan = plan with { ReviewFingerprint = Convert.ToHexStringLower(SHA256.HashData(canonical.ToArray())) };
         Write(operation, "merge-plan-00.json", plan, ReplacementJsonContext.Default.ReplacementPlan, token);
     }
+
+    // Seed interrupted private state through the same held creation path as the
+    // product. Directory/File.Create defaults can use an Administrators owner on
+    // elevated Windows runners, even beneath an otherwise private operation.
+    internal static void SeedOperation(string state, ReplacementResult result, CancellationToken token, Action<NativeStateDirectory> seed)
+    {
+        using var root = NativeStateDirectory.OpenOrCreate(state, [], token, allowCreate: false);
+        using var writer = root.OpenExistingFile("writer.lock", true, token);
+        using var operation = NativeStateDirectory.OpenOrCreate(Path.Combine(root.CanonicalPath, result.Id), [], token, allowCreate: false);
+        using var operationWriter = operation.OpenExistingFile("writer.lock", true, token);
+        seed(operation);
+        operation.FlushPublication(token);
+    }
+
+    internal static void CreateIncompleteAttempt(string state, ReplacementResult result, CancellationToken token,
+        string archiveName = "review-installed-merged-00") => SeedOperation(state, result, token, operation =>
+    {
+        using (var attempt = operation.CreateStagingDirectory("merged-00", token)) attempt.SealStagingDirectory(493, token);
+        using var archive = operation.CreateStagingDirectory(archiveName, token);
+        archive.SealStagingDirectory(448, token);
+    });
 
     private static (CapturedResolutionArchive Archive, string Hash) CaptureResolution(NativeStateDirectory draft, string input, CancellationToken token)
     {
