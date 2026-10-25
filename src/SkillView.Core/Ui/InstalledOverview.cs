@@ -22,6 +22,7 @@ internal sealed record InstalledOverviewRows(IReadOnlyList<InstalledOverviewRow>
 /// filtering, navigation and drawing only consume the frozen values below.
 internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Groups, int Copies, int Placements, int AmbiguousCopies, string Coverage)
 {
+    internal InstalledFilters? Filters { get; init; }
     internal const int MaxRows = 8192;
     internal static InstalledOverview Empty { get; } = new([], 0, 0, 0, "Inventory not loaded");
 
@@ -92,7 +93,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
         var coverage = $"{(partial ? "Partial" : "Captured")}: {snapshot.ScannedRoots.Length} scanned / {snapshot.ConfiguredRoots.Length} configured roots"
             + (partial ? $"; {snapshot.Diagnostics.InaccessiblePaths.Length} access limits; other consumers may exist" : "; observed placements only");
         return new(groups.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Key, StringComparer.Ordinal).ToArray(),
-            copies.Count, copies.Sum(c => c.Records.SelectMany(s => s.Agents).Distinct().Count()), copies.Count(c => c.Ambiguous), coverage);
+            copies.Count, copies.Sum(c => c.Records.SelectMany(s => s.Agents).Distinct().Count()), copies.Count(c => c.Ambiguous), coverage) { Filters = new(snapshot, token, captured) };
     }
 
     internal InstalledOverviewRows View(Func<InstalledSkill, bool> matches, string sort, ISet<string> expanded,
@@ -122,7 +123,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
             var states = copies.GroupBy(c => c.Ambiguous ? "ambiguous" : c.ReadOnly ? "read-only"
                 : availability?.Invoke(c.Target!).TableLabel.ToLowerInvariant() ?? "not checked")
                 .Select(s => $"{s.Count()} {s.Key}");
-            var summary = $"{copies.Length}{(copies.Length == group.Copies.Count ? "" : " of " + group.Copies.Count)} {(group.Copies.Count == 1 ? "copy" : "copies")}"
+            var summary = $"{copies.Length}{(copies.Length == group.Copies.Count ? "" : " of " + group.Copies.Count)} observed {(group.Copies.Count == 1 ? "copy" : "copies")}"
                 + (group.RefsDiffer ? "; refs differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; refs incomplete" : "") + "; " + string.Join(", ", states);
             Add(new(group.Key, group, null, (expanded.Contains(group.Key) ? "v " : "> ") + group.Name + " · " + group.Source, summary));
             if (!expanded.Contains(group.Key)) continue;

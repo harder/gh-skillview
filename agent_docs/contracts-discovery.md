@@ -35,8 +35,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   redirected context. Native directory keys and broken-entry parent/name keys
   merge aliases on every supported OS; preserve original paths for policy.
 
-- Inventory scope/agent filters select reconciled physical rows. Both predicates
-  must match one exposure; retain every other consumer and metadata conflict in
+- Inventory scope/agent filters select reconciled physical rows. With an agent
+  selected, both predicates must match one exposure; scope alone accepts the copy's
+  own scope or any exposure scope. Retain every other consumer and metadata conflict in
   the selected row. Capture the default gh catalog without those filters first.
   Legacy memberships with null scope use their installation's declared scope;
   a known contrary exposure scope never falls back to another consumer.
@@ -90,3 +91,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   physical aliases and must retain that possibility. Root catalog probes are bounded to four concurrent
   children and reconciled in configured-root order. See
   [inventory performance](inventory-performance.md).
+
+- Installed preserves legacy scope-only filtering: with Agent and Project/location
+  both Any, G matches the copy's own scope or any exposure scope, like the CLI.
+  Once either membership facet is constrained, Agent + Project/location + Scope
+  must match one exposure. Context falls back only to its retained discovery root or
+  placement; copies with no exposure offer unknown agent and declared scope/root,
+  never invented consumer availability. Source/owner selects any retained claim
+  while grouping remains primary source key + name. Unknown/managed/conflicting
+  evidence and every other consumer remain on a matching physical copy.
+- Inline coverage is frozen from configured/scanned roots and captured limits.
+  Name referenced-but-unscanned contexts only from explicit retained owner/link
+  evidence; never enumerate unconfigured projects. Filters preserve observed
+  denominators and partial coverage, and must perform no I/O or classification.

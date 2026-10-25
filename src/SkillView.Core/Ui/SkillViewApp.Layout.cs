@@ -183,6 +183,8 @@ public sealed partial class SkillViewApp
             availability: _workflows.Availability,
             onCheckUpdates: CheckUpdates,
             onReviewUpdate: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
+            capturedIssues: () => _changesTab?.CapturedIssues,
+            catalogGeneration: () => _services.ListAdapter.Generation,
             onRemovalError: error =>
             {
                 _services.Logger.Error("installed.remove", error.ToString());
@@ -236,6 +238,7 @@ public sealed partial class SkillViewApp
             availability: _workflows.Availability,
             onCheckUpdates: CheckUpdates,
             homeDirectory: DisplayPath.CaptureHome(_services.Runner),
+            catalogGeneration: () => _services.ListAdapter.Generation,
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,
             lifetimeToken: GetRunLifetimeToken(),
