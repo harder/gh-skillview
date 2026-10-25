@@ -22,7 +22,9 @@ internal static class UpdateReviewPresentation
         yield return ("Authored version", skill.FrontMatter.Version);
         yield return ("Used by", CopiesPresentation.Consumers(skill));
         yield return ("Source", skill.SourceIdentity.Origin);
-        yield return ("Pin", skill.Revision.PinnedRef ?? (skill.Pinned ? "pinned; ref unknown" : "no pin recorded"));
+        var pin = PinDisplayPolicy.From(skill);
+        yield return ("Pin", pin.Description);
+        if (pin.State != PinDisplayState.Unpinned) yield return ("Pin policy", pin.Guidance);
     }
 
     internal static string Plan(ReplacementResult plan, bool awaitingReview) =>

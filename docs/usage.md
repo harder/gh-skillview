@@ -83,6 +83,12 @@ Installed tab:
 
 Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). The default detail pane starts with the installation/package summary. The description follows the observed evidence and is labeled as skill metadata.
 
+TUI pin displays include contextual lockfile records as well as skill metadata. The
+**pinned only** filter includes copies with any recorded pin, including conflicting
+claims; **unpinned only** excludes conflicting or unreadable pin state. Copies
+and Updates mark pins with `p`, conflicting pin records with `!`, and unknown pin
+state with `?`; details explain the state before review.
+
 Installed columns are **Name → State → Loc → Agents → Package**. Location and known single-agent badges use subtle color cues in the default theme; their text remains visible in every theme. Mixed-agent badges retain the normal text color. The Package column appears when the inventory includes packages. Headers stay visible while scrolling.
 
 Installed and Changes summaries shorten paths beneath the known home directory used for discovery to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
@@ -109,6 +115,11 @@ workspace performs neither action. Refresh keeps an exact Updates selection.
 The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
 full evidence; keep the same global workspace/profile/scan-root options.
+Same-name rows show the shortest useful location suffix that distinguishes their
+paths, omitting the trailing skill name when it repeats the row title. Visible
+case differences remain distinct. When long or sanitized paths would still look
+identical, a `#` marker
+distinguishes them within the captured list; details retain the full location.
 
 For **Same name, multiple copies** or **Duplicate** observations, Enter opens
 **Copies and versions**. Each row is one physical installation; its recorded
@@ -459,7 +470,7 @@ Skill code is never executed, and the check performs no remote lookup or repair.
 
 Optionally select a package rule target, for example:
 `skillview --scan-root /path/to/skills check --path /path/to/skills/demo --agent gemini-cli --agent-version 0.46.0 --json`.
-This reuses existing version-cited loading rules without launching a client. Known
+This applies version-cited static package rules without launching a client. Known
 Gemini 0.46.0 framing rejection can report `incompatible`; passing that limited rule
 leaves whole-agent compatibility `unknown`. Unmodeled agents or versions never
 receive assumed compatibility. The dialog leaves agent/version unspecified.
@@ -472,10 +483,9 @@ match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
-Separate workflows support [opt-in isolated evaluations](isolated-evaluations.md)
-and [source authoring validation](#validate-a-source-repository-while-authoring),
-including `gh skill publish --dry-run`. `publish --fix` is never a repair action
-for installed payloads; no installed authored bytes are rewritten.
+Source authors can use `gh skill publish --dry-run` directly in their source
+repository. `publish --fix` is never a repair action for installed payloads;
+no installed authored bytes are rewritten.
 
 ### Global flags
 
@@ -742,28 +752,3 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
-
-### Validate a source repository while authoring
-
-Run `skillview authoring-validate --repository /path/to/source-repository --dry-run`
-(or add `--json` for schema-1 evidence). This explicitly invokes
-`gh skill publish --dry-run`; it is separate from installed-package `check`.
-GitHub remote advisories may contact GitHub, and gh may write cache/config state.
-The command never requests publishing, `--fix`, skill-script execution or an AI
-client. It preserves raw gh diagnostics and checks observed candidate payload
-bytes before/after, reporting unexpected changes without repairing them.
-
-A completed result means the bounded gh command succeeded with unchanged observed
-candidate bytes. It does not certify safety, whole-agent compatibility, authentic
-source or source review. Unsupported/incomplete discovery, truncation, cancellation
-and changes have explicit refused/skipped/partial results. Root-only `SKILL.md`
-layout is explicitly unavailable in this repository workflow. See the
-[authoring validation guide](../agent_docs/maintenance-authoring-validation.md)
-for discovery scope, bounds, status and exit-code semantics.
-
-## Opt-in offline evaluations
-
-Use `evaluate-review` to inspect a frozen package, your representative prompts and
-an explicit already-local offline Docker evaluator. `evaluate-run` requires the
-exact review fingerprint and `--consent-run`. No routine inspection or update
-starts evaluations. See [environment, protocol and limitations](isolated-evaluations.md).

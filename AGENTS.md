@@ -28,7 +28,7 @@ approved scope.
 | Terminal.Gui, async work, cancellation, dispatch and shutdown | [TUI/lifetime contracts](agent_docs/contracts-tui-lifetimes.md) |
 | Test isolation, xUnit, Terminal.Gui packages and AOT | [Testing contracts](agent_docs/contracts-testing.md) |
 | CI, releases, dependency automation and documentation | [Repository contracts](agent_docs/contracts-repository.md) |
-| Package checks, authoring validation and isolated evaluations | [Package-check contracts](agent_docs/contracts-package-checks.md) |
+| Package checks | [Package-check contracts](agent_docs/contracts-package-checks.md) |
 
 Changes spanning areas must satisfy every relevant contract. Keep detailed
 subsystem rules in these guides; keep this root file short. The

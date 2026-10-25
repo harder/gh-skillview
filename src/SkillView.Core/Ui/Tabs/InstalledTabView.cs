@@ -346,8 +346,8 @@ internal sealed class InstalledTabView : FrameView
         }
         source = _pinFilter switch
         {
-            PinFilter.PinnedOnly => source.Where(s => s.Pinned),
-            PinFilter.UnpinnedOnly => source.Where(s => !s.Pinned),
+            PinFilter.PinnedOnly => source.Where(s => PinDisplayPolicy.From(s).HasPin),
+            PinFilter.UnpinnedOnly => source.Where(s => PinDisplayPolicy.From(s).State == PinDisplayState.Unpinned),
             _ => source,
         };
         _rows = ApplySort(source);

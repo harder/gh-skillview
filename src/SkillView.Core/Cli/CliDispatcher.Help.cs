@@ -57,9 +57,6 @@ public static partial class CliDispatcher
             | --- | --- | --- |
             | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
-            | `authoring-validate` | Explicitly run gh publish dry-run on a selected source repository; may contact GitHub and write cache state. | `--repository PATH`, `--dry-run`, `--json` |
-            | `evaluate-review` | Freeze a package, explicit offline Docker environment and representative prompts without launching Docker. | `--path`, `--config`, `--json` |
-            | `evaluate-run` | Explicitly run the reviewed offline evaluation. Requires a local Linux Docker daemon and already-local digest-pinned image. | `--path`, `--config`, `--review`, `--consent-run`, `--json` |
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
             | `queue` | Refresh read-only maintenance observations grouped by issue and physical installation. Update availability and running-session state remain unknown. | `--install-id`, `--allow-hidden-dirs`, `--json` (schema 1) |
             | `inspect` | Inspect one exact installation, or verify locations of a saved local plan reference. | `--path` / `--install-id`, or `--plan-file`, `--json` |

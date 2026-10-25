@@ -14,7 +14,6 @@ or release verdict.
   [standalone unpin](maintenance-standalone-unpin.md).
 - [Managed discovery](maintenance-managed-discovery.md).
 - [Static package checks](maintenance-static-package-check.md),
-  [source authoring validation](maintenance-authoring-validation.md),
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
 - [Version selection scope](version-selection-scope.md).
