@@ -138,6 +138,8 @@ public sealed partial class SkillViewApp
 
             var snapshot = await CaptureStartupInventoryAsync(report, cancellationToken).ConfigureAwait(false);
 
+            var overview = InstalledOverview.Build(snapshot, cancellationToken);
+
             Invoke(() =>
             {
                 if (_hiddenDirsBox is not null)
@@ -158,7 +160,7 @@ public sealed partial class SkillViewApp
                         ShowSearchPanes(false);
                         _activeTab = SkillViewTab.Installed;
                         _tabBar?.SetActiveTab(SkillViewTab.Installed);
-                        _installedTab.LoadSeeded(snapshot);
+                        _installedTab.LoadSeeded(snapshot, overview);
                         // Defer to the next loop tick so the list focus wins
                         // over Terminal.Gui's post-reflow default that would
                         // otherwise land on the filter field and swallow the

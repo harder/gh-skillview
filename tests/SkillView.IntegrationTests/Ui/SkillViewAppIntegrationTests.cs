@@ -80,7 +80,7 @@ public sealed class SkillViewAppIntegrationTests
         var listFocused = false;
         var elapsed = Stopwatch.StartNew();
         var boundaryChecked = false;
-        string Progress() => $"phase={(keysSent < count + 10 ? "down" : "up")}; ticks={ticks}; keys={keysSent}; "
+        string Progress() => $"phase={(keysSent < count * 2 + 10 ? "down" : "up")}; ticks={ticks}; keys={keysSent}; "
             + $"expected={expectedRow}; observed={observedName}; focused={listFocused}; "
             + $"draws={downDraws}/{upDraws}; elapsed={elapsed.Elapsed}";
         var options = new AppOptions(
@@ -91,8 +91,8 @@ public sealed class SkillViewAppIntegrationTests
             terminal.Driver!.SetScreenSize(120, 36);
             terminal.LayoutAndDrawComplete += (_, _) =>
             {
-                if (keysSent > 0 && keysSent <= count + 10) downDraws++;
-                else if (keysSent > count + 10) upDraws++;
+                if (keysSent > 0 && keysSent <= count * 2 + 10) downDraws++;
+                else if (keysSent > count * 2 + 10) upDraws++;
             };
             terminal.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
             {
@@ -104,11 +104,11 @@ public sealed class SkillViewAppIntegrationTests
                     skillview.ForceActiveTabForTests(SkillViewTab.Installed);
                     installed.FocusList();
                 }
-                if (keysSent == 2 * (count + 10))
+                if (keysSent == 2 * (count * 2 + 10))
                 {
                     observedName = installed.GetSelectedSkill()?.Name;
                     listFocused = installed.TableHasFocusForTests;
-                    Assert.True(observedName == "skill-000" && listFocused, Progress());
+                    Assert.True(observedName is null && listFocused, Progress());
                     Assert.True(downDraws > 0 && upDraws > 0, Progress());
                     boundaryChecked = true;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Q | KeyCode.CtrlMask));
@@ -119,14 +119,14 @@ public sealed class SkillViewAppIntegrationTests
                 // full redraws to fit the watchdog on a loaded Windows runner.
                 for (var repeat = 0; repeat < 5; repeat++)
                 {
-                    var down = keysSent < count + 10;
+                    var down = keysSent < count * 2 + 10;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(down ? KeyCode.CursorDown : KeyCode.CursorUp));
                     keysSent++;
-                    expectedRow = down ? Math.Min(keysSent, count - 1)
-                        : Math.Max(count - 1 - (keysSent - count - 10), 0);
+                    expectedRow = down ? Math.Min(keysSent, count * 2 - 1)
+                        : Math.Max(count * 2 - 1 - (keysSent - count * 2 - 10), 0);
                     observedName = installed.GetSelectedSkill()?.Name;
                     listFocused = installed.TableHasFocusForTests;
-                    Assert.True(observedName == $"skill-{expectedRow:D3}", Progress());
+                    Assert.True(observedName == (expectedRow % 2 == 0 ? null : $"skill-{expectedRow / 2:D3}"), Progress());
                     Assert.True(listFocused, Progress());
                 }
                 return true;
@@ -140,7 +140,7 @@ public sealed class SkillViewAppIntegrationTests
         var exitCode = await skillview.RunAsync(deadline.Token);
 
         Assert.True(boundaryChecked, Progress());
-        Assert.Equal(2 * (count + 10), keysSent);
+        Assert.Equal(2 * (count * 2 + 10), keysSent);
         Assert.False(deadline.IsCancellationRequested, Progress());
         Assert.Equal(ExitCodes.Success, exitCode);
     }

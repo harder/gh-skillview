@@ -13,8 +13,9 @@ logging, or subprocess adapters.
 - A `SpinnerView` must be immediately before its status label on the same row.
   The main spinner is owned by `StatusStripView`; tab and modal spinners use the
   same inline layout.
-- Discover searches and Installed/Changes inventory loads use `TabLoadingView`
-  centered in the workspace, hiding stale tables and details until completion.
+- Discover searches and initial Installed/Changes inventory loads use `TabLoadingView`
+  centered in the workspace. Installed refresh retains old rows marked Refreshing
+  and pauses copy actions until the new projection is published.
   Give the indicator non-text focus before hiding focused browse content, so
   global shortcuts keep working. Restore browse focus before hiding the
   indicator. Keep intentional query/filter focus and gate hidden-row actions. Discover retains its prior result model until

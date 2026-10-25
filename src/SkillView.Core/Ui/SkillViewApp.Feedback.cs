@@ -81,8 +81,9 @@ public sealed partial class SkillViewApp
         if (_statusStrip is null) return;
 
         var hints = GetCurrentHints();
-        var badges = GetCurrentBadges();
-        _statusStrip.Update(text, hints, badges);
+        if (_activeTab == SkillViewTab.Installed && !_inDoctor && _updatesTab?.Visible != true && text == _defaultStatus)
+            text = "";
+        _statusStrip.Update(text, hints);
     }
 
     private List<StatusHint> GetCurrentHints()
@@ -114,10 +115,9 @@ public sealed partial class SkillViewApp
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
             SkillViewTab.Installed => [
-                new StatusHint("C", "Check updates"),
-                new StatusHint("u", "Review"),
-                new StatusHint("f", "Filter"),
-                new StatusHint("x", "Remove"),
+                new StatusHint("Enter", "Details/Expand"),
+                new StatusHint("/", "Search"),
+                new StatusHint("c", "Cleanup"),
                 new StatusHint("r", "Refresh"),
                 new StatusHint("?", "Help"),
                 new StatusHint("Ctrl+Q", "Quit"),
@@ -136,27 +136,6 @@ public sealed partial class SkillViewApp
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
         };
-    }
-
-    private string GetCurrentBadges()
-    {
-        var parts = new List<string>();
-
-        // Show active facets from Installed tab selection if applicable.
-        if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
-        {
-            var selected = _installedTab.GetSelectedSkill();
-            if (selected is not null)
-            {
-                var agents = InstalledInventoryFormatter.DescribeAgents(selected);
-                if (!string.IsNullOrEmpty(agents))
-                {
-                    parts.Add($"Agents {agents}");
-                }
-            }
-        }
-
-        return parts.Count > 0 ? string.Join(" ", parts) : string.Empty;
     }
 
     private void ScheduleStatusAutoClear()

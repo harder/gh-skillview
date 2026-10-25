@@ -6,7 +6,7 @@ For installation and a quick start, see the [README](../README.md).
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Issues** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Issues pairs local findings and review suggestions with captured details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Issues** — plus a Doctor view reachable on demand. Discover pairs a list with contextual detail; Installed shows an expandable skill/source overview with physical-copy children. At 80×24, Enter on a copy opens full-width detail and Esc returns to the list. At 120×36, the same detail appears beside the list. Issues pairs local findings and review suggestions with captured details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
@@ -73,15 +73,22 @@ Installed tab:
 
 | Key | Action |
 |---|---|
-| `f` | Focus the filter field |
-| `s` | Cycle sort (name / package / location) |
+| `Enter` | Expand/collapse a source group, or browse one physical copy |
+| `←` / `→` | Collapse/expand the selected source group; use `1` / `2` / `3` for tabs |
+| `Esc` | Return from full-width detail, then leave Installed from the list |
+| `C` (Shift+c) | Check updates for the whole catalog, or cancel the check |
+| `u` | Hand the selected exact copy to saved update review |
+| `c` | Open Cleanup |
+| `G` | Cycle scope (all / user / project / custom), keeping all consumers |
+| `/` or `f` | Search Installed by name, path, agent or recorded source |
+| `s` | Cycle sort (name / source / location); keep the current choice across refresh |
 | `R` | Review replacement from the selected installation’s same recorded local source; reopen saved history by ID |
 | `P` | Cycle pin filter (all / pinned only / unpinned only) |
 | `K` | Check selected local package metadata and supported references |
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
 
-Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). The default detail pane starts with the installation/package summary. The description follows the observed evidence and is labeled as skill metadata.
+Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). Ordinary detail starts with a bounded, literal-text description attributed to skill metadata (Markdown and links remain inert), followed by recorded source, exact location, version/ref evidence, pins and every recorded consumer. **More actions** exposes open, remove, package check and contextual local-source reviews. Source groups cannot run copy operations; ambiguous IDs remain inspect-only.
 
 TUI pin displays include contextual lockfile records as well as skill metadata. The
 **pinned only** filter includes copies with any recorded pin, including conflicting
@@ -89,11 +96,13 @@ claims; **unpinned only** excludes conflicting or unreadable pin state. Copies
 and Updates mark pins with `p`, conflicting pin records with `!`, and unknown pin
 state with `?`; details explain the state before review.
 
-Installed columns are **Name → State → Loc → Agents → Package**. Location and known single-agent badges use subtle color cues in the default theme; their text remains visible in every theme. Mixed-agent badges retain the normal text color. The Package column appears when the inventory includes packages. Headers stay visible while scrolling.
+Source headings count distinct observed physical copies, with separate counts for update states. Two known differing recorded Git refs can say **refs differ**; missing refs remain incomplete evidence. Authored, Git and distributor versions stay separate. Unknown, incomplete or conflicting source identities remain separate, location-labeled groups. A shared payload with two recorded consumers counts as one copy and two placements. Managed copies say **Read-only** and retain owning-tool guidance.
 
-Installed and Issues summaries shorten paths beneath the known home directory used for discovery to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
+The view retains selection by installation ID and exact path, expansion, search/P/G filters, sort, focus and the top visible row key across refresh, checks, resize and operation return. Missing, ambiguous, filtered-out or collapsed selections disable copy actions until an exact visible copy is selected. The list shows at most 8,192 rows including source headings and an omission row; footer counts distinguish observed, filtered, shown and omitted rows. Coverage describes only captured configured/scanned roots and discovery limitations; it does not enumerate unknown projects.
 
-Inventory loads and Discover searches show a centered spinner while replacing old rows and details. Leaving a tab clears its loading indicator. Installed and Issues share a complete inventory snapshot for up to one minute; partial captures retry on the next visit; switching tabs during a scan joins that same background capture. Press **r** from a list to read disk again immediately. Maintenance actions validate current evidence before acting. Loading keeps browse focus out of text fields and temporarily disables actions on hidden selections. Help, quit, tab navigation and refresh remain available; intentional query/filter editing keeps its focus.
+Installed keeps exact copy and consumer paths useful for inspection. Issues summaries can shorten paths beneath the captured home to `~`; technical evidence retains full paths. Actions always retain original exact addresses.
+
+Discover searches and initial inventory loads show a centered spinner. Installed refreshes keep existing rows visible with **Refreshing inventory… copy actions paused** until publication. Installed and Issues share a complete inventory snapshot for up to one minute; partial captures retry on the next visit. Press **r** to read disk again. Checks are explicit and shared; inventory refresh alone makes prior observations stale. Help, quit, navigation, refresh and intentional query editing remain available.
 
 Issues tab:
 
@@ -136,7 +145,7 @@ owning tool. F2 shows retained diagnostic output.
 Each finding retains its installation address ID and exact frozen entries.
 Cleanup issues reopen only that issue at that physical address after a fresh
 inventory capture. A missing or ambiguous ID refuses the hand-off instead of
-choosing a same-name sibling. Installed's **Review update (u / Enter)** and an
+choosing a same-name sibling. Installed's **Review update (u)** and an
 Issues **Updates** finding immediately prepare the existing saved-candidate
 review for the chosen copy. Source acknowledgement, original retention, fresh
 admission, verification and undo remain separate steps. Entering Issues or

@@ -142,8 +142,7 @@ public sealed class UpdatesTabViewTests
             runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: _ => ++loadCount == 1 ? first.Task : second.Task,
             onRemove: static (_, _, _) => Task.CompletedTask,
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
+            onLeaveTab: static () => { });
 
         var initialLoad = view.LoadAsync();
         var replacementLoad = view.LoadAsync();
@@ -181,8 +180,7 @@ public sealed class UpdatesTabViewTests
                 return SnapshotWithSkill("newer");
             },
             onRemove: static (_, _, _) => Task.CompletedTask,
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
+            onLeaveTab: static () => { });
 
         var firstLoad = view.LoadAsync();
         await firstStarted.Task;
@@ -216,7 +214,6 @@ public sealed class UpdatesTabViewTests
             snapshotLoader: _ => Task.FromResult(SnapshotWithSkill("loaded")),
             onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
-            onGoToSearch: static () => { },
             onStateChange: () =>
             {
                 callbackCount++;
@@ -228,8 +225,7 @@ public sealed class UpdatesTabViewTests
 
         Assert.True(callbackCount >= 1);
         Assert.Equal(["loaded"], visibleNamesAtCallback);
-        Assert.NotNull(selectedSkillAtCallback);
-        Assert.Equal("loaded", selectedSkillAtCallback!.Name);
+        Assert.Null(selectedSkillAtCallback); // source heading is initially selected
     }
 
     private static UpdatesTabView CreateUpdatesTab(

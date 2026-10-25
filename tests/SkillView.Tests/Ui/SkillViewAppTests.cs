@@ -599,15 +599,13 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         var hints = app.CurrentHintsForTests;
 
-        Assert.Equal(7, hints.Count);
-        Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filter");
-        Assert.Contains(hints, hint => hint.Key == "C" && hint.Label == "Check updates");
-        Assert.Contains(hints, hint => hint.Key == "u" && hint.Label == "Review");
+        Assert.Equal(6, hints.Count);
+        Assert.Contains(hints, hint => hint.Key == "/" && hint.Label == "Search");
+        Assert.Contains(hints, hint => hint.Key == "Enter" && hint.Label == "Details/Expand");
         Assert.Contains(hints, hint => hint.Key == "r" && hint.Label == "Refresh");
-        Assert.Contains(hints, hint => hint.Key == "x" && hint.Label == "Remove");
+        Assert.Contains(hints, hint => hint.Key == "c" && hint.Label == "Cleanup");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
         Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
-        Assert.DoesNotContain(hints, hint => hint.Key == "/" && hint.Label == "Search");
         Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
         Assert.DoesNotContain(hints, hint => hint.Key == "q" && hint.Label == "Quit");
     }
@@ -964,16 +962,17 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void BuildUi_WindowShortcutFocusesQueryField()
+    public void BuildUi_WindowShortcutFocusesLocalInstalledSearch()
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
 
+        app.InstalledTabForTests!.LoadSeeded(InventorySnapshot.Empty);
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('/'));
 
-        Assert.Equal(SkillViewTab.Discover, app.ActiveTabForTests);
-        Assert.True(app.QueryFieldForTests!.HasFocus);
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+        Assert.True(app.InstalledTabForTests!.FilterHasFocus);
     }
 
     [Fact]
@@ -1010,8 +1009,8 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('u'));
         Assert.False(app.UpdatesWorkspaceVisibleForTests);
-        Assert.Equal(SkillViewTab.Changes, app.ActiveTabForTests);
-        Assert.True(app.ChangesTabForTests!.Visible);
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+        Assert.False(app.ChangesTabForTests!.Visible);
     }
 
     [Fact]
@@ -1385,8 +1384,8 @@ public sealed class SkillViewAppTests
 
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         var installedHints = app.StatusStripForTests!.HintsForTests;
-        Assert.Contains(installedHints, hint => hint is { Key: "f", Label: "Filter" });
-        Assert.Contains(installedHints, hint => hint is { Key: "x", Label: "Remove" });
+        Assert.Contains(installedHints, hint => hint is { Key: "/", Label: "Search" });
+        Assert.Contains(installedHints, hint => hint is { Key: "Enter", Label: "Details/Expand" });
 
         app.ForceActiveTabForTests(SkillViewTab.Changes);
         Assert.Equal(0, app.ChangesTabForTests!.RowCountForTests);
@@ -1413,9 +1412,7 @@ public sealed class SkillViewAppTests
         Assert.Null(contextBar.LocationLabel);
         Assert.Null(contextBar.ProvenanceLabel);
         Assert.Null(contextBar.HealthLabel);
-        Assert.Equal(
-            $"Agents {InstalledInventoryFormatter.DescribeAgents(app.InstalledTabForTests.GetSelectedSkill()!)}",
-            app.StatusStripForTests!.LeftBadgesForTests);
+        Assert.Equal("", app.StatusStripForTests!.LeftBadgesForTests);
     }
 
     [Fact]
