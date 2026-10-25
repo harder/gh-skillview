@@ -16,9 +16,7 @@ public sealed partial class ReplacementLocalReviewTests
         var expectedLegacy = "{\n  \"schemaVersion\": 1,\n  \"headerFingerprint\": \"" + new string('a', 64) + "\",\n  \"choices\": []\n}";
         Assert.Equal(expectedLegacy.ReplaceLineEndings(System.Environment.NewLine), encoded);
         var plan = await Plan(); var first = HistoricalMergeFixture.CaptureReview(State, plan, Token);
-        Directory.CreateDirectory(Path.Combine(State, plan.Id, "merged-00"));
-        var attempt = Directory.CreateDirectory(Path.Combine(State, plan.Id, "review-installed-merged-00"));
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(attempt.FullName, (UnixFileMode)448);
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token);
         var path = Path.Combine(first.ReviewPath, "choices-00.json");
         File.WriteAllText(path, File.ReadAllText(path).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2"));
         Assert.Throws<IOException>(() => Store(sourceReviewRequired: true).Inspect(plan.Id, Inventory(), Token));
@@ -29,10 +27,16 @@ public sealed partial class ReplacementLocalReviewTests
     public async Task ExcessivePrivateDraftEntriesAreRefusedBeforeLoadingAnyResolutionArchive()
     {
         var plan = await Plan(); var review = HistoricalMergeFixture.CaptureReview(State, plan, Token);
-        Directory.CreateDirectory(Path.Combine(State, plan.Id, "merged-00"));
-        var attempt = Directory.CreateDirectory(Path.Combine(State, plan.Id, "review-installed-merged-00"));
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(attempt.FullName, (UnixFileMode)448);
-        for (var i = 0; i < 37; i++) File.WriteAllText(Path.Combine(review.ReviewPath, $"unexpected-{i:D2}"), "retained");
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token);
+        HistoricalMergeFixture.SeedOperation(State, plan, Token, operation =>
+        {
+            using var draft = NativeStateDirectory.OpenOrCreate(Path.Combine(operation.CanonicalPath, "local-review"), [], Token, allowCreate: false);
+            for (var i = 0; i < 37; i++)
+            {
+                using var file = draft.OpenFile($"unexpected-{i:D2}", false, Token); file.Write("retained"u8); file.Flush(true);
+            }
+            draft.FlushNamespace(Token);
+        });
         var failure = Assert.Throws<IOException>(() => Store(sourceReviewRequired: true).Inspect(plan.Id, Inventory(), Token));
         Assert.Contains("bounded history budget", failure.Message);
         Assert.False(Directory.Exists(plan.RetainedPath));
@@ -43,12 +47,14 @@ public sealed partial class ReplacementLocalReviewTests
     {
         var plan = await Plan();
         var review = HistoricalMergeFixture.CaptureReview(State, plan, Token);
-        Directory.CreateDirectory(Path.Combine(State, plan.Id, "merged-00"));
-        var attempt = Directory.CreateDirectory(Path.Combine(State, plan.Id, "review-installed-merged-00"));
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(attempt.FullName, (UnixFileMode)448);
-        var newest = Path.Combine(review.ReviewPath, "choices-01.json");
-        File.WriteAllText(newest, "{");
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(newest, (UnixFileMode)384);
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token);
+        Assert.Equal("ready", Store().Inspect(plan.Id, Inventory(), Token).Status);
+        HistoricalMergeFixture.SeedOperation(State, plan, Token, operation =>
+        {
+            using var draft = NativeStateDirectory.OpenOrCreate(Path.Combine(operation.CanonicalPath, "local-review"), [], Token, allowCreate: false);
+            using (var newest = draft.OpenFile("choices-01.json", false, Token)) { newest.Write("{"u8); newest.Flush(true); }
+            draft.FlushNamespace(Token);
+        });
         Assert.ThrowsAny<JsonException>(() => Store().Inspect(plan.Id, Inventory(), Token));
         Assert.ThrowsAny<JsonException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
         Assert.False(Directory.Exists(plan.RetainedPath));
@@ -59,8 +65,10 @@ public sealed partial class ReplacementLocalReviewTests
     {
         var plan = await Plan();
         var original = PayloadSnapshot.Capture(Payload, Token);
-        var review = Directory.CreateDirectory(Path.Combine(State, plan.Id, "local-review"));
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(review.FullName, (UnixFileMode)448);
+        HistoricalMergeFixture.SeedOperation(State, plan, Token, operation =>
+        {
+            using var review = operation.CreateStagingDirectory("local-review", Token); review.SealStagingDirectory(448, Token);
+        });
         Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
         Assert.Equal(original.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
         Assert.False(Directory.Exists(plan.RetainedPath));
@@ -79,33 +87,35 @@ public sealed partial class ReplacementLocalReviewTests
         Assert.Equal(2, selection.SchemaVersion); Assert.Single(selection.Resolutions!.Entries);
         // Retained source-review attempt forces the historical saved-review reader
         // even when this interrupted operation never completed its merge plan.
-        Directory.CreateDirectory(Path.Combine(State, plan.Id, "merged-00"));
-        var attempt = Directory.CreateDirectory(Path.Combine(State, plan.Id, "review-installed-merged-00"));
-        var unused = Directory.CreateDirectory(Path.Combine(review.ReviewPath, "resolutions-01"));
-        if (!OperatingSystem.IsWindows())
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token);
+        Assert.Equal("ready", Store().Inspect(plan.Id, Inventory(), Token).Status);
+        var blobPath = Path.Combine(review.ReviewPath, "resolutions-01", "entry-00000");
+        HistoricalMergeFixture.SeedOperation(State, plan, Token, operation =>
         {
-            File.SetUnixFileMode(attempt.FullName, (UnixFileMode)448);
-            File.SetUnixFileMode(unused.FullName, (UnixFileMode)448);
-        }
-        var blobPath = Path.Combine(unused.FullName, "entry-00000");
-        using (var blob = File.Create(blobPath)) blob.SetLength(CapturedResolutionArchive.MaxRetainedBytes);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(blobPath, (UnixFileMode)384);
-        if (completedUnused)
-        {
-            using var blob = File.OpenRead(blobPath);
-            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(blob));
-            var entry = Assert.Single(review.Resolution!.Entries);
-            var archive = new CapturedResolutionArchive([entry with
+            using var draft = NativeStateDirectory.OpenOrCreate(Path.Combine(operation.CanonicalPath, "local-review"), [], Token, allowCreate: false);
+            using var unused = draft.CreateStagingDirectory("resolutions-01", Token);
+            using (var blob = unused.OpenFile("entry-00000", false, Token))
             {
-                Entry = entry.Entry with { Bytes = blob.Length, ContentHash = hash, ComparisonHash = hash }, StoredBytes = blob.Length
-            }]);
-            archive.Validate();
-            using var file = new FileStream(Path.Combine(unused.FullName, "manifest.json"), FileMode.CreateNew);
-            BoundedReviewJson.Write(file, new ResolutionArchiveManifest(1, archive.Entries),
-                ResolutionJsonContext.Default.ResolutionArchiveManifest, CapturedPayloadArchive.MaxManifestBytes, Token);
-            file.Flush(true);
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(file.SafeFileHandle, (UnixFileMode)384);
-        }
+                blob.SetLength(CapturedResolutionArchive.MaxRetainedBytes); blob.Flush(true);
+                if (completedUnused)
+                {
+                    blob.Position = 0;
+                    var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(blob));
+                    var entry = Assert.Single(review.Resolution!.Entries);
+                    var archive = new CapturedResolutionArchive([entry with
+                    {
+                        Entry = entry.Entry with { Bytes = blob.Length, ContentHash = hash, ComparisonHash = hash }, StoredBytes = blob.Length
+                    }]);
+                    archive.Validate();
+                    using var file = unused.OpenFile("manifest.json", false, Token);
+                    BoundedReviewJson.Write(file, new ResolutionArchiveManifest(1, archive.Entries),
+                        ResolutionJsonContext.Default.ResolutionArchiveManifest, CapturedPayloadArchive.MaxManifestBytes, Token);
+                    file.Flush(true);
+                }
+            }
+            unused.SealStagingDirectory(448, Token);
+            draft.FlushNamespace(Token);
+        });
         var before = PayloadSnapshot.Capture(Payload, Token);
         var moves = new List<string>();
         var failure = Assert.Throws<IOException>(() => Store(step => { if (step.EndsWith("-moved", StringComparison.Ordinal)) moves.Add(step); })

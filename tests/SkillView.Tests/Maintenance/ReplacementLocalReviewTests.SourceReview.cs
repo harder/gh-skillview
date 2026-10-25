@@ -59,20 +59,22 @@ public sealed partial class ReplacementLocalReviewTests
         var plan = await Plan();
         HistoricalMergeFixture.CaptureReview(State, plan, Token);
         var operation = Path.Combine(State, plan.Id);
-        Directory.CreateDirectory(Path.Combine(operation, "merged-00"));
-        var archive = Path.Combine(operation, kind == "unbound" ? "review-installed-merged-01" : "review-installed-merged-00");
-        Directory.CreateDirectory(archive);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(archive, (UnixFileMode)448);
+        var archiveName = kind == "unbound" ? "review-installed-merged-01" : "review-installed-merged-00";
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token, archiveName);
+        var archive = Path.Combine(operation, archiveName);
         if (kind == "corrupt")
         {
             var header = Path.Combine(operation, "local-review", "header.json");
             File.WriteAllText(header, File.ReadAllText(header).Replace(plan.PlanFingerprint, new string('0', 64), StringComparison.Ordinal));
         }
-        if (kind == "unknown") File.WriteAllText(Path.Combine(archive, "unexpected"), "No authority");
-        if (kind == "excess")
+        if (kind is "unknown" or "excess") HistoricalMergeFixture.SeedOperation(State, plan, Token, held =>
         {
-            using var oversized = File.Create(Path.Combine(archive, "entry-00000")); oversized.SetLength(PayloadSnapshot.MaxBytes + 1);
-        }
+            using var attempt = NativeStateDirectory.OpenOrCreate(Path.Combine(held.CanonicalPath, archiveName), [], Token, allowCreate: false);
+            using var file = attempt.OpenFile(kind == "unknown" ? "unexpected" : "entry-00000", false, Token);
+            if (kind == "unknown") file.Write("No authority"u8);
+            else file.SetLength(PayloadSnapshot.MaxBytes + 1);
+            file.Flush(true); attempt.FlushNamespace(Token);
+        });
         if (kind == "link")
         {
             var target = Path.Combine(temporary.FullName, "external"); File.WriteAllText(target, "No authority");
