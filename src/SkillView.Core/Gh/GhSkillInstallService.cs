@@ -22,6 +22,9 @@ public sealed class GhSkillInstallService
         _logger = logger;
     }
 
+    internal ProcessRunner CaptureContext() =>
+        _runner.WithContext(_runner.EffectiveWorkingDirectory, new Dictionary<string, string>());
+
     public sealed record Options(
         IReadOnlyList<string>? Agents = null,
         string? Scope = null,
