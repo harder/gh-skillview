@@ -442,13 +442,6 @@ jobs:
           assert result['ref'] == 'refs/tags/v2.102.0'
           assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
           PYREF
-      - name: Prove contextual agent loading without starting AI clients
-        if: matrix.shard == 'inspection-unpin'
-        shell: bash
-        run: |
-          proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
-          python tests/native/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
-          python tests/native/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
       - name: Prove external cleanup suppression without payload mutations
         if: matrix.shard == 'inspection-unpin'
         shell: bash

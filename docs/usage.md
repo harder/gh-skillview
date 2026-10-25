@@ -240,7 +240,6 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
 | `skillview queue --json` | Refresh maintenance observations with schema 1 JSON and exact physical installation IDs; no upstream check or mutation |
-| `skillview effective --agent <id> --project <directory>` | Explain conditional loading policy for an agent, profile and project, retaining every observed copy |
 | `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
 | `skillview backup --path <installed-directory>` | Capture private, bounded payload evidence with a durable creating/captured journal |
 | `skillview rescan` | Re-run inventory capture and print a summary |
@@ -256,7 +255,6 @@ Examples:
 
 ```bash
 skillview list --json
-skillview effective --agent gemini-cli --project /path/to/project --client-version 0.46.0 --json
 skillview search prompt --owner github
 skillview preview github/awesome-copilot documentation-writer
 skillview preview cli/cli gh --version v2.103.0
@@ -276,24 +274,6 @@ when a ref is supplied; for an entire repository, `OWNER/REPO@<ref> --all --pin`
 pins that ref. `--upstream` is a switch for a republished skill's declared
 upstream source, not a URL argument. Run `skillview --help` for the
 complete option list.
-
-`effective` analyzes bounded local configuration and skill metadata without
-changing skills or agent configuration. In Installed, select a skill and press
-**E** to choose the same context and inspect relevant competing copies.
-Use `--cwd`, `--config-dir`, `--profile`, `--client-version`, and, for OpenCode,
-`--agent-name` to describe the context precisely. Here `--profile` is a loading
-context option; the global inventory `--profile agent[:name]=skills-directory`
-still belongs before the subcommand. `--trust trusted|untrusted|unknown` is an
-analysis assumption; it never grants trust to an agent.
-
-The JSON schema is version 1. It separates a conditional local-file policy
-preview, native inventory observations, and active-session state. A symlink,
-cache entry, portable metadata warning, or client version label alone does not
-prove native loading. The cited Gemini 0.46.0 source supports an expected rule
-profile; native AI-client conformance remains untested. Other rule profiles are
-dated documentation previews with explicit version uncertainty. Native providers
-currently report unavailable with their startup-audit reason; SkillView does
-not start an AI client or execute skill content to obtain a listing.
 
 For `backup`, select one exact installation with `--path` or `--install-id` from
 `list --json`. Put global flags before the command, for example:

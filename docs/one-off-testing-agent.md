@@ -54,7 +54,7 @@ temp directories. Strip inherited `GIT_*` and agent overrides as described in
 AGENTS.md; keep the parent process environment unchanged. Capture existing auth
 privately before isolating HOME when a remote operation requires it. Never
 apply, remove, unpin or undo against actual user installations. Do not launch
-AI clients to populate effective-loading evidence.
+AI clients to populate inventory or session-loading evidence.
 
 Start at **80×24**, then repeat any clipped or awkward view at a larger size.
 Use help/current documentation for keys rather than guessing mutation flags.
@@ -76,8 +76,8 @@ Prioritize these user journeys, in this order:
 Use [usage](usage.md) and [saved updates](saved-updates.md) for current behavior.
 Avoid a large matrix of every supported agent or every adversarial native case;
 the automated suites/proofs cover those contracts. Inspect static package-check
-and effective-loading output if convenient, but do not displace the journeys
-above or install real AI clients just to test them.
+output if convenient, but do not displace the journeys above or install real AI
+clients just to test them.
 
 On WSL/macOS, the existing
 `tests/native/prove-reviewed-update-tui.py` can automate a live reviewed

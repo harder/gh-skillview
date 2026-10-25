@@ -3,7 +3,7 @@
 `evaluate-review` freezes a bounded regular-file skill package, your representative
 prompts and an explicit offline Docker environment. It does not start Docker or
 an AI client. `evaluate-run` starts that environment only with the matching review
-fingerprint and `--consent-run`. Inventory, `check`, effective loading, updates and
+fingerprint and `--consent-run`. Inventory, `check`, updates and
 source review never start evaluations automatically.
 
 Supply your own already-local Linux image containing a runnable offline evaluator

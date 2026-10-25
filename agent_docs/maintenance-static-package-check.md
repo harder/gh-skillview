@@ -71,9 +71,11 @@ Home-prefixed `file:`/`link:` dependency addresses remain environment-specific a
 unknown, with partial declaration coverage. Never expand HOME or classify an
 external home-relative address against a literal `~` directory in the payload.
 
-`--agent` / `--agent-version` reuse `AgentLoadingRules` citations/applicability and
-`LoadingHeaderFraming` on complete captured root bytes. Only the cited Gemini
-0.46.0 framing rejection is currently a definite package incompatibility. Passing
+`--agent` / `--agent-version` select static rules in `PackageCompatibilityChecker`
+on complete hash-verified root bytes. Its citations cover package metadata only;
+agent settings, permissions and trust are not read or modeled. Only the cited
+Gemini 0.46.0 framing rejection (BOM or missing closing `---`) is currently a
+definite package incompatibility. A later `---` after YAML `...` remains unknown. Passing
 this subset is still unknown for whole-agent compatibility; other agents/versions
 retain explicit unknown reasons. No ambient policy/default allow is inferred.
 Portability and literal URL/tool observations remain review evidence, distinct
