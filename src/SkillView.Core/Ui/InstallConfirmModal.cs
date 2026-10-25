@@ -39,7 +39,7 @@ internal sealed class InstallConfirmModal
         Failed,
     }
 
-    internal sealed record Result(Outcome Outcome, InstallResult? Install);
+    internal sealed record Result(Outcome Outcome, InstallResult? Install, InstalledInstallHandoff? Handoff = null);
 
     // Fixed visible height of the scrollable agent-checkbox grid; the
     // catalog is long enough now (gh skill install --agent lists ~47) that
@@ -54,6 +54,8 @@ internal sealed class InstallConfirmModal
     private readonly InstallRequest _request;
     private readonly bool _installAll;
     private readonly ProcessRunner _runner;
+    private readonly Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? _findInstalled;
+    private readonly Func<InstalledInstallHandoff, bool>? _canPublish;
 
     internal InstallConfirmModal(
         IApplication app,
@@ -61,7 +63,9 @@ internal sealed class InstallConfirmModal
         Logger logger,
         string ghPath,
         InstallRequest request,
-        bool installAll = false)
+        bool installAll = false,
+        Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? findInstalled = null,
+        Func<InstalledInstallHandoff, bool>? canPublish = null)
     {
         _app = app;
         _runner = install.CaptureContext();
@@ -70,12 +74,15 @@ internal sealed class InstallConfirmModal
         _ghPath = ghPath;
         _request = request;
         _installAll = installAll;
+        _findInstalled = findInstalled;
+        _canPublish = canPublish;
     }
 
     internal Result Show(Action<Dialog, ModalOperationTracker>? readyForTests = null, Action<Action>? invokeForTests = null)
     {
         var outcome = Outcome.Cancelled;
         InstallResult? installResult = null;
+        InstalledInstallHandoff? handoff = null;
         var operationName = "project lookup";
         var preparing = true;
         var preparationCancelled = false;
@@ -338,7 +345,33 @@ internal sealed class InstallConfirmModal
                     if (installResult.Succeeded)
                     {
                         outcome = Outcome.Installed;
-                        _app.RequestStop();
+                        if (_installAll) { _app.RequestStop(); return; }
+                        operation.Release();
+                        dialog.Title = " Install completed ";
+                        foreach (var control in new View[] { scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath,
+                            customPathLabel, customPathField, agentsLabel, agentsView, placementHint }) control.Visible = false;
+                        dialog.Height = 9;
+                        dialog.Y = Pos.Center();
+                        repoLabel.Height = 1;
+                        scopeDescription.Y = 1;
+                        scopeDescription.Visible = true;
+                        scopeDescription.Text = options.Scope switch
+                        {
+                            "project" => "Selected scope: Project",
+                            "user" => "Selected scope: User",
+                            _ => "Selected scope: Custom folder",
+                        };
+                        status.Y = 3;
+                        status.Height = 3;
+                        spinner.Y = 3;
+                        status.Text = " Install completed";
+                        installButton.Text = "View installed skill";
+                        installButton.Enabled = true;
+                        advancedButton.Visible = false;
+                        cancelButton.X = Pos.Right(installButton) + 2;
+                        cancelButton.Text = "Back to Discover";
+                        cancelButton.Enabled = true;
+                        installButton.SetFocus();
                     }
                     else
                     {
@@ -388,10 +421,66 @@ internal sealed class InstallConfirmModal
             }
         }
 
+        async Task FindInstalledAsync(CancellationToken token)
+        {
+            try
+            {
+                if (installResult?.Navigation is not { } evidence || _findInstalled is null)
+                    throw new IOException(scopeSelector.Value == 2
+                        ? "Automatic navigation is not supported for custom folders. Outside the current scan, add an explicit scan root."
+                        : "Automatic navigation is available for a named Discover skill with a known source path at User or Project scope.");
+                var found = await _findInstalled(evidence, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    if (token.IsCancellationRequested || dialog.StopRequested || !dialog.IsRunning || !ReferenceEquals(_app.TopRunnableView, dialog)) return;
+                    if (_canPublish?.Invoke(found) != true)
+                    {
+                        FinishFinding("The inventory or installation context changed; refresh Installed before choosing a copy.");
+                        return;
+                    }
+                    handoff = found;
+                    _app.RequestStop();
+                });
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                _logger.Error("install.handoff", ex.Message);
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    if (!token.IsCancellationRequested) FinishFinding(TuiHelpers.ErrorSnippet(ex.Message));
+                });
+            }
+        }
+
+        void FinishFinding(string message)
+        {
+            operation.Release();
+            spinner.AutoSpin = false;
+            spinner.Visible = false;
+            // Keep the source and selected scope visible above the explanation.
+            status.Text = "Install completed; the exact installed copy could not be verified.\n" + message;
+            installButton.Enabled = true;
+            cancelButton.Enabled = true;
+            cancelButton.SetFocus();
+        }
+
         installButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
+            if (outcome == Outcome.Installed)
+            {
+                operationName = "finding installed skill";
+                status.Text = " Finding installed skill…";
+                spinner.Visible = true;
+                spinner.AutoSpin = true;
+                installButton.Enabled = false;
+                cancelButton.SetFocus();
+                operation.TryStart(FindInstalledAsync);
+                return;
+            }
 
             var validationError = CurrentValidationError();
             if (validationError is not null)
@@ -405,7 +494,8 @@ internal sealed class InstallConfirmModal
                 customPathField.Text.ToString() ?? string.Empty,
                 agentBoxes,
                 entries,
-                _installAll);
+                _installAll) with
+            { NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) };
             operationName = "install";
             scopeSelector.Enabled = false;
             agentsView.Enabled = false;
@@ -434,6 +524,13 @@ internal sealed class InstallConfirmModal
         };
         void CancelOrClose()
         {
+            if (outcome == Outcome.Installed)
+            {
+                handoff = null;
+                operation.Cancel();
+                _app.RequestStop();
+                return;
+            }
             var ownership = operation.CurrentOwnership;
             if (ownership != ModalOperationTracker.Ownership.None)
             {
@@ -497,7 +594,7 @@ internal sealed class InstallConfirmModal
             operation.Cancel();
         }
 
-        return new Result(outcome, installResult);
+        return new Result(outcome, installResult, handoff);
     }
 
     private static string FormatBasePath(string path)

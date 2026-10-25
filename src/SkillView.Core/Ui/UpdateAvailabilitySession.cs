@@ -80,8 +80,11 @@ internal sealed class UpdateAvailabilitySession
         if (_entries.Count == 0) _failure = "Update check canceled";
         foreach (var (id, entry) in _entries)
             if (entry.Observation.Status == UpdateAvailabilityStatus.Checking)
-                _entries[id] = entry with { Observation = new(UpdateAvailabilityStatus.Canceled,
-                    "Canceled before a complete answer for this copy.", DateTimeOffset.Now) };
+                _entries[id] = entry with
+                {
+                    Observation = new(UpdateAvailabilityStatus.Canceled,
+                    "Canceled before a complete answer for this copy.", DateTimeOffset.Now)
+                };
     }
 
     internal void Invalidate()
@@ -89,8 +92,11 @@ internal sealed class UpdateAvailabilitySession
         _request++;
         Running = false;
         foreach (var (id, entry) in _entries)
-            _entries[id] = entry with { Observation = Stale(entry.Observation,
-                "Disk refresh, context change or operation invalidated this observation. Check again.") };
+            _entries[id] = entry with
+            {
+                Observation = Stale(entry.Observation,
+                "Disk refresh, context change or operation invalidated this observation. Check again.")
+            };
     }
 
     private static UpdateAvailability Stale(UpdateAvailability previous, string reason) =>

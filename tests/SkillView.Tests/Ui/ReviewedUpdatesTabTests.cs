@@ -35,7 +35,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var controls = view.SubViews.Where(child => child.Visible && child is Button or CheckBox).ToArray();
         foreach (var control in controls)
             Assert.DoesNotContain(controls, other => !ReferenceEquals(control, other) && control.Frame.IntersectsWith(other.Frame));
-        }
+    }
 
     private static InstalledSkill Target(string name, string root = "/skills") => new()
     {

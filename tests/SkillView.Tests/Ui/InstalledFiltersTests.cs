@@ -138,8 +138,10 @@ public sealed class InstalledFiltersTests
         var second = first with { ResolvedPath = "/Alpha/demo", Agents = [new("codex", "/Alpha/demo", false, Scope.Project, "/work/Alpha")] };
         var snapshot = InventorySnapshot.Empty with
         {
-            Skills = [first, second], ConfiguredRoots = [new("/home", Scope.User, "claude"), new("/Gamma", Scope.Project, "codex")],
-            ScannedRoots = [new("/home", Scope.User, "claude")], ConfiguredRootsComplete = false,
+            Skills = [first, second],
+            ConfiguredRoots = [new("/home", Scope.User, "claude"), new("/Gamma", Scope.Project, "codex")],
+            ScannedRoots = [new("/home", Scope.User, "claude")],
+            ConfiguredRootsComplete = false,
             Diagnostics = new() { InaccessiblePaths = ["/Gamma"], Locations = [new("/hidden", "omitted", "hidden directory excluded")] },
         };
         var overview = InstalledOverview.Build(snapshot, Token);
@@ -159,9 +161,11 @@ public sealed class InstalledFiltersTests
     public void LabelsAreBoundedSanitizedCollisionDistinctWhileKeysRetainOriginalIdentity()
     {
         var skill = InstalledOverviewTests.Copy("/skills/demo", "demo") with
-        { Agents = [new("claude\u001b[31m", "/a", false), new("claude", "/b", false),
+        {
+            Agents = [new("claude\u001b[31m", "/a", false), new("claude", "/b", false),
             new(new string('x', 200) + "a", "/c", false), new(new string('x', 200) + "b", "/d", false),
-            new(new string('界', 80) + "a", "/e", false), new(new string('界', 80) + "b", "/f", false)] };
+            new(new string('界', 80) + "a", "/e", false), new(new string('界', 80) + "b", "/f", false)]
+        };
         var filters = InstalledOverview.Build(InventorySnapshot.Empty with { Skills = [skill] }, Token).Filters!;
         Assert.Equal(6, filters.Agents.Select(c => c.Key).Distinct().Count());
         Assert.Equal(6, filters.Agents.Select(c => c.Label).Distinct().Count());

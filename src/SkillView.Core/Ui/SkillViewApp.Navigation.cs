@@ -233,7 +233,7 @@ public sealed partial class SkillViewApp
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
-    private void ActivateTab(SkillViewTab tab)
+    private void ActivateTab(SkillViewTab tab, InstalledInstallHandoff? installHandoff = null)
     {
         var leftDoctor = false;
         if (_inDoctor)
@@ -277,9 +277,12 @@ public sealed partial class SkillViewApp
                 if (_installedTab is not null)
                 {
                     _installedTab.Visible = true;
-                    RunOwnedTask(_installedTab.LoadAsync, "installed.load");
                     var installed = _installedTab;
-                    Invoke(() => installed.FocusList());
+                    if (installHandoff is null || !installed.RevealInstall(installHandoff))
+                    {
+                        RunOwnedTask(installed.LoadAsync, "installed.load");
+                        Invoke(() => installed.FocusList());
+                    }
                 }
                 break;
             case SkillViewTab.Changes:
@@ -291,6 +294,12 @@ public sealed partial class SkillViewApp
                 }
                 break;
         }
+        RefreshShellChrome();
+    }
+
+    private void RevealInstalledInstall(InstalledInstallHandoff handoff)
+    {
+        ActivateTab(SkillViewTab.Installed, handoff);
         RefreshShellChrome();
     }
 

@@ -213,7 +213,7 @@ public static class InstalledScreen
         if (!s.MetadataConflicts.IsEmpty || !s.OwnershipDiagnostics.IsEmpty)
             AppendDetailItem(sb, "Evidence limits", "Metadata or ownership conflicts remain; inspect F2 before requesting an operation.");
         if (showDetails) foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts).Concat(s.OwnershipDiagnostics))
-            sb.AppendLine($"- ⚠️ {MarkdownTableFormatter.FormatTableCell(diagnostic)}");
+                sb.AppendLine($"- ⚠️ {MarkdownTableFormatter.FormatTableCell(diagnostic)}");
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();

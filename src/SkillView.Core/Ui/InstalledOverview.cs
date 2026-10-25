@@ -93,7 +93,8 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
         var coverage = $"{(partial ? "Partial" : "Captured")}: {snapshot.ScannedRoots.Length} scanned / {snapshot.ConfiguredRoots.Length} configured roots"
             + (partial ? $"; {snapshot.Diagnostics.InaccessiblePaths.Length} access limits; other consumers may exist" : "; observed placements only");
         return new(groups.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Key, StringComparer.Ordinal).ToArray(),
-            copies.Count, copies.Sum(c => c.Records.SelectMany(s => s.Agents).Distinct().Count()), copies.Count(c => c.Ambiguous), coverage) { Filters = new(snapshot, token, captured) };
+            copies.Count, copies.Sum(c => c.Records.SelectMany(s => s.Agents).Distinct().Count()), copies.Count(c => c.Ambiguous), coverage)
+        { Filters = new(snapshot, token, captured) };
     }
 
     internal InstalledOverviewRows View(Func<InstalledSkill, bool> matches, string sort, ISet<string> expanded,
