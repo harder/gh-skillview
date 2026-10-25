@@ -10,8 +10,7 @@ namespace SkillView.Cli;
 
 public static partial class CliDispatcher
 {
-    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token,
-        MaintenancePlanReference? reference = null)
+    private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
         var requestedCommand = options.SubcommandName!;
         var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
@@ -74,13 +73,6 @@ public static partial class CliDispatcher
             var backupRoot = MaintenanceBackupStore.ResolveRoot(services.Runner);
             var store = new ReplacementPlanStore(Path.Combine(Path.GetDirectoryName(backupRoot)!, "replacements"), services.Logger,
                 runner: services.Runner, subjectObserved: impact => frozenImpact = impact with { Operation = requestedCommand }, sourceReviewRequired: true);
-            if (reference is not null)
-            {
-                var referenced = store.Inspect(id!, inventory, token, expectedPurpose);
-                reference.RequireMatch(referenced.Reference);
-                if (command == "restore-recover" && referenced.Status == "ready")
-                    throw new IOException("The saved candidate has not replaced the installation. Use apply with explicit retention consent; repair cannot start a ready plan. If inspection reports an interrupted pre-move journal, review the specialist recovery command explicitly.");
-            }
             ReplacementResult result;
             if (command == "restore-plan")
             {
@@ -158,7 +150,6 @@ public static partial class CliDispatcher
                 w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
                 if (tag is not null) w.WriteString("versionSelection", VersionUpdateGuidance.ExplicitTagChoice);
                 w.WritePropertyName("operation"); JsonSerializer.Serialize(w, result, ReplacementJsonContext.Default.ReplacementResult);
-                WritePlanReference(w, result);
                 w.WriteString("diskVerification", result.Succeeded
                     ? command == "restore-ack-source" ? "not-performed; source-review acknowledgement only" : "verified-saved-locations"
                     : "incomplete; inspect operation status and retained evidence");

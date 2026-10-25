@@ -36,8 +36,7 @@ public static partial class CliDispatcher
                 "authoring-validate" => await AuthoringAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "evaluate-review" or "evaluate-run" => await EvaluateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "queue" => await QueueAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "inspect" or "plan" or "apply" or "repair" or "verify" => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "undo" when options.SubcommandArgs.Contains("--plan-file") => await MaintenanceAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "inspect" => await InspectAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "rescan" => await RescanAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "search" => await SearchAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "preview" => await PreviewAsync(options, services, deadline.Token).ConfigureAwait(false),
@@ -78,8 +77,8 @@ public static partial class CliDispatcher
         "evaluate-review" => TimeSpan.FromMinutes(2),
         "evaluate-run" => TimeSpan.FromMinutes(10),
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "effective" or "check" or "authoring-validate" or "queue" or "inspect" or "verify" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
-        "plan" or "apply" or "repair" or "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
+        "list" or "effective" or "check" or "authoring-validate" or "queue" or "inspect" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
             or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"

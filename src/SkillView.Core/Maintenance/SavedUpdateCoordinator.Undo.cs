@@ -10,7 +10,7 @@ internal sealed partial class SavedUpdateCoordinator
 {
     internal static bool IsRevisionUpdate(ReplacementResult plan) => plan.Revision is not null
         && plan.PinPolicy is null && plan.LocalImport is null && plan.LocalSourceSwitch is null
-        && (plan.Reference is null || plan.Reference.Purpose == "update-revision");
+        && (plan.Purpose is null or "update-revision");
 
     internal static void RequireSameUndoPlan(ReplacementResult applied, ReplacementResult inspected)
     {

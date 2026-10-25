@@ -186,34 +186,40 @@ For newly installed Codex skills, the [official catalog](https://github.com/open
 instructs restarting Codex. Other combinations explain that their reload rule is
 unknown. Successful disk verification never claims that a running session reloaded.
 
-The CLI exposes the same saved replacement workflows through local plan references:
+The CLI inspects exact installations and uses purpose-specific saved operations:
 
 ```bash
 skillview --scan-root /path/to/skills inspect --install-id INSTALLATION_ID --json
 skillview --scan-root /path/to/skills check --install-id INSTALLATION_ID --json
-skillview --scan-root /path/to/skills plan --purpose update-revision --install-id INSTALLATION_ID --json > review.json
-skillview --scan-root /path/to/skills inspect --plan-file review.json --json
-# Review the comparison, all consumers, source and retention disposition first.
-# Supply the reviewed planFingerprint independently; the file is not approval.
-skillview --scan-root /path/to/skills apply --plan-file review.json --expect REVIEWED_PLAN_FINGERPRINT --yes --disposition retain-original --json
-skillview --scan-root /path/to/skills verify --plan-file review.json --json
-# Undo uses the fresh inspection's reviewFingerprint, not the plan fingerprint.
-skillview --scan-root /path/to/skills undo --plan-file review.json --expect CURRENT_REVIEW_FINGERPRINT --yes --json
+skillview --scan-root /path/to/skills update-plan --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills update-inspect --id SAVED_ID --json
 ```
 
-Keep HOME, state, CWD and global scan/workspace/profile options unchanged. The
-schema-1 `planReference` names an exact plan already retained locally, its purpose,
-fingerprints and installation context. It imports no files and cannot authorize a
-write. The file must be a bounded regular JSON file (256 KiB maximum); large plan
-responses can use only their `planReference` object. After a merge produces a new
-plan fingerprint, export a fresh reference with the specialist `update-inspect`.
-`plan` also accepts `restore-recorded`, `unpin-only` and `local-reimport` purposes;
-apply requires their existing explicit retention disposition. `repair --plan-file`
-resumes a recognized interrupted transaction after current inspection; it refuses
-to start a ready replacement. Torn owner-image repairs and cleanup remain explicit
-specialist operations. Legacy quarantine `undo --id` continues to use its own
-review contract. JSON retains exact per-path before/after file evidence, operation
-status/reason, affected/retained consumers and unknown session state.
+Review the saved candidate, source and all consumers, then use the specialist
+source acknowledgement, apply, recovery or undo command. See
+[saved updates](saved-updates.md), [recorded restoration](recorded-restoration.md),
+and the unpin, local reimport and local source-switch sections below. Recovery
+resumes a saved transaction; it does not mean repairing an arbitrary broken skill.
+Quarantine `undo --id` continues to use its own review contract.
+
+The generic `plan`, `apply`, `repair`, `verify` and `undo --plan-file` wrappers
+were introduced after the last public release (1.0.1) and have been retired.
+New operation output no longer exports `planReference` or its duplicate comparison;
+complete before/after payload evidence remains in the saved native manifest,
+with changed paths and status in specialist output. Persisted plans, hashes,
+retained originals and specialist recovery/undo remain supported.
+
+For an existing schema-1 reference, use `inspect --plan-file review.json --json`.
+This read-only compatibility reader accepts a bare reference or an old response's
+`planReference` object in a regular JSON file (256 KiB maximum, depth 32).
+It reports the exact saved ID, purpose, address and fingerprints plus direct
+specialist inspection/recovery/undo commands. Its `guidance-only` response does
+**not** validate the reference against the local retained store or verify disk
+state. Keep the original HOME, state, CWD and global scan/workspace/profile options,
+then run the indicated specialist inspection and review its purpose, address,
+context and fingerprints. Never treat the file as payload authority or approval.
+Apply still requires the separate source review and explicit retention disposition;
+recovery and undo require a fresh inspection fingerprint and separate approval.
 
 Other:
 
