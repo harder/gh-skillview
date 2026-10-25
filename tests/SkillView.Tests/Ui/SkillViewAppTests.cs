@@ -1371,7 +1371,7 @@ public sealed class SkillViewAppTests
         var labels = tabBar!.TabLabelsForTests;
         Assert.Contains("Discover", labels);
         Assert.Contains("Installed", labels);
-        Assert.Contains("Changes", labels);
+        Assert.Contains("Issues", labels);
         Assert.DoesNotContain("Search", labels);
         Assert.DoesNotContain("Updates", labels);
     }
@@ -1416,7 +1416,9 @@ public sealed class SkillViewAppTests
         Assert.Contains(installedHints, hint => hint is { Key: "x", Label: "Remove" });
 
         app.ForceActiveTabForTests(SkillViewTab.Changes);
+        Assert.Equal(0, app.ChangesTabForTests!.RowCountForTests);
         var changesHints = app.StatusStripForTests.HintsForTests;
+        Assert.Contains(changesHints, hint => hint is { Key: "u", Label: "Updates" });
         Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Review" });
         Assert.Contains(changesHints, hint => hint is { Key: "F2", Label: "Details" });
         Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });

@@ -88,12 +88,11 @@ public sealed class LoadingFocusTests
         var refreshes = 0;
         var activations = 0;
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
-            token => pending.Task.WaitAsync(token), () => activations++, () => activations++, () => activations++, () => { },
+            token => pending.Task.WaitAsync(token), () => { }, onActivateEntry: _ => activations++,
             runTask: (work, _) => tasks.Add(work()), onRefresh: () => refreshes++)
         { Visible = true, Width = Dim.Fill(), Height = Dim.Fill() };
         using var window = new Window();
         window.Add(view);
-        view.Load(["old result"], [], []);
         var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
         var session = app.Begin(window);
         try

@@ -92,7 +92,7 @@ public sealed class SelectedCleanupHandoffKeyboardTests
             { Validity = ValidityState.MissingSkillMd };
             Snapshot = InventorySnapshot.Empty with { Skills = [skill] };
             View = new ChangesTabView(action => { action(); return Task.CompletedTask; },
-                _ => Task.FromResult(Snapshot), static () => { }, static () => { }, static () => { },
+                _ => Task.FromResult(Snapshot),
                 () => { View!.CancelPendingLoad(); View.Visible = false; _destination.Visible = true; _destination.SetFocus(); },
                 runTask: (work, _) => Work.Add(work()),
                 activateEntryAsync: (entry, request) => SelectedCleanupHandoff.RunAsync(entry, request, capture,

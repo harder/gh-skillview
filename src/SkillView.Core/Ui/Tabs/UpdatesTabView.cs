@@ -366,8 +366,8 @@ internal sealed partial class UpdatesTabView : FrameView
         Populate(snapshot with { Skills = target is null ? [] : [target] });
         if (target is null)
         {
-            _status.Text = " selected installation is missing or ambiguous — refresh Changes";
-            ShowPreview("## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Changes and refresh disk inventory.", "");
+            _status.Text = " selected installation is missing or ambiguous — refresh Issues";
+            ShowPreview("## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Issues and refresh disk inventory.", "");
             return;
         }
         _table.SetSelectedRow(0);

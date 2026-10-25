@@ -19,7 +19,7 @@ so CLI behavior and the terminal interface share the same services.
 ## Terminal interface
 
 `SkillViewApp` owns the Terminal.Gui application lifetime, the persistent
-Discover/Installed/Changes shell, and shared pane state.
+Discover/Installed/Issues shell, and shared pane state.
 `SkillViewWorkflowCoordinator` orchestrates install, update, inventory, remove,
 cleanup, and Doctor workflows. The views in `src/SkillView.Core/Ui/Tabs/`
 render those workflows. Dialogs and background tasks retain explicit lifetime

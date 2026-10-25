@@ -16,6 +16,34 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class MaintenanceQueueKeyboardTests
 {
+    [Fact]
+    public async Task EmptyFindingsKeepUpdateShortcutReachableThroughApplicationKeyboard()
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(80, 24);
+        using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+        var updatesOpened = false;
+        window.KeyDown += (_, key) =>
+        {
+            if (key.AsRune.Value != 'u') return;
+            updatesOpened = true;
+            key.Handled = true;
+        };
+        var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty), static () => { })
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        await view.LoadAsync();
+        var session = app.Begin(window);
+        try
+        {
+            Assert.True(view.SubViews.OfType<Markdown>().Single().HasFocus);
+            app.Keyboard.RaiseKeyDownEvent(new Key('u'));
+            Assert.True(updatesOpened);
+        }
+        finally { app.End(session!); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -136,9 +164,7 @@ public sealed class MaintenanceQueueKeyboardTests
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => { captures++; return Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }); },
-            static () => throw new InvalidOperationException("Untargeted updates"),
-            static () => throw new InvalidOperationException("Untargeted cleanup"),
-            static () => { }, static () => { }, onActivateEntry: entry => activated = entry,
+            static () => { }, onActivateEntry: entry => activated = entry,
             runTask: (work, _) => work().GetAwaiter().GetResult())
         { Width = Dim.Fill(), Height = Dim.Fill() };
         window.Add(view);
@@ -150,8 +176,8 @@ public sealed class MaintenanceQueueKeyboardTests
             table.SetFocus();
             Assert.True(table.HasFocus);
             var detail = view.SubViews.OfType<Markdown>().Single();
-            Assert.Contains("Next", detail.Text.ToString());
-            Assert.Contains("Enter Review", view.StatusTextForTests);
+            Assert.Contains("2 captured copies", view.SubViews.OfType<TableView>().Single().Table![0, 1]?.ToString());
+            Assert.Contains("1 Review", view.StatusTextForTests);
             Assert.Contains("F2 Details", view.StatusTextForTests);
             Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
             Press(new Key(KeyCode.F2));
@@ -165,12 +191,12 @@ public sealed class MaintenanceQueueKeyboardTests
             Assert.Equal(2, captures);
             Assert.Null(activated);
             Assert.True(table.HasFocus);
-            Press(new Key(KeyCode.CursorDown));
+            Press(new Key(KeyCode.CursorDown)); // A one-row family keeps its exact anchor.
             Press(Key.Enter);
             Assert.NotNull(activated);
             Assert.Equal("NameCollision", activated.Issue);
-            Assert.Equal(second.InstallationId, activated.Subject.InstallationId);
-            Assert.Contains(second.ResolvedPath, activated.AffectedPaths);
+            Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
+            Assert.Contains(first.ResolvedPath, activated.AffectedPaths);
         }
         finally { app.End(session!); }
 

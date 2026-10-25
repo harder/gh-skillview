@@ -232,11 +232,6 @@ public sealed partial class SkillViewApp
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onRefresh: () => _services.ListAdapter.Invalidate(),
             homeDirectory: DisplayPath.CaptureHome(_services.Runner),
-            onActivateUpdates: OpenUpdatesWorkspace,
-            onActivateCleanup: () => _workflows.ShowCleanupScreen(),
-            onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
-                hideChanges: () => { if (_changesTab is not null) _changesTab.Visible = false; },
-                enterDoctor: EnterDoctor),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,
             lifetimeToken: GetRunLifetimeToken(),
@@ -316,7 +311,7 @@ public sealed partial class SkillViewApp
             _ when _inDoctor => "Doctor — Environment diagnostics",
             SkillViewTab.Discover => "Discover skills",
             SkillViewTab.Installed => "Installed skills",
-            SkillViewTab.Changes => "Review changes",
+            SkillViewTab.Changes => "Issues",
             _ => null
         };
 
@@ -360,10 +355,9 @@ public sealed partial class SkillViewApp
         if (_activeTab == SkillViewTab.Changes && _changesTab is not null)
         {
             var label = _changesTab.GetQueueLabel();
-            var count = _changesTab.GetPendingCount();
-            if (!string.IsNullOrWhiteSpace(label) && count > 0)
+            if (!string.IsNullOrWhiteSpace(label))
             {
-                filterLabel = $"{label} · {count}";
+                filterLabel = label;
             }
         }
 

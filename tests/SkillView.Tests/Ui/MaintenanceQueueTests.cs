@@ -30,13 +30,13 @@ public sealed class MaintenanceQueueTests
     {
         var entry = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
         { Skills = [Skill("/skills/one", "https://github.com/one/repo")] }, TestContext.Current.CancellationToken).Entries[0];
-        entry = entry with { AffectedPaths = Enumerable.Range(0, 1500).Select(index => "/exact/" + index + new string('p', 200)).ToImmutableArray() };
+        entry = entry with { Issue = "Malformed", AffectedPaths = Enumerable.Range(0, 1500).Select(index => "/exact/" + index + new string('p', 200)).ToImmutableArray() };
         var queue = new MaintenanceQueue(DateTimeOffset.UnixEpoch, true,
             Enumerable.Repeat(new string('d', 16000), 100).ToImmutableArray(), Enumerable.Repeat(entry, 10000).ToImmutableArray());
         var projected = ChangesQueueBuilder.Build(queue, TestContext.Current.CancellationToken);
         Assert.Equal(ChangesQueueBuilder.MaxRows, projected.Rows.Count);
         Assert.Equal(10000 - ChangesQueueBuilder.MaxRows, projected.OmittedRows);
-        Assert.All(projected.Rows, row => { Assert.Null(row.Detail); Assert.Same(entry, row.Entry); });
+        Assert.All(projected.Rows, row => { Assert.Same(entry, row.Entry); });
         Assert.InRange(projected.CoverageDetail.Length, 1, MaintenanceQueueFormatter.MaxCoverageCharacters);
         Assert.Contains("Coverage fields omitted: 100", projected.CoverageDetail);
         var detail = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, showDetails: true);
