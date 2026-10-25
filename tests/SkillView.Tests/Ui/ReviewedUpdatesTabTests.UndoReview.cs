@@ -32,6 +32,7 @@ public sealed partial class ReviewedUpdatesTabTests
     [Theory]
     [InlineData("unpin")]
     [InlineData("local-reimport")]
+    [InlineData("wrong-purpose")]
     [InlineData("partial")]
     [InlineData("canceled")]
     public async Task NonRevisionOrIncompleteAppliesCannotOfferResultUndo(string kind)
@@ -39,7 +40,8 @@ public sealed partial class ReviewedUpdatesTabTests
         var target = Target("demo"); var plan = Review(target);
         var applied = plan with { Status = "installed", MutationObserved = true };
         if (kind == "unpin") applied = applied with { Revision = null, PinPolicy = new(target.FrontMatter, "archive", "policy", []) };
-        if (kind == "local-reimport") applied = applied with { Revision = null, Reference = new(1, applied.Id, "local-reimport", applied.PlanFingerprint, "context", target.InstallationId, target.ResolvedPath) };
+        if (kind == "local-reimport") applied = applied with { Revision = null, Purpose = "local-reimport" };
+        if (kind == "wrong-purpose") applied = applied with { Purpose = "restore-recorded" };
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result(applied, true) with
         { ReconciliationPartial = kind == "partial", Cancelled = kind == "canceled" }),
             inspectUndo: (_, _, _) => throw new InvalidOperationException("No inspection allowed"), undo: (_, _, _) => throw new InvalidOperationException("No undo allowed"));

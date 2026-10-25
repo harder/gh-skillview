@@ -22,7 +22,7 @@ public sealed partial class ReviewedUpdatesTabTests
             plan = plan with { SourceReview = new(1, "installed", "candidate", "i", "c", SourceUpdateReview.Hash(report), report) };
         }
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => throw new InvalidOperationException("No implicit apply"),
-            local: (_, _, _) => throw new InvalidOperationException("No implicit local review"));
+            preserve: (_, _, _) => throw new InvalidOperationException("No implicit local review"));
         await view.LoadForSubjectAsync(OperationSubject.From(target));
         Layout();
         var preview = view.SubViews.OfType<Markdown>().Single();
@@ -34,7 +34,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Layout();
         Assert.True(view.RetainBoxForTests.Visible); Assert.True(view.ApplyButtonForTests.Visible);
         Assert.False(view.ChooseVersionButtonForTests.Visible);
-        Assert.Equal(sourceReview, view.SourceReviewBoxForTests.Visible); Assert.False(view.BuildMergeButtonForTests.Visible);
+        Assert.Equal(sourceReview, view.SourceReviewBoxForTests.Visible);
         Assert.Contains("Preserve installed", view.SubViews.OfType<Button>().Where(button => button.Visible).Select(button => button.Text.ToString()));
         Assert.False(view.ApplyButtonForTests.Enabled);
 

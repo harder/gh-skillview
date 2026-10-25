@@ -1015,34 +1015,6 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void BuildUi_LocalResolutionInputProtectsFilenameFromShellShortcutsAndKeepsUnconditionalQuit()
-    {
-        var app = CreateApp();
-        app.StopBackgroundAdmissionForTests();
-        using var window = app.BuildUiForTests();
-        app.ForceActiveTabForTests(SkillViewTab.Installed);
-        app.InstalledTabForTests!.LoadSeeded(InventorySnapshot.Empty with { Skills = [MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/owner/repo")] });
-        window.NewKeyDownEvent(new Key('u'));
-        Assert.True(app.UpdatesWorkspaceVisibleForTests);
-        var updates = app.UpdatesTabForTests!;
-        updates.LocalPanelForTests.Visible = true;
-        updates.LocalPanelForTests.Enabled = true;
-        updates.ResolutionFileForTests.SetFocus();
-        Assert.True(updates.LocalFileInputHasFocus);
-        foreach (var character in "/adpuUqlrEeDoOiIcC123?filename.txt")
-        {
-            var key = new Key(character);
-            window.NewKeyDownEvent(key);
-            Assert.False(key.Handled);
-            Assert.True(app.UpdatesWorkspaceVisibleForTests);
-            Assert.True(updates.LocalFileInputHasFocus);
-        }
-        var quit = new Key(KeyCode.Q | KeyCode.CtrlMask);
-        window.NewKeyDownEvent(quit);
-        Assert.True(quit.Handled);
-    }
-
-    [Fact]
     public void BuildUi_EscLeavesDiscoverQueryField()
     {
         var app = CreateApp();

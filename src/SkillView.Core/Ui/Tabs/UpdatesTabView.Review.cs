@@ -69,7 +69,7 @@ internal sealed partial class UpdatesTabView
     private void RefreshReviewControls()
     {
         var idle = !_operationCancellations.HasActive && !_loadCancellations.HasActive;
-        var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
+        var applicable = _review is not null;
         _retainBox.Enabled = idle && applicable;
         _sourceReviewBox.Enabled = idle && applicable && _review?.SourceReview is not null;
         _applyButton.Enabled = idle && applicable && _applyRunner is not null && _retainBox.Value == CheckState.Checked
@@ -80,7 +80,7 @@ internal sealed partial class UpdatesTabView
             : "Retain original, including local edits; apply this reviewed plan";
         _finishButton.Text = _inventoryNeedsRefresh && _review is null ? "Refresh inventory" : "Skip review";
         _finishButton.Enabled = idle && (_review is not null || _inventoryNeedsRefresh);
-        RefreshLocalReviewControls(idle);
+        _preserveButton.Enabled = idle && _review is { PinPolicy: null } && _preserveRunner is not null;
         RefreshUndoControls(idle);
         RefreshPresentation();
     }
@@ -89,7 +89,6 @@ internal sealed partial class UpdatesTabView
     {
         if (_review is not { } captured || _applyRunner is null || _retainBox.Value != CheckState.Checked
             || captured.SourceReview is not null && _sourceReviewBox.Value != CheckState.Checked
-            || _localReviewStarted && captured.LocalDisposition is null
             || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
         var hidden = _options?.AllowHiddenDirectories ?? false;
         if (captured.SourceReview is not null) captured = captured with { AcknowledgeSourceReview = _sourceReviewBox.Value == CheckState.Checked };
@@ -104,7 +103,6 @@ internal sealed partial class UpdatesTabView
         _review = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
-        ResetLocalReview();
         _options = null;
         const string next = "Return to Installed or Issues to choose another copy.";
         _status.Text = " review closed; " + next;
@@ -138,7 +136,6 @@ internal sealed partial class UpdatesTabView
                 _inventoryNeedsRefresh |= result.MutationAttempted;
                 SaveOutcomes(result.Outcomes);
                 _review = applying ? null : result.SavedPlan;
-                ResetLocalReview();
                 _retainBox.Value = CheckState.UnChecked;
                 _sourceReviewBox.Value = CheckState.UnChecked;
                 var itemResult = result;
@@ -146,7 +143,7 @@ internal sealed partial class UpdatesTabView
                 RememberUndo(itemResult, result, applying);
                 ShowResultPreview(result, unpinOnly);
                 _status.Text = _review?.PinPolicy is not null ? " pin-only review required · inspect all consumers, approve retention, then Apply unpin only"
-                    : _review is not null ? " review required · choose preserve or approve Replace reviewed"
+                    : _review is not null ? " review required · choose Preserve installed or approve Replace reviewed"
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
                     : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)}"
                     : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {(_inventoryNeedsRefresh ? "Refresh inventory before another review" : "F2 Details for outcome")}";

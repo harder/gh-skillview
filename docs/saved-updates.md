@@ -46,18 +46,15 @@ Each candidate has its own source acknowledgement, retention checkbox and
 **Replace reviewed** action. **Skip review** retains an unapplied plan without
 starting another copy. Choose another copy in Installed or Issues.
 **Preserve installed** verifies the current payload and owner without applying or
-recording a maintenance preference. **Review local** freezes recorded, installed
-and source evidence and closes the earlier replacement approval. Select a path,
-then **Use installed**, **Use source**, or **Automatic**; select `/` to review root
-permissions. Enter a regular-file path beside **File:** and select **Capture file
-for path** for custom content. Each successful choice clears that file input.
+recording a maintenance preference. Local edits and source files remain available
+for comparison in Details. To keep local files, choose **Preserve installed** or
+**Skip review**. To replace them, review the candidate and approve retention of
+the original directory. New local merge creation and the built-in editor have
+been removed.
 
-**Build merge** creates a separate verified candidate. Review its result and
-source baseline, check retention again, then select **Apply reviewed merge**.
-A failed private write requires **Review local** to refresh before another build.
-**Skip review** keeps private evidence without applying. Preparation, apply and
-undo diagnostics for this copy remain available in Details. Backend/CLI batch
-callers still prepare each sibling only after the prior operation reconciles.
+Preparation, apply and undo diagnostics for this copy remain available in Details.
+Backend/CLI batch callers still prepare each sibling only after the prior
+operation reconciles.
 Select **Include hidden directories** (CLI `--allow-hidden-dirs`) when hidden
 containers would otherwise make inventory incomplete. Main-view availability
 checks do not create plans or consume the retained-plan quota.
@@ -105,69 +102,21 @@ To keep the installed payload instead, verify the never-started plan with
 `update-preserve --id PLAN_ID --expect PLAN_FINGERPRINT`. This leaves payloads,
 owner records and preferences unchanged; the unused plan stays available.
 
-The local merge workflow captures the recorded base, installed files and approved
-source in private immutable archives. Starting it closes the earlier replacement
-approval. Use the same global scan and context options for every command:
+Existing schema-3 merge plans remain supported. Use `update-inspect` to inspect
+the exact saved candidate, disposition and source baseline. If native metadata
+and all saved evidence still validate, apply the existing plan with its immutable
+fingerprint and the explicit `merge-reviewed` disposition:
 
 ```sh
-skillview --scan-root /path/to/skills update-merge-review --id PLAN_ID --expect PLAN_FINGERPRINT --json
-skillview --scan-root /path/to/skills update-merge-choose --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --choose-installed SKILL.md --json
-skillview --scan-root /path/to/skills update-merge-plan --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --json
-skillview --scan-root /path/to/skills update-apply --id PLAN_ID --yes --disposition merge-reviewed --expect MERGE_PLAN_FINGERPRINT
+skillview --scan-root /path/to/skills update-apply --id PLAN_ID --yes --disposition merge-reviewed --expect PLAN_FINGERPRINT
 ```
 
-Each choose command replaces the complete explicit choice set. Repeat
-`--choose-installed PATH` or `--choose-source PATH`; use `/` for root permissions.
-Use the review fingerprint returned by each command for the following choose or
-merge-plan command.
-Unselected paths use the three-way rules: take source when installed is unchanged
-from base, keep installed when source is unchanged, and keep installed presentation
-when both agree. Conflicting bytes, deletion/type changes and inconsistent directory
-topology need explicit choices. No textual merge or conflict markers are inserted.
-
-For a custom regular-file resolution, use
-`update-merge-choose --id PLAN_ID --expect LOCAL_REVIEW_FINGERPRINT --resolve SKILL.md /path/to/reviewed-file`.
-The command freezes exact bytes, mode and the native source observation before
-publishing the choice. Repeat `--resolve TARGET FILE` for other captured paths.
-Only target `SKILL.md` requires valid UTF-8/frontmatter and the two-megabyte limit;
-other targets can contain binary bytes. Final-component symlinks, directories and
-special-file inputs are refused. Renaming the authored skill needs a separate
-migration plan.
-
-Later complete choice sets can reuse those bytes with `--choose-resolved TARGET`.
-Editing or deleting the original input no longer changes the saved resolution.
-Revised inputs create separate immutable captures; prior captures and incomplete
-attempts remain retained and count toward the plan's cumulative 256 MiB byte and
-64 MiB manifest limits. Selected frozen blobs are verified again on apply and
-recovery. Compatible node kinds keep installed attributes; new resolved nodes carry
-captured resolution attributes with reviewed installed-parent ownership.
-
-Review reports path hashes, choices, conflicts, metadata refusals and archive
-locations. Merged planning preserves supported native metadata and root privacy,
-then verifies the result before saving a separate approval fingerprint. Compatible
-installed node kinds keep installed attributes; new source nodes carry captured
-source attributes and reviewed installed-parent ownership. Approved source tracking
-continues to identify the real source baseline; customized result bytes have separate
-evidence. The next update compares local changes against that source baseline.
-
-Current metadata publication supports the verified macOS owner/group/mode/xattr
-policy. Extended ACLs, special flags, external hard links and unavailable metadata
-are refused. Linux requires proven complete attribute visibility.
-
-Windows supports complete owner/group/DACL/SACL security descriptors, supported
-nonrestrictive file attributes and bounded alternate data streams. Objects must be
-owned by the effective user and have recoverable access permissions. Complete SACL
-visibility requires the caller's existing `SeSecurityPrivilege`; SkillView enables
-it on a duplicate thread token and restores the prior thread token afterward.
-Unsupported owners or ACLs, restrictive/storage attributes, junctions or unknown
-reparse types, hard links, unsupported stream layouts and incomplete metadata
-remain explicit refusals. A refusal cannot authorize a lossy merge.
-
-Choices and finalization attempts are bounded and append-only. A partial merged
-attempt remains retained and a retry builds a separate candidate. Incomplete newest
-records never revive older approvals. An interrupted initial archive capture needs
-a new revision plan; installed files remain unchanged. Apply, inspection, recovery
-and undo revalidate the original, source baseline, choices and materialized result.
+This does not create or edit a merge. Saved B/I/C archives, custom-resolution
+blobs, choices, result hashes and metadata policies remain part of validation.
+The original source C stays the future comparison baseline; customized result M
+has separate evidence. Unknown or unsupported metadata still refuses application.
+A partial historical review cannot reopen its earlier replacement approval;
+retain its evidence and prepare a new ordinary revision plan when appropriate.
 
 Inspect before recovery or undo, then use that inspection's review fingerprint:
 

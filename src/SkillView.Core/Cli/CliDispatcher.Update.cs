@@ -280,7 +280,6 @@ public static partial class CliDispatcher
             foreach (var arg in new[] { "update-apply", "--id", plan.Id, "--expect", plan.PlanFingerprint, "--yes", "--disposition", "retain-original" }) w.WriteStringValue(arg);
             if (p.AllowHiddenDirectories) w.WriteStringValue("--allow-hidden-dirs");
             w.WriteEndArray();
-            WritePlanReference(w, plan);
             w.WriteString("applyContext", "Reuse the same HOME, state, working directory and global scan/workspace/profile options.");
         }
         w.WriteString("stdout", r.StdOut);

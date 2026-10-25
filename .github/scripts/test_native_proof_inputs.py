@@ -183,7 +183,7 @@ class NativeProofInputsTests(unittest.TestCase):
         path_file = self.root / 'path'
         def checkout(spec):
             return self.root / ('checkout-' + spec['family'])
-        for shard, expected in [('owners', []), ('sources', families), ('inspection-unpin', families[:1])]:
+        for shard, expected in [('owners', families[1:2]), ('sources', families), ('inspection-unpin', families[:2])]:
             with self.subTest(shard=shard), patch.object(native, 'specs', return_value=families), patch.object(
                     native, 'checkout', side_effect=checkout), patch.dict(
                     os.environ, GITHUB_ENV=str(environment), GITHUB_PATH=str(path_file)):

@@ -87,7 +87,7 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }
     [JsonIgnore]
-    internal MaintenancePlanReference? Reference { get; init; }
+    internal string? Purpose { get; init; }
     [JsonIgnore]
     internal MaintenancePlanComparison? Comparison { get; init; }
 }

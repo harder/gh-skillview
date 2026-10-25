@@ -182,7 +182,6 @@ public sealed partial class SkillViewApp
     private bool TextInputHasFocus()
     {
         if (_inDoctor) return false;
-        if (_updatesTab?.Visible == true) return _updatesTab.LocalFileInputHasFocus;
         if (_activeTab == SkillViewTab.Installed)
         {
             return _installedTab?.FilterHasFocus == true;

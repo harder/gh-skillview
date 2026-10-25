@@ -77,7 +77,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>> prepare,
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>> apply,
         Action? changed = null, Func<Action, Task>? dispatch = null,
-        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? local = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? preserve = null,
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpin = null,
         Func<InstalledSkill, string?>? chooseTag = null,
         Func<CancellationToken, Task<InventorySnapshot>>? snapshotLoader = null,
@@ -87,7 +87,7 @@ public sealed partial class ReviewedUpdatesTabTests
             dispatch ?? (action => { action(); return Task.CompletedTask; }),
             runTask ?? ((operation, _) => operation().GetAwaiter().GetResult()),
             snapshotLoader ?? (_ => Task.FromResult(InventorySnapshot.Empty with { Skills = targets.ToImmutableArray() })),
-            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin, chooseTag: chooseTag,
+            prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, preserveRunner: preserve, unpinRunner: unpin, chooseTag: chooseTag,
             inspectUndoRunner: inspectUndo, undoRunner: undo);
 
     [Fact]
