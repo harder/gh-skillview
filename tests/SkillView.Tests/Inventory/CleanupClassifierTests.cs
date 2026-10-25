@@ -56,6 +56,30 @@ public class CleanupClassifierTests : IDisposable
     };
 
     [Fact]
+    public void EmptyDirectoryCoverageIsReobservedWhenManagedAliasChangesDuringClassification()
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix symlink fixture."); return; }
+        var scan = Directory.CreateDirectory(Path.Combine(_tempRoot, "scan")).FullName;
+        var ordinary = Directory.CreateDirectory(Path.Combine(_tempRoot, "ordinary")).FullName;
+        var alias = Path.Combine(_tempRoot, "managed-alias");
+        Directory.CreateSymbolicLink(alias, ordinary);
+        Directory.CreateDirectory(Path.Combine(scan, "first"));
+        Directory.CreateDirectory(Path.Combine(scan, "second"));
+        var snapshot = Snapshot(false) with { ManagedRegions = [new(alias, "fixture", "codex", "plugin")] };
+        var inspected = 0;
+        var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, [new(scan, Scope.Custom, null)], null,
+            TestContext.Current.CancellationToken, child =>
+            {
+                inspected++;
+                Directory.Delete(alias);
+                Directory.CreateSymbolicLink(alias, scan);
+                return OwnershipPath.EntryAddress(child);
+            });
+        Assert.Equal(1, inspected);
+        Assert.Single(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.EmptyDirectory);
+    }
+
+    [Fact]
     public void Classify_Malformed_Detected()
     {
         var snap = Snapshot(false, Skill("m1", validity: ValidityState.MissingSkillMd));

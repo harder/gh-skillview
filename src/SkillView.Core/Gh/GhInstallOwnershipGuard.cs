@@ -27,7 +27,7 @@ internal static class GhInstallOwnershipGuard
         var discoveryRoots = destinations.SelectMany(destination => new[] { destination, CanonicalCandidate(destination) })
             .Distinct(StringComparer.Ordinal).ToArray();
         var managed = ManagedSkillDiscovery.Capture(runner, discoveryRoots.Select(path => new ScanRoot(path, Scope.Custom, null)),
-            token, options.ProcessEnvironment, workingDirectory, allowHidden: true);
+            token, options.ProcessEnvironment, workingDirectory, allowHidden: true, cachePathObservations: false);
         ManagedSkillDiscovery.Refuse(managed, destinations);
         var observations = new SkillLockFileReader(logger).LoadObservations(discoveryRoots, token, new(home, state), diagnostics);
         bool Covers(IEnumerable<string> roots) => roots.Any(root => destinations.Any(destination => SameDirectory(root, destination)));
@@ -49,7 +49,7 @@ internal static class GhInstallOwnershipGuard
         ManagedSkillDiscovery.Refuse(context.Managed, replacements, includeContainedRegions: true);
         var live = ManagedSkillDiscovery.Capture(context.Runner,
             selected.Select(path => new ScanRoot(path, Scope.Custom, null)), token,
-            context.Options.ProcessEnvironment, context.Options.WorkingDirectory, discoverPayloads: false);
+            context.Options.ProcessEnvironment, context.Options.WorkingDirectory, discoverPayloads: false, cachePathObservations: false);
         ManagedSkillDiscovery.Refuse(live, selected);
         ManagedSkillDiscovery.Refuse(live, replacements, includeContainedRegions: true);
         if (context.Claims.IsEmpty) return;

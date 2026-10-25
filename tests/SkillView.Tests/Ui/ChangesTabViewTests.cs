@@ -14,6 +14,68 @@ namespace SkillView.Tests.Ui;
 public sealed class ChangesTabViewTests
 {
     [Fact]
+    public async Task SummaryUsesCapturedChildHomeAndTechnicalViewKeepsExactPath()
+    {
+        var home = Path.GetFullPath("changes-child-home");
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo");
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }),
+            static () => { }, static () => { }, static () => { }, static () => { }, homeDirectory: home);
+        await view.LoadAsync();
+        var detail = Assert.IsType<Markdown>(view.SubViews.Single(child => child is Markdown));
+        Assert.DoesNotContain(home, detail.Text.ToString());
+        Assert.Contains("~", detail.Text.ToString());
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains(skill.ResolvedPath, detail.Text.ToString());
+    }
+
+    [Fact]
+    public async Task SameFrozenSnapshotReusesQueueAndNewSnapshotReclassifies()
+    {
+        var root = Directory.CreateTempSubdirectory("skillview-queue-cache-");
+        try
+        {
+            var snapshot = InventorySnapshot.Empty with { ScannedRoots = [new(root.FullName, Scope.Custom, null)] };
+            using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+                _ => Task.FromResult(snapshot), static () => { }, static () => { }, static () => { }, static () => { });
+            await view.LoadAsync();
+            Assert.Equal(0, view.RowCountForTests);
+            Directory.CreateDirectory(Path.Combine(root.FullName, "new-empty-child"));
+            await view.LoadAsync();
+            Assert.Equal(0, view.RowCountForTests);
+            snapshot = snapshot with { CapturedAt = DateTimeOffset.UtcNow };
+            await view.LoadAsync();
+            Assert.True(view.RowCountForTests > 0);
+        }
+        finally { root.Delete(true); }
+    }
+
+    [Fact]
+    public async Task Loading_ReplacesOldContentAndClearsOnCancellationAndCompletion()
+    {
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => pending.Task, static () => { }, static () => { }, static () => { }, static () => { });
+        view.Load(["old result"], [], []);
+        var loading = view.LoadAsync();
+        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
+        var indicator = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
+        Assert.True(indicator.Visible);
+        Assert.False(table.Visible);
+        Assert.Null(table.Table);
+        Assert.Equal(0, view.RowCountForTests);
+        view.CancelPendingLoad();
+        Assert.False(indicator.Visible);
+        pending.SetResult(SnapshotWithMalformedSkill());
+        await loading;
+        Assert.Equal(0, view.RowCountForTests);
+        await view.LoadAsync();
+        Assert.False(indicator.Visible);
+        Assert.True(table.Visible);
+        Assert.True(view.RowCountForTests > 0);
+    }
+
+    [Fact]
     public async Task Enter_RoutesExactSelectedIssueAndPhysicalInstallation()
     {
         var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
@@ -38,11 +100,13 @@ public sealed class ChangesTabViewTests
     public async Task CancelBeforeQueuedUiDispatch_DoesNotPublishRows()
     {
         Action? queued = null;
+        var dispatchQueued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var view = new ChangesTabView(action => { queued = action; return dispatched.Task; },
+        using var view = new ChangesTabView(action => { queued = action; dispatchQueued.TrySetResult(); return dispatched.Task; },
             _ => Task.FromResult(SnapshotWithMalformedSkill()), static () => { }, static () => { },
             static () => { }, static () => { });
         var loading = view.LoadAsync();
+        await dispatchQueued.Task.WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(queued);
         view.CancelPendingLoad();
         queued();
@@ -103,7 +167,7 @@ public sealed class ChangesTabViewTests
         var kindStyle = table.Style.GetOrCreateColumnStyle(0);
         var titleStyle = table.Style.GetOrCreateColumnStyle(1);
 
-        Assert.False(table.Style.ExpandLastColumn);
+        Assert.True(table.Style.ExpandLastColumn);
         Assert.True(titleStyle.MinWidth > kindStyle.MinWidth);
         Assert.Equal(titleStyle.MinWidth, titleStyle.MaxWidth);
     }

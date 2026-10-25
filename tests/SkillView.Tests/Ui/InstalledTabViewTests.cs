@@ -12,6 +12,78 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public async Task RemovePreflightFailureIsVisibleAndReportedWithoutRefreshing()
+    {
+        Exception? reported = null;
+        var operations = new Dictionary<string, Task>();
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (work, name) => operations[name] = work(), _ => throw new InvalidOperationException("Unexpected refresh"),
+            (_, _, _) => throw new IOException("Selected installation disappeared; refresh Installed and select it again."),
+            () => { }, () => { }, onRemovalError: error => reported = error);
+        view.LoadSeeded(SnapshotWithSkill("demo", null));
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await operations["installed.remove"];
+        Assert.IsType<IOException>(reported);
+        Assert.Contains("Selected installation disappeared", view.FooterTextForTests);
+        Assert.Contains("refresh Installed and select it again", view.DetailTextForTests);
+        Assert.DoesNotContain("Checking removal safety", view.DetailTextForTests);
+        Assert.False(view.RemoveActiveForTests);
+        Assert.False(view.SpinnerVisibleForTests);
+        Assert.False(operations.ContainsKey("installed.remove-refresh"));
+    }
+
+    [Fact]
+    public async Task HiddenSelectionsCannotBeRemovedOrOpenedDuringLoadOrPreflight()
+    {
+        var inventory = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new Dictionary<string, Task>();
+        var removed = 0;
+        var opened = 0;
+        var snapshot = SnapshotWithSkill("demo", null);
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (work, name) => operations[name] = work(), token => inventory.Task.WaitAsync(token),
+            async (_, _, token) => { removed++; await removal.Task.WaitAsync(token); }, () => { }, () => { },
+            openPath: _ => { opened++; return true; });
+        view.LoadSeeded(snapshot);
+        view.FocusList();
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.Equal(1, opened);
+        var loading = view.LoadAsync();
+        view.NewKeyDownEvent(new Key('x'));
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.False(view.TryStartSelectedRemoveForTests());
+        Assert.Equal(0, removed);
+        Assert.Equal(1, opened);
+        inventory.SetResult(snapshot);
+        await loading;
+        view.NewKeyDownEvent(new Key('x'));
+        Assert.Equal(1, removed);
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.Equal(1, opened);
+        removal.SetResult();
+        await operations["installed.remove"];
+        if (operations.TryGetValue("installed.remove-refresh", out var refresh)) await refresh;
+    }
+
+    [Fact]
+    public async Task CompletedLoadReturnsNonTextFocusToTable()
+    {
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (_, _) => { }, _ => pending.Task, (_, _, _) => Task.CompletedTask, () => { }, () => { });
+        view.LoadSeeded(InventorySnapshot.Empty);
+        view.FocusList();
+        var load = view.LoadAsync();
+        view.FocusList();
+        Assert.False(view.FilterHasFocusForTests);
+        pending.SetResult(InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow });
+        await load;
+        Assert.True(view.TableHasFocusForTests);
+        Assert.False(view.FilterHasFocusForTests);
+    }
+
+    [Fact]
     public void EffectiveLoadingShortcutUsesSelectedSkillAndDoesNotInterceptFilterTyping()
     {
         InstalledSkill? selected = null;
@@ -42,7 +114,7 @@ public sealed class InstalledTabViewTests
     }
 
     [Fact]
-    public void ScopeCycle_ReloadsFullInventoryAfterServerSideFiltering()
+    public void ScopeCycleFiltersSharedSnapshotWithoutReloadOrLoadingState()
     {
         var snapshot = SnapshotWithSkill("user-skill", null) with
         {
@@ -53,23 +125,13 @@ public sealed class InstalledTabViewTests
                 SnapshotWithSkill("custom-skill", null).Skills[0] with { Scope = Scope.Custom },
             ],
         };
-        var requestedScopes = new List<string?>();
+        var loads = 0;
         using var view = new InstalledTabView(
             action => { action(); return Task.CompletedTask; },
             (operation, _) => operation().GetAwaiter().GetResult(),
-            _ => Task.FromResult(snapshot),
+            _ => { loads++; return Task.FromResult(snapshot); },
             (_, _, _) => Task.CompletedTask,
-            () => { }, () => { },
-            scopedSnapshotLoader: (scope, _) =>
-            {
-                requestedScopes.Add(scope);
-                return Task.FromResult(snapshot with
-                {
-                    Skills = snapshot.Skills.Where(s => scope is null
-                        || (scope == "user" ? s.Scope == Scope.User : s.Scope == Scope.Project))
-                        .ToImmutableArray(),
-                });
-            });
+            () => { }, () => { });
         view.LoadSeeded(snapshot);
         view.FocusList();
 
@@ -81,7 +143,11 @@ public sealed class InstalledTabViewTests
         Assert.Equal(["custom-skill"], view.VisibleSkillNamesForTests);
         view.NewKeyDownEvent(new Key('G'));
         Assert.Equal(["custom-skill", "project-skill", "user-skill"], view.VisibleSkillNamesForTests);
-        Assert.Equal(new string?[] { "user", "project", null, null }, requestedScopes);
+        Assert.Equal(0, loads);
+        Assert.Same(snapshot, view.CurrentSnapshot);
+        Assert.False(view.LoadActiveForTests);
+        Assert.False(view.SpinnerVisibleForTests);
+        Assert.DoesNotContain("scope:", view.FooterTextForTests);
     }
 
     [Fact]
@@ -242,10 +308,10 @@ public sealed class InstalledTabViewTests
             packageSource: "owner/repo",
             agentIds: ["claude"]));
 
-        var initialLoad = view.LoadAsync();
-        await inventoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
         Assert.True(view.TryStartSelectedRemoveForTests());
         await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var initialLoad = view.LoadAsync();
+        await inventoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
 
         releaseRemove.TrySetResult();
         await operations["installed.remove"];
@@ -394,9 +460,10 @@ public sealed class InstalledTabViewTests
         var agentsIndex = Array.IndexOf(table.Table!.ColumnNames, "Agents");
         var agentsStyle = table.Style.GetOrCreateColumnStyle(agentsIndex);
 
+        Assert.Equal(["Name", "State", "Loc", "Agents", "Package"], table.Table.ColumnNames);
         Assert.False(table.Style.ExpandLastColumn);
-        Assert.Equal(5, agentsStyle.MinWidth);
-        Assert.Equal(5, agentsStyle.MaxWidth);
+        Assert.Equal(7, agentsStyle.MinWidth);
+        Assert.Equal(7, agentsStyle.MaxWidth);
     }
 
     [Fact]

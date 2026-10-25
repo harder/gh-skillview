@@ -120,6 +120,8 @@ internal sealed class GhSkillListCache
         }
     }
 
+    internal long Generation { get { lock (_gate) return _generation; } }
+
     internal void Invalidate()
     {
         InflightLoad[] invalidated;

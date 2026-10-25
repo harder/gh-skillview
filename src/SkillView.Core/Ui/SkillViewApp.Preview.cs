@@ -9,6 +9,7 @@ public sealed partial class SkillViewApp
 
     private async Task PreviewSelectedAsync()
     {
+        if (_discoverTab?.IsLoading == true) return;
         _services.Logger.Debug("preview", $"PreviewSelectedAsync entered: table={_resultsTable is not null} results={_results.Count} ghPath={_ghPath is not null}");
         if (_resultsTable is null || _results.Count == 0 || _ghPath is null)
         {

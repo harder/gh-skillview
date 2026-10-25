@@ -21,7 +21,7 @@ internal sealed class InstalledTabView : FrameView
     private enum FocusTarget { Table, Filter }
     private const int LocationColumnWidth = 3;
     private const int StateColumnWidth = 5;
-    private const int AgentsColumnWidth = 5;
+    private const int AgentsColumnWidth = 7;
 
     /// winget-tui-style pin filter cycle for the Installed table.
     /// Maps to: All rows · only pinned · only unpinned.
@@ -35,8 +35,9 @@ internal sealed class InstalledTabView : FrameView
     private readonly Func<Action, Task> _runOnUi;
     private readonly Action<Func<Task>, string> _runTask;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
-    private readonly Func<string?, CancellationToken, Task<InventorySnapshot>>? _scopedSnapshotLoader;
     private readonly Func<InstalledSkill, InventorySnapshot, CancellationToken, Task> _onRemove;
+    private readonly Action<Exception>? _onRemovalError;
+    private readonly Func<string, bool> _openPath;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
@@ -50,6 +51,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
+    private readonly TabLoadingView _loading = new("Loading installed skills…");
+    private bool _showDetails;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
     internal InventorySnapshot? CurrentSnapshot => _snapshot;
@@ -63,7 +66,6 @@ internal sealed class InstalledTabView : FrameView
     private int _lastWidth = -1;
     private int _nameW = 12;
     private int _pkgW = 18;
-    private int _agentsW = 8;
     private FocusTarget _lastFocusedTarget = FocusTarget.Table;
     private long _loadGeneration;
     private readonly CancellationOperationSlot _loadCancellations;
@@ -71,6 +73,7 @@ internal sealed class InstalledTabView : FrameView
     private int _loadActive;
     private int _removeActive;
     private string? _idleStatusMessage;
+    private string? _removalErrorDetail;
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
@@ -80,18 +83,19 @@ internal sealed class InstalledTabView : FrameView
         Action onLeaveTab,
         Action onGoToSearch,
         Action? onStateChange = null,
-        Func<string?, CancellationToken, Task<InventorySnapshot>>? scopedSnapshotLoader = null,
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onEffectiveLoading = null,
         Action<InstalledSkill>? onPackageCheck = null,
-        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null)
+        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
+        Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
         _snapshotLoader = snapshotLoader;
-        _scopedSnapshotLoader = scopedSnapshotLoader;
         _onRemove = onRemove;
+        _onRemovalError = onRemovalError;
+        _openPath = openPath ?? TuiHelpers.OpenInDefaultHandler;
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
@@ -152,6 +156,9 @@ internal sealed class InstalledTabView : FrameView
         TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.Style.ShowVerticalCellLineForLastColumn = true;
+        _table.Style.AlwaysUseNormalColorForVerticalCellLines = true;
+        _table.Style.AlwaysShowHeaders = true;
+        _table.MaxCellWidth = int.MaxValue;
         _table.HasFocusChanged += (_, _) =>
         {
             if (_table.HasFocus)
@@ -188,6 +195,8 @@ internal sealed class InstalledTabView : FrameView
             Style = new SpinnerStyle.Dots(),
         };
 
+        Add(_loading);
+
         _filterField.TextChanged += (_, _) => RefreshAll();
         _filterField.KeyDown += (_, key) =>
         {
@@ -217,6 +226,11 @@ internal sealed class InstalledTabView : FrameView
                 RecomputeColumnWidths();
             }
         };
+        _table.ViewportChanged += (_, _) =>
+        {
+            if (_table.Viewport.Width > 0 && _table.Viewport.Width != _lastWidth)
+                RecomputeColumnWidths();
+        };
 
         KeyDown += OnKeyDown;
 
@@ -234,12 +248,14 @@ internal sealed class InstalledTabView : FrameView
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
+        _showDetails = false;
+        _detail.Text = string.Empty;
         Interlocked.Exchange(ref _loadActive, 1);
         _idleStatusMessage = null;
         RefreshOperationStatus();
         try
         {
-            var snapshot = await CaptureSnapshotAsync(loadCancellation.Token).ConfigureAwait(false);
+            var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 if (!IsCurrentLoad(loadGeneration))
@@ -248,7 +264,13 @@ internal sealed class InstalledTabView : FrameView
                 }
 
                 Interlocked.Exchange(ref _loadActive, 0);
-                Populate(snapshot);
+                if (ReferenceEquals(_snapshot, snapshot))
+                {
+                    RefreshOperationStatus();
+                    RestoreFocus();
+                    _onStateChange?.Invoke();
+                }
+                else Populate(snapshot);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -283,6 +305,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void Populate(InventorySnapshot snapshot)
     {
+        SetContentVisibility(loading: false, removing: Volatile.Read(ref _removeActive) != 0);
         _snapshot = snapshot;
         _all = snapshot.Skills;
         _packageCount = _all
@@ -298,6 +321,7 @@ internal sealed class InstalledTabView : FrameView
         BuildTableSource();
         ScheduleDeferredWidthStabilization();
         _idleStatusMessage = null;
+        _removalErrorDetail = null;
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
         RestoreFocus();
         _onStateChange?.Invoke();
@@ -317,11 +341,11 @@ internal sealed class InstalledTabView : FrameView
                 || s.Agents.Any(a => a.AgentId.Contains(q, cmp))
                 || (s.Package?.Source.Contains(q, cmp) ?? false));
         }
-        // Scope filter is also applied here (not just server-side) so it's
-        // correct whether or not the gh push-down ran, and covers "custom".
+        // Select physical rows using the same exposure semantics as discovery,
+        // retaining every other consumer in each selected row.
         if (ToScope(_scopeFilter) is { } wantedScope)
         {
-            source = source.Where(s => (s.Scope == wantedScope || s.Agents.Any(agent => agent.Scope == wantedScope)));
+            source = source.Where(s => SkillView.Inventory.LocalInventoryService.MatchesFilters(s, wantedScope, null));
         }
         source = _pinFilter switch
         {
@@ -331,15 +355,6 @@ internal sealed class InstalledTabView : FrameView
         };
         _rows = ApplySort(source);
     }
-
-    /// Snapshot source for <see cref="LoadAsync"/>. When a scope-aware loader
-    /// is wired and the filter is user/project, the capture pushes `--scope`
-    /// down to `gh skill list`; otherwise it captures everything and the
-    /// in-process filter narrows the view.
-    private Task<InventorySnapshot> CaptureSnapshotAsync(CancellationToken cancellationToken) =>
-        _scopedSnapshotLoader is not null
-            ? _scopedSnapshotLoader(ToGhScope(_scopeFilter), cancellationToken)
-            : _snapshotLoader(cancellationToken);
 
     internal static PinFilter CyclePin(PinFilter current) => current switch
     {
@@ -379,15 +394,6 @@ internal sealed class InstalledTabView : FrameView
         _ => null,
     };
 
-    /// gh's `--scope` accepts only project|user, so "custom" and "all" map to
-    /// null (full capture) and are narrowed in-process.
-    private static string? ToGhScope(ScopeFilter f) => f switch
-    {
-        ScopeFilter.User => "user",
-        ScopeFilter.Project => "project",
-        _ => null,
-    };
-
     private IReadOnlyList<InstalledSkill> ApplySort(IEnumerable<InstalledSkill> input) => _sort switch
     {
         SortMode.Package => input
@@ -405,21 +411,19 @@ internal sealed class InstalledTabView : FrameView
 
     private void BuildTableSource()
     {
+        // Let TableView truncate by terminal cell width. Pre-truncating the data
+        // loses text permanently when a resize makes a column wider.
         var columns = new Dictionary<string, Func<InstalledSkill, object>>
         {
-            ["Name"] = s => TuiHelpers.Truncate(s.Name, _nameW),
+            ["Name"] = s => s.Name,
+            ["State"] = s => SkillHealthFormatter.CompactBadge(s.Validity, s.IsSymlinked),
             ["Loc"] = s => InstalledInventoryFormatter.DescribeTableLocation(s),
+            ["Agents"] = s => InstalledInventoryFormatter.DescribeAgents(s),
         };
         if (_hasPackages)
         {
-            columns["Package"] = s => TuiHelpers.Truncate(
-                InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source),
-                _pkgW);
+            columns["Package"] = s => InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source);
         }
-        columns["State"] = s => SkillHealthFormatter.CompactBadge(s.Validity, s.IsSymlinked);
-        columns["Agents"] = s => TuiHelpers.Truncate(
-            InstalledInventoryFormatter.DescribeAgents(s),
-            _agentsW);
 
         _table.Table = new InstalledTableSource(_rows, columns);
         var style = _table.Style;
@@ -436,7 +440,19 @@ internal sealed class InstalledTabView : FrameView
                 case "Agents": cs.MinWidth = AgentsColumnWidth; cs.MaxWidth = AgentsColumnWidth; break;
             }
         }
+        ConfigureCategoryColors();
         _table.Update();
+    }
+
+    private void ConfigureCategoryColors()
+    {
+        var baseScheme = _table.GetScheme();
+        // Allocate these few schemes once per table source, never per cell draw.
+        var colors = new InstalledCategoryColors(baseScheme, TuiHelpers.CurrentTheme);
+        var locations = _rows.Select(s => colors.Location(s.Scope)).ToArray();
+        var agents = _rows.Select(s => colors.Agents(InstalledInventoryFormatter.DescribeAgents(s))).ToArray();
+        _table.Style.GetOrCreateColumnStyle(2).ColorGetter = args => locations[args.RowIndex];
+        _table.Style.GetOrCreateColumnStyle(3).ColorGetter = args => agents[args.RowIndex];
     }
 
     private void RecomputeColumnWidths()
@@ -447,18 +463,20 @@ internal sealed class InstalledTabView : FrameView
             _lastWidth > 0 ? _lastWidth : 70);
         _lastWidth = width;
 
-        var available = Math.Max(40, width - 6);
+        // Four/five columns consume one separator each (including the final
+        // border). Spending the whole viewport prevents a selected blank cell
+        // from appearing beyond the last border.
+        var available = Math.Max(2, width - (_hasPackages ? 5 : 4));
         var fixedCols = LocationColumnWidth + StateColumnWidth + AgentsColumnWidth;
-        var remaining = Math.Max(20, available - fixedCols);
-        _agentsW = AgentsColumnWidth;
+        var remaining = Math.Max(2, available - fixedCols);
         if (_hasPackages)
         {
-            _pkgW = Math.Max(18, (int)Math.Round(remaining * 0.54));
-            _nameW = Math.Max(12, remaining - _pkgW);
+            _nameW = Math.Clamp((int)Math.Round(remaining * 0.55), Math.Min(12, remaining - 1), remaining - 1);
+            _pkgW = remaining - _nameW;
         }
         else
         {
-            _nameW = Math.Max(12, remaining);
+            _nameW = remaining;
         }
         var style = _table.Style;
         for (var i = 0; i < (_table.Table?.Columns ?? 0); i++)
@@ -545,7 +563,9 @@ internal sealed class InstalledTabView : FrameView
     internal void FocusList()
     {
         _lastFocusedTarget = FocusTarget.Table;
-        _table.SetFocus();
+        if (_table.Visible) _table.SetFocus();
+        else if (_loading.Visible) _loading.SetFocus();
+        else _detail.SetFocus();
     }
 
     private void RestoreFocus()
@@ -556,7 +576,7 @@ internal sealed class InstalledTabView : FrameView
                 _filterField.SetFocus();
                 break;
             default:
-                _table.SetFocus();
+                FocusList();
                 break;
         }
     }
@@ -600,6 +620,13 @@ internal sealed class InstalledTabView : FrameView
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        if (key.KeyCode == KeyCode.F2)
+        {
+            key.Handled = true;
+            _showDetails = !_showDetails;
+            RefreshSelectedDetail();
+            return;
+        }
         if (!_filterField.HasFocus && key.AsRune.Value == 'K' && _onPackageCheck is not null
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {
@@ -639,22 +666,11 @@ internal sealed class InstalledTabView : FrameView
             key.Handled = true;
             return;
         }
-        // `G` cycles the scope filter (all → user → project → custom). When a
-        // scope-aware loader is wired, user/project re-query `gh skill list
-        // --scope` server-side; otherwise it's an in-process narrow.
+        // Every scope selects reconciled rows from the full shared snapshot.
         if (!_filterField.HasFocus && key.AsRune.Value == 'G')
         {
             _scopeFilter = CycleScope(_scopeFilter);
-            // Custom and All must recapture too: the previous user/project
-            // query may have replaced _all with a server-filtered snapshot.
-            if (_scopedSnapshotLoader is not null)
-            {
-                _runTask(LoadAsync, "installed.scope");
-            }
-            else
-            {
-                RefreshAll();
-            }
+            RefreshAll();
             key.Handled = true;
             return;
         }
@@ -676,7 +692,7 @@ internal sealed class InstalledTabView : FrameView
                 _filterField.SelectAll();
                 break;
             case InstalledScreen.ShortcutCommand.FocusTable:
-                _table.SetFocus();
+                FocusList();
                 break;
             case InstalledScreen.ShortcutCommand.CycleSort:
                 _sort = _sort switch
@@ -692,11 +708,8 @@ internal sealed class InstalledTabView : FrameView
                 break;
             case InstalledScreen.ShortcutCommand.Open:
                 {
-                    var i = _table.GetSelectedRow();
-                    if (i >= 0 && i < _rows.Count)
-                    {
-                        TuiHelpers.OpenInDefaultHandler(_rows[i].ResolvedPath);
-                    }
+                    if (CanActOnSelection && GetSelectedSkill() is { } selected)
+                        _openPath(selected.ResolvedPath);
                     break;
                 }
         }
@@ -708,9 +721,9 @@ internal sealed class InstalledTabView : FrameView
             : base(rows, cols) { }
     }
 
-    private static string RenderDetail(InstalledSkill skill)
+    private string RenderDetail(InstalledSkill skill)
     {
-        return InstalledScreen.RenderDetail(skill);
+        return InstalledScreen.RenderDetail(skill, _showDetails);
     }
 
     private bool IsCurrentLoad(long loadGeneration) =>
@@ -732,6 +745,7 @@ internal sealed class InstalledTabView : FrameView
         using var removeCancellation = _removeCancellations.Replace(_lifetimeToken);
         var cancellationToken = removeCancellation.Token;
         var shouldRefresh = false;
+        Exception? failure = null;
         try
         {
             await _onRemove(skill, snapshot, cancellationToken).ConfigureAwait(false);
@@ -742,6 +756,7 @@ internal sealed class InstalledTabView : FrameView
             // Tab deactivation or app shutdown canceled the preflight before a
             // dialog could be opened.
         }
+        catch (Exception ex) { failure = ex; }
         finally
         {
             try
@@ -749,7 +764,17 @@ internal sealed class InstalledTabView : FrameView
                 await _runOnUi(() =>
                 {
                     Interlocked.Exchange(ref _removeActive, 0);
+                    if (failure is not null && !cancellationToken.IsCancellationRequested)
+                    {
+                        _idleStatusMessage = " removal failed: " + TuiHelpers.ErrorSnippet(failure.Message);
+                        var message = failure.Message;
+                        if (message.Length > 4096) message = message[..4096] + " [truncated]";
+                        _removalErrorDetail = "## Could not start removal\n\n" + MarkdownTableFormatter.FormatCodeSpan(message)
+                            + "\n\nRefresh Installed and select a visible skill before trying again.";
+                    }
                     RefreshOperationStatus();
+                    if (failure is not null && !cancellationToken.IsCancellationRequested)
+                        _onRemovalError?.Invoke(failure);
                     if (shouldRefresh && !cancellationToken.IsCancellationRequested)
                     {
                         // The modal invalidates the shared inventory cache when
@@ -766,8 +791,11 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
+    private bool CanActOnSelection => Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0;
+
     private bool TryStartSelectedRemove()
     {
+        if (!CanActOnSelection) return false;
         var index = _table.GetSelectedRow();
         if (index < 0
             || index >= _rows.Count
@@ -779,6 +807,8 @@ internal sealed class InstalledTabView : FrameView
 
         var skill = _rows[index];
         var snapshot = _snapshot;
+        _idleStatusMessage = null;
+        _removalErrorDetail = null;
         RefreshOperationStatus();
         _runTask(
             () => RunRemoveAsync(skill, snapshot),
@@ -788,6 +818,9 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshOperationStatus()
     {
+        var loading = Volatile.Read(ref _loadActive) != 0;
+        var removing = Volatile.Read(ref _removeActive) != 0;
+        SetContentVisibility(loading, removing);
         if (Volatile.Read(ref _removeActive) != 0)
         {
             SetSpinnerActive(true);
@@ -807,8 +840,10 @@ internal sealed class InstalledTabView : FrameView
 
         SetSpinnerActive(false);
         RefreshSelectedDetail();
+        if (_removalErrorDetail is not null) _detail.Text = _removalErrorDetail;
         if (_idleStatusMessage is not null)
         {
+            if (_snapshot is null) _detail.Text = "## Could not load installed skills\n\n" + TerminalEscapeSanitizer.Sanitize(_idleStatusMessage) + "\n\nLeave this tab and return to retry.";
             _footer.Text = _idleStatusMessage;
             return;
         }
@@ -816,9 +851,33 @@ internal sealed class InstalledTabView : FrameView
         RefreshFooter();
     }
 
+    private void SetContentVisibility(bool loading, bool removing)
+    {
+        if (loading && !removing)
+        {
+            _loading.SetLoading(true);
+            if (_lastFocusedTarget == FocusTarget.Table) _loading.SetFocus();
+            _table.Visible = false;
+            _detail.Visible = false;
+        }
+        else
+        {
+            // Make the destination focusable before retiring the indicator;
+            // hiding a focused view must not implicitly focus the filter.
+            _table.Visible = !loading;
+            _detail.Visible = true;
+            if (_loading.HasFocus)
+            {
+                if (loading) _detail.SetFocus();
+                else RestoreFocus();
+            }
+            _loading.SetLoading(false);
+        }
+    }
+
     private void RefreshSelectedDetail()
     {
-        if (_snapshot is null || Volatile.Read(ref _removeActive) != 0)
+        if (_snapshot is null || Volatile.Read(ref _removeActive) != 0 || Volatile.Read(ref _loadActive) != 0)
         {
             return;
         }

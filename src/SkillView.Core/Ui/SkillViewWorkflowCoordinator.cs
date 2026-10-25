@@ -3,12 +3,14 @@ using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Threading;
 using Terminal.Gui.App;
 
 namespace SkillView.Ui;
 
 internal sealed class SkillViewWorkflowCoordinator
 {
+    private readonly DisplayInventoryCache _displayInventory;
     private readonly TuiServices _services;
     private readonly AppOptions _options;
     private readonly Func<IApplication?> _getApp;
@@ -21,7 +23,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Action<string, TuiHelpers.NotificationLevel> _setStatusWithLevel;
     private readonly Action<Action> _invoke;
     private readonly Func<Action, CancellationToken, Task<bool>> _invokeAsync;
-    private readonly Action<Func<CancellationToken, Task>, string> _runBackground;
+    private readonly Func<Func<CancellationToken, Task>, string, bool> _runBackground;
     private readonly Action _focusSearchFromInstalled;
     private readonly Action _refreshActiveTab;
 
@@ -38,7 +40,7 @@ internal sealed class SkillViewWorkflowCoordinator
         Action<string, TuiHelpers.NotificationLevel> setStatusWithLevel,
         Action<Action> invoke,
         Func<Action, CancellationToken, Task<bool>> invokeAsync,
-        Action<Func<CancellationToken, Task>, string> runBackground,
+        Func<Func<CancellationToken, Task>, string, bool> runBackground,
         Action focusSearchFromInstalled,
         Action refreshActiveTab)
     {
@@ -57,6 +59,12 @@ internal sealed class SkillViewWorkflowCoordinator
         _runBackground = runBackground;
         _focusSearchFromInstalled = focusSearchFromInstalled;
         _refreshActiveTab = refreshActiveTab;
+        _displayInventory = new(() => _services.ListAdapter.Generation, async token =>
+        {
+            var report = await GetOrProbeReportAsync(token).ConfigureAwait(false);
+            return await CaptureInventoryCoreAsync(report, token).ConfigureAwait(false);
+        }, _runBackground, onCancellationCallbackException:
+            CancellationCallbackReporter.For(_services.Logger, "display inventory capture"));
     }
 
     /// Open the install flow. By default takes the compact one-screen modal
@@ -357,13 +365,16 @@ internal sealed class SkillViewWorkflowCoordinator
 
 
 
+    internal Task<InventorySnapshot> CaptureDisplayInventoryAsync(EnvironmentReport report, CancellationToken token) =>
+        _displayInventory.GetAsync(token, ct => CaptureInventoryCoreAsync(report, ct));
+
     public Task<InventorySnapshot> CaptureInventorySnapshotAsync(CancellationToken cancellationToken = default)
     {
         // Used by the embedded InstalledTabView / UpdatesTabView for their
         // on-activate snapshot loads. Probes the environment lazily so the
         // first tab activation doesn't hard-fail when gh hasn't been probed
         // yet (mirrors the lazy-probe in ShowDoctor).
-        return CaptureForTabAsync(null, cancellationToken);
+        return _displayInventory.GetAsync(cancellationToken);
     }
 
     internal void ShowEffectiveLoading(InstalledSkill selected)
@@ -478,15 +489,6 @@ internal sealed class SkillViewWorkflowCoordinator
             throw new IOException("This saved local reimport belongs to another purpose or physical installation address.");
     }
 
-    /// Scope-filtered capture used by the Installed tab's scope cycle. When
-    /// `scopeFilter` is "user"/"project", `gh skill list --scope` does the
-    /// filtering server-side; null captures everything (the tab narrows
-    /// "custom" in-process, since gh's `--scope` only accepts project|user).
-    public Task<InventorySnapshot> CaptureInventorySnapshotAsync(string? scopeFilter, CancellationToken cancellationToken = default)
-    {
-        return CaptureForTabAsync(scopeFilter, cancellationToken);
-    }
-
     public async Task OpenRemoveDialogAsync(
         InstalledSkill target,
         InventorySnapshot snapshot,
@@ -497,6 +499,10 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
+        // Display snapshots can be reused across tabs; removal preflight needs
+        // current consumers/owners in addition to native execution validation.
+        var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
+        snapshot = await CaptureInventoryAsync(report, cancellationToken, bypassGhCache: true).ConfigureAwait(false);
         var plan = await BuildRemoveDialogPlanAsync(target, snapshot, cancellationToken)
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
@@ -506,7 +512,7 @@ internal sealed class SkillViewWorkflowCoordinator
                     var app = _getApp();
                     if (app is not null)
                     {
-                        OpenRemoveDialogInternal(app, target, snapshot, plan);
+                        OpenRemoveDialogInternal(app, plan.Target, snapshot, plan);
                     }
                 },
                 cancellationToken)
@@ -521,8 +527,10 @@ internal sealed class SkillViewWorkflowCoordinator
         Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var freshTarget = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, OperationSubject.From(target))
+                ?? throw new IOException("The selected installation is missing or ambiguous in the fresh inventory; refresh Installed and select it again.");
             var targets = RemoveTargetResolver.BuildTargetsWithCancellation(
-                target,
+                freshTarget,
                 snapshot,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
@@ -530,14 +538,8 @@ internal sealed class SkillViewWorkflowCoordinator
                 ? null
                 : (evaluator ?? RemoveTargetResolver.EvaluateWithCancellation)(targets[0], snapshot, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return new RemoveDialogPlan(targets, primaryEvaluation);
+            return new RemoveDialogPlan(freshTarget, targets, primaryEvaluation);
         }, cancellationToken);
-
-    private async Task<InventorySnapshot> CaptureForTabAsync(string? scopeFilter, CancellationToken cancellationToken)
-    {
-        var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-        return await CaptureInventoryAsync(report, cancellationToken, scopeFilter).ConfigureAwait(false);
-    }
 
     private void OpenRemoveDialogInternal(
         IApplication app,
@@ -689,7 +691,7 @@ internal sealed class SkillViewWorkflowCoordinator
     {
         _runBackground(async cancellationToken =>
         {
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
+            var snapshot = await CaptureDisplayInventoryAsync(report, cancellationToken).ConfigureAwait(false);
             _invoke(() =>
                 _setStatusWithLevel(
                     string.Format(successStatus, snapshot.Skills.Length),
@@ -702,14 +704,26 @@ internal sealed class SkillViewWorkflowCoordinator
         return await _getOrProbeReport(cancellationToken).ConfigureAwait(false);
     }
 
-    internal Task<InventorySnapshot> CaptureInventoryAsync(
-        EnvironmentReport report, CancellationToken cancellationToken, string? scopeFilter = null) =>
+    internal async Task<InventorySnapshot> CaptureInventoryAsync(
+        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false)
+    {
+        var capturedGeneration = _services.ListAdapter.Generation;
+        var snapshot = await CaptureInventoryCoreAsync(report, cancellationToken, bypassGhCache).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        // Operation captures may seed browsing; display workers publish through
+        // DisplayInventoryCache.LoadAsync alone.
+        _displayInventory.PublishFresh(snapshot, capturedGeneration);
+        return snapshot;
+    }
+
+    private Task<InventorySnapshot> CaptureInventoryCoreAsync(
+        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false) =>
         _services.InventoryService.CaptureAsync(
             report.GhPath,
             new LocalInventoryService.Options(
                 ScanRoots: _options.ScanRoots, WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles,
-                AllowHiddenDirs: false,
-                FilterScope: scopeFilter),
+                AllowHiddenDirs: false)
+            { BypassGhCache = bypassGhCache },
             cancellationToken);
 
     internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUpdatesAsync(string ghPath,
@@ -792,5 +806,6 @@ internal sealed class SkillViewWorkflowCoordinator
 }
 
 internal sealed record RemoveDialogPlan(
+    InstalledSkill Target,
     ImmutableArray<RemoveTarget> Targets,
     RemoveTargetEvaluation? PrimaryEvaluation);

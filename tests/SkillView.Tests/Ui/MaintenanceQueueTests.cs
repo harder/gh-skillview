@@ -12,6 +12,20 @@ namespace SkillView.Tests.Ui;
 public sealed class MaintenanceQueueTests
 {
     [Fact]
+    public void SummaryAbbreviatesHomeWhileEvidenceAndQueueSelectorsStayExact()
+    {
+        var entry = Assert.Single(MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with
+        { Skills = [Skill("/home/alex/skills/demo", "https://github.com/owner/repo")] }, TestContext.Current.CancellationToken).Entries);
+        var summary = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken, homeDirectory: "/home/alex");
+        Assert.Contains("~/skills/demo", summary);
+        Assert.DoesNotContain("/home/alex", summary);
+        var evidence = MaintenanceQueueFormatter.Render(entry, TestContext.Current.CancellationToken,
+            showDetails: true, homeDirectory: "/home/alex");
+        Assert.Contains("/home/alex/skills/demo", evidence);
+        Assert.Equal("/home/alex/skills/demo", entry.Subject.Path);
+    }
+
+    [Fact]
     public void LargeQueue_KeepsLightweightRowsAndBoundsSelectedDetailAndSharedCoverage()
     {
         var entry = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with

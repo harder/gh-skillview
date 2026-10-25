@@ -4,6 +4,7 @@ using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using Terminal.Gui.Views;
 using Xunit;
@@ -12,6 +13,28 @@ namespace SkillView.Tests.Ui;
 
 public sealed class UpdatesTabViewTests
 {
+    [Fact]
+    public async Task SelectedPreviewRetainsExactEvidenceWithoutInstalledShortcuts()
+    {
+        var home = Path.GetFullPath("updates-child-home");
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo") with
+        {
+            OwnershipRunner = new SkillView.Subprocess.ProcessRunner(new Logger(),
+                environment: new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home }),
+        };
+        skill = skill with { ObservedSubject = OperationSubject.From(skill) };
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }));
+        await view.LoadForSubjectAsync(OperationSubject.From(skill));
+        view.ToggleDetailsForTests();
+        var detail = view.PreviewTextForTests;
+        Assert.Contains("**Path:** `" + skill.ResolvedPath + "`", detail);
+        Assert.Contains("Installation address ID", detail);
+
+        Assert.DoesNotContain("**E** Analyze", detail);
+        Assert.DoesNotContain("**K** Check", detail);
+        Assert.DoesNotContain("**F2** Technical", detail);
+    }
+
     [Fact]
     public async Task QueueDrillIn_SelectsOnlyExactPhysicalInstallAndDoesNotStartAnUpdate()
     {
@@ -252,10 +275,15 @@ public sealed class UpdatesTabViewTests
 
         var firstLoad = view.LoadAsync();
         await firstStarted.Task;
+        var indicator = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
+        Assert.True(indicator.Visible);
+        Assert.False(view.SubViews.Single(child => child is TableView).Visible);
         var replacementLoad = view.LoadAsync();
 
         await Task.WhenAll(firstLoad, replacementLoad);
 
+        Assert.False(indicator.Visible);
+        Assert.True(view.SubViews.Single(child => child is TableView).Visible);
         Assert.True(firstToken.IsCancellationRequested);
         Assert.Equal(["newer"], view.VisibleSkillNamesForTests);
     }

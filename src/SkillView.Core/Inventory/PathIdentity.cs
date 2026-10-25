@@ -25,21 +25,25 @@ public static class PathIdentity
         return caseSensitive ? normalized : normalized.ToUpperInvariant();
     }
 
-    public static bool Equals(string left, string right)
+    public static bool Equals(string left, string right) => Equals(left, right, IsCaseSensitive);
+
+    internal static bool Equals(string left, string right, Func<string, bool> caseSensitive)
     {
         var leftNormalized = Normalize(left);
         var rightNormalized = Normalize(right);
-        var comparison = IsCaseSensitive(leftNormalized) && IsCaseSensitive(rightNormalized)
+        var comparison = caseSensitive(leftNormalized) && caseSensitive(rightNormalized)
             ? StringComparison.Ordinal
             : StringComparison.OrdinalIgnoreCase;
         return string.Equals(leftNormalized, rightNormalized, comparison);
     }
 
-    public static bool IsInside(string candidate, string root)
+    public static bool IsInside(string candidate, string root) => IsInside(candidate, root, IsCaseSensitive);
+
+    internal static bool IsInside(string candidate, string root, Func<string, bool> caseSensitive)
     {
         var candidateNormalized = Normalize(candidate);
         var rootNormalized = Normalize(root);
-        var comparison = ComparisonFor(rootNormalized);
+        var comparison = caseSensitive(rootNormalized) ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         var rootPrefix = rootNormalized.EndsWith('/')
             ? rootNormalized
             : rootNormalized + "/";

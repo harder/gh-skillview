@@ -1,6 +1,7 @@
 using SkillView.Gh;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -13,6 +14,13 @@ namespace SkillView.Ui.Tabs;
 /// SkillViewApp stabilise before a later phase migrates more behaviour here.
 internal sealed class DiscoverTabView : FrameView
 {
+    private readonly TabLoadingView _loading = new("Searching skills…");
+
+    internal bool IsLoading => _loading.Visible;
+
+    internal void SetLoading(bool loading) =>
+        _loading.SetContentLoading(loading, ResultsTable, ResultsTable, DetailPane);
+
     // Left pane — search controls + results table.
     internal FrameView LeftFrame { get; }
     internal TextField QueryField { get; }
@@ -30,7 +38,6 @@ internal sealed class DiscoverTabView : FrameView
     {
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
-
         // ── Left frame: search controls ──────────────────────────────────
         LeftFrame = new FrameView
         {
@@ -50,6 +57,12 @@ internal sealed class DiscoverTabView : FrameView
             Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(QueryField, SkillViewStyling.BaseSchemeName);
+        KeyDown += (_, key) =>
+        {
+            if (key.Handled || !IsLoading || QueryField.HasFocus) return;
+            if (key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'i' or 'I' or 'A' or 'o' or 'O')
+                key.Handled = true;
+        };
 
         // Owner, Agent, Limit, and HiddenDirs are filter state holders surfaced
         // through the [f] dialog rather than rendered inline. They are not added
@@ -114,7 +127,7 @@ internal sealed class DiscoverTabView : FrameView
             DetailPane.MetadataPane, DetailPane.PreviewPane,
             DetailPane.PreviewRawPane, DetailPane.LogPane);
 
-        Add(LeftFrame, DetailPane);
+        Add(LeftFrame, DetailPane, _loading);
     }
 
     internal static string BuildFilterSummaryForTests(

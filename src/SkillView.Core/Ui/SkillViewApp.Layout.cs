@@ -69,6 +69,7 @@ public sealed partial class SkillViewApp
         _detailPane = _discoverTab.DetailPane;
         _rightFrame = _discoverTab.DetailPane;
         _itemActionsLabel = _discoverTab.DetailPane.ItemActionsLabel;
+        UpdateDiscoverActions();
         _metadataFrame = _discoverTab.DetailPane.MetadataFrame;
         _previewFrame = _discoverTab.DetailPane.PreviewFrame;
         _previewPane = _discoverTab.DetailPane.PreviewPane;
@@ -173,15 +174,18 @@ public sealed partial class SkillViewApp
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
-            // Scope cycle (`G`) pushes `--scope` down to `gh skill list`.
-            scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
                 CancellationCallbackReporter.For(_services.Logger, "installed tab"),
             onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill),
             onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
-            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()))
+            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
+            onRemovalError: error =>
+            {
+                _services.Logger.Error("installed.remove", error.ToString());
+                SetStatus("removal failed: " + TuiHelpers.ErrorSnippet(error.Message), TuiHelpers.NotificationLevel.Error);
+            })
         {
             X = 0,
             Y = 2,
@@ -225,11 +229,9 @@ public sealed partial class SkillViewApp
 
         _changesTab = new SkillView.Ui.Tabs.ChangesTabView(
             runOnUi: runOnUi,
-            snapshotLoader: token =>
-            {
-                _services.ListAdapter.Invalidate();
-                return _workflows.CaptureInventorySnapshotAsync(token);
-            },
+            snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
+            onRefresh: () => _services.ListAdapter.Invalidate(),
+            homeDirectory: DisplayPath.CaptureHome(_services.Runner),
             onActivateUpdates: OpenUpdatesWorkspace,
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(

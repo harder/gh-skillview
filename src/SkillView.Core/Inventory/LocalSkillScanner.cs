@@ -236,7 +236,7 @@ public sealed class LocalSkillScanner
         bool unknown = false;
         bool Observed(ManagedSkillRegion region, string candidate)
         {
-            var value = region.ObserveCoverage(candidate);
+            var value = managed.ObserveCoverage(region, candidate);
             if (value is null)
             {
                 unknown = true;

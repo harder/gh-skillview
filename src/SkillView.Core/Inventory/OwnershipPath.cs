@@ -3,15 +3,21 @@ namespace SkillView.Inventory;
 /// Non-destructive context matching. This never supplies removal authority.
 internal static class OwnershipPath
 {
-    internal static bool Same(string left, string right) => PathIdentity.Equals(left, right)
-        || (CanonicalCandidate(left) is { } a && CanonicalCandidate(right) is { } b && PathIdentity.Equals(a, b))
-        || (EntryAddress(left) is { } c && EntryAddress(right) is { } d && PathIdentity.Equals(c, d));
+    internal static bool Same(string left, string right) =>
+        Same(left, right, PathIdentity.Equals, CanonicalCandidate, EntryAddress);
 
-    internal static string? EntryAddress(string path)
+    internal static bool Same(string left, string right, Func<string, string, bool> equal,
+        Func<string, string?> canonical, Func<string, string?> entry) => equal(left, right)
+        || (canonical(left) is { } a && canonical(right) is { } b && equal(a, b))
+        || (entry(left) is { } c && entry(right) is { } d && equal(c, d));
+
+    internal static string? EntryAddress(string path) => EntryAddress(path, CanonicalCandidate);
+
+    internal static string? EntryAddress(string path, Func<string, string?> canonicalize)
     {
         var full = Path.GetFullPath(path);
         var parent = Path.GetDirectoryName(full);
-        return parent is not null && CanonicalCandidate(parent) is { } canonical
+        return parent is not null && canonicalize(parent) is { } canonical
             ? Path.Combine(canonical, Path.GetFileName(full)) : null;
     }
 

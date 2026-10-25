@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using SkillView.Cli;
 using SkillView.Gh;
@@ -14,6 +15,30 @@ public sealed class InventoryProviderOutcomeTests : IDisposable
     private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-provider-outcome-");
     public void Dispose() => temporary.Delete(true);
 
+    [Fact]
+    public async Task FreshInventoryBypassesBothDefaultAndRootCatalogsWithoutInvalidation()
+    {
+        var root = CreateSkillRoot("fresh-catalog", "visible");
+        var logger = new Logger();
+        var calls = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+        var adapter = new GhSkillListAdapter((executable, arguments, token) =>
+        {
+            calls.AddOrUpdate(DirectoryArgument(arguments) ?? "default", 1, (_, count) => count + 1);
+            return Task.FromResult(new ProcessResult(executable, arguments, 0, "[]", "", TimeSpan.Zero));
+        }, logger);
+        var service = CreateService(logger, adapter);
+        var options = new LocalInventoryService.Options([root], true);
+        await service.CaptureAsync("protocol-fixture", options, TestContext.Current.CancellationToken);
+        var generation = adapter.Generation;
+        await service.CaptureAsync("protocol-fixture", options with { BypassGhCache = true }, TestContext.Current.CancellationToken);
+        Assert.Equal(generation, adapter.Generation);
+        Assert.Equal(2, calls["default"]);
+        Assert.Equal(2, calls[root]);
+        await service.CaptureAsync("protocol-fixture", options, TestContext.Current.CancellationToken);
+        Assert.Equal(2, calls["default"]);
+        Assert.Equal(2, calls[root]);
+    }
+
     [Theory]
     [InlineData("credentials", false, "credentials-unavailable-sentinel")]
     [InlineData("network", false, "network-unavailable-sentinel")]
@@ -26,12 +51,12 @@ public sealed class InventoryProviderOutcomeTests : IDisposable
     {
         var root = CreateSkillRoot("loose-payloads", "visible");
         var logger = new Logger();
-        var calls = new Dictionary<string, int>(StringComparer.Ordinal);
+        var calls = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
         var adapter = new GhSkillListAdapter((executable, arguments, token) =>
         {
             token.ThrowIfCancellationRequested();
             var key = DirectoryArgument(arguments) ?? "default";
-            calls[key] = calls.GetValueOrDefault(key) + 1;
+            calls.AddOrUpdate(key, 1, (_, count) => count + 1);
             var output = outcome switch
             {
                 "malformed" => "{broken",
@@ -155,6 +180,62 @@ public sealed class InventoryProviderOutcomeTests : IDisposable
         Assert.Contains(snapshot.Providers, provider => provider.Provider == "gh" && provider.Succeeded && provider.CoveredRoots.Contains(root));
         Assert.Equal("visible", Assert.Single(snapshot.Skills).Name);
         Assert.Empty(CleanupClassifier.Classify(snapshot, []));
+    }
+
+    [Fact]
+    public async Task RootCatalogProbesOverlapWithinBoundAndPreserveConfiguredOrder()
+    {
+        var roots = Enumerable.Range(0, 8).Select(i => CreateSkillRoot("root-" + i, "skill-" + i)).ToArray();
+        var logger = new Logger();
+        var active = 0;
+        var maximum = 0;
+        var overlap = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var adapter = new GhSkillListAdapter(async (executable, arguments, token) =>
+        {
+            if (DirectoryArgument(arguments) is not null)
+            {
+                var current = Interlocked.Increment(ref active);
+                int prior;
+                do { prior = Volatile.Read(ref maximum); }
+                while (current > prior && Interlocked.CompareExchange(ref maximum, current, prior) != prior);
+                if (current >= 2) overlap.TrySetResult();
+                try { await overlap.Task.WaitAsync(token); }
+                finally { Interlocked.Decrement(ref active); }
+            }
+            return new ProcessResult(executable, arguments, 0, "[]", "", TimeSpan.Zero);
+        }, logger);
+        var snapshot = await CreateService(logger, adapter).CaptureAsync("protocol-fixture", new(roots, true),
+            TestContext.Current.CancellationToken);
+        Assert.InRange(maximum, 2, 4);
+        Assert.Equal(0, active);
+        Assert.Equal(snapshot.ScannedRoots.Where(root => !root.Managed).Select(root => root.Path),
+            snapshot.Providers.Where(provider => provider.Provider == "gh").SelectMany(provider => provider.CoveredRoots));
+    }
+
+    [Fact]
+    public async Task CancelingCaptureDrainsActiveRootProbes()
+    {
+        var roots = Enumerable.Range(0, 8).Select(i => CreateSkillRoot("cancel-root-" + i, "skill-" + i)).ToArray();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var logger = new Logger();
+        var adapter = new GhSkillListAdapter(async (executable, arguments, token) =>
+        {
+            if (DirectoryArgument(arguments) is not null)
+            {
+                Interlocked.Increment(ref active);
+                started.TrySetResult();
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, token); }
+                finally { Interlocked.Decrement(ref active); }
+            }
+            return new ProcessResult(executable, arguments, 0, "[]", "", TimeSpan.Zero);
+        }, logger);
+        var capture = CreateService(logger, adapter).CaptureAsync("protocol-fixture", new(roots, true), cancellation.Token);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => capture);
+        Assert.Equal(0, active);
     }
 
     private string CreateSkillRoot(string directory, string name)

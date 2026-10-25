@@ -595,6 +595,28 @@ public sealed class CleanupScreenTests
     }
 
     [Fact]
+    public void TechnicalReviewRetainsExactSkillEvidenceWithoutInstalledShortcuts()
+    {
+        var home = Path.GetFullPath("cleanup-child-home");
+        var skill = Skill("demo", Path.Combine(home, "skills", "demo")) with
+        {
+            OwnershipRunner = new SkillView.Subprocess.ProcessRunner(new Logger(),
+                environment: new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home }),
+            CleanupSuppression = new(false, false, "unsuppressed"),
+        };
+        skill = skill with { ObservedSubject = OperationSubject.From(skill) };
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed,
+            skill.ResolvedPath, "fixture", skill);
+        var detail = CleanupScreen.RenderDetail(candidate, showDetails: true);
+        Assert.Contains("**Path:** `" + skill.ResolvedPath + "`", detail);
+        Assert.Contains("Installation address ID", detail);
+        Assert.Contains("**Cleanup suppression:**", detail);
+        Assert.DoesNotContain("**E** Analyze", detail);
+        Assert.DoesNotContain("**K** Check", detail);
+        Assert.DoesNotContain("**F2** Technical", detail);
+    }
+
+    [Fact]
     public void RenderDetail_DefaultExplainsActionAndKeepsTechnicalEvidenceBehindDetails()
     {
         var candidate = new CleanupClassifier.Candidate(

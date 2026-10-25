@@ -13,6 +13,16 @@ public sealed partial class SkillViewApp
         ReplaceSearchResults(results);
     }
 
+    internal Task RunSearchForTestsAsync(string query, Func<CancellationToken, Task<SkillView.Gh.SearchResponse>> search)
+    {
+        _ghPath ??= "search-fixture";
+        return RunSearchAsync(query, search: search);
+    }
+
+    internal SkillView.Ui.Tabs.DiscoverTabView? DiscoverTabForTests => _discoverTab;
+    internal string DiscoverActionsForTests => _detailPane?.ItemActionsLabel.Text ?? string.Empty;
+    internal void SetStatusForTests(string text, TuiHelpers.NotificationLevel level) => SetStatus(text, level);
+
     internal LatestRequestGate.Lease BeginPreviewRequestForTests()
     {
         var request = _previewRequests.Begin(DiscoverLifetimeForTests, PreviewTimeout);
