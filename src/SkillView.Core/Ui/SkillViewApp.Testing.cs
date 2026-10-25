@@ -122,6 +122,10 @@ public sealed partial class SkillViewApp
 
     internal void ActivateTabForTests(SkillViewTab tab) => ActivateTab(tab);
 
+    internal void RevealInstalledInstallForTests(InstalledInstallHandoff handoff) => RevealInstalledInstall(handoff);
+
+    internal void SetInstalledTabForTests(SkillView.Ui.Tabs.InstalledTabView tab) => _installedTab = tab;
+
     internal void EnterDoctorForTests(EnvironmentReport report)
     {
         Volatile.Write(ref _lastReport, report);

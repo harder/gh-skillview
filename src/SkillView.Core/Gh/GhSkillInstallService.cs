@@ -37,7 +37,10 @@ public sealed class GhSkillInstallService
         bool FromLocal = false,
         bool All = false,
         IReadOnlyDictionary<string, string>? ProcessEnvironment = null,
-        string? WorkingDirectory = null);
+        string? WorkingDirectory = null)
+    {
+        internal SkillView.Inventory.Models.SkillSourceIdentity? NavigationSource { get; init; }
+    }
 
     public async Task<InstallResult> InstallAsync(
         string ghPath,
@@ -49,6 +52,7 @@ public sealed class GhSkillInstallService
         options ??= new Options();
         options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? _runner.EffectiveWorkingDirectory) };
         var args = BuildArgs(repo, skillName, options);
+        InstallNavigationEvidence? navigation = null;
         try
         {
             var mutates = options.All || !string.IsNullOrEmpty(skillName);
@@ -117,6 +121,7 @@ public sealed class GhSkillInstallService
                         throw new IOException("Shared records changed during install preparation; refresh before installing.");
                 }
                 GhInstallOwnershipGuard.RequireVacantForceDestinations(destinations, options, cancellationToken);
+                navigation = InstallNavigationEvidence.Capture(options, destinations, _runner);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -144,6 +149,7 @@ public sealed class GhSkillInstallService
             StdErr = result.StdErr,
             ErrorMessage = null,
             CommandLine = args,
+            Navigation = navigation,
         };
     }
 

@@ -144,6 +144,88 @@ public sealed class SkillViewAppTests
         LogDirectory = "/tmp/skillview-logs",
     };
 
+    [Fact]
+    public void InstallHandoffSeedsEmbeddedInstalledAndReturnsToUnchangedDiscover()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.QueryFieldForTests!.Text = "retained query";
+        app.OwnerFieldForTests!.Text = "retained-owner";
+        app.AgentFieldForTests!.Text = "retained-agent";
+        app.LoadSearchResultsForTests(Enumerable.Range(0, 30).Select(i =>
+            new SearchResultSkill("Description " + i, "ns", "skills/source", "owner/repo", "skill-" + i, i)).ToArray());
+        app.ResultsTableForTests!.SetSelectedRow(20);
+        app.ResultsTableForTests!.RowOffset = 15;
+        app.SetPreviewTextForTests("retained preview with scroll context");
+        var preview = app.PreviewTextForTests;
+        var results = app.ResultsTableForTests.Table;
+        var skill = new InstalledSkill
+        {
+            Name = "installed", ResolvedPath = Path.Combine(Path.GetTempPath(), "handoff-host", "materialized"),
+            ScanRoot = Path.Combine(Path.GetTempPath(), "handoff-host"), Scope = Scope.User,
+            Agents = [], FrontMatter = new() { Upstream = "https://github.com/owner/repo", GithubPath = "skills/source" },
+            Validity = ValidityState.Valid, Provenance = Provenance.FsScan, Ignored = false, IsSymlinked = false, InstalledAt = null,
+        };
+        var snapshot = InventorySnapshot.Empty with { Skills = [skill], CapturedAt = DateTimeOffset.UtcNow };
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        var group = Assert.Single(overview.Groups);
+        app.RevealInstalledInstallForTests(new(snapshot, overview, group.Key, [Assert.Single(group.Copies).Key]));
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+        Assert.Same(snapshot, app.InstalledTabForTests!.CurrentSnapshot);
+        Assert.False(app.InstalledTabForTests.LoadActiveForTests);
+        Assert.Same(skill, app.InstalledTabForTests.GetSelectedSkill());
+        app.ActivateTabForTests(SkillViewTab.Discover);
+        Assert.Equal("retained query", app.QueryFieldForTests.Text);
+        Assert.Equal("retained-owner", app.OwnerFieldForTests.Text);
+        Assert.Equal("retained-agent", app.AgentFieldForTests.Text);
+        Assert.Same(results, app.ResultsTableForTests.Table);
+        Assert.Equal(20, app.ResultsTableForTests.GetSelectedRow());
+        Assert.Equal(15, app.ResultsTableForTests.RowOffset);
+        Assert.Equal(preview, app.PreviewTextForTests);
+        Assert.False(app.DiscoverTabForTests!.IsLoading);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectedInstallRevealLoadsOnceWhileValidSeedDoesNotReload(bool valid)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var snapshot = SnapshotWithInstalledSkill();
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        var group = Assert.Single(overview.Groups);
+        var inventory = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var populated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loads = 0;
+        SkillView.Ui.Tabs.InstalledTabView? tab = null;
+        tab = new(action =>
+        {
+            action();
+            if (ReferenceEquals(tab?.CurrentSnapshot, snapshot)) populated.TrySetResult();
+            return Task.CompletedTask;
+        }, (_, _) => { }, _ => { loads++; return inventory.Task; },
+            (_, _, _) => throw new InvalidOperationException("No mutation from navigation"), () => { });
+        window.Add(tab);
+        app.SetInstalledTabForTests(tab);
+        app.RevealInstalledInstallForTests(new(snapshot, overview, valid ? group.Key : "missing-group", [Assert.Single(group.Copies).Key]));
+        Assert.Equal(SkillViewTab.Installed, app.ActiveTabForTests);
+        Assert.Equal(valid ? 0 : 1, loads);
+        if (!valid)
+        {
+            Assert.True(tab.LoadActiveForTests);
+            inventory.SetResult(snapshot);
+            await populated.Task.WaitAsync(TestContext.Current.CancellationToken);
+        }
+        Assert.Same(snapshot, tab.CurrentSnapshot);
+        Assert.False(tab.LoadActiveForTests);
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        Assert.Equal(valid ? 0 : 1, loads);
+        Assert.True(tab.Visible);
+        if (valid) Assert.True(tab.DetailOpenForTests);
+        else Assert.True(tab.TableHasFocusForTests);
+    }
+
     private static SkillViewApp CreateApp()
     {
         var services = TuiServices.Build(new Logger(LogLevel.Debug));

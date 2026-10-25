@@ -161,3 +161,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   admission correctly refuses a second global-selector overwrite. Capture gh
   credentials before changing fixture HOME; keychain-backed lookup afterward
   can become unauthenticated. Preserve all update/local-change assertions.
+
+- Named Discover installs carry the explicit repository and search-result source
+  path separately from gh selectors. Compact success navigation retains only
+  transient source/placement/context observations from final admission, excluded
+  from JSON. Never infer source subpaths or materialized leaves from authored
+  names, `RepoSkill`, `ResolveWriteSelectors`, or install stdout. Conservative
+  legacy/override destination alternatives do not verify which folder gh used.
+  After installation, the coordinator derives each requested agent's folder set
+  with single-agent GhPlacementCatalog calls under the captured context. Require
+  their union to equal the admitted flat folders and recheck context/folders
+  around capture. These lookups never enter the final-admission-to-launch gap;
+  User-scope lookups launch no children. This evidence grants browsing only;
+  later mutations require fresh admission.
