@@ -15,7 +15,6 @@ or release verdict.
 - [Managed discovery](maintenance-managed-discovery.md) and
   [effective loading](maintenance-effective-loading.md).
 - [Static package checks](maintenance-static-package-check.md),
-  [source authoring validation](maintenance-authoring-validation.md),
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
 - [Version selection scope](version-selection-scope.md).

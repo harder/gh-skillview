@@ -25,8 +25,7 @@ public class CliDispatcherHelpTests
         Assert.Contains("brew install harder/tap/skillview", stdout);
         Assert.Contains("WinGet manifests are generated for release review", stdout);
         Assert.Contains("automation-friendly", stdout);
-        Assert.Contains("| `authoring-validate` |", stdout);
-        Assert.Contains("--repository PATH", stdout);
+        Assert.Contains("| `check` |", stdout);
         Assert.Contains("| `quarantine` |", stdout);
         Assert.Contains("| `restore-plan` |", stdout);
         Assert.Contains("| `unpin-plan` |", stdout);
@@ -49,7 +48,7 @@ public class CliDispatcherHelpTests
     [InlineData("doctor", 30)]
     [InlineData("preview", 30)]
     [InlineData("list", 120)]
-    [InlineData("authoring-validate", 120)]
+    [InlineData("check", 120)]
     [InlineData("search", 120)]
     [InlineData("install", 600)]
     [InlineData("cleanup", 600)]
