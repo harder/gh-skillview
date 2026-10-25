@@ -63,7 +63,7 @@ public sealed class PinDisplayPolicyTests
         var pin = PinDisplayPolicy.From(skill);
         Assert.Equal(PinDisplayState.Conflicting, pin.State);
         Assert.True(pin.HasPin);
-        Assert.Contains("**Pinned:** Conflicting", InstalledScreen.RenderDetail(skill));
+        Assert.Contains("Pin: `conflicting pin records", InstalledScreen.RenderDetail(skill));
         Assert.Contains("conflicting pin records", UpdateReviewPresentation.Selection(skill));
         var entry = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with { Skills = [skill] },
             TestContext.Current.CancellationToken).Entries.Single(entry => entry.Issue == "installation-review");
@@ -82,7 +82,7 @@ public sealed class PinDisplayPolicyTests
         Assert.Equal(PinDisplayState.Unknown, pin.State);
         Assert.False(pin.HasPin);
         Assert.Equal("?", pin.Flag);
-        Assert.Contains("**Pinned:** Unknown", InstalledScreen.RenderDetail(skill));
+        Assert.Contains("Pin: `pin state unknown", InstalledScreen.RenderDetail(skill));
         Assert.Contains("pin state unknown", CopiesPresentation.Render(new([skill], 0, 0, false), skill, skill));
         var entry = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with { Skills = [skill] },
             TestContext.Current.CancellationToken).Entries.Single(entry => entry.Issue == "installation-review");
@@ -117,8 +117,8 @@ public sealed class PinDisplayPolicyTests
             var pin = PinDisplayPolicy.From(skill);
             Assert.Equal(PinDisplayState.Pinned, pin.State);
             Assert.Equal("p", pin.Flag);
-            Assert.Contains("**Pinned:** Yes", InstalledScreen.RenderDetail(skill));
-            Assert.Contains("**Pinned ref:** `refs/tags/v1`", InstalledScreen.RenderDetail(skill));
+            Assert.Contains("Pin: `refs/tags/v1`", InstalledScreen.RenderDetail(skill));
+            Assert.Contains("**Pinned ref:** `refs/tags/v1`", InstalledScreen.RenderDetail(skill, showDetails: true));
             Assert.Contains("Pin: refs/tags/v1", CopiesPresentation.Render(new([skill], 0, 0, false), skill, skill));
             Assert.Contains("refs/tags/v1", UpdateReviewPresentation.Selection(skill));
             var snapshot = InventorySnapshot.Empty with { Skills = [skill] };
@@ -152,7 +152,7 @@ public sealed class PinDisplayPolicyTests
         Assert.Equal(PinDisplayState.Conflicting, pin.State);
         Assert.True(pin.HasPin);
         Assert.Equal("!", pin.Flag);
-        Assert.Contains("**Pinned:** Conflicting", InstalledScreen.RenderDetail(skill));
+        Assert.Contains("Pin: `conflicting pin records", InstalledScreen.RenderDetail(skill));
         Assert.Contains("conflicting pin records", CopiesPresentation.Render(new([skill], 0, 0, false), skill, skill));
         Assert.Contains("conflicting pin records", UpdateReviewPresentation.Selection(skill));
         var queue = MaintenanceQueueBuilder.Build(InventorySnapshot.Empty with { Skills = [skill] }, TestContext.Current.CancellationToken);

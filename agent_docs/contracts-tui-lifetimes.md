@@ -340,3 +340,25 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   and appends its choose-copy notice when filters were adjusted. Preserve sort and
   Discover state. If seeded reveal is rejected, use one ordinary owned Installed
   load/focus; successful reveal never reloads.
+
+- Installed descriptions retain at most 2,048 UTF-16 code units, backing off a
+  split surrogate pair. Sanitize and normalize the original bounded source,
+  then wrap each raw line with Terminal.Gui's column-aware WordWrapText at the
+  current positive Markdown viewport width, reserving the two copy-glyph columns
+  (the viewport already excludes its scrollbar). Reflow never wraps generated
+  Markdown. Compute the inert no-info backtick fence after final wrapping; its
+  delimiter must exceed every resulting run. A trusted [truncated] paragraph
+  stays outside the fence and copy contents. Copy may include display line breaks.
+  Reflow preserves exact selection/focus and clamps scroll after layout.
+- Ordinary placement literals sanitize controls before one FormatCodeSpan pass;
+  Markdown wraps styled inline values. Group exact retained path, effective scope
+  and captured Context without I/O or inferred roots. Counts use AgentMembership
+  structural Distinct, including hidden evidence fields; identical normalized
+  agent/profile labels compress with a trusted multiplier outside the literal.
+  Show a deterministic prefix of at most 128 whole memberships within 32,768
+  encoded characters including headers/notice (reserve 256 for the latter).
+  Recompute multipliers from included members and report the exact omitted count;
+  keep full headline/footer totals. Order path ordinally, scope ascending, known
+  context before null, normalized agent/profile ordinally, then every original
+  membership field in declaration order (ordinal/null-first strings, ascending
+  enums and false before true). Raw evidence, authority and filters are unchanged.

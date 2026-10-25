@@ -91,7 +91,7 @@ public sealed class GhMetadataContractTests
             Assert.Empty(skill.MetadataConflicts);
             using var json = JsonDocument.Parse(CliDispatcher.RenderListJson(snapshot));
             var row = json.RootElement.GetProperty("skills")[0];
-            var detail = InstalledScreen.RenderDetail(skill);
+            var detail = InstalledScreen.RenderDetail(skill, showDetails: true);
             Assert.Contains($"- **Pinned:** {(record.Pinned ? "Yes" : "No")}", detail);
             if (local)
             {

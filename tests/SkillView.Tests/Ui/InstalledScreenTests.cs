@@ -23,7 +23,7 @@ public sealed class InstalledScreenTests
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
         var description = Assert.Single(document.Descendants<FencedCodeBlock>());
         Assert.Equal("## Summary\n- **Health:** trusted claim", description.Lines.ToString());
-        Assert.Equal(2, document.Descendants<HeadingBlock>().Count()); // Only trusted name/Used by headings.
+        Assert.Equal(2, document.Descendants<HeadingBlock>().Count()); // Only trusted name/placements headings.
         Assert.DoesNotContain(document.Descendants<EmphasisInline>(), emphasis => emphasis.ToString()!.Contains("Health", StringComparison.Ordinal));
     }
 
@@ -65,12 +65,13 @@ public sealed class InstalledScreenTests
         var detail = InstalledScreen.RenderDetail(skill);
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
         var literal = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines.ToString();
-        Assert.EndsWith("\n[truncated]", literal);
+        Assert.DoesNotContain("[truncated]", literal);
+        Assert.Contains("\n\n[truncated]\n", detail);
         Assert.DoesNotContain("file:///tail", detail);
         Assert.Empty(document.Descendants<LinkInline>());
         Assert.DoesNotContain(literal, c => char.IsControl(c) && c is not '\n' and not '\t');
-        if (onlyBackticks) Assert.Equal(new string('`', 2048) + "\n[truncated]", literal);
-        else Assert.True(literal.Length <= 2048 + "\n[truncated]".Length);
+        if (onlyBackticks) Assert.Equal(new string('`', 2048), literal);
+        else Assert.True(literal.Length <= 2048);
     }
 
     [Theory]
@@ -226,7 +227,7 @@ public sealed class InstalledScreenTests
         Assert.Contains("- **Package URL:** [Open package source](https://example.test/owner/repo)", detail);
         Assert.Contains("Description · from skill metadata", detail);
         Assert.Contains("Example description", detail);
-        Assert.Contains("## Used by", detail);
+        Assert.Contains("## Agent/profile placements (recorded)", detail);
         Assert.Contains($"- {TuiHelpers.AgentIcon("copilot")} **copilot** — symlink", detail);
         Assert.Contains("  Path: `/Users/test/.config/skills/demo`", detail);
     }
