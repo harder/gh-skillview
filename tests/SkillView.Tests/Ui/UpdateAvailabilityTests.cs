@@ -181,7 +181,13 @@ public sealed class UpdateAvailabilityTests
     private static UpdateAvailability Classify(UpdateResult result) => SkillUpdateCoordinator.ClassifyAvailability(result, "demo", "https://github.com/owner/repo");
     private static UpdateResult Result(string output) => new()
     {
-        DryRun = true, Succeeded = true, ExitCode = 0, StdOut = output, StdErr = "", ErrorMessage = null,
-        CommandLine = [], Entries = GhSkillUpdateService.ParseEntries(output, true)
+        DryRun = true,
+        Succeeded = true,
+        ExitCode = 0,
+        StdOut = output,
+        StdErr = "",
+        ErrorMessage = null,
+        CommandLine = [],
+        Entries = GhSkillUpdateService.ParseEntries(output, true)
     };
 }

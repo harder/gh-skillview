@@ -26,7 +26,8 @@ public sealed class InstalledTableRenderingTests
         app.Driver!.SetScreenSize(width, height);
         using var window = new Window();
         var skills = Enumerable.Range(0, 60).Select(index => MaintenanceQueueTests.Skill("/skills/skill-" + index.ToString("D2"), "https://github.com/owner/repo")
-            with { Name = "skill-" + index.ToString("D2") }).ToImmutableArray();
+            with
+        { Name = "skill-" + index.ToString("D2") }).ToImmutableArray();
         var snapshot = InventorySnapshot.Empty with { Skills = skills };
         var availability = new UpdateAvailabilitySession();
         var request = availability.Begin(snapshot, 1, "context");

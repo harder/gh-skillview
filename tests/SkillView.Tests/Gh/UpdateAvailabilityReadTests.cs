@@ -127,7 +127,9 @@ public sealed class UpdateAvailabilityReadTests
             Directory.CreateDirectory(home);
             var environment = new Dictionary<string, string>(SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(Root, "context")))
             {
-                ["HOME"] = home, ["USERPROFILE"] = home, ["GH_CONFIG_DIR"] = Path.Combine(Root, "gh"),
+                ["HOME"] = home,
+                ["USERPROFILE"] = home,
+                ["GH_CONFIG_DIR"] = Path.Combine(Root, "gh"),
                 ["FIXTURE_ROOT"] = Root
             };
             _services = TuiServices.Build(new Logger(), processEnvironment: environment, workingDirectory: Root);
