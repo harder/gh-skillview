@@ -98,7 +98,8 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
         var detail = InstalledScreen.RenderDetail(inventory.Skills.First(skill => skill.Name == "demo"));
         Assert.Contains("Distributor version", detail);
         Assert.Contains("Read-only; use the owning agent", detail);
-        Assert.Contains("active session state unknown", detail);
+        Assert.DoesNotContain("active session state unknown", detail);
+        Assert.Contains("active session state unknown", InstalledScreen.RenderDetail(inventory.Skills.First(skill => skill.Name == "demo"), showDetails: true));
         var report = new EnvironmentReport
         {
             GhPath = "/fixture/gh",

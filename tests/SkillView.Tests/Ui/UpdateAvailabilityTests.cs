@@ -91,11 +91,10 @@ public sealed class UpdateAvailabilityTests
         MaintenanceQueueEntry? finding = null;
         using var installed = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
             _ => throw new InvalidOperationException("Availability must not reload inventory"), (_, _, _) => Task.CompletedTask,
-            () => { }, () => { }, availability: state, onCheckUpdates: () => checkCalls++, onReviewUpdate: skill => reviewed = skill);
+            () => { }, availability: state, onCheckUpdates: () => checkCalls++, onReviewUpdate: skill => reviewed = skill);
         installed.LoadSeeded(snapshot);
         var table = installed.SubViews.OfType<TableView>().Single();
-        table.SetSelectedRow(1);
-        var tableSource = table.Table;
+        installed.SetSelectedRowForTests(2);
         using var issues = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(snapshot), () => { }, onActivateEntry: entry => finding = entry,
             availability: state, onCheckUpdates: () => checkCalls++);
@@ -108,10 +107,10 @@ public sealed class UpdateAvailabilityTests
         Assert.Equal(1, checkCalls);
         state.Publish(request, 1, "ctx", second, Classify(Result("demo (owner/repo) abc > def [main]")));
         installed.RefreshAvailability(); issues.RefreshAvailability();
-        Assert.Same(tableSource, table.Table);
+        Assert.Equal(2, table.GetSelectedRow());
         Assert.Equal(second.InstallationId, installed.GetSelectedSkill()!.InstallationId);
         Assert.Contains("Update available", installed.DetailTextForTests);
-        installed.NewKeyDownEvent(Key.Enter);
+        installed.NewKeyDownEvent(new Key('u'));
         Assert.Equal(second.InstallationId, reviewed!.InstallationId);
         var issueTable = issues.SubViews.OfType<TableView>().Single();
         var updateRow = Enumerable.Range(0, issueTable.Table!.Rows).Single(i => (string)issueTable.Table[i, 0] == "Updates");

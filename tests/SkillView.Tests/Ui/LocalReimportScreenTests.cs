@@ -109,7 +109,7 @@ public sealed partial class LocalReimportScreenTests
         var target = Target(); InstalledSkill? selected = null; InstalledSkill? checkedSkill = null; InstalledSkill? switched = null; var shellReceived = false;
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
-            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { }, () => { },
+            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { },
             onPackageCheck: skill => checkedSkill = skill, onLocalReimport: skill => selected = skill, onLocalSourceSwitch: skill => switched = skill)
         { Width = Dim.Fill(), Height = Dim.Fill() };
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [target] });
@@ -122,7 +122,7 @@ public sealed partial class LocalReimportScreenTests
             Press('R'); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("R", view.GetFilterText());
             Press('K'); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("RK", view.GetFilterText());
             Press('T'); Assert.Null(switched); Assert.Null(selected); Assert.Null(checkedSkill); Assert.Equal("RKT", view.GetFilterText());
-            view.SetFilterTextForTests(""); view.FocusList(); Assert.False(view.FilterHasFocusForTests);
+            view.SetFilterTextForTests(""); view.SetSelectedRowForTests(1); view.FocusList(); Assert.False(view.FilterHasFocusForTests);
             shellReceived = false; Press('R'); Assert.Same(target, selected); Assert.False(shellReceived);
             Assert.Null(checkedSkill); selected = null;
             Press('K'); Assert.Same(target, checkedSkill); Assert.Null(selected); Assert.False(shellReceived);

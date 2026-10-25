@@ -19,8 +19,8 @@ public sealed class InstalledTabViewTests
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
             (work, name) => operations[name] = work(), _ => throw new InvalidOperationException("Unexpected refresh"),
             (_, _, _) => throw new IOException("Selected installation disappeared; refresh Installed and select it again."),
-            () => { }, () => { }, onRemovalError: error => reported = error);
-        view.LoadSeeded(SnapshotWithSkill("demo", null));
+            () => { }, onRemovalError: error => reported = error);
+        SeedExactCopy(view, SnapshotWithSkill("demo", null));
         Assert.True(view.TryStartSelectedRemoveForTests());
         await operations["installed.remove"];
         Assert.IsType<IOException>(reported);
@@ -43,9 +43,9 @@ public sealed class InstalledTabViewTests
         var snapshot = SnapshotWithSkill("demo", null);
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
             (work, name) => operations[name] = work(), token => inventory.Task.WaitAsync(token),
-            async (_, _, token) => { removed++; await removal.Task.WaitAsync(token); }, () => { }, () => { },
+            async (_, _, token) => { removed++; await removal.Task.WaitAsync(token); }, () => { },
             openPath: _ => { opened++; return true; });
-        view.LoadSeeded(snapshot);
+        SeedExactCopy(view, snapshot);
         view.FocusList();
         view.NewKeyDownEvent(new Key('o'));
         Assert.Equal(1, opened);
@@ -71,8 +71,8 @@ public sealed class InstalledTabViewTests
     {
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
-            (_, _) => { }, _ => pending.Task, (_, _, _) => Task.CompletedTask, () => { }, () => { });
-        view.LoadSeeded(InventorySnapshot.Empty);
+            (_, _) => { }, _ => pending.Task, (_, _, _) => Task.CompletedTask, () => { });
+        SeedExactCopy(view, InventorySnapshot.Empty);
         view.FocusList();
         var load = view.LoadAsync();
         view.FocusList();
@@ -89,14 +89,14 @@ public sealed class InstalledTabViewTests
         using var view = new InstalledTabView(
             action => { action(); return Task.CompletedTask; },
             (_, _) => { }, _ => Task.FromResult(InventorySnapshot.Empty),
-            (_, _, _) => Task.CompletedTask, () => { }, () => { });
-        view.LoadSeeded(SnapshotWithSkill("demo", null) with
+            (_, _, _) => Task.CompletedTask, () => { });
+        SeedExactCopy(view, SnapshotWithSkill("demo", null) with
         {
             Providers = [new ProviderObservation("gh", false, [], DateTimeOffset.UtcNow, "failed")],
             Diagnostics = new ScanDiagnostics { InaccessiblePaths = ["/denied"] },
         });
-        Assert.Contains("partial scan", view.FooterTextForTests);
-        Assert.Contains("1 inaccessible", view.FooterTextForTests);
+        Assert.Contains("Partial scan", view.FooterTextForTests);
+        Assert.Contains("1 access limits", view.CoverageForTests);
     }
 
     [Fact]
@@ -117,8 +117,8 @@ public sealed class InstalledTabViewTests
             (operation, _) => operation().GetAwaiter().GetResult(),
             _ => { loads++; return Task.FromResult(snapshot); },
             (_, _, _) => Task.CompletedTask,
-            () => { }, () => { });
-        view.LoadSeeded(snapshot);
+            () => { });
+        SeedExactCopy(view, snapshot);
         view.FocusList();
 
         view.NewKeyDownEvent(new Key('G'));
@@ -157,9 +157,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await releaseRemove.Task.WaitAsync(cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkill(
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -201,9 +200,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await releaseRemove.Task.WaitAsync(cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkills("frontend-design", "backend-design"));
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkills("frontend-design", "backend-design"));
 
         Assert.True(view.TryStartSelectedRemoveForTests());
         await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -238,9 +236,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkill(
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -287,9 +284,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await releaseRemove.Task.WaitAsync(cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkill(
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -306,7 +302,7 @@ public sealed class InstalledTabViewTests
         Assert.False(view.RemoveActiveForTests);
         Assert.True(view.LoadActiveForTests);
         Assert.True(view.SpinnerVisibleForTests);
-        Assert.Equal(" loading inventory…", view.FooterTextForTests);
+        Assert.Equal(" Refreshing inventory… copy actions paused", view.FooterTextForTests);
 
         view.CancelPendingWork();
         await operations["installed.remove-refresh"];
@@ -340,9 +336,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await releaseRemove.Task.WaitAsync(cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkill(
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -389,9 +384,8 @@ public sealed class InstalledTabViewTests
                 removeStarted.TrySetResult();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             },
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
-        view.LoadSeeded(SnapshotWithSkill(
+            onLeaveTab: static () => { });
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -433,63 +427,6 @@ public sealed class InstalledTabViewTests
     }
 
     [Fact]
-    public void LoadSeeded_KeepsAgentsColumnCompactWithoutExpandingTheLastColumn()
-    {
-        var view = CreateSubject();
-
-        view.LoadSeeded(SnapshotWithSkill(
-            name: "frontend-design",
-            packageSource: "owner/repo",
-            agentIds: ["claude", "gemini", "copilot"]));
-
-        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
-        var agentsIndex = Array.IndexOf(table.Table!.ColumnNames, "Agents");
-        var agentsStyle = table.Style.GetOrCreateColumnStyle(agentsIndex);
-
-        Assert.Equal(["Name", "State", "Loc", "Agents", "Package"], table.Table.ColumnNames);
-        Assert.False(table.Style.ExpandLastColumn);
-        Assert.Equal(7, agentsStyle.MinWidth);
-        Assert.Equal(7, agentsStyle.MaxWidth);
-    }
-
-    [Fact]
-    public void LoadSeeded_ShowsARightEdgeLineForTheInstalledTable()
-    {
-        var view = CreateSubject();
-
-        view.LoadSeeded(SnapshotWithSkill(
-            name: "frontend-design",
-            packageSource: "owner/repo",
-            agentIds: ["claude", "gemini"]));
-
-        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
-
-        Assert.True(table.Style.ShowVerticalCellLineForLastColumn);
-    }
-
-    [Fact]
-    public void LoadSeeded_AssignsRemainingLeftPaneWidthToNameAndPackageColumns()
-    {
-        var view = CreateSubject();
-
-        view.LoadSeeded(SnapshotWithSkill(
-            name: "workers-best-practices",
-            packageSource: "cloudflare/skills",
-            agentIds: ["claude", "gemini"]));
-
-        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
-        var nameIndex = Array.IndexOf(table.Table!.ColumnNames, "Name");
-        var packageIndex = Array.IndexOf(table.Table.ColumnNames, "Package");
-        var nameStyle = table.Style.GetOrCreateColumnStyle(nameIndex);
-        var packageStyle = table.Style.GetOrCreateColumnStyle(packageIndex);
-
-        Assert.Equal(nameStyle.MaxWidth, nameStyle.MinWidth);
-        Assert.Equal(packageStyle.MaxWidth, packageStyle.MinWidth);
-        Assert.True(nameStyle.MaxWidth > 8);
-        Assert.True(packageStyle.MaxWidth > 8);
-    }
-
-    [Fact]
     public void LoadSeeded_RequestsMultipleDeferredUiPassesToStabilizeInitialColumnWidths()
     {
         var deferredPasses = 0;
@@ -503,10 +440,9 @@ public sealed class InstalledTabViewTests
             runTask: (operation, _) => operation().GetAwaiter().GetResult(),
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onRemove: static (_, _, _) => Task.CompletedTask,
-            onLeaveTab: static () => { },
-            onGoToSearch: static () => { });
+            onLeaveTab: static () => { });
 
-        view.LoadSeeded(SnapshotWithSkill(
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude", "gemini"]));
@@ -526,30 +462,29 @@ public sealed class InstalledTabViewTests
             snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
             onRemove: static (_, _, _) => Task.CompletedTask,
             onLeaveTab: static () => { },
-            onGoToSearch: static () => { },
             lifetimeToken: lifetime.Token);
 
-        view.LoadSeeded(SnapshotWithSkill(
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
 
-        Assert.NotNull(deferredPass);
-        await deferredPass;
-        Assert.True(deferredPass.IsCompletedSuccessfully);
+        Assert.Null(deferredPass);
+        await Task.CompletedTask;
+        Assert.Null(view.CurrentSnapshot);
     }
 
     [Fact]
     public void LoadSeeded_RestoresFilterFocusAfterRefresh()
     {
         var view = CreateSubject();
-        view.LoadSeeded(SnapshotWithSkill(
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
 
         view.FocusFilterForTests();
-        view.LoadSeeded(SnapshotWithSkill(
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -562,7 +497,7 @@ public sealed class InstalledTabViewTests
     public void EscLeavesInstalledFilterWithoutDiscardingIt()
     {
         var view = CreateSubject();
-        view.LoadSeeded(SnapshotWithSkill(
+        SeedExactCopy(view, SnapshotWithSkill(
             name: "frontend-design",
             packageSource: "owner/repo",
             agentIds: ["claude"]));
@@ -574,25 +509,11 @@ public sealed class InstalledTabViewTests
         Assert.True(view.TableHasFocusForTests);
     }
 
-    [Fact]
-    public void Constructor_ShowsInstalledFilterGuideAndCompactLegend()
+    private static void SeedExactCopy(InstalledTabView view, InventorySnapshot snapshot)
     {
-        var view = CreateSubject();
-
-        var labels = view.SubViews
-            .OfType<Label>()
-            .Select(label => label.Text.ToString())
-            .ToArray();
-
-        Assert.Contains(labels, text => text.Contains("name", StringComparison.OrdinalIgnoreCase)
-            && text.Contains("agent", StringComparison.OrdinalIgnoreCase)
-            && text.Contains("package", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(labels, text => text.Contains("USR", StringComparison.Ordinal)
-            && text.Contains("PRJ", StringComparison.Ordinal)
-            && text.Contains("OK", StringComparison.Ordinal)
-            && text.Contains("REV", StringComparison.Ordinal));
-        Assert.DoesNotContain(labels, text => text.Contains("P pin", StringComparison.Ordinal)
-            || text.Contains("G scope", StringComparison.Ordinal));
+        view.LoadSeeded(snapshot);
+        var index = view.RowsForTests.ToList().FindIndex(row => row.Copy is not null);
+        if (index >= 0) view.SetSelectedRowForTests(index);
     }
 
     private static InstalledTabView CreateSubject() => new(
@@ -604,8 +525,7 @@ public sealed class InstalledTabViewTests
         runTask: (operation, _) => operation().GetAwaiter().GetResult(),
         snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
         onRemove: static (_, _, _) => Task.CompletedTask,
-        onLeaveTab: static () => { },
-        onGoToSearch: static () => { });
+        onLeaveTab: static () => { });
 
     private static InventorySnapshot SnapshotWithSkills(string firstName, string secondName)
     {

@@ -264,3 +264,20 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   a failed/missing/ambiguous capture clears the actionable target. The retired
   full inventory browser, marks/All, UI sibling queue and dry-run action must
   not be reintroduced as test helpers. Main-view availability remains separate.
+
+- Installed builds one transient source/copy projection off the UI thread per new
+  snapshot. SourceIdentity.Key plus case-insensitive name groups known sources;
+  null/conflicting keys stay singleton groups; duplicate IDs are inspect-only.
+  Drawing
+  and navigation use frozen labels/addresses, with no discovery or classifier I/O.
+  Shared exposures count as placements, not extra physical copies. Preserve all
+  owner claims and availability states; read-only policy never invents a check.
+- Installed uses full-width list/detail below 110 columns and master/detail above
+  that width. Enter browses/toggles; visible Review/u hands off the exact ID/path
+  to existing fresh admission. Esc returns detail to list before leaving the tab;
+  Left/Right expands locally and / focuses Installed search. P/G/sort persist.
+  Keep selection and top-row keys through projection changes, and disable actions
+  when that selection is missing, hidden, filtered or ambiguous. Refresh leaves
+  old rows visibly refreshing with copy actions paused. Bound display to 8,192
+  rows including headings and omission indication. C (Shift+c) remains global
+  check/cancel; c remains Cleanup. The existing Issues copy chooser is separate.

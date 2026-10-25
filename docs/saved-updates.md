@@ -14,8 +14,7 @@ are explicitly `not-started`. Prepare each next target after applying or skippin
 the current review. Applying a sibling changes captured directory generations.
 
 To choose a specific version for one installed copy, select **Choose version...**
-in Updates and enter its Git tag (for example, `v1.2.0`). This uses the current row,
-independently of marks or All. The equivalent CLI preparation is:
+in Updates and enter its Git tag (for example, `v1.2.0`). This uses the one exact copy selected for the review. The equivalent CLI preparation is:
 
 ```sh
 skillview --scan-root /path/to/skills update-plan --path /path/to/skills/demo --tag v1.2.0 --json
@@ -35,11 +34,10 @@ with `--unpin`. Branches and raw commits are not selected by this action; a tag
 named like a commit is still resolved only as a tag. New pin policy, automatic tag
 browsing and persistent version approvals are outside this flow.
 
-Installed's **Review update (u / Enter)** and an Issues **Updates** finding open
+Installed's **Review update (u)** and an Issues **Updates** finding open
 one exact physical copy and prepare its saved candidate immediately. Copies'
 **Update / version...** opens options for its already selected copy, so choosing
-a tag does not first stage latest. The operation surface has no inventory table,
-marks, All selection or availability check. Main-view **Check updates (C)** is
+a tag does not first stage latest. Enter in Installed browses ordinary detail; it does not prepare an update. The operation surface stays restricted to its one selected copy. Main-view **Check updates (C)** is
 read-only and consumes no saved-plan quota.
 
 Each candidate has its own source acknowledgement, retention checkbox and

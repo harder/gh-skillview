@@ -173,7 +173,6 @@ public sealed partial class SkillViewApp
             onRemove: (skill, snap, token) =>
                 _workflows.OpenRemoveDialogAsync(skill, snap, token),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
-            onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
@@ -344,20 +343,12 @@ public sealed partial class SkillViewApp
             return;
         }
 
-        // For Installed, keep the shell chrome focused on active filters/pin
-        // state; the selected row's metadata already lives in the detail pane.
+        // Installed owns its filter/coverage chrome and needs the row budget
+        // for its full-width list at 80x24.
         if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
         {
-            var filter = _installedTab.GetFilterText();
-            if (!string.IsNullOrEmpty(filter))
-            {
-                filterLabel = $"filter: {filter}";
-            }
-            var pinFilter = _installedTab.GetPinFilterState();
-            if (pinFilter is not null)
-            {
-                agentLabel = pinFilter;
-            }
+            ApplyContextBarVisibility(false);
+            return;
         }
 
         // For Changes tab, show count of pending items.
