@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Text.Json.Serialization;
 
 namespace SkillView.Maintenance;
 
@@ -17,7 +16,3 @@ internal sealed record MaintenancePlanComparison(string InstalledPayload, string
         return new(plan.Original.Payload, plan.Candidate.Payload, paths);
     }
 }
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(MaintenancePlanComparison))]
-internal partial class MaintenanceComparisonJsonContext : JsonSerializerContext;

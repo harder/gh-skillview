@@ -59,9 +59,7 @@ public static partial class CliDispatcher
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
             | `queue` | Refresh read-only maintenance observations grouped by issue and physical installation. Update availability and running-session state remain unknown. | `--install-id`, `--allow-hidden-dirs`, `--json` (schema 1) |
-            | `inspect` | Inspect one exact installation, or verify locations of a saved local plan reference. | `--path` / `--install-id`, or `--plan-file`, `--json` |
-            | `plan` | Save one immutable specialist candidate and compare installed/candidate file evidence. JSON includes a local plan reference. | `--purpose update-revision` / `restore-recorded` / `unpin-only` / `local-reimport` / `switch-local-source`, `--path` / `--install-id`, `--new-source` for source switching, `--json` |
-            | `apply`, `repair`, `undo`, `verify` | Resolve a bounded local plan-reference file through the retained native store. Repair resumes a recognized transaction; it never invents owner repair. | `--plan-file`, execution requires separate `--yes --expect`; apply also requires explicit specialist `--disposition`; `--json` |
+            | `inspect` | Inspect one exact installation, or read an old plan reference for specialist recovery guidance. | `--path` / `--install-id`, or `--plan-file`, `--json` |
             | `rescan` | Rebuild the local inventory snapshot and print a summary. | _none_ |
             | `search <query>` | Search public skill repositories. | `--owner`, `--limit`, `--page`, `--json` |
             | `preview OWNER/REPO [SKILL]` | Render a skill preview without installing it. | `--version`, `--allow-hidden-dirs`, `--rendered`, `--json` |

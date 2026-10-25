@@ -19,13 +19,15 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   requests cannot open a modal, and started dispatch stays exclusive until return.
   See `agent_docs/maintenance-queue.md` for the queue workflow and its limits.
 
-- Maintenance plan files are bounded local references, never imported payload
-  authority or approval. Read them through `RegularFileInspection.Capture` and
-  match ID/purpose/fingerprints/address/context against the native retained store.
-  Keep independent `--expect`, explicit retention, source-review and native
-  transition gates in specialist workflows. Generic repair cannot start a ready
-  replacement. Disk verification and conditional agent reload instructions never
-  establish active-session state. See `agent_docs/maintenance-queue.md`.
+- Legacy maintenance reference files remain bounded, read-only locators through
+  `inspect --plan-file` and `RegularFileInspection.Capture`. Report the exact saved
+  ID/purpose and direct specialist inspection/recovery/undo guidance, explicitly
+  unverified against the local store. Do not create/export new references or
+  execute generic plan-file mutations. Keep independent `--expect`, retention,
+  source-review and native transition gates in specialist workflows. Recovery
+  resumes a saved transaction; it must not be relabeled as arbitrary skill repair.
+  Disk verification and conditional reload guidance never establish active-session
+  state. See `agent_docs/maintenance-queue.md`.
 
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention

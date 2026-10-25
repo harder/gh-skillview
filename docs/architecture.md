@@ -16,6 +16,12 @@ so CLI behavior and the terminal interface share the same services.
 - `src/SkillView.Core/Gh/` invokes `gh` with argument arrays. Install and
   listing calls put trusted flags before `--` and selectors after it.
 
+Saved replacements use purpose-specific CLI commands and the shared saved-operation
+coordinators/store. The retired generic mutation facade creates no new plan
+references. A bounded `inspect --plan-file` reader supplies unverified specialist
+recovery guidance for existing references; it cannot execute an operation. Native
+plan schemas, hashes and retained originals remain the recovery authority.
+
 ## Terminal interface
 
 `SkillViewApp` owns the Terminal.Gui application lifetime, the persistent
