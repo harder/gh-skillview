@@ -145,10 +145,24 @@ public sealed class InstalledOverviewTests
 
     internal static InstalledSkill Copy(string path, string name, string? repository = null, string? gitRef = null) => new()
     {
-        Name = name, ResolvedPath = path, ScanRoot = "/skills", Scope = Scope.User, Agents = [],
-        FrontMatter = new() { Name = name, Description = "Explains commands and tools for a project.", Upstream = repository is null ? null : "https://github.com/" + repository,
-            GithubPath = repository is null ? null : "skills/demo", GithubRef = gitRef },
-        Validity = ValidityState.Valid, Provenance = Provenance.FsScan, Ignored = false, IsSymlinked = false, InstalledAt = null,
+        Name = name,
+        ResolvedPath = path,
+        ScanRoot = "/skills",
+        Scope = Scope.User,
+        Agents = [],
+        FrontMatter = new()
+        {
+            Name = name,
+            Description = "Explains commands and tools for a project.",
+            Upstream = repository is null ? null : "https://github.com/" + repository,
+            GithubPath = repository is null ? null : "skills/demo",
+            GithubRef = gitRef
+        },
+        Validity = ValidityState.Valid,
+        Provenance = Provenance.FsScan,
+        Ignored = false,
+        IsSymlinked = false,
+        InstalledAt = null,
     };
     private static InstalledOverview Build(params InstalledSkill[] skills) => InstalledOverview.Build(InventorySnapshot.Empty with { Skills = [.. skills] }, TestContext.Current.CancellationToken);
     private static InstalledOverviewRows View(InstalledOverview overview) => overview.View(_ => true, "name", overview.Groups.Select(g => g.Key).ToHashSet(), null, TestContext.Current.CancellationToken);

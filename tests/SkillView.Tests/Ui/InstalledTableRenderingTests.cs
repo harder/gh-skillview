@@ -27,7 +27,8 @@ public sealed class InstalledTableRenderingTests
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
             token => pending.Task.WaitAsync(token), (_, _, _) => Task.CompletedTask, () => { },
-            availability: new(), onReviewUpdate: _ => { }) { Width = Dim.Fill(), Height = Dim.Fill() };
+            availability: new(), onReviewUpdate: _ => { })
+        { Width = Dim.Fill(), Height = Dim.Fill() };
         window.Add(view); view.LoadSeeded(snapshot);
         var session = app.Begin(window);
         // This fixture dispatches inline without pumping Terminal.Gui's event

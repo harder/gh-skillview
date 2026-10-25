@@ -790,11 +790,16 @@ internal sealed class InstalledTabView : FrameView
         }
         _actionsMenu?.Dispose();
         var key = _selectedKey;
-        _actionsMenu = new PopoverMenu(actions.Select(a => new MenuItem { Title = a.Label, Action = () =>
+        _actionsMenu = new PopoverMenu(actions.Select(a => new MenuItem
+        {
+            Title = a.Label,
+            Action = () =>
         {
             if (CanActOnSelection && _selectedKey == key && GetSelectedSkill() is { } current
                 && current.ResolvedPath == skill.ResolvedPath) a.Run();
-        } }).ToArray()) { App = App };
+        }
+        }).ToArray())
+        { App = App };
         _actionsMenu.MakeVisible();
     }
 
