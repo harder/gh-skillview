@@ -17,7 +17,7 @@ public sealed class InstalledScreenTests
         };
         var detail = InstalledScreen.RenderDetail(skill);
         Assert.True(detail.IndexOf("**Path:**", StringComparison.Ordinal) < detail.IndexOf("## Description", StringComparison.Ordinal));
-        Assert.Contains("> ## Summary\n> - **Health:** trusted claim", detail);
+        Assert.Contains("> ## Summary\n> - **Health:** trusted claim", detail.ReplaceLineEndings("\n"));
     }
 
     [Theory]
