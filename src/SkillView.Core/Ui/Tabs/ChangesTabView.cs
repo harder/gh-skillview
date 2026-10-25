@@ -401,7 +401,8 @@ internal sealed class ChangesTabView : FrameView
             .Select(item => new ChangesQueueRow("Updates", item.Skill.Name + " · " + DisplayPath.Abbreviate(item.Skill.ResolvedPath, _homeDirectory),
                 [new MaintenanceQueueEntry("update-" + UpdateAvailability.Address(item.Skill), "upstream-update", item.Skill.Name,
                     OperationSubject.From(item.Skill), [item.Skill.ResolvedPath], "gh-dry-run", item.Check.Reason,
-                    "review-update", false, item.Skill.Pinned)]) { Availability = item.Check }).ToArray();
+                    "review-update", false, item.Skill.Pinned)])
+            { Availability = item.Check }).ToArray();
         _availabilityOmittedRows = Math.Max(0, _projection.Rows.Count + updates.Length - ChangesQueueBuilder.MaxRows);
         return _projection.Rows.Where(row => row.Kind == "Problem").Concat(updates)
             .Concat(_projection.Rows.Where(row => row.Kind != "Problem")).Take(ChangesQueueBuilder.MaxRows).ToArray();
