@@ -28,7 +28,7 @@ approved scope.
 | Terminal.Gui, async work, cancellation, dispatch and shutdown | [TUI/lifetime contracts](agent_docs/contracts-tui-lifetimes.md) |
 | Test isolation, xUnit, Terminal.Gui packages and AOT | [Testing contracts](agent_docs/contracts-testing.md) |
 | CI, releases, dependency automation and documentation | [Repository contracts](agent_docs/contracts-repository.md) |
-| Package checks, authoring validation and isolated evaluations | [Package-check contracts](agent_docs/contracts-package-checks.md) |
+| Package checks | [Package-check contracts](agent_docs/contracts-package-checks.md) |
 
 Changes spanning areas must satisfy every relevant contract. Keep detailed
 subsystem rules in these guides; keep this root file short. The
@@ -47,7 +47,7 @@ subsystem rules in these guides; keep this root file short. The
 - Keep saved schema/hash compatibility and retained originals for recovery.
   A historical schema proof remains current coverage while that schema is supported.
 - Use captured child CWD/environment; never change the parent process environment
-  to implement discovery. Read-only policy inspection must not launch AI clients.
+  to implement discovery. Read-only inventory and package checks must not launch AI clients.
 - Use the existing application-owned cancellation, background-task and UI-dispatch
   helpers. Preserve lifetime/ownership checks through queued UI completion.
 - Keep gh authentication delegated to gh. Require gh 2.97.0 or newer. Put trusted

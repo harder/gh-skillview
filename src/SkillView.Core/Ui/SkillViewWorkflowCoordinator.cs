@@ -378,15 +378,6 @@ internal sealed class SkillViewWorkflowCoordinator
         return _displayInventory.GetAsync(cancellationToken);
     }
 
-    internal void ShowEffectiveLoading(InstalledSkill selected)
-    {
-        if (_getApp() is not { } app) return;
-        EffectiveLoadingScreen.Show(app, _services.Logger, selected, _services.Runner.EffectiveWorkingDirectory,
-            (request, token) => new SkillView.Loading.EffectiveSkillLoader(_services.Runner).CaptureInventoryAsync(
-                _services.InventoryService, _getGhPath(), request, _options.ScanRoots,
-                _options.WorkspaceDirectories, _options.Profiles, token));
-    }
-
     internal void ShowPackageCheck(InstalledSkill selected, CancellationToken lifetimeToken)
     {
         if (_getApp() is not { } app) return;

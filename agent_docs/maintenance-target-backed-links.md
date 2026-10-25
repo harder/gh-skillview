@@ -1,7 +1,7 @@
 # Target-backed exposure link retention
 
 This internal native primitive retains exposure links without granting detach,
-manager-adoption or effective-loading authority. Broader topology workflows
+manager-adoption or running-session loading evidence. Broader topology workflows
 remain deferred; see [project scope](deferred-maintenance-work.md).
 
 `NativeExposureLinkLease.Open(root, entry, targetLease, token)` binds a single

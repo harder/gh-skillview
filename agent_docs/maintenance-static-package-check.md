@@ -71,9 +71,11 @@ Home-prefixed `file:`/`link:` dependency addresses remain environment-specific a
 unknown, with partial declaration coverage. Never expand HOME or classify an
 external home-relative address against a literal `~` directory in the payload.
 
-`--agent` / `--agent-version` reuse `AgentLoadingRules` citations/applicability and
-`LoadingHeaderFraming` on complete captured root bytes. Only the cited Gemini
-0.46.0 framing rejection is currently a definite package incompatibility. Passing
+`--agent` / `--agent-version` select static rules in `PackageCompatibilityChecker`
+on complete hash-verified root bytes. Its citations cover package metadata only;
+agent settings, permissions and trust are not read or modeled. Only the cited
+Gemini 0.46.0 framing rejection (BOM or missing closing `---`) is currently a
+definite package incompatibility. A later `---` after YAML `...` remains unknown. Passing
 this subset is still unknown for whole-agent compatibility; other agents/versions
 retain explicit unknown reasons. No ambient policy/default allow is inferred.
 Portability and literal URL/tool observations remain review evidence, distinct
@@ -87,14 +89,10 @@ verified and merged in PR71. Other original maintenance findings remain open.
 
 The [saved-update source-review phase](maintenance-update-source-review.md) adds
 frozen content diffs, bounded declaration deltas and explicit acknowledgement to
-new product plans. The explicit repository authoring `gh skill publish --dry-run`
-workflow is documented in [authoring validation](maintenance-authoring-validation.md);
-its gh command result is separate from installed-package static evidence.
-The [explicit offline evaluation workflow](maintenance-isolated-evaluation.md)
-requires a reviewed environment and prompts plus separate execution consent.
-PR71's Linux proof exercised the explicit offline evaluator and cleanup; its
-four native hosts separately verified static checks and actual authoring dry-runs.
-Those results do not establish model quality or skill safety. Never use
+new product plans. Source authors can use `gh skill publish --dry-run` directly;
+its diagnostics are separate from installed-package static evidence.
+PR71's four native hosts verified static checks.
+Those results do not establish skill safety. Never use
 `publish --fix` to repair installed updates or silently edit authored instructions.
 
 The dialog uses `ModalOperationTracker` ownership through queued completion.

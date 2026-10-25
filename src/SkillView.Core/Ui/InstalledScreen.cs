@@ -97,9 +97,12 @@ public static class InstalledScreen
         AppendDetailItem(sb, "Health", MarkdownTableFormatter.FormatTableCell(
             s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
         AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
-        AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Pinned)));
+        var pin = PinDisplayPolicy.From(s);
+        AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(pin.Label));
+        if (pin.State is PinDisplayState.Conflicting or PinDisplayState.Unknown)
+            AppendDetailItem(sb, "Pin policy", MarkdownTableFormatter.FormatTableCell(pin.Guidance));
         if (s.FrontMatter.GithubRef is { } repositoryRef) AppendDetailItem(sb, "Repository ref", MarkdownTableFormatter.FormatCodeSpan(repositoryRef));
-        if (s.FrontMatter.PinnedRef is { } pinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(pinnedRef));
+        if (pin.PinnedRef is { } pinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(pinnedRef));
         if (s.FrontMatter.GithubPath is { } sourcePath) AppendDetailItem(sb, "Source path", MarkdownTableFormatter.FormatCodeSpan(sourcePath));
         if (s.FrontMatter.LocalPath is { } localPath)
         {
@@ -183,7 +186,7 @@ public static class InstalledScreen
         }
         sb.AppendLine();
         sb.AppendLine(showShortcuts
-            ? "Active-session loading is unknown. **E** Analyze loading · **K** Check package · **F2** Technical details."
+            ? "Active-session loading is unknown. **K** Check package · **F2** Technical details."
             : "Active-session loading is unknown.");
         if (showDetails && s.ObservedSubject is { } subject)
         {

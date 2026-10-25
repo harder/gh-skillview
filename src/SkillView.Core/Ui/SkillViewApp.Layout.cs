@@ -177,7 +177,6 @@ public sealed partial class SkillViewApp
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
                 CancellationCallbackReporter.For(_services.Logger, "installed tab"),
-            onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill),
             onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
             onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),

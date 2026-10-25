@@ -26,6 +26,23 @@ coverage detail at 8 Ki characters. Omission counts are explicit; exact fields
 are omitted whole rather than shortened into routing selectors. Full schema JSON
 remains available through a fresh queue capture. Projection and field rendering
 check cancellation while enumerating. Coverage text is retained once per view.
+Changes labels use unique location suffixes within each same-name group, with
+bounded display markers when sanitization or shortening erases distinctions.
+Omit a trailing skill name that repeats the title. Compare displayed suffixes
+ordinally; this visual distinction does not change physical path identity.
+Repeated issues at one path retain the same location label. Labels never replace
+the original frozen entry as a routing selector.
+
+`PinDisplayPolicy` is a transient read-only projection shared by Installed,
+Copies, update selection and queue presentation. It includes contextual owner
+pins, retains differing refs/owner policies, and keeps unreadable metadata
+distinct from unpinned. Unrelated source conflicts alone are not pin conflicts.
+The pinned filter includes any positive pin claim; the unpinned filter admits
+only an unpinned projection. Malformed blank refs remain unknown, and skill-less
+cleanup observations omit pin presentation. Legacy entries without the internal
+projection fall back to their recorded ref/owner/boolean evidence. The queue
+carries this projection internally;
+legacy JSON booleans, saved subjects/hashes and mutation admission stay unchanged.
 
 Selected cleanup hand-offs use the Changes activation/request lease, not only
 the app lifetime. Leaving or refreshing Changes cancels pending selection work;

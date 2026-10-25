@@ -18,7 +18,6 @@
     <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
     <PackageReference Include="Terminal.Gui.Editor" Version="$(TerminalGuiEditorVersion)" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
-    <PackageReference Include="Tomlyn" Version="2.10.1" />
     <!-- Service Terminal.Gui's runtime dependencies independently of its release
          cadence. Keep these overrides together and verify all AOT targets. -->
     <PackageReference Include="Markdig" Version="1.4.2" />

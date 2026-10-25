@@ -37,9 +37,6 @@ public sealed class LocalInventoryService
         _contextRunner = contextRunner ?? new ProcessRunner(logger);
     }
 
-    internal LocalInventoryService InContext(ProcessRunner runner) => new(_resolver, _scanner,
-        new GhSkillListAdapter(runner, _logger), _logger, runner);
-
     public sealed record Options(
         IReadOnlyList<string> ScanRoots,
         bool AllowHiddenDirs,
@@ -49,8 +46,6 @@ public sealed class LocalInventoryService
         IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null)
     {
         internal bool BypassGhCache { get; init; }
-        internal bool DiscoverNestedSkillFiles { get; init; }
-        internal bool IncludeRootSkillFiles { get; init; }
     }
 
     public async Task<InventorySnapshot> CaptureAsync(
@@ -305,7 +300,7 @@ public sealed class LocalInventoryService
         var scanned = _scanner.ScanWithCancellation(
             allRoots,
             new LocalSkillScanner.Options(options.AllowHiddenDirs)
-            { Managed = managed, DiscoverNestedSkillFiles = options.DiscoverNestedSkillFiles, IncludeRootSkillFiles = options.IncludeRootSkillFiles },
+            { Managed = managed },
             cancellationToken, inaccessible, locations);
         _logger.Info("inventory.timing", $"payload metadata scanned: {fsSw.ElapsedMilliseconds}ms cumulative");
         var lockDiagnostics = new List<LockReadDiagnostic>();
