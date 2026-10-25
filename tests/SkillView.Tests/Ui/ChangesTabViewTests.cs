@@ -17,10 +17,10 @@ public sealed class ChangesTabViewTests
     public async Task SummaryUsesCapturedChildHomeAndTechnicalViewKeepsExactPath()
     {
         var home = Path.GetFullPath("changes-child-home");
-        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo");
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo") with { Validity = ValidityState.InvalidMetadata };
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }),
-            static () => { }, static () => { }, static () => { }, static () => { }, homeDirectory: home);
+            static () => { }, homeDirectory: home);
         await view.LoadAsync();
         var detail = Assert.IsType<Markdown>(view.SubViews.Single(child => child is Markdown));
         Assert.DoesNotContain(home, detail.Text.ToString());
@@ -37,7 +37,7 @@ public sealed class ChangesTabViewTests
         {
             var snapshot = InventorySnapshot.Empty with { ScannedRoots = [new(root.FullName, Scope.Custom, null)] };
             using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
-                _ => Task.FromResult(snapshot), static () => { }, static () => { }, static () => { }, static () => { });
+                _ => Task.FromResult(snapshot), static () => { });
             await view.LoadAsync();
             Assert.Equal(0, view.RowCountForTests);
             Directory.CreateDirectory(Path.Combine(root.FullName, "new-empty-child"));
@@ -54,9 +54,11 @@ public sealed class ChangesTabViewTests
     public async Task Loading_ReplacesOldContentAndClearsOnCancellationAndCompletion()
     {
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstLoad = true;
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
-            _ => pending.Task, static () => { }, static () => { }, static () => { }, static () => { });
-        view.Load(["old result"], [], []);
+            _ => { if (firstLoad) { firstLoad = false; return Task.FromResult(SnapshotWithMalformedSkill()); } return pending.Task; },
+            static () => { });
+        await view.LoadAsync();
         var loading = view.LoadAsync();
         var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
         var indicator = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
@@ -83,17 +85,15 @@ public sealed class ChangesTabViewTests
         MaintenanceQueueEntry? activated = null;
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            static () => throw new InvalidOperationException("Untargeted updates must not be used."),
-            static () => throw new InvalidOperationException("Untargeted cleanup must not be used."),
-            static () => { }, static () => { }, onActivateEntry: entry => activated = entry);
+            static () => { }, onActivateEntry: entry => activated = entry);
         await view.LoadAsync();
         var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
-        table.SetSelection(0, 1, false); // NameCollision at the second physical address.
+        table.SetSelection(0, 0, false); // One family, anchored at the first exact address.
         table.NewKeyDownEvent(Key.Enter);
         Assert.NotNull(activated);
         Assert.Equal("NameCollision", activated.Issue);
-        Assert.Equal(second.InstallationId, activated.Subject.InstallationId);
-        Assert.Equal(second.ResolvedPath, activated.Cleanup!.Path);
+        Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
+        Assert.Equal(first.ResolvedPath, activated.Cleanup!.Path);
     }
 
     [Fact]
@@ -103,8 +103,7 @@ public sealed class ChangesTabViewTests
         var dispatchQueued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var view = new ChangesTabView(action => { queued = action; dispatchQueued.TrySetResult(); return dispatched.Task; },
-            _ => Task.FromResult(SnapshotWithMalformedSkill()), static () => { }, static () => { },
-            static () => { }, static () => { });
+            _ => Task.FromResult(SnapshotWithMalformedSkill()), static () => { });
         var loading = view.LoadAsync();
         await dispatchQueued.Task.WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(queued);
@@ -116,60 +115,53 @@ public sealed class ChangesTabViewTests
     }
 
     [Fact]
-    public void Load_ShowsDetailForTheFirstPendingItemWithoutNeedingEnter()
+    public async Task HealthyInventoryShowsCleanLocalStateAndKeepsUpdatesAccessible()
     {
-        var view = new ChangesTabView(
-            runOnUi: action =>
-            {
-                action();
-                return Task.CompletedTask;
-            },
-            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
-            onActivateUpdates: static () => { },
-            onActivateCleanup: static () => { },
-            onActivateDoctor: static () => { },
-            onLeaveTab: static () => { });
-
-        view.Load(
-            updates: [],
-            cleanup: ["SYM  stale-link"],
-            diagnostics: [],
-            summary: "Needs review");
-
-        var detail = Assert.IsType<Markdown>(view.SubViews.Single(child => child is Markdown));
-
-        Assert.Contains("## Cleanup", detail.Text.ToString());
-        Assert.Contains("SYM  stale-link", detail.Text.ToString());
+        var healthy = MaintenanceQueueTests.Skill("/skills/healthy", "https://github.com/one/repo");
+        healthy = healthy with { ObservedSubject = OperationSubject.From(healthy) with { ExposureCoverageComplete = true, ExposureCoverage = "complete" } };
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [healthy] }),
+            static () => { });
+        await view.LoadAsync();
+        Assert.Equal(0, view.RowCountForTests);
+        var detail = view.SubViews.OfType<Markdown>().Single().Text.ToString();
+        Assert.Contains("No local problems found. Updates not checked.", detail);
+        Assert.Contains("**u:** open Updates", detail);
+        Assert.DoesNotContain("omitted", detail);
+        Assert.Contains("0 Problems", view.StatusTextForTests);
+        Assert.Contains("Updates not checked", view.StatusTextForTests);
+        Assert.Contains("0 Review", view.StatusTextForTests);
+        Assert.Equal("0 Problems · Updates not checked · 0 Review", view.GetQueueLabel());
+        Assert.DoesNotContain("0 Updates", view.GetQueueLabel());
+        Assert.Contains("u Updates", view.StatusTextForTests);
     }
 
     [Fact]
-    public void Load_AssignsExplicitWidthToTheTitleColumn()
+    public async Task IncompleteConsumerCoverageStaysVisibleEvenWhenRoutineRowsAreHidden()
     {
-        var view = new ChangesTabView(
-            runOnUi: action =>
-            {
-                action();
-                return Task.CompletedTask;
-            },
-            snapshotLoader: static _ => Task.FromResult(InventorySnapshot.Empty),
-            onActivateUpdates: static () => { },
-            onActivateCleanup: static () => { },
-            onActivateDoctor: static () => { },
-            onLeaveTab: static () => { });
+        var skill = MaintenanceQueueTests.Skill("/skills/unobserved", "https://github.com/one/repo");
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }), static () => { });
+        await view.LoadAsync();
+        Assert.Equal(0, view.RowCountForTests);
+        Assert.Contains("Scan incomplete", view.StatusTextForTests);
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains("Consumer discovery incomplete for 1", view.SubViews.OfType<Markdown>().Single().Text.ToString());
+    }
 
-        view.Load(
-            updates: [],
-            cleanup: ["malformed  codex-primary-runtime"],
-            diagnostics: [],
-            summary: "Needs review");
-
-        var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
-        var kindStyle = table.Style.GetOrCreateColumnStyle(0);
-        var titleStyle = table.Style.GetOrCreateColumnStyle(1);
-
-        Assert.True(table.Style.ExpandLastColumn);
-        Assert.True(titleStyle.MinWidth > kindStyle.MinWidth);
-        Assert.Equal(titleStyle.MinWidth, titleStyle.MaxWidth);
+    [Fact]
+    public async Task IncompleteDiscoveryNeverClaimsACleanScanAndDetailsRemainAccessibleWithoutRows()
+    {
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { ConfiguredRootsComplete = false }),
+            static () => { });
+        await view.LoadAsync();
+        Assert.Contains("Scan incomplete", view.StatusTextForTests);
+        var detail = view.SubViews.OfType<Markdown>().Single();
+        Assert.Contains("checked locations", detail.Text.ToString());
+        Assert.DoesNotContain("No local problems found. Updates not checked.", detail.Text.ToString());
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains("Configured-root discovery is incomplete", detail.Text.ToString());
     }
 
     [Fact]
@@ -182,9 +174,6 @@ public sealed class ChangesTabViewTests
                 return Task.CompletedTask;
             },
             snapshotLoader: static _ => Task.FromResult(SnapshotWithMalformedSkill()),
-            onActivateUpdates: static () => { },
-            onActivateCleanup: static () => { },
-            onActivateDoctor: static () => { },
             onLeaveTab: static () => { });
 
         await view.LoadAsync();
@@ -199,7 +188,7 @@ public sealed class ChangesTabViewTests
     }
 
     [Fact]
-    public async Task LoadAsync_LabelsUnknownUpdateRowsAsObservations()
+    public async Task LoadAsync_CountsProblemsWithoutInventingAvailableUpdates()
     {
         var view = new ChangesTabView(
             runOnUi: action =>
@@ -208,15 +197,14 @@ public sealed class ChangesTabViewTests
                 return Task.CompletedTask;
             },
             snapshotLoader: static _ => Task.FromResult(SnapshotWithMalformedSkill()),
-            onActivateUpdates: static () => { },
-            onActivateCleanup: static () => { },
-            onActivateDoctor: static () => { },
             onLeaveTab: static () => { });
 
         await view.LoadAsync();
 
-        Assert.Contains("observations", view.StatusTextForTests, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Enter Review", view.StatusTextForTests);
+        Assert.Contains("1 Problems", view.StatusTextForTests);
+        Assert.Equal("1 Problems · Updates not checked · 0 Review", view.GetQueueLabel());
+        Assert.DoesNotContain("0 Updates", view.GetQueueLabel());
+        Assert.Contains("Updates not checked", view.StatusTextForTests);
         Assert.Contains("F2 Details", view.StatusTextForTests);
     }
 
@@ -225,16 +213,16 @@ public sealed class ChangesTabViewTests
     {
         var skills = Enumerable.Range(0, ChangesQueueBuilder.MaxRows + 1).Select(index =>
             MaintenanceQueueTests.Skill("/skills/" + index, "https://github.com/one/repo") with
-            { Name = "skill-" + index }).ToImmutableArray();
+            { Name = "skill-" + index, Validity = ValidityState.InvalidMetadata }).ToImmutableArray();
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = skills }),
-            static () => { }, static () => { }, static () => { }, static () => { });
+            static () => { });
         await view.LoadAsync();
         Assert.Equal(ChangesQueueBuilder.MaxRows, view.RowCountForTests);
         Assert.Contains("1 omitted", view.StatusTextForTests);
         view.NewKeyDownEvent(new Key(KeyCode.F2));
         Assert.Contains("1 omitted", view.StatusTextForTests);
-        Assert.Contains("1 additional observations", view.SubViews.OfType<Markdown>().Single().Text.ToString());
+        Assert.Contains("1 additional findings", view.SubViews.OfType<Markdown>().Single().Text.ToString());
         view.NewKeyDownEvent(new Key(KeyCode.F2));
         Assert.Contains("1 omitted", view.StatusTextForTests);
         Assert.Contains("F2 Details", view.StatusTextForTests);

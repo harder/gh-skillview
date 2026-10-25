@@ -16,7 +16,7 @@ internal static class HelpOverlay
 ## Primary
 
 - **↑ / ↓** — move selection
-- **Enter** — preview the selected search result or open the selected change item
+- **Enter** — preview the selected search result or open the selected issue
 - **f** — filters in Discover · filter box in Installed
 - **1 / 2 / 3** or **← / →** — switch tabs
 - **?** or **F1** — show this help
@@ -35,10 +35,13 @@ internal static class HelpOverlay
 - **o** — open the selected skill path
 - **G** — cycle scope filter (all / user / project / custom)
 
-## Changes
+## Issues
 
 - **Enter** — review the selected issue without changing files
 - **F2** — switch between the issue summary and technical details
+- Problems are local findings; same-name copies are review suggestions. Updates not checked.
+- **u** — open Updates; choose **Check updates** explicitly
+- **r** — refresh local inventory (no update check)
 - **c** — open cleanup
 - **d** — open Doctor
 

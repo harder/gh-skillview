@@ -306,7 +306,7 @@ internal sealed class SkillViewWorkflowCoordinator
         {
             if (!request.TryEnterDispatch() || lifetimeToken.IsCancellationRequested) return;
             if (group is null || group.Copies.Length == 0)
-            { _setStatus("Selected installation is missing or ambiguous — refresh Changes."); return; }
+            { _setStatus("Selected installation is missing or ambiguous — refresh Issues."); return; }
             var choice = CopiesScreen.Show(app, _services.Logger, group,
                 (left, right, token) => new SkillView.Maintenance.SkillComparisonService().CompareAsync(left, right, token,
                     inventoryComplete: !group.Partial), lifetimeToken);
@@ -327,7 +327,7 @@ internal sealed class SkillViewWorkflowCoordinator
         await SelectedCleanupHandoff.RunAsync(selected, request,
             token => CaptureInventoryAsync(report, token), _invokeAsync,
             (snapshot, candidates) => ShowCleanupReview(app, report, snapshot, candidates),
-            () => _setStatus("selected cleanup issue is missing or ambiguous — refresh Changes")).ConfigureAwait(false);
+            () => _setStatus("selected cleanup issue is missing or ambiguous — refresh Issues")).ConfigureAwait(false);
     }
 
     private void ShowCleanupReview(IApplication app, EnvironmentReport report, InventorySnapshot snapshot,

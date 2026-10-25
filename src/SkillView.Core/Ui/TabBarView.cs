@@ -32,7 +32,7 @@ internal sealed class TabBarView : View
     {
         (SkillViewTab.Discover,  "◇", "Discover"),
         (SkillViewTab.Installed, "▣", "Installed"),
-        (SkillViewTab.Changes,   "△", "Changes"),
+        (SkillViewTab.Changes,   "△", "Issues"),
     };
 
     /// One column per tab. Recomputed on every Draw so the layout reflows on

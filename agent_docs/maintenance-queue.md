@@ -7,7 +7,7 @@ queue never authorizes mutation or establishes current object identity. Empty
 directory issues retain the classifier's captured subject. Unknown update and
 active-session state must remain explicit.
 
-Changes routes the selected cleanup issue through a fresh classification and
+Issues routes the selected cleanup issue through a fresh classification and
 filters by issue, exact path and installation ID. Updates drill-in resolves the
 selected ID + path against fresh inventory, clears all/batch choices, and shows
 only that installation. Preserve that restriction on refresh. Missing/ambiguous
@@ -20,18 +20,36 @@ path, including fresh retention approval and sequential sibling preparation.
 Preparation may resolve/stage an explicitly requested remote source; entering or
 refreshing the queue does not. No skill code or client session runs for comparison.
 
-The presentation retains lightweight rows and renders only the selected detail.
-It caps visible rows at 8,192, selected detail at 32 Ki characters, and shared
-coverage detail at 8 Ki characters. Omission counts are explicit; exact fields
-are omitted whole rather than shortened into routing selectors. Full schema JSON
-remains available through a fresh queue capture. Projection and field rendering
-check cancellation while enumerating. Coverage text is retained once per view.
-Changes labels use unique location suffixes within each same-name group, with
-bounded display markers when sanitization or shortening erases distinctions.
-Omit a trailing skill name that repeats the title. Compare displayed suffixes
-ordinally; this visual distinction does not change physical path identity.
-Repeated issues at one path retain the same location label. Labels never replace
-the original frozen entry as a routing selector.
+The main tab is visibly **Issues** (keyboard alias `3`; internal Changes names
+remain). `ChangesQueueBuilder` is a pure presentation over the captured queue:
+it filters `installation-review` and `Untracked` routine observations, groups
+`NameCollision`/`Duplicate` by raw name using the classifier's ordinal-ignore-case
+comparison, and retains every frozen member. One stable path/ID-sorted member
+anchors the existing copy chooser; it grants no survivor preference or mutation
+authority. Affected-copy count uses distinct captured installation ID/path pairs.
+Problems (`Malformed`, `MetadataConflict`, `BrokenSymlink`, `BrokenSharedMapping`,
+`EmptyDirectory`) remain individual findings, including review-only findings.
+Other observations are Review suggestions. Availability is always **Updates not
+checked**. Header and status counts share that wording and omit a numeric update
+count until availability results exist; routine unknown availability is never a
+finding. Routine inspection remains in Installed, and the Issues footer exposes
+`u Updates` even for an empty list. Family field omission messages appear only
+when the omission count is positive.
+
+The presentation caps visible findings at 8,192 after filtering/grouping. Counts
+include omitted findings; hidden routine rows and collapsed family members are
+not omissions. Selected detail stays bounded at 32 Ki characters (4 Ki summary)
+and shared coverage at 8 Ki. Whole omitted fields are counted, and family members
+retain exact paths/IDs regardless of display bounds. Full queue JSON is unchanged
+and comes from a fresh capture. Incomplete coverage stays separate, including
+F2 diagnostics when no findings exist. Draw/selection handlers render only frozen
+values and never call native classification or disk I/O. Projection and rendering
+check cancellation. Non-family labels use distinct location suffixes with bounded
+markers if sanitization/shortening erases distinctions; labels never replace
+frozen routing selectors. Family summaries use distinct location suffixes;
+F2 retains full exact paths.
+Long fields are omitted whole and counted. Consumer-coverage limitations on
+filtered routine entries remain visible as separate diagnostics.
 
 `PinDisplayPolicy` is a transient read-only projection shared by Installed,
 Copies, update selection and queue presentation. It includes contextual owner
@@ -44,8 +62,8 @@ projection fall back to their recorded ref/owner/boolean evidence. The queue
 carries this projection internally;
 legacy JSON booleans, saved subjects/hashes and mutation admission stay unchanged.
 
-Selected cleanup hand-offs use the Changes activation/request lease, not only
-the app lifetime. Leaving or refreshing Changes cancels pending selection work;
+Selected cleanup hand-offs use the Issues activation/request lease, not only
+the app lifetime. Leaving or refreshing Issues cancels pending selection work;
 repeated Enter supersedes a pending capture. The queued callback rechecks the
 request before admission. Once dispatch starts, ownership remains exclusive
 until the awaited modal/UI completion returns, so repeated activation cannot
@@ -58,7 +76,7 @@ agent startup. JSON schema 1 retains full frozen subjects, exact affected paths,
 coverage diagnostics and explicit policy/status distinctions. Exit codes are
 0 for captured observations, 1 for partial inventory, 2 for invalid arguments,
 and 20 for a complete capture with no matching observations. Entries are
-observations rather than confirmed updates. Re-run `queue` or use Changes `r`
+observations rather than confirmed updates. Re-run `queue` or use Issues `r`
 to refresh disk inventory; checking availability is a separate explicit action.
 
 `inspect --path/--install-id` selects one physical installation using the existing

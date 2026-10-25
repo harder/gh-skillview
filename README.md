@@ -47,11 +47,11 @@ Put the binary on your `PATH`. On macOS and Linux, make it executable first (`ch
 
 ## Use SkillView
 
-Start the TUI with `gh skillview` (extension) or `skillview` (standalone). Search for a skill, select a result to preview its `SKILL.md`, and press `i` to review an install. The **Installed** tab shows local skills and their details; **Changes** shows maintenance work. Press `?` or `F1` for all shortcuts.
+Start the TUI with `gh skillview` (extension) or `skillview` (standalone). Search for a skill, select a result to preview its `SKILL.md`, and press `i` to review an install. The **Installed** tab shows local skills and their details; **Issues** shows local problems and review suggestions; updates are checked explicitly. Press `?` or `F1` for all shortcuts.
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` | Discover / Installed / Changes |
+| `1` / `2` / `3` | Discover / Installed / Issues |
 | `/` | Focus search |
 | `i` / `I` | Install / advanced install |
 | `x` | Review removal of a selected installed skill |

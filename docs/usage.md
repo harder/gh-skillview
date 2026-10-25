@@ -6,13 +6,13 @@ For installation and a quick start, see the [README](../README.md).
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Changes** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Changes pairs its maintenance queue with frozen observation details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Issues** — plus a Doctor view reachable on demand. Discover and Installed pair a list on the left (60% of the width) with a contextual detail pane on the right (40%); Issues pairs local findings and review suggestions with captured details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Opens when no skills are installed. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Changes** △ | Maintenance observations grouped by issue and physical installation, including cleanup review and unchecked installations. Enter opens the exact selected target. | `3`, `u`, click the pill, or `←/→` |
+| **Issues** △ | Local Problems and Review suggestions, with incomplete discovery separate. Updates are not checked. Enter reviews the exact issue or opens the existing copy chooser. | `3`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
@@ -45,7 +45,7 @@ Navigation:
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` | Jump directly to Discover / Installed / Changes |
+| `1` / `2` / `3` | Jump directly to Discover / Installed / Issues |
 | `←` / `→` | Cycle tabs |
 | `↑` / `↓`, `PgUp` / `PgDn`, `Home` / `End` | Move through rows |
 | `Tab` / `Shift+Tab` | Move focus between list and detail |
@@ -91,27 +91,48 @@ state with `?`; details explain the state before review.
 
 Installed columns are **Name → State → Loc → Agents → Package**. Location and known single-agent badges use subtle color cues in the default theme; their text remains visible in every theme. Mixed-agent badges retain the normal text color. The Package column appears when the inventory includes packages. Headers stay visible while scrolling.
 
-Installed and Changes summaries shorten paths beneath the known home directory used for discovery to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
+Installed and Issues summaries shorten paths beneath the known home directory used for discovery to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
 
-Inventory loads and Discover searches show a centered spinner while replacing old rows and details. Leaving a tab clears its loading indicator. Installed and Changes share a complete inventory snapshot for up to one minute; partial captures retry on the next visit; switching tabs during a scan joins that same background capture. Press **r** from a list to read disk again immediately. Maintenance actions validate current evidence before acting. Loading keeps browse focus out of text fields and temporarily disables actions on hidden selections. Help, quit, tab navigation and refresh remain available; intentional query/filter editing keeps its focus.
+Inventory loads and Discover searches show a centered spinner while replacing old rows and details. Leaving a tab clears its loading indicator. Installed and Issues share a complete inventory snapshot for up to one minute; partial captures retry on the next visit; switching tabs during a scan joins that same background capture. Press **r** from a list to read disk again immediately. Maintenance actions validate current evidence before acting. Loading keeps browse focus out of text fields and temporarily disables actions on hidden selections. Help, quit, tab navigation and refresh remain available; intentional query/filter editing keeps its focus.
 
-Changes tab:
+Issues tab:
 
 | Key | Action |
 |---|---|
 | `Enter` | Review the selected maintenance item without changing files |
 | `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
+| `u` | Open the existing Updates workspace; choose Check updates explicitly |
 
-Each observation retains its installation address ID, exact affected paths,
-source/ref/tree, recorded owners and consumers. Cleanup issues reopen only that
-issue at that physical address after a fresh inventory capture. Installation
-review opens Updates with only that exact installation selected, clearing prior
-batch and `--all` choices. A missing or ambiguous ID refuses the hand-off instead
-of choosing a same-name sibling. Press **Check updates** explicitly to check update
-availability; **c** compares installed content with one immutable saved candidate
-and opens its plan review (**u** also prepares review). Entry into the
-workspace performs neither action. Refresh keeps an exact Updates selection.
+Routine valid installs show **No local problems found. Updates not checked.**
+The list excludes generic installation-review opportunities and absence from gh
+alone; inspect routine or manual installs in **Installed (2)**. Problems include
+malformed metadata, broken links, conflicting records and empty residue, even
+when only review is supported. Same-name/duplicate observations form one **Review**
+family with an affected-copy count and distinct locations in its detail pane.
+Matching names alone do not establish damage or redundant content; project
+overrides can be intentional. Enter opens the existing copy chooser, where an
+exact copy must be chosen before update/version or cleanup review. Other faults
+at those locations remain separate Problems.
+
+The persistent header and counts say **Updates not checked**, without a numeric
+update count. The Issues footer keeps **u Updates** available even for an empty
+list. Family details report omitted fields only when fields were actually omitted.
+Counts cover findings after filtering and family grouping, including findings
+beyond the row limit. Hidden routine observations are not omitted issues.
+Incomplete discovery/checks are shown separately and never imply a healthy scan;
+F2 exposes captured coverage diagnostics even when there are no findings.
+
+Each finding retains its installation address ID and exact frozen entries.
+Cleanup issues reopen only that issue at that physical address after a fresh
+inventory capture. A missing or ambiguous ID refuses the hand-off instead of
+choosing a same-name sibling. **u** opens the existing Updates workspace;
+**Check updates** explicitly checks availability. **c** within Updates compares
+installed content with one immutable saved candidate and opens its plan review
+(**u** there also prepares review). Entering Issues and pressing **r** perform
+local capture only, with no startup network availability scan or payload hashing.
+Updates selection from an exact copy keeps only that installation selected on
+refresh, clearing prior batch and `--all` choices.
 The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
 full evidence; keep the same global workspace/profile/scan-root options.
@@ -608,7 +629,7 @@ A same-name collision is not proof of duplicate content. Collisions, malformed
 metadata, conflicting observations and skills absent from a covered gh catalog
 are review-only items; `cleanup --apply --yes` cannot delete them. Explicit
 removal of an unowned chosen install remains available through the Installed workflow.
-An incomplete scan is marked in the Installed footer and Changes summary.
+An incomplete scan is marked in the Installed footer and Issues summary.
 
 Cleanup reports a verified empty immediate child of a scan root as
 `EmptyDirectory`, even when inventory retained it as `MissingSkillMd`.

@@ -128,6 +128,7 @@ public sealed partial class SkillViewApp
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),
+                new StatusHint("u", "Updates"),
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
             _ => [

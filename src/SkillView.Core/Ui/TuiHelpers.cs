@@ -308,8 +308,8 @@ internal static class TuiHelpers
         "d  open Doctor\n" +
         "I  open the advanced install wizard\n" +
         "2  show installed skills\n" +
-        "3  show the Changes workspace\n" +
-        "u  open Changes workspace\n" +
+        "3  show Issues\n" +
+        "u  open Updates (Check updates checks availability)\n" +
         "c  review cleanup candidates\n" +
         "   in Installed: / returns to Discover, f filters, x removes the selected skill\n" +
         "F1 show this help\n" +

@@ -11,19 +11,16 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui.Tabs;
 
-/// Embedded tab 3 — the Changes workspace maintenance queue.
+/// Embedded tab 3 — the Issues findings view.
 /// Shows issue + physical-installation observations with frozen detail and
 /// routes exact selected targets into the existing specialist workflows.
 internal sealed class ChangesTabView : FrameView
 {
-    private const int KindColumnWidth = 11;
+    private const int KindColumnWidth = 8;
     private readonly string? _homeDirectory;
     private readonly Action? _onRefresh;
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
-    private readonly Action _onActivateUpdates;
-    private readonly Action _onActivateCleanup;
-    private readonly Action _onActivateDoctor;
     private readonly Action _onLeaveTab;
     private readonly Action? _onStateChange;
     private readonly CancellationToken _lifetimeToken;
@@ -33,7 +30,7 @@ internal sealed class ChangesTabView : FrameView
     private readonly ChangesSelectionGate _selectionRequests;
     private long _selectionGeneration;
 
-    private readonly TabLoadingView _loading = new("Loading maintenance observations…");
+    private readonly TabLoadingView _loading = new("Loading local findings…");
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _status;
@@ -41,6 +38,8 @@ internal sealed class ChangesTabView : FrameView
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private string _coverageDetail = string.Empty;
     private int _omittedRows;
+    private ChangesQueueProjection? _projection;
+    private bool _partial;
     private bool _showDetails;
     private long _loadGeneration;
     private CachedQueue? _cachedQueue;
@@ -50,9 +49,6 @@ internal sealed class ChangesTabView : FrameView
     internal ChangesTabView(
         Func<Action, Task> runOnUi,
         Func<CancellationToken, Task<InventorySnapshot>> snapshotLoader,
-        Action onActivateUpdates,
-        Action onActivateCleanup,
-        Action onActivateDoctor,
         Action onLeaveTab,
         Action? onStateChange = null,
         CancellationToken lifetimeToken = default,
@@ -66,9 +62,6 @@ internal sealed class ChangesTabView : FrameView
         _onRefresh = onRefresh;
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
-        _onActivateUpdates = onActivateUpdates;
-        _onActivateCleanup = onActivateCleanup;
-        _onActivateDoctor = onActivateDoctor;
         _onLeaveTab = onLeaveTab;
         _onStateChange = onStateChange;
         _lifetimeToken = lifetimeToken;
@@ -102,7 +95,7 @@ internal sealed class ChangesTabView : FrameView
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
-            Text = "## Changes\n\n_Select a queue item to inspect its details._",
+            Text = "## Issues\n\n_Select a finding to inspect its details._",
         };
         TuiHelpers.ConfigureMarkdownPane(_detail, SchemeNames.Base);
 
@@ -130,11 +123,11 @@ internal sealed class ChangesTabView : FrameView
         _loading.KeyDown += OnTableKeyDown;
         KeyDown += (_, key) =>
         {
-            if (key.Handled || _loading.Visible || key.KeyCode != KeyCode.F2 || !_rows.Any(row => row.Entry is not null)) return;
+            if (key.Handled || _loading.Visible || key.KeyCode != KeyCode.F2 || _rows.Count == 0 && _coverageDetail.Length == 0) return;
             key.Handled = true;
             _showDetails = !_showDetails;
             UpdateDetail();
-            _status.Text = BuildStatusText(string.Empty);
+            _status.Text = BuildStatusText();
         };
 
         Add(_table, _detail, _spinner, _status, _loading);
@@ -153,6 +146,8 @@ internal sealed class ChangesTabView : FrameView
         _detail.Text = string.Empty;
         _coverageDetail = string.Empty;
         _showDetails = false;
+        _projection = null;
+        _partial = false;
         SetLoading(true);
         _status.Text = " loading inventory…";
 
@@ -171,21 +166,16 @@ internal sealed class ChangesTabView : FrameView
                 }, loadCancellation.Token).ConfigureAwait(false);
             }
             var projection = cached.Projection;
-            var summary = (cached.Partial ? "Partial inventory · " : "")
-                + "update availability and sessions unknown · r refresh disk inventory";
 
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
                 _cachedQueue = cached;
+                _projection = projection;
+                _partial = cached.Partial || projection.CoverageDetail.Length > 0;
                 _coverageDetail = projection.CoverageDetail;
                 _omittedRows = projection.OmittedRows;
-                if (projection.OmittedRows > 0)
-                    summary += $" · {projection.OmittedRows} rows omitted by presentation limit; queue --json captures all observations";
-                LoadRows(projection.Rows, summary, loadCancellation.Token);
-                if (projection.Rows.Count == 0)
-                    _detail.Text = "## Maintenance observations\n\nNo matching physical installations or cleanup observations. Update availability and active sessions remain unknown.\n"
-                        + _coverageDetail;
+                LoadRows(projection.Rows, loadCancellation.Token);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -198,27 +188,14 @@ internal sealed class ChangesTabView : FrameView
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
                 _status.Text = $" load failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
-                _detail.Text = "## Could not load changes\n\nPress **r** to retry. See the status below for details.";
+                _detail.Text = "## Could not load issues\n\nPress **r** to retry. See the status below for details.";
                 SetLoading(false);
                 _table.SetFocus();
             }).ConfigureAwait(false);
         }
     }
 
-    /// Bind pre-computed string lists to the table. Exposed for unit tests.
-    internal void Load(
-        IEnumerable<string> updates,
-        IEnumerable<string> cleanup,
-        IEnumerable<string> diagnostics,
-        string summary = "Healthy")
-    {
-        LoadRows(ChangesQueueBuilder.BuildForTests(updates, cleanup, diagnostics), summary);
-    }
-
-    private void LoadRows(
-        IReadOnlyList<ChangesQueueRow> rows,
-        string summary,
-        CancellationToken renderToken = default)
+    private void LoadRows(IReadOnlyList<ChangesQueueRow> rows, CancellationToken renderToken = default)
     {
         _rows = rows;
         var source = new EnumerableTableSource<ChangesQueueRow>(
@@ -239,7 +216,7 @@ internal sealed class ChangesTabView : FrameView
 
         RecomputeColumnWidths();
         _table.Update();
-        _status.Text = BuildStatusText(summary);
+        _status.Text = BuildStatusText();
         UpdateDetail(renderToken);
 
         SetLoading(false);
@@ -247,6 +224,12 @@ internal sealed class ChangesTabView : FrameView
         {
             _table.SetSelectedRow(0);
             _table.SetFocus();
+        }
+        else
+        {
+            // Terminal.Gui's empty table can consume printable keys before
+            // they reach the shell. Keep update/help/navigation usable.
+            _detail.SetFocus();
         }
 
         _onStateChange?.Invoke();
@@ -257,9 +240,7 @@ internal sealed class ChangesTabView : FrameView
     internal int RowCountForTests => _rows.Count;
     internal string StatusTextForTests => _status.Text.ToString();
 
-    internal int GetPendingCount() => _rows.Count;
-
-    internal string GetQueueLabel() => DescribeQueueLabel();
+    internal string GetQueueLabel() => _projection?.Counts ?? string.Empty;
 
     // Internals ------------------------------------------------------------
 
@@ -289,13 +270,6 @@ internal sealed class ChangesTabView : FrameView
             _onActivateEntry?.Invoke(entry);
             return;
         }
-        var kind = _rows[row].Kind;
-        switch (kind)
-        {
-            case "Update": _onActivateUpdates(); break;
-            case "Cleanup": _onActivateCleanup(); break;
-            case "Diagnostics": _onActivateDoctor(); break;
-        }
     }
 
     private void UpdateDetail(CancellationToken token = default)
@@ -306,74 +280,27 @@ internal sealed class ChangesTabView : FrameView
         {
             var row = _table.GetSelectedRow();
             var detail = row >= 0 && row < _rows.Count
-                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token, _showDetails, _homeDirectory)
-                    : _rows[row].Detail ?? RenderDetail(_rows[row]))
-                    + (_showDetails ? _coverageDetail + (_omittedRows > 0
-                        ? $"\n{_omittedRows} additional observations are omitted from the list. Use queue --json for all observations.\n" : string.Empty)
-                        : string.IsNullOrEmpty(_coverageDetail) ? string.Empty
-                        : "\nSome inventory locations could not be fully checked. Press **F2** for coverage details.\n")
-                : "## Changes\n\n_No pending work._";
+                ? ChangesQueueBuilder.Render(_rows[row], token, _showDetails, _homeDirectory)
+                : "## Issues\n\n" + (_partial
+                    ? "No local problems found in checked locations. Discovery is incomplete.\n"
+                    : $"No local problems found. {ChangesQueueProjection.UpdatesNotChecked}.\n");
+            if (_rows.Count > 0 || _partial) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
+            detail += "\n**u:** open Updates to check availability or review a saved update. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
+            if (_showDetails) detail += _coverageDetail;
+            else if (_coverageDetail.Length > 0) detail += "\nDiscovery/checks incomplete. Press **F2** for coverage details.\n";
+            if (_omittedRows > 0) detail += $"\n{_omittedRows} additional findings omitted by the row limit. Counts include these findings; queue --json makes a fresh full capture.\n";
             token.ThrowIfCancellationRequested();
             _detail.Text = detail;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
 
-    private static string RenderDetail(ChangesQueueRow row)
+    private string BuildStatusText()
     {
-        var summary = row.Kind switch
-        {
-            "Update" => "Run the selected update workflow to inspect package-level changes before applying them.",
-            "Cleanup" => "Review the pending cleanup item, then confirm removal from the cleanup workflow.",
-            "Diagnostics" => "Open Doctor for the selected diagnostic item and inspect the current environment report.",
-            _ => "Inspect the selected queue item.",
-        };
-
-        return $"## {row.Kind}\n\n- **Item:** `{row.Title}`\n\n{summary}";
-    }
-
-    private string BuildStatusText(string summary)
-    {
-        if (_rows.Count == 0)
-        {
-            return $" {summary}";
-        }
-
-        if (_rows.Any(row => row.Entry is not null))
-        {
-            var count = _omittedRows > 0 ? $"{_rows.Count} shown + {_omittedRows} omitted" : $"{_rows.Count} observations";
-            return $" {(_coverageDetail.Length > 0 ? "Limited scan · " : "")}{count} · Enter Review · F2 {(_showDetails ? "Summary" : "Details")} · r Refresh";
-        }
-        var label = DescribeQueueLabel();
-        return label == "Changes"
-            ? $" {summary} · {_rows.Count} items"
-            : $" {label} · {_rows.Count}";
-    }
-
-    private string DescribeQueueLabel()
-    {
-        if (_rows.Count == 0)
-        {
-            return string.Empty;
-        }
-        if (_rows.Any(row => row.Entry is not null)) return "Maintenance observations";
-
-        var distinctKinds = _rows
-            .Select(row => row.Kind)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (distinctKinds.Length != 1)
-        {
-            return "Changes";
-        }
-
-        return distinctKinds[0] switch
-        {
-            "Cleanup" => _rows.Count == 1 ? "Cleanup candidate" : "Cleanup candidates",
-            "Update" => _rows.Count == 1 ? "Update" : "Updates",
-            "Diagnostics" => _rows.Count == 1 ? "Diagnostic" : "Diagnostics",
-            _ => distinctKinds[0],
-        };
+        if (_projection is null) return string.Empty;
+        return " " + (_partial ? "Scan incomplete · " : "") + _projection.Counts + " · u Updates"
+            + (_omittedRows > 0 ? $" · {_rows.Count} shown, {_omittedRows} omitted" : "")
+            + (_rows.Count > 0 || _coverageDetail.Length > 0 ? $" · F2 {(_showDetails ? "Summary" : "Details")}" : "");
     }
 
     private void RecomputeColumnWidths()
