@@ -10,40 +10,18 @@ namespace SkillView.Ui;
 
 /// Static helpers for the Installed view's keyboard dispatch + detail
 /// rendering. The interactive view itself is now <see cref="Tabs.InstalledTabView"/>;
-/// the modal Show() subloop was retired in Phase 4 of the winget-tui
-/// redesign in favor of an embedded tab. The helpers below stay on this
-/// type so the test surface (BuildShortcuts / DecideShortcut / RenderDetail /
-/// ShortcutCommand) is unchanged.
+/// source overview owns navigation and exact-copy handoff. These helpers retain
+/// local shortcut policy and the shared ordinary/technical detail renderer.
 public static class InstalledScreen
 {
-    internal enum ShortcutCommand { None, Close, GoToSearch, FocusFilter, FocusTable, CycleSort, Remove, Open }
+    internal enum ShortcutCommand { None, Close, FocusFilter, FocusTable, CycleSort, Remove, Open }
     internal readonly record struct ShortcutDecision(ShortcutCommand Command, bool RequestStop);
 
-
-    internal static Shortcut[] BuildShortcuts(bool canRemove, bool hasPackages)
-    {
-        var list = new List<Shortcut>
-        {
-            new() { Key = (Key)'/', Title = "/", HelpText = "Search" },
-            new() { Key = (Key)'f', Title = "f", HelpText = "Filter" },
-        };
-        if (canRemove) list.Add(new() { Key = (Key)'x', Title = "x", HelpText = "Remove" });
-        list.Add(new() { Key = (Key)'o', Title = "o", HelpText = "Open" });
-        if (hasPackages) list.Add(new() { Key = (Key)'s', Title = "s", HelpText = "Sort" });
-        list.Add(new() { Key = Key.Esc, Title = "Esc", HelpText = "Back" });
-        list.Add(new() { Key = (Key)'q', Title = "q", HelpText = "Quit" });
-        return list.ToArray();
-    }
 
     internal static ShortcutDecision DecideShortcut(Key key, bool filterHasFocus, bool canRemove)
     {
         if (filterHasFocus)
         {
-            if (key.AsRune.Value == '/')
-            {
-                return new ShortcutDecision(ShortcutCommand.GoToSearch, RequestStop: true);
-            }
-
             return key.KeyCode == KeyCode.Esc
                 ? new ShortcutDecision(ShortcutCommand.FocusTable, RequestStop: false)
                 : default;
@@ -57,7 +35,7 @@ public static class InstalledScreen
         var r = key.AsRune.Value;
         if (r == '/')
         {
-            return new ShortcutDecision(ShortcutCommand.GoToSearch, RequestStop: true);
+            return new ShortcutDecision(ShortcutCommand.FocusFilter, RequestStop: false);
         }
         if (r == 'f' || r == 'F')
         {
@@ -85,18 +63,81 @@ public static class InstalledScreen
             homeDirectory = DisplayPath.CaptureHome(runner);
         string PathLabel(string path) => showDetails ? path : DisplayPath.Abbreviate(path, homeDirectory);
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"## {s.Name}");
+        sb.AppendLine($"## {MarkdownTableFormatter.FormatTableCell(InstalledOverview.Text(s.Name, 128))}");
         sb.AppendLine();
+        if (s.FrontMatter.Description is { Length: > 0 } description)
+        {
+            sb.AppendLine("Description · from skill metadata (untrusted):");
+            sb.AppendLine();
+            var text = (TerminalEscapeSanitizer.Sanitize(description.Length > 2048 ? description[..2048] : description) ?? "")
+                .ReplaceLineEndings("\n");
+            text = string.Concat(text.Select(c => char.IsControl(c) && c is not '\n' and not '\t' ? '\uFFFD' : c));
+            var longestRun = 0;
+            var run = 0;
+            foreach (var c in text)
+            {
+                run = c == '`' ? run + 1 : 0;
+                longestRun = Math.Max(longestRun, run);
+            }
+            // Compute after bounding and sanitizing: neither embedded fences nor
+            // controls that join backtick runs can escape this literal block.
+            var fence = new string('`', Math.Max(3, longestRun + 1));
+            sb.AppendLine(fence);
+            sb.AppendLine(text);
+            if (description.Length > 2048) sb.AppendLine("[truncated]");
+            sb.AppendLine(fence);
+            sb.AppendLine();
+        }
+
+        if (!showDetails)
+        {
+            var recorded = s.ObservedSubject?.Source ?? s.SourceIdentity;
+            AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatCodeSpan(recorded.Key is null
+                ? (recorded.Conflicted ? "Conflicting source" : "Unknown or incomplete source") + (recorded.Origin is null ? "" : " · recorded " + InstalledOverview.SourceLabel(recorded)) : InstalledOverview.SourceLabel(recorded)));
+            AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
+            AppendDetailItem(sb, "Scope", InstalledInventoryFormatter.DescribeLocation(s));
+            var revision = s.Revision;
+            if (revision.RepositoryRef is { } gitRef) AppendDetailItem(sb, "Recorded Git ref", MarkdownTableFormatter.FormatCodeSpan(gitRef));
+            if (revision.AuthoredVersion is { } authored) AppendDetailItem(sb, "Authored version", MarkdownTableFormatter.FormatCodeSpan(authored));
+            if (revision.DistributorVersion is { } distributor) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatCodeSpan(distributor));
+            var policy = PinDisplayPolicy.From(s);
+            AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(policy.Label + " · " + policy.Description));
+            if (policy.PinnedRef is { } summaryPinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(summaryPinnedRef));
+            sb.AppendLine();
+            sb.AppendLine("## Used by · recorded placements");
+            sb.AppendLine($"{s.Agents.Length} placement(s) share this one physical copy.");
+            foreach (var agent in s.Agents)
+                sb.AppendLine("- " + MarkdownTableFormatter.FormatTableCell(agent.AgentId + " · " + (agent.Scope ?? s.Scope))
+                    + " · " + MarkdownTableFormatter.FormatCodeSpan(agent.Path)
+                    + (agent.Context is { } context ? " · " + MarkdownTableFormatter.FormatCodeSpan(context) : "")
+                    + (agent.Profile is { } profile ? " · Profile: " + MarkdownTableFormatter.FormatTableCell(profile) : ""));
+            if (s.Agents.IsEmpty) sb.AppendLine("No consumers recorded; other consumers may exist.");
+            sb.AppendLine();
+            foreach (var owner in s.AllOwnershipClaims)
+            {
+                AppendDetailItem(sb, "Also recorded by", MarkdownTableFormatter.FormatCodeSpan(owner.Provider + ": " + owner.Source));
+                if (owner.SourceUrl is { } url) AppendDetailItem(sb, "Recorded source URL", MarkdownTableFormatter.FormatCodeSpan(url));
+                if (owner.SkillPath is { } path) AppendDetailItem(sb, "Recorded source path", MarkdownTableFormatter.FormatCodeSpan(path));
+                if (owner.RepositoryRef is { } r) AppendDetailItem(sb, "Recorded Git ref", MarkdownTableFormatter.FormatCodeSpan(r));
+                if (owner.PackageVersion is { } v) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatCodeSpan(v));
+                if (owner.ReadOnly || owner.InstallationMode == "managed-read-only")
+                    AppendDetailItem(sb, "Maintenance", "Read-only; use the owning agent or package manager");
+            }
+            if (!s.MetadataConflicts.IsEmpty || !s.OwnershipDiagnostics.IsEmpty)
+                AppendDetailItem(sb, "Evidence limits", "Metadata or ownership conflicts remain; inspect F2 before requesting an operation.");
+            if (showShortcuts) sb.AppendLine("\n**F2** Technical details.");
+            return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
+        }
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
-        AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(PathLabel(s.ResolvedPath)));
+        AppendDetailItem(sb, "Path", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
 
         AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeLocation(s)));
         AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatTableCell(InstalledInventoryFormatter.DescribeProvenance(s)));
         AppendDetailItem(sb, "Health", MarkdownTableFormatter.FormatTableCell(
             s.Validity == ValidityState.Valid ? "✅ Valid" : $"⚠️ {s.Validity}"));
-        AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
+        if (showDetails) AppendDetailItem(sb, "Symlinked", MarkdownTableFormatter.FormatTableCell(FormatBool(s.IsSymlinked)));
         var pin = PinDisplayPolicy.From(s);
         AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(pin.Label));
         if (pin.State is PinDisplayState.Conflicting or PinDisplayState.Unknown)
@@ -113,17 +154,17 @@ public static class InstalledScreen
                 AppendDetailItem(sb, "Local reimport", "**R** Review changes from this source. The installed original is retained for recovery.");
             }
         }
-        AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
+        if (showDetails) AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
         if (s.CleanupSuppression is { } suppression && showDetails)
             AppendDetailItem(sb, "Cleanup suppression", MarkdownTableFormatter.FormatTableCell(
                 $"{suppression.State}; legacy={suppression.LegacyMarker}, external={suppression.External}. {suppression.Diagnostic}"));
-        if (!string.IsNullOrWhiteSpace(s.TreeSha))
+        if (showDetails && !string.IsNullOrWhiteSpace(s.TreeSha))
         {
             AppendDetailItem(sb, "Tree SHA", MarkdownTableFormatter.FormatCodeSpan(s.TreeSha));
         }
         if (!string.IsNullOrWhiteSpace(s.FrontMatter.Version))
         {
-            AppendDetailItem(sb, "Version", MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version));
+            AppendDetailItem(sb, "Authored version", MarkdownTableFormatter.FormatTableCell(s.FrontMatter.Version));
         }
         if (s.FrontMatter.Upstream is { Length: > 0 } upstream)
         {
@@ -147,7 +188,7 @@ public static class InstalledScreen
                 if (pkg.PluginName is { } plugin) AppendDetailItem(sb, "Plugin", MarkdownTableFormatter.FormatTableCell(plugin));
                 if (pkg.PackageVersion is { } version) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatTableCell(version));
                 AppendDetailItem(sb, "Maintenance", "Read-only; use the owning agent or package manager");
-                AppendDetailItem(sb, "Loading", "Enabled and active session state unknown");
+                if (showDetails) AppendDetailItem(sb, "Loading", "Enabled and active session state unknown");
             }
             if (pkg.SourceUrl is { Length: > 0 } url)
             {
@@ -159,12 +200,25 @@ public static class InstalledScreen
                     u.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
             }
         }
-        foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts).Concat(s.OwnershipDiagnostics))
+        foreach (var owner in s.AllOwnershipClaims)
+        {
+            AppendDetailItem(sb, "Also recorded by", MarkdownTableFormatter.FormatCodeSpan(owner.Provider + ": " + owner.Source));
+            if (owner.SkillPath is { } ownerPath) AppendDetailItem(sb, "Recorded source path", MarkdownTableFormatter.FormatCodeSpan(ownerPath));
+            if (owner.RepositoryRef is { } ownerRef) AppendDetailItem(sb, "Recorded Git ref", MarkdownTableFormatter.FormatCodeSpan(ownerRef));
+            if (owner.PackageVersion is { } ownerVersion) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatCodeSpan(ownerVersion));
+            if (owner.ReadOnly || owner.InstallationMode == "managed-read-only") AppendDetailItem(sb, "Maintenance", "Read-only; use the owning agent or package manager");
+        }
+        var source = s.ObservedSubject?.Source ?? s.SourceIdentity;
+        AppendDetailItem(sb, "Source evidence", source.Conflicted ? "Conflicting" : source.Key is null ? "Unknown or incomplete" : "Known recorded source");
+        if (!s.MetadataConflicts.IsEmpty || !s.OwnershipDiagnostics.IsEmpty)
+            AppendDetailItem(sb, "Evidence limits", "Metadata or ownership conflicts remain; inspect F2 before requesting an operation.");
+        if (showDetails) foreach (var diagnostic in s.FrontMatter.Diagnostics.Concat(s.MetadataConflicts).Concat(s.OwnershipDiagnostics))
             sb.AppendLine($"- ⚠️ {MarkdownTableFormatter.FormatTableCell(diagnostic)}");
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("## Agents · observed on disk");
+            sb.AppendLine("## Used by · recorded placements");
+            sb.AppendLine($"{s.Agents.Length} placement(s) share this one physical copy.");
             sb.AppendLine();
             foreach (var a in s.Agents)
             {
@@ -185,23 +239,14 @@ public static class InstalledScreen
             }
         }
         sb.AppendLine();
-        sb.AppendLine(showShortcuts
-            ? "Active-session loading is unknown. **K** Check package · **F2** Technical details."
-            : "Active-session loading is unknown.");
+        if (showShortcuts) sb.AppendLine("**K** Check package · **F2** Technical details.");
+        if (showDetails) sb.AppendLine("Active-session loading is unknown.");
         if (showDetails && s.ObservedSubject is { } subject)
         {
             sb.AppendLine();
             sb.AppendLine("## Technical details");
             sb.AppendLine();
             OperationImpactFormatter.Append(sb, OperationImpact.Payload(subject, "inspect"));
-        }
-        if (s.FrontMatter.Description is { Length: > 0 } desc)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## Description · from skill metadata");
-            sb.AppendLine();
-            foreach (var line in desc.Replace("\r", "", StringComparison.Ordinal).Split('\n'))
-                sb.AppendLine("> " + line);
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
@@ -213,7 +258,7 @@ public static class InstalledScreen
         sb.Append("- **");
         sb.Append(label);
         sb.Append(":** ");
-        sb.AppendLine(value);
+        sb.AppendLine(value.Length > 2048 ? value[..2048] + " [truncated]" : value);
     }
 
     private static string FormatTableLink(string value, string label, bool showDestination)
@@ -234,12 +279,4 @@ public static class InstalledScreen
             .Replace(")", "%29", StringComparison.Ordinal)
             .Replace("|", "%7C", StringComparison.Ordinal);
 
-    /// Tiny `EnumerableTableSource<InstalledSkill>` shim — exists only so we
-    /// can keep a stable named type for the `currentSource` field reassignment
-    /// pattern (avoids capturing inferred-anonymous generic locals).
-    private sealed class InstalledTableSource : EnumerableTableSource<InstalledSkill>
-    {
-        public InstalledTableSource(IReadOnlyList<InstalledSkill> rows, Dictionary<string, Func<InstalledSkill, object>> cols)
-            : base(rows, cols) { }
-    }
 }

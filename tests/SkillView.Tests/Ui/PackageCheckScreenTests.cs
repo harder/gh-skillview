@@ -28,7 +28,7 @@ public sealed class PackageCheckScreenTests
         var first = Target("first"); var second = Target("second");
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
-            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { }, () => { },
+            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { },
             onPackageCheck: target => captured = target)
         { Width = Dim.Fill(), Height = Dim.Fill(), Visible = true };
         window.Add(view); view.LoadSeeded(InventorySnapshot.Empty with { Skills = [first, second] });
@@ -37,7 +37,7 @@ public sealed class PackageCheckScreenTests
         var session = app.Begin(window);
         try
         {
-            view.SetSelectedRowForTests(1); view.FocusList(); Assert.True(view.TableHasFocusForTests);
+            view.SetSelectedRowForTests(3); view.FocusList(); Assert.True(view.TableHasFocusForTests);
             app.Keyboard.RaiseKeyDownEvent(new Key('K')); window.Draw(new DrawContext());
             Assert.Same(second, captured); Assert.False(shellReceived);
             captured = null; view.FocusFilterForTests(); Assert.True(view.FilterHasFocusForTests);

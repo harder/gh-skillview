@@ -18,7 +18,7 @@ internal static class HelpOverlay
 - **↑ / ↓** — move selection
 - **Enter** — preview the selected search result or open the selected issue
 - **f** — filters in Discover · filter box in Installed
-- **1 / 2 / 3** or **← / →** — switch tabs
+- **1 / 2 / 3** — switch tabs (← / → also cycle outside Installed)
 - **?** or **F1** — show this help
 
 ## Discover
@@ -32,7 +32,14 @@ internal static class HelpOverlay
 ## Installed
 
 - **C** — Check updates / cancel checks (browsing stays available)
-- **u / Enter** — review an update for the selected exact copy
+- **Enter** — expand a source group or browse the selected exact copy
+- **← / →** — collapse / expand the selected source group
+- **/** or **f** — search Installed; Esc leaves the field
+- **Esc** — back from full-width detail, then leave Installed
+- **u** or **Review update** — review an update for the selected exact copy
+- **More actions** — open, remove, package check and contextual local-source reviews
+- **F2** — technical evidence for the same copy
+- **c** — Cleanup
 - **x** — remove the selected installed skill
 - **o** — open the selected skill path
 - **G** — cycle scope filter (all / user / project / custom)

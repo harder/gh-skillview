@@ -26,7 +26,7 @@ public sealed class InstalledNavigationTests
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var view = new SkillView.Ui.Tabs.InstalledTabView(action => { action(); return Task.CompletedTask; },
             (_, _) => { }, token => pending.Task.WaitAsync(token), (_, _, _) => Task.CompletedTask,
-            () => { }, () => { })
+            () => { })
         { Visible = true, Width = Dim.Fill(), Height = Dim.Fill() };
         using var window = new Terminal.Gui.Views.Window();
         window.Add(view);
@@ -39,7 +39,8 @@ public sealed class InstalledNavigationTests
             load = view.LoadAsync();
             view.FocusList(); // Same focus request as cold tab activation.
             var loading = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
-            Assert.True(loading.HasFocus);
+            Assert.Equal(!refresh, loading.HasFocus);
+            if (refresh) Assert.True(view.SubViews.OfType<Markdown>().Single().HasFocus);
             Assert.False(view.FilterHasFocusForTests);
             var received = new List<int>();
             window.KeyDown += (_, key) => received.Add(key.AsRune.Value);
@@ -92,20 +93,20 @@ public sealed class InstalledNavigationTests
         try
         {
             view.FocusList();
-            Press(KeyCode.CursorDown, count + 10);
+            Press(KeyCode.CursorDown, count * 2 + 10);
             Assert.Equal(count == 0 ? null : $"skill-{count - 1:D3}", view.GetSelectedSkill()?.Name);
-            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
+            Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.N | KeyCode.CtrlMask, 10);
-            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
-            Press(KeyCode.CursorUp, count + 10);
-            Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name);
-            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
+            Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
+            Press(KeyCode.CursorUp, count * 2 + 10);
+            Assert.Null(view.GetSelectedSkill()); // first row is a source heading
+            Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.P | KeyCode.CtrlMask, 10);
-            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
+            Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.PageDown, 10);
             Assert.Equal(count == 0 ? null : $"skill-{count - 1:D3}", view.GetSelectedSkill()?.Name);
             Press(KeyCode.PageUp, 10);
-            Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name);
+            Assert.Null(view.GetSelectedSkill()); // first row is a source heading
             Press(KeyCode.End | KeyCode.CtrlMask);
             app.Driver.SetScreenSize(90, 26);
             window.Layout();
@@ -114,7 +115,7 @@ public sealed class InstalledNavigationTests
             Press(KeyCode.CursorDown, 10);
             Press(KeyCode.CursorUp, 10);
             Assert.Null(view.GetSelectedSkill());
-            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
+            Assert.True(view.SubViews.OfType<Markdown>().Single().HasFocus);
             view.SetFilterTextForTests("skill-000");
             Press(KeyCode.CursorDown, 10);
             Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name);

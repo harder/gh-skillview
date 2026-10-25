@@ -98,6 +98,9 @@ public sealed partial class SkillViewApp
             return false;
         }
 
+        if (_activeTab == SkillViewTab.Installed && _updatesTab?.Visible != true && !_inDoctor
+            && _installedTab is { } installed && installed.HandleLocalNavigation(key)) return true;
+
         // Esc at the root of a primary tab would otherwise fall through to
         // Terminal.Gui's default quit-on-Esc and exit the app with no
         // confirmation. Swallow it and hint how to quit instead. Modals,
@@ -153,8 +156,8 @@ public sealed partial class SkillViewApp
         if (rune.Value == 'C') { CheckUpdates(); return true; }
         if (rune.Value == 'u' || rune.Value == 'U')
         {
-            if (_activeTab == SkillViewTab.Installed && _installedTab?.GetSelectedSkill() is { } selected)
-                OpenUpdatesWorkspace(OperationSubject.From(selected));
+            if (_activeTab == SkillViewTab.Installed)
+                _installedTab?.ReviewSelectedUpdate();
             else { ActivateTab(SkillViewTab.Changes); SetStatus("Use Check updates (C), then select an Updates finding and press Enter."); }
             return true;
         }

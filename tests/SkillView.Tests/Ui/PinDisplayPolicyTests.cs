@@ -191,11 +191,11 @@ public sealed class PinDisplayPolicyTests
         var unknown = CopiesPresentationTests.Copy("/unknown", "unknown") with { Validity = ValidityState.UnparsableFrontMatter };
         var malformed = CopiesPresentationTests.Copy("/malformed", "malformed") with { Package = Owner(" ") };
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
-            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { }, () => { });
+            _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { });
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [plain, locked, conflict, unknown, malformed] });
         view.FocusList();
         view.NewKeyDownEvent(new Key('P'));
-        Assert.Equal(["locked", "conflict"], view.VisibleSkillNamesForTests);
+        Assert.Equal(["conflict", "locked"], view.VisibleSkillNamesForTests);
         view.NewKeyDownEvent(new Key('P'));
         Assert.Equal(["plain"], view.VisibleSkillNamesForTests);
         view.NewKeyDownEvent(new Key('P'));
