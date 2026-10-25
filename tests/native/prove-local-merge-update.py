@@ -1,4 +1,4 @@
-"""Actual-gh local merge CLI proof. All writes use disposable home/state/payloads."""
+"""Historical schema3 lifecycle proof with current CLI apply/recovery/undo. All writes use disposable home/state/payloads."""
 import argparse
 import hashlib
 import json
@@ -10,7 +10,10 @@ import tempfile
 import threading
 import time
 
+from historical_merge_proof import add_arguments, verify, assert_reviewed_shape
+
 parser = argparse.ArgumentParser()
+add_arguments(parser)
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--gh', action='append', required=True, type=Path)
 parser.add_argument('--output', required=True, type=Path)
@@ -28,6 +31,7 @@ if bool(args.proof_host) != bool(boundary) or boundary and args.expect_metadata_
 if args.disk_full_boundary and os.name != 'posix':
     parser.error('Real disk-full proof requires Linux; the host additionally verifies bounded tmpfs authority.')
 app = args.app.resolve()
+old, producer = verify(args, app)
 proof_host = args.proof_host.resolve() if args.proof_host else None
 auth = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
 if not auth:
@@ -142,12 +146,12 @@ for gh_path in args.gh:
         original_registry = registry.read_bytes()
         commands = []
 
-        def run(command, *arguments, ok=True):
-            process = subprocess.run([str(app), '--scan-root', str(skills), command, *map(str, arguments),
+        def run(command, *arguments, ok=True, historical=False):
+            process = subprocess.run([str(old if historical else app), '--scan-root', str(skills), command, *map(str, arguments),
                                       '--allow-hidden-dirs', '--json'], env=env, cwd=root, capture_output=True, text=True, timeout=180)
             assert (process.returncode == 0) == ok, (command, process.returncode, process.stdout, process.stderr)
             result = json.loads(process.stdout)
-            commands.append(dict(command=command, exitCode=process.returncode))
+            commands.append(dict(host="historical" if historical else "current", command=command, exitCode=process.returncode))
             return result
 
         def kill_at(saved, action, fingerprint):
@@ -266,15 +270,16 @@ for gh_path in args.gh:
 
         disk_full_evidence = []
 
-        source_plan = run('update-plan', '--path', payload, '--unpin')['operation']
-        source_payload_fingerprint = json.loads(Path(source_plan['planPath']).read_text())['candidate']['payload']
+        source_plan = run('update-plan', '--path', payload, '--unpin', historical=True)['operation']
+        source_record = assert_reviewed_shape(source_plan, 2)
+        source_payload_fingerprint = source_record['candidate']['payload']
         preserved = run('update-preserve', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'])
         assert preserved['status'] == 'preserved' and not preserved['mutationObserved'], preserved
         assert manifest(payload) == before and registry.read_bytes() == original_registry
         source_path = Path(source_plan['candidatePath'])
         source_bytes = manifest(source_path)
         source_id = source_path.stat().st_ino
-        review = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'])
+        review = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'], historical=True)
         assert any(row['path'] == 'keep-local-extra' and row['selection'] == 'installed' for row in review['review']['paths']), review
         refused = run('update-apply', '--id', source_plan['id'], '--yes', '--disposition', 'retain-original',
                       '--expect', source_plan['planFingerprint'], ok=False)
@@ -287,21 +292,21 @@ for gh_path in args.gh:
             if os.name != 'nt':
                 resolution_file.chmod(0o600)
             prepare_windows_fixture_owner(resolution_file)
-            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--resolve', 'SKILL.md', resolution_file)
+            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--resolve', 'SKILL.md', resolution_file, historical=True)
             resolved_row = next(row for row in chosen['review']['paths'] if row['path'] == 'SKILL.md')
             assert resolved_row['selection'] == 'resolved' and resolved_row['resolution']['kind'] == 'file'
             resolution_file.write_text('Changed after capture\n')
             resolution_file.unlink()
-            reused = run('update-merge-choose', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], '--choose-resolved', 'SKILL.md')
+            reused = run('update-merge-choose', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], '--choose-resolved', 'SKILL.md', historical=True)
             assert next(row for row in reused['review']['paths'] if row['path'] == 'SKILL.md')['resolution'] == resolved_row['resolution']
             chosen = reused
         else:
-            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md')
+            chosen = run('update-merge-choose', '--id', source_plan['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md', historical=True)
         if args.expect_metadata_refusal:
             assert not chosen['canMaterialize'] and chosen['metadataRefusals'], chosen
             assert all(args.expect_metadata_refusal in issue for issue in chosen['metadataRefusals']), chosen
             assert not chosen['review']['topologyConflicts'] and all(row['selection'] for row in chosen['review']['paths']), chosen
-            refused = run('update-merge-plan', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], ok=False)
+            refused = run('update-merge-plan', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], ok=False, historical=True)
             assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], refused
             assert 'native metadata cannot be preserved' in refused['error'].lower(), refused
             assert args.expect_metadata_refusal in refused['error'], refused
@@ -310,7 +315,7 @@ for gh_path in args.gh:
             assert source_path.stat().st_ino == source_id and manifest(source_path) == source_bytes
             assert not Path(source_plan['retainedPath']).exists() and not Path(source_plan['displacedPath']).exists()
             assert not list(Path(source_plan['planPath']).parent.glob('merged-*'))
-            results.append(dict(host=str(app), gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
+            results.append(dict(host=str(app), historicalProducer=producer, gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
                                 sourceRevision=source_plan['revision']['source'], commands=commands,
                                 proofKind='explicit-unsupported-metadata', metadataRefusals=chosen['metadataRefusals'],
                                 windowsSupportedFixtureOwnerPrepared=windows_owner_prepared,
@@ -319,9 +324,10 @@ for gh_path in args.gh:
                                 **(dict(capturedResolutionSurvivesInputDeletion=True) if args.resolved else {})))
             continue
         assert chosen['canMaterialize'], chosen
-        repeat = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'])
+        repeat = run('update-merge-review', '--id', source_plan['id'], '--expect', source_plan['planFingerprint'], historical=True)
         assert repeat['reviewFingerprint'] == chosen['reviewFingerprint']
-        merged = run('update-merge-plan', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'])
+        merged = run('update-merge-plan', '--id', source_plan['id'], '--expect', chosen['reviewFingerprint'], historical=True)
+        assert_reviewed_shape(merged, 3)
         assert merged['localDisposition']['sourcePlanFingerprint'] == source_plan['planFingerprint']
         assert merged['localDisposition']['sourceCandidate']['payload'] == source_payload_fingerprint
         assert source_plan['revision']['source']['tree'] != source_plan['subject']['metadata']['githubTreeSha']
@@ -329,11 +335,18 @@ for gh_path in args.gh:
         merged_bytes = manifest(Path(merged['candidatePath']))
         merged_id = Path(merged['candidatePath']).stat().st_ino
         merged_objects = native_objects(Path(merged['candidatePath']))
-        acknowledge_frozen_source(run, merged)
         refused = run('update-apply', '--id', merged['id'], '--yes', '--disposition', 'retain-original', '--expect', merged['planFingerprint'], ok=False)
         assert commands[-1]['exitCode'] == 1 and not refused['succeeded'] and not refused['canceled'], (commands[-1], refused.get('error'))
         assert 'exact saved disposition: merge-reviewed' in refused['error'].lower(), refused
         assert manifest(payload) == before and registry.read_bytes() == original_registry
+        frozen_plan = Path(merged['planPath']).read_bytes()
+        unacknowledged = run('update-apply', '--id', merged['id'], '--yes', '--disposition', 'merge-reviewed',
+                             '--expect', merged['planFingerprint'], ok=False)
+        assert 'source-review acknowledgement is required' in unacknowledged['error'], unacknowledged
+        assert manifest(payload) == before and registry.read_bytes() == original_registry
+        assert not Path(merged['retainedPath']).exists()
+        acknowledge_frozen_source(run, merged)
+        assert Path(merged['planPath']).read_bytes() == frozen_plan
         if boundary in ('retain-moved', 'install-moved'):
             (disk_full_at if args.disk_full_boundary else kill_at)(merged, 'apply-merged', merged['planFingerprint'])
             inspection = run('update-inspect', '--id', merged['id'])['operation']
@@ -364,9 +377,9 @@ for gh_path in args.gh:
         assert native_objects(payload) == original_objects
         assert manifest(Path(undone['displacedPath'])) == merged_bytes
         assert registry.read_bytes() == original_registry and manifest(source_path) == source_bytes
-        results.append(dict(host=str(app), gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
+        results.append(dict(host=str(app), historicalProducer=producer, gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
                             sourceRevision=source_plan['revision']['source'], commands=commands, preserveVerified=True,
-                            immutableReviewRestartVerified=True, priorApprovalRefused=True, wrongMergedDispositionRefused=True, mergedNativeStagePromoted=True,
+                            immutableReviewRestartVerified=True, sourceReviewRequiredAndAcknowledged=True, priorApprovalRefused=True, wrongMergedDispositionRefused=True, mergedNativeStagePromoted=True,
                             localBytesAndEmptyDirectoryPreserved=True, sourceBaselineUnchanged=True,
                             nextUpdateUsesRealSourceBaseline=True,
                             exactOriginalNativeObjectRestored=True, registryBytesUnchanged=True,

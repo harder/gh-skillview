@@ -10,12 +10,11 @@ public sealed partial class ReplacementLocalReviewTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task LegacyFallbackInspectsAndReopensRealRetainedReviewAttemptWithoutGrantingApproval(bool unreadableNewestPlan)
+    public async Task LegacyFallbackInspectsRealRetainedReviewAttemptWithoutGrantingApproval(bool unreadableNewestPlan)
     {
         var plan = await Plan();
         Assert.Null(plan.SourceReview);
-        var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var selected = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "source")], Inventory(), Token);
+        var selected = HistoricalMergeFixture.CaptureReview(State, plan, Token, "source");
         var original = PayloadSnapshot.Capture(Payload, Token);
         // Reproduce the exact durable prefix of a canceled first capture using
         // real immutable archive copies. This does not fabricate publication
@@ -42,7 +41,6 @@ public sealed partial class ReplacementLocalReviewTests
         {
             var inspection = current.Inspect(plan.Id, Inventory(), Token);
             Assert.Equal("ready", inspection.Status); Assert.Null(inspection.SourceReview); Assert.False(inspection.SourceReviewAcknowledged);
-            Assert.Equal(selected.ReviewFingerprint, current.ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token).ReviewFingerprint);
             Assert.Throws<IOException>(() => current.Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
             Assert.Throws<IOException>(() => current.Recover(plan.Id, inspection.ReviewFingerprint, Inventory(), false, Token));
         }
@@ -59,22 +57,24 @@ public sealed partial class ReplacementLocalReviewTests
     public async Task LegacyFallbackRefusesUnboundUnknownExcessAndLinkedAttemptArchives(string kind)
     {
         var plan = await Plan();
-        Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
+        HistoricalMergeFixture.CaptureReview(State, plan, Token);
         var operation = Path.Combine(State, plan.Id);
-        Directory.CreateDirectory(Path.Combine(operation, "merged-00"));
-        var archive = Path.Combine(operation, kind == "unbound" ? "review-installed-merged-01" : "review-installed-merged-00");
-        Directory.CreateDirectory(archive);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(archive, (UnixFileMode)448);
+        var archiveName = kind == "unbound" ? "review-installed-merged-01" : "review-installed-merged-00";
+        HistoricalMergeFixture.CreateIncompleteAttempt(State, plan, Token, archiveName);
+        var archive = Path.Combine(operation, archiveName);
         if (kind == "corrupt")
         {
             var header = Path.Combine(operation, "local-review", "header.json");
             File.WriteAllText(header, File.ReadAllText(header).Replace(plan.PlanFingerprint, new string('0', 64), StringComparison.Ordinal));
         }
-        if (kind == "unknown") File.WriteAllText(Path.Combine(archive, "unexpected"), "No authority");
-        if (kind == "excess")
+        if (kind is "unknown" or "excess") HistoricalMergeFixture.SeedOperation(State, plan, Token, held =>
         {
-            using var oversized = File.Create(Path.Combine(archive, "entry-00000")); oversized.SetLength(PayloadSnapshot.MaxBytes + 1);
-        }
+            using var attempt = NativeStateDirectory.OpenOrCreate(Path.Combine(held.CanonicalPath, archiveName), [], Token, allowCreate: false);
+            using var file = attempt.OpenFile(kind == "unknown" ? "unexpected" : "entry-00000", false, Token);
+            if (kind == "unknown") file.Write("No authority"u8);
+            else file.SetLength(PayloadSnapshot.MaxBytes + 1);
+            file.Flush(true); attempt.FlushNamespace(Token);
+        });
         if (kind == "link")
         {
             var target = Path.Combine(temporary.FullName, "external"); File.WriteAllText(target, "No authority");
@@ -84,23 +84,4 @@ public sealed partial class ReplacementLocalReviewTests
         Assert.False(Directory.Exists(plan.RetainedPath));
     }
 
-    public static bool SupportsNativeMergePublication => OperatingSystem.IsMacOS();
-    [Fact(Skip = "Full native merge metadata publication proof requires supported host coverage.", SkipUnless = nameof(SupportsNativeMergePublication))]
-    public async Task CanceledLegacyFinalizeAfterInstalledArchiveRetriesIntoFreshReviewedAttempt()
-    {
-        var plan = await Plan(); var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var selected = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "source")], Inventory(), Token);
-        Assert.True(selected.CanMaterialize, string.Join("; ", selected.MetadataRefusals));
-        var original = PayloadSnapshot.Capture(Payload, Token);
-        Assert.Throws<OperationCanceledException>(() => Store(step =>
-        { if (step == "merge-source-review-installed-captured") throw new OperationCanceledException("capture canceled"); }, true)
-            .FinalizeLocalChanges(plan.Id, selected.ReviewFingerprint, Inventory(), Token));
-        Assert.Equal("ready", Store().Inspect(plan.Id, Inventory(), Token).Status);
-        var reopened = Store(sourceReviewRequired: true).ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var merged = Store(sourceReviewRequired: true).FinalizeLocalChanges(plan.Id, reopened.ReviewFingerprint, Inventory(), Token);
-        Assert.EndsWith("merged-01", merged.CandidatePath); Assert.NotNull(merged.SourceReview);
-        Assert.False(merged.SourceReviewAcknowledged);
-        Assert.Throws<IOException>(() => Store().Apply(plan.Id, merged.PlanFingerprint, Inventory(), Token, "merge-reviewed"));
-        Assert.Equal(original.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
-    }
 }

@@ -51,7 +51,7 @@ public sealed class PayloadNativeMetadataTests : IDisposable
     }
 
     [Fact]
-    public void MacMergePreservesBinaryAndEmptyExtendedAttributesOnFilesAndRoot()
+    public void MacClonePreservesBinaryAndEmptyExtendedAttributesOnFilesAndRoot()
     {
         if (!OperatingSystem.IsMacOS()) return;
         using var original = CreateOriginal();
@@ -65,10 +65,8 @@ public sealed class PayloadNativeMetadataTests : IDisposable
         Assert.All(archive.Entries, entry => Assert.True(entry.Metadata!.Supported, string.Join(" ", entry.Metadata.Refusals)));
         using var files = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "installed-evidence"), [Target], Token, allowCreate: false);
         var before = original.Capture(Token);
-        var merged = ReviewedPayloadMaterializer.StagePreservingMetadata(state, "merged", ThreeWayPayloadReview.Analyze(archive.Snapshot, archive.Snapshot, archive.Snapshot),
-            new Dictionary<string, CapturedPayloadArchive.Reader> { ["installed"] = archive.OpenReader(files) }, archive.Snapshot.FrontMatter!, Token);
-        Assert.Contains("unsupported/unknown metadata refused", merged.MetadataPolicy);
-        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, merged.Snapshot.Path, Token);
+        var merged = CloneInstalled(state, archive, files, "merged");
+        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, merged.Path, Token);
         var copied = CapturedPayloadArchive.Capture(state, "merged-evidence", candidate, Token);
         Assert.Equal(new byte[] { 7, 0, 255 }, copied.RootMetadata!.Attributes.Single(item => item.Name == "com.harder.skillview.root").Value);
         var attributes = copied.Entries.Single(entry => entry.Entry.Path == "extra").Metadata!.Attributes;
@@ -95,9 +93,8 @@ public sealed class PayloadNativeMetadataTests : IDisposable
         Assert.True(metadata.Supported, string.Join(" ", metadata.Refusals));
         Assert.Equal(new byte[] { 1, 0, 2 }, metadata.Attributes.Single(item => item.Name == "com.harder.skillview.test").Value);
         using var files = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "installed-evidence"), [Target], Token, allowCreate: false);
-        var merged = ReviewedPayloadMaterializer.StagePreservingMetadata(state, "merged", ThreeWayPayloadReview.Analyze(archive.Snapshot, archive.Snapshot, archive.Snapshot),
-            new Dictionary<string, CapturedPayloadArchive.Reader> { ["installed"] = archive.OpenReader(files) }, archive.Snapshot.FrontMatter!, Token);
-        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, merged.Snapshot.Path, Token);
+        var merged = CloneInstalled(state, archive, files, "merged");
+        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, merged.Path, Token);
         var copied = CapturedPayloadArchive.Capture(state, "merged-evidence", candidate, Token);
         Assert.Equal(new byte[] { 1, 0, 2 }, copied.Entries.Single(entry => entry.Entry.Path == "external").Metadata!.Attributes.Single(item => item.Name == "com.harder.skillview.test").Value);
         Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.CaptureEvidence(outside, Token).ObjectStateFingerprint);
@@ -116,8 +113,7 @@ public sealed class PayloadNativeMetadataTests : IDisposable
         Assert.Equal(2UL, metadata.LinkCount); Assert.False(metadata.Supported);
         Assert.Contains(metadata.Refusals, refusal => refusal.Contains("Hard-linked", StringComparison.Ordinal));
         using var files = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "installed-evidence"), [Target], Token, allowCreate: false);
-        Assert.Throws<IOException>(() => ReviewedPayloadMaterializer.StagePreservingMetadata(state, "not-created", ThreeWayPayloadReview.Analyze(archive.Snapshot, archive.Snapshot, archive.Snapshot),
-            new Dictionary<string, CapturedPayloadArchive.Reader> { ["installed"] = archive.OpenReader(files) }, archive.Snapshot.FrontMatter!, Token));
+        Assert.Throws<IOException>(() => CloneInstalled(state, archive, files, "not-created"));
         Assert.False(Directory.Exists(Path.Combine(state.CanonicalPath, "not-created")));
     }
 
@@ -172,10 +168,17 @@ public sealed class PayloadNativeMetadataTests : IDisposable
         var metadata = archive.Entries.Single(entry => entry.Entry.Path == "extra").Metadata!;
         Assert.False(metadata.Supported); Assert.Contains(metadata.Refusals, refusal => refusal.Contains("ACL", StringComparison.Ordinal));
         using var files = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "installed-evidence"), [Target], Token, allowCreate: false);
-        Assert.Throws<IOException>(() => ReviewedPayloadMaterializer.StagePreservingMetadata(state, "not-created", ThreeWayPayloadReview.Analyze(archive.Snapshot, archive.Snapshot, archive.Snapshot),
-            new Dictionary<string, CapturedPayloadArchive.Reader> { ["installed"] = archive.OpenReader(files) }, archive.Snapshot.FrontMatter!, Token));
+        Assert.Throws<IOException>(() => CloneInstalled(state, archive, files, "not-created"));
         Assert.False(Directory.Exists(Path.Combine(state.CanonicalPath, "not-created")));
         Assert.Equal(before.ObjectStateFingerprint, original.Capture(Token).ObjectStateFingerprint);
+    }
+
+    private PayloadSnapshot CloneInstalled(NativeStateDirectory state, CapturedPayloadArchive archive, NativeStateDirectory files, string name)
+    {
+        var reader = archive.OpenReader(files);
+        using var metadata = PayloadMetadataReview.PreserveInstalled(archive, reader, Token);
+        using var skill = new MemoryStream(); reader.CopyEntry("SKILL.md", skill, Token);
+        return InstalledPayloadMaterializer.Stage(state, archive, reader, metadata, skill.ToArray(), Token, name);
     }
 
     private static void SetAttribute(string path, string name, byte[] bytes, bool noFollow = false) =>

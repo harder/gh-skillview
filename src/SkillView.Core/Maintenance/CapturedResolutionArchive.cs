@@ -1,12 +1,9 @@
 using System.Collections.Immutable;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Serialization;
 using SkillView.Inventory;
 
 namespace SkillView.Maintenance;
 
-internal sealed record LocalResolutionInput(string Path, string SourceFile);
 internal sealed record ResolutionEntryReference(string Path, string Archive, string ManifestFingerprint);
 internal sealed record LocalResolutionSet(ImmutableArray<ResolutionEntryReference> Entries);
 internal sealed record ResolutionArchiveManifest(int SchemaVersion, ImmutableArray<ArchivedPayloadEntry> Entries);
@@ -18,80 +15,6 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
 {
     internal const long MaxRetainedBytes = PayloadSnapshot.MaxBytes;
     internal const long MaxRetainedManifestBytes = 64L * 1024 * 1024;
-
-    internal static string Capture(NativeStateDirectory parent, string name, IReadOnlyList<LocalResolutionInput> inputs,
-        long remainingBytes, long remainingManifestBytes, CancellationToken token,
-        Action<string>? afterCopyForTests = null)
-    {
-        token.ThrowIfCancellationRequested();
-        if (inputs.Count is 0 or > PayloadSnapshot.MaxEntries) throw new IOException("Resolution input count exceeds its budget.");
-        if (inputs.Any(input => input is null || string.IsNullOrEmpty(input.Path) || string.IsNullOrEmpty(input.SourceFile))
-            || inputs.Select(input => input.Path).Distinct(StringComparer.Ordinal).Count() != inputs.Count)
-            throw new IOException("Every resolution needs one distinct target path and regular input file.");
-        using var archive = parent.CreateStagingDirectory(name, token);
-        using var authority = PayloadMetadataAuthority.Open(archive, create: true, token);
-        var entries = ImmutableArray.CreateBuilder<ArchivedPayloadEntry>();
-        var bytesBudget = new WriteBudget(remainingBytes); long metadataBytes = 0;
-        foreach (var input in inputs.OrderBy(input => input.Path, StringComparer.Ordinal))
-        {
-            token.ThrowIfCancellationRequested();
-            ArchivedPayloadEntry? captured = null;
-            RegularFileInspection.Capture(input.SourceFile, item =>
-            {
-                var file = item.Content ?? throw new IOException("Resolution regular-file content is unavailable.");
-                var length = file.Length;
-                if (length > bytesBudget.Remaining || input.Path == "SKILL.md" && length > PayloadSnapshot.MaxSkillBytes)
-                    throw new IOException("Resolution input exceeds its remaining byte budget.");
-                var metadata = PayloadNativeMetadata.Capture(item, token, authority, bytesBudget.Remaining - length);
-                metadataBytes += metadata.Validate();
-                if (metadataBytes > PayloadNativeMetadata.MaxArchiveMetadataBytes)
-                    throw new IOException("Resolution metadata exceeds its archive budget.");
-                bytesBudget.Consume(checked((int)metadata.AlternateStreamBytes));
-                if (length > bytesBudget.Remaining) throw new IOException("Resolution data/alternate streams exceed the remaining raw byte budget.");
-                file.Position = 0;
-                var blob = $"entry-{entries.Count:D5}";
-                using var destination = archive.OpenFile(blob, false, token);
-                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-                using var skill = input.Path == "SKILL.md" ? new MemoryStream() : null;
-                var buffer = new byte[64 * 1024]; long stored = 0;
-                while (true)
-                {
-                    token.ThrowIfCancellationRequested();
-                    var count = file.Read(buffer);
-                    if (count == 0) break;
-                    stored += count;
-                    if (stored > length) throw new IOException("Resolution input grew during capture.");
-                    bytesBudget.Consume(count); destination.Write(buffer, 0, count);
-                    hash.AppendData(buffer.AsSpan(0, count)); skill?.Write(buffer, 0, count);
-                }
-                if (stored != length) throw new IOException("Resolution input changed length during capture.");
-                var raw = Convert.ToHexString(hash.GetHashAndReset()); var comparison = raw;
-                if (skill is not null)
-                {
-                    var text = new UTF8Encoding(false, true).GetString(skill.GetBuffer(), 0, checked((int)skill.Length));
-                    var (_, frontMatter, parsed) = FrontMatterParser.Parse(text);
-                    if (!parsed || !frontMatter.Diagnostics.IsEmpty) throw new IOException("Resolved SKILL.md needs valid, unambiguous frontmatter.");
-                    comparison = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(InstallerMetadataNormalizer.Normalize(text))));
-                }
-                destination.Flush(true);
-                captured = new(new(input.Path, "file", raw, comparison, stored, item.UnixMode, null), blob, stored, metadata);
-                afterCopyForTests?.Invoke(input.Path);
-                return new(raw, stored);
-            }, token);
-            entries.Add(captured ?? throw new IOException("Resolution input was not captured."));
-        }
-        var result = new CapturedResolutionArchive(entries.ToImmutable());
-        result.Validate();
-        using (var file = archive.OpenFile("manifest.json", false, token))
-        {
-            using var bounded = new BudgetedWriteStream(file, new(remainingManifestBytes));
-            var hash = BoundedReviewJson.Write(bounded, new ResolutionArchiveManifest(1, result.Entries),
-                ResolutionJsonContext.Default.ResolutionArchiveManifest, CapturedPayloadArchive.MaxManifestBytes, token);
-            file.Flush(true); archive.FlushNamespace(token); archive.FlushPublication(token);
-            archive.SealStagingDirectory(448, token);
-            return hash;
-        }
-    }
 
     internal static CapturedResolutionArchive Load(NativeStateDirectory archive, string expectedHash, CancellationToken token)
     {
@@ -156,27 +79,7 @@ internal sealed record CapturedResolutionArchive(ImmutableArray<ArchivedPayloadE
         }
     }
 
-    private sealed class WriteBudget(long remaining)
-    {
-        internal long Remaining { get; private set; } = remaining;
-        internal void Consume(int count)
-        {
-            if (count > Remaining) throw new IOException("Retained resolution storage budget exceeded; partial evidence retained.");
-            Remaining -= count;
-        }
-    }
-    private sealed class BudgetedWriteStream(Stream output, WriteBudget budget) : Stream
-    {
-        public override bool CanRead => false; public override bool CanSeek => false; public override bool CanWrite => true;
-        public override long Length => throw new NotSupportedException();
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-        public override void Flush() => output.Flush();
-        public override void Write(byte[] buffer, int offset, int count) { budget.Consume(count); output.Write(buffer, offset, count); }
-        public override void Write(ReadOnlySpan<byte> buffer) { budget.Consume(buffer.Length); output.Write(buffer); }
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-    }
+
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

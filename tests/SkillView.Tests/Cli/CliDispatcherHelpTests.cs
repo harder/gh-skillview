@@ -28,6 +28,10 @@ public class CliDispatcherHelpTests
         Assert.Contains("| `check` |", stdout);
         Assert.Contains("| `quarantine` |", stdout);
         Assert.Contains("| `restore-plan` |", stdout);
+        Assert.Contains("| `update-preserve` |", stdout);
+        Assert.DoesNotContain("update-merge-review", stdout);
+        Assert.DoesNotContain("update-merge-choose", stdout);
+        Assert.DoesNotContain("update-merge-plan", stdout);
         Assert.Contains("| `unpin-plan` |", stdout);
         Assert.Contains("| `reimport-plan` |", stdout);
         Assert.Contains("| `source-switch-plan` |", stdout);
@@ -85,9 +89,6 @@ public class CliDispatcherHelpTests
     [InlineData("unpin-recover", 600)]
     [InlineData("unpin-undo", 600)]
     [InlineData("unpin-repair-owner", 600)]
-    [InlineData("update-merge-review", 600)]
-    [InlineData("update-merge-choose", 600)]
-    [InlineData("update-merge-plan", 600)]
     [InlineData("update-preserve", 600)]
     public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
     {

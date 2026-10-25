@@ -62,41 +62,6 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task SavedReviewSurvivesRestartAndClosesOldApprovalWithoutChangingInstalledObjects()
-    {
-        var before = PayloadSnapshot.Capture(Payload, Token);
-        var plan = await Plan();
-        var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        Assert.False(review.CanMaterialize);
-        Assert.Null(review.Review.Paths.Single(row => row.Path == "SKILL.md").Selection);
-        Assert.Equal("installed", review.Review.Paths.Single(row => row.Path == "extra").Selection);
-        Assert.Equal("source", review.Review.Paths.Single(row => row.Path == "resource").Selection);
-        Assert.Equal(review.ReviewFingerprint, Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token).ReviewFingerprint);
-        Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        var inspected = Store().Inspect(plan.Id, Inventory(), Token);
-        Assert.Throws<IOException>(() => Store().Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), false, Token));
-        Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
-        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
-        Assert.False(Directory.Exists(plan.RetainedPath));
-    }
-
-    [Fact]
-    public async Task ExplicitChoicesAreAppendOnlyBoundedAndNewestCorruptionDoesNotRevivePriorSelection()
-    {
-        var plan = await Plan();
-        var first = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, first.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token);
-        Assert.NotEqual(first.ReviewFingerprint, chosen.ReviewFingerprint);
-        Assert.Equal("installed", chosen.Review.Paths.Single(row => row.Path == "SKILL.md").Selection);
-        Assert.Throws<IOException>(() => Store().ChooseLocalChanges(plan.Id, first.ReviewFingerprint, [new("SKILL.md", "source")], Inventory(), Token));
-        var latest = Path.Combine(chosen.ReviewPath, "choices-01.json");
-        File.WriteAllText(latest, "{\"schemaVersion\":1,");
-        Assert.ThrowsAny<JsonException>(() => Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.False(Directory.Exists(plan.RetainedPath));
-    }
-
     [Theory]
     [InlineData("installed")]
     [InlineData("source")]
@@ -105,10 +70,8 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
         if (!OperatingSystem.IsMacOS()) { Assert.Skip("Merged native metadata publication currently requires macOS evidence."); return; }
         var before = PayloadSnapshot.Capture(Payload, Token);
         var plan = await Plan();
-        var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", side)], Inventory(), Token);
-        Assert.True(chosen.CanMaterialize, string.Join("; ", chosen.MetadataRefusals));
-        var merged = Store().FinalizeLocalChanges(plan.Id, chosen.ReviewFingerprint, Inventory(), Token);
+        HistoricalMergeFixture.Create(State, plan, Token, side);
+        var merged = Store().Inspect(plan.Id, Inventory(), Token);
         Assert.Equal("merge-reviewed", merged.LocalDisposition!.Kind);
         Assert.Equal(side == "installed" ? "1.0" : "2.0", merged.LocalDisposition.ResultAuthoredVersion);
         Assert.Equal("2.0", merged.Revision!.DesiredMetadata.Version);
@@ -154,9 +117,9 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
     public async Task InterruptedMergedPublicationRecoversFromSavedEvidenceWithoutReResolving(string stop)
     {
         if (!OperatingSystem.IsMacOS()) return;
-        var plan = await Plan(); var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token);
-        var merged = Store().FinalizeLocalChanges(plan.Id, chosen.ReviewFingerprint, Inventory(), Token);
+        var plan = await Plan();
+        HistoricalMergeFixture.Create(State, plan, Token);
+        var merged = Store().Inspect(plan.Id, Inventory(), Token);
         var interrupted = Store(step => { if (step == stop) throw new IOException("interrupt"); })
             .Apply(plan.Id, merged.PlanFingerprint, Inventory(), Token, "merge-reviewed");
         Assert.False(interrupted.Succeeded); Assert.True(interrupted.MutationObserved);
@@ -167,43 +130,39 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
     }
 
     [Fact]
-    public async Task PartialFinalizationIsRetainedAndNewAttemptCanCompleteWithoutRevivingOldApproval()
+    public async Task HistoricalReviewCapturesCanonicalCandidateThroughObservedAncestorAlias()
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        var plan = await Plan(); var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token);
-        var operation = Path.Combine(State, plan.Id);
-        Directory.CreateDirectory(Path.Combine(operation, "merged-00"));
-        File.WriteAllText(Path.Combine(operation, "merge-plan-00.json"), "{\"schemaVersion\":3,");
-        Assert.Equal("ready", Store().Inspect(plan.Id, Inventory(), Token).Status);
-        Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.Equal(chosen.ReviewFingerprint, Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token).ReviewFingerprint);
-        var merged = Store().FinalizeLocalChanges(plan.Id, chosen.ReviewFingerprint, Inventory(), Token);
-        Assert.EndsWith("merged-01", merged.CandidatePath);
-        Assert.Equal("{\"schemaVersion\":3,", File.ReadAllText(Path.Combine(operation, "merge-plan-00.json")));
-        Assert.True(Store().Apply(plan.Id, merged.PlanFingerprint, Inventory(), Token, "merge-reviewed").Succeeded);
-    }
-
-    [Fact]
-    public async Task ChangedInputOrImmutableManifestRefusesBeforeAnyLiveMove()
-    {
-        var plan = await Plan(); var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        File.WriteAllText(Path.Combine(Payload, "extra"), "Changed after review");
-        Assert.Throws<IOException>(() => Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token));
-        Assert.False(Directory.Exists(plan.RetainedPath));
-    }
-
-    [Fact]
-    public async Task InterruptedCaptureClosesOldApprovalAndRetainsPartialEvidence()
-    {
-        var before = PayloadSnapshot.Capture(Payload, Token); var plan = await Plan();
-        Assert.Throws<IOException>(() => Store(step => { if (step == "local-review-created") throw new IOException("interrupt"); })
-            .ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.Throws<IOException>(() => Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.Throws<IOException>(() => Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token));
-        Assert.True(Directory.Exists(Path.Combine(State, plan.Id, "local-review")));
-        Assert.Equal(before.Fingerprint, PayloadSnapshot.Capture(Payload, Token).Fingerprint);
-        Assert.False(Directory.Exists(plan.RetainedPath));
+        var plan = await Plan();
+        var original = PayloadSnapshot.Capture(Payload, Token);
+        var savedBytes = File.ReadAllBytes(plan.PlanPath);
+        var saved = JsonSerializer.Deserialize(savedBytes, ReplacementJsonContext.Default.ReplacementPlan)!;
+        var alias = Path.Combine(temporary.FullName, "ancestor-alias");
+        Directory.CreateSymbolicLink(alias, temporary.FullName);
+        try
+        {
+            var aliasedState = Path.Combine(alias, "state");
+            var observed = plan with
+            {
+                CandidatePath = Path.Combine(aliasedState, plan.Id, "candidate"),
+                PlanPath = Path.Combine(aliasedState, plan.Id, "plan.json")
+            };
+            var canonicalOperation = Path.GetDirectoryName(saved.Candidate.Identity.CanonicalPath)!;
+            Assert.NotEqual(observed.CandidatePath, saved.Candidate.Identity.CanonicalPath);
+            // The native guard must still reject mixing canonical roots with
+            // observed aliases, even when both names reach the same object.
+            Assert.Throws<IOException>(() =>
+            {
+                using var lease = NativeDirectoryMoveLease.Open(canonicalOperation, observed.CandidatePath, Token);
+            });
+            var review = HistoricalMergeFixture.CaptureReview(aliasedState, observed, Token);
+            Assert.Equal(saved.Candidate.Identity.CanonicalPath, review.Source.Snapshot.Path);
+            Assert.Equal(saved.Candidate.Payload, review.Source.Snapshot.Fingerprint);
+            Assert.Equal(Path.Combine(aliasedState, plan.Id, "candidate"), observed.CandidatePath);
+            Assert.Equal(savedBytes, File.ReadAllBytes(observed.PlanPath));
+            Assert.Equal(original.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+            Assert.False(Directory.Exists(plan.RetainedPath));
+        }
+        finally { Directory.Delete(alias); }
     }
 
     [Fact]

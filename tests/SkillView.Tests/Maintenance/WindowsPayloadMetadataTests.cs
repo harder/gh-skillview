@@ -119,7 +119,7 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
     }
 
     [Fact]
-    public void WindowsNativeMergeCopiesExactDescriptorAndRootFileStreamsOrRefusesWithoutMutation()
+    public void WindowsNativeCloneCopiesExactDescriptorAndRootFileStreamsOrRefusesWithoutMutation()
     {
         if (!OperatingSystem.IsWindows()) return;
         using var initialImpersonation = WindowsIdentity.GetCurrent(ifImpersonating: true);
@@ -148,7 +148,7 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
             Assert.False(Directory.Exists(Path.Combine(state.CanonicalPath, "merged")));
             Assert.Equal(before.ObjectStateFingerprint, source.Capture(Token).ObjectStateFingerprint);
             Assert.False(System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF") == "1",
-                "Supported Windows merge fixture refused: " + string.Join(" | ", captured.RootMetadata.Refusals
+                "Supported Windows clone fixture refused: " + string.Join(" | ", captured.RootMetadata.Refusals
                     .Concat(captured.Entries.SelectMany(entry => entry.Metadata!.Refusals.Select(reason => entry.Entry.Path + ": " + reason)))));
             return;
         }
@@ -160,7 +160,7 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
         using var beforePublicationImpersonation = WindowsIdentity.GetCurrent(ifImpersonating: true);
         Assert.Null(beforePublicationImpersonation);
         var built = Build();
-        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, built.Snapshot.Path, Token);
+        using var candidate = NativeDirectoryMoveLease.Open(state.CanonicalPath, built.Path, Token);
         var actual = CapturedPayloadArchive.Capture(state, "verified", candidate, Token);
         Assert.True(WindowsPayloadMetadata.Same(captured.RootMetadata.Windows, actual.RootMetadata!.Windows));
         foreach (var expected in captured.Entries)
@@ -168,38 +168,14 @@ public sealed class WindowsPayloadMetadataTests : IDisposable
         Assert.Equal(before.ObjectStateFingerprint, source.Capture(Token).ObjectStateFingerprint);
         Assert.Equal(new byte[] { 7, 0, 255 }, File.ReadAllBytes(Path.Combine(target.FullName, "resource") + ":Zone.Identifier"));
 
-        VerifiedMergedPayload Build()
+        PayloadSnapshot Build()
         {
             using var files = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "capture"), [target.FullName], Token, allowCreate: false);
-            return ReviewedPayloadMaterializer.StagePreservingMetadata(state, "merged",
-                ThreeWayPayloadReview.Analyze(captured.Snapshot, captured.Snapshot, captured.Snapshot),
-                new Dictionary<string, CapturedPayloadArchive.Reader> { ["installed"] = captured.OpenReader(files) }, captured.Snapshot.FrontMatter!, Token);
+            var reader = captured.OpenReader(files);
+            using var metadata = PayloadMetadataReview.PreserveInstalled(captured, reader, Token);
+            using var skill = new MemoryStream(); reader.CopyEntry("SKILL.md", skill, Token);
+            return InstalledPayloadMaterializer.Stage(state, captured, reader, metadata, skill.ToArray(), Token, "merged");
         }
-    }
-
-    [Fact]
-    public void WindowsResolutionObservesOriginalFileThroughItsInitialHandleAndFreezesAlternateStreams()
-    {
-        if (!OperatingSystem.IsWindows()) return;
-        var input = Path.Combine(temporary.FullName, "input"); File.WriteAllBytes(input, [1, 2, 3]);
-        File.WriteAllBytes(input + ":Zone.Identifier", [9, 0, 8]);
-        SetFixtureOwner(input);
-        using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temporary.FullName, "state"), [], Token);
-        var hash = CapturedResolutionArchive.Capture(state, "resolution", [new("resource", input)],
-            PayloadSnapshot.MaxBytes, CapturedResolutionArchive.MaxRetainedManifestBytes, Token);
-        using var archive = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, "resolution"), [], Token, allowCreate: false);
-        var saved = Assert.Single(CapturedResolutionArchive.Load(archive, hash, Token).Entries);
-        if (!saved.Metadata!.Supported)
-        {
-            Assert.NotEmpty(saved.Metadata.Refusals);
-            Assert.False(System.Environment.GetEnvironmentVariable("SKILLVIEW_WINDOWS_METADATA_PROOF") == "1",
-                "Supported Windows resolution fixture refused: " + string.Join(" | ", saved.Metadata.Refusals)); return;
-        }
-        Assert.Equal(new byte[] { 9, 0, 8 }, saved.Metadata.Windows!.Streams.Single().Bytes);
-        File.WriteAllBytes(input + ":Zone.Identifier", [1]); File.Delete(input);
-        Assert.Equal(new byte[] { 9, 0, 8 }, saved.Metadata.Windows.Streams.Single().Bytes);
-        using var bytes = new MemoryStream(); new CapturedResolutionArchive([saved]).OpenReader(archive).CopyEntry("resource", bytes, Token);
-        Assert.Equal(new byte[] { 1, 2, 3 }, bytes.ToArray());
     }
 
     [Theory]

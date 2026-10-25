@@ -70,7 +70,7 @@ internal sealed partial class UpdatesTabView : FrameView
         Action onUpdateApplied,
         CancellationToken lifetimeToken = default,
         Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? applyRunner = null,
-        Func<LocalUpdateRequest, bool, CancellationToken, Task<LocalUpdateResponse>>? localReviewRunner = null,
+        Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? preserveRunner = null,
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null,
         Func<InstalledSkill, string?>? chooseTag = null,
         Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? inspectUndoRunner = null,
@@ -84,7 +84,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _inspectUndoRunner = inspectUndoRunner;
         _undoRunner = undoRunner;
         _applyRunner = applyRunner;
-        _localReviewRunner = localReviewRunner;
+        _preserveRunner = preserveRunner;
         _ghPathProvider = ghPathProvider;
         _logger = logger;
         _onLeaveTab = onLeaveTab;
@@ -198,7 +198,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _detailsButton.Accepting += (_, args) => { args.Handled = true; TogglePreviewDetails(); };
 
         InitializeReviewControls();
-        InitializeLocalReviewControls();
+        InitializePreserveControl();
         InitializeUndoControls();
 
         _dryRunButton.Accepting += (_, ev) =>
@@ -239,7 +239,7 @@ internal sealed partial class UpdatesTabView : FrameView
         Add(_tableLabel, _table, _preview,
             _allBox, _hiddenBox, _unpinBox,
             _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
-        Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
+        Add(_preserveButton);
         Add(_undoButton, _undoApproval, _confirmUndoButton, _cancelUndoButton);
         _table.ValueChanged += (_, _) =>
         {
@@ -431,9 +431,6 @@ internal sealed partial class UpdatesTabView : FrameView
             return;
         }
 
-        // Local-review file paths and table navigation belong to their controls.
-        // Whole-screen printable shortcuts must not consume typed filenames.
-        if (_localPanel.Visible) return;
         if (key.KeyCode == KeyCode.F2)
         {
             key.Handled = true;
@@ -599,7 +596,6 @@ internal sealed partial class UpdatesTabView : FrameView
         _operationCancellations.Cancel();
         _review = null;
         ClearUndo();
-        ResetLocalReview();
         _queue.Clear();
         _queueOptions = null;
         _retainBox.Value = CheckState.UnChecked;
