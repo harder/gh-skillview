@@ -147,6 +147,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   progress on `InvokeIfActive` so a cosmetic failure cannot release a running
   worker.
 
+- Compact install captures the install service's child CWD/environment for
+  default-scope preparation, agent detection and submission. Resolve the
+  project base through `GhPlacementCatalog` under that context. Preparation
+  owns the modal operation slot; a provisional scope cannot be submitted.
+  Keep the selected radio and its focused item aligned at initialization,
+  and focus the visible primary action when preparation completes unless the
+  user moved focus during lookup. Honor preparation cancellation again inside
+  queued completion before enabling controls. Sanitize/bound displayed base
+  paths without changing the raw child context or placement paths.
+
 - Awaiting dispatch of an entire synchronous modal needs the stronger owned
   dispatch contract: cancellation may reject a callback that is still queued,
   but once that callback starts the background owner must wait until the nested
