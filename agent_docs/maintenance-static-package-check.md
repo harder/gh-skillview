@@ -90,11 +90,8 @@ frozen content diffs, bounded declaration deltas and explicit acknowledgement to
 new product plans. The explicit repository authoring `gh skill publish --dry-run`
 workflow is documented in [authoring validation](maintenance-authoring-validation.md);
 its gh command result is separate from installed-package static evidence.
-The [explicit offline evaluation workflow](maintenance-isolated-evaluation.md)
-requires a reviewed environment and prompts plus separate execution consent.
-PR71's Linux proof exercised the explicit offline evaluator and cleanup; its
-four native hosts separately verified static checks and actual authoring dry-runs.
-Those results do not establish model quality or skill safety. Never use
+PR71's four native hosts verified static checks and actual authoring dry-runs.
+Those results do not establish skill safety. Never use
 `publish --fix` to repair installed updates or silently edit authored instructions.
 
 The dialog uses `ModalOperationTracker` ownership through queued completion.

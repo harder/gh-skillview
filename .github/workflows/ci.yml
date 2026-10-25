@@ -408,21 +408,6 @@ jobs:
           python tests/native/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
             --gh ".ci-native/gh-minimum/$proof_gh_name" \
             --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-extension-proof
-      - name: Prove explicit offline evaluation against a real local Docker runtime
-        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Fixture preparation is explicit and outside the product's no-pull boundary.
-          docker pull busybox:1.37.0
-          docker image inspect busybox:1.37.0 > dist/evaluation-fixture-image.json
-          fixture_digest="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["RepoDigests"][0])')"
-          fixture_id="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["Id"])')"
-          docker_path="$(command -v docker)"
-          python3 tests/native/prove-isolated-evaluation.py --app dist/app/skillview \
-            --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-app-proof
-          python3 tests/native/prove-isolated-evaluation.py --app dist/ext/gh-skillview \
-            --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-extension-proof
       - name: Verify repository API access and retain response evidence
         if: matrix.shard == 'owners'
         shell: bash
@@ -764,8 +749,6 @@ jobs:
           name: native-maintenance-evidence-${{ matrix.rid }}-${{ matrix.shard }}
           path: |
             dist/*-proof.json
-            dist/evaluation-*-proof/**
-            dist/evaluation-fixture-image.json
             dist/authoring-*-proof/**
             dist/gh-api-access.txt
             dist/disk-full-proof/**

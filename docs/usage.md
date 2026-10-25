@@ -492,8 +492,8 @@ match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
-Separate workflows support [opt-in isolated evaluations](isolated-evaluations.md)
-and [source authoring validation](#validate-a-source-repository-while-authoring),
+A separate workflow supports
+[source authoring validation](#validate-a-source-repository-while-authoring),
 including `gh skill publish --dry-run`. `publish --fix` is never a repair action
 for installed payloads; no installed authored bytes are rewritten.
 
@@ -780,10 +780,3 @@ and changes have explicit refused/skipped/partial results. Root-only `SKILL.md`
 layout is explicitly unavailable in this repository workflow. See the
 [authoring validation guide](../agent_docs/maintenance-authoring-validation.md)
 for discovery scope, bounds, status and exit-code semantics.
-
-## Opt-in offline evaluations
-
-Use `evaluate-review` to inspect a frozen package, your representative prompts and
-an explicit already-local offline Docker evaluator. `evaluate-run` requires the
-exact review fingerprint and `--consent-run`. No routine inspection or update
-starts evaluations. See [environment, protocol and limitations](isolated-evaluations.md).

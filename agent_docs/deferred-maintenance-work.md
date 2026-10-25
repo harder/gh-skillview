@@ -17,8 +17,8 @@ Saved updates retain source review, explicit retention, local-change review,
 inspection, recovery and undo. Basic pinning, standalone unpin, local reimport
 and local source switching remain supported within their documented bounds.
 Effective-loading inspection is conditional local-policy analysis; it does not
-launch AI clients. Package checks, authoring dry-run and offline evaluations
-remain explicit opt-in workflows, not automatic installation requirements.
+launch AI clients. Package checks and authoring dry-run remain explicit opt-in
+workflows, not automatic installation requirements.
 
 ## Deferred expansion
 
@@ -29,7 +29,7 @@ remain explicit opt-in workflows, not automatic installation requirements.
 | Machine profiles and first-install profile management | Observed profile paths are inventory context, not permission to build profile lifecycle management. |
 | Additional native-owner adapters or remote-source adoption | Retain existing owner diagnostics and safe refusals until one concrete repair justifies a supported transition. |
 | Claude local plugin disable | Historical fixtures did not establish a complete native disable proof. Reconsider only with current source/layout evidence and an actual user need. |
-| General transaction, migration, lint or evaluation framework expansion | Reuse current recovery and package-check foundations. Broaden only for a bounded user-facing requirement. |
+| General transaction, migration or lint framework expansion | Reuse current recovery and package-check foundations. Broaden only for a bounded user-facing requirement. |
 
 Retired local work was archived and verified before obsolete checkouts and
 branches were removed. The canonical PR #73 branch is preserved in that private

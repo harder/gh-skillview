@@ -74,6 +74,4 @@ compatibility and payload integrity `unknown`, safety `not-assessed`, and source
 
 PR71 completed the [historical verification](https://github.com/harder/gh-skillview/blob/0f7264f7eca48f6329f9a82d60fbf803e43dd5bd/agent_docs/evidence/maintenance-pr71-m19-m20-final.json),
 including both native product hosts with gh 2.97.0 and 2.102.0. Other original
-maintenance findings remain open. Opt-in representative-prompt evaluations
-require an explicit runnable isolated environment and separate authorization for
-any agent/API execution.
+maintenance findings remain open.
