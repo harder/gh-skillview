@@ -46,7 +46,7 @@ public static partial class CliDispatcher
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
-                "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => await LocalReviewAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "update-preserve" => await PreserveUpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
                     or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
                     or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
@@ -84,7 +84,7 @@ public static partial class CliDispatcher
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"
             or "source-switch-ack-source" or "source-switch-plan" or "source-switch-inspect" or "source-switch-apply" or "source-switch-recover" or "source-switch-undo"
             or "unpin-plan" or "unpin-inspect" or "unpin-apply" or "unpin-recover" or "unpin-undo" or "unpin-repair-owner"
-            or "update-merge-review" or "update-merge-choose" or "update-merge-plan" or "update-preserve" => TimeSpan.FromMinutes(10),
+            or "update-preserve" => TimeSpan.FromMinutes(10),
         _ => TimeSpan.FromSeconds(30),
     };
 

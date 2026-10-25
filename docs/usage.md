@@ -141,9 +141,11 @@ mnemonics are **Alt+C** for Check updates and **Alt+R** for Review update.
 Review controls appear when applicable. Source review and retention remain
 separate declarations: inspect the frozen source changes and omissions in Details,
 then check the source declaration and retention approval before applying. Unpin
-reviews change only the verified pin. Local-change review remains available
-through **Preserve installed**, **Review local** and **Build merge** as applicable;
-building a merge requires fresh approval of its exact result. **Next / skip**
+reviews change only the verified pin. Compare local and source files in Details,
+then choose **Preserve installed**, skip, or approve **Replace reviewed** with the
+original retained. New merge creation and the built-in editor have been removed;
+existing saved merge plans still support inspection, admitted apply, recovery and
+undo through the specialist update commands. **Next / skip**
 continues a batch one installation at a time, preserving earlier outcomes and
 diagnostics in Details. A completed disk operation does not prove that an agent
 reloaded the skill.
@@ -205,8 +207,8 @@ Keep HOME, state, CWD and global scan/workspace/profile options unchanged. The
 schema-1 `planReference` names an exact plan already retained locally, its purpose,
 fingerprints and installation context. It imports no files and cannot authorize a
 write. The file must be a bounded regular JSON file (256 KiB maximum); large plan
-responses can use only their `planReference` object. After a merge produces a new
-plan fingerprint, export a fresh reference with the specialist `update-inspect`.
+responses can use only their `planReference` object. For an existing saved merge,
+export its exact reference with the specialist `update-inspect`.
 `plan` also accepts `restore-recorded`, `unpin-only` and `local-reimport` purposes;
 apply requires their existing explicit retention disposition. `repair --plan-file`
 resumes a recognized interrupted transaction after current inspection; it refuses

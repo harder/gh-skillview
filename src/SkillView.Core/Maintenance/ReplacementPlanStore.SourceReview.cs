@@ -45,7 +45,7 @@ internal sealed partial class ReplacementPlanStore
         || new[] { "review-installed-", "review-source-" }.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)
             && (name[prefix.Length..] == "candidate" || IsMergeSlot(name[prefix.Length..])));
 
-    // A failed current merge may leave private capture files before its new
+    // A failed historical merge may leave private capture files before its new
     // contract is published. Admit only bounded, native directories belonging
     // to real local-review/merge history; these bytes confer no review authority.
     private static HashSet<string> ValidateLegacyReviewAttemptArchives(ReplacementPlan plan,

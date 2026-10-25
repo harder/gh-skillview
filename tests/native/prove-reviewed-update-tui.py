@@ -27,8 +27,9 @@ p = argparse.ArgumentParser()
 p.add_argument("--app", required=True)
 p.add_argument("--gh", required=True)
 p.add_argument("--shortcut", choices=["u", "U", "button"], default="u")
-p.add_argument("--disposition", choices=["replace", "merge", "resolved"], default="replace")
+p.add_argument("--disposition", choices=["replace"], default="replace")
 p.add_argument("--preserve-first", action="store_true")
+p.add_argument("--local-edits", action="store_true", help="Review replacement of locally edited instructions, retaining the original for undo.")
 p.add_argument("--output", required=True)
 a = p.parse_args()
 app = str(pathlib.Path(a.app).resolve())
@@ -121,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
     (unrelated / "resource").write_bytes(b"Unselected resource\x00\xff")
     unrelated_before = manifest(unrelated)
     (payload / "user-extra").write_bytes(b"Keep local extra\x00\xff")
-    if a.disposition != "replace":
+    if a.local_edits:
         (payload / "SKILL.md").write_bytes((payload / "SKILL.md").read_bytes() + b"\nLocally authored instructions\n")
     original = manifest(payload)
     master, slave = pty.openpty()
@@ -251,9 +252,11 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
                 return
         raise AssertionError("TUI condition timed out\n" + text())
 
-    def click(label, offset=1):
+    def click(label, offset=1, table=False):
         rows = ["".join(row) for row in screen]
         found = [(row.index(label), i) for i, row in enumerate(rows) if label in row]
+        if table:
+            found = [(xx, yy) for xx, yy in found if xx < 54]
         assert found, "Missing control " + label + "\n" + text()
         # Status/instruction text can repeat an action label. Prefer the actual
         # Terminal.Gui button rather than the last textual occurrence.
@@ -277,11 +280,11 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             ),
             60,
         )
-        click("unpin")
+        click("Unpin with update")
         click("Include hidden directories")
         if a.shortcut in ("u", "U"):
             click("all")  # row/marked shortcuts must not widen to this selection
-        click("gh-skill")  # marking must target the table, not the last checkbox
+        click("gh-skill", table=True)  # marking must target the table, not the last checkbox
         if a.shortcut == "U":
             send(" ")
             read(0.1)
@@ -289,7 +292,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
         elif a.shortcut == "button":
             send(" ")
             read(0.1)
-            click("Update")
+            click("Review update")
         else:
             send("u")
         wait(lambda: len(list(state.rglob("plan.json"))) == 1, 180)
@@ -302,7 +305,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             assert manifest(payload) == original and registry.read_bytes() == original_registry
             assert not (planfile.parent / "original").exists()
             click("Next / skip")
-            click("gh-skill")
+            click("gh-skill", table=True)
             send("u")
             wait(lambda: len(list(state.rglob("plan.json"))) == 2, 180)
             wait(lambda: "review required" in text().lower(), 30)
@@ -324,49 +327,14 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
         )
         assert registry.read_bytes() == original_registry
         screenshot = text()
-        if a.disposition != "replace":
-            click("Review local")
-            wait(lambda: (planfile.parent / "local-review/choices-00.json").exists(), 60)
-            wait(lambda: "Capture file for path" in text(), 30)
-            click("SKILL.md")
-            if a.disposition == "merge":
-                click("Use installed")
-                wait(lambda: (planfile.parent / "local-review/choices-01.json").exists(), 30)
-            else:
-                click("Use source")
-                wait(lambda: (planfile.parent / "local-review/choices-01.json").exists(), 30)
-                wait(lambda: "choices ready" in text(), 30)
-                click("Automatic")
-                wait(lambda: (planfile.parent / "local-review/choices-02.json").exists(), 30)
-                wait(lambda: "resolve path / topology conflicts" in text(), 30)
-                resolution = root / "aduU-reviewed-resolution.txt"
-                resolution.write_bytes((payload / "SKILL.md").read_bytes() + b"\nCaptured custom resolution\n")
-                resolution.chmod(0o600)
-                click("File:", offset=7)
-                send(str(resolution))
-                click("Capture file for path")
-                wait(lambda: (planfile.parent / "local-review/choices-03.json").exists(), 30)
-                resolution.write_text("Changed after capture\n")
-                resolution.unlink()
-            wait(lambda: "choices ready" in text(), 30)
-            assert manifest(payload) == original and registry.read_bytes() == original_registry
-            click("Build merge")
-            wait(lambda: len(list(planfile.parent.glob("merge-plan-*.json"))) == 1, 60)
-            wait(lambda: "merged candidate verified" in text(), 30)
-            merged = json.loads(next(planfile.parent.glob("merge-plan-*.json")).read_bytes())
-            candidate = planfile.parent / merged["localDisposition"]["mergedSlot"]
-            approved = manifest(candidate)
-            assert candidate.joinpath("user-extra").read_bytes() == b"Keep local extra\x00\xff"
-            if a.disposition == "resolved":
-                assert b"Captured custom resolution" in candidate.joinpath("SKILL.md").read_bytes()
-            send("\r")
-            for _ in range(6):
-                read(0.1)
-            assert manifest(payload) == original and not (planfile.parent / "original").exists()
-            assert registry.read_bytes() == original_registry
-            screenshot = text()
+        assert saved['schemaVersion'] == 2 and 'localDisposition' not in saved
+        assert saved['sourceReview']['version'] == 1
+        assert not any(label in screenshot for label in ('Review local', 'Build merge', 'Capture file for path'))
+        click("Details (F2)")
+        wait(lambda: "Summary (F2)" in text(), 30)
+        click("I reviewed F2 source changes/omissions")
         click("Retain original")
-        click("Replace reviewed" if a.disposition == "replace" else "Apply reviewed merge")
+        click("Replace reviewed")
         wait(
             lambda: (
                 (planfile.parent / "original").exists()
@@ -375,7 +343,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             ),
             60,
         )
-        wait(lambda: "changed · 0 remaining" in text(), 60)
+        wait(lambda: "changed · no remaining items" in text(), 60)
         assert manifest(payload) == approved
         assert manifest(planfile.parent / "original") == original
         assert manifest(unrelated) == unrelated_before
@@ -404,6 +372,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
         assert (
             inspected["status"] == "installed"
             and inspected["owner"]["state"] == "desired"
+            and inspected["sourceReviewAcknowledged"]
         )
         undone = cli(
             "update-undo",
@@ -420,7 +389,8 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             "shortcut": a.shortcut,
             "disposition": a.disposition,
             "preserveVerified": a.preserve_first,
-            "capturedResolutionSurvivesInputDeletion": a.disposition == "resolved",
+            "locallyEditedInstructionsReviewed": a.local_edits,
+            "sourceReviewAcknowledged": True,
             "actualPty": True,
             "actualGh": subprocess.run(
                 [gh, "--version"], capture_output=True, text=True, check=True

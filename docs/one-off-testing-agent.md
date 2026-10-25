@@ -81,7 +81,10 @@ above or install real AI clients just to test them.
 
 On WSL/macOS, the existing
 `tests/native/prove-reviewed-update-tui.py` can automate a live reviewed
-update journey; inspect its `--help` and retain its captures. It uses POSIX PTYs
+replacement-update journey; use `--disposition replace` and optionally `--local-edits`
+or `--preserve-first`. It reviews frozen source evidence and retention separately;
+the removed merge/resolution editor modes are not supported. Inspect its `--help`
+and retain its captures. It uses POSIX PTYs
 and is not a Windows proof. Run it with a new output directory and the built
 host; it creates private fixtures. Report the exact shortcut/disposition tested.
 Do not rerun every variant automatically. On Windows, if symlink privileges or

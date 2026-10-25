@@ -31,7 +31,7 @@ public sealed partial class ReviewedUpdatesTabTests
             {
                 Assert.Same(plan, captured); Assert.Equal(plan.PlanFingerprint, captured.PlanFingerprint);
                 applied++; return Task.FromResult(Result(captured with { Status = "installed" }, attempted: true));
-            }, local: (_, _, _) => throw new InvalidOperationException("Unpin has no local merge review"),
+            }, preserve: (_, _, _) => throw new InvalidOperationException("Unpin has no local merge review"),
             unpin: (target, _, _) =>
             { Assert.Same(second, target); prepared++; return Task.FromResult(Result(plan)); });
         await view.LoadAsync(); view.SelectRowForTests(1); view.MarkRowForTests(0);
@@ -48,8 +48,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Contains("claude", view.PreviewTextForTests); Assert.Contains("codex", view.PreviewTextForTests);
         Assert.Contains("new active object IDs and timestamps", view.PreviewTextForTests);
         Assert.Contains("does not detach", view.PreviewTextForTests);
-        await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
-        Assert.False(view.LocalPanelVisibleForTests);
+        await view.PreserveForTestsAsync();
         await view.ApplyReviewForTestsAsync(); Assert.Equal(0, applied);
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync(); Assert.Equal(1, applied);

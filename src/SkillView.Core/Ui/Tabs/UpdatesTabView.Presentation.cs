@@ -45,7 +45,7 @@ internal sealed partial class UpdatesTabView
 
     private void TogglePreviewDetails()
     {
-        if (_choosingVersion || _localPanel.Visible || _technicalPreview.Length == 0) return;
+        if (_choosingVersion || _technicalPreview.Length == 0) return;
         _showTechnical = !_showTechnical;
         _preview.Text = _showTechnical ? _technicalPreview : _summaryPreview;
         _detailsButton.Text = _showTechnical ? "Summary (F2)" : "Details (F2)";
@@ -68,11 +68,9 @@ internal sealed partial class UpdatesTabView
         if (!_reviewPresentationReady) return;
         var undoing = _undoReview is not null;
         var reviewing = undoing || _review is not null || _queue.Count > 0 || _inventoryNeedsRefresh;
-        var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
-        var localActions = _review is { PinPolicy: null } && _localReviewRunner is not null;
-        var editing = _localPanel.Visible;
-        _reviewHint.Text = editing ? "Tab Move focus · Esc Back · Build merge for a new review"
-            : _showTechnical ? "F2 Summary · Tab Move focus · Esc Back" : "F2 Details · Tab Move focus · Esc Back";
+        var applicable = _review is not null;
+        var localActions = _review is { PinPolicy: null } && _preserveRunner is not null;
+        _reviewHint.Text = _showTechnical ? "F2 Summary · Tab Move focus · Esc Back" : "F2 Details · Tab Move focus · Esc Back";
         _statusBar.Visible = !reviewing && !_singleInstallationView;
         _reviewHint.Visible = !_statusBar.Visible;
         if (_queueOptions?.Tag is null)
@@ -83,8 +81,8 @@ internal sealed partial class UpdatesTabView
                 : _singleInstallationView ? "Selected physical copy · F2 Details"
                 : "Space marks · c compare/plan row · u review · U marked · p unpin";
         var tableHadFocus = _table.HasFocus;
-        _table.Visible = !editing && !reviewing && !_singleInstallationView;
-        _preview.Visible = !editing;
+        _table.Visible = !reviewing && !_singleInstallationView;
+        _preview.Visible = true;
         _preview.X = _table.Visible ? Pos.Right(_table) + 1 : 0;
         _preview.Width = Dim.Fill();
 
@@ -100,9 +98,8 @@ internal sealed partial class UpdatesTabView
         _undoButton.Visible = !undoing && _undoResult is not null && _review is null && _queue.Count == 0
             && _inspectUndoRunner is not null && _undoRunner is not null;
         _confirmUndoButton.Visible = _cancelUndoButton.Visible = _undoApproval.Visible = undoing;
-        _preserveButton.Visible = _localReviewButton.Visible = localActions;
-        _buildMergeButton.Visible = localActions && _localReview is not null;
-        _detailsButton.Visible = !editing;
+        _preserveButton.Visible = localActions;
+        _detailsButton.Visible = true;
 
         _dryRunButton.X = 0;
         _updateButton.X = Pos.Right(_dryRunButton) + 2;
@@ -134,11 +131,11 @@ internal sealed partial class UpdatesTabView
             if (_sourceReviewBox.Visible) _sourceReviewBox.Y = Pos.AnchorEnd(row++);
             if (localActions)
             {
-                _preserveButton.Y = _localReviewButton.Y = _buildMergeButton.Y = Pos.AnchorEnd(row++);
+                _preserveButton.Y = Pos.AnchorEnd(row++);
             }
             footer = row - 1;
         }
-        _table.Height = _preview.Height = _localPanel.Height = Dim.Fill(footer);
+        _table.Height = _preview.Height = Dim.Fill(footer);
         if (tableHadFocus && !_table.Visible && _preview.Visible) _preview.SetFocus();
         SetNeedsLayout();
     }

@@ -1,3 +1,4 @@
+using SkillView.Maintenance;
 using System.Collections.Immutable;
 using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
@@ -775,26 +776,10 @@ internal sealed class SkillViewWorkflowCoordinator
             new LocalInventoryService.Options(_options.ScanRoots, allowHidden,
                 WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles), token);
 
-    internal async Task<LocalUpdateResponse> ReviewLocalUpdateAsync(LocalUpdateRequest request, bool allowHidden, CancellationToken token)
+    internal async Task<ReplacementResult> PreserveUpdateAsync(ReplacementResult plan, bool allowHidden, CancellationToken token)
     {
         var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);
-        return await Task.Run(() =>
-        {
-            var plans = _services.SavedUpdatePlans;
-            var plan = request.Plan;
-            return request.Action switch
-            {
-                LocalUpdateAction.Preserve => new LocalUpdateResponse(Plan: plans.PreserveInstalled(plan.Id, plan.PlanFingerprint, inventory, token)),
-                LocalUpdateAction.Review => new LocalUpdateResponse(Review: plans.ReviewLocalChanges(plan.Id, plan.PlanFingerprint, inventory, token)),
-                LocalUpdateAction.Choose when request.Review is { } review => new LocalUpdateResponse(Review: plans.ChooseLocalChanges(
-                    plan.Id, review.ReviewFingerprint, request.Choices, inventory, token,
-                    request.Resolutions.Select(input => input with
-                    { SourceFile = Path.GetFullPath(input.SourceFile, _services.Runner.EffectiveWorkingDirectory) }).ToArray())),
-                LocalUpdateAction.Build when request.Review is { } review => new LocalUpdateResponse(Plan: plans.FinalizeLocalChanges(
-                    plan.Id, review.ReviewFingerprint, inventory, token)),
-                _ => throw new ArgumentException("The local update action needs its exact captured review.")
-            };
-        }, token).ConfigureAwait(false);
+        return await Task.Run(() => _services.SavedUpdatePlans.PreserveInstalled(plan.Id, plan.PlanFingerprint, inventory, token), token).ConfigureAwait(false);
     }
 
     /// Drill into the Updates workspace from the Changes queue.

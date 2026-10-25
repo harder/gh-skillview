@@ -1,9 +1,10 @@
-# Native metadata in reviewed local merges
+# Native metadata and saved local merges
 
 Merged payloads need independently captured native metadata as well as bytes,
 links and Unix modes. Retained originals remain the rollback authority. A metadata
 refusal permits review and preserve; it never permits silently dropping metadata
-while publishing a merge.
+during a retained operation. New merge creation is retired; these shared
+primitives remain required by schema-3 validation, unpin and local reimport.
 
 Windows evidence independently versions complete owner/group/DACL/SACL security
 descriptors, supported file attributes and bounded alternate data streams. Older
