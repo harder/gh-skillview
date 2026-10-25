@@ -340,6 +340,30 @@ public sealed class DisplayInventoryCacheTests
         Assert.Contains(Assert.Single(errors).InnerExceptions, error => error.Message == "cancellation-callback-sentinel");
     }
 
+    [Fact]
+    public void FactValidityIgnoresReuseAgeAndCoverageButRejectsReplacementAndGeneration()
+    {
+        var now = DateTimeOffset.UtcNow;
+        long generation = 7;
+        var calls = 0;
+        var cache = new DisplayInventoryCache(() => generation, _ => { calls++; return Task.FromResult(InventorySnapshot.Empty); }, Start, () => now);
+        var snapshot = InventorySnapshot.Empty with { CapturedAt = now, ConfiguredRootsComplete = false };
+        cache.PublishFresh(snapshot, generation);
+        now += TimeSpan.FromMinutes(5);
+        Assert.True(cache.CacheIsCurrent(snapshot, 7));
+        Assert.False(cache.CacheIsCurrent(snapshot with { }, 7));
+        var newer = snapshot with { CapturedAt = now };
+        cache.PublishFresh(newer, generation);
+        Assert.False(cache.CacheIsCurrent(snapshot, 7));
+        Assert.True(cache.CacheIsCurrent(newer, 7));
+        cache.PublishFresh(snapshot, generation);
+        Assert.True(cache.CacheIsCurrent(newer, 7));
+        generation++;
+        Assert.False(cache.CacheIsCurrent(newer, 7));
+        Assert.False(cache.CacheIsCurrent(newer, 8));
+        Assert.Equal(0, calls);
+    }
+
     private static bool Start(Func<CancellationToken, Task> work, string operation)
     {
         _ = work(CancellationToken.None);

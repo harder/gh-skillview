@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using SkillView.Inventory.Models;
+using SkillView.Logging;
 using SkillView.Maintenance;
 using SkillView.Ui;
 using SkillView.Ui.Tabs;
@@ -194,6 +195,186 @@ public sealed class InstalledFilterRenderingTests
             }
             finally { app.End(session!); }
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public async Task PackageOverlayIsOneExactCopyProblemAndReviewsStayInInstalled(int width, int height)
+    {
+        using var app = Application.Create().Init();
+        app.Driver!.SetScreenSize(width, height);
+        var target = InstalledOverviewTests.Copy("/nonexistent/package-a/demo", "demo");
+        var sibling = target with { Name = "sibling", ResolvedPath = "/nonexistent/package-a/other" };
+        var snapshot = InventorySnapshot.Empty with { Skills = [target, sibling] };
+        var report = PackageCheckFactTests.Report() with
+        {
+            Findings = [
+            new("reference", "reference-missing", "SKILL.md", 56, "references/maintenance.md", "m", "r"),
+            new("reference", "reference-missing", "SKILL.md", 60, "references/other.md", "m", "r"),
+            new("metadata", "format", "SKILL.md", 1, null, "m", "r")],
+            FindingCount = 3
+        };
+        var fact = new PackageCheckFact(new(snapshot, target, 1, "context", target.InstallationId), report, DateTimeOffset.UtcNow);
+        PackageCheckFact? current = fact; PackageCheckFact? activated = null;
+        using var issues = new ChangesTabView(a => { a(); return Task.CompletedTask; }, _ => Task.FromResult(snapshot), () => { },
+            catalogGeneration: () => 1, packageCheck: () => current, onPackageCheck: f => activated = f);
+        await issues.LoadAsync();
+        var overlay = Assert.Single(issues.RowsForTests, r => r.PackageCheck is not null);
+        Assert.Equal("Problem", overlay.Kind);
+        Assert.Same(fact, overlay.PackageCheck);
+        Assert.Empty(issues.CapturedIssues!.Findings);
+        Assert.Contains("1 Problems", issues.GetQueueLabel());
+        var key = overlay.Entry.Id;
+        issues.NewKeyDownEvent(Key.Enter); Assert.Same(fact, activated);
+        using var installed = new InstalledTabView(a => { a(); return Task.CompletedTask; }, (_, _) => { }, _ => throw new InvalidOperationException("No new inventory"),
+            (_, _, _) => Task.CompletedTask, () => { }, capturedIssues: () => issues.CapturedIssues, catalogGeneration: () => 1, packageCheck: () => current);
+        installed.LoadSeeded(snapshot);
+        installed.SelectFilter(3, "any-finding");
+        Assert.Single(installed.RowsForTests, r => r.Copy is not null);
+        installed.SetSelectedRowForTests(1); installed.NewKeyDownEvent(Key.Enter);
+        Assert.Contains("line 56", installed.DetailTextForTests);
+        Assert.Contains("references/maintenance.md", installed.DetailTextForTests);
+        Assert.Contains("1 Reviews", installed.DetailTextForTests);
+        current = fact with { Report = report with { Findings = [report.Findings[2]], FindingCount = 1 } };
+        await issues.LoadAsync();
+        Assert.DoesNotContain(issues.RowsForTests, r => r.PackageCheck is not null);
+        installed.RefreshAvailability();
+        Assert.Single(installed.RowsForTests, r => r.Copy is not null); // Review-only remains a captured finding.
+        current = fact;
+        await issues.LoadAsync(); Assert.Equal(key, Assert.Single(issues.RowsForTests, r => r.PackageCheck is not null).Entry.Id);
+        current = null;
+        await issues.LoadAsync(); Assert.DoesNotContain(issues.RowsForTests, r => r.PackageCheck is not null);
+    }
+
+    [Fact]
+    public async Task AgedDisplayedInventoryAllowsBoundKButNextTabReloadClearsItsPackageOverlay()
+    {
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(120, 36);
+            var root = Directory.CreateTempSubdirectory("skillview-package-lifetime-");
+            try
+            {
+                var token = TestContext.Current.CancellationToken;
+                File.WriteAllText(Path.Combine(root.FullName, "SKILL.md"), "---\nname: demo\ndescription: inert fixture\n---\n[missing](references/missing.md)\n");
+                var target = InstalledOverviewTests.Copy(root.FullName, "demo");
+                var initialPayload = PayloadSnapshot.CaptureEvidence(root.FullName, token);
+                var now = DateTimeOffset.UtcNow;
+                target = target with
+                {
+                    ObservedSubject = OperationSubject.From(target) with
+                    { NativeObject = NativeObjectObservation.From(initialPayload.RootIdentity!.Value, now, "inventory-observation") }
+                };
+                var snapshot = InventorySnapshot.Empty with { CapturedAt = now, Skills = [target] };
+                var replacement = snapshot with { CapturedAt = now.AddMinutes(3) };
+                const long generation = 4;
+                var displayCaptures = 0; var payloadCaptures = 0; var timedOut = false;
+                var cache = new DisplayInventoryCache(() => generation, _ =>
+                {
+                    displayCaptures++;
+                    return Task.FromResult(replacement);
+                }, (work, operation) => { _ = work(token); return true; }, () => now);
+                cache.PublishFresh(snapshot, generation);
+                PackageCheckFact? lastFact = null;
+                PackageCheckFact? CurrentFact() => lastFact is not null && cache.CacheIsCurrent(lastFact.Request.Snapshot, generation) ? lastFact : null;
+                using var issues = new ChangesTabView(a => { a(); return Task.CompletedTask; }, ct => cache.GetAsync(ct), () => { },
+                    catalogGeneration: () => generation, packageCheck: CurrentFact);
+                issues.LoadAsync().GetAwaiter().GetResult();
+                Assert.Same(snapshot, issues.CapturedIssues!.Snapshot);
+                InstalledTabView? installed = null;
+                using var installedOwner = installed = new InstalledTabView(a => { a(); return Task.CompletedTask; }, (_, _) => { }, ct => cache.GetAsync(ct),
+                    (_, _, _) => Task.CompletedTask, () => { }, catalogGeneration: () => generation, packageCheck: CurrentFact, onPackageCheck: Check)
+                { Width = Dim.Fill(), Height = Dim.Fill(), Visible = true };
+                using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+                window.Add(installed);
+                var session = app.Begin(window);
+                try
+                {
+                    installed.LoadSeeded(snapshot);
+                    installed.SetSelectedRowForTests(1);
+                    installed.FocusList();
+                    Assert.True(installed.TableHasFocusForTests);
+                    Assert.Same(target, installed.GetSelectedSkill());
+                    now += TimeSpan.FromMinutes(3);
+                    Assert.True(cache.CacheIsCurrent(snapshot, generation));
+                    installed.NewKeyDownEvent(new Key('K'));
+                    Assert.False(timedOut);
+                    var fact = Assert.IsType<PackageCheckFact>(lastFact);
+                    Assert.Same(snapshot, fact.Request.Snapshot);
+                    Assert.Equal(1, fact.Problems);
+                    Assert.Contains("Check results are cleared when the skill list reloads.", fact.Detail);
+                    Assert.Contains("Opening Installed or Issues reloads lists at least 1 minute old.", fact.Detail);
+                    installed.NewKeyDownEvent(Key.Enter);
+                    Assert.Contains(PackageCheckFact.InventoryLifetimeNotice, installed.DetailTextForTests);
+                    issues.RefreshAvailability();
+                    Assert.Same(fact, Assert.Single(issues.RowsForTests, r => r.PackageCheck is not null).PackageCheck);
+                    Assert.Equal(0, displayCaptures);
+                    Assert.Equal(1, payloadCaptures);
+
+                    // Entering Issues calls GetAsync. The old capture's reuse window
+                    // expired before K, so even this just-completed fact belongs to S only.
+                    issues.LoadAsync().GetAwaiter().GetResult();
+                    Assert.Same(replacement, issues.CapturedIssues!.Snapshot);
+                    Assert.False(cache.CacheIsCurrent(snapshot, generation));
+                    Assert.Null(CurrentFact());
+                    Assert.DoesNotContain(issues.RowsForTests, r => r.PackageCheck is not null);
+                    Assert.False(fact.Matches(replacement, generation, target));
+                    Assert.Same(fact, lastFact); // Retained memory was not rebound to S2.
+                    installed.LoadAsync().GetAwaiter().GetResult();
+                    Assert.Same(replacement, installed.CurrentSnapshot);
+                    installed.SetSelectedRowForTests(1); installed.NewKeyDownEvent(Key.Enter);
+                    Assert.Contains("Package not checked for this inventory capture.", installed.DetailTextForTests);
+                    Assert.Contains(PackageCheckFact.InventoryLifetimeNotice, installed.DetailTextForTests);
+                    Assert.Equal(1, displayCaptures);
+                    Assert.Equal(1, payloadCaptures); // No automatic payload check/hash on either tab load.
+
+                }
+                finally { app.End(session!); }
+
+                void Check(InventorySnapshot displayed, string id, InstalledSkill selected)
+                {
+                    Assert.Same(snapshot, displayed);
+                    Dialog? modal = null;
+                    var request = new PackageCheckRequest(displayed, selected, generation, "captured-child-context", id);
+                    app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+                    app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+                    {
+                        if (lastFact is null || modal?.SubViews.OfType<Button>().Single(b => b.Text == "_Check again").Enabled != true) return true;
+                        app.Keyboard.RaiseKeyDownEvent(Key.Esc); return false;
+                    });
+                    PackageCheckScreen.ShowBound(app, new Logger(), selected, ct => request.CaptureAsync(ct, (path, sink, captureToken) =>
+                    {
+                        payloadCaptures++;
+                        return PayloadSnapshot.CaptureWithEntrySink(path, sink, captureToken);
+                    }), token, dialog => modal = dialog, publish: result =>
+                    {
+                        if (result.Fact is not { } completed || !cache.CacheIsCurrent(displayed, generation)
+                            || !ReferenceEquals(installed?.CurrentSnapshot, displayed)) return false;
+                        lastFact = completed;
+                        return true;
+                    });
+                    installed?.RefreshAvailability();
+                }
+            }
+            finally { root.Delete(true); }
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task MetadataReviewAddsNoProblemToExistingMalformedQueueRow()
+    {
+        var target = InstalledOverviewTests.Copy("/nonexistent/package-a/malformed", "demo") with { Validity = ValidityState.InvalidMetadata };
+        var snapshot = InventorySnapshot.Empty with { Skills = [target] };
+        var report = PackageCheckFactTests.Report() with { Findings = [new("metadata", "required", "SKILL.md", 1, null, "m", "r")], FindingCount = 1 };
+        var fact = new PackageCheckFact(new(snapshot, target, 1, "context", target.InstallationId), report, DateTimeOffset.UtcNow);
+        using var issues = new ChangesTabView(a => { a(); return Task.CompletedTask; }, _ => Task.FromResult(snapshot), () => { },
+            catalogGeneration: () => 1, packageCheck: () => fact);
+        await issues.LoadAsync();
+        Assert.DoesNotContain(issues.RowsForTests, r => r.PackageCheck is not null);
+        Assert.Single(issues.RowsForTests, r => r.Entry.Issue == "Malformed");
+        Assert.Contains("1 Problems", issues.GetQueueLabel());
     }
 
     [Fact]

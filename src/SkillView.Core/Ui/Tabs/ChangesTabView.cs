@@ -30,6 +30,9 @@ internal sealed class ChangesTabView : FrameView
     private readonly ChangesSelectionGate _selectionRequests;
     private long _selectionGeneration;
     private readonly UpdateAvailabilitySession? _availability;
+    private readonly Func<PackageCheckFact?> _packageCheck;
+    private readonly Action<PackageCheckFact>? _onPackageCheck;
+    private int _packageProblems;
     private readonly Action? _onCheckUpdates;
     private readonly Button _checkUpdates;
     private readonly Button _reviewFinding;
@@ -70,8 +73,11 @@ internal sealed class ChangesTabView : FrameView
         Action<Func<Task>, string>? runTask = null,
         Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
         Action? onRefresh = null, string? homeDirectory = null,
-        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null, Func<long>? catalogGeneration = null)
+        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null, Func<long>? catalogGeneration = null,
+        Func<PackageCheckFact?>? packageCheck = null, Action<PackageCheckFact>? onPackageCheck = null)
     {
+        _packageCheck = packageCheck ?? (() => null);
+        _onPackageCheck = onPackageCheck;
         _catalogGeneration = catalogGeneration ?? (() => 0);
         _homeDirectory = homeDirectory;
         _availability = availability;
@@ -236,6 +242,7 @@ internal sealed class ChangesTabView : FrameView
     private void LoadRows(IReadOnlyList<ChangesQueueRow> rows, CancellationToken renderToken = default)
     {
         _rows = rows;
+        _reviewFinding.Enabled = rows.Count > 0;
         var source = new EnumerableTableSource<ChangesQueueRow>(
             _rows,
             new Dictionary<string, Func<ChangesQueueRow, object>>
@@ -279,10 +286,14 @@ internal sealed class ChangesTabView : FrameView
     // Tests only -----------------------------------------------------------
 
     internal int RowCountForTests => _rows.Count;
+    internal IReadOnlyList<ChangesQueueRow> RowsForTests => _rows;
     internal string StatusTextForTests => _status.Text.ToString();
 
-    internal string GetQueueLabel() => (_projection?.Counts ?? string.Empty).Replace(
+    internal string GetQueueLabel() => Counts.Replace(
         ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal);
+
+    private string Counts => _projection is null ? string.Empty
+        : $"{_projection.Problems + _packageProblems} Problems · {ChangesQueueProjection.UpdatesNotChecked} · {_projection.ReviewSuggestions} Review";
 
     // Internals ------------------------------------------------------------
 
@@ -290,6 +301,11 @@ internal sealed class ChangesTabView : FrameView
     {
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _rows.Count) return;
+        if (_rows[row].PackageCheck is { } package)
+        {
+            if (ReferenceEquals(package, _packageCheck())) _onPackageCheck?.Invoke(package);
+            return;
+        }
         if (_rows[row].Entry is { } entry)
         {
             if (_activateEntryAsync is not null && _runTask is not null)
@@ -329,6 +345,7 @@ internal sealed class ChangesTabView : FrameView
             if (_rows.Count > 0 || _partial) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
             if (_availability is not null)
                 detail = detail.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability.Summary, StringComparison.Ordinal);
+            detail += "\nPackage Problems come only from the last explicit check of one exact copy. Other copies remain package not checked for this inventory capture; Reviews stay in Installed/full report. Queue JSON contains captured scan findings only.\n";
             detail += "\n**C:** Check updates / cancel. **Enter / u:** review selected finding. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
             if (_showDetails) detail += _coverageDetail;
             else if (_coverageDetail.Length > 0) detail += "\nDiscovery/checks incomplete. Press **F2** for coverage details.\n";
@@ -342,7 +359,7 @@ internal sealed class ChangesTabView : FrameView
     private string BuildStatusText()
     {
         if (_projection is null) return string.Empty;
-        return " " + (_partial ? "Scan incomplete · " : "") + _projection.Counts.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal)
+        return " " + (_partial ? "Scan incomplete · " : "") + Counts.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal)
             + (OmittedRows > 0 ? $" · {_rows.Count} shown, {OmittedRows} omitted" : "")
             + (_rows.Count > 0 || _coverageDetail.Length > 0 ? $" · F2 {(_showDetails ? "Summary" : "Details")}" : "");
     }
@@ -395,25 +412,37 @@ internal sealed class ChangesTabView : FrameView
     private IReadOnlyList<ChangesQueueRow> AvailabilityRows()
     {
         if (_projection is null) return [];
-        if (_availability is null || _snapshot is null) return _projection.Rows;
-        var updates = _snapshot.Skills.Select(skill => (Skill: skill, Check: _availability.Get(skill)))
+        var package = _packageCheck();
+        _packageProblems = package is { Problems: > 0 } && _snapshot is not null
+            && package.Matches(_snapshot, _catalogGeneration(), package.Request.Id, package.Request.Target.ResolvedPath) ? 1 : 0;
+        var packageRows = _packageProblems == 0 ? Array.Empty<ChangesQueueRow>() : new[]
+        {
+            new ChangesQueueRow("Problem", InstalledFilters.ChoiceText(package!.Request.Target.Name + " · missing root reference · " + package.Request.Target.ResolvedPath, ChangesQueueBuilder.MaxTitleCharacters),
+                [new MaintenanceQueueEntry(package.Key, "package-reference", package.Request.Target.Name,
+                    OperationSubject.From(package.Request.Target), [package.Request.Target.ResolvedPath], "explicit-package-check", "Captured root reference missing", "inspect-report", false, package.Request.Target.Pinned)])
+            { PackageCheck = package }
+        };
+        var updates = (_availability is null || _snapshot is null ? [] : _snapshot.Skills.Select(skill => (Skill: skill, Check: _availability.Get(skill))))
             .Where(item => item.Check.Status == UpdateAvailabilityStatus.Available)
             .Select(item => new ChangesQueueRow("Updates", item.Skill.Name + " · " + DisplayPath.Abbreviate(item.Skill.ResolvedPath, _homeDirectory),
                 [new MaintenanceQueueEntry("update-" + UpdateAvailability.Address(item.Skill), "upstream-update", item.Skill.Name,
                     OperationSubject.From(item.Skill), [item.Skill.ResolvedPath], "gh-dry-run", item.Check.Reason,
                     "review-update", false, item.Skill.Pinned)])
             { Availability = item.Check }).ToArray();
-        _availabilityOmittedRows = Math.Max(0, _projection.Rows.Count + updates.Length - ChangesQueueBuilder.MaxRows);
-        return _projection.Rows.Where(row => row.Kind == "Problem").Concat(updates)
+        _availabilityOmittedRows = Math.Max(0, _projection.Rows.Count + updates.Length + packageRows.Length - ChangesQueueBuilder.MaxRows);
+        return _projection.Rows.Where(row => row.Kind == "Problem").Concat(packageRows).Concat(updates)
             .Concat(_projection.Rows.Where(row => row.Kind != "Problem")).Take(ChangesQueueBuilder.MaxRows).ToArray();
     }
 
     internal void RefreshAvailability()
     {
-        if (_disposed || _lifetimeToken.IsCancellationRequested || _availability is null) return;
-        _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check updates (C)";
-        _checkUpdates.Enabled = !_availability.Stopping;
-        _updateStatus.Text = _availability.Summary;
+        if (_disposed || _lifetimeToken.IsCancellationRequested) return;
+        if (_availability is not null)
+        {
+            _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check updates (C)";
+            _checkUpdates.Enabled = !_availability.Stopping;
+            _updateStatus.Text = _availability.Summary;
+        }
         _reviewFinding.Enabled = !_loading.Visible && _rows.Count > 0;
         if (_loading.Visible || _projection is null) return;
         var selected = _table.GetSelectedRow();
@@ -435,6 +464,7 @@ internal sealed class ChangesTabView : FrameView
             if (hadFocus && rows.Count == 0) _detail.SetFocus();
         }
         else _rows = rows;
+        _reviewFinding.Enabled = _rows.Count > 0;
         _table.Update();
         UpdateDetail();
         var currentRow = _table.GetSelectedRow();

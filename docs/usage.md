@@ -517,7 +517,32 @@ refusals until a coordinated maintenance plan is available.
 Use `skillview --scan-root /path/to/skills check --path /path/to/skills/demo --json`
 to check one observed installation. `--install-id ID` also selects a physical
 installation; an observed agent exposure path may be used with `--path`.
-In Installed, select a row and press **K** to open the same read-only check.
+In Installed, select a physical copy and press **K** (or **More actions → Check
+package**) for an explicit read-only check. The app retains only the last check
+bound to the displayed inventory, catalog generation, child context and observed
+native copy. Check results are cleared when the skill list reloads. Opening
+Installed or Issues reloads lists at least one minute old. While you stay on the
+same displayed list, time alone does not block K; switching tabs can clear even
+a just-completed check when that list was already over a minute old. Unknown
+identity or failed whole-payload capture keeps diagnostics in the dialog and asks
+for Refresh without attaching findings to Installed or Issues.
+
+Installed shows Problems and Reviews with their document, resource and available
+line, plus incomplete/omitted coverage. Only an exact missing-file reference from
+root `SKILL.md` is a package **Problem**. Other-document references, dependency-file
+observations, case/portability and metadata findings are **Review**. Declarations
+retain their Info/Review and unknown meanings in the full report. A package check
+never proves source integrity or dependency availability.
+
+Issues adds at most one Problem row for that checked copy; **Enter** opens its
+retained report and offers no repair action. Reviews stay in Installed/full report;
+metadata does not duplicate the queue's Malformed Problem. **Has captured findings**
+combines current queue findings with package Problems/Reviews. Package findings,
+partial coverage or omissions exclude **No local findings observed** for that copy;
+a clean report cannot establish absence without complete matching queue evidence.
+Other copies remain **package not checked for this inventory capture** with their
+own captured-scan semantics.
+This evidence is transient; CLI check schema 2 and queue schema 1 JSON are unchanged.
 
 JSON schema 2 and the dialog show four independent assessments: portable metadata
 format, agent compatibility, payload integrity,

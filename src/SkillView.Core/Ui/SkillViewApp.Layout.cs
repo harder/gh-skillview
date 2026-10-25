@@ -177,13 +177,18 @@ public sealed partial class SkillViewApp
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
                 CancellationCallbackReporter.For(_services.Logger, "installed tab"),
-            onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
+            onPackageCheck: (snapshot, id, skill) =>
+            {
+                _workflows.ShowPackageCheck(snapshot, id, skill, () => _installedTab?.CurrentSnapshot, GetRunLifetimeToken());
+                _installedTab?.RefreshAvailability();
+            },
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
             onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
             availability: _workflows.Availability,
             onCheckUpdates: CheckUpdates,
             onReviewUpdate: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
             capturedIssues: () => _changesTab?.CapturedIssues,
+            packageCheck: () => _workflows.CurrentPackageCheck,
             catalogGeneration: () => _services.ListAdapter.Generation,
             onRemovalError: error =>
             {
@@ -238,6 +243,8 @@ public sealed partial class SkillViewApp
             availability: _workflows.Availability,
             onCheckUpdates: CheckUpdates,
             homeDirectory: DisplayPath.CaptureHome(_services.Runner),
+            packageCheck: () => _workflows.CurrentPackageCheck,
+            onPackageCheck: fact => _workflows.ShowRetainedPackageCheck(fact, GetRunLifetimeToken()),
             catalogGeneration: () => _services.ListAdapter.Generation,
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,

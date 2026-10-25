@@ -9,6 +9,7 @@ internal sealed record ChangesQueueRow(string Kind, string Title, IReadOnlyList<
 {
     internal MaintenanceQueueEntry Entry => Entries[0];
     internal UpdateAvailability? Availability { get; init; }
+    internal PackageCheckFact? PackageCheck { get; init; }
     internal bool IsFamily => Entry.IsCopyReview;
     internal IReadOnlyList<string> LocationLabels { get; init; } = [];
 }
@@ -107,6 +108,8 @@ internal static class ChangesQueueBuilder
 
     internal static string Render(ChangesQueueRow row, CancellationToken token, bool showDetails, string? homeDirectory)
     {
+        if (row.PackageCheck is { } package)
+            return package.Detail + "\n\n**Enter:** open the retained full report. No repair action is supplied by this check.\n";
         if (row.Availability is { } observation)
             return "## Review update\n\n" + observation.Detail + "\nCopy: "
                 + MarkdownTableFormatter.FormatCodeSpan(row.Entry.Subject.Path)

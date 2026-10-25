@@ -149,9 +149,24 @@ public sealed class SkillViewWorkflowCoordinatorTests
         // must find the exact operation snapshot already stored at generation G.
         Assert.Same(handoff.Snapshot, await coordinator.CaptureDisplayInventoryAsync(fixture.Report, TestContext.Current.CancellationToken));
         Assert.Same(handoff.Snapshot, await coordinator.CaptureInventorySnapshotAsync(TestContext.Current.CancellationToken));
+        var selected = Assert.Single(handoff.Snapshot.Skills);
+        var request = coordinator.CreatePackageCheckRequest(handoff.Snapshot, selected.InstallationId, selected);
+        Assert.True(coordinator.PackageRequestIsCurrent(request));
+        var result = await request.CaptureAsync(TestContext.Current.CancellationToken);
+        var fact = Assert.IsType<PackageCheckFact>(result.Fact);
+        Assert.False(coordinator.PublishPackageCheck(fact, handoff.Snapshot with { }));
+        Assert.True(coordinator.PublishPackageCheck(fact, handoff.Snapshot));
+        Assert.Same(fact, coordinator.CurrentPackageCheck);
+        Assert.False(coordinator.PackageRequestIsCurrent(request with { Context = "changed" }));
+        Assert.Same(handoff.Snapshot, await coordinator.CaptureInventorySnapshotAsync(TestContext.Current.CancellationToken));
         Assert.Equal(commands, File.ReadAllLines(Path.Combine(fixture.Root, "calls")));
         Assert.Equal(generation, fixture.Services.ListAdapter.Generation);
         Assert.True(coordinator.IsInstallHandoffCurrent(handoff));
+        Assert.False(coordinator.CompletePackageCheck(result with { Fact = null }, handoff.Snapshot));
+        Assert.Null(coordinator.CurrentPackageCheck);
+        Assert.True(coordinator.CompletePackageCheck(result, handoff.Snapshot));
+        fixture.Services.ListAdapter.Invalidate();
+        Assert.Null(coordinator.CurrentPackageCheck);
     }
 
     [Fact]

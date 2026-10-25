@@ -110,7 +110,7 @@ public sealed partial class LocalReimportScreenTests
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
             _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { },
-            onPackageCheck: skill => checkedSkill = skill, onLocalReimport: skill => selected = skill, onLocalSourceSwitch: skill => switched = skill)
+            onPackageCheck: (_, _, skill) => checkedSkill = skill, onLocalReimport: skill => selected = skill, onLocalSourceSwitch: skill => switched = skill)
         { Width = Dim.Fill(), Height = Dim.Fill() };
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [target] });
         window.Add(view);
