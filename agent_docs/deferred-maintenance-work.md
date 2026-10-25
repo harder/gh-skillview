@@ -17,8 +17,8 @@ Saved updates retain source review, explicit retention, local-change review,
 inspection, recovery and undo. Basic pinning, standalone unpin, local reimport
 and local source switching remain supported within their documented bounds.
 Effective-loading inspection is conditional local-policy analysis; it does not
-launch AI clients. Package checks, authoring dry-run and offline evaluations
-remain explicit opt-in workflows, not automatic installation requirements.
+launch AI clients. Package checks and offline evaluations remain explicit opt-in
+workflows, not automatic installation requirements.
 
 ## Deferred expansion
 

@@ -87,13 +87,12 @@ verified and merged in PR71. Other original maintenance findings remain open.
 
 The [saved-update source-review phase](maintenance-update-source-review.md) adds
 frozen content diffs, bounded declaration deltas and explicit acknowledgement to
-new product plans. The explicit repository authoring `gh skill publish --dry-run`
-workflow is documented in [authoring validation](maintenance-authoring-validation.md);
-its gh command result is separate from installed-package static evidence.
+new product plans. Source authors can use `gh skill publish --dry-run` directly;
+its diagnostics are separate from installed-package static evidence.
 The [explicit offline evaluation workflow](maintenance-isolated-evaluation.md)
 requires a reviewed environment and prompts plus separate execution consent.
 PR71's Linux proof exercised the explicit offline evaluator and cleanup; its
-four native hosts separately verified static checks and actual authoring dry-runs.
+four native hosts separately verified static checks.
 Those results do not establish model quality or skill safety. Never use
 `publish --fix` to repair installed updates or silently edit authored instructions.
 

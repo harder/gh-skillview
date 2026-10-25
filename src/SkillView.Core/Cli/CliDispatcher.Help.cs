@@ -58,7 +58,6 @@ public static partial class CliDispatcher
             | `doctor` | Inspect `gh`, auth state, `gh skill` availability, log path, and optional inventory. | `--json`, `--inventory`, `--clear-logs` |
             | `list` | Show installed skills from the filesystem and, when supported, `gh skill list`. | `--json`, `--scope`, `--agent`, `--dir`, `--allow-hidden-dirs` |
             | `effective` | Explain conditional loading policy for an exact agent/profile/project. Native inventory and active-session state stay separate. | `--agent`, `--profile`, `--project`, `--cwd`, `--config-dir`, `--client-version`, `--agent-name`, `--trust`, `--json` |
-            | `authoring-validate` | Explicitly run gh publish dry-run on a selected source repository; may contact GitHub and write cache state. | `--repository PATH`, `--dry-run`, `--json` |
             | `evaluate-review` | Freeze a package, explicit offline Docker environment and representative prompts without launching Docker. | `--path`, `--config`, `--json` |
             | `evaluate-run` | Explicitly run the reviewed offline evaluation. Requires a local Linux Docker daemon and already-local digest-pinned image. | `--path`, `--config`, `--review`, `--consent-run`, `--json` |
             | `check` | Check bounded local package metadata, references and literal declarations without running skill code. | `--path` or `--install-id`, `--agent`, `--agent-version`, `--allow-hidden-dirs`, `--json` |
