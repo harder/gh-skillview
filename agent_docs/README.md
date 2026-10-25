@@ -12,8 +12,7 @@ or release verdict.
 - [Saved updates](../docs/saved-updates.md), [replacement plans](maintenance-update-plans.md),
   [local dispositions](maintenance-local-dispositions.md), and
   [standalone unpin](maintenance-standalone-unpin.md).
-- [Managed discovery](maintenance-managed-discovery.md) and
-  [effective loading](maintenance-effective-loading.md).
+- [Managed discovery](maintenance-managed-discovery.md).
 - [Static package checks](maintenance-static-package-check.md),
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).

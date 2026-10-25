@@ -70,6 +70,12 @@ public sealed partial class StaticPackageCheckerTests
         var acceptedFraming = await checker.CheckAsync(Target(), Token);
         Assert.Equal("unknown", acceptedFraming.AgentAssessment.State);
         Assert.Contains(acceptedFraming.AgentAssessment.Reasons, r => r.Contains("framing rule passed", StringComparison.Ordinal));
+
+        Write("SKILL.md", Metadata.Replace("\n---\n", "\n...\n", StringComparison.Ordinal) + "\n---\n");
+        var laterDelimiter = await checker.CheckAsync(Target(), Token);
+        Assert.Equal("valid", laterDelimiter.Format.State);
+        Assert.Equal("unknown", laterDelimiter.AgentAssessment.State);
+        Assert.Contains(laterDelimiter.AgentAssessment.Reasons, r => r.Contains("acceptance is not established", StringComparison.Ordinal));
     }
 
     [Fact]
