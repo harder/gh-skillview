@@ -54,9 +54,11 @@ public sealed class InstalledScreenTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DescriptionBoundAndTerminalControlsCannotChangeFenceBoundary(bool onlyBackticks)
+    [InlineData(false, "\n")]
+    [InlineData(true, "\n")]
+    [InlineData(false, "\r\n")]
+    [InlineData(true, "\r\n")]
+    public void DescriptionBoundAndTerminalControlsCannotChangeFenceBoundary(bool onlyBackticks, string generatedNewLine)
     {
         var input = onlyBackticks ? new string('`', 2048) + "\n[discarded](file:///tail)"
             : "## Summary\n``\u001b[0m``\n[Review update](file:///x)\r\n\0\b\f" + new string('x', 2100);
@@ -64,14 +66,43 @@ public sealed class InstalledScreenTests
         { FrontMatter = SkillFrontMatter.Empty with { Description = input } };
         var detail = InstalledScreen.RenderDetail(skill);
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
-        var literal = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines.ToString();
+        var block = Assert.Single(document.Descendants<FencedCodeBlock>());
+        var lines = block.Lines;
+        var descriptionEnd = lines.Lines[lines.Count - 1].Slice.End + 1;
+        var boundedDescription = detail[lines.Lines[0].Slice.Start..descriptionEnd];
+        var markerStart = detail.IndexOf("[truncated]", StringComparison.Ordinal);
+        Assert.True(markerStart > block.Span.End);
+        var marker = Assert.Single(document.Descendants<ParagraphBlock>(), paragraph => paragraph.Span.Start == markerStart);
+        Assert.Equal("[truncated]", detail[marker.Span.Start..(marker.Span.End + 1)]);
+        Assert.Equal(block.OpeningFencedCharCount, block.ClosingFencedCharCount);
+        var fence = new string(block.FencedChar, block.ClosingFencedCharCount);
+        Assert.Equal(System.Environment.NewLine + fence + System.Environment.NewLine + System.Environment.NewLine,
+            detail[descriptionEnd..markerStart]);
+        // C3 closes the fence before the separate notice paragraph. Change only
+        // these trusted AppendLine separators; metadata's interior bytes stay raw.
+        detail = detail[..descriptionEnd] + generatedNewLine + fence + generatedNewLine + generatedNewLine + detail[markerStart..];
+        document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
+        block = Assert.Single(document.Descendants<FencedCodeBlock>());
+        var literal = block.Lines.ToString();
+        Assert.Equal(boundedDescription, detail[block.Lines.Lines[0].Slice.Start..(block.Lines.Lines[block.Lines.Count - 1].Slice.End + 1)]);
+        Assert.Equal(boundedDescription, literal);
         Assert.DoesNotContain("[truncated]", literal);
-        Assert.Contains("\n\n[truncated]\n", detail);
+        Assert.Contains(fence + generatedNewLine + generatedNewLine + "[truncated]\n", detail);
+        markerStart = detail.IndexOf("[truncated]", StringComparison.Ordinal);
+        Assert.True(markerStart > block.Span.End);
+        marker = Assert.Single(document.Descendants<ParagraphBlock>(), paragraph => paragraph.Span.Start == markerStart);
+        Assert.Equal("[truncated]", detail[marker.Span.Start..(marker.Span.End + 1)]);
         Assert.DoesNotContain("file:///tail", detail);
         Assert.Empty(document.Descendants<LinkInline>());
-        Assert.DoesNotContain(literal, c => char.IsControl(c) && c is not '\n' and not '\t');
-        if (onlyBackticks) Assert.Equal(new string('`', 2048), literal);
-        else Assert.True(literal.Length <= 2048);
+        // Inspect the raw payload span, including its original interior newlines:
+        // parser line splitting must not hide an unnormalized input CR/control.
+        Assert.DoesNotContain(boundedDescription, c => char.IsControl(c) && c is not '\n' and not '\t');
+        if (onlyBackticks) Assert.Equal(new string('`', 2048), boundedDescription);
+        else
+        {
+            Assert.StartsWith("## Summary\n````\n[Review update](file:///x)\n\uFFFD\uFFFD\n", boundedDescription);
+            Assert.True(boundedDescription.Length <= 2048);
+        }
     }
 
     [Theory]
