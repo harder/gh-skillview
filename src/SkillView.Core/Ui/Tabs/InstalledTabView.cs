@@ -75,6 +75,8 @@ internal sealed class InstalledTabView : FrameView
     private bool _detailOpen;
     private bool _wide;
     private bool _layoutActive;
+    private bool _reflowActive;
+    private int? _descriptionWidth;
     private View? _rememberedFocus;
     private string _selectionReason = "Select an exact copy for actions.";
     private bool _disposed;
@@ -266,6 +268,7 @@ internal sealed class InstalledTabView : FrameView
         };
         FrameChanged += (_, _) => ApplyResponsiveLayout();
         _table.ViewportChanged += (_, _) => RecomputeColumnWidths();
+        _detail.ViewportChanged += (_, _) => ReflowDetail();
 
         KeyDown += OnKeyDown;
         _detail.KeyDown += OnKeyDown;
@@ -517,6 +520,30 @@ internal sealed class InstalledTabView : FrameView
         _table.SetNeedsDraw();
     }
 
+    private void ReflowDetail()
+    {
+        if (_reflowActive || _disposed || _lifetimeToken.IsCancellationRequested) return;
+        // Viewport already excludes the actual scrollbar. The code-block copy
+        // glyph occupies the last two columns, including its click target.
+        var width = _detail.Viewport.Width - (_detail.ShowCopyButtons ? 2 : 0);
+        if (width <= 0 || width == _descriptionWidth) return;
+        _descriptionWidth = width;
+        _reflowActive = true;
+        try
+        {
+            var offset = _detail.Viewport.Location;
+            RefreshSelectedDetail();
+            TuiHelpers.RestoreMarkdownScroll(_detail, offset);
+            var size = _detail.GetContentSize();
+            _detail.Viewport = _detail.Viewport with
+            {
+                X = Math.Clamp(offset.X, 0, Math.Max(0, size.Width - _detail.Viewport.Width)),
+                Y = Math.Clamp(offset.Y, 0, Math.Max(0, size.Height - _detail.Viewport.Height))
+            };
+        }
+        finally { _reflowActive = false; }
+    }
+
     private void ApplyResponsiveLayout()
     {
         if (_layoutActive || _facetButtons is null || _detail is null) return;
@@ -637,9 +664,9 @@ internal sealed class InstalledTabView : FrameView
             _footer.Text = " (inventory not loaded)";
             return;
         }
-        var counts = _viewRows.MatchingCopies == _overview.Copies ? $"{_overview.Copies} observed copies"
+        var counts = _viewRows.MatchingCopies == _overview.Copies ? $"{_overview.Copies} observed {(_overview.Copies == 1 ? "copy" : "copies")}"
             : $"{_viewRows.MatchingCopies} of {_overview.Copies} observed copies";
-        _footer.Text = $" {counts} · {_overview.Placements} placements"
+        _footer.Text = $" {counts} · {InstalledScreen.PlacementCount(_overview.Placements)}"
             + (_overview.AmbiguousCopies > 0 ? $" · {_overview.AmbiguousCopies} ambiguous" : "")
             + (_viewRows.OmittedRows > 0 ? $" · {_viewRows.ShownCopies} shown; {_viewRows.OmittedRows} rows omitted" : "")
             + (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete ? " · Partial scan" : "");
@@ -945,11 +972,11 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
-    private string RenderDetail(InstalledSkill skill)
+    private string RenderDetail(InstalledSkill skill, int? recordedPlacementCount)
     {
         var observation = _availability?.Get(skill);
         var package = _snapshot is not null && _packageView?.Matches(_snapshot, _issueView.Generation, skill) == true ? _packageView : null;
-        return InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false)
+        return InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false, descriptionWidth: _descriptionWidth, recordedPlacementCount: recordedPlacementCount)
             + "\n\n" + (package?.Detail ?? "Package not checked for this inventory capture. **K:** explicit local package check.\n\n" + PackageCheckFact.InventoryLifetimeNotice)
             + (observation is null ? "" : "\n" + observation.Detail
                 + (_showDetails && observation.Diagnostic.Length > 0 ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : ""))
@@ -1221,8 +1248,12 @@ internal sealed class InstalledTabView : FrameView
             _detailsButton.Enabled = _reviewUpdate.Enabled = _moreActions.Enabled = false;
         }
         else if (row?.Copy is { } copy)
+        {
+            int? placementCount = copy.Records.All(s => string.Equals(s.ResolvedPath, copy.Path, StringComparison.Ordinal))
+                ? copy.Records.SelectMany(s => s.Agents).Distinct().Count() : null;
             _detail.Text = (copy.Ambiguous ? "## Ambiguous copy\n\n" + _selectionReason + "\n\n" : "")
-                + string.Join("\n\n---\n\n", copy.Records.Select(RenderDetail)) + "\n\n" + FilterDescription();
+                + string.Join("\n\n---\n\n", copy.Records.Select(skill => RenderDetail(skill, placementCount))) + "\n\n" + FilterDescription();
+        }
         else if (row?.Group is { } group)
             _detail.Text = "## " + MarkdownTableFormatter.FormatTableCell(group.Name) + "\n\nSource: " + MarkdownTableFormatter.FormatCodeSpan(group.Source)
                 + "\n\n" + row.Summary + "\n\n" + _selectionReason + "\n\nEnter or Left/Right expands/collapses the group.\n\n" + _overview.Coverage;

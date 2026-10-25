@@ -11,11 +11,13 @@ namespace SkillView.Tests.Gh;
 
 public sealed class UpdateAvailabilityReadTests
 {
-    [Fact]
-    public async Task SameNamesUseExactDirectoryAndCapturedChildContextWithoutCapturingPayload()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SameNamesUseExactDirectoryAndCapturedChildContextWithoutCapturingPayload(bool aliasedContext)
     {
         if (OperatingSystem.IsWindows()) return; // Inert POSIX executable fixture.
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(aliasedContext);
         var first = fixture.Skill("first");
         var second = fixture.Skill("second");
         // Full payload capture refuses this external link; upstream checking
@@ -27,6 +29,10 @@ public sealed class UpdateAvailabilityReadTests
         var registry = Path.Combine(fixture.Root, "home", ".agents", ".skill-lock.json");
         Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
         File.WriteAllText(registry, "inert owner bytes");
+        // getcwd reports the native physical directory, including macOS /var
+        // aliases. HOME remains the exact lexical value captured for the child.
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(fixture.Root, out var expectedWorkingDirectory, out var contextError), contextError);
+        if (aliasedContext) Assert.NotEqual(fixture.Root, expectedWorkingDirectory);
         var available = await fixture.Observe(first);
         var current = await fixture.Observe(second);
         Assert.Equal(UpdateAvailabilityStatus.Available, available.Status);
@@ -37,14 +43,17 @@ public sealed class UpdateAvailabilityReadTests
         try
         {
             Assert.Equal(4, commands.Length);
-            foreach (var command in commands)
+            for (var commandIndex = 0; commandIndex < commands.Length; commandIndex++)
             {
-                var root = command.RootElement;
+                var root = commands[commandIndex].RootElement;
                 Assert.Equal(Path.Combine(fixture.Root, "home"), root.GetProperty("home").GetString());
-                Assert.Equal(fixture.Root, root.GetProperty("cwd").GetString());
+                Assert.Equal(expectedWorkingDirectory, root.GetProperty("cwd").GetString());
                 var args = root.GetProperty("args").EnumerateArray().Select(item => item.GetString()).ToArray();
                 Assert.Equal("skill", args[0]);
-                Assert.Contains(args[1], new[] { "list", "update" });
+                Assert.Equal(commandIndex % 2 == 0 ? "list" : "update", args[1]);
+                var directoryArgument = Array.IndexOf(args, "--dir");
+                Assert.InRange(directoryArgument, 0, args.Length - 2);
+                Assert.Equal(Path.GetDirectoryName(commandIndex < 2 ? first.ResolvedPath : second.ResolvedPath), args[directoryArgument + 1]);
                 if (args[1] == "update")
                 {
                     Assert.Contains("--dry-run", args);
@@ -115,14 +124,21 @@ public sealed class UpdateAvailabilityReadTests
 
     private sealed class Fixture : IDisposable
     {
-        internal string Root { get; } = Directory.CreateTempSubdirectory("availability-read-").FullName;
+        private readonly string _temporaryRoot = Directory.CreateTempSubdirectory("availability-read-").FullName;
+        internal string Root { get; }
         internal string Log => Path.Combine(Root, "commands.jsonl");
         internal string Started => Path.Combine(Root, "started");
         private readonly TuiServices _services;
         private readonly string _gh;
 
-        internal Fixture()
+        internal Fixture(bool aliasedContext = false)
         {
+            Root = _temporaryRoot;
+            if (aliasedContext)
+            {
+                Root = Path.Combine(_temporaryRoot, "context-alias");
+                Directory.CreateSymbolicLink(Root, _temporaryRoot);
+            }
             var home = Path.Combine(Root, "home");
             Directory.CreateDirectory(home);
             var environment = new Dictionary<string, string>(SkillUpdateCoordinator.CreateStagingEnvironment(Path.Combine(Root, "context")))
@@ -184,6 +200,6 @@ public sealed class UpdateAvailabilityReadTests
         internal Task<UpdateAvailability> Observe(InstalledSkill skill) => Check(skill, TestContext.Current.CancellationToken);
         internal Task<UpdateAvailability> Check(InstalledSkill skill, CancellationToken token) =>
             _services.UpdateAvailability.CheckAvailabilityAsync(_gh, skill, _services.Runner, token);
-        public void Dispose() => Directory.Delete(Root, true);
+        public void Dispose() => Directory.Delete(_temporaryRoot, true);
     }
 }
