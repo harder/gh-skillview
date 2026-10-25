@@ -44,6 +44,13 @@ outside those ancestors, for example beneath `/var/tmp`. Keep the placement guar
 and sandbox marker intact. Record the initial environment refusal separately
 from the isolated rerun.
 
+Managed fixtures that intend equal Unix payload metadata must set explicit modes
+where one side is created or sealed with a fixed mode; do not inherit that intent
+from the contributor's umask. Keep intentional mode differences explicit and
+meaningful to equality/review checks. Verify such fixture changes under both
+`umask 0002` and `umask 0022`, reusing the same build with `dotnet test --no-build`.
+Native proof tools retain their own documented environment prerequisites.
+
 Archive-copy fixtures compare their recorded address with the held native
 lease's canonical path, then require the copy to preserve that exact address.
 Lexical temporary paths can differ on macOS (`/var` versus `/private/var`).
