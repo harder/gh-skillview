@@ -5,11 +5,11 @@ namespace SkillView.Ui;
 /// Lexical presentation only: never resolve links, probe disk, or create selectors.
 internal static class DisplayPath
 {
-    internal static string CaptureHome(ProcessRunner runner)
+    internal static string? CaptureHome(ProcessRunner runner)
     {
         var value = runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
         return string.IsNullOrEmpty(value)
-            ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify)
+            ? null
             : Path.GetFullPath(value, runner.EffectiveWorkingDirectory);
     }
 

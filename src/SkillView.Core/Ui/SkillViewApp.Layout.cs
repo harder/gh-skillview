@@ -69,6 +69,7 @@ public sealed partial class SkillViewApp
         _detailPane = _discoverTab.DetailPane;
         _rightFrame = _discoverTab.DetailPane;
         _itemActionsLabel = _discoverTab.DetailPane.ItemActionsLabel;
+        UpdateDiscoverActions();
         _metadataFrame = _discoverTab.DetailPane.MetadataFrame;
         _previewFrame = _discoverTab.DetailPane.PreviewFrame;
         _previewPane = _discoverTab.DetailPane.PreviewPane;
@@ -179,7 +180,12 @@ public sealed partial class SkillViewApp
             onEffectiveLoading: skill => _workflows.ShowEffectiveLoading(skill),
             onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
-            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()))
+            onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
+            onRemovalError: error =>
+            {
+                _services.Logger.Error("installed.remove", error.ToString());
+                SetStatus("removal failed: " + TuiHelpers.ErrorSnippet(error.Message), TuiHelpers.NotificationLevel.Error);
+            })
         {
             X = 0,
             Y = 2,

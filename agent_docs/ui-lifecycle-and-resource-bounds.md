@@ -15,8 +15,9 @@ logging, or subprocess adapters.
   same inline layout.
 - Discover searches and Installed/Changes inventory loads use `TabLoadingView`
   centered in the workspace, hiding stale tables and details until completion.
-  Installed gives the indicator non-text focus while its table is hidden, so
-  global shortcuts keep working. Discover retains its prior result model until
+  Give the indicator non-text focus before hiding focused browse content, so
+  global shortcuts keep working. Restore browse focus before hiding the
+  indicator. Keep intentional query/filter focus and gate hidden-row actions. Discover retains its prior result model until
   a successful replacement; failed searches restore the previous view/actions.
   Stop loading feedback on success, error, supersession and deactivation; queued
   completions must still pass ownership checks. Installed keeps raw evidence behind F2.
@@ -58,7 +59,8 @@ logging, or subprocess adapters.
 - Installed, Changes, and Updates cancel superseded display waiters and reject
   stale queued UI publication. `DisplayInventoryCache` owns one app-lifetime
   capture shared across these tabs and startup; a tab switch does not cancel
-  work another tab can reuse. Shutdown cancels and drains the app-owned worker.
+  work another tab can reuse. Invalidation cancels the obsolete flight through
+  its own owned lease; shutdown cancels and drains all admitted workers.
   It retains one complete snapshot for one minute; partial or root-incomplete
   captures retry on the next visit. It observes catalog invalidation generations
   and never supplies mutation authority. Changes reuses one queue

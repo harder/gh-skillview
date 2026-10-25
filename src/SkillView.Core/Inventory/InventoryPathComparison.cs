@@ -2,19 +2,42 @@ using System.Collections.Concurrent;
 
 namespace SkillView.Inventory;
 
-/// Reuses read-only path observations within one inventory matching pass only.
-/// Never use this for mutation admission or retain it across inventory captures.
+/// Supplies observations to the shared path predicates. Cached instances belong
+/// to one read-only capture; mutation admission must use the uncached mode.
 internal sealed class InventoryPathComparison
 {
-    private readonly ConcurrentDictionary<string, bool> _case = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, string?> _canonical = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, string?> _entries = new(StringComparer.Ordinal);
+    internal static InventoryPathComparison Uncached { get; } = new(cacheObservations: false);
+    private readonly ConcurrentDictionary<string, bool>? _case;
+    private readonly ConcurrentDictionary<string, string?>? _canonical;
+    private readonly ConcurrentDictionary<string, string?>? _entries;
+    private readonly Func<string, bool> _caseProbe;
+    private readonly Func<string, string, bool> _equal;
+    private readonly Func<string, string?> _canonicalProbe;
+    private readonly Func<string, string?> _entryProbe;
+    private readonly Func<string, string?> _computeEntry;
 
-    private bool CaseSensitive(string path) => _case.GetOrAdd(path, PathIdentity.IsCaseSensitive);
+    internal InventoryPathComparison(bool cacheObservations = true)
+    {
+        if (cacheObservations)
+        {
+            _case = new(StringComparer.Ordinal);
+            _canonical = new(StringComparer.Ordinal);
+            _entries = new(StringComparer.Ordinal);
+        }
+        _caseProbe = CaseSensitive;
+        _equal = Equal;
+        _canonicalProbe = Canonical;
+        _entryProbe = Entry;
+        _computeEntry = path => OwnershipPath.EntryAddress(path, _canonicalProbe);
+    }
 
-    internal string? Canonical(string path) => _canonical.GetOrAdd(path, OwnershipPath.CanonicalCandidate);
+    private bool CaseSensitive(string path) => _case is null
+        ? PathIdentity.IsCaseSensitive(path) : _case.GetOrAdd(path, PathIdentity.IsCaseSensitive);
 
-    internal string? Entry(string path) => _entries.GetOrAdd(path, OwnershipPath.EntryAddress);
+    internal string? Canonical(string path) => _canonical is null
+        ? OwnershipPath.CanonicalCandidate(path) : _canonical.GetOrAdd(path, OwnershipPath.CanonicalCandidate);
+
+    internal string? Entry(string path) => _entries is null ? _computeEntry(path) : _entries.GetOrAdd(path, _computeEntry);
 
     internal IEnumerable<string> Keys(string path)
     {
@@ -23,24 +46,7 @@ internal sealed class InventoryPathComparison
         if (Entry(path) is { } entry) yield return PathIdentity.Normalize(entry);
     }
 
-    private bool Equal(string left, string right)
-    {
-        var a = PathIdentity.Normalize(left);
-        var b = PathIdentity.Normalize(right);
-        return string.Equals(a, b, CaseSensitive(a) && CaseSensitive(b)
-            ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
-    }
-
-    internal bool Same(string left, string right) => Equal(left, right)
-        || Canonical(left) is { } a && Canonical(right) is { } b && Equal(a, b)
-        || Entry(left) is { } c && Entry(right) is { } d && Equal(c, d);
-
-    internal bool IsInside(string candidate, string root)
-    {
-        var path = PathIdentity.Normalize(candidate);
-        var parent = PathIdentity.Normalize(root);
-        var comparison = CaseSensitive(parent) ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-        return string.Equals(path, parent, comparison)
-            || path.StartsWith(parent.EndsWith('/') ? parent : parent + "/", comparison);
-    }
+    private bool Equal(string left, string right) => PathIdentity.Equals(left, right, _caseProbe);
+    internal bool Same(string left, string right) => OwnershipPath.Same(left, right, _equal, _canonicalProbe, _entryProbe);
+    internal bool IsInside(string candidate, string root) => PathIdentity.IsInside(candidate, root, _caseProbe);
 }

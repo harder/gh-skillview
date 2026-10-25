@@ -342,10 +342,21 @@ public sealed class LocalInventoryService
                         bucket.Add(i);
                     }
             }
+            if (index.Count == 0) return skills;
+            var hasExplicitSelectors = packages.Any(entry => entry.Package.Selector is not null);
+            var legacyNames = packages.Where(entry => entry.Package.Selector is null)
+                .Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
             var enriched = ImmutableArray.CreateBuilder<InstalledSkill>(skills.Length);
             foreach (var skill in skills)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // Explicit selectors can describe a differently named physical
+                // alias; only name-bound legacy claims permit this shortcut.
+                if (!hasExplicitSelectors && !legacyNames.Contains(skill.Name))
+                {
+                    enriched.Add(skill);
+                    continue;
+                }
                 var candidates = new HashSet<int>();
                 foreach (var path in skill.Agents.Select(agent => agent.Path).Prepend(skill.ResolvedPath))
                     foreach (var key in paths.Keys(path))

@@ -5,6 +5,16 @@ namespace SkillView.Tests.Ui;
 
 public sealed class DisplayPathTests
 {
+    [Fact]
+    public void UnknownCapturedHomeDoesNotAbbreviateTheAmbientUserProfile()
+    {
+        var runner = new SkillView.Subprocess.ProcessRunner(new SkillView.Logging.Logger())
+            .WithIsolatedContext(Path.GetFullPath("isolated-child"), new Dictionary<string, string>());
+        Assert.Null(DisplayPath.CaptureHome(runner));
+        var path = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "skills", "demo");
+        Assert.Equal(path, DisplayPath.Abbreviate(path, DisplayPath.CaptureHome(runner)));
+    }
+
     [Theory]
     [InlineData("/Users/alex/skills/demo", "/Users/alex", false, "~/skills/demo")]
     [InlineData("/home/alex", "/home/alex/", false, "~")]

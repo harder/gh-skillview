@@ -10,6 +10,48 @@ public sealed class IndexedOwnershipMatchingTests : IDisposable
     private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("skillview-owner-index-");
     public void Dispose() => _root.Delete(true);
 
+    [Fact]
+    public void EmptyCandidateIndexDoesNotInspectUnrelatedSkillAddresses()
+    {
+        var skill = Skill("unowned", Path.Combine(_root.FullName, "unowned")) with { ResolvedPath = "\0" };
+        var packages = new[] { new PackageObservation("elsewhere", Claim("legacy", _root.FullName, null).Package) }.ToImmutableArray();
+        var result = LocalInventoryService.EnrichOwnership([skill], packages, TestContext.Current.CancellationToken);
+        Assert.Same(skill, Assert.Single(result));
+    }
+
+    [Fact]
+    public void NameBoundClaimsDoNotInspectUnrelatedSkillAddresses()
+    {
+        var tracked = Skill("demo", Directory.CreateDirectory(Path.Combine(_root.FullName, "demo")).FullName);
+        var unrelated = Skill("other", Path.Combine(_root.FullName, "other")) with { ResolvedPath = "\0" };
+        var claim = Claim("legacy", _root.FullName, null);
+        var result = LocalInventoryService.EnrichOwnership([tracked, unrelated], [claim], TestContext.Current.CancellationToken);
+        Assert.Single(result[0].OwnershipClaims);
+        Assert.Same(unrelated, result[1]);
+    }
+
+    [Fact]
+    public void UncachedComparisonReobservesAliasRetargetsInTheSameInstance()
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix symlink fixture."); return; }
+        var first = Directory.CreateDirectory(Path.Combine(_root.FullName, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(_root.FullName, "second")).FullName;
+        var alias = Path.Combine(_root.FullName, "moving-alias");
+        Directory.CreateSymbolicLink(alias, first);
+        var cached = new InventoryPathComparison();
+        var strict = new InventoryPathComparison(cacheObservations: false);
+        Assert.True(cached.Same(alias, first));
+        Assert.True(strict.Same(alias, first));
+        Directory.Delete(alias);
+        Directory.CreateSymbolicLink(alias, second);
+        Assert.True(cached.Same(alias, first));
+        Assert.False(strict.Same(alias, first));
+        Assert.True(strict.Same(alias, second));
+        var region = new ManagedSkillRegion(second, "fixture", "codex", "plugin");
+        Assert.True(region.ObserveCoverage(alias, strict));
+        Assert.True(region.Covers(alias));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -114,6 +114,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   aliases, conflicts and consumers. Never reuse those path observations for
   destructive admission. Cleanup classification uses uncached coverage/owner
   comparisons; managed discovery for install/removal admission explicitly disables
-  capture-local path reuse. Root catalog probes are bounded to four concurrent
+  capture-local path reuse. Cached and uncached observations use the same
+  PathIdentity/OwnershipPath predicates; uncached mode must reobserve every
+  lookup. Skip package address work when the index is empty or only legacy
+  names can match another row; explicit selectors can describe differently named
+  physical aliases and must retain that possibility. Root catalog probes are bounded to four concurrent
   children and reconciled in configured-root order. See
   [inventory performance](inventory-performance.md).

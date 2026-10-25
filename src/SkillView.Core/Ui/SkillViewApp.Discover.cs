@@ -86,7 +86,6 @@ public sealed partial class SkillViewApp
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
-                UpdateDiscoverActions();
                 _discoverTab?.SetLoading(true);
             }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
@@ -116,7 +115,6 @@ public sealed partial class SkillViewApp
                 }
                 _discoverTab?.SetLoading(false);
                 ReplaceSearchResults(filteredResults);
-                UpdateDiscoverActions();
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
                 if (!_showingLogs)
@@ -190,6 +188,7 @@ public sealed partial class SkillViewApp
         RefreshDiscoverResultsTitle();
         UpdateMetadataPane();
         UpdatePreviewPlaceholder();
+        UpdateDiscoverActions();
     }
 
     private async Task<IReadOnlyList<SearchResultSkill>> FilterResultsByAgentAsync(
@@ -405,6 +404,7 @@ public sealed partial class SkillViewApp
     /// browser. Bound to `o` on the main view.
     private void OpenSelected()
     {
+        if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
             SetStatus("no result to open");
@@ -439,6 +439,7 @@ public sealed partial class SkillViewApp
     /// in `OpenInstallDialog`.
     private void StageInstall(bool forceAdvanced = false)
     {
+        if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
             SetStatus("no results to install");
@@ -469,6 +470,7 @@ public sealed partial class SkillViewApp
     /// listing, cli/cli#13548). Falls back to install-all if discovery fails.
     private void StageInstallAll()
     {
+        if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
             SetStatus("no results to install");

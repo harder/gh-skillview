@@ -36,6 +36,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<Func<Task>, string> _runTask;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
     private readonly Func<InstalledSkill, InventorySnapshot, CancellationToken, Task> _onRemove;
+    private readonly Action<Exception>? _onRemovalError;
+    private readonly Func<string, bool> _openPath;
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
@@ -49,7 +51,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
-    private readonly TabLoadingView _loading = new("Loading installed skills…") { CanFocus = true };
+    private readonly TabLoadingView _loading = new("Loading installed skills…");
     private bool _showDetails;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
@@ -71,6 +73,7 @@ internal sealed class InstalledTabView : FrameView
     private int _loadActive;
     private int _removeActive;
     private string? _idleStatusMessage;
+    private string? _removalErrorDetail;
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
@@ -84,12 +87,15 @@ internal sealed class InstalledTabView : FrameView
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onEffectiveLoading = null,
         Action<InstalledSkill>? onPackageCheck = null,
-        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null)
+        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
+        Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
         _snapshotLoader = snapshotLoader;
         _onRemove = onRemove;
+        _onRemovalError = onRemovalError;
+        _openPath = openPath ?? TuiHelpers.OpenInDefaultHandler;
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
@@ -299,10 +305,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void Populate(InventorySnapshot snapshot)
     {
-        var focusTarget = _lastFocusedTarget;
-        _loading.SetLoading(false);
-        _table.Visible = true;
-        _detail.Visible = true;
+        SetContentVisibility(loading: false, removing: Volatile.Read(ref _removeActive) != 0);
         _snapshot = snapshot;
         _all = snapshot.Skills;
         _packageCount = _all
@@ -318,8 +321,8 @@ internal sealed class InstalledTabView : FrameView
         BuildTableSource();
         ScheduleDeferredWidthStabilization();
         _idleStatusMessage = null;
+        _removalErrorDetail = null;
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
-        _lastFocusedTarget = focusTarget;
         RestoreFocus();
         _onStateChange?.Invoke();
         RefreshOperationStatus();
@@ -560,8 +563,9 @@ internal sealed class InstalledTabView : FrameView
     internal void FocusList()
     {
         _lastFocusedTarget = FocusTarget.Table;
-        if (_loading.Visible) _loading.SetFocus();
-        else _table.SetFocus();
+        if (_table.Visible) _table.SetFocus();
+        else if (_loading.Visible) _loading.SetFocus();
+        else _detail.SetFocus();
     }
 
     private void RestoreFocus()
@@ -688,7 +692,7 @@ internal sealed class InstalledTabView : FrameView
                 _filterField.SelectAll();
                 break;
             case InstalledScreen.ShortcutCommand.FocusTable:
-                _table.SetFocus();
+                FocusList();
                 break;
             case InstalledScreen.ShortcutCommand.CycleSort:
                 _sort = _sort switch
@@ -704,11 +708,8 @@ internal sealed class InstalledTabView : FrameView
                 break;
             case InstalledScreen.ShortcutCommand.Open:
                 {
-                    var i = _table.GetSelectedRow();
-                    if (i >= 0 && i < _rows.Count)
-                    {
-                        TuiHelpers.OpenInDefaultHandler(_rows[i].ResolvedPath);
-                    }
+                    if (CanActOnSelection && GetSelectedSkill() is { } selected)
+                        _openPath(selected.ResolvedPath);
                     break;
                 }
         }
@@ -744,6 +745,7 @@ internal sealed class InstalledTabView : FrameView
         using var removeCancellation = _removeCancellations.Replace(_lifetimeToken);
         var cancellationToken = removeCancellation.Token;
         var shouldRefresh = false;
+        Exception? failure = null;
         try
         {
             await _onRemove(skill, snapshot, cancellationToken).ConfigureAwait(false);
@@ -754,6 +756,7 @@ internal sealed class InstalledTabView : FrameView
             // Tab deactivation or app shutdown canceled the preflight before a
             // dialog could be opened.
         }
+        catch (Exception ex) { failure = ex; }
         finally
         {
             try
@@ -761,7 +764,17 @@ internal sealed class InstalledTabView : FrameView
                 await _runOnUi(() =>
                 {
                     Interlocked.Exchange(ref _removeActive, 0);
+                    if (failure is not null && !cancellationToken.IsCancellationRequested)
+                    {
+                        _idleStatusMessage = " removal failed: " + TuiHelpers.ErrorSnippet(failure.Message);
+                        var message = failure.Message;
+                        if (message.Length > 4096) message = message[..4096] + " [truncated]";
+                        _removalErrorDetail = "## Could not start removal\n\n" + MarkdownTableFormatter.FormatCodeSpan(message)
+                            + "\n\nRefresh Installed and select a visible skill before trying again.";
+                    }
                     RefreshOperationStatus();
+                    if (failure is not null && !cancellationToken.IsCancellationRequested)
+                        _onRemovalError?.Invoke(failure);
                     if (shouldRefresh && !cancellationToken.IsCancellationRequested)
                     {
                         // The modal invalidates the shared inventory cache when
@@ -778,8 +791,11 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
+    private bool CanActOnSelection => Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0;
+
     private bool TryStartSelectedRemove()
     {
+        if (!CanActOnSelection) return false;
         var index = _table.GetSelectedRow();
         if (index < 0
             || index >= _rows.Count
@@ -791,6 +807,8 @@ internal sealed class InstalledTabView : FrameView
 
         var skill = _rows[index];
         var snapshot = _snapshot;
+        _idleStatusMessage = null;
+        _removalErrorDetail = null;
         RefreshOperationStatus();
         _runTask(
             () => RunRemoveAsync(skill, snapshot),
@@ -802,12 +820,7 @@ internal sealed class InstalledTabView : FrameView
     {
         var loading = Volatile.Read(ref _loadActive) != 0;
         var removing = Volatile.Read(ref _removeActive) != 0;
-        var focusTarget = _lastFocusedTarget;
-        _loading.SetLoading(loading && !removing);
-        if (_loading.Visible && focusTarget == FocusTarget.Table) _loading.SetFocus();
-        _table.Visible = !loading;
-        _detail.Visible = !loading || removing;
-        _lastFocusedTarget = focusTarget;
+        SetContentVisibility(loading, removing);
         if (Volatile.Read(ref _removeActive) != 0)
         {
             SetSpinnerActive(true);
@@ -827,6 +840,7 @@ internal sealed class InstalledTabView : FrameView
 
         SetSpinnerActive(false);
         RefreshSelectedDetail();
+        if (_removalErrorDetail is not null) _detail.Text = _removalErrorDetail;
         if (_idleStatusMessage is not null)
         {
             if (_snapshot is null) _detail.Text = "## Could not load installed skills\n\n" + TerminalEscapeSanitizer.Sanitize(_idleStatusMessage) + "\n\nLeave this tab and return to retry.";
@@ -835,6 +849,30 @@ internal sealed class InstalledTabView : FrameView
         }
 
         RefreshFooter();
+    }
+
+    private void SetContentVisibility(bool loading, bool removing)
+    {
+        if (loading && !removing)
+        {
+            _loading.SetLoading(true);
+            if (_lastFocusedTarget == FocusTarget.Table) _loading.SetFocus();
+            _table.Visible = false;
+            _detail.Visible = false;
+        }
+        else
+        {
+            // Make the destination focusable before retiring the indicator;
+            // hiding a focused view must not implicitly focus the filter.
+            _table.Visible = !loading;
+            _detail.Visible = true;
+            if (_loading.HasFocus)
+            {
+                if (loading) _detail.SetFocus();
+                else RestoreFocus();
+            }
+            _loading.SetLoading(false);
+        }
     }
 
     private void RefreshSelectedDetail()

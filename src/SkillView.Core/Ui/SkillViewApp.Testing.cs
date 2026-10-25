@@ -11,7 +11,6 @@ public sealed partial class SkillViewApp
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
     {
         ReplaceSearchResults(results);
-        UpdateDiscoverActions();
     }
 
     internal Task RunSearchForTestsAsync(string query, Func<CancellationToken, Task<SkillView.Gh.SearchResponse>> search)

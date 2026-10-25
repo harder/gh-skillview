@@ -226,8 +226,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   and superseded preview/inventory work must be canceled.
 
 - Display inventory captures share a flight only within the current catalog
-  generation. Refresh detaches obsolete work without releasing app ownership;
-  stale completions cannot clear the new flight. Scheduling must report refused
+  generation. Refresh detaches and cancels obsolete work outside the ownership
+  lock. Each flight has an owned cancellation lease; its worker links that token
+  with the app lifetime. Keep sources until work and cancellation callbacks settle. The app still
+  drains these workers; stale completions cannot clear the new flight. Scheduling must report refused
   admission so every display waiter settles during shutdown. Partial or
   root-incomplete snapshots are shared with current waiters but not reused;
   retain their ordering evidence so an older complete flight cannot hide them.
@@ -240,3 +242,11 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   paths remain unshortened. Cleanup/Updates previews explicitly request technical
   evidence and omit Installed-only shortcuts. Technical link fields expose their
   destinations; non-HTTP(S) upstream/package URLs are plain text.
+
+- Loading indicators transfer browse focus before hiding a table or detail pane
+  and restore it before hiding the indicator. Intentional query/filter focus
+  remains editable. Gate selection actions while their rows are hidden or a
+  conflicting operation is active; keep navigation, help, quit and refresh
+  available. Report removal preflight failures in the owned UI completion with
+  readable guidance and full exception logging; canceled owners must not publish
+  stale failures. Keep focus-gain bookkeeping separate from visibility handoffs.

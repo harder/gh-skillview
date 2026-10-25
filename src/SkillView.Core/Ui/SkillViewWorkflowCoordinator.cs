@@ -3,6 +3,7 @@ using SkillView.Bootstrapping;
 using SkillView.Diagnostics;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
+using SkillView.Threading;
 using Terminal.Gui.App;
 
 namespace SkillView.Ui;
@@ -62,7 +63,8 @@ internal sealed class SkillViewWorkflowCoordinator
         {
             var report = await GetOrProbeReportAsync(token).ConfigureAwait(false);
             return await CaptureInventoryCoreAsync(report, token).ConfigureAwait(false);
-        }, _runBackground);
+        }, _runBackground, onCancellationCallbackException:
+            CancellationCallbackReporter.For(_services.Logger, "display inventory capture"));
     }
 
     /// Open the install flow. By default takes the compact one-screen modal

@@ -1,4 +1,5 @@
 using SkillView.Inventory.Models;
+using SkillView.Threading;
 
 namespace SkillView.Ui;
 
@@ -8,7 +9,8 @@ internal sealed class DisplayInventoryCache(
     Func<long> generation,
     Func<CancellationToken, Task<InventorySnapshot>> capture,
     Func<Func<CancellationToken, Task>, string, bool> runBackground,
-    Func<DateTimeOffset>? clock = null)
+    Func<DateTimeOffset>? clock = null,
+    Action<AggregateException>? onCancellationCallbackException = null)
 {
     private readonly object _gate = new();
     private readonly Func<DateTimeOffset> _now = clock ?? (() => DateTimeOffset.UtcNow);
@@ -22,46 +24,71 @@ internal sealed class DisplayInventoryCache(
         while (true)
         {
             token.ThrowIfCancellationRequested();
-            Flight flight;
-            bool start;
+            Flight? flight = null;
+            Flight? obsolete;
+            InventorySnapshot? cached = null;
+            var start = false;
             lock (_gate)
             {
                 var current = generation();
+                obsolete = DetachObsoleteFlightUnderLock(current);
                 // Keep the latest observation for ordering, but let a later
                 // visit retry incomplete coverage immediately.
                 if (_snapshot is not null && _snapshotGeneration == current
                     && !_snapshot.IsPartial && _snapshot.ConfiguredRootsComplete
-                    && _now() - _completedAt < TimeSpan.FromMinutes(1)) return _snapshot;
-                // Detach obsolete work so a refresh starts immediately. The app
-                // still owns and drains the old worker and its existing waiters.
-                if (_flight is not null && _flight.Generation != current) _flight = null;
-                start = _flight is null;
-                flight = _flight ??= new Flight(current);
-            }
-            // Publish ownership before an inline scheduler can start the worker.
-            if (start)
-            {
-                try
+                    && _now() - _completedAt < TimeSpan.FromMinutes(1)) cached = _snapshot;
+                else
                 {
-                    if (!runBackground(ct => LoadAsync(flight, ct, captureOverride ?? capture), "inventory.display-capture"))
-                        throw new OperationCanceledException("Inventory capture was refused during shutdown.");
-                }
-                catch (Exception ex)
-                {
-                    lock (_gate) ClearFlightUnderLock(flight);
-                    flight.Completion.TrySetException(ex);
+                    start = _flight is null;
+                    flight = _flight ??= new Flight(current, onCancellationCallbackException);
                 }
             }
+            // Publish and schedule the replacement before cancellation callbacks
+            // can re-enter. Cancellation never runs under the ownership gate.
+            if (start) StartFlight(flight!, captureOverride ?? capture);
+            obsolete?.Cancel();
+            if (cached is not null) return cached;
+            var active = flight!;
             InventorySnapshot result;
-            try { result = await flight.Completion.Task.WaitAsync(token).ConfigureAwait(false); }
-            catch when (!token.IsCancellationRequested && flight.Generation != generation()) { continue; }
-            if (flight.Generation == generation()) return result;
+            try { result = await active.Completion.Task.WaitAsync(token).ConfigureAwait(false); }
+            catch when (!token.IsCancellationRequested && active.Generation != generation()) { continue; }
+            if (active.Generation == generation()) return result;
+        }
+    }
+
+    private void StartFlight(Flight flight, Func<CancellationToken, Task<InventorySnapshot>> loader)
+    {
+        try
+        {
+            if (!runBackground(ct => LoadAsync(flight, ct, loader), "inventory.display-capture"))
+                throw new OperationCanceledException("Inventory capture was refused during shutdown.");
+        }
+        catch (Exception ex)
+        {
+            lock (_gate) ClearFlightUnderLock(flight);
+            flight.Completion.TrySetException(ex);
+            _ = flight.Completion.Task.Exception;
+            flight.Dispose();
         }
     }
 
     internal void PublishFresh(InventorySnapshot snapshot, long capturedGeneration)
     {
-        lock (_gate) _ = StoreUnderLock(snapshot, capturedGeneration);
+        Flight? obsolete;
+        lock (_gate)
+        {
+            _ = StoreUnderLock(snapshot, capturedGeneration);
+            obsolete = DetachObsoleteFlightUnderLock(generation());
+        }
+        obsolete?.Cancel();
+    }
+
+    private Flight? DetachObsoleteFlightUnderLock(long current)
+    {
+        if (_flight is null || _flight.Generation == current) return null;
+        var obsolete = _flight;
+        _flight = null;
+        return obsolete;
     }
 
     private InventorySnapshot StoreUnderLock(InventorySnapshot snapshot, long capturedGeneration)
@@ -79,9 +106,12 @@ internal sealed class DisplayInventoryCache(
     {
         try
         {
+            using var lifetime = new CancellationSource(token, flight.Token, onCancellationCallbackException);
+            var captureToken = lifetime.Token;
+            captureToken.ThrowIfCancellationRequested();
             var result = flight.Generation == generation()
-                ? await loader(token).ConfigureAwait(false) : InventorySnapshot.Empty;
-            token.ThrowIfCancellationRequested();
+                ? await loader(captureToken).ConfigureAwait(false) : InventorySnapshot.Empty;
+            captureToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
                 result = StoreUnderLock(result, flight.Generation);
@@ -96,6 +126,7 @@ internal sealed class DisplayInventoryCache(
             // All display waiters may have left; the app still owns this worker.
             _ = flight.Completion.Task.Exception;
         }
+        finally { flight.Dispose(); }
     }
 
     private void ClearFlightUnderLock(Flight flight)
@@ -103,9 +134,22 @@ internal sealed class DisplayInventoryCache(
         if (ReferenceEquals(_flight, flight)) _flight = null;
     }
 
-    private sealed class Flight(long generation)
+    private sealed class Flight : IDisposable
     {
-        internal long Generation { get; } = generation;
+        private readonly CancellationOperationSlot _cancellation;
+        private readonly CancellationOperationSlot.Lease _lease;
+
+        internal Flight(long generation, Action<AggregateException>? report)
+        {
+            Generation = generation;
+            _cancellation = new(report);
+            _lease = _cancellation.Replace(CancellationToken.None);
+        }
+
+        internal long Generation { get; }
+        internal CancellationToken Token => _lease.Token;
         internal TaskCompletionSource<InventorySnapshot> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal void Cancel() => _cancellation.Cancel();
+        public void Dispose() => _lease.Dispose();
     }
 }

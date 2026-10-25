@@ -12,6 +12,61 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public async Task RemovePreflightFailureIsVisibleAndReportedWithoutRefreshing()
+    {
+        Exception? reported = null;
+        var operations = new Dictionary<string, Task>();
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (work, name) => operations[name] = work(), _ => throw new InvalidOperationException("Unexpected refresh"),
+            (_, _, _) => throw new IOException("Selected installation disappeared; refresh Installed and select it again."),
+            () => { }, () => { }, onRemovalError: error => reported = error);
+        view.LoadSeeded(SnapshotWithSkill("demo", null));
+        Assert.True(view.TryStartSelectedRemoveForTests());
+        await operations["installed.remove"];
+        Assert.IsType<IOException>(reported);
+        Assert.Contains("Selected installation disappeared", view.FooterTextForTests);
+        Assert.Contains("refresh Installed and select it again", view.DetailTextForTests);
+        Assert.DoesNotContain("Checking removal safety", view.DetailTextForTests);
+        Assert.False(view.RemoveActiveForTests);
+        Assert.False(view.SpinnerVisibleForTests);
+        Assert.False(operations.ContainsKey("installed.remove-refresh"));
+    }
+
+    [Fact]
+    public async Task HiddenSelectionsCannotBeRemovedOrOpenedDuringLoadOrPreflight()
+    {
+        var inventory = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var operations = new Dictionary<string, Task>();
+        var removed = 0;
+        var opened = 0;
+        var snapshot = SnapshotWithSkill("demo", null);
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (work, name) => operations[name] = work(), token => inventory.Task.WaitAsync(token),
+            async (_, _, token) => { removed++; await removal.Task.WaitAsync(token); }, () => { }, () => { },
+            openPath: _ => { opened++; return true; });
+        view.LoadSeeded(snapshot);
+        view.FocusList();
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.Equal(1, opened);
+        var loading = view.LoadAsync();
+        view.NewKeyDownEvent(new Key('x'));
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.False(view.TryStartSelectedRemoveForTests());
+        Assert.Equal(0, removed);
+        Assert.Equal(1, opened);
+        inventory.SetResult(snapshot);
+        await loading;
+        view.NewKeyDownEvent(new Key('x'));
+        Assert.Equal(1, removed);
+        view.NewKeyDownEvent(new Key('o'));
+        Assert.Equal(1, opened);
+        removal.SetResult();
+        await operations["installed.remove"];
+        if (operations.TryGetValue("installed.remove-refresh", out var refresh)) await refresh;
+    }
+
+    [Fact]
     public async Task CompletedLoadReturnsNonTextFocusToTable()
     {
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -253,10 +308,10 @@ public sealed class InstalledTabViewTests
             packageSource: "owner/repo",
             agentIds: ["claude"]));
 
-        var initialLoad = view.LoadAsync();
-        await inventoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
         Assert.True(view.TryStartSelectedRemoveForTests());
         await removeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var initialLoad = view.LoadAsync();
+        await inventoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
 
         releaseRemove.TrySetResult();
         await operations["installed.remove"];

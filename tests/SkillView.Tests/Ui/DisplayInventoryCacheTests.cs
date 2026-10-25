@@ -247,6 +247,99 @@ public sealed class DisplayInventoryCacheTests
         Assert.Equal(2, calls);
     }
 
+    [Fact]
+    public async Task RepeatedRefreshCancelsEveryObsoleteCaptureAndAllWaitersUseTheLatest()
+    {
+        long generation = 0;
+        var tokens = new System.Collections.Concurrent.ConcurrentDictionary<long, CancellationToken>();
+        var workers = new System.Collections.Concurrent.ConcurrentBag<Task>();
+        var calls = 0;
+        var active = 0;
+        var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow };
+        var cache = new DisplayInventoryCache(() => Interlocked.Read(ref generation), async token =>
+        {
+            var current = Interlocked.Read(ref generation);
+            tokens[current] = token;
+            Interlocked.Increment(ref calls);
+            Interlocked.Increment(ref active);
+            try
+            {
+                if (current < 5) await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return fresh;
+            }
+            finally { Interlocked.Decrement(ref active); }
+        }, (work, _) => { workers.Add(work(CancellationToken.None)); return true; });
+        var waiters = new List<Task<InventorySnapshot>> { cache.GetAsync(TestContext.Current.CancellationToken) };
+        for (var i = 1; i <= 5; i++)
+        {
+            Interlocked.Increment(ref generation);
+            waiters.Add(cache.GetAsync(TestContext.Current.CancellationToken));
+        }
+        Assert.All(await Task.WhenAll(waiters).WaitAsync(TestContext.Current.CancellationToken), result => Assert.Same(fresh, result));
+        await Task.WhenAll(workers).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(6, calls);
+        Assert.Equal(0, active);
+        for (var i = 0; i < 5; i++) Assert.True(tokens[i].IsCancellationRequested);
+        Assert.False(tokens[5].IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task FreshOperationPublicationCancelsAnObsoleteWorkerWithoutRecapture()
+    {
+        long generation = 0;
+        var calls = 0;
+        CancellationToken captureToken = default;
+        var cache = new DisplayInventoryCache(() => Interlocked.Read(ref generation), async token =>
+        {
+            calls++;
+            captureToken = token;
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return InventorySnapshot.Empty;
+        }, Start);
+        var waiting = cache.GetAsync(TestContext.Current.CancellationToken);
+        Interlocked.Increment(ref generation);
+        var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow };
+        cache.PublishFresh(fresh, generation);
+        Assert.Same(fresh, await waiting);
+        Assert.True(captureToken.IsCancellationRequested);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task ObsoleteCancellationAllowsCrossThreadReentryAndReportsCallbackFailures()
+    {
+        long generation = 0;
+        DisplayInventoryCache? cache = null;
+        var errors = new List<AggregateException>();
+        var reentered = false;
+        using var published = new ManualResetEventSlim();
+        Task? publication = null;
+        var calls = 0;
+        cache = new DisplayInventoryCache(() => Interlocked.Read(ref generation), async token =>
+        {
+            if (++calls > 1) return InventorySnapshot.Empty;
+            using var registration = token.Register(() =>
+            {
+                publication = Task.Factory.StartNew(() =>
+                {
+                    cache!.PublishFresh(InventorySnapshot.Empty, generation);
+                    published.Set();
+                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                reentered = published.Wait(TimeSpan.FromSeconds(10));
+                throw new InvalidOperationException("cancellation-callback-sentinel");
+            });
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return InventorySnapshot.Empty;
+        }, Start, onCancellationCallbackException: errors.Add);
+        var first = cache.GetAsync(TestContext.Current.CancellationToken);
+        Interlocked.Increment(ref generation);
+        await cache.GetAsync(TestContext.Current.CancellationToken);
+        await first;
+        await publication!;
+        Assert.True(reentered);
+        Assert.Contains(Assert.Single(errors).InnerExceptions, error => error.Message == "cancellation-callback-sentinel");
+    }
+
     private static bool Start(Func<CancellationToken, Task> work, string operation)
     {
         _ = work(CancellationToken.None);

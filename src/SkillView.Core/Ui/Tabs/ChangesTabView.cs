@@ -127,9 +127,10 @@ internal sealed class ChangesTabView : FrameView
         TuiHelpers.ApplyScheme(SchemeNames.Base, this, _table, _detail, _spinner, _status);
 
         _table.KeyDown += OnTableKeyDown;
+        _loading.KeyDown += OnTableKeyDown;
         KeyDown += (_, key) =>
         {
-            if (key.Handled || key.KeyCode != KeyCode.F2 || !_rows.Any(row => row.Entry is not null)) return;
+            if (key.Handled || _loading.Visible || key.KeyCode != KeyCode.F2 || !_rows.Any(row => row.Entry is not null)) return;
             key.Handled = true;
             _showDetails = !_showDetails;
             UpdateDetail();
@@ -249,7 +250,6 @@ internal sealed class ChangesTabView : FrameView
         }
 
         _onStateChange?.Invoke();
-        SetLoading(false);
     }
 
     // Tests only -----------------------------------------------------------
@@ -405,7 +405,7 @@ internal sealed class ChangesTabView : FrameView
         if (key.KeyCode == KeyCode.Enter)
         {
             key.Handled = true;
-            ActivateSelectedRow();
+            if (!_loading.Visible) ActivateSelectedRow();
         }
         if (key.AsRune.Value == 'r' && _runTask is not null)
         {
@@ -425,9 +425,8 @@ internal sealed class ChangesTabView : FrameView
 
     private void SetLoading(bool loading)
     {
-        _loading.SetLoading(loading);
-        _table.Visible = !loading;
-        _detail.Visible = !loading;
+        _loading.SetContentLoading(loading, _table, _table, _detail);
+        if (loading) _loading.SetFocus();
         _spinner.Visible = loading;
         _spinner.AutoSpin = loading;
     }

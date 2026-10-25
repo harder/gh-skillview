@@ -141,7 +141,7 @@ index hits.
 | Package association | N × P records × roots/selectors/consumers, with filesystem work inside each comparison | Index candidate lexical/canonical/parent addresses once; look up installation/consumer addresses; verify only hits with the original predicate |
 | Package matching cost | Pairwise filesystem probes | Expected O(C + E + H) candidate lookup, plus stable hit ordering and verification; native observations scale with U |
 | Managed coverage | O(E × G) comparisons with repeated native work | Comparisons still O(E × G), but the native/case observations are reused within the capture; measured tens of milliseconds |
-| Contextual managed roots | Canonicalize each payload again for every ordinary root | Canonicalize payloads once; compare cached addresses while preserving every contextual exposure |
+| Contextual managed roots | Canonicalize each payload again for every ordinary root | Cache read-only observations through the shared path predicates while preserving every contextual exposure; admission uses uncached providers |
 | Region/root deduplication | Repeated linear scans, including record copies for region equality | Hash sets for exact recorded keys, retaining the original list order and limits |
 | Catalog accumulation | Repeated immutable-array concatenation | One builder, preserving provider/root result order |
 | Root catalog latency | R serial children | At most four children; still R observations, stable reconciliation order, cancellation drains owned children |
@@ -161,11 +161,11 @@ nested comparisons. Their filesystem work has been removed from the inner loop.
   Current waiters still receive the partial capture with its coverage warnings.
 - One shared display capture is admitted per catalog generation. Invalidation
   detaches an obsolete flight so new callers can start a fresh capture immediately;
-  obsolete workers remain app-owned and drain normally. Their completions cannot
-  clear or overwrite a newer flight. A tab can cancel its wait and
+  obsolete workers receive per-flight cancellation and remain app-owned until
+  drained. Their completions cannot clear or overwrite a newer flight. A tab can cancel its wait and
   its queued UI publication; the app-owned worker remains available to another
   tab. App shutdown cancels/drains all admitted workers. Old-generation waiters
-  retry against the current generation once their obsolete worker settles;
+  retry against the current generation once their canceled worker settles;
   refused background admission completes waiters with cancellation.
 - Storage retains one completed snapshot, the current in-flight capture, and one
   Changes projection, plus obsolete app-owned workers until they settle.
@@ -231,3 +231,9 @@ retry after failure, completed-operation capture reuse, newer-observation orderi
 queued UI publication, queue reuse, and fresh admission.
 Do not run CPU-heavy tests/publishes concurrently with timing runs and present
 the resulting variation as a product improvement.
+
+Third-round review follow-up: empty ownership indexes and impossible legacy-name
+matches skip skill address probes. Explicit-selector matching still checks
+physical aliases, including differently named exposures. Cached comparisons and
+strict admission now share the PathIdentity/OwnershipPath implementation through
+observation providers; strict providers retain no lookup cache.
