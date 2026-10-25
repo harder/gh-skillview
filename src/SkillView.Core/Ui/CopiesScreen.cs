@@ -32,7 +32,7 @@ internal static class CopiesScreen
             ["Location"] = skill => Safe(TuiHelpers.ShortenPath(skill.ResolvedPath, 2), 18),
             ["Scope"] = skill => skill.Scope,
             ["Ref"] = skill => Safe(skill.Revision.RepositoryRef ?? "unknown", 16),
-            ["Pin"] = skill => skill.Pinned || skill.Revision.PinnedRef is not null ? "yes" : "—",
+            ["Pin"] = skill => PinDisplayPolicy.From(skill).Flag,
             ["Used by"] = skill => Safe(CopiesPresentation.Consumers(skill), 18)
         });
         foreach (var (column, width) in new[] { (0, 16), (1, 7), (2, 14), (3, 3), (4, 16) }) table.Style.GetOrCreateColumnStyle(column).MaxWidth = width;

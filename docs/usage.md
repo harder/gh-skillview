@@ -83,6 +83,12 @@ Installed tab:
 
 Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). The default detail pane starts with the installation/package summary. The description follows the observed evidence and is labeled as skill metadata.
 
+TUI pin displays include contextual lockfile records as well as skill metadata. The
+**pinned only** filter includes copies with any recorded pin, including conflicting
+claims; **unpinned only** excludes conflicting or unreadable pin state. Copies
+and Updates mark pins with `p`, conflicting pin records with `!`, and unknown pin
+state with `?`; details explain the state before review.
+
 Installed columns are **Name → State → Loc → Agents → Package**. Location and known single-agent badges use subtle color cues in the default theme; their text remains visible in every theme. Mixed-agent badges retain the normal text color. The Package column appears when the inventory includes packages. Headers stay visible while scrolling.
 
 Installed and Changes summaries shorten paths beneath the known home directory used for discovery to `~` (for example, `~/.agents/skills/demo`). F2 technical evidence keeps full paths for copying and inspection. Opening folders and maintenance actions always use the original paths.
@@ -109,6 +115,11 @@ workspace performs neither action. Refresh keeps an exact Updates selection.
 The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
 full evidence; keep the same global workspace/profile/scan-root options.
+Same-name rows show the shortest useful location suffix that distinguishes their
+paths, omitting the trailing skill name when it repeats the row title. Visible
+case differences remain distinct. When long or sanitized paths would still look
+identical, a `#` marker
+distinguishes them within the captured list; details retain the full location.
 
 For **Same name, multiple copies** or **Duplicate** observations, Enter opens
 **Copies and versions**. Each row is one physical installation; its recorded

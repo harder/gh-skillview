@@ -99,7 +99,7 @@ internal static class CopiesPresentation
         if (selected.Agents.Length > 1) text.AppendLine("These recorded consumers share this installation's files.");
         Line("Recorded ref", selected.Revision.RepositoryRef);
         Line("Authored version", selected.FrontMatter.Version);
-        Line("Pin", selected.Revision.PinnedRef ?? (selected.Pinned ? "pinned; ref unknown" : "no pin recorded"));
+        Line("Pin", PinDisplayPolicy.From(selected).Description);
         Line("Recorded source", selected.SourceIdentity.Origin);
         Line("Skill subpath", selected.SourceIdentity.Subpath is "" ? "repository root" : selected.SourceIdentity.Subpath);
         Line("Reference location", reference.ResolvedPath);
