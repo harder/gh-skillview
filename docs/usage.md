@@ -173,9 +173,11 @@ mnemonics are **Alt+C** for Check updates and **Alt+R** for Review update.
 Review controls appear when applicable. Source review and retention remain
 separate declarations: inspect the frozen source changes and omissions in Details,
 then check the source declaration and retention approval before applying. Unpin
-reviews change only the verified pin. Local-change review remains available
-through **Preserve installed**, **Review local** and **Build merge** as applicable;
-building a merge requires fresh approval of its exact result. **Next / skip**
+reviews change only the verified pin. Compare local and source files in Details,
+then choose **Preserve installed**, skip, or approve **Replace reviewed** with the
+original retained. New merge creation and the built-in editor have been removed;
+existing saved merge plans still support inspection, admitted apply, recovery and
+undo through the specialist update commands. **Next / skip**
 continues a batch one installation at a time, preserving earlier outcomes and
 diagnostics in Details. A completed disk operation does not prove that an agent
 reloaded the skill.
@@ -218,34 +220,40 @@ For newly installed Codex skills, the [official catalog](https://github.com/open
 instructs restarting Codex. Other combinations explain that their reload rule is
 unknown. Successful disk verification never claims that a running session reloaded.
 
-The CLI exposes the same saved replacement workflows through local plan references:
+The CLI inspects exact installations and uses purpose-specific saved operations:
 
 ```bash
 skillview --scan-root /path/to/skills inspect --install-id INSTALLATION_ID --json
 skillview --scan-root /path/to/skills check --install-id INSTALLATION_ID --json
-skillview --scan-root /path/to/skills plan --purpose update-revision --install-id INSTALLATION_ID --json > review.json
-skillview --scan-root /path/to/skills inspect --plan-file review.json --json
-# Review the comparison, all consumers, source and retention disposition first.
-# Supply the reviewed planFingerprint independently; the file is not approval.
-skillview --scan-root /path/to/skills apply --plan-file review.json --expect REVIEWED_PLAN_FINGERPRINT --yes --disposition retain-original --json
-skillview --scan-root /path/to/skills verify --plan-file review.json --json
-# Undo uses the fresh inspection's reviewFingerprint, not the plan fingerprint.
-skillview --scan-root /path/to/skills undo --plan-file review.json --expect CURRENT_REVIEW_FINGERPRINT --yes --json
+skillview --scan-root /path/to/skills update-plan --install-id INSTALLATION_ID --json
+skillview --scan-root /path/to/skills update-inspect --id SAVED_ID --json
 ```
 
-Keep HOME, state, CWD and global scan/workspace/profile options unchanged. The
-schema-1 `planReference` names an exact plan already retained locally, its purpose,
-fingerprints and installation context. It imports no files and cannot authorize a
-write. The file must be a bounded regular JSON file (256 KiB maximum); large plan
-responses can use only their `planReference` object. After a merge produces a new
-plan fingerprint, export a fresh reference with the specialist `update-inspect`.
-`plan` also accepts `restore-recorded`, `unpin-only` and `local-reimport` purposes;
-apply requires their existing explicit retention disposition. `repair --plan-file`
-resumes a recognized interrupted transaction after current inspection; it refuses
-to start a ready replacement. Torn owner-image repairs and cleanup remain explicit
-specialist operations. Legacy quarantine `undo --id` continues to use its own
-review contract. JSON retains exact per-path before/after file evidence, operation
-status/reason, affected/retained consumers and unknown session state.
+Review the saved candidate, source and all consumers, then use the specialist
+source acknowledgement, apply, recovery or undo command. See
+[saved updates](saved-updates.md), [recorded restoration](recorded-restoration.md),
+and the unpin, local reimport and local source-switch sections below. Recovery
+resumes a saved transaction; it does not mean repairing an arbitrary broken skill.
+Quarantine `undo --id` continues to use its own review contract.
+
+The generic `plan`, `apply`, `repair`, `verify` and `undo --plan-file` wrappers
+were introduced after the last public release (1.0.1) and have been retired.
+New operation output no longer exports `planReference` or its duplicate comparison;
+complete before/after payload evidence remains in the saved native manifest,
+with changed paths and status in specialist output. Persisted plans, hashes,
+retained originals and specialist recovery/undo remain supported.
+
+For an existing schema-1 reference, use `inspect --plan-file review.json --json`.
+This read-only compatibility reader accepts a bare reference or an old response's
+`planReference` object in a regular JSON file (256 KiB maximum, depth 32).
+It reports the exact saved ID, purpose, address and fingerprints plus direct
+specialist inspection/recovery/undo commands. Its `guidance-only` response does
+**not** validate the reference against the local retained store or verify disk
+state. Keep the original HOME, state, CWD and global scan/workspace/profile options,
+then run the indicated specialist inspection and review its purpose, address,
+context and fingerprints. Never treat the file as payload authority or approval.
+Apply still requires the separate source review and explicit retention disposition;
+recovery and undo require a fresh inspection fingerprint and separate approval.
 
 Other:
 
@@ -272,7 +280,6 @@ SkillView runs in CLI mode when you provide a subcommand.
 | `skillview doctor` | Inspect environment, auth, `gh skill` availability, and log paths |
 | `skillview list` | Show installed skills from filesystem and, when available, `gh skill list` |
 | `skillview queue --json` | Refresh maintenance observations with schema 1 JSON and exact physical installation IDs; no upstream check or mutation |
-| `skillview effective --agent <id> --project <directory>` | Explain conditional loading policy for an agent, profile and project, retaining every observed copy |
 | `skillview compare --path <left> --other-path <right>` | Compare two captured installations, including instructions, scripts, resources, permissions and contextual source records |
 | `skillview backup --path <installed-directory>` | Capture private, bounded payload evidence with a durable creating/captured journal |
 | `skillview rescan` | Re-run inventory capture and print a summary |
@@ -288,7 +295,6 @@ Examples:
 
 ```bash
 skillview list --json
-skillview effective --agent gemini-cli --project /path/to/project --client-version 0.46.0 --json
 skillview search prompt --owner github
 skillview preview github/awesome-copilot documentation-writer
 skillview preview cli/cli gh --version v2.103.0
@@ -308,24 +314,6 @@ when a ref is supplied; for an entire repository, `OWNER/REPO@<ref> --all --pin`
 pins that ref. `--upstream` is a switch for a republished skill's declared
 upstream source, not a URL argument. Run `skillview --help` for the
 complete option list.
-
-`effective` analyzes bounded local configuration and skill metadata without
-changing skills or agent configuration. In Installed, select a skill and press
-**E** to choose the same context and inspect relevant competing copies.
-Use `--cwd`, `--config-dir`, `--profile`, `--client-version`, and, for OpenCode,
-`--agent-name` to describe the context precisely. Here `--profile` is a loading
-context option; the global inventory `--profile agent[:name]=skills-directory`
-still belongs before the subcommand. `--trust trusted|untrusted|unknown` is an
-analysis assumption; it never grants trust to an agent.
-
-The JSON schema is version 1. It separates a conditional local-file policy
-preview, native inventory observations, and active-session state. A symlink,
-cache entry, portable metadata warning, or client version label alone does not
-prove native loading. The cited Gemini 0.46.0 source supports an expected rule
-profile; native AI-client conformance remains untested. Other rule profiles are
-dated documentation previews with explicit version uncertainty. Native providers
-currently report unavailable with their startup-audit reason; SkillView does
-not start an AI client or execute skill content to obtain a listing.
 
 For `backup`, select one exact installation with `--path` or `--install-id` from
 `list --json`. Put global flags before the command, for example:
@@ -511,7 +499,7 @@ Skill code is never executed, and the check performs no remote lookup or repair.
 
 Optionally select a package rule target, for example:
 `skillview --scan-root /path/to/skills check --path /path/to/skills/demo --agent gemini-cli --agent-version 0.46.0 --json`.
-This reuses existing version-cited loading rules without launching a client. Known
+This applies version-cited static package rules without launching a client. Known
 Gemini 0.46.0 framing rejection can report `incompatible`; passing that limited rule
 leaves whole-agent compatibility `unknown`. Unmodeled agents or versions never
 receive assumed compatibility. The dialog leaves agent/version unspecified.
@@ -524,10 +512,9 @@ match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
-Separate workflows support [opt-in isolated evaluations](isolated-evaluations.md)
-and [source authoring validation](#validate-a-source-repository-while-authoring),
-including `gh skill publish --dry-run`. `publish --fix` is never a repair action
-for installed payloads; no installed authored bytes are rewritten.
+Source authors can use `gh skill publish --dry-run` directly in their source
+repository. `publish --fix` is never a repair action for installed payloads;
+no installed authored bytes are rewritten.
 
 ### Global flags
 
@@ -794,28 +781,3 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
-
-### Validate a source repository while authoring
-
-Run `skillview authoring-validate --repository /path/to/source-repository --dry-run`
-(or add `--json` for schema-1 evidence). This explicitly invokes
-`gh skill publish --dry-run`; it is separate from installed-package `check`.
-GitHub remote advisories may contact GitHub, and gh may write cache/config state.
-The command never requests publishing, `--fix`, skill-script execution or an AI
-client. It preserves raw gh diagnostics and checks observed candidate payload
-bytes before/after, reporting unexpected changes without repairing them.
-
-A completed result means the bounded gh command succeeded with unchanged observed
-candidate bytes. It does not certify safety, whole-agent compatibility, authentic
-source or source review. Unsupported/incomplete discovery, truncation, cancellation
-and changes have explicit refused/skipped/partial results. Root-only `SKILL.md`
-layout is explicitly unavailable in this repository workflow. See the
-[authoring validation guide](../agent_docs/maintenance-authoring-validation.md)
-for discovery scope, bounds, status and exit-code semantics.
-
-## Opt-in offline evaluations
-
-Use `evaluate-review` to inspect a frozen package, your representative prompts and
-an explicit already-local offline Docker evaluator. `evaluate-run` requires the
-exact review fingerprint and `--consent-run`. No routine inspection or update
-starts evaluations. See [environment, protocol and limitations](isolated-evaluations.md).

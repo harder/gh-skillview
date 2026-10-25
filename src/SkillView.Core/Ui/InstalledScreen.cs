@@ -186,7 +186,7 @@ public static class InstalledScreen
         }
         sb.AppendLine();
         sb.AppendLine(showShortcuts
-            ? "Active-session loading is unknown. **E** Analyze loading · **K** Check package · **F2** Technical details."
+            ? "Active-session loading is unknown. **K** Check package · **F2** Technical details."
             : "Active-session loading is unknown.");
         if (showDetails && s.ObservedSubject is { } subject)
         {

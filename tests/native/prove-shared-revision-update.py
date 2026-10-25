@@ -1,9 +1,10 @@
 """Real gh shared update, raw-image recovery and process-kill/restart proof.
 
 The proof-only host pauses at production checkpoints. The product CLI performs
-all planning, inspection, repair, recovery and undo in a disposable HOME/CWD.
-Opt-in --merged keeps reviewed local bytes while C remains the source baseline
-and desired shared-owner revision throughout the same restart/recovery matrix.
+ordinary planning, inspection, repair, recovery and undo in a disposable HOME/CWD.
+For --merged, the frozen historical producer authors the schema3 fixture; current
+hosts keep its reviewed local bytes while C remains the source baseline and
+desired shared-owner revision throughout the same restart/recovery matrix.
 """
 import argparse
 import base64
@@ -36,7 +37,10 @@ def resolve_gh_executable(path, *, windows=None, lookup=None):
     raise FileNotFoundError(f'Explicit gh executable does not name a file: {path}')
 
 
+from historical_merge_proof import add_arguments, verify, assert_reviewed_shape
+
 parser = argparse.ArgumentParser()
+add_arguments(parser, required=False)
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--proof-host', required=True, type=Path)
 parser.add_argument('--gh', required=True, action='append', type=Path)
@@ -47,6 +51,9 @@ parser.add_argument('--expect-metadata-refusal', help='Standalone unpin must ref
 mode.add_argument('--merged', action='store_true', help='Review and preserve local bytes in a schema3 shared-owner merge, then run the same recovery matrix.')
 args = parser.parse_args()
 app, host = args.app.resolve(), args.proof_host.resolve()
+if args.merged and (not args.old_app or not (args.old_checkout or args.old_source_receipt)):
+    parser.error("--merged requires a frozen --old-app and source verification")
+old, producer = verify(args, app) if args.merged else (None, None)
 if args.expect_metadata_refusal and not args.unpin_only:
     parser.error('--expect-metadata-refusal requires --unpin-only')
 try:
@@ -218,10 +225,10 @@ for gh_path in args.gh:
         original_payload, unrelated_payload = manifest(payload), manifest(custom / 'gh-skill')
         original_exposure = exposure.lstat().st_ino
 
-        def run(command, *arguments, ok=True):
+        def run(command, *arguments, ok=True, historical=False):
             if args.unpin_only and command in ('update-apply', 'update-inspect', 'update-recover', 'update-undo', 'update-repair-owner'):
                 command = command.replace('update-', 'unpin-', 1)
-            process = subprocess.run([str(app), '--scan-root', str(custom), command, *map(str, arguments),
+            process = subprocess.run([str(old if historical else app), '--scan-root', str(custom), command, *map(str, arguments),
                                       '--allow-hidden-dirs', '--json'], env=env, cwd=root,
                                      capture_output=True, text=True, timeout=180)
             assert (process.returncode == 0) == ok, (process.returncode, process.stdout, process.stderr)
@@ -253,11 +260,14 @@ for gh_path in args.gh:
                 assert b'\nUser modifications\n' in Path(result['candidatePath']).joinpath('SKILL.md').read_bytes()
                 assert Path(result['candidatePath']).joinpath('user-extra').read_bytes() == b'\x00\xffKeep extra'
                 return result
-            preparation = run('update', '--path', payload, '--unpin', '--force')
-            assert not preparation['mutationAttempted']
-            assert preparation['outcomes'][0]['status'] == 'review-required'
-            result = preparation['savedPlan']
-            assert preparation['applyArguments'] == ['update-apply', '--id', result['id'], '--expect', result['planFingerprint'], '--yes', '--disposition', 'retain-original', '--allow-hidden-dirs']
+            if args.merged:
+                result = run('update-plan', '--path', payload, '--unpin', historical=True)['operation']
+            else:
+                preparation = run('update', '--path', payload, '--unpin', '--force')
+                assert not preparation['mutationAttempted']
+                assert preparation['outcomes'][0]['status'] == 'review-required'
+                result = preparation['savedPlan']
+                assert preparation['applyArguments'] == ['update-apply', '--id', result['id'], '--expect', result['planFingerprint'], '--yes', '--disposition', 'retain-original', '--allow-hidden-dirs']
             assert manifest(payload) == original_payload
             assert manifest(custom / 'gh-skill') == unrelated_payload
             assert result['revision']['owner']['selector'] == 'gh-skill', result
@@ -269,6 +279,7 @@ for gh_path in args.gh:
                 source_path = Path(source['candidatePath'])
                 source_bytes = manifest(source_path)
                 source_plan = json.loads(Path(source['planPath']).read_bytes())
+                assert_reviewed_shape(source, 2)
                 assert source_plan['schemaVersion'] == 2
                 source_payload = source_plan['candidate']['payload']
                 desired = source['revision']['desiredMetadata']
@@ -281,15 +292,22 @@ for gh_path in args.gh:
                 assert b'\nUser modifications\n' not in source_path.joinpath('SKILL.md').read_bytes()
                 assert not source_path.joinpath('user-extra').exists()
                 before_registry = registry_path.read_bytes()
-                review = run('update-merge-review', '--id', source['id'], '--expect', source['planFingerprint'])
+                review = run('update-merge-review', '--id', source['id'], '--expect', source['planFingerprint'], historical=True)
                 assert any(row['path'] == 'user-extra' and row['selection'] == 'installed' for row in review['review']['paths']), review
-                chosen = run('update-merge-choose', '--id', source['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md')
+                chosen = run('update-merge-choose', '--id', source['id'], '--expect', review['reviewFingerprint'], '--choose-installed', 'SKILL.md', historical=True)
                 assert chosen['canMaterialize'], chosen
                 assert not chosen['review']['topologyConflicts'] and all(row['selection'] for row in chosen['review']['paths']), chosen
-                repeated = run('update-merge-review', '--id', source['id'], '--expect', source['planFingerprint'])
+                repeated = run('update-merge-review', '--id', source['id'], '--expect', source['planFingerprint'], historical=True)
                 assert repeated['reviewFingerprint'] == chosen['reviewFingerprint']
-                result = run('update-merge-plan', '--id', source['id'], '--expect', chosen['reviewFingerprint'])
-                merged_plan = json.loads(Path(result['planPath']).read_bytes())
+                result = run('update-merge-plan', '--id', source['id'], '--expect', chosen['reviewFingerprint'], historical=True)
+                merged_plan = assert_reviewed_shape(result, 3)
+                frozen_plan = Path(result['planPath']).read_bytes()
+                refusal = run('update-apply', '--id', result['id'], '--yes', '--disposition', 'merge-reviewed',
+                              '--expect', result['planFingerprint'], ok=False)
+                assert 'source-review acknowledgement is required' in refusal['error'], refusal
+                assert manifest(payload) == original_payload and registry_path.read_bytes() == before_registry
+                assert not Path(result['retainedPath']).exists()
+                assert Path(result['planPath']).read_bytes() == frozen_plan
                 assert merged_plan['schemaVersion'] == 3 and result['localDisposition']['kind'] == 'merge-reviewed'
                 assert result['localDisposition']['sourcePlanFingerprint'] == source['planFingerprint']
                 assert result['localDisposition']['sourceCandidate'] == source_plan['candidate']
@@ -389,7 +407,7 @@ for gh_path in args.gh:
             assert registry_path.read_bytes() == registry_before
             assert_original()
             assert not list((root / 'state').rglob('plan.json'))
-            results.append(dict(host=str(app), proofKind='standalone-unpin-native-refusal',
+            results.append(dict(host=str(app), historicalProducer=producer, proofKind='standalone-unpin-native-refusal',
                                 gh=subprocess.check_output([str(gh), '--version'], text=True).splitlines()[0],
                                 exactRefusal=args.expect_metadata_refusal, originalNativeObjectsAndOwnerUnchanged=True,
                                 publicationSucceeded=False))
@@ -466,7 +484,7 @@ for gh_path in args.gh:
                 ('repair', 'owner-repair-intent', True, False)]:
             saved = plan()
             # Every matrix row has its own immutable plan and source review;
-            # the earlier successful row's receipt cannot authorize this one.
+            # the earlier successful receipt cannot authorize this one.
             acknowledge_frozen_source(run, saved)
             before = registry_path.read_bytes()
             if undo:
@@ -502,7 +520,7 @@ for gh_path in args.gh:
                              originalNativePayloadAndExposureRestored=True, unrelatedSameNameUnchanged=True,
                              **(dict(schema4StandaloneUnpinRecoveryVerified=True, recordedSourceRefTreePreserved=True) if args.unpin_only else {}),
                              **(dict(schema3MergedRecoveryVerified=True, localBytesPreserved=True, sourceCandidateUnchanged=True) if args.merged else {})))
-        results.append(dict(host=str(app), proofHost=str(host),
+        results.append(dict(host=str(app), historicalProducer=producer, proofHost=str(host),
                             hostSha256=hashlib.sha256(app.read_bytes()).hexdigest(),
                             proofHostSha256=hashlib.sha256(host.read_bytes()).hexdigest(),
                             ghSha256=hashlib.sha256(gh.read_bytes()).hexdigest(),
@@ -514,7 +532,7 @@ for gh_path in args.gh:
                                     localInstructionsAndExtraPreserved=True, exactOwnerAndOriginalNativeUndo=True,
                                     sourceNetworkBlockedAfterFixtureInstall=True, selectedEquivalentRawReformatRefused=True,
                                     windowsSupportedFixtureOwnerPrepared=windows_owner_prepared) if args.unpin_only else {}),
-                            **(dict(proofKind='shared-local-merge', schema3ReviewedPlanVerified=True,
+                            **(dict(proofKind='shared-local-merge', schema3ReviewedPlanVerified=True, sourceReviewRequiredAndAcknowledged=True,
                                     immutableSourceAndExactOwnerTransitionRetained=True, localInstructionsAndExtraPreserved=True,
                                     nextUpdateUsesRealSourceBaseline=True,
                                     windowsSupportedFixtureOwnerPrepared=windows_owner_prepared) if args.merged else {})))

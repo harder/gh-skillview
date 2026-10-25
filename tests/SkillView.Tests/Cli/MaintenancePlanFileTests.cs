@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text.Json;
 using SkillView.Bootstrapping;
 using SkillView.Cli;
@@ -23,6 +22,7 @@ public sealed class MaintenancePlanFileTests : IDisposable
     public MaintenancePlanFileTests()
     {
         Directory.CreateDirectory(Payload);
+        Directory.CreateDirectory(Path.Combine(root.FullName, "other"));
         File.WriteAllText(Path.Combine(Payload, "SKILL.md"), Metadata + "Original instructions\n");
         var home = Directory.CreateDirectory(Path.Combine(root.FullName, "home")).FullName;
         var environment = System.Environment.GetEnvironmentVariables().Keys.Cast<string>()
@@ -46,7 +46,7 @@ public sealed class MaintenancePlanFileTests : IDisposable
             ["GIT_WORK_TREE"] = root.FullName,
             ["GIT_COMMON_DIR"] = Path.Combine(root.FullName, "private.git"),
             ["GIT_CONFIG_COUNT"] = "0",
-            ["TMPDIR"] = OperatingSystem.IsWindows() ? root.FullName : "/var/tmp"
+            ["TMPDIR"] = root.FullName
         }) environment[name] = value;
         services = TuiServices.Build(new Logger(), logDirectory: Path.Combine(home, "logs"), processEnvironment: environment,
             workingDirectory: root.FullName);
@@ -55,7 +55,7 @@ public sealed class MaintenancePlanFileTests : IDisposable
     private async Task<ReplacementResult> Prepare()
     {
         // Fixture-only immutable staging; no remote source or skill code runs.
-        var inventory = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(), new([Skills], false), Token);
+        var inventory = await services.InventoryService.CaptureAsync(services.GhLocator.FindOnPath(), new([Skills, Path.Combine(root.FullName, "other")], false), Token);
         var target = Assert.Single(inventory.Skills, skill => skill.ResolvedPath == Payload);
         var plan = await services.SavedUpdatePlans.PlanAsync(target, inventory, (destination, _) =>
         {
@@ -63,91 +63,96 @@ public sealed class MaintenancePlanFileTests : IDisposable
             File.WriteAllText(Path.Combine(destination.CanonicalPath, "resource.txt"), "Saved resource\n");
             return Task.CompletedTask;
         }, Token);
-        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(plan.Reference, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
+        // Reproduce the retired schema-1 locator from the persisted manifest.
+        // Product planners no longer create or export references.
+        using var manifest = JsonDocument.Parse(File.ReadAllText(plan.PlanPath));
+        var reference = new MaintenancePlanReference(1, plan.Id, "restore-recorded", plan.PlanFingerprint,
+            manifest.RootElement.GetProperty("contextFingerprint").GetString()!, plan.Subject.InstallationId, plan.OriginalPath);
+        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(reference, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
         return plan;
     }
 
     [Fact]
-    public async Task ReferenceRoutesInspectApplyVerifyAndUndoThroughRetainedNativePlan()
+    public async Task LegacyReferenceGuidancePreservesSpecialistInspectionApplyAndUndo()
     {
         var original = File.ReadAllBytes(Path.Combine(Payload, "SKILL.md"));
         var plan = await Prepare();
         var referenceBytes = File.ReadAllBytes(ReferencePath);
+        var before = PayloadSnapshot.Capture(Payload, Token);
         var inspection = await Run("inspect", "--plan-file", ReferencePath, "--json");
         Assert.Equal(ExitCodes.Success, inspection.Code);
         using (var json = JsonDocument.Parse(inspection.Output))
         {
-            Assert.Equal(plan.Subject.InstallationId, json.RootElement.GetProperty("planReference").GetProperty("installationId").GetString());
-            Assert.Equal("unknown", json.RootElement.GetProperty("sessionState").GetString());
-            Assert.NotEmpty(json.RootElement.GetProperty("comparison").GetProperty("paths").EnumerateArray());
+            var output = json.RootElement;
+            Assert.Equal("guidance-only", output.GetProperty("status").GetString());
+            Assert.Equal(plan.Id, output.GetProperty("reference").GetProperty("id").GetString());
+            Assert.Equal("restore-recorded", output.GetProperty("reference").GetProperty("purpose").GetString());
+            Assert.False(output.GetProperty("storeInspected").GetBoolean());
+            Assert.False(output.GetProperty("mutationObserved").GetBoolean());
+            Assert.Equal($"skillview restore-inspect --id {plan.Id}", output.GetProperty("inspectCommand").GetString());
+            Assert.Contains($"restore-recover --id {plan.Id}", output.GetProperty("recoverCommand").GetString());
+            Assert.Contains($"restore-undo --id {plan.Id}", output.GetProperty("undoCommand").GetString());
         }
-        var denied = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--json");
-        Assert.Equal(ExitCodes.InvalidUsage, denied.Code);
-        using (var json = JsonDocument.Parse(denied.Output)) Assert.Equal("refused", json.RootElement.GetProperty("status").GetString());
-        Assert.Equal(original, File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")));
-        using (var inspected = JsonDocument.Parse(inspection.Output))
-        {
-            var recover = await Run("repair", "--plan-file", ReferencePath, "--yes", "--expect",
-                inspected.RootElement.GetProperty("operation").GetProperty("reviewFingerprint").GetString()!, "--json");
-            Assert.Equal(ExitCodes.UserError, recover.Code);
-            Assert.Contains("repair cannot start a ready plan", recover.Output);
-        }
-        var noSourceReview = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
+        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+        Assert.False(Directory.Exists(plan.RetainedPath));
+        var noSourceReview = await Run("restore-apply", "--id", plan.Id, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
         Assert.Equal(ExitCodes.UserError, noSourceReview.Code);
         Assert.Contains("source-review acknowledgement", noSourceReview.Output);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")));
-        Assert.False(Directory.Exists(plan.RetainedPath));
         var sourceReview = Assert.IsType<SourceReviewEvidence>(plan.SourceReview);
         var acknowledged = await Run("restore-ack-source", "--id", plan.Id, "--expect", plan.PlanFingerprint,
             "--review", sourceReview.Fingerprint, "--yes", "--json");
         Assert.Equal(ExitCodes.Success, acknowledged.Code);
-        using (var declaration = JsonDocument.Parse(acknowledged.Output))
-            Assert.Equal("not-performed; source-review acknowledgement only", declaration.RootElement.GetProperty("diskVerification").GetString());
-        var applied = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
+        var applied = await Run("restore-apply", "--id", plan.Id, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
         Assert.Equal(ExitCodes.Success, applied.Code);
         Assert.Contains("Saved candidate instructions", File.ReadAllText(Path.Combine(Payload, "SKILL.md")));
-        var verified = await Run("verify", "--plan-file", ReferencePath, "--json");
+        var verified = await Run("restore-inspect", "--id", plan.Id, "--json");
         Assert.Equal(ExitCodes.Success, verified.Code);
         using var observed = JsonDocument.Parse(verified.Output);
         Assert.Equal("installed", observed.RootElement.GetProperty("operation").GetProperty("status").GetString());
         Assert.Equal("verified-saved-locations", observed.RootElement.GetProperty("diskVerification").GetString());
         var currentReview = observed.RootElement.GetProperty("operation").GetProperty("reviewFingerprint").GetString()!;
-        var undo = await Run("undo", "--plan-file", ReferencePath, "--yes", "--expect", currentReview, "--json");
+        var undo = await Run("restore-undo", "--id", plan.Id, "--yes", "--expect", currentReview, "--json");
         Assert.Equal(ExitCodes.Success, undo.Code);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(Payload, "SKILL.md")));
         Assert.Equal(referenceBytes, File.ReadAllBytes(ReferencePath));
     }
 
-    [Fact]
-    public async Task SourceSwitchLocatorIsReadableButCannotRetypeAnotherNativePlan()
+    [Theory]
+    [InlineData("update-revision", "update")]
+    [InlineData("restore-recorded", "restore")]
+    [InlineData("unpin-only", "unpin")]
+    [InlineData("local-reimport", "reimport")]
+    [InlineData("switch-local-source", "source-switch")]
+    public async Task UnverifiedLocatorReportsExactPurposeAndGuidanceWithoutCreatingState(string purpose, string prefix)
     {
-        var plan = await Prepare();
-        var before = PayloadSnapshot.Capture(Payload, Token);
-        var forged = plan.Reference! with { Purpose = ReplacementPlanStore.LocalSourceSwitchPurpose };
-        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(forged, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
-        Assert.Equal(forged, MaintenancePlanReference.Read(ReferencePath, Token));
-        var refused = await Run("verify", "--plan-file", ReferencePath, "--json");
-        Assert.Equal(ExitCodes.UserError, refused.Code);
-        Assert.Contains("purpose", refused.Output, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
-        Assert.False(Directory.Exists(plan.RetainedPath));
+        var reference = new MaintenancePlanReference(1, new('a', 32), purpose, new('b', 64), new('c', 64), new('d', 64), Payload);
+        // Old responses and bare reference objects are both supported.
+        File.WriteAllText(ReferencePath, "{\"planReference\":" + JsonSerializer.Serialize(reference,
+            MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference) + ",\"operation\":{\"untrusted\":true}}");
+        var inspected = await Run("inspect", "--plan-file", ReferencePath, "--json");
+        Assert.Equal(ExitCodes.Success, inspected.Code);
+        using var json = JsonDocument.Parse(inspected.Output);
+        Assert.False(json.RootElement.GetProperty("storeInspected").GetBoolean());
+        Assert.Equal(purpose, json.RootElement.GetProperty("reference").GetProperty("purpose").GetString());
+        Assert.Equal($"skillview {prefix}-inspect --id {reference.Id}", json.RootElement.GetProperty("inspectCommand").GetString());
+        Assert.False(Directory.Exists(Path.Combine(root.FullName, "home", "maintenance")));
     }
 
     [Fact]
-    public async Task ForgedContextAndWrongApprovalCannotRedirectPlanOrModifyPayload()
+    public async Task ExactInstallationInspectionDoesNotSelectASameNameSibling()
     {
-        var plan = await Prepare();
-        var before = PayloadSnapshot.Capture(Payload, Token);
-        var forged = plan.Reference! with { ContextFingerprint = new('0', 64) };
-        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(forged, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
-        var refused = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", plan.PlanFingerprint, "--json");
-        Assert.Equal(ExitCodes.UserError, refused.Code);
-        Assert.Contains("does not match", refused.Output);
-        File.WriteAllText(ReferencePath, JsonSerializer.Serialize(plan.Reference, MaintenancePlanReferenceJsonContext.Default.MaintenancePlanReference));
-        var wrongApproval = await Run("apply", "--plan-file", ReferencePath, "--yes", "--disposition", "retain-original", "--expect", new string('0', 64), "--json");
-        Assert.Equal(ExitCodes.UserError, wrongApproval.Code);
-        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
-        Assert.False(Directory.Exists(plan.RetainedPath));
+        var sibling = Directory.CreateDirectory(Path.Combine(root.FullName, "other", "demo")).FullName;
+        File.WriteAllText(Path.Combine(sibling, "SKILL.md"), Metadata);
+        var result = await Run("inspect", "--path", Payload, "--json");
+        Assert.Equal(ExitCodes.Success, result.Code);
+        using var json = JsonDocument.Parse(result.Output);
+        var entries = json.RootElement.GetProperty("entries").EnumerateArray().ToArray();
+        Assert.NotEmpty(entries);
+        Assert.All(entries, entry => Assert.Equal(Payload, entry.GetProperty("subject").GetProperty("path").GetString()));
+        var missing = await Run("inspect", "--path", Path.Combine(Skills, "missing"), "--json");
+        Assert.Equal(ExitCodes.NoMatches, missing.Code);
+        Assert.Contains("no sibling was selected", missing.Output);
     }
 
     [Fact]
@@ -169,14 +174,10 @@ public sealed class MaintenancePlanFileTests : IDisposable
     }
 
     [Theory]
-    [InlineData("plan --purpose update-revision --path one --path two --json")]
-    [InlineData("plan --purpose owner-adoption --path one --json")]
-    [InlineData("plan --purpose restore-recorded --path one --new-source /unrelated --json")]
-    [InlineData("plan --purpose switch-local-source --path one --json")]
-    [InlineData("plan --purpose switch-local-source --path one --new-source relative --json")]
     [InlineData("inspect --plan-file missing --json --json")]
-    [InlineData("apply --plan-file missing --id override --json")]
-    [InlineData("verify --plan-file missing --execute --json")]
+    [InlineData("inspect --plan-file missing --id override --json")]
+    [InlineData("inspect --plan-file missing --yes --json")]
+    [InlineData("inspect --plan-file --json")]
     public async Task UnsupportedAliasesAndDuplicateArgumentsHaveVersionedRefusalWithoutState(string arguments)
     {
         var result = await Run(arguments.Split(' '));
@@ -197,7 +198,7 @@ public sealed class MaintenancePlanFileTests : IDisposable
         Console.SetOut(output); Console.SetError(errors);
         try
         {
-            var code = await CliDispatcher.RunAsync(ArgParser.Parse("skillview", ["--scan-root", Skills, .. args]), services, Token);
+            var code = await CliDispatcher.RunAsync(ArgParser.Parse("skillview", ["--scan-root", Skills, "--scan-root", Path.Combine(root.FullName, "other"), .. args]), services, Token);
             Assert.True(output.ToString().Length > 0, errors.ToString());
             return (code, output.ToString());
         }

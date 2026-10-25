@@ -22,7 +22,7 @@ corresponding index/cache boundary for ordinary browsing:
   coverage was repeatedly resolved during discovery, scanning, and enrichment.
 - #61 added frozen native observations. Measurements show that the final native
   observation stage itself is small; it was not the main cause of the delay.
-- #64's cleanup preferences and the on-demand loading, authoring, package-check,
+- #64's cleanup preferences and the on-demand loading, package-check,
   copy-comparison, and saved-update workflows are not all executed at startup.
   Do not attribute the startup cost to all later features indiscriminately.
 

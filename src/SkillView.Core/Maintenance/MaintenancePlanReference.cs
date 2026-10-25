@@ -5,8 +5,8 @@ using SkillView.Inventory;
 
 namespace SkillView.Maintenance;
 
-/// A local locator, never an imported payload or an approval. The native store
-/// still validates its own immutable plan, context, receipt and live objects.
+/// Read-only compatibility for references emitted by the retired, unreleased CLI
+/// facade. File contents are unverified locators, never store evidence or approval.
 internal sealed record MaintenancePlanReference(int SchemaVersion, string Id, string Purpose,
     string PlanFingerprint, string ContextFingerprint, string InstallationId, string OriginalPath)
 {
@@ -37,7 +37,7 @@ internal sealed record MaintenancePlanReference(int SchemaVersion, string Id, st
         if (references > 1) throw new IOException("Duplicate planReference envelope member.");
         if (references == 0 && (root.TryGetProperty("operation", out _) || root.TryGetProperty("savedPlan", out _)
             || root.TryGetProperty("unchanged", out _)))
-            throw new IOException("This response contains no retained local plan reference. An unchanged result needs no apply; export an existing plan through specialist inspection.");
+            throw new IOException("This response contains no retained local plan reference. An unchanged result needs no apply; use specialist inspection with the saved ID.");
         if (root.TryGetProperty("planReference", out var reference)) root = reference;
         if (root.ValueKind != JsonValueKind.Object) throw new IOException("No saved local plan reference is present.");
         var names = new HashSet<string>(StringComparer.Ordinal);
@@ -53,10 +53,15 @@ internal sealed record MaintenancePlanReference(int SchemaVersion, string Id, st
         return result;
     }
 
-    internal void RequireMatch(MaintenancePlanReference? actual)
+    internal string SpecialistPrefix => Purpose switch
     {
-        if (actual != this) throw new IOException("Plan reference does not match the locally retained plan, purpose, address or context. Inspect the local plan again.");
-    }
+        "update-revision" => "update",
+        "restore-recorded" => "restore",
+        "unpin-only" => "unpin",
+        "local-reimport" => "reimport",
+        "switch-local-source" => "source-switch",
+        _ => throw new IOException("Unsupported local plan purpose.")
+    };
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

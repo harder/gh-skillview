@@ -653,8 +653,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         {
             SourceReview = plan.SourceReview,
             Impact = PlanImpact(plan, status),
-            Reference = new(1, plan.Id, plan.Purpose, plan.ReviewFingerprint,
-                plan.ContextFingerprint, plan.Subject.InstallationId, plan.OriginalPath),
+            Purpose = plan.Purpose,
             Comparison = MaintenancePlanComparison.From(plan)
         };
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text;
 using SkillView.Inventory;
@@ -17,6 +18,30 @@ public sealed class NativePayloadCaptureTests : IDisposable
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, "SKILL.md"),
             "---\nname: demo\ndescription: Capture fixture\nmetadata:\n  github-repo: https://github.com/fixture/source\n  github-path: skills/demo\n---\n" + body);
+    }
+
+    private string Create(string name, string tree, string body)
+    {
+        var path = Path.Combine(_temp.FullName, "fixtures", name); Directory.CreateDirectory(path);
+        File.WriteAllText(Path.Combine(path, "SKILL.md"), "---\nname: demo\ndescription: Draft fixture\nmetadata:\n  github-repo: https://github.com/fixture/source\n  github-path: skills/demo\n  github-ref: refs/heads/main\n  github-tree-sha: " + tree + "\n---\n" + body);
+        return path;
+    }
+
+    [Fact]
+    public void RawLinkModeCaptureDoesNotChangeLegacyBackupAndReplacementHashInputs()
+    {
+        var i = Create("installed", new('a', 40), "Body.");
+        File.CreateSymbolicLink(Path.Combine(i, "dangling"), "absent");
+        using var installed = NativeDirectoryMoveLease.Open(Path.GetDirectoryName(i)!, i, Token);
+        var legacy = installed.Capture(Token);
+        var backup = PayloadSnapshot.CaptureWithEntrySink(i, (_, _) => { }, Token);
+        var draft = installed.CaptureInto((_, _) => { }, null, Token);
+        Assert.Equal(legacy.Fingerprint, backup.Fingerprint);
+        Assert.Equal(legacy.ObjectStateFingerprint, backup.ObjectStateFingerprint);
+        Assert.Null(legacy.Entries.Single(entry => entry.Path == "dangling").UnixMode);
+        var projected = draft.Entries.Select(entry => entry.Kind == "link" ? entry with { UnixMode = null } : entry).ToImmutableArray();
+        Assert.Equal(legacy.Fingerprint, PayloadSnapshot.Digest(projected, false));
+        if (!OperatingSystem.IsWindows()) Assert.InRange(draft.Entries.Single(entry => entry.Path == "dangling").UnixMode!.Value, 0, 511);
     }
 
     [Fact]

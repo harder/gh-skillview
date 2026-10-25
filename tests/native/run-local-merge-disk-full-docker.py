@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import uuid
 
+from historical_merge_proof import BASELINE as REVIEWED_MERGE_BASELINE
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True, type=Path)
 parser.add_argument('--proof-host-dir', required=True, type=Path)
@@ -20,7 +22,7 @@ parser.add_argument('--output', required=True, type=Path)
 mode = parser.add_mutually_exclusive_group()
 mode.add_argument('--unpin-only', action='store_true', help='Run standalone-unpin recovery without filling any filesystem.')
 mode.add_argument('--local-reimport', action='store_true', help='Run local-only reimport recovery without authentication or filling any filesystem.')
-parser.add_argument('--legacy-app', type=Path, help='Optional frozen native baseline: schemas1-3 for unpin mode, schema4 for local-reimport mode.')
+parser.add_argument('--legacy-app', type=Path, help='Frozen fixture producer: required for merge mode; source-reviewed schema3 for merge, schemas1-3 for unpin, schema4 for local reimport.')
 parser.add_argument('--legacy-kill-boundary', choices=('retain-moved', 'install-moved'), default='retain-moved')
 parser.add_argument('--legacy-checkout', type=Path, help='Exact clean baseline checkout used to build --legacy-app; never mounted.')
 parser.add_argument('--platform', choices=('linux/amd64', 'linux/arm64'))
@@ -29,8 +31,10 @@ args = parser.parse_args()
 non_filling = args.unpin_only or args.local_reimport
 if args.extra_gh and not non_filling:
     parser.error('--extra-gh requires --unpin-only or --local-reimport.')
-if bool(args.legacy_app) != bool(args.legacy_checkout) or args.legacy_app and not non_filling:
-    parser.error('Use --legacy-app and --legacy-checkout together with --unpin-only or --local-reimport.')
+if bool(args.legacy_app) != bool(args.legacy_checkout):
+    parser.error('Use --legacy-app and --legacy-checkout together.')
+if not non_filling and not args.legacy_app:
+    parser.error('Disk-full schema3 proofs require the frozen --legacy-app and --legacy-checkout.')
 if not args.local_reimport and not (os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')):
     parser.error('A child GH_TOKEN/GITHUB_TOKEN is required; its value is never printed.')
 docker = shutil.which('docker')
@@ -94,11 +98,12 @@ with tempfile.TemporaryDirectory(prefix='skillview-disk-full-tools-') as tempora
         shutil.copy2(extra.resolve(), tools / ('gh-extra-' + str(index)))
         extra_gh_arguments += ' --gh /proof-tools/gh-extra-' + str(index)
     proof_scripts = ('prove-local-reimport.py',) if args.local_reimport else ('prove-shared-revision-update.py',) if args.unpin_only else ('prove-local-merge-update.py', 'prove-disk-full-guards.py', 'prove-local-merge-disk-full.sh')
-    for name in (*proof_scripts, 'source_review_proof.py'):
+    for name in (*proof_scripts, 'source_review_proof.py', 'historical_merge_proof.py'):
         shutil.copy2(scripts / name, tools / name)
     legacy_command = ''
     if args.legacy_app:
-        baseline = 'c919199a6861b9aaf9301e31c4b2945e098da799' if args.local_reimport else '0dba59be59776e6e654123aa1ce1e5496074763e'
+        baseline = ('c919199a6861b9aaf9301e31c4b2945e098da799' if args.local_reimport else
+                    '0dba59be59776e6e654123aa1ce1e5496074763e' if args.unpin_only else REVIEWED_MERGE_BASELINE)
         checkout, old_app = args.legacy_checkout.resolve(), args.legacy_app.resolve()
         assert old_app.is_relative_to(checkout), 'Baseline binary must be beneath its exact source checkout'
         observed = subprocess.check_output(['git', '-C', str(checkout), 'rev-parse', 'HEAD'], text=True).strip()
@@ -107,12 +112,13 @@ with tempfile.TemporaryDirectory(prefix='skillview-disk-full-tools-') as tempora
         copy_tools(old_app.parent, tools / 'legacy')
         (tools / 'legacy-source.json').write_text(json.dumps(dict(sourceCommit=observed, trackedClean=clean,
             binarySha256=digest(old_app)), indent=2) + '\n')
-        legacy_script = 'prove-old-native-unpin.py' if args.local_reimport else 'prove-old-native-plans.py'
-        shutil.copy2(scripts / legacy_script, tools / legacy_script)
-        legacy_command = 'python3 /proof-tools/' + legacy_script + ' --old-app /proof-tools/legacy/' + shlex.quote(old_app.name) + ' --old-source-receipt /proof-tools/legacy-source.json --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh --kill-boundary ' + args.legacy_kill_boundary + ' --output /proof-results/old-native-proof.json\n'
+        if non_filling:
+            legacy_script = 'prove-old-native-unpin.py' if args.local_reimport else 'prove-old-native-plans.py'
+            shutil.copy2(scripts / legacy_script, tools / legacy_script)
+            legacy_command = 'python3 /proof-tools/' + legacy_script + ' --old-app /proof-tools/legacy/' + shlex.quote(old_app.name) + ' --old-source-receipt /proof-tools/legacy-source.json --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh --kill-boundary ' + args.legacy_kill_boundary + ' --output /proof-results/old-native-proof.json\n'
     proof_command = ('export TMPDIR=/proof-fixtures\n'
         'python3 /proof-tools/prove-local-reimport.py --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh' + extra_gh_arguments + ' --output /proof-results/local-reimport-proof.json\n' + legacy_command) if args.local_reimport else ('export TMPDIR=/proof-fixtures\n'
-        'python3 /proof-tools/prove-shared-revision-update.py --unpin-only --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh' + extra_gh_arguments + ' --output /proof-results/standalone-unpin-proof.json\n' + legacy_command) if args.unpin_only else 'sh /proof-tools/prove-local-merge-disk-full.sh "$1" /proof-tools/proof/SkillView.MaintenanceProof /proof-tools/gh /proof-results\n'
+        'python3 /proof-tools/prove-shared-revision-update.py --unpin-only --app "$1" --proof-host /proof-tools/proof/SkillView.MaintenanceProof --gh /proof-tools/gh' + extra_gh_arguments + ' --output /proof-results/standalone-unpin-proof.json\n' + legacy_command) if args.unpin_only else 'sh /proof-tools/prove-local-merge-disk-full.sh "$1" /proof-tools/proof/SkillView.MaintenanceProof /proof-tools/gh /proof-results /proof-tools/legacy/' + shlex.quote(old_app.name) + ' /proof-tools/legacy-source.json\n'
     (tools / 'entry.sh').write_text('''#!/bin/sh
 set -eu
 export DOTNET_EnableDiagnostics=0

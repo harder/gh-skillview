@@ -396,33 +396,6 @@ jobs:
         run: |
           python tests/native/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
           python tests/native/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
-      - name: Prove explicit authoring dry-runs preserve authored and Git files
-        if: matrix.shard == 'inspection-unpin'
-        shell: bash
-        run: |
-          set -euo pipefail
-          proof_gh_name='gh${{ matrix.ext }}'
-          python tests/native/prove-authoring-validation.py --app 'dist/app/skillview${{ matrix.ext }}' \
-            --gh ".ci-native/gh-minimum/$proof_gh_name" \
-            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-app-proof
-          python tests/native/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
-            --gh ".ci-native/gh-minimum/$proof_gh_name" \
-            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-extension-proof
-      - name: Prove explicit offline evaluation against a real local Docker runtime
-        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Fixture preparation is explicit and outside the product's no-pull boundary.
-          docker pull busybox:1.37.0
-          docker image inspect busybox:1.37.0 > dist/evaluation-fixture-image.json
-          fixture_digest="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["RepoDigests"][0])')"
-          fixture_id="$(python3 -c 'import json; print(json.load(open("dist/evaluation-fixture-image.json"))[0]["Id"])')"
-          docker_path="$(command -v docker)"
-          python3 tests/native/prove-isolated-evaluation.py --app dist/app/skillview \
-            --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-app-proof
-          python3 tests/native/prove-isolated-evaluation.py --app dist/ext/gh-skillview \
-            --docker "$docker_path" --image "$fixture_digest" --image-id "$fixture_id" --output dist/evaluation-extension-proof
       - name: Verify repository API access and retain response evidence
         if: matrix.shard == 'owners'
         shell: bash
@@ -442,13 +415,6 @@ jobs:
           assert result['ref'] == 'refs/tags/v2.102.0'
           assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
           PYREF
-      - name: Prove contextual agent loading without starting AI clients
-        if: matrix.shard == 'inspection-unpin'
-        shell: bash
-        run: |
-          proof_gh_path="$(python -c 'import shutil; print(shutil.which("gh") or "", end="")')"
-          python tests/native/prove-effective-loading.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-app-proof.json
-          python tests/native/prove-effective-loading.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/effective-loading-extension-proof.json
       - name: Prove external cleanup suppression without payload mutations
         if: matrix.shard == 'inspection-unpin'
         shell: bash
@@ -549,7 +515,7 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python tests/native/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python tests/native/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
-      - name: Prove reviewed shared-owner merges and restart repair
+      - name: Prove saved schema3 shared-owner merges and restart repair
         if: matrix.shard == 'owners' && (runner.os != 'Linux')
         shell: bash
         env:
@@ -557,8 +523,8 @@ jobs:
         run: |
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
-          python tests/native/prove-shared-revision-update.py --merged --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
-          python tests/native/prove-shared-revision-update.py --merged --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
+          python tests/native/prove-shared-revision-update.py --merged --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
+          python tests/native/prove-shared-revision-update.py --merged --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
       - name: Prove standalone unpin without source access on both native hosts
         if: matrix.shard == 'inspection-unpin'
         shell: bash
@@ -714,7 +680,7 @@ jobs:
               --legacy-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/unpin-privileged-$proof_name-proof" --platform linux/amd64
           done
-      - name: Prove reviewed local dispositions and frozen resolutions
+      - name: Prove historical local dispositions and frozen resolutions
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
@@ -724,9 +690,9 @@ jobs:
           proof_gh_path="$(command -v gh)"
           prove_local_merge() {
             if [ "$RUNNER_OS" = Linux ]; then
-              python tests/native/prove-local-merge-update.py --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+              python tests/native/prove-local-merge-update.py --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --gh "$proof_gh_path" --resolved --expect-metadata-refusal CAP_SYS_ADMIN "$@"
             else
-              python tests/native/prove-local-merge-update.py --gh "$proof_gh_path" --resolved "$@"
+              python tests/native/prove-local-merge-update.py --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --gh "$proof_gh_path" --resolved "$@"
             fi
           }
           prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
@@ -740,7 +706,7 @@ jobs:
           set -euo pipefail
           proof_gh_path="$(command -v gh)"
           for boundary in retain-moved install-moved displace-moved restore-moved; do
-            python tests/native/prove-local-merge-update.py --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
+            python tests/native/prove-local-merge-update.py --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --gh "$proof_gh_path" --resolved \
               --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
               --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
           done
@@ -755,6 +721,7 @@ jobs:
           python3 tests/native/run-local-merge-disk-full-docker.py \
             --app dist/app/skillview \
             --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
+            --legacy-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" \
             --gh "$proof_gh_path" --output dist/disk-full-proof --platform linux/amd64
       - name: Retain native verification evidence
         if: always()
@@ -764,9 +731,6 @@ jobs:
           name: native-maintenance-evidence-${{ matrix.rid }}-${{ matrix.shard }}
           path: |
             dist/*-proof.json
-            dist/evaluation-*-proof/**
-            dist/evaluation-fixture-image.json
-            dist/authoring-*-proof/**
             dist/gh-api-access.txt
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**

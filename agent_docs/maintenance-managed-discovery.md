@@ -88,8 +88,9 @@ created before managed discovery is enabled.
 - Disposable native fixtures on all four RIDs prove observable managed resources,
   zero mutation on refusal, and compatibility of pre-existing saved plans.
 
-Plugin lifecycle mutations remain separate scope. Effective-loading analysis
-uses its own [conditional policy contracts](contracts-discovery.md).
+Plugin lifecycle mutations remain separate scope. Inventory retains physical
+exposures and managed ownership under the [discovery contracts](contracts-discovery.md);
+it does not infer enabled state or simulate agent configuration policy.
 
 ## Review corrections implemented
 

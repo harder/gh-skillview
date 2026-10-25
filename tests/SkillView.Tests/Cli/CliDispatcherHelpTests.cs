@@ -25,10 +25,13 @@ public class CliDispatcherHelpTests
         Assert.Contains("brew install harder/tap/skillview", stdout);
         Assert.Contains("WinGet manifests are generated for release review", stdout);
         Assert.Contains("automation-friendly", stdout);
-        Assert.Contains("| `authoring-validate` |", stdout);
-        Assert.Contains("--repository PATH", stdout);
+        Assert.Contains("| `check` |", stdout);
         Assert.Contains("| `quarantine` |", stdout);
         Assert.Contains("| `restore-plan` |", stdout);
+        Assert.Contains("| `update-preserve` |", stdout);
+        Assert.DoesNotContain("update-merge-review", stdout);
+        Assert.DoesNotContain("update-merge-choose", stdout);
+        Assert.DoesNotContain("update-merge-plan", stdout);
         Assert.Contains("| `unpin-plan` |", stdout);
         Assert.Contains("| `reimport-plan` |", stdout);
         Assert.Contains("| `source-switch-plan` |", stdout);
@@ -49,7 +52,7 @@ public class CliDispatcherHelpTests
     [InlineData("doctor", 30)]
     [InlineData("preview", 30)]
     [InlineData("list", 120)]
-    [InlineData("authoring-validate", 120)]
+    [InlineData("check", 120)]
     [InlineData("search", 120)]
     [InlineData("install", 600)]
     [InlineData("cleanup", 600)]
@@ -86,9 +89,6 @@ public class CliDispatcherHelpTests
     [InlineData("unpin-recover", 600)]
     [InlineData("unpin-undo", 600)]
     [InlineData("unpin-repair-owner", 600)]
-    [InlineData("update-merge-review", 600)]
-    [InlineData("update-merge-choose", 600)]
-    [InlineData("update-merge-plan", 600)]
     [InlineData("update-preserve", 600)]
     public void SubcommandTimeouts_AreBoundedByOperationCost(string subcommand, int seconds)
     {

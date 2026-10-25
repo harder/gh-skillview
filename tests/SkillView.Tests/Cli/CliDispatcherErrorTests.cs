@@ -44,6 +44,18 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
     }
 
+    [Theory]
+    [InlineData("update-merge-review")]
+    [InlineData("update-merge-choose")]
+    [InlineData("update-merge-plan")]
+    public async Task RetiredMergeCreationCommandsAreUnknownWithoutCreatingState(string command)
+    {
+        var (code, _, error) = await RunCliAsync("skillview", command);
+        Assert.Equal(ExitCodes.InvalidUsage, code);
+        Assert.Contains("Unknown subcommand", error, StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(Path.Combine(_tempRoot, "fixture-home", "maintenance-state")));
+    }
+
     // --- remove parser edge cases ----------------------------------------
 
     [Fact]
@@ -446,11 +458,6 @@ public class CliDispatcherErrorTests : IDisposable
     [InlineData("update-repair-owner", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000")]
     [InlineData("update-repair-owner", "--id 00000000000000000000000000000000 --yes --expect bad")]
     [InlineData("update-repair-owner", "--id ../outside --yes --expect 0000000000000000000000000000000000000000000000000000000000000000")]
-    [InlineData("update-merge-review", "--id ../outside --expect bad")]
-    [InlineData("update-merge-choose", "--id 00000000000000000000000000000000 --expect bad")]
-    [InlineData("update-merge-choose", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000 --resolve SKILL.md")]
-    [InlineData("update-merge-review", "--id 00000000000000000000000000000000 --expect 0000000000000000000000000000000000000000000000000000000000000000 --choose-resolved SKILL.md")]
-    [InlineData("update-merge-plan", "--id 00000000000000000000000000000000 --expect bad")]
     [InlineData("update-preserve", "--id 00000000000000000000000000000000 --expect bad")]
     public async Task QuarantineInvalidConfirmationOrSelectorIsRejectedBeforeInventory(string command, string arguments)
     {

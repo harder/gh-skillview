@@ -10,10 +10,8 @@ public sealed partial class SharedReplacementRevisionTests
     private async Task<ReplacementResult> LocalMergePlan()
     {
         var plan = await Plan();
-        var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token);
-        Assert.True(chosen.CanMaterialize, string.Join(" ", chosen.MetadataRefusals));
-        return Store().FinalizeLocalChanges(plan.Id, chosen.ReviewFingerprint, Inventory(), Token);
+        HistoricalMergeFixture.Create(State, plan, Token);
+        return Store().Inspect(plan.Id, Inventory(), Token);
     }
 
     [Fact]

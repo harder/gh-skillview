@@ -1,4 +1,4 @@
-# Maintenance queue and local plan references
+# Maintenance queue and legacy plan-reference inspection
 
 `MaintenanceQueueBuilder` projects reconciled inventory and the existing cleanup
 classifier into read-only issue + physical-installation rows. Use the frozen
@@ -82,37 +82,36 @@ to refresh disk inventory; checking availability is a separate explicit action.
 `inspect --path/--install-id` selects one physical installation using the existing
 exact-selection contract. `check` remains the bounded static package checker;
 availability remains the explicitly requested `update --dry-run` specialist.
-`plan --purpose update-revision|restore-recorded|unpin-only|local-reimport|switch-local-source` routes
-to the existing specialist planner. Its JSON response includes a schema-1
-`planReference`, identifying the locally retained plan ID, plan/context fingerprints,
-purpose, installation ID and original path. It contains no payload authority.
-Source switching additionally requires `--new-source <absolute directory>` and
-its `replace-local-source-retain-original` retention disposition.
-Plan and inspection envelopes can be redirected to a file; a bare `planReference`
-object is also accepted. Limit: 256 KiB UTF-8 JSON, depth 32, regular native file,
-no duplicate reference members, unknown reference fields or arbitrary archive paths.
-Larger envelopes need their `planReference` object extracted. Capture uses
+The duplicate generic `plan`, `apply`, `repair`, `verify` and plan-file `undo`
+wrappers are retired. They were absent from release 1.0.1 (PR41); do not restore
+another generic executor to preserve their unreleased vocabulary. Use the
+purpose-specific saved-operation commands and existing coordinators.
+
+`inspect --plan-file FILE [--json]` is a read-only compatibility reader for existing
+schema-1 references. It accepts a bare reference or an old `planReference` envelope
+member. Limits remain 256 KiB UTF-8 JSON, depth 32, a regular native file, no
+duplicate reference members, unknown reference fields or arbitrary archive paths.
+Larger old envelopes need their reference object extracted. Capture uses
 `RegularFileInspection.Capture`, including held-object and final content checks.
 
-`inspect|verify|apply|repair|undo --plan-file FILE` reread that bounded file once,
-then compare the entire locator with a fresh native-store inspection. No context
-field in the file is used to construct inventory or state locations. The native
-store still checks purpose, immutable records, live slots, owner locks/receipts,
-local-review closure and native identity. Apply independently requires `--expect`,
-`--yes` and the specialist retention disposition; file text never supplies consent.
-Repair resumes only an existing recognized interrupted transaction with a current
-inspection fingerprint. It refuses a ready plan rather than starting replacement
-without retention consent. A ready topology with an interrupted pre-move journal
-requires explicit specialist recovery review. Torn owner-image repair stays the
-explicit specialist action; generic repair never infers an owner transition.
-Legacy quarantine `undo --id` remains separate.
+The reader reports `guidance-only`, the exact saved ID/purpose/address/fingerprints,
+and direct purpose-specific inspect/recover/undo commands. It does not open the
+retained store, establish a locator match, construct inventory/state from file
+fields, or execute a saved operation. Keep the original HOME/state/CWD and global
+scan/workspace/profile options. Review the specialist inspection's purpose,
+address, context and fingerprints before proceeding. Recovery resumes a saved
+transaction, not arbitrary skill repair. Current inspection fingerprints and
+separate approval remain required; apply retains independent source/retention
+gates. Torn owner-image repair stays an explicit specialist action. Quarantine
+`undo --id` remains separate.
 
-These fields are transient projections (`JsonIgnore` on `ReplacementResult`), so
-persisted plan/result hashes and schemas remain unchanged. A merged plan needs a
-fresh specialist inspection/export because its fingerprint changes. A source-review
-acknowledgement is independent of the reference and retention approval. Generic
-apply enforces the same persisted receipt as specialist apply; declare the exact
-frozen source review with its purpose-specific `*-ack-source` command first.
+New planners and specialist output do not create/export `MaintenancePlanReference`
+or export the duplicate comparison JSON. `MaintenancePlanComparison` remains
+shared with the installed→candidate TUI preview; its facade-only JSON context is
+removed. Undo classification retains the native plan purpose as a transient result
+field instead of a reference. These result projections use `JsonIgnore`; persisted
+schemas and hashes are unchanged. Saved native manifests still contain full payload
+evidence; `SkillComparisonService` and `GhPresentationComparison` also remain shared.
 
 Queue JSON and operation output distinguish affected and retained exposures from
 retained payload locations. Reload instructions are separate from disk verification.

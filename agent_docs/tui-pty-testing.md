@@ -72,9 +72,8 @@ That makes `.agents/skills` the most predictable sandbox root for PTY tests.
 Do not rely only on visible screen text. Terminal.Gui redraws, status auto-clear,
 and truncation make pure screen scraping brittle.
 
-- Avoid whole-screen absence checks such as `"loading" not in screen`; the
-  permanent Installed shortcut legend includes `E loading`. Wait for the exact
-  inventory/status or saved-plan condition needed by the next action.
+- Wait for the exact inventory/status or saved-plan condition needed by the
+  next action; generic whole-screen absence checks are unreliable during redraws.
 - Button labels can repeat in instructions and status text. Prefer the actual
   bracketed button when locating a click target.
 - Check real focus before typing. A nonfocusable ancestor can leave a text field

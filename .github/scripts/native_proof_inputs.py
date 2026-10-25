@@ -22,6 +22,7 @@ PUBLISH = ('-c', 'Release', '-p:PublishAot=true', '-p:StripSymbols=true',
            '-warnaserror:IL3050', '-warnaserror:IL3053')
 FAMILIES = (
     ('legacy', 'prove-old-native-plans.py', 'BASELINE', 'skillview-unpin-baseline', 'SKILLVIEW_LEGACY_CHECKOUT'),
+    ('reviewed-merge', 'historical_merge_proof.py', 'BASELINE', 'skillview-reviewed-merge-baseline', 'SKILLVIEW_REVIEWED_MERGE_CHECKOUT'),
     ('unpin', 'prove-old-native-unpin.py', 'BASELINE', 'skillview-local-reimport-baseline', 'SKILLVIEW_UNPIN_CHECKOUT'),
     ('reimport', 'prove-old-native-reimport.py', 'BASELINE', 'skillview-source-switch-baseline', 'SKILLVIEW_REIMPORT_CHECKOUT'),
     ('source-switch', 'prove-old-native-reimport.py', 'SOURCE_SWITCH_BASELINE',
@@ -210,7 +211,7 @@ def safe_member(name):
 def stage(rid, shard):
     manifest = json.loads((ROOT / '.ci-native/native-inputs-manifest.json').read_text(encoding='utf-8'))
     for spec in specs():
-        if shard == 'sources' or (shard == 'inspection-unpin' and spec['family'] == 'legacy'):
+        if shard == 'sources' or spec['family'] == 'reviewed-merge' or (shard == 'inspection-unpin' and spec['family'] == 'legacy'):
             source = checkout(spec)
             binary = verify_producer(ROOT / '.ci-native/baselines' / spec['family'], spec, manifest['cacheKey'], rid)
             destination = source / 'dist/app' / binary.name

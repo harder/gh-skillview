@@ -16,6 +16,12 @@ so CLI behavior and the terminal interface share the same services.
 - `src/SkillView.Core/Gh/` invokes `gh` with argument arrays. Install and
   listing calls put trusted flags before `--` and selectors after it.
 
+Saved replacements use purpose-specific CLI commands and the shared saved-operation
+coordinators/store. The retired generic mutation facade creates no new plan
+references. A bounded `inspect --plan-file` reader supplies unverified specialist
+recovery guidance for existing references; it cannot execute an operation. Native
+plan schemas, hashes and retained originals remain the recovery authority.
+
 ## Terminal interface
 
 `SkillViewApp` owns the Terminal.Gui application lifetime, the persistent
@@ -43,3 +49,10 @@ committed; CI restores in locked mode, tests on Linux, macOS, and Windows, and
 smoke-publishes four Native AOT targets. Release tags trigger the asset,
 checksum, provenance, and publication workflow described in
 [`agent_docs/release-engineering.md`](../agent_docs/release-engineering.md).
+
+New local merge creation and its editor are retired. `ReplacementPlanStore`
+retains schema-3 DTOs, readers, choice/resolution validation and native metadata
+checks for saved-plan inspection, admitted apply, recovery and undo. These share
+metadata/archive primitives with unpin and local reimport; they are not dead
+creator code. Ordinary update comparison, keep-local and reviewed replacement
+continue through the saved-update workflow.

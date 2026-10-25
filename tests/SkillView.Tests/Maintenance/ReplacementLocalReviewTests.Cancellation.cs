@@ -16,9 +16,8 @@ public sealed partial class ReplacementLocalReviewTests
         if (!OperatingSystem.IsMacOS()) return;
         var original = PayloadSnapshot.Capture(Payload, Token);
         var plan = await Plan();
-        var review = Store().ReviewLocalChanges(plan.Id, plan.PlanFingerprint, Inventory(), Token);
-        var chosen = Store().ChooseLocalChanges(plan.Id, review.ReviewFingerprint, [new("SKILL.md", "installed")], Inventory(), Token);
-        var merged = Store().FinalizeLocalChanges(plan.Id, chosen.ReviewFingerprint, Inventory(), Token);
+        HistoricalMergeFixture.Create(State, plan, Token);
+        var merged = Store().Inspect(plan.Id, Inventory(), Token);
         var undo = boundary is "displace-moved" or "restore-moved";
         if (undo)
             Assert.True(Store().Apply(plan.Id, merged.PlanFingerprint, Inventory(), Token, "merge-reviewed").Succeeded);

@@ -123,10 +123,14 @@ for every RID.
 
 After building, run `tests/native/prove-reviewed-update-tui.py` with an
 absolute `--app`, `--gh`, `--output`, and `--shortcut u`, `U`, or `button`.
+Only `--disposition replace` is supported. `--local-edits` adds authored changes
+that must remain in the retained original; `--preserve-first` verifies keep-local
+before preparing another replacement review. The retired editor is not exercised.
 The script uses a private HOME/state/CWD and actual gh remote installation,
 answers terminal probes, and locates visible controls through a small ANSI screen
 reader. It verifies preparation and unapproved Enter leave payload/registry
-unchanged, then explicitly approves retention and applies. Filesystem manifests
+unchanged, then opens frozen source Details, acknowledges source review, explicitly
+approves retention and applies. Filesystem manifests
 independently compare candidate bytes/modes/native objects; CLI inspection and
 undo prove restoration of the original objects and exact registry bytes. An
 unselected manual installation remains unchanged, including when the all checkbox

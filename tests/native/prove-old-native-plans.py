@@ -246,12 +246,14 @@ def main():
                 frozen = Path(saved['planPath']).read_bytes()
                 record = json.loads(frozen)
                 assert record['schemaVersion'] == schema and 'pinPolicy' not in record
+                assert 'sourceReview' not in record, 'Frozen pre-source-review shapes must stay legacy'
                 assert ('revision' in record) is (schema >= 2) and ('localDisposition' in record) is (schema == 3)
                 approved = manifest(Path(saved['candidatePath']))
                 unchanged()
                 inspected = run(app, family + '-inspect', '--id', saved['id'])['operation']
                 assert inspected['status'] == 'ready' and inspected['planFingerprint'] == saved['planFingerprint'], inspected
                 assert 'pinPolicy' not in inspected
+                assert inspected.get('sourceReview') is None and not inspected.get('sourceReviewAcknowledged', False)
                 kill_at(host, root, gh, env, saved, 'apply-merged' if schema == 3 else 'apply', boundary)
                 interrupted = run(app, family + '-inspect', '--id', saved['id'])['operation']
                 assert interrupted['status'] == ('original-retained' if boundary == 'retain-moved' else 'installed'), interrupted
