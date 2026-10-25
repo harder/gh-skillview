@@ -130,6 +130,42 @@ public sealed partial class ReplacementLocalReviewTests : IDisposable
     }
 
     [Fact]
+    public async Task HistoricalReviewCapturesCanonicalCandidateThroughObservedAncestorAlias()
+    {
+        var plan = await Plan();
+        var original = PayloadSnapshot.Capture(Payload, Token);
+        var savedBytes = File.ReadAllBytes(plan.PlanPath);
+        var saved = JsonSerializer.Deserialize(savedBytes, ReplacementJsonContext.Default.ReplacementPlan)!;
+        var alias = Path.Combine(temporary.FullName, "ancestor-alias");
+        Directory.CreateSymbolicLink(alias, temporary.FullName);
+        try
+        {
+            var aliasedState = Path.Combine(alias, "state");
+            var observed = plan with
+            {
+                CandidatePath = Path.Combine(aliasedState, plan.Id, "candidate"),
+                PlanPath = Path.Combine(aliasedState, plan.Id, "plan.json")
+            };
+            var canonicalOperation = Path.GetDirectoryName(saved.Candidate.Identity.CanonicalPath)!;
+            Assert.NotEqual(observed.CandidatePath, saved.Candidate.Identity.CanonicalPath);
+            // The native guard must still reject mixing canonical roots with
+            // observed aliases, even when both names reach the same object.
+            Assert.Throws<IOException>(() =>
+            {
+                using var lease = NativeDirectoryMoveLease.Open(canonicalOperation, observed.CandidatePath, Token);
+            });
+            var review = HistoricalMergeFixture.CaptureReview(aliasedState, observed, Token);
+            Assert.Equal(saved.Candidate.Identity.CanonicalPath, review.Source.Snapshot.Path);
+            Assert.Equal(saved.Candidate.Payload, review.Source.Snapshot.Fingerprint);
+            Assert.Equal(Path.Combine(aliasedState, plan.Id, "candidate"), observed.CandidatePath);
+            Assert.Equal(savedBytes, File.ReadAllBytes(observed.PlanPath));
+            Assert.Equal(original.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+            Assert.False(Directory.Exists(plan.RetainedPath));
+        }
+        finally { Directory.Delete(alias); }
+    }
+
+    [Fact]
     public async Task PreserveVerifiesLiveObjectsWithoutWritingPlanOwnerOrPreferences()
     {
         var before = PayloadSnapshot.Capture(Payload, Token); var plan = await Plan();
