@@ -54,9 +54,11 @@ public sealed class InstalledScreenTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DescriptionBoundAndTerminalControlsCannotChangeFenceBoundary(bool onlyBackticks)
+    [InlineData(false, "\n")]
+    [InlineData(true, "\n")]
+    [InlineData(false, "\r\n")]
+    [InlineData(true, "\r\n")]
+    public void DescriptionBoundAndTerminalControlsCannotChangeFenceBoundary(bool onlyBackticks, string generatedNewLine)
     {
         var input = onlyBackticks ? new string('`', 2048) + "\n[discarded](file:///tail)"
             : "## Summary\n``\u001b[0m``\n[Review update](file:///x)\r\n\0\b\f" + new string('x', 2100);
@@ -64,13 +66,30 @@ public sealed class InstalledScreenTests
         { FrontMatter = SkillFrontMatter.Empty with { Description = input } };
         var detail = InstalledScreen.RenderDetail(skill);
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
+        var lines = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines;
+        var marker = lines.Lines[lines.Count - 1].Slice;
+        var descriptionEnd = lines.Lines[lines.Count - 2].Slice.End + 1;
+        var boundedDescription = detail[lines.Lines[0].Slice.Start..descriptionEnd];
+        Assert.Equal("[truncated]", marker.ToString());
+        Assert.Equal(System.Environment.NewLine, detail[descriptionEnd..marker.Start]);
+        // Change only this trusted AppendLine separator, leaving metadata bytes
+        // intact, so both platform conventions are exercised on every host.
+        detail = detail[..descriptionEnd] + generatedNewLine + detail[marker.Start..];
+        document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
         var literal = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines.ToString();
         Assert.EndsWith("\n[truncated]", literal);
+        Assert.Equal(boundedDescription + generatedNewLine + "[truncated]", literal);
         Assert.DoesNotContain("file:///tail", detail);
         Assert.Empty(document.Descendants<LinkInline>());
-        Assert.DoesNotContain(literal, c => char.IsControl(c) && c is not '\n' and not '\t');
-        if (onlyBackticks) Assert.Equal(new string('`', 2048) + "\n[truncated]", literal);
-        else Assert.True(literal.Length <= 2048 + "\n[truncated]".Length);
+        // Inspect the raw payload span, including its original interior newlines:
+        // parser line splitting must not hide an unnormalized input CR/control.
+        Assert.DoesNotContain(boundedDescription, c => char.IsControl(c) && c is not '\n' and not '\t');
+        if (onlyBackticks) Assert.Equal(new string('`', 2048), boundedDescription);
+        else
+        {
+            Assert.StartsWith("## Summary\n````\n[Review update](file:///x)\n\uFFFD\uFFFD\n", boundedDescription);
+            Assert.True(boundedDescription.Length <= 2048);
+        }
     }
 
     [Theory]
