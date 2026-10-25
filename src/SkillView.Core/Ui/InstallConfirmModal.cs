@@ -4,6 +4,7 @@ using SkillView.Diagnostics;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Logging;
+using SkillView.Subprocess;
 using SkillView.Ui.Theming;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
@@ -44,6 +45,7 @@ internal sealed class InstallConfirmModal
     // catalog is long enough now (gh skill install --agent lists ~47) that
     // it must scroll rather than grow the dialog.
     private const int AgentsVisibleRows = 4;
+    internal const int MaxBasePathDisplayCharacters = 4096;
 
     private readonly IApplication _app;
     private readonly GhSkillInstallService _install;
@@ -51,6 +53,7 @@ internal sealed class InstallConfirmModal
     private readonly string _ghPath;
     private readonly InstallRequest _request;
     private readonly bool _installAll;
+    private readonly ProcessRunner _runner;
 
     internal InstallConfirmModal(
         IApplication app,
@@ -61,33 +64,38 @@ internal sealed class InstallConfirmModal
         bool installAll = false)
     {
         _app = app;
-        _install = install;
+        _runner = install.CaptureContext();
+        _install = new GhSkillInstallService(_runner, logger);
         _logger = logger;
         _ghPath = ghPath;
         _request = request;
         _installAll = installAll;
     }
 
-    internal Result Show()
+    internal Result Show(Action<Dialog, ModalOperationTracker>? readyForTests = null, Action<Action>? invokeForTests = null)
     {
         var outcome = Outcome.Cancelled;
         InstallResult? installResult = null;
+        var operationName = "project lookup";
+        var preparing = true;
+        var preparationCancelled = false;
 
         using var dialog = new Dialog
         {
             Title = _installAll
                 ? $" Install all skills from {_request.Repo} "
                 : $" Install {_request.SkillName ?? _request.Repo} ",
-            Width = Dim.Percent(60),
+            Width = Dim.Func(_ => Math.Min(90, _app.Screen.Width - 4)),
             Height = 18,
         };
         dialog.SchemeName = SchemeNames.Dialog;
-        using var operation = new ModalOperationTracker(_app, _logger, "install.compact.ui");
+        using var operation = new ModalOperationTracker(invokeForTests ?? _app.Invoke, _logger, "install.compact.ui");
 
         var repoLabel = new Label
         {
             X = 1,
             Y = 0,
+            Width = Dim.Fill(2),
             Text = _installAll
                 ? $"Repo:  {_request.Repo} · ALL skills in repo"
                 : $"Repo:  {_request.Repo}{(string.IsNullOrEmpty(_request.SkillName) ? "" : " · " + _request.SkillName)}",
@@ -99,10 +107,11 @@ internal sealed class InstallConfirmModal
             X = 9,
             Y = 2,
             Orientation = Orientation.Horizontal,
-            Labels = new List<string> { "Project", "User (global)", "Custom path" },
-            // Pick a sensible default: Project if cwd has a known agent seed,
-            // otherwise User.
-            Value = InstallAgentCatalog.HasProjectScopeCandidate(Environment.CurrentDirectory) ? 0 : 1,
+            Labels = new List<string> { "Project", "User", "Custom path" },
+            // Resolve the initial choice under the same frozen context as gh.
+            Enabled = false,
+            Value = 1,
+            FocusedItem = 1,
         };
         var customPathLabel = new Label
         {
@@ -121,11 +130,34 @@ internal sealed class InstallConfirmModal
         };
         TuiHelpers.ConfigureTextInput(customPathField, SkillViewStyling.DialogSchemeName);
         var agentsLabel = new Label { X = 1, Y = 6, Text = "Agents:" };
-        var home = Environment.GetEnvironmentVariable("HOME")
+        var home = _runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME")
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        home = Path.GetFullPath(home, _runner.EffectiveWorkingDirectory);
+        string? projectRoot = null;
+        var scopeDescription = new Label { X = 1, Y = 3, Width = Dim.Fill(2), Height = 1 };
+        var baseLabel = new Label { X = 1, Y = 4, Text = "Base:" };
+        var basePath = new TextField { X = 9, Y = 4, Width = Dim.Fill(2), Text = FormatBasePath(home), ReadOnly = true };
+        TuiHelpers.ConfigureTextInput(basePath, SkillViewStyling.DialogSchemeName);
+        void RefreshScopeDescription()
+        {
+            var custom = scopeSelector.Value == 2;
+            baseLabel.Visible = !custom;
+            basePath.Visible = !custom;
+            basePath.Text = FormatBasePath(scopeSelector.Value == 0 ? projectRoot ?? "Unresolved; placement must pass install checks" : home);
+            scopeDescription.Text = scopeSelector.Value switch
+            {
+                0 => "Project: available to agents in this project.",
+                1 => "User: your home, across projects.",
+                _ => "Custom: install directly in the folder below.",
+            };
+        }
+        scopeSelector.ValueChanged += (_, _) => RefreshScopeDescription();
+        RefreshScopeDescription();
+        string? ConfigPath(string key) => _runner.GetEffectiveEnvironmentVariable(key) is { Length: > 0 } value
+            ? Path.GetFullPath(value, _runner.EffectiveWorkingDirectory) : null;
         var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
-            home ?? string.Empty,
-            Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"), Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
+            home,
+            ConfigPath("PI_CODING_AGENT_DIR"), ConfigPath("CLAUDE_CONFIG_DIR"));
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {
@@ -133,6 +165,7 @@ internal sealed class InstallConfirmModal
             Y = 6,
             Width = Dim.Fill(2),
             Height = AgentsVisibleRows,
+            Enabled = false,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 3);
@@ -146,6 +179,7 @@ internal sealed class InstallConfirmModal
             Y = Pos.AnchorEnd(3),
             Width = Dim.Fill(2),
             Text = " ready",
+            CanFocus = true,
         };
         var spinner = new SpinnerView
         {
@@ -158,16 +192,29 @@ internal sealed class InstallConfirmModal
             Style = new SpinnerStyle.Dots(),
         };
 
-        var installButton = new Button
+        var placementHint = new Label { X = 1, Y = 11, Width = Dim.Fill(2), Height = 1 };
+        void RefreshPlacementHint()
         {
-            X = Pos.Center() - 22,
+            placementHint.Text = scopeSelector.Value == 2
+                ? "Custom folder overrides scope and agent folders."
+                : agentBoxes.Any(box => box.Value == CheckState.Checked)
+                    ? "Selected agents use their gh installation folders."
+                    : "No agents checked: Universal, shared .agents/skills folder.";
+        }
+        scopeSelector.ValueChanged += (_, _) => RefreshPlacementHint();
+        foreach (var box in agentBoxes) box.ValueChanged += (_, _) => RefreshPlacementHint();
+        RefreshPlacementHint();
+
+        var installButton = new SingleRowButton
+        {
+            X = 1,
             Y = Pos.AnchorEnd(1),
             Text = "Install",
             IsDefault = true,
         };
-        var advancedButton = new Button
+        var advancedButton = new SingleRowButton
         {
-            X = Pos.Center() - 10,
+            X = Pos.Right(installButton) + 2,
             Y = Pos.AnchorEnd(1),
             Text = "Advanced…",
             // The advanced wizard is single-skill; there's nothing to escalate
@@ -175,18 +222,100 @@ internal sealed class InstallConfirmModal
             Visible = !_installAll,
             Enabled = !_installAll,
         };
-        var cancelButton = new Button
+        var cancelButton = new SingleRowButton
         {
-            X = Pos.Center() + 4,
+            X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2,
             Y = Pos.AnchorEnd(1),
             Text = "Cancel",
         };
+
+        // Keep Enter local to the editor. Selector/checkbox Accept commands
+        // otherwise bubble into Dialog's implicit close behavior.
+        scopeSelector.KeyBindings.ReplaceCommands(KeyCode.Enter, Command.Activate);
+        foreach (var box in scopeSelector.SubViews.OfType<CheckBox>().Concat(agentBoxes))
+            box.KeyBindings.ReplaceCommands(KeyCode.Enter, Command.Activate);
+        foreach (var field in new[] { customPathField, basePath })
+            field.KeyDown += (_, key) =>
+            {
+                if (key.KeyCode != KeyCode.Enter) return;
+                key.Handled = true;
+                installButton.InvokeCommand(Command.Accept);
+            };
 
         string? CurrentValidationError() => ValidateSelection(
             scopeSelector.Value ?? 0,
             customPathField.Text.ToString() ?? string.Empty);
 
         WireValidation(scopeSelector, customPathLabel, customPathField, installButton, status, spinner);
+
+        bool FinishPreparation(string? project, bool hasProject)
+        {
+            if (preparationCancelled || operation.Token.IsCancellationRequested)
+            {
+                outcome = Outcome.Cancelled;
+                _app.RequestStop();
+                return false;
+            }
+            preparing = false;
+            projectRoot = project;
+            scopeSelector.Value = hasProject ? 0 : 1;
+            RefreshScopeDescription();
+            scopeSelector.FocusedItem = scopeSelector.Value!.Value;
+            scopeSelector.Enabled = true;
+            agentsView.Enabled = true;
+            customPathField.Enabled = true;
+            spinner.Visible = false;
+            spinner.AutoSpin = false;
+            installButton.Enabled = true;
+            advancedButton.Enabled = !_installAll;
+            status.Text = " ready";
+            operation.Release();
+            // The loading status owns initial focus. Preserve any focus the
+            // user moved to Cancel or the base field while lookup was pending.
+            if (status.HasFocus || dialog.Focused is null) installButton.SetFocus();
+            status.CanFocus = false;
+            return true;
+        }
+
+        status.KeyDown += (_, key) =>
+        {
+            if (preparing && key.KeyCode == KeyCode.Enter) key.Handled = true;
+        };
+
+        // Preparation owns the modal just like installation. Enter cannot
+        // submit a provisional choice, and Esc cancels its child Git probe.
+        installButton.Enabled = false;
+        advancedButton.Enabled = false;
+        spinner.Visible = true;
+        spinner.AutoSpin = true;
+        status.Text = " checking project scope…";
+        operation.TryStart(async token =>
+        {
+            try
+            {
+                var project = await GhPlacementCatalog.ProjectRootAsync(
+                    _runner, new(), _runner.EffectiveWorkingDirectory, token).ConfigureAwait(false);
+                var hasProject = InstallAgentCatalog.HasProjectScopeCandidate(project);
+                token.ThrowIfCancellationRequested();
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    FinishPreparation(project, hasProject);
+                });
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                operation.InvokeTerminalIfActive(() => _app.RequestStop());
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("install.compact", ex.Message);
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    if (FinishPreparation(null, false))
+                        status.Text = " project lookup failed; User or Custom available";
+                });
+            }
+        });
 
         async Task RunInstallAsync(
             GhSkillInstallService.Options options,
@@ -219,8 +348,11 @@ internal sealed class InstallConfirmModal
                         status.Text = snippet.Length > 0
                             ? $" install failed (exit {installResult.ExitCode}): {snippet}"
                             : $" install failed (exit {installResult.ExitCode}) — see logs";
+                        scopeSelector.Enabled = true;
+                        agentsView.Enabled = true;
+                        customPathField.Enabled = true;
                         installButton.Enabled = CurrentValidationError() is null;
-                        advancedButton.Enabled = true;
+                        advancedButton.Enabled = !_installAll;
                         cancelButton.Enabled = true;
                     }
                 });
@@ -246,8 +378,11 @@ internal sealed class InstallConfirmModal
                     spinner.Visible = false;
                     outcome = Outcome.Failed;
                     status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                    scopeSelector.Enabled = true;
+                    agentsView.Enabled = true;
+                    customPathField.Enabled = true;
                     installButton.Enabled = CurrentValidationError() is null;
-                    advancedButton.Enabled = true;
+                    advancedButton.Enabled = !_installAll;
                     cancelButton.Enabled = true;
                 });
             }
@@ -271,6 +406,10 @@ internal sealed class InstallConfirmModal
                 agentBoxes,
                 entries,
                 _installAll);
+            operationName = "install";
+            scopeSelector.Enabled = false;
+            agentsView.Enabled = false;
+            customPathField.Enabled = false;
             spinner.Visible = true;
             spinner.AutoSpin = true;
             installButton.Enabled = false;
@@ -286,31 +425,37 @@ internal sealed class InstallConfirmModal
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
             {
                 status.Text = operation.CurrentOwnership == ModalOperationTracker.Ownership.Running
-                    ? " install in progress — Esc cancels"
-                    : " finishing install…";
+                    ? $" {operationName} in progress — Esc cancels"
+                    : $" finishing {operationName}…";
                 return;
             }
             outcome = Outcome.EscalateToAdvanced;
             _app.RequestStop();
         };
-        cancelButton.Accepting += (_, ev) =>
+        void CancelOrClose()
         {
-            ev.Handled = true;
-            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
+            var ownership = operation.CurrentOwnership;
+            if (ownership != ModalOperationTracker.Ownership.None)
             {
-                if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
+                if (preparing || ownership == ModalOperationTracker.Ownership.Running)
                 {
+                    if (preparing) preparationCancelled = true;
                     operation.Cancel();
-                    status.Text = " canceling install…";
+                    status.Text = $" canceling {operationName}…";
                 }
                 else
                 {
-                    status.Text = " finishing install…";
+                    status.Text = $" finishing {operationName}…";
                 }
                 return;
             }
             outcome = Outcome.Cancelled;
             _app.RequestStop();
+        }
+        cancelButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            CancelOrClose();
         };
 
         dialog.KeyDown += (_, key) =>
@@ -318,32 +463,23 @@ internal sealed class InstallConfirmModal
             if (key.KeyCode == KeyCode.Esc)
             {
                 key.Handled = true;
-                if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
-                {
-                    if (operation.CurrentOwnership == ModalOperationTracker.Ownership.Running)
-                    {
-                        operation.Cancel();
-                        status.Text = " canceling install…";
-                    }
-                    else
-                    {
-                        status.Text = " finishing install…";
-                    }
-                    return;
-                }
-                outcome = Outcome.Cancelled;
-                _app.RequestStop();
+                CancelOrClose();
             }
         };
 
-        dialog.Add(repoLabel, scopeLabel, scopeSelector, customPathLabel, customPathField,
+        // Only the explicit actions close this review. An Accept bubbling
+        // from the scope selector or base field must not dismiss an owned
+        // operation (or silently cancel a review before Install is chosen).
+        dialog.Accepting += (_, ev) => ev.Handled = true;
+
+        dialog.Add(status, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath, customPathLabel, customPathField,
                    agentsLabel, agentsView);
-        dialog.Add(status, spinner, installButton, advancedButton, cancelButton);
+        dialog.Add(placementHint, spinner, installButton, advancedButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
-            dialog, repoLabel, scopeLabel, scopeSelector,
+            dialog, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath,
             customPathLabel, customPathField,
-            agentsLabel, agentsView, status, spinner,
+            agentsLabel, agentsView, placementHint, status, spinner,
             installButton, advancedButton, cancelButton);
         foreach (var box in agentBoxes)
         {
@@ -352,6 +488,8 @@ internal sealed class InstallConfirmModal
 
         try
         {
+            status.SetFocus();
+            readyForTests?.Invoke(dialog, operation);
             _app.Run(dialog);
         }
         finally
@@ -360,6 +498,15 @@ internal sealed class InstallConfirmModal
         }
 
         return new Result(outcome, installResult);
+    }
+
+    private static string FormatBasePath(string path)
+    {
+        var truncated = path.Length > MaxBasePathDisplayCharacters;
+        var bounded = path[..Math.Min(path.Length, MaxBasePathDisplayCharacters - (truncated ? 1 : 0))];
+        var sanitized = TerminalEscapeSanitizer.Sanitize(bounded) ?? string.Empty;
+        var singleLine = new string(sanitized.Select(character => char.IsControl(character) ? '\uFFFD' : character).ToArray());
+        return truncated ? singleLine + "…" : singleLine;
     }
 
     private static GhSkillInstallService.Options BuildOptions(

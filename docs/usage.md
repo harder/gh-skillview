@@ -37,6 +37,18 @@ The main "discover and inspect" loop:
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
 5. Press `i` to stage an install, or `I` for the advanced wizard.
 
+In the compact review, **Project** uses the displayed project base; **User**
+uses your home across projects. The default is Project when this Git project
+already has a known skills folder, otherwise User. Review the scope and base,
+then press Enter on **Install**. Tab reaches **Advanced…** and **Cancel**;
+Escape cancels, including while an install is running.
+
+Agent checkboxes select gh's installation folders. With none checked,
+**Universal** installs into the shared `.agents/skills` folder under the
+displayed base. **Custom path** requires an explicit folder and overrides
+the scope and agent folders. After installation, open **Installed** (`2`)
+to find the resulting copy and inspect its locations.
+
 The same operations are available from the CLI; see [CLI usage](#cli-usage).
 
 ### Keyboard reference
