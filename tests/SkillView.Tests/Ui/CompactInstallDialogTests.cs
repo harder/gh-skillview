@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using SkillView.Gh;
+using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
@@ -135,27 +136,38 @@ public sealed class CompactInstallDialogTests
         Assert.DoesNotContain("universal", result.Install.CommandLine);
     }
 
-    [Fact]
-    public async Task RedirectedGitProjectDrivesDefaultAndNativePlacementFromCapturedChildContext()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RedirectedGitProjectDrivesDefaultAndNativePlacementFromCapturedChildContext(bool aliasedAncestor)
     {
-        using var fixture = new Fixture(true);
+        using var fixture = new Fixture(true, aliasedAncestor);
         var project = fixture.Runner.EffectiveWorkingDirectory;
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(project, out var nativeProject, out var error), error);
+        if (aliasedAncestor) Assert.NotEqual(project, nativeProject);
         var init = await fixture.Runner.RunAsync("/usr/bin/git", ["init", "--quiet"], cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(init.Succeeded);
         var elsewhere = Path.Combine(fixture.Custom, "elsewhere");
         Directory.CreateDirectory(elsewhere);
         fixture.Runner = fixture.Runner.WithContext(elsewhere, new Dictionary<string, string>
         { ["GIT_DIR"] = Path.Combine(project, ".git"), ["GIT_WORK_TREE"] = project });
+        var gitRoot = await fixture.Runner.RunAsync("/usr/bin/git", ["rev-parse", "--show-toplevel"], cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(gitRoot.Succeeded);
+        Assert.Equal(nativeProject, gitRoot.StdOut.TrimEnd('\r', '\n'));
         var result = await RunModal(fixture, 80, 24, false, (app, dialog) =>
         {
             Assert.Equal(0, dialog.SubViews.OfType<OptionSelector>().Single().Value);
+            Assert.Equal(nativeProject, dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text);
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
         });
         Assert.Equal(InstallConfirmModal.Outcome.Installed, result.Outcome);
         Assert.Contains("project", result.Install!.CommandLine);
         var destinations = await GhPlacementCatalog.DestinationsAsync(
             new(Agents: ["universal"], Scope: "project", WorkingDirectory: elsewhere), fixture.Runner, TestContext.Current.CancellationToken);
-        Assert.Equal([Path.Combine(project, ".agents", "skills")], destinations);
+        Assert.Equal([Path.Combine(nativeProject, ".agents", "skills")], destinations);
+        Assert.Equal(elsewhere, fixture.Runner.EffectiveWorkingDirectory);
+        Assert.Equal(Path.Combine(project, ".git"), fixture.Runner.GetEffectiveEnvironmentVariable("GIT_DIR"));
+        Assert.Equal(project, fixture.Runner.GetEffectiveEnvironmentVariable("GIT_WORK_TREE"));
     }
 
     [Fact]
@@ -345,13 +357,20 @@ public sealed class CompactInstallDialogTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DisplaySanitizesControlPathsButPlacementAndChildKeepRawBase(bool project)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task DisplaySanitizesControlPathsButPlacementAndChildKeepRawBase(bool project, bool aliasedAncestor)
     {
-        using var fixture = new Fixture(false);
+        using var fixture = new Fixture(false, aliasedAncestor);
         var rawBase = Path.Combine(fixture.Custom, "base-\u001b[31mred\u001b[0m\u0007\t");
         Directory.CreateDirectory(rawBase);
+        Assert.True(SecureRemovalBackend.TryCanonicalizePath(rawBase, out var nativeBase, out var error), error);
+        if (aliasedAncestor) Assert.NotEqual(rawBase, nativeBase);
+        // Git and getcwd report the physical project address; HOME remains the
+        // exact lexical value supplied to the child, including ancestor aliases.
+        var expectedBase = project ? nativeBase : rawBase;
         if (project)
         {
             Directory.CreateDirectory(Path.Combine(rawBase, ".agents", "skills"));
@@ -368,6 +387,7 @@ public sealed class CompactInstallDialogTests
         {
             Assert.Equal(project ? 0 : 1, dialog.SubViews.OfType<OptionSelector>().Single().Value);
             var displayed = dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text;
+            Assert.Equal(Path.Combine(Path.GetDirectoryName(expectedBase)!, "base-red\uFFFD"), displayed);
             Assert.Contains("red", displayed);
             Assert.DoesNotContain("[31m", displayed);
             Assert.DoesNotContain(displayed, char.IsControl);
@@ -375,9 +395,11 @@ public sealed class CompactInstallDialogTests
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
         }, child);
         Assert.Equal(InstallConfirmModal.Outcome.Installed, result.Outcome);
-        Assert.Equal(rawBase, result.Install!.StdOut);
+        Assert.Equal(expectedBase, result.Install!.StdOut);
         Assert.Contains(project ? "project" : "user", result.Install.CommandLine);
-        Assert.Equal([Path.Combine(rawBase, ".agents", "skills")], await GhPlacementCatalog.DestinationsAsync(
+        Assert.Equal(rawBase, project ? fixture.Runner.EffectiveWorkingDirectory : fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
+        if (!project) Assert.Equal(rawBase, fixture.Runner.GetEffectiveEnvironmentVariable("USERPROFILE"));
+        Assert.Equal([Path.Combine(expectedBase, ".agents", "skills")], await GhPlacementCatalog.DestinationsAsync(
             new(Agents: ["universal"], Scope: project ? "project" : "user", WorkingDirectory: fixture.Runner.EffectiveWorkingDirectory),
             fixture.Runner, TestContext.Current.CancellationToken));
     }
@@ -386,20 +408,62 @@ public sealed class CompactInstallDialogTests
     public async Task DisplayBoundsLongHomeWithoutChangingRawContext()
     {
         using var fixture = new Fixture(false);
+        var workingDirectory = fixture.Runner.EffectiveWorkingDirectory;
         var rawHome = Path.Combine(fixture.Custom, new string('x', InstallConfirmModal.MaxBasePathDisplayCharacters + 128));
-        fixture.Runner = fixture.Runner.WithContext(fixture.Runner.EffectiveWorkingDirectory,
-            new Dictionary<string, string> { ["HOME"] = rawHome, ["USERPROFILE"] = rawHome });
-        var result = await RunModal(fixture, 80, 24, false, (app, dialog) =>
+        // This display-bound check needs no Git process. Hold the existing owned
+        // completion so readiness, focus and Cancel are checked in one callback.
+        fixture.Runner = fixture.Runner.WithContext(workingDirectory,
+            new Dictionary<string, string> { ["HOME"] = rawHome, ["USERPROFILE"] = rawHome, ["PATH"] = string.Empty });
+        var result = await RunQueuedPreparation(fixture, 80, 24, (app, dialog, operation, completion) =>
         {
             var displayed = dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text;
-            Assert.InRange(displayed.Length, 1, InstallConfirmModal.MaxBasePathDisplayCharacters);
+            Assert.Equal(4096, InstallConfirmModal.MaxBasePathDisplayCharacters);
+            Assert.Equal(4096, displayed.Length);
+            Assert.Equal(rawHome[..4095] + "…", displayed);
             Assert.EndsWith("…", displayed);
             Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
-            dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").SetFocus();
-            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+            Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("USERPROFILE"));
+            Assert.Equal(workingDirectory, fixture.Runner.EffectiveWorkingDirectory);
+            completion();
+            Assert.Equal(ModalOperationTracker.Ownership.None, operation.CurrentOwnership);
+            var selector = dialog.SubViews.OfType<OptionSelector>().Single();
+            Assert.True(selector.Enabled);
+            Assert.Equal(1, selector.Value);
+            Assert.Equal(1, selector.FocusedItem);
+            Assert.Equal(displayed, dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text);
+            Assert.True(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Install").HasFocus);
+            var cancel = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel");
+            cancel.SetFocus();
+            Assert.True(cancel.HasFocus);
+            Assert.True(app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)));
+            Assert.True(dialog.StopRequested);
         });
         Assert.Equal(InstallConfirmModal.Outcome.Cancelled, result.Outcome);
         Assert.Null(result.Install);
+        Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
+        Assert.Equal(workingDirectory, fixture.Runner.EffectiveWorkingDirectory);
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.StartsWith("exec:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InteractionAssertionPropagatesWithOriginalStackAfterTeardown(bool queued)
+    {
+        using var fixture = new Fixture(false);
+        IApplication? observedApp = null;
+        void FailInteraction(IApplication app, Dialog dialog)
+        {
+            observedApp = app;
+            Assert.Fail("interaction assertion sentinel");
+        }
+        var error = await Assert.ThrowsAnyAsync<Xunit.Sdk.XunitException>(() => queued
+            ? RunQueuedPreparation(fixture, 80, 24, (app, dialog, _, _) => FailInteraction(app, dialog))
+            : RunModal(fixture, 80, 24, false, FailInteraction));
+        Assert.Equal("interaction assertion sentinel", error.Message);
+        Assert.Contains(nameof(FailInteraction), error.StackTrace);
+        Assert.False(observedApp!.Initialized);
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -634,15 +698,24 @@ public sealed class CompactInstallDialogTests
     private sealed class Fixture : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "skillview-compact-" + Guid.NewGuid().ToString("N"));
-        internal string Custom => Path.Combine(_root, "custom");
+        private readonly string _contextRoot;
+        internal string Custom => Path.Combine(_contextRoot, "custom");
         internal Logger Logger { get; } = new(LogLevel.Debug);
         internal ProcessRunner Runner { get; set; }
 
-        internal Fixture(bool seeded)
+        internal Fixture(bool seeded, bool aliasedAncestor = false)
         {
             Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses Unix echo as an inert gh child; built PTY checks cover actual gh separately.");
-            var work = Path.Combine(_root, "work");
-            var home = Path.Combine(_root, "home");
+            _contextRoot = _root;
+            if (aliasedAncestor)
+            {
+                var physical = Path.Combine(_root, "physical");
+                Directory.CreateDirectory(physical);
+                _contextRoot = Path.Combine(_root, "alias");
+                Directory.CreateSymbolicLink(_contextRoot, physical);
+            }
+            var work = Path.Combine(_contextRoot, "work");
+            var home = Path.Combine(_contextRoot, "home");
             Directory.CreateDirectory(work);
             Directory.CreateDirectory(home);
             if (seeded) Directory.CreateDirectory(Path.Combine(work, ".agents", "skills"));
